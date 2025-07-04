@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, Wifi } from 'lucide-react';
+import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, Wifi, WorkflowIcon } from 'lucide-react';
 import { Button } from '@heroui/button';
 import { Spinner, Link } from '@heroui/react';
 import { useDisclosure } from '@heroui/modal';
@@ -153,6 +153,16 @@ function ResourceDetailsComponent() {
                   data-cy="iot-settings-button"
                 >
                   {t('navItems.iotSettings')}
+                </Button>
+
+                <Button
+                  as={Link}
+                  href={`/resources/${resourceId}/flows`}
+                  variant="light"
+                  startContent={<WorkflowIcon className="w-4 h-4" />}
+                  data-cy="flows-button"
+                >
+                  {t('navItems.flows')}
                 </Button>
 
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>

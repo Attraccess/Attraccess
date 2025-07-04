@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { InfoResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, VerifyEmailData, VerifyEmailResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, GetOneUserByIdData, GetOneUserByIdResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, MqttServersTestConnectionData, MqttServersTestConnectionResponse, MqttServersGetStatusOfOneData, MqttServersGetStatusOfOneResponse, MqttServersGetStatusOfAllResponse, MqttResourceConfigGetAllData, MqttResourceConfigGetAllResponse, MqttResourceConfigCreateData, MqttResourceConfigCreateResponse, MqttResourceConfigGetOneData, MqttResourceConfigGetOneResponse, MqttResourceConfigUpdateData, MqttResourceConfigUpdateResponse, MqttResourceConfigDeleteOneData, MqttResourceConfigDeleteOneResponse, MqttResourceConfigTestOneData, MqttResourceConfigTestOneResponse, WebhookConfigGetAllData, WebhookConfigGetAllResponse, WebhookConfigCreateOneData, WebhookConfigCreateOneResponse, WebhookConfigGetOneByIdData, WebhookConfigGetOneByIdResponse, WebhookConfigUpdateOneData, WebhookConfigUpdateOneResponse, WebhookConfigDeleteOneData, WebhookConfigDeleteOneResponse, WebhookConfigUpdateStatusData, WebhookConfigUpdateStatusResponse, WebhookConfigTestData, WebhookConfigTestResponse, WebhookConfigRegenerateSecretData, WebhookConfigRegenerateSecretResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, AnalyticsControllerGetResourceUsageHoursInDateRangeData, AnalyticsControllerGetResourceUsageHoursInDateRangeResponse } from './types.gen';
+import type { InfoResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, VerifyEmailData, VerifyEmailResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, GetOneUserByIdData, GetOneUserByIdResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, MqttServersTestConnectionData, MqttServersTestConnectionResponse, MqttServersGetStatusOfOneData, MqttServersGetStatusOfOneResponse, MqttServersGetStatusOfAllResponse, MqttResourceConfigGetAllData, MqttResourceConfigGetAllResponse, MqttResourceConfigCreateData, MqttResourceConfigCreateResponse, MqttResourceConfigGetOneData, MqttResourceConfigGetOneResponse, MqttResourceConfigUpdateData, MqttResourceConfigUpdateResponse, MqttResourceConfigDeleteOneData, MqttResourceConfigDeleteOneResponse, MqttResourceConfigTestOneData, MqttResourceConfigTestOneResponse, WebhookConfigGetAllData, WebhookConfigGetAllResponse, WebhookConfigCreateOneData, WebhookConfigCreateOneResponse, WebhookConfigGetOneByIdData, WebhookConfigGetOneByIdResponse, WebhookConfigUpdateOneData, WebhookConfigUpdateOneResponse, WebhookConfigDeleteOneData, WebhookConfigDeleteOneResponse, WebhookConfigUpdateStatusData, WebhookConfigUpdateStatusResponse, WebhookConfigTestData, WebhookConfigTestResponse, WebhookConfigRegenerateSecretData, WebhookConfigRegenerateSecretResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, AnalyticsControllerGetResourceUsageHoursInDateRangeData, AnalyticsControllerGetResourceUsageHoursInDateRangeResponse } from './types.gen';
 
 export class SystemService {
     /**
@@ -1868,6 +1868,107 @@ export class AccessControlService {
             errors: {
                 401: 'User is not authenticated',
                 403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+}
+
+export class ResourceFlowsService {
+    /**
+     * Get resource flow
+     * Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to get the flow for
+     * @returns ResourceFlowResponseDto Resource flow retrieved successfully
+     * @throws ApiError
+     */
+    public static getResourceFlow(data: GetResourceFlowData): CancelablePromise<GetResourceFlowResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Save resource flow
+     * Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to save the flow for
+     * @param data.requestBody
+     * @returns ResourceFlowResponseDto Resource flow saved successfully. May include validation errors for individual nodes that have invalid configuration.
+     * @throws ApiError
+     */
+    public static saveResourceFlow(data: SaveResourceFlowData): CancelablePromise<SaveResourceFlowResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{resourceId}/flow',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid request data',
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get resource flow logs
+     * Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to get the flow logs for
+     * @param data.page Page number (1-based)
+     * @param data.limit Number of items per page
+     * @returns ResourceFlowLogsResponseDto Resource flow logs retrieved successfully
+     * @throws ApiError
+     */
+    public static getResourceFlowLogs(data: GetResourceFlowLogsData): CancelablePromise<GetResourceFlowLogsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/logs',
+            path: {
+                resourceId: data.resourceId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static resourceFlowsControllerStreamEvents(data: ResourceFlowsControllerStreamEventsData): CancelablePromise<ResourceFlowsControllerStreamEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/logs/live',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
             }
         });
     }

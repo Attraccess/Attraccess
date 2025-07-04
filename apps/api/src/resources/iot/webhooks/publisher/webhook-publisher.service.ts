@@ -599,7 +599,7 @@ export class WebhookPublisherService {
     }
   }
 
-  @OnEvent('resource.usage.started')
+  @OnEvent(ResourceUsageStartedEvent.eventName)
   async handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
     const { resourceId, startTime } = event;
 

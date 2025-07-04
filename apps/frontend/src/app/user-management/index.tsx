@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PageHeader } from '../../components/pageHeader';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -36,6 +36,13 @@ export const UserManagementPage: React.FC = () => {
   const { data: searchResult, status: fetchStatus } = useUsersServiceFindMany({ limit, page, search: debouncedSearch });
 
   const fetchState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
+
+  const totalPages = useMemo(() => {
+    if (!searchResult?.total) {
+      return 1;
+    }
+    return Math.ceil(searchResult.total / limit);
+  }, [searchResult?.total, limit]);
 
   return (
     <div data-cy="user-management-page">
@@ -91,13 +98,7 @@ export const UserManagementPage: React.FC = () => {
         </CardBody>
 
         <CardFooter className="flex w-full justify-end">
-          <Pagination
-            isCompact
-            showControls
-            page={page}
-            total={searchResult?.totalPages ?? 0}
-            onChange={(page) => setPage(page)}
-          />
+          <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
         </CardFooter>
       </Card>
     </div>

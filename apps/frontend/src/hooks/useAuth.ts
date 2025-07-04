@@ -11,6 +11,7 @@ import {
   useUsersServiceGetCurrent,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getBaseUrl } from '../api';
 
 interface LoginCredentials {
   username: string;
@@ -18,47 +19,8 @@ interface LoginCredentials {
 }
 
 export function usePersistedAuth() {
-  const { jwtTokenLoginMutate } = useAuth();
-
-  const loadExistingAuth = useCallback(async () => {
-    let auth: CreateSessionResponse | null = null;
-
-    try {
-      const authFromLocalStorage = localStorage.getItem('auth');
-      const authFromSessionStorage = sessionStorage.getItem('auth');
-
-      const authFromAnySource = authFromLocalStorage ?? authFromSessionStorage;
-
-      if (!authFromAnySource) {
-        console.warn('No auth found in any source', {
-          authFromLocalStorage,
-          authFromSessionStorage,
-        });
-        return;
-      }
-
-      if (typeof authFromAnySource === 'string') {
-        auth = JSON.parse(authFromAnySource) as CreateSessionResponse;
-      } else {
-        auth = authFromAnySource;
-      }
-
-      jwtTokenLoginMutate(auth);
-    } catch (e) {
-      console.error('Error parsing persisted auth:', e);
-    }
-  }, [jwtTokenLoginMutate]);
-
-  const didLoadExistingAuth = useRef(false);
-
-  useEffect(() => {
-    if (didLoadExistingAuth.current) {
-      return;
-    }
-
-    didLoadExistingAuth.current = true;
-    loadExistingAuth();
-  }, [loadExistingAuth]);
+  // This hook is now just a placeholder since initialization is handled in useAuth
+  // We'll keep it for backward compatibility but it doesn't do anything
 }
 
 export function useRefreshSession() {
@@ -112,17 +74,48 @@ export function useAuth() {
   const navigate = useNavigate();
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  // Initialize token from storage on mount
+  useEffect(() => {
+    const initializeAuth = () => {
+      OpenAPI.BASE = getBaseUrl();
+
+      // Check both storage locations
+      const authFromLocalStorage = localStorage.getItem('auth');
+      const authFromSessionStorage = sessionStorage.getItem('auth');
+      const authData = authFromLocalStorage || authFromSessionStorage;
+
+      if (authData) {
+        try {
+          const auth = JSON.parse(authData) as CreateSessionResponse;
+          if (auth.authToken) {
+            OpenAPI.TOKEN = auth.authToken;
+            setToken(auth.authToken);
+          }
+        } catch (e) {
+          console.error('Error parsing persisted auth:', e);
+        }
+      } else {
+        // No token found, we're initialized but not authenticated
+        setIsInitialized(true);
+      }
+    };
+
+    initializeAuth();
+  }, []);
 
   const { data: currentUser, error: currentUserError } = useUsersServiceGetCurrent(undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
+    enabled: !!token, // Only fetch when we have a token
   });
 
   useEffect(() => {
-    if (currentUser || currentUserError) {
+    if (token && (currentUser || currentUserError)) {
       setIsInitialized(true);
     }
-  }, [currentUser, currentUserError]);
+  }, [currentUser, currentUserError, token]);
 
   const { mutate: jwtTokenLoginMutate } = useMutation({
     mutationFn: async (auth: CreateSessionResponse) => {
@@ -135,6 +128,7 @@ export function useAuth() {
       localStorage.setItem('auth', JSON.stringify(auth));
 
       OpenAPI.TOKEN = auth.authToken;
+      setToken(auth.authToken);
 
       setIsInitialized(true);
 
@@ -159,6 +153,7 @@ export function useAuth() {
       sessionStorage.removeItem('auth');
 
       OpenAPI.TOKEN = '';
+      setToken(null);
 
       navigate('/', { replace: true });
       window.location.reload();
@@ -181,5 +176,6 @@ export function useAuth() {
       }
       return (currentUser.systemPermissions as SystemPermissions)[permission] ?? false;
     },
+    token,
   };
 }

@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
@@ -125,6 +125,17 @@ export const prefetchUseAccessControlServiceResourceIntroductionsGetHistory = (q
   resourceId: number;
   userId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) });
+export const prefetchUseResourceFlowsServiceGetResourceFlow = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getResourceFlow({ resourceId }) });
+export const prefetchUseResourceFlowsServiceGetResourceFlowLogs = (queryClient: QueryClient, { limit, page, resourceId }: {
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) });
+export const prefetchUseResourceFlowsServiceResourceFlowsControllerStreamEvents = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.resourceFlowsControllerStreamEvents({ resourceId }) });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

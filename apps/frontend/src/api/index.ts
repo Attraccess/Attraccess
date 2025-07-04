@@ -15,20 +15,6 @@ export function getBaseUrl() {
   return import.meta.env.VITE_ATTRACCESS_URL || getInferredApiUrl();
 }
 
-const setupApiParameters = () => {
-  OpenAPI.BASE = getBaseUrl();
-
-  // Check both storage locations
-  const authFromLocalStorage = localStorage.getItem('auth');
-  const authFromSessionStorage = sessionStorage.getItem('auth');
-  const authData = authFromLocalStorage || authFromSessionStorage;
-
-  if (authData) {
-    const auth = JSON.parse(authData) as CreateSessionResponse;
-    OpenAPI.TOKEN = auth.authToken;
-  }
-};
-
 export function filenameToUrl(name?: string) {
   if (!name) {
     return undefined;
@@ -44,5 +30,3 @@ export function filenameToUrl(name?: string) {
 
   return `${getBaseUrl()}/${name}`;
 }
-
-export default setupApiParameters;

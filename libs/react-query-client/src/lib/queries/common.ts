@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -238,6 +238,26 @@ export const UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn = ({ re
   resourceId: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useAccessControlServiceResourceIntroductionsGetHistoryKey, ...(queryKey ?? [{ resourceId, userId }])];
+export type ResourceFlowsServiceGetResourceFlowDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getResourceFlow>>;
+export type ResourceFlowsServiceGetResourceFlowQueryResult<TData = ResourceFlowsServiceGetResourceFlowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceGetResourceFlowKey = "ResourceFlowsServiceGetResourceFlow";
+export const UseResourceFlowsServiceGetResourceFlowKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetResourceFlowKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourceFlowsServiceGetResourceFlowLogsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getResourceFlowLogs>>;
+export type ResourceFlowsServiceGetResourceFlowLogsQueryResult<TData = ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceGetResourceFlowLogsKey = "ResourceFlowsServiceGetResourceFlowLogs";
+export const UseResourceFlowsServiceGetResourceFlowLogsKeyFn = ({ limit, page, resourceId }: {
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetResourceFlowLogsKey, ...(queryKey ?? [{ limit, page, resourceId }])];
+export type ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.resourceFlowsControllerStreamEvents>>;
+export type ResourceFlowsServiceResourceFlowsControllerStreamEventsQueryResult<TData = ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceResourceFlowsControllerStreamEventsKey = "ResourceFlowsServiceResourceFlowsControllerStreamEvents";
+export const UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceResourceFlowsControllerStreamEventsKey, ...(queryKey ?? [{ resourceId }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -308,6 +328,7 @@ export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<t
 export type MqttServiceMqttResourceConfigUpdateMutationResult = Awaited<ReturnType<typeof MqttService.mqttResourceConfigUpdate>>;
 export type WebhooksServiceWebhookConfigUpdateOneMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigUpdateOne>>;
 export type WebhooksServiceWebhookConfigUpdateStatusMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigUpdateStatus>>;
+export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type FabReaderServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof FabReaderService.updateReader>>;

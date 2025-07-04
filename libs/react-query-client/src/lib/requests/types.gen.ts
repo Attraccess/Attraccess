@@ -107,11 +107,6 @@ export type PaginatedUsersResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<User>;
 };
 
@@ -519,11 +514,6 @@ export type PaginatedResourceResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<Resource>;
 };
 
@@ -1378,11 +1368,6 @@ export type GetResourceHistoryResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<ResourceUsage>;
 };
 
@@ -1412,6 +1397,172 @@ export type UpdateResourceIntroductionDto = {
      * The comment for the action
      */
     comment?: string;
+};
+
+export type ResourceFlowNodePositionDto = {
+    /**
+     * The x position of the node
+     */
+    x: number;
+    /**
+     * The y position of the node
+     */
+    y: number;
+};
+
+export type ResourceFlowNodeDto = {
+    /**
+     * The unique identifier of the resource flow node
+     */
+    id: string;
+    /**
+     * The type of the node
+     */
+    type: 'event.resource.usage.started' | 'event.resource.usage.stopped' | 'event.resource.usage.takeover' | 'action.http.sendRequest' | 'action.mqtt.sendMessage' | 'action.util.wait';
+    /**
+     * The position of the node
+     */
+    position: ResourceFlowNodePositionDto;
+    /**
+     * The data of the node, depending on the type of the node
+     */
+    data: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * The type of the node
+ */
+export enum type2 {
+    EVENT_RESOURCE_USAGE_STARTED = 'event.resource.usage.started',
+    EVENT_RESOURCE_USAGE_STOPPED = 'event.resource.usage.stopped',
+    EVENT_RESOURCE_USAGE_TAKEOVER = 'event.resource.usage.takeover',
+    ACTION_HTTP_SEND_REQUEST = 'action.http.sendRequest',
+    ACTION_MQTT_SEND_MESSAGE = 'action.mqtt.sendMessage',
+    ACTION_UTIL_WAIT = 'action.util.wait'
+}
+
+export type ResourceFlowEdgeDto = {
+    /**
+     * The unique identifier of the resource flow edge
+     */
+    id: string;
+    /**
+     * The source node id
+     */
+    source: string;
+    /**
+     * The target node id
+     */
+    target: string;
+};
+
+export type ValidationErrorDto = {
+    /**
+     * The ID of the node that has the validation error
+     */
+    nodeId: string;
+    /**
+     * The type of the node that has the validation error
+     */
+    nodeType: string;
+    /**
+     * The field that has the validation error
+     */
+    field: string;
+    /**
+     * The validation error message
+     */
+    message: string;
+    /**
+     * The invalid value that caused the error
+     */
+    value?: {
+        [key: string]: unknown;
+    };
+};
+
+export type ResourceFlowResponseDto = {
+    /**
+     * Array of flow nodes defining the workflow steps
+     */
+    nodes: Array<ResourceFlowNodeDto>;
+    /**
+     * Array of flow edges connecting nodes to define the workflow flow
+     */
+    edges: Array<ResourceFlowEdgeDto>;
+    /**
+     * Validation errors for nodes, if any
+     */
+    validationErrors?: Array<ValidationErrorDto>;
+};
+
+export type ResourceFlowSaveDto = {
+    /**
+     * Array of flow nodes defining the workflow steps
+     */
+    nodes: Array<ResourceFlowNodeDto>;
+    /**
+     * Array of flow edges connecting nodes to define the workflow flow
+     */
+    edges: Array<ResourceFlowEdgeDto>;
+};
+
+export type ResourceFlowLog = {
+    /**
+     * The unique identifier of the resource flow log
+     */
+    id: number;
+    /**
+     * The node id of the node that generated the log
+     */
+    nodeId: string;
+    /**
+     * The run/execution id of the flow that generated the log
+     */
+    flowRunId: string;
+    /**
+     * The type of the log entry
+     */
+    type: 'flow.start' | 'node.processing.started' | 'node.processing.failed' | 'node.processing.completed' | 'flow.completed';
+    /**
+     * Optional payload for additional user information
+     */
+    payload?: string;
+    /**
+     * When the node was created
+     */
+    createdAt: string;
+    /**
+     * The id of the resource that this log belongs to
+     */
+    resourceId: number;
+    /**
+     * The resource being this log belongs to
+     */
+    resource?: Resource;
+};
+
+/**
+ * The type of the log entry
+ */
+export enum type3 {
+    FLOW_START = 'flow.start',
+    NODE_PROCESSING_STARTED = 'node.processing.started',
+    NODE_PROCESSING_FAILED = 'node.processing.failed',
+    NODE_PROCESSING_COMPLETED = 'node.processing.completed',
+    FLOW_COMPLETED = 'flow.completed'
+}
+
+export type ResourceFlowLogsResponseDto = {
+    total: number;
+    page: number;
+    limit: number;
+    /**
+     * Array of flow log entries, ordered by creation time (newest first)
+     */
+    data: Array<ResourceFlowLog>;
 };
 
 export type PluginMainFrontend = {
@@ -2342,6 +2493,48 @@ export type ResourceIntroductionsGetHistoryData = {
 };
 
 export type ResourceIntroductionsGetHistoryResponse = Array<ResourceIntroductionHistoryItem>;
+
+export type GetResourceFlowData = {
+    /**
+     * The ID of the resource to get the flow for
+     */
+    resourceId: number;
+};
+
+export type GetResourceFlowResponse = ResourceFlowResponseDto;
+
+export type SaveResourceFlowData = {
+    requestBody: ResourceFlowSaveDto;
+    /**
+     * The ID of the resource to save the flow for
+     */
+    resourceId: number;
+};
+
+export type SaveResourceFlowResponse = ResourceFlowResponseDto;
+
+export type GetResourceFlowLogsData = {
+    /**
+     * Number of items per page
+     */
+    limit?: number;
+    /**
+     * Page number (1-based)
+     */
+    page?: number;
+    /**
+     * The ID of the resource to get the flow logs for
+     */
+    resourceId: number;
+};
+
+export type GetResourceFlowLogsResponse = ResourceFlowLogsResponseDto;
+
+export type ResourceFlowsControllerStreamEventsData = {
+    resourceId: number;
+};
+
+export type ResourceFlowsControllerStreamEventsResponse = unknown;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -3823,6 +4016,101 @@ export type $OpenApiTs = {
                  * User does not have permission to introduce users to this resource
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow': {
+        get: {
+            req: GetResourceFlowData;
+            res: {
+                /**
+                 * Resource flow retrieved successfully
+                 */
+                200: ResourceFlowResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+        put: {
+            req: SaveResourceFlowData;
+            res: {
+                /**
+                 * Resource flow saved successfully. May include validation errors for individual nodes that have invalid configuration.
+                 */
+                200: ResourceFlowResponseDto;
+                /**
+                 * Invalid request data
+                 */
+                400: {
+                    message?: Array<(string)>;
+                    statusCode?: number;
+                };
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow/logs': {
+        get: {
+            req: GetResourceFlowLogsData;
+            res: {
+                /**
+                 * Resource flow logs retrieved successfully
+                 */
+                200: ResourceFlowLogsResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow/logs/live': {
+        get: {
+            req: ResourceFlowsControllerStreamEventsData;
+            res: {
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

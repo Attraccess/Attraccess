@@ -1,0 +1,8 @@
+{
+  "title": "Add Node",
+  "nodeType": {
+    "input": "Input",
+    "output": "Output",
+    "input-output": "Input/Output"
+  }
+}

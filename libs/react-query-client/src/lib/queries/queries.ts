@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
-import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMqttResourceConfigDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CreateWebhookConfigDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMqttResourceConfigDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UpdateWebhookConfigDto, UploadPluginDto, VerifyEmailDto, WebhookStatusDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMqttResourceConfigDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CreateWebhookConfigDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMqttResourceConfigDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UpdateWebhookConfigDto, UploadPluginDto, VerifyEmailDto, WebhookStatusDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceFindMany = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
@@ -126,6 +126,17 @@ export const useAccessControlServiceResourceIntroductionsGetHistory = <TData = C
   resourceId: number;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) as TData, ...options });
+export const useResourceFlowsServiceGetResourceFlow = <TData = Common.ResourceFlowsServiceGetResourceFlowDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId }, queryKey), queryFn: () => ResourceFlowsService.getResourceFlow({ resourceId }) as TData, ...options });
+export const useResourceFlowsServiceGetResourceFlowLogs = <TData = Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId }: {
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }, queryKey), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) as TData, ...options });
+export const useResourceFlowsServiceResourceFlowsControllerStreamEvents = <TData = Common.ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn({ resourceId }, queryKey), queryFn: () => ResourceFlowsService.resourceFlowsControllerStreamEvents({ resourceId }) as TData, ...options });
 export const usePluginsServiceGetPlugins = <TData = Common.PluginsServiceGetPluginsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(queryKey), queryFn: () => PluginsService.getPlugins() as TData, ...options });
 export const usePluginsServiceGetFrontendPluginFile = <TData = Common.PluginsServiceGetFrontendPluginFileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filePath, pluginName }: {
   filePath: string;
@@ -386,6 +397,13 @@ export const useWebhooksServiceWebhookConfigUpdateStatus = <TData = Common.Webho
   requestBody: WebhookStatusDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ id, requestBody, resourceId }) => WebhooksService.webhookConfigUpdateStatus({ id, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourceFlowsServiceSaveResourceFlow = <TData = Common.ResourceFlowsServiceSaveResourceFlowMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: ResourceFlowSaveDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: ResourceFlowSaveDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceFlowsService.saveResourceFlow({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
 export const useUsersServiceUpdatePermissions = <TData = Common.UsersServiceUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;
   requestBody: UpdateUserPermissionsDto;

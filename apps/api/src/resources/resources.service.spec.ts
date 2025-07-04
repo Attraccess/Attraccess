@@ -84,6 +84,8 @@ describe('ResourcesService', () => {
       mqttConfigs: [],
       webhookConfigs: [],
       groups: [],
+      flowNodes: [],
+      flowEdges: [],
     });
 
     beforeEach(() => {
@@ -441,6 +443,8 @@ describe('ResourcesService', () => {
         mqttConfigs: [],
         webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);
@@ -489,6 +493,8 @@ describe('ResourcesService', () => {
         mqttConfigs: [],
         webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
       };
 
       resourceRepository.create.mockReturnValue(newResource);
@@ -536,6 +542,8 @@ describe('ResourcesService', () => {
         mqttConfigs: [],
         webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
       };
 
       const updatedResource = {
@@ -588,6 +596,8 @@ describe('ResourcesService', () => {
         mqttConfigs: [],
         webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);

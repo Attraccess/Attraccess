@@ -303,7 +303,7 @@ export class MqttPublisherService {
     );
   }
 
-  @OnEvent('resource.usage.started')
+  @OnEvent(ResourceUsageStartedEvent.eventName)
   async handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
     await this.sendStartMessage({
       event: 'start',

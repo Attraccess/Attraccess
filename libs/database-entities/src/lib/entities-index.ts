@@ -19,6 +19,18 @@ import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
 import { WebhookConfig } from './entities/webhookConfig.entity';
 import { FabReader } from './entities/fabReader.entity';
+import {
+  ResourceFlowNode,
+  ResourceFlowNodeType,
+  getNodeDataSchema,
+  EventNodeDataSchema,
+  HttpRequestNodeDataSchema,
+  MqttSendMessageNodeDataSchema,
+  WaitNodeDataSchema,
+  ResourceFlowNodeData,
+} from './entities/resourceFlowNode';
+import { ResourceFlowEdge } from './entities/resourceFlowEdge';
+import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 
 // Export all entities individually
 export {
@@ -44,6 +56,17 @@ export {
   NFCCard,
   FabReader,
   EmailTemplate,
+  ResourceFlowNode,
+  ResourceFlowNodeType,
+  ResourceFlowEdge,
+  getNodeDataSchema,
+  EventNodeDataSchema,
+  HttpRequestNodeDataSchema,
+  MqttSendMessageNodeDataSchema,
+  WaitNodeDataSchema,
+  ResourceFlowNodeData,
+  ResourceFlowLog,
+  ResourceFlowLogType,
 };
 
 // Export the entities object
@@ -66,4 +89,7 @@ export const entities = {
   NFCCard,
   FabReader,
   EmailTemplate,
+  ResourceFlowNode,
+  ResourceFlowEdge,
+  ResourceFlowLog,
 };

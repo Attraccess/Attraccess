@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const ensureUseUsersServiceFindManyData = (queryClient: QueryClient, { ids, limit, page, search }: {
@@ -125,6 +125,17 @@ export const ensureUseAccessControlServiceResourceIntroductionsGetHistoryData = 
   resourceId: number;
   userId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) });
+export const ensureUseResourceFlowsServiceGetResourceFlowData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getResourceFlow({ resourceId }) });
+export const ensureUseResourceFlowsServiceGetResourceFlowLogsData = (queryClient: QueryClient, { limit, page, resourceId }: {
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) });
+export const ensureUseResourceFlowsServiceResourceFlowsControllerStreamEventsData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.resourceFlowsControllerStreamEvents({ resourceId }) });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

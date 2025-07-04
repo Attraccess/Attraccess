@@ -20,6 +20,7 @@ import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
+import FlowsPage from '../resources/details/flows';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -46,6 +47,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/resources/:id/iot',
     element: <IoTSettings />,
     authRequired: 'canManageResources',
+  },
+  {
+    path: '/resources/:id/flows',
+    element: <FlowsPage />,
+    authRequired: true,
   },
   {
     path: '/resources/:resourceId/iot/mqtt/create',

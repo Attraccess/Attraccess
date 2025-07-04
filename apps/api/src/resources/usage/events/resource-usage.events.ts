@@ -5,10 +5,14 @@
 import { User } from '@attraccess/database-entities';
 
 export class ResourceUsageStartedEvent {
+  public static readonly eventName = 'resource.usage.started';
+
   constructor(public readonly resourceId: number, public readonly startTime: Date, public readonly user: User) {}
 }
 
 export class ResourceUsageEndedEvent {
+  public static readonly eventName = 'resource.usage.ended';
+
   constructor(
     public readonly resourceId: number,
     public readonly startTime: Date,
@@ -18,6 +22,8 @@ export class ResourceUsageEndedEvent {
 }
 
 export class ResourceUsageTakenOverEvent {
+  public static readonly eventName = 'resource.usage.taken_over';
+
   constructor(
     public readonly resourceId: number,
     public readonly takeoverTime: Date,

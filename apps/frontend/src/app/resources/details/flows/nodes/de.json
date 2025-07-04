@@ -1,0 +1,34 @@
+{
+  "action": {
+    "mqtt": {
+      "sendMessage": {
+        "title": "MQTT-Nachricht senden",
+        "description": "Sendet eine MQTT-Nachricht."
+      }
+    },
+    "util": {
+      "wait": {
+        "title": "Warten",
+        "description": "Wartet eine bestimmte Zeit."
+      }
+    }
+  },
+  "event": {
+    "resource": {
+      "usage": {
+        "started": {
+          "title": "Resource wurde gestartet",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestartet wird."
+        },
+        "stopped": {
+          "title": "Resource wurde gestoppt",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestoppt wird."
+        },
+        "takeover": {
+          "title": "Ressource wurde übernommen",
+          "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird."
+        }
+      }
+    }
+  }
+}

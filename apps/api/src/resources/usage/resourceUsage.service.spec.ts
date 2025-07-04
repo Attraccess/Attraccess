@@ -14,6 +14,7 @@ import { ResourceGroupsIntroductionsService } from '../groups/introductions/reso
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+import { ResourceUsageStartedEvent } from './events/resource-usage.events';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -202,7 +203,7 @@ describe('ResourceUsageService', () => {
         endNotes: null,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith('resource.usage.started', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageStartedEvent.eventName, expect.any(Object));
     });
 
     it('should throw error when resource does not exist', async () => {

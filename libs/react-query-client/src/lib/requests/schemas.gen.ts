@@ -157,14 +157,6 @@ export const $PaginatedUsersResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -172,7 +164,7 @@ export const $PaginatedUsersResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $UpdateUserPermissionsDto = {
@@ -762,14 +754,6 @@ export const $PaginatedResourceResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -777,7 +761,7 @@ export const $PaginatedResourceResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $UpdateResourceDto = {
@@ -1968,14 +1952,6 @@ export const $GetResourceHistoryResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -1983,7 +1959,7 @@ export const $GetResourceHistoryResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $GetActiveUsageSessionDto = {
@@ -2033,6 +2009,320 @@ export const $UpdateResourceIntroductionDto = {
             example: 'This is a comment'
         }
     }
+} as const;
+
+export const $ResourceFlowNodePositionDto = {
+    type: 'object',
+    properties: {
+        x: {
+            type: 'number',
+            description: 'The x position of the node',
+            example: 100
+        },
+        y: {
+            type: 'number',
+            description: 'The y position of the node',
+            example: 200
+        }
+    },
+    required: ['x', 'y']
+} as const;
+
+export const $ResourceFlowNodeDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The unique identifier of the resource flow node',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the node',
+            example: 'event.resource.usage.started',
+            enum: ['event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover', 'action.http.sendRequest', 'action.mqtt.sendMessage', 'action.util.wait']
+        },
+        position: {
+            description: 'The position of the node',
+            example: {
+                x: 100,
+                y: 200
+            },
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceFlowNodePositionDto'
+                }
+            ]
+        },
+        data: {
+            type: 'object',
+            description: 'The data of the node, depending on the type of the node',
+            example: {
+                url: 'https://example.com/webhook',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: '{"message": "Resource usage started"}'
+            },
+            additionalProperties: true
+        }
+    },
+    required: ['id', 'type', 'position', 'data']
+} as const;
+
+export const $ResourceFlowEdgeDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The unique identifier of the resource flow edge',
+            example: 'edge-abc123'
+        },
+        source: {
+            type: 'string',
+            description: 'The source node id',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        target: {
+            type: 'string',
+            description: 'The target node id',
+            example: 'TGVgqDzCKXKVr-XGUD5V4'
+        }
+    },
+    required: ['id', 'source', 'target']
+} as const;
+
+export const $ValidationErrorDto = {
+    type: 'object',
+    properties: {
+        nodeId: {
+            type: 'string',
+            description: 'The ID of the node that has the validation error',
+            example: 'node-123'
+        },
+        nodeType: {
+            type: 'string',
+            description: 'The type of the node that has the validation error',
+            example: 'action.http.sendRequest'
+        },
+        field: {
+            type: 'string',
+            description: 'The field that has the validation error',
+            example: 'url'
+        },
+        message: {
+            type: 'string',
+            description: 'The validation error message',
+            example: 'Invalid URL format'
+        },
+        value: {
+            type: 'object',
+            description: 'The invalid value that caused the error',
+            example: 'invalid-url'
+        }
+    },
+    required: ['nodeId', 'nodeType', 'field', 'message']
+} as const;
+
+export const $ResourceFlowResponseDto = {
+    type: 'object',
+    properties: {
+        nodes: {
+            description: 'Array of flow nodes defining the workflow steps',
+            example: [
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V3',
+                    type: 'event.resource.usage.started',
+                    position: {
+                        x: 100,
+                        y: 200
+                    },
+                    data: {}
+                },
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V4',
+                    type: 'action.http.sendRequest',
+                    position: {
+                        x: 300,
+                        y: 200
+                    },
+                    data: {
+                        url: 'https://example.com/webhook',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: '{"message": "Resource usage started"}'
+                    }
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowNodeDto'
+            }
+        },
+        edges: {
+            description: 'Array of flow edges connecting nodes to define the workflow flow',
+            example: [
+                {
+                    id: 'edge-abc123',
+                    source: 'TGVgqDzCKXKVr-XGUD5V3',
+                    target: 'TGVgqDzCKXKVr-XGUD5V4'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowEdgeDto'
+            }
+        },
+        validationErrors: {
+            description: 'Validation errors for nodes, if any',
+            example: [
+                {
+                    nodeId: 'TGVgqDzCKXKVr-XGUD5V4',
+                    nodeType: 'action.http.sendRequest',
+                    field: 'url',
+                    message: 'Invalid URL format',
+                    value: 'not-a-valid-url'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ValidationErrorDto'
+            }
+        }
+    },
+    required: ['nodes', 'edges']
+} as const;
+
+export const $ResourceFlowSaveDto = {
+    type: 'object',
+    properties: {
+        nodes: {
+            description: 'Array of flow nodes defining the workflow steps',
+            example: [
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V3',
+                    type: 'event.resource.usage.started',
+                    position: {
+                        x: 100,
+                        y: 200
+                    },
+                    data: {}
+                },
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V4',
+                    type: 'action.http.sendRequest',
+                    position: {
+                        x: 300,
+                        y: 200
+                    },
+                    data: {
+                        url: 'https://example.com/webhook',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: '{"message": "Resource usage started"}'
+                    }
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowNodeDto'
+            }
+        },
+        edges: {
+            description: 'Array of flow edges connecting nodes to define the workflow flow',
+            example: [
+                {
+                    id: 'edge-abc123',
+                    source: 'TGVgqDzCKXKVr-XGUD5V3',
+                    target: 'TGVgqDzCKXKVr-XGUD5V4'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowEdgeDto'
+            }
+        }
+    },
+    required: ['nodes', 'edges']
+} as const;
+
+export const $ResourceFlowLog = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the resource flow log',
+            example: 42
+        },
+        nodeId: {
+            type: 'string',
+            description: 'The node id of the node that generated the log',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        flowRunId: {
+            type: 'string',
+            description: 'The run/execution id of the flow that generated the log',
+            example: '123e4567-e89b-12d3-a456-426614174000'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the log entry',
+            enum: ['flow.start', 'node.processing.started', 'node.processing.failed', 'node.processing.completed', 'flow.completed'],
+            example: 'node.processing.started'
+        },
+        payload: {
+            type: 'string',
+            description: 'Optional payload for additional user information',
+            example: 'Processing took longer than expected due to network latency'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the node was created'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The id of the resource that this log belongs to',
+            example: 1
+        },
+        resource: {
+            description: 'The resource being this log belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Resource'
+                }
+            ]
+        }
+    },
+    required: ['id', 'nodeId', 'flowRunId', 'type', 'createdAt', 'resourceId']
+} as const;
+
+export const $ResourceFlowLogsResponseDto = {
+    type: 'object',
+    properties: {
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        },
+        data: {
+            description: 'Array of flow log entries, ordered by creation time (newest first)',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowLog'
+            }
+        }
+    },
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $PluginMainFrontend = {

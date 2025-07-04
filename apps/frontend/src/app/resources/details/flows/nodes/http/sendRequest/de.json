@@ -1,0 +1,22 @@
+{
+  "editor": {
+    "inputs": {
+      "url": {
+        "label": "URL"
+      },
+      "method": {
+        "label": "Methode"
+      },
+      "headers": {
+        "label": "Headers"
+      },
+      "body": {
+        "label": "Body"
+      }
+    },
+    "buttons": {
+      "close": "Schließen",
+      "save": "Speichern"
+    }
+  }
+}

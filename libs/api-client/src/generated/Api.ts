@@ -134,9 +134,6 @@ export interface PaginatedUsersResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: User[];
 }
 
@@ -578,9 +575,6 @@ export interface PaginatedResourceResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: Resource[];
 }
 
@@ -1553,9 +1547,6 @@ export interface GetResourceHistoryResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: ResourceUsage[];
 }
 
@@ -1580,6 +1571,91 @@ export interface UpdateResourceIntroductionDto {
    * @example "This is a comment"
    */
   comment?: string;
+}
+
+export interface ResourceFlowNodePosition {
+  /**
+   * The x position of the node
+   * @example 100
+   */
+  x: number;
+  /**
+   * The y position of the node
+   * @example 100
+   */
+  y: number;
+}
+
+export interface ResourceFlowNode {
+  /**
+   * The unique identifier of the resource flow node
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  id: string;
+  /**
+   * The type of the node
+   * @example "event.resource.usage.started"
+   */
+  type: string;
+  /**
+   * The position of the node
+   * @example {"x":100,"y":100}
+   */
+  position: ResourceFlowNodePosition;
+  /**
+   * The data of the node, depending on the type of the node
+   * @example {"url":"https://example.com","method":"GET"}
+   */
+  data: object;
+  /**
+   * When the node was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the node was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The resource being this node belongs to */
+  resource?: Resource;
+}
+
+export interface ResourceFlowEdge {
+  /**
+   * The unique identifier of the resource flow edge
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  id: string;
+  /**
+   * The source node id
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  source: string;
+  /**
+   * The target node id
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  target: string;
+  /**
+   * When the node was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the node was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The resource being this edge belongs to */
+  resource?: Resource;
+}
+
+export interface ResourceFlowSaveAndResponseDto {
+  /** Array of flow nodes */
+  nodes: ResourceFlowNode[];
+  /** Array of flow edges connecting nodes */
+  edges: ResourceFlowEdge[];
 }
 
 export interface PluginMainFrontend {
@@ -2069,6 +2145,10 @@ export type ResourceIntroductionsRevokeData = ResourceIntroductionHistoryItem;
 
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
+
+export type GetResourceFlowData = ResourceFlowSaveAndResponseDto;
+
+export type SaveResourceFlowData = ResourceFlowSaveAndResponseDto;
 
 export type GetPluginsData = LoadedPluginManifest[];
 
@@ -3700,6 +3780,52 @@ export namespace AccessControl {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroductionsGetHistoryData;
+  }
+}
+
+export namespace ResourceFlows {
+  /**
+   * @description Retrieve the complete flow configuration for a resource, including all nodes and edges
+   * @tags Resource Flows
+   * @name GetResourceFlow
+   * @summary Get resource flow
+   * @request GET:/api/resources/{resourceId}/flows
+   * @secure
+   */
+  export namespace GetResourceFlow {
+    export type RequestParams = {
+      /**
+       * The ID of the resource
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceFlowData;
+  }
+
+  /**
+   * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges.
+   * @tags Resource Flows
+   * @name SaveResourceFlow
+   * @summary Save resource flow
+   * @request PUT:/api/resources/{resourceId}/flows
+   * @secure
+   */
+  export namespace SaveResourceFlow {
+    export type RequestParams = {
+      /**
+       * The ID of the resource
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ResourceFlowNode;
+    export type RequestHeaders = {};
+    export type ResponseBody = SaveResourceFlowData;
   }
 }
 
@@ -5916,6 +6042,49 @@ export class Api<
         path: `/api/resources/${resourceId}/introductions/${userId}/history`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  resourceFlows = {
+    /**
+     * @description Retrieve the complete flow configuration for a resource, including all nodes and edges
+     *
+     * @tags Resource Flows
+     * @name GetResourceFlow
+     * @summary Get resource flow
+     * @request GET:/api/resources/{resourceId}/flows
+     * @secure
+     */
+    getResourceFlow: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetResourceFlowData, void>({
+        path: `/api/resources/${resourceId}/flows`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges.
+     *
+     * @tags Resource Flows
+     * @name SaveResourceFlow
+     * @summary Save resource flow
+     * @request PUT:/api/resources/{resourceId}/flows
+     * @secure
+     */
+    saveResourceFlow: (
+      resourceId: number,
+      data: ResourceFlowNode,
+      params: RequestParams = {},
+    ) =>
+      this.request<SaveResourceFlowData, void>({
+        path: `/api/resources/${resourceId}/flows`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

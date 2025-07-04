@@ -159,7 +159,7 @@ export class ResourceUsageService {
     } else {
       // Emit event after successful save
       this.eventEmitter.emit(
-        'resource.usage.started',
+        ResourceUsageStartedEvent.eventName,
         new ResourceUsageStartedEvent(resourceId, usageData.startTime, user)
       );
     }
