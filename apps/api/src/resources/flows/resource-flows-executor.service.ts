@@ -20,6 +20,7 @@ import { Cron } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
 import { nanoid } from 'nanoid';
+import { WaitNodeData } from 'libs/database-entities/src/lib/entities/resourceFlowNode';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
@@ -173,8 +174,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     try {
       await Promise.all(
         eventNodes.map((node) => {
-          const flowRunId = `${nanoid(3)}-${nanoid(3)}-${nanoid(3)}`;
-          return this.processNode(flowRunId, node);
+          return this.processNode(null, node);
         })
       );
       this.logger.log(
@@ -189,10 +189,24 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async processNode(flowRunId: string, node: ResourceFlowNode) {
+  private async processNode(givenFlowRunId: string | null, node: ResourceFlowNode) {
+    let flowRunId: string = givenFlowRunId as string;
+    if (givenFlowRunId === null) {
+      flowRunId = `${nanoid(3)}-${nanoid(3)}-${nanoid(3)}`;
+    }
+
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
     const startTime = Date.now();
+
+    if (givenFlowRunId === null) {
+      await this.createFlowLog({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.FLOW_START,
+      });
+    }
 
     try {
       // Log the start of node processing
@@ -207,13 +221,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED:
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED:
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER:
-          await this.createFlowLog({
-            flowRunId,
-            nodeId: node.id,
-            resourceId: node.resourceId,
-            type: ResourceFlowLogType.FLOW_START,
-          });
           break;
+
+        case ResourceFlowNodeType.ACTION_WAIT: {
+          const { duration, unit } = node.data as WaitNodeData;
+
+          let waitDurationMs = duration * 1000;
+          if (unit === 'minutes') {
+            waitDurationMs *= 60;
+          } else if (unit === 'hours') {
+            waitDurationMs *= 60 * 60;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, waitDurationMs));
+          break;
+        }
 
         default: {
           await this.createFlowLog({

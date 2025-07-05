@@ -1573,7 +1573,7 @@ export interface UpdateResourceIntroductionDto {
   comment?: string;
 }
 
-export interface ResourceFlowNodePosition {
+export interface ResourceFlowNodePositionDto {
   /**
    * The x position of the node
    * @example 100
@@ -1581,12 +1581,12 @@ export interface ResourceFlowNodePosition {
   x: number;
   /**
    * The y position of the node
-   * @example 100
+   * @example 200
    */
   y: number;
 }
 
-export interface ResourceFlowNode {
+export interface ResourceFlowNodeDto {
   /**
    * The unique identifier of the resource flow node
    * @example "TGVgqDzCKXKVr-XGUD5V3"
@@ -1596,35 +1596,29 @@ export interface ResourceFlowNode {
    * The type of the node
    * @example "event.resource.usage.started"
    */
-  type: string;
+  type:
+    | "event.resource.usage.started"
+    | "event.resource.usage.stopped"
+    | "event.resource.usage.takeover"
+    | "action.http.sendRequest"
+    | "action.mqtt.sendMessage"
+    | "action.util.wait";
   /**
    * The position of the node
-   * @example {"x":100,"y":100}
+   * @example {"x":100,"y":200}
    */
-  position: ResourceFlowNodePosition;
+  position: ResourceFlowNodePositionDto;
   /**
    * The data of the node, depending on the type of the node
-   * @example {"url":"https://example.com","method":"GET"}
+   * @example {"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}
    */
-  data: object;
-  /**
-   * When the node was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * When the node was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-  /** The resource being this node belongs to */
-  resource?: Resource;
+  data: Record<string, any>;
 }
 
-export interface ResourceFlowEdge {
+export interface ResourceFlowEdgeDto {
   /**
    * The unique identifier of the resource flow edge
-   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   * @example "edge-abc123"
    */
   id: string;
   /**
@@ -1634,28 +1628,121 @@ export interface ResourceFlowEdge {
   source: string;
   /**
    * The target node id
-   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   * @example "TGVgqDzCKXKVr-XGUD5V4"
    */
   target: string;
+}
+
+export interface ValidationErrorDto {
+  /**
+   * The ID of the node that has the validation error
+   * @example "node-123"
+   */
+  nodeId: string;
+  /**
+   * The type of the node that has the validation error
+   * @example "action.http.sendRequest"
+   */
+  nodeType: string;
+  /**
+   * The field that has the validation error
+   * @example "url"
+   */
+  field: string;
+  /**
+   * The validation error message
+   * @example "Invalid URL format"
+   */
+  message: string;
+  /**
+   * The invalid value that caused the error
+   * @example "invalid-url"
+   */
+  value?: object;
+}
+
+export interface ResourceFlowResponseDto {
+  /**
+   * Array of flow nodes defining the workflow steps
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   */
+  nodes: ResourceFlowNodeDto[];
+  /**
+   * Array of flow edges connecting nodes to define the workflow flow
+   * @example [{"id":"edge-abc123","source":"TGVgqDzCKXKVr-XGUD5V3","target":"TGVgqDzCKXKVr-XGUD5V4"}]
+   */
+  edges: ResourceFlowEdgeDto[];
+  /**
+   * Validation errors for nodes, if any
+   * @example [{"nodeId":"TGVgqDzCKXKVr-XGUD5V4","nodeType":"action.http.sendRequest","field":"url","message":"Invalid URL format","value":"not-a-valid-url"}]
+   */
+  validationErrors?: ValidationErrorDto[];
+}
+
+export interface ResourceFlowSaveDto {
+  /**
+   * Array of flow nodes defining the workflow steps
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   */
+  nodes: ResourceFlowNodeDto[];
+  /**
+   * Array of flow edges connecting nodes to define the workflow flow
+   * @example [{"id":"edge-abc123","source":"TGVgqDzCKXKVr-XGUD5V3","target":"TGVgqDzCKXKVr-XGUD5V4"}]
+   */
+  edges: ResourceFlowEdgeDto[];
+}
+
+export interface ResourceFlowLog {
+  /**
+   * The unique identifier of the resource flow log
+   * @example 42
+   */
+  id: number;
+  /**
+   * The node id of the node that generated the log
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  nodeId: string;
+  /**
+   * The run/execution id of the flow that generated the log
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
+  flowRunId: string;
+  /**
+   * The type of the log entry
+   * @example "node.processing.started"
+   */
+  type:
+    | "flow.start"
+    | "node.processing.started"
+    | "node.processing.failed"
+    | "node.processing.completed"
+    | "flow.completed";
+  /**
+   * Optional payload for additional user information
+   * @example "Processing took longer than expected due to network latency"
+   */
+  payload?: string;
   /**
    * When the node was created
    * @format date-time
    */
   createdAt: string;
   /**
-   * When the node was last updated
-   * @format date-time
+   * The id of the resource that this log belongs to
+   * @example 1
    */
-  updatedAt: string;
-  /** The resource being this edge belongs to */
+  resourceId: number;
+  /** The resource being this log belongs to */
   resource?: Resource;
 }
 
-export interface ResourceFlowSaveAndResponseDto {
-  /** Array of flow nodes */
-  nodes: ResourceFlowNode[];
-  /** Array of flow edges connecting nodes */
-  edges: ResourceFlowEdge[];
+export interface ResourceFlowLogsResponseDto {
+  total: number;
+  page: number;
+  limit: number;
+  /** Array of flow log entries, ordered by creation time (newest first) */
+  data: ResourceFlowLog[];
 }
 
 export interface PluginMainFrontend {
@@ -2146,9 +2233,62 @@ export type ResourceIntroductionsRevokeData = ResourceIntroductionHistoryItem;
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
 
-export type GetResourceFlowData = ResourceFlowSaveAndResponseDto;
+export type GetResourceFlowData = ResourceFlowResponseDto;
 
-export type SaveResourceFlowData = ResourceFlowSaveAndResponseDto;
+export type GetResourceFlowError = {
+  /** @example "Resource not found" */
+  message?: string;
+  /** @example 404 */
+  statusCode?: number;
+};
+
+export type SaveResourceFlowData = ResourceFlowResponseDto;
+
+export type SaveResourceFlowError =
+  | {
+      /** @example ["nodes must be an array"] */
+      message?: string[];
+      /** @example 400 */
+      statusCode?: number;
+    }
+  | {
+      /** @example "Resource not found" */
+      message?: string;
+      /** @example 404 */
+      statusCode?: number;
+    };
+
+export interface GetResourceFlowLogsParams {
+  /**
+   * Page number (1-based)
+   * @min 1
+   * @default 1
+   */
+  page?: number;
+  /**
+   * Number of items per page
+   * @min 1
+   * @max 500
+   * @default 50
+   */
+  limit?: number;
+  /**
+   * The ID of the resource to get the flow logs for
+   * @example 1
+   */
+  resourceId: number;
+}
+
+export type GetResourceFlowLogsData = ResourceFlowLogsResponseDto;
+
+export type GetResourceFlowLogsError = {
+  /** @example "Resource not found" */
+  message?: string;
+  /** @example 404 */
+  statusCode?: number;
+};
+
+export type ResourceFlowsControllerStreamEventsData = any;
 
 export type GetPluginsData = LoadedPluginManifest[];
 
@@ -3785,17 +3925,17 @@ export namespace AccessControl {
 
 export namespace ResourceFlows {
   /**
-   * @description Retrieve the complete flow configuration for a resource, including all nodes and edges
+   * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
    * @tags Resource Flows
    * @name GetResourceFlow
    * @summary Get resource flow
-   * @request GET:/api/resources/{resourceId}/flows
+   * @request GET:/api/resources/{resourceId}/flow
    * @secure
    */
   export namespace GetResourceFlow {
     export type RequestParams = {
       /**
-       * The ID of the resource
+       * The ID of the resource to get the flow for
        * @example 1
        */
       resourceId: number;
@@ -3807,25 +3947,78 @@ export namespace ResourceFlows {
   }
 
   /**
-   * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges.
+   * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
    * @tags Resource Flows
    * @name SaveResourceFlow
    * @summary Save resource flow
-   * @request PUT:/api/resources/{resourceId}/flows
+   * @request PUT:/api/resources/{resourceId}/flow
    * @secure
    */
   export namespace SaveResourceFlow {
     export type RequestParams = {
       /**
-       * The ID of the resource
+       * The ID of the resource to save the flow for
        * @example 1
        */
       resourceId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = ResourceFlowNode;
+    export type RequestBody = ResourceFlowSaveDto;
     export type RequestHeaders = {};
     export type ResponseBody = SaveResourceFlowData;
+  }
+
+  /**
+   * @description Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+   * @tags Resource Flows
+   * @name GetResourceFlowLogs
+   * @summary Get resource flow logs
+   * @request GET:/api/resources/{resourceId}/flow/logs
+   * @secure
+   */
+  export namespace GetResourceFlowLogs {
+    export type RequestParams = {
+      /**
+       * The ID of the resource to get the flow logs for
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * Page number (1-based)
+       * @min 1
+       * @default 1
+       */
+      page?: number;
+      /**
+       * Number of items per page
+       * @min 1
+       * @max 500
+       * @default 50
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceFlowLogsData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Flows
+   * @name ResourceFlowsControllerStreamEvents
+   * @request GET:/api/resources/{resourceId}/flow/logs/live
+   * @secure
+   */
+  export namespace ResourceFlowsControllerStreamEvents {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFlowsControllerStreamEventsData;
   }
 }
 
@@ -6048,17 +6241,17 @@ export class Api<
   };
   resourceFlows = {
     /**
-     * @description Retrieve the complete flow configuration for a resource, including all nodes and edges
+     * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
      *
      * @tags Resource Flows
      * @name GetResourceFlow
      * @summary Get resource flow
-     * @request GET:/api/resources/{resourceId}/flows
+     * @request GET:/api/resources/{resourceId}/flow
      * @secure
      */
     getResourceFlow: (resourceId: number, params: RequestParams = {}) =>
-      this.request<GetResourceFlowData, void>({
-        path: `/api/resources/${resourceId}/flows`,
+      this.request<GetResourceFlowData, GetResourceFlowError>({
+        path: `/api/resources/${resourceId}/flow`,
         method: "GET",
         secure: true,
         format: "json",
@@ -6066,26 +6259,67 @@ export class Api<
       }),
 
     /**
-     * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges.
+     * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
      *
      * @tags Resource Flows
      * @name SaveResourceFlow
      * @summary Save resource flow
-     * @request PUT:/api/resources/{resourceId}/flows
+     * @request PUT:/api/resources/{resourceId}/flow
      * @secure
      */
     saveResourceFlow: (
       resourceId: number,
-      data: ResourceFlowNode,
+      data: ResourceFlowSaveDto,
       params: RequestParams = {},
     ) =>
-      this.request<SaveResourceFlowData, void>({
-        path: `/api/resources/${resourceId}/flows`,
+      this.request<SaveResourceFlowData, SaveResourceFlowError>({
+        path: `/api/resources/${resourceId}/flow`,
         method: "PUT",
         body: data,
         secure: true,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+     *
+     * @tags Resource Flows
+     * @name GetResourceFlowLogs
+     * @summary Get resource flow logs
+     * @request GET:/api/resources/{resourceId}/flow/logs
+     * @secure
+     */
+    getResourceFlowLogs: (
+      { resourceId, ...query }: GetResourceFlowLogsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetResourceFlowLogsData, GetResourceFlowLogsError>({
+        path: `/api/resources/${resourceId}/flow/logs`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Flows
+     * @name ResourceFlowsControllerStreamEvents
+     * @request GET:/api/resources/{resourceId}/flow/logs/live
+     * @secure
+     */
+    resourceFlowsControllerStreamEvents: (
+      resourceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFlowsControllerStreamEventsData, void>({
+        path: `/api/resources/${resourceId}/flow/logs/live`,
+        method: "GET",
+        secure: true,
         ...params,
       }),
   };

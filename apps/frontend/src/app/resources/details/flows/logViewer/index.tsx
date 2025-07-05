@@ -151,8 +151,8 @@ export function LogViewer(props: Props) {
           <DrawerBody>
             <div className="flex flex-col gap-4">
               {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
-                <>
-                  <div key={runId}>
+                <div key={`${runId}-logs`}>
+                  <div>
                     <PageHeader
                       title={t('nodes.' + firstNodeOfRun(runId)?.node?.type + '.title')}
                       subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
@@ -171,7 +171,7 @@ export function LogViewer(props: Props) {
                     </Accordion>
                   </div>
                   {index < self.length - 1 && <Divider className="my-4" />}
-                </>
+                </div>
               ))}
             </div>
           </DrawerBody>

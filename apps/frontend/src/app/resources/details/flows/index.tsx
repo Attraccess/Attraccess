@@ -41,6 +41,7 @@ import { LogViewer } from './logViewer';
 import { useSnapConnect } from './useSnapConnect';
 import { useRemoveEdgeOnDrop } from './useRemoveEdgeOnDrop';
 import { useNodeEdgeIntersectionSnapConnect } from './useNodeEdgeIntersectionSnapConnect';
+import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[], options: { direction: 'TB' | 'LR' }) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -221,6 +222,17 @@ function FlowsPageInner() {
     [snapConnect, nodeEdgeIntersectionSnapConnect]
   );
 
+  const edgesWithCorrectType = useMemo(() => {
+    const mapped = edges.map((edge) => ({
+      ...edge,
+      type: edge.type ?? 'attraccess-edge',
+    }));
+
+    console.log(mapped);
+
+    return mapped;
+  }, [edges]);
+
   return (
     <div className="h-full w-full flex flex-col">
       <PageHeader
@@ -232,7 +244,7 @@ function FlowsPageInner() {
       <div className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={edgesWithCorrectType}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -245,6 +257,9 @@ function FlowsPageInner() {
           onReconnectStart={onReconnectStart}
           onReconnect={onReconnect}
           onReconnectEnd={onReconnectEnd}
+          edgeTypes={{
+            'attraccess-edge': EdgeWithDeleteButton,
+          }}
         >
           <Controls />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
