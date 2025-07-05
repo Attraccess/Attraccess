@@ -11,6 +11,8 @@ import {
   Edge,
   useReactFlow,
   NodeTypes,
+  OnNodeDrag,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -36,6 +38,9 @@ import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { LogViewer } from './logViewer';
+import { useSnapConnect } from './useSnapConnect';
+import { useRemoveEdgeOnDrop } from './useRemoveEdgeOnDrop';
+import { useNodeEdgeIntersectionSnapConnect } from './useNodeEdgeIntersectionSnapConnect';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[], options: { direction: 'TB' | 'LR' }) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -196,6 +201,26 @@ function FlowsPageInner() {
     return types;
   }, []);
 
+  const { onReconnectStart, onReconnect, onReconnectEnd } = useRemoveEdgeOnDrop();
+  const snapConnect = useSnapConnect();
+  const nodeEdgeIntersectionSnapConnect = useNodeEdgeIntersectionSnapConnect();
+
+  const onNodeDrag: OnNodeDrag = useCallback(
+    (...params) => {
+      snapConnect.onNodeDrag(...params);
+      nodeEdgeIntersectionSnapConnect.onNodeDrag(...params);
+    },
+    [snapConnect, nodeEdgeIntersectionSnapConnect]
+  );
+
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (...params) => {
+      snapConnect.onNodeDragStop(...params);
+      nodeEdgeIntersectionSnapConnect.onNodeDragStop(...params);
+    },
+    [snapConnect, nodeEdgeIntersectionSnapConnect]
+  );
+
   return (
     <div className="h-full w-full flex flex-col">
       <PageHeader
@@ -214,7 +239,12 @@ function FlowsPageInner() {
           colorMode={theme === 'dark' ? 'dark' : 'light'}
           fitView
           nodeTypes={flowNodeTypes}
-          defaultEdgeOptions={{ animated: true }}
+          defaultEdgeOptions={{ animated: true, style: { strokeWidth: 4 } }}
+          onNodeDrag={onNodeDrag}
+          onNodeDragStop={onNodeDragStop}
+          onReconnectStart={onReconnectStart}
+          onReconnect={onReconnect}
+          onReconnectEnd={onReconnectEnd}
         >
           <Controls />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />

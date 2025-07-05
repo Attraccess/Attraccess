@@ -1,6 +1,6 @@
-import { Badge, Card, CardBody, CardHeader, useDisclosure } from '@heroui/react';
+import { Badge, Button, Card, CardBody, CardHeader, useDisclosure } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
-import { Handle, Position, useNodeId } from '@xyflow/react';
+import { Handle, NodeProps, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Trash2Icon } from 'lucide-react';
 import { useFlowContext } from '../../flowContext';
 import { useCallback } from 'react';
@@ -14,9 +14,13 @@ interface Props {
   children?: React.ReactNode;
   hasTarget?: boolean;
   hasSource?: boolean;
+  data?: {
+    forceToolbarVisible?: boolean;
+    toolbarPosition?: Position;
+  };
 }
 
-export function BaseNodeCard(props: Props) {
+export function BaseNodeCard(props: Props & NodeProps) {
   const { removeNode } = useFlowContext();
   const nodeId = useNodeId();
 
@@ -42,21 +46,25 @@ export function BaseNodeCard(props: Props) {
         onConfirm={remove}
         itemName={props.title}
       />
+
+      <NodeToolbar isVisible={props.data?.forceToolbarVisible || undefined} position={props.data?.toolbarPosition}>
+        <div className="flex flex-row gap-2">
+          {props.previewMode ? undefined : props.actions}
+          {!props.previewMode && (
+            <Button
+              isIconOnly
+              color="danger"
+              size="sm"
+              startContent={<Trash2Icon size={12} />}
+              onPress={userWantsToDelete}
+            />
+          )}
+        </div>
+      </NodeToolbar>
       <Card className="bg-gray-100 dark:bg-gray-800 w-64 overflow-visible">
-        <Badge
-          color="warning"
-          className="cursor-pointer"
-          isOneChar
-          content={<Trash2Icon size={12} />}
-          placement="top-left"
-          onClick={userWantsToDelete}
-          isInvisible={props.previewMode}
-        >
-          <CardHeader className="flex flex-row justify-between">
-            <PageHeader noMargin title={props.title} subtitle={props.previewMode ? props.subtitle : undefined} />
-            {props.previewMode ? undefined : props.actions}
-          </CardHeader>
-        </Badge>
+        <CardHeader className="flex flex-row justify-between">
+          <PageHeader noMargin title={props.title} subtitle={props.previewMode ? props.subtitle : undefined} />
+        </CardHeader>
 
         {props.children && <CardBody>{props.children}</CardBody>}
       </Card>
