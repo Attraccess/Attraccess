@@ -8,7 +8,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import replace from '@rollup/plugin-replace';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
-// import MillionLint from '@million/lint';
 
 export default defineConfig({
   root: __dirname,
@@ -25,7 +24,6 @@ export default defineConfig({
     react(),
     nxViteTsPaths(),
     nxCopyAssetsPlugin([]),
-    // MillionLint.vite(),
     federation({
       name: 'attraccess',
       remotes: {

@@ -43,7 +43,7 @@ const simpleNodes = Object.fromEntries(
   nodeDefinitions.map((node) => [
     node.key,
     {
-      component: ({ previewMode }: { previewMode: boolean }) => (
+      component: ({ previewMode, resourceId }: { previewMode: boolean; resourceId: number }) => (
         <AttraccessBaseNode
           nodeType={node.key}
           hasSource={node.type === AttraccessNodeType.input || node.type === AttraccessNodeType.inputOutput}

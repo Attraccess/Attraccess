@@ -12,23 +12,23 @@ import {
   useReactFlow,
   NodeTypes,
   OnNodeDrag,
-  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ResourceFlowEdgeDto,
+  ResourceFlowLog,
   ResourceFlowNodeDto,
   useResourceFlowsServiceGetResourceFlow,
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
-import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon } from 'lucide-react';
+import { CheckIcon, LayoutGridIcon, PlusIcon, SaveIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 
 import de from './de.json';
@@ -42,6 +42,7 @@ import { useSnapConnect } from './useSnapConnect';
 import { useRemoveEdgeOnDrop } from './useRemoveEdgeOnDrop';
 import { useNodeEdgeIntersectionSnapConnect } from './useNodeEdgeIntersectionSnapConnect';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
+import JSConfetti from 'js-confetti';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[], options: { direction: 'TB' | 'LR' }) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -72,6 +73,53 @@ function getLayoutedElements(nodes: Node[], edges: Edge[], options: { direction:
   };
 }
 
+// Efficient comparison functions to replace expensive JSON.stringify operations
+function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNodeDto | Node): boolean {
+  return (
+    node1.id === node2.id &&
+    node1.type === node2.type &&
+    node1.position.x === node2.position.x &&
+    node1.position.y === node2.position.y &&
+    JSON.stringify(node1.data) === JSON.stringify(node2.data) // Only stringify the smaller data object
+  );
+}
+
+function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdgeDto | Edge): boolean {
+  return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
+}
+
+// Memory monitoring and automatic degradation
+function useMemoryMonitoring() {
+  const [memoryPressure, setMemoryPressure] = useState<'low' | 'medium' | 'high'>('low');
+  const lastMemoryCheck = useRef(0);
+
+  const checkMemory = useCallback(() => {
+    const now = Date.now();
+    if (now - lastMemoryCheck.current < 2000) return; // Check every 2 seconds
+    lastMemoryCheck.current = now;
+
+    // Type assertion for performance.memory which is non-standard
+    const perfMemory = (performance as any).memory;
+    if (perfMemory) {
+      const usedMB = perfMemory.usedJSHeapSize / 1024 / 1024;
+      const limitMB = perfMemory.totalJSHeapSize / 1024 / 1024;
+      const usage = usedMB / limitMB;
+
+      if (usage > 0.8) {
+        setMemoryPressure('high');
+        console.warn('High memory pressure detected:', Math.round(usedMB) + 'MB');
+      } else if (usage > 0.6) {
+        setMemoryPressure('medium');
+      } else {
+        setMemoryPressure('low');
+      }
+    }
+  }, []);
+
+  // Check memory on every drag operation
+  return { memoryPressure, checkMemory };
+}
+
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
@@ -79,6 +127,7 @@ function FlowsPageInner() {
   const { t } = useTranslations('resources.details.flows', { de, en });
   const { setPullToRefreshIsEnabled } = usePtrStore();
   const queryClient = useQueryClient();
+  const jsConfetti = useRef<JSConfetti>(new JSConfetti());
 
   useEffect(() => {
     setPullToRefreshIsEnabled(false);
@@ -108,7 +157,18 @@ function FlowsPageInner() {
   });
 
   const { fitView } = useReactFlow();
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setNodes, setEdges, addNode } = useFlowContext();
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    setNodes,
+    setEdges,
+    addNode,
+    addLiveLogReceiver,
+    removeLiveLogReceiver,
+  } = useFlowContext();
 
   useEffect(() => {
     if (originalFlowData) {
@@ -124,19 +184,17 @@ function FlowsPageInner() {
       return true;
     }
 
-    const fullNodeToSimpleNodeString = (node: ResourceFlowNodeDto | Node) => {
-      return JSON.stringify({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        data: node.data,
-      });
-    };
+    // More efficient comparison without JSON.stringify on entire arrays
+    for (let i = 0; i < originalNodes.length; i++) {
+      const originalNode = originalNodes[i];
+      const currentNode = nodes.find((n) => n.id === originalNode.id);
 
-    const simpleDbNodesString = originalNodes.map(fullNodeToSimpleNodeString);
-    const simpleFlowNodesString = nodes.map(fullNodeToSimpleNodeString);
+      if (!currentNode || !areNodesEqual(originalNode, currentNode)) {
+        return true;
+      }
+    }
 
-    return simpleDbNodesString.some((node) => !simpleFlowNodesString.includes(node));
+    return false;
   }, [nodes, originalFlowData?.nodes]);
 
   const edgesHaveChanged = useMemo(() => {
@@ -146,24 +204,24 @@ function FlowsPageInner() {
       return true;
     }
 
-    const fullEdgeToSimpleEdgeString = (edge: ResourceFlowEdgeDto | Edge) => {
-      return JSON.stringify({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-      });
-    };
+    // More efficient comparison without JSON.stringify on entire arrays
+    for (let i = 0; i < originalEdges.length; i++) {
+      const originalEdge = originalEdges[i];
+      const currentEdge = edges.find((e) => e.id === originalEdge.id);
 
-    const simpleDbEdgesString = originalEdges.map(fullEdgeToSimpleEdgeString);
-    const simpleFlowEdgesString = edges.map(fullEdgeToSimpleEdgeString);
+      if (!currentEdge || !areEdgesEqual(originalEdge, currentEdge)) {
+        return true;
+      }
+    }
 
-    return simpleDbEdgesString.some((edge) => !simpleFlowEdgesString.includes(edge));
+    return false;
   }, [edges, originalFlowData?.edges]);
 
   const flowHasChanged = useMemo(() => {
     return nodesHaveChanged || edgesHaveChanged;
   }, [nodesHaveChanged, edgesHaveChanged]);
 
+  // Memoize the save callback with stable dependencies
   const save = useCallback(() => {
     saveFlow({
       resourceId: Number(resourceId),
@@ -174,6 +232,7 @@ function FlowsPageInner() {
     });
   }, [nodes, edges, saveFlow, resourceId]);
 
+  // Memoize layout callback with stable dependencies
   const layout = useCallback(() => {
     const layouted = getLayoutedElements(nodes, edges, { direction: 'TB' });
     setNodes([...layouted.nodes]);
@@ -181,6 +240,7 @@ function FlowsPageInner() {
     fitView();
   }, [nodes, edges, fitView, setNodes, setEdges]);
 
+  // Memoize addStartNode with stable dependency
   const addStartNode = useCallback(
     (nodeType: string) => {
       const newNode: Node = {
@@ -194,44 +254,147 @@ function FlowsPageInner() {
     [addNode]
   );
 
+  // Cache flow node types - this should rarely change
   const flowNodeTypes = useMemo(() => {
     const types: NodeTypes = {};
     Object.entries(AttraccessNodes).forEach(([key, value]) => {
       types[key] = value.component;
     });
     return types;
-  }, []);
+  }, []); // Empty dependency array since AttraccessNodes is static
 
-  const { onReconnectStart, onReconnect, onReconnectEnd } = useRemoveEdgeOnDrop();
-  const snapConnect = useSnapConnect();
-  const nodeEdgeIntersectionSnapConnect = useNodeEdgeIntersectionSnapConnect();
+  // Enhanced Safari and memory detection
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const { memoryPressure, checkMemory } = useMemoryMonitoring();
 
+  // Progressive feature enablement based on memory pressure
+  const shouldEnableSnapConnect = !isSafari && memoryPressure === 'low';
+  const shouldEnableEdgeIntersection = !isSafari && memoryPressure !== 'high';
+
+  // Create hooks but only use them conditionally
+  const removeEdgeOnDropHooks = useRemoveEdgeOnDrop();
+  const snapConnectHooks = useSnapConnect();
+  const nodeEdgeIntersectionSnapConnectHooks = useNodeEdgeIntersectionSnapConnect();
+
+  // Aggressive throttling for drag operations
+  const dragThrottle = useRef(0);
+  const AGGRESSIVE_THROTTLE = isSafari ? 100 : memoryPressure === 'high' ? 50 : 32;
+
+  // Memory-aware drag callbacks with progressive degradation
   const onNodeDrag: OnNodeDrag = useCallback(
     (...params) => {
-      snapConnect.onNodeDrag(...params);
-      nodeEdgeIntersectionSnapConnect.onNodeDrag(...params);
+      const now = Date.now();
+
+      // More aggressive throttling based on memory pressure
+      if (now - dragThrottle.current < AGGRESSIVE_THROTTLE) {
+        return;
+      }
+      dragThrottle.current = now;
+
+      // Check memory periodically during drag
+      checkMemory();
+
+      // Progressive feature degradation
+      if (shouldEnableSnapConnect) {
+        snapConnectHooks.onNodeDrag(...params);
+      }
+
+      if (shouldEnableEdgeIntersection) {
+        nodeEdgeIntersectionSnapConnectHooks.onNodeDrag(...params);
+      }
     },
-    [snapConnect, nodeEdgeIntersectionSnapConnect]
+    [
+      shouldEnableSnapConnect,
+      shouldEnableEdgeIntersection,
+      checkMemory,
+      AGGRESSIVE_THROTTLE,
+      snapConnectHooks,
+      nodeEdgeIntersectionSnapConnectHooks,
+    ]
   );
 
   const onNodeDragStop: OnNodeDrag = useCallback(
     (...params) => {
-      snapConnect.onNodeDragStop(...params);
-      nodeEdgeIntersectionSnapConnect.onNodeDragStop(...params);
+      // Always allow drag stop for consistency
+      if (shouldEnableSnapConnect) {
+        snapConnectHooks.onNodeDragStop(...params);
+      }
+
+      if (shouldEnableEdgeIntersection) {
+        nodeEdgeIntersectionSnapConnectHooks.onNodeDragStop(...params);
+      }
+
+      // Force garbage collection hint for Safari
+      if (isSafari && window.gc) {
+        window.gc();
+      }
     },
-    [snapConnect, nodeEdgeIntersectionSnapConnect]
+    [
+      shouldEnableSnapConnect,
+      shouldEnableEdgeIntersection,
+      isSafari,
+      nodeEdgeIntersectionSnapConnectHooks,
+      snapConnectHooks,
+    ]
   );
 
+  const [flowIsRunning, setFlowIsRunning] = useState(false);
+  const [flowExecutionHadError, setFlowExecutionHadError] = useState(false);
+
+  // Memory-aware live log callback
+  const onLiveLog = useCallback(
+    (log: ResourceFlowLog) => {
+      if (log.type === 'node.processing.failed') {
+        setFlowExecutionHadError(true);
+      }
+
+      if (log.type === 'flow.start') {
+        setFlowIsRunning(true);
+      }
+
+      if (log.type === 'flow.completed') {
+        setFlowIsRunning(false);
+        setFlowExecutionHadError(false);
+
+        if (!flowExecutionHadError) {
+          jsConfetti.current.addConfetti();
+        }
+      }
+    },
+    [flowExecutionHadError]
+  );
+
+  useEffect(() => {
+    addLiveLogReceiver(onLiveLog);
+    return () => {
+      removeLiveLogReceiver(onLiveLog);
+    };
+  }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
+
+  // Memory-aware edges with conditional animations
   const edgesWithCorrectType = useMemo(() => {
-    const mapped = edges.map((edge) => ({
+    return edges.map((edge) => ({
       ...edge,
       type: edge.type ?? 'attraccess-edge',
+      animated: flowIsRunning,
     }));
+  }, [edges, flowIsRunning]);
 
-    console.log(mapped);
+  // Status message based on active optimizations
+  const getStatusMessage = () => {
+    if (isSafari) {
+      return `Safari compatibility mode (Memory: ${memoryPressure})`;
+    }
+    if (memoryPressure === 'high') {
+      return 'High memory usage - some features disabled';
+    }
+    if (memoryPressure === 'medium') {
+      return 'Medium memory usage - reduced features';
+    }
+    return null;
+  };
 
-    return mapped;
-  }, [edges]);
+  const statusMessage = getStatusMessage();
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -240,6 +403,24 @@ function FlowsPageInner() {
         subtitle={t('subtitle')}
         backTo={`/resources/${resourceId}`}
       />
+
+      {statusMessage && (
+        <div
+          className={`p-2 text-sm ${
+            memoryPressure === 'high'
+              ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+              : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+          }`}
+        >
+          {statusMessage}
+          {memoryPressure !== 'low' && (
+            <span className="ml-2">
+              Features: Snap={shouldEnableSnapConnect ? '✓' : '✗'}
+              Intersect={shouldEnableEdgeIntersection ? '✓' : '✗'}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <ReactFlow
@@ -251,12 +432,13 @@ function FlowsPageInner() {
           colorMode={theme === 'dark' ? 'dark' : 'light'}
           fitView
           nodeTypes={flowNodeTypes}
-          defaultEdgeOptions={{ animated: true, style: { strokeWidth: 4 } }}
+          defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
-          onReconnectStart={onReconnectStart}
-          onReconnect={onReconnect}
-          onReconnectEnd={onReconnectEnd}
+          // Progressive reconnect feature enablement
+          onReconnectStart={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnectStart : undefined}
+          onReconnect={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnect : undefined}
+          onReconnectEnd={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnectEnd : undefined}
           edgeTypes={{
             'attraccess-edge': EdgeWithDeleteButton,
           }}
@@ -272,9 +454,9 @@ function FlowsPageInner() {
               onPress={save}
               isDisabled={!flowHasChanged}
             />
-            <LogViewer resourceId={Number(resourceId)}>
+            {/*<LogViewer resourceId={Number(resourceId)}>
               {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}
-            </LogViewer>
+            </LogViewer>*/}
             <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
             <NodePickerModal onSelect={addStartNode}>
               {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
@@ -287,8 +469,10 @@ function FlowsPageInner() {
 }
 
 export default function FlowsPage() {
+  const { id: resourceId } = useParams();
+
   return (
-    <FlowProvider>
+    <FlowProvider resourceId={Number(resourceId)}>
       <FlowsPageInner />
     </FlowProvider>
   );

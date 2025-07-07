@@ -20,9 +20,39 @@ import { Cron } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
 import { nanoid } from 'nanoid';
-import { WaitNodeData } from 'libs/database-entities/src/lib/entities/resourceFlowNode';
+import {
+  ResourceFlowActionHttpSendRequestNodeData,
+  ResourceFlowActionMqttSendMessageNodeData,
+  ResourceFlowActionUtilWaitNodeData,
+} from '@attraccess/database-entities';
+import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import axios from 'axios';
+import Handlebars from 'handlebars';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
+
+interface UsageEventData {
+  resource: {
+    id: number;
+  };
+  event: {
+    timestamp: Date;
+  };
+  usage: {
+    start: Date;
+    end: Date;
+  };
+  user: {
+    id: number;
+    username: string;
+    externalIdentifier: string;
+  };
+  previousUser?: {
+    id: number;
+    username: string;
+    externalIdentifier: string;
+  };
+}
 
 @Injectable()
 export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestroy {
@@ -39,7 +69,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly mqttClientService: MqttClientService
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -48,7 +79,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   onModuleInit() {
     // Send keep-alive messages every 30 seconds to prevent connection timeouts
     this.keepAliveInterval = setInterval(() => {
-      // For each resource subject, emit a keep-alive event
       this.resourceFlowLogSubjects.forEach((subject) => {
         subject.next({ data: { keepalive: true } });
       });
@@ -60,13 +90,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       clearInterval(this.keepAliveInterval);
     }
 
-    // Complete all subjects when the module is destroyed
     this.resourceFlowLogSubjects.forEach((subject) => subject.complete());
   }
 
-  /**
-   * Creates a log entry for a flow node
-   */
   private async createFlowLog(data: Omit<ResourceFlowLog, 'id' | 'createdAt' | 'resource'>): Promise<ResourceFlowLog> {
     const logEntry = this.flowLogRepository.create(data);
 
@@ -113,7 +139,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage started event for resource ID: ${resourceId}`);
 
     try {
-      await this.handleEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED);
+      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED, {
+        event: {
+          timestamp: event.startTime,
+        },
+        usage: {
+          start: event.startTime,
+          end: null,
+        },
+        user: {
+          id: event.user.id,
+          username: event.user.username,
+          externalIdentifier: event.user.externalIdentifier,
+        },
+        resource: {
+          id: event.resourceId,
+        },
+      });
       this.logger.log(`Successfully processed resource usage started event for resource ID: ${resourceId}`);
     } catch (error) {
       this.logger.error(`Failed to handle resource usage started event for resource ID: ${resourceId}`, error.stack);
@@ -128,7 +170,28 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage takeover event for resource ID: ${resourceId}`);
 
     try {
-      await this.handleEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER);
+      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER, {
+        event: {
+          timestamp: event.takeoverTime,
+        },
+        usage: {
+          start: event.takeoverTime,
+          end: null,
+        },
+        user: {
+          id: event.newUser.id,
+          username: event.newUser.username,
+          externalIdentifier: event.newUser.externalIdentifier,
+        },
+        previousUser: {
+          id: event.previousUser.id,
+          username: event.previousUser.username,
+          externalIdentifier: event.previousUser.externalIdentifier,
+        },
+        resource: {
+          id: event.resourceId,
+        },
+      });
       this.logger.log(`Successfully processed resource usage takeover event for resource ID: ${resourceId}`);
     } catch (error) {
       this.logger.error(`Failed to handle resource usage takeover event for resource ID: ${resourceId}`, error.stack);
@@ -143,7 +206,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage ended event for resource ID: ${resourceId}`);
 
     try {
-      await this.handleEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED);
+      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED, {
+        event: {
+          timestamp: event.endTime,
+        },
+        usage: {
+          start: event.startTime,
+          end: event.endTime,
+        },
+        user: {
+          id: event.user.id,
+          username: event.user.username,
+          externalIdentifier: event.user.externalIdentifier,
+        },
+        resource: {
+          id: event.resourceId,
+        },
+      });
       this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resourceId}`);
     } catch (error) {
       this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resourceId}`, error.stack);
@@ -151,7 +230,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async handleEvent(resourceId: number, eventType: ResourceFlowNodeType) {
+  private async handleResourceUsageEvent(
+    resourceId: number,
+    eventType: ResourceFlowNodeType,
+    eventData: UsageEventData
+  ) {
     this.logger.debug(`Looking for flow nodes of type '${eventType}' for resource ID: ${resourceId}`);
 
     const eventNodes = await this.flowNodeRepository.find({
@@ -169,44 +252,50 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(
       `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`
     );
-    this.logger.debug(`Processing nodes: ${eventNodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
+
+    await this.startFlow(eventNodes, eventData);
+  }
+
+  private async startFlow(node: ResourceFlowNode | ResourceFlowNode[], data: object) {
+    const nodes = Array.isArray(node) ? node : [node];
+
+    this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
+
+    const flowRunId = `${nanoid(3)}-${nanoid(3)}-${nanoid(3)}`;
+
+    await this.createFlowLog({
+      flowRunId,
+      nodeId: null,
+      resourceId: nodes[0].resourceId,
+      type: ResourceFlowLogType.FLOW_START,
+    });
 
     try {
       await Promise.all(
-        eventNodes.map((node) => {
-          return this.processNode(null, node);
+        nodes.map((node) => {
+          return this.processNode(flowRunId, node, data);
         })
       );
-      this.logger.log(
-        `Successfully processed all ${eventNodes.length} flow nodes for event type '${eventType}' and resource ID: ${resourceId}`
-      );
+      this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
     } catch (error) {
-      this.logger.error(
-        `Failed to process flow nodes for event type '${eventType}' and resource ID: ${resourceId}`,
-        error.stack
-      );
+      this.logger.error(`Failed to process flow nodes`, error.stack);
       throw error;
+    } finally {
+      await this.createFlowLog({
+        flowRunId,
+        nodeId: null,
+        resourceId: nodes[0].resourceId,
+        type: ResourceFlowLogType.FLOW_COMPLETED,
+      });
     }
   }
 
-  private async processNode(givenFlowRunId: string | null, node: ResourceFlowNode) {
-    let flowRunId: string = givenFlowRunId as string;
-    if (givenFlowRunId === null) {
-      flowRunId = `${nanoid(3)}-${nanoid(3)}-${nanoid(3)}`;
-    }
-
+  private async processNode(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: object) {
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
     const startTime = Date.now();
 
-    if (givenFlowRunId === null) {
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: node.id,
-        resourceId: node.resourceId,
-        type: ResourceFlowLogType.FLOW_START,
-      });
-    }
+    let responseOfNode: object = {};
 
     try {
       // Log the start of node processing
@@ -215,27 +304,27 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
+        payload: JSON.stringify({ input: resultOfPreviousNode }),
       });
 
       switch (node.type) {
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED:
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED:
         case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER:
+          responseOfNode = resultOfPreviousNode;
           break;
 
-        case ResourceFlowNodeType.ACTION_WAIT: {
-          const { duration, unit } = node.data as WaitNodeData;
-
-          let waitDurationMs = duration * 1000;
-          if (unit === 'minutes') {
-            waitDurationMs *= 60;
-          } else if (unit === 'hours') {
-            waitDurationMs *= 60 * 60;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, waitDurationMs));
+        case ResourceFlowNodeType.ACTION_WAIT:
+          responseOfNode = await this.processWaitNode(node, resultOfPreviousNode);
           break;
-        }
+
+        case ResourceFlowNodeType.ACTION_HTTP_SEND_REQUEST:
+          responseOfNode = await this.processHttpSendRequestNode(node, resultOfPreviousNode);
+          break;
+
+        case ResourceFlowNodeType.ACTION_MQTT_SEND_MESSAGE:
+          responseOfNode = await this.processMqttSendMessageNode(node, resultOfPreviousNode);
+          break;
 
         default: {
           await this.createFlowLog({
@@ -252,12 +341,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       const processingTime = Date.now() - startTime;
       this.logger.debug(`Successfully processed flow node ID: ${node.id} (Type: ${node.type}) in ${processingTime}ms`);
 
-      // Log successful completion
       await this.createFlowLog({
         flowRunId,
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
+        payload: JSON.stringify({ output: responseOfNode }),
       });
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -266,7 +355,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         error.stack
       );
 
-      // Log the error
       await this.createFlowLog({
         flowRunId,
         nodeId: node.id,
@@ -278,10 +366,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       throw error;
     }
 
-    await this.executeNextNode(flowRunId, node);
+    await this.executeNextNodes(flowRunId, node, responseOfNode);
   }
 
-  private async executeNextNode(flowRunId: string, node: ResourceFlowNode) {
+  private async executeNextNodes(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: object) {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
     const edgesFromThisNode = await this.flowEdgeRepository.find({
@@ -294,12 +382,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       this.logger.debug(
         `No outgoing edges found from node ID: ${node.id} (Type: ${node.type}) - flow execution stops here`
       );
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: node.id,
-        resourceId: node.resourceId,
-        type: ResourceFlowLogType.FLOW_COMPLETED,
-      });
       return;
     }
 
@@ -324,9 +406,60 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     this.logger.debug(`Executing ${nextNodes.length} next node(s) from node ID: ${node.id} (Type: ${node.type})`);
 
-    await Promise.all(nextNodes.map((nextNode) => this.processNode(flowRunId, nextNode)));
+    await Promise.all(nextNodes.map((nextNode) => this.processNode(flowRunId, nextNode, resultOfPreviousNode)));
     this.logger.debug(
       `Successfully executed all ${nextNodes.length} next node(s) from node ID: ${node.id} (Type: ${node.type})`
     );
+  }
+
+  private async processWaitNode(node: ResourceFlowNode, input: object) {
+    const { duration, unit } = node.data as ResourceFlowActionUtilWaitNodeData;
+
+    let waitDurationMs = duration * 1000;
+    if (unit === 'minutes') {
+      waitDurationMs *= 60;
+    } else if (unit === 'hours') {
+      waitDurationMs *= 60 * 60;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, waitDurationMs));
+
+    return input;
+  }
+
+  private async processHttpSendRequestNode(node: ResourceFlowNode, input: object) {
+    const data = node.data as ResourceFlowActionHttpSendRequestNodeData;
+
+    const url = this.compileTemplate(data.url ?? '', input);
+    const method = this.compileTemplate(data.method ?? '', input);
+    const headers = Object.fromEntries(
+      Object.entries(data.headers).map(([key, value]) => [key, this.compileTemplate(value, input)])
+    );
+    const body = this.compileTemplate(data.body ?? '', input);
+
+    const response = await axios.request({
+      url,
+      method,
+      headers,
+      data: body,
+    });
+
+    return response.data;
+  }
+
+  private async processMqttSendMessageNode(node: ResourceFlowNode, input: object) {
+    const { serverId, ...data } = node.data as ResourceFlowActionMqttSendMessageNodeData;
+
+    const topic = this.compileTemplate(data.topic ?? '', input);
+    const payload = this.compileTemplate(data.payload ?? '', input);
+
+    await this.mqttClientService.publish(serverId, topic, payload);
+
+    return input;
+  }
+
+  private compileTemplate(template: string, data: object): string {
+    const compiledTemplate = Handlebars.compile(template);
+    return compiledTemplate({ input: data });
   }
 }

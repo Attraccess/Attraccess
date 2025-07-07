@@ -1,5 +1,11 @@
 {
   "action": {
+    "http": {
+      "sendRequest": {
+        "title": "HTTP-Anfrage senden",
+        "description": "Sendet eine HTTP-Anfrage."
+      }
+    },
     "mqtt": {
       "sendMessage": {
         "title": "MQTT-Nachricht senden",

@@ -31,7 +31,7 @@ export type SidebarItemGroup = {
   icon: React.FunctionComponent<LucideProps>;
   openByDefault?: boolean;
   items: SidebarItem[];
-  translationKey?: string;
+  translationKey: string;
 };
 
 export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [

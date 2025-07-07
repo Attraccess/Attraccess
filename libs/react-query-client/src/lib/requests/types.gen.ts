@@ -1517,7 +1517,7 @@ export type ResourceFlowLog = {
     /**
      * The node id of the node that generated the log
      */
-    nodeId: string;
+    nodeId: string | null;
     /**
      * The run/execution id of the flow that generated the log
      */

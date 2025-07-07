@@ -56,12 +56,16 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 }
 
 // Type definitions for node data
-export type EventNodeData = z.infer<typeof EventNodeDataSchema>;
-export type HttpRequestNodeData = z.infer<typeof HttpRequestNodeDataSchema>;
-export type MqttSendMessageNodeData = z.infer<typeof MqttSendMessageNodeDataSchema>;
-export type WaitNodeData = z.infer<typeof WaitNodeDataSchema>;
+export type ResourceFlowEventNodeData = z.infer<typeof EventNodeDataSchema>;
+export type ResourceFlowActionHttpSendRequestNodeData = z.infer<typeof HttpRequestNodeDataSchema>;
+export type ResourceFlowActionMqttSendMessageNodeData = z.infer<typeof MqttSendMessageNodeDataSchema>;
+export type ResourceFlowActionUtilWaitNodeData = z.infer<typeof WaitNodeDataSchema>;
 
-export type ResourceFlowNodeData = EventNodeData | HttpRequestNodeData | MqttSendMessageNodeData | WaitNodeData;
+export type ResourceFlowNodeData =
+  | ResourceFlowEventNodeData
+  | ResourceFlowActionHttpSendRequestNodeData
+  | ResourceFlowActionMqttSendMessageNodeData
+  | ResourceFlowActionUtilWaitNodeData;
 
 export class ResourceFlowNodePosition {
   @Column({ type: 'integer' })

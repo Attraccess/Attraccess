@@ -2,7 +2,12 @@
   "editor": {
     "inputs": {
       "url": {
-        "label": "URL"
+        "origin": {
+          "label": "Origin"
+        },
+        "pathname": {
+          "label": "Pathname"
+        }
       },
       "method": {
         "label": "Method"

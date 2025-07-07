@@ -28,6 +28,9 @@ import {
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
   ResourceFlowNodeData,
+  ResourceFlowActionHttpSendRequestNodeData,
+  ResourceFlowActionMqttSendMessageNodeData,
+  ResourceFlowActionUtilWaitNodeData,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -67,6 +70,9 @@ export {
   ResourceFlowNodeData,
   ResourceFlowLog,
   ResourceFlowLogType,
+  ResourceFlowActionHttpSendRequestNodeData,
+  ResourceFlowActionMqttSendMessageNodeData,
+  ResourceFlowActionUtilWaitNodeData,
 };
 
 // Export the entities object

@@ -1,5 +1,11 @@
 {
   "action": {
+    "http": {
+      "sendRequest": {
+        "title": "Send HTTP request",
+        "description": "This node sends a HTTP request."
+      }
+    },
     "mqtt": {
       "sendMessage": {
         "title": "MQTT message send",

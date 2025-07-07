@@ -58,7 +58,6 @@ export function WaitNode(
       unit,
     });
 
-    console.log('updated node data', { duration, unit });
     onCloseEditor();
   }, [duration, unit, nodeId, updateNodeData, onCloseEditor]);
 

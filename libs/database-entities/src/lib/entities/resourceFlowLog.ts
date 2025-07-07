@@ -19,12 +19,13 @@ export class ResourceFlowLog {
   })
   id!: number;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description: 'The node id of the node that generated the log',
     example: 'TGVgqDzCKXKVr-XGUD5V3',
+    nullable: true,
   })
-  nodeId!: string;
+  nodeId!: string | null;
 
   @Column({ type: 'text', nullable: false })
   @ApiProperty({

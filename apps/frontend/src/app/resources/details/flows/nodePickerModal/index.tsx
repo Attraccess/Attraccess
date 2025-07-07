@@ -22,6 +22,16 @@ interface Props {
   nodeTypes?: AttraccessNodeType[];
 }
 
+interface NodeEntry {
+  key: string;
+  node: AttraccessNode;
+}
+
+interface NodeGroup {
+  type: AttraccessNodeType;
+  nodes: NodeEntry[];
+}
+
 export function NodePickerModal(props: Props) {
   const { isOpen, onOpenChange, onClose, onOpen } = useDisclosure();
 
@@ -30,25 +40,43 @@ export function NodePickerModal(props: Props) {
     en,
   });
 
-  const nodesToShow = useMemo(() => {
-    if (!props.nodeTypes) {
-      return Object.entries(AttraccessNodes);
+  // Convert nodes object to array format upfront
+  const allNodesArray = useMemo((): NodeEntry[] => {
+    return Object.entries(AttraccessNodes).map(([key, node]) => ({
+      key,
+      node,
+    }));
+  }, []);
+
+  // Filter nodes by allowed types if specified
+  const availableNodes = useMemo((): NodeEntry[] => {
+    if (!props.nodeTypes || props.nodeTypes.length === 0) {
+      return allNodesArray;
     }
 
-    return Object.entries(AttraccessNodes).filter(([, nodeData]) =>
-      (props.nodeTypes as AttraccessNodeType[]).includes(nodeData.type)
-    );
-  }, [props.nodeTypes]);
+    return allNodesArray.filter((nodeEntry) => props.nodeTypes!.includes(nodeEntry.node.type));
+  }, [allNodesArray, props.nodeTypes]);
 
-  const nodesByType = useMemo(() => {
-    return nodesToShow.reduce((acc, [key, nodeData]) => {
-      if (!acc[nodeData.type]) {
-        acc[nodeData.type] = [];
+  // Group nodes by their type
+  const nodeGroups = useMemo((): NodeGroup[] => {
+    // Initialize groups array
+    const groups: NodeGroup[] = [
+      { type: AttraccessNodeType.input, nodes: [] },
+      { type: AttraccessNodeType.output, nodes: [] },
+      { type: AttraccessNodeType.inputOutput, nodes: [] },
+    ];
+
+    // Group nodes by type
+    availableNodes.forEach((nodeEntry) => {
+      const group = groups.find((g) => g.type === nodeEntry.node.type);
+      if (group) {
+        group.nodes.push(nodeEntry);
       }
-      acc[nodeData.type].push([key, nodeData]);
-      return acc;
-    }, {} as Record<AttraccessNodeType, Array<[string, AttraccessNode]>>);
-  }, [nodesToShow]);
+    });
+
+    // Return only groups that have nodes
+    return groups.filter((group) => group.nodes.length > 0);
+  }, [availableNodes]);
 
   const onSelect = useCallback(
     (nodeType: string) => {
@@ -65,17 +93,17 @@ export function NodePickerModal(props: Props) {
         <ModalContent>
           <ModalHeader>{t('title')}</ModalHeader>
           <ModalBody className="flex flex-col gap-4">
-            <Accordion defaultExpandedKeys={Object.keys(nodesByType)}>
-              {Object.entries(nodesByType).map(([type, nodes]) => (
-                <AccordionItem key={type} title={t('nodeType.' + type)}>
+            <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
+              {nodeGroups.map((group, index) => (
+                <AccordionItem key={index} title={t('nodeType.' + group.type)}>
                   <div className="flex flex-row flex-wrap gap-4">
-                    {nodes.map(([key, node]) => (
+                    {group.nodes.map((nodeEntry) => (
                       <div
-                        key={key}
-                        onClick={() => onSelect(key)}
+                        key={nodeEntry.key}
+                        onClick={() => onSelect(nodeEntry.key)}
                         className="cursor-pointer hover:scale-105 transition-all"
                       >
-                        <node.component {...({ previewMode: true } as unknown as NodeProps)} />
+                        <nodeEntry.node.component {...({ previewMode: true } as unknown as NodeProps)} />
                       </div>
                     ))}
                   </div>

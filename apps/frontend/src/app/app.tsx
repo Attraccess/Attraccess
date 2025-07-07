@@ -3,7 +3,7 @@ import { Unauthorized } from './unauthorized/unauthorized';
 import { useTheme } from '@heroui/use-theme';
 import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
-import { useAuth, usePersistedAuth, useRefreshSession } from '../hooks/useAuth';
+import { useAuth, usePersistedAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verifyEmail';
 import { ToastProvider } from '../components/toastProvider';
@@ -129,7 +129,7 @@ function AppContent() {
 
 export function App() {
   usePersistedAuth();
-  useRefreshSession();
+  // useRefreshSession();
   const { isInitialized } = useAuth();
   const { setTheme } = useTheme();
 

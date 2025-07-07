@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from '@xyflow/react';
 import { Button, cn } from '@heroui/react';
 import { Trash2Icon } from 'lucide-react';
@@ -47,7 +47,6 @@ export function EdgeWithDeleteButton(props: EdgeProps) {
               pointerEvents: 'all',
             }}
             onPress={removeEdge}
-            isDisabled={!selected}
             isIconOnly
             startContent={<Trash2Icon />}
           />

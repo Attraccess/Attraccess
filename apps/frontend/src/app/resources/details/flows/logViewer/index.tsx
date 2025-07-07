@@ -1,15 +1,4 @@
-import {
-  Accordion,
-  AccordionItem,
-  Code,
-  Divider,
-  Drawer,
-  DrawerBody,
-  DrawerContent,
-  DrawerHeader,
-  Textarea,
-  useDisclosure,
-} from '@heroui/react';
+import { Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea, useDisclosure } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -18,17 +7,18 @@ import {
   useResourceFlowsServiceGetResourceFlow,
   useResourceFlowsServiceGetResourceFlowLogs,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { events } from 'fetch-event-stream';
+import { useSSEQuery } from '../../../../../api/useSSEQuery';
+import { InfoIcon, LogsIcon } from 'lucide-react';
+import { Accordion } from '../../../../../components/accordion';
 
 import de from './de.json';
 import en from './en.json';
 
 import nodeTranslationsDe from '../nodes/de.json';
 import nodeTranslationsEn from '../nodes/en.json';
-import { InfoIcon, LogsIcon } from 'lucide-react';
 
 interface Props {
   children: (open: () => void) => React.ReactNode;
@@ -52,60 +42,28 @@ export function LogViewer(props: Props) {
   const [limit, setLimit] = useState(50);
   const [page, setPage] = useState(1);
 
-  const [sseLogs, setSseLogs] = useState<ResourceFlowLog[]>([]);
-
   const { token: authToken } = useAuth();
 
-  const startListeningToLogs = useCallback(async () => {
-    console.log('startListeningToLogs', authToken);
-
-    if (!authToken) {
-      return null;
-    }
-
-    const url = `${getBaseUrl()}/api/resources/${props.resourceId}/flow/logs/live`;
-
-    const abort = new AbortController();
-
-    // Manually fetch a Response
-    const res = await fetch(url, {
+  const { data: sseLogs } = useSSEQuery<ResourceFlowLog>({
+    queryKey: ['resource-flow-logs', props.resourceId],
+    url: `${getBaseUrl()}/api/resources/${props.resourceId}/flow/logs/live`,
+    init: {
       method: 'GET',
-      signal: abort.signal,
       headers: {
         Authorization: `Bearer ${authToken}`,
       },
-    });
-
-    if (res.ok) {
-      const stream = events(res, abort.signal);
-      for await (const event of stream) {
-        const data = JSON.parse(event.data as string);
-        if (data.keepalive) {
-          continue;
-        }
-
-        console.log('new log: ', data);
-
-        setSseLogs((prev) => [...prev, data]);
-      }
-    }
-
-    return abort;
-  }, [props.resourceId, authToken]);
-
-  useEffect(() => {
-    const ctrl = startListeningToLogs();
-    return () => {
-      ctrl?.then((ctrl) => ctrl?.abort());
-    };
-  }, [startListeningToLogs]);
+    },
+    queryOptions: {
+      enabled: !!authToken,
+    },
+  });
 
   const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
   const { data: logs } = useResourceFlowsServiceGetResourceFlowLogs({ limit, page, resourceId: props.resourceId });
 
   const logsWithNodes = useMemo(() => {
-    const allLogs = [...(logs?.data ?? []), ...sseLogs];
-    console.log('allLogs: ', allLogs.length);
+    const allLogs = [...(logs?.data ?? []), ...(sseLogs ?? [])];
+
     return allLogs.map((log) => {
       const nodeOfLog = flowData?.nodes.find((node) => node.id === log.nodeId);
       return {
@@ -116,8 +74,8 @@ export function LogViewer(props: Props) {
   }, [flowData, logs, sseLogs]);
 
   const logsOrdered = useMemo(() => {
-    // decending by createdAt
-    return logsWithNodes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // descending by id
+    return logsWithNodes.sort((a, b) => a.id - b.id);
   }, [logsWithNodes]);
 
   const logsByRunId = useMemo(() => {
@@ -158,16 +116,21 @@ export function LogViewer(props: Props) {
                       subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
                       noMargin
                     />
-                    <Accordion isCompact className="mt-2">
-                      {logsOfRun.map((log) => (
-                        <AccordionItem
-                          key={`${runId}-${log.id}`}
-                          title={`${t('nodes.' + log.node?.type + '.title')} -> ${log.type}`}
-                          indicator={log.payload ? <LogsIcon /> : <InfoIcon className="hidden" />}
-                        >
-                          {log.payload && <Textarea isReadOnly value={JSON.stringify(log.payload, null, 2)} />}
-                        </AccordionItem>
-                      ))}
+
+                    <Accordion
+                      items={logsOfRun}
+                      itemKey={(log) => `${runId}-${log.id}`}
+                      itemTitle={(log) => `${t('nodes.' + log.node?.type + '.title')} -> ${log.type}`}
+                      variant="flat"
+                      className="mt-2"
+                    >
+                      {(log) => (
+                        <>
+                          {log.payload && (
+                            <Textarea isReadOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
+                          )}
+                        </>
+                      )}
                     </Accordion>
                   </div>
                   {index < self.length - 1 && <Divider className="my-4" />}

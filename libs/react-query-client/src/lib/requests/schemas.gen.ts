@@ -2262,7 +2262,8 @@ export const $ResourceFlowLog = {
         nodeId: {
             type: 'string',
             description: 'The node id of the node that generated the log',
-            example: 'TGVgqDzCKXKVr-XGUD5V3'
+            example: 'TGVgqDzCKXKVr-XGUD5V3',
+            nullable: true
         },
         flowRunId: {
             type: 'string',

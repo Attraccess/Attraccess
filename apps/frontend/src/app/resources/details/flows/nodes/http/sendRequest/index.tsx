@@ -136,6 +136,12 @@ export function HTTPRequestNode(
     return `${headerCount} header${headerCount === 1 ? '' : 's'}`;
   }, [node?.data.headers]);
 
+  const urlObject = useMemo(() => {
+    const urlString = node?.data.url as string;
+    if (!urlString) return null;
+    return new URL(urlString);
+  }, [node?.data.url]);
+
   return (
     <BaseNodeCard
       title={t('nodes.action.http.sendRequest.title')}
@@ -148,18 +154,10 @@ export function HTTPRequestNode(
       <div className="flex flex-col gap-2">
         <Input label={t('editor.inputs.method.label')} isReadOnly value={node?.data.method as string} />
         <Input
-          label={t('editor.inputs.url.label')}
+          label={t('editor.inputs.url.origin.label')}
           isReadOnly
-          value={node?.data.url as string}
-          title={node?.data.url as string}
-        />
-        <Input label={t('editor.inputs.headers.label')} isReadOnly value={headersDisplay} />
-        <Textarea
-          label={t('editor.inputs.body.label')}
-          title={node?.data.body as string}
-          isReadOnly
-          value={shortBody}
-          rows={4}
+          value={urlObject?.origin}
+          title={urlObject?.toString()}
         />
       </div>
 
