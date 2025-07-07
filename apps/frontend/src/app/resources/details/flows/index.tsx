@@ -37,7 +37,6 @@ import { AttraccessNodes } from './nodes';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogViewer } from './logViewer';
 import { useSnapConnect } from './useSnapConnect';
 import { useRemoveEdgeOnDrop } from './useRemoveEdgeOnDrop';
 import { useNodeEdgeIntersectionSnapConnect } from './useNodeEdgeIntersectionSnapConnect';
@@ -86,38 +85,6 @@ function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNod
 
 function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdgeDto | Edge): boolean {
   return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
-}
-
-// Memory monitoring and automatic degradation
-function useMemoryMonitoring() {
-  const [memoryPressure, setMemoryPressure] = useState<'low' | 'medium' | 'high'>('low');
-  const lastMemoryCheck = useRef(0);
-
-  const checkMemory = useCallback(() => {
-    const now = Date.now();
-    if (now - lastMemoryCheck.current < 2000) return; // Check every 2 seconds
-    lastMemoryCheck.current = now;
-
-    // Type assertion for performance.memory which is non-standard
-    const perfMemory = (performance as any).memory;
-    if (perfMemory) {
-      const usedMB = perfMemory.usedJSHeapSize / 1024 / 1024;
-      const limitMB = perfMemory.totalJSHeapSize / 1024 / 1024;
-      const usage = usedMB / limitMB;
-
-      if (usage > 0.8) {
-        setMemoryPressure('high');
-        console.warn('High memory pressure detected:', Math.round(usedMB) + 'MB');
-      } else if (usage > 0.6) {
-        setMemoryPressure('medium');
-      } else {
-        setMemoryPressure('low');
-      }
-    }
-  }, []);
-
-  // Check memory on every drag operation
-  return { memoryPressure, checkMemory };
 }
 
 function FlowsPageInner() {
@@ -263,79 +230,26 @@ function FlowsPageInner() {
     return types;
   }, []); // Empty dependency array since AttraccessNodes is static
 
-  // Enhanced Safari and memory detection
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const { memoryPressure, checkMemory } = useMemoryMonitoring();
-
-  // Progressive feature enablement based on memory pressure
-  const shouldEnableSnapConnect = !isSafari && memoryPressure === 'low';
-  const shouldEnableEdgeIntersection = !isSafari && memoryPressure !== 'high';
-
   // Create hooks but only use them conditionally
   const removeEdgeOnDropHooks = useRemoveEdgeOnDrop();
   const snapConnectHooks = useSnapConnect();
   const nodeEdgeIntersectionSnapConnectHooks = useNodeEdgeIntersectionSnapConnect();
 
-  // Aggressive throttling for drag operations
-  const dragThrottle = useRef(0);
-  const AGGRESSIVE_THROTTLE = isSafari ? 100 : memoryPressure === 'high' ? 50 : 32;
-
   // Memory-aware drag callbacks with progressive degradation
   const onNodeDrag: OnNodeDrag = useCallback(
     (...params) => {
-      const now = Date.now();
-
-      // More aggressive throttling based on memory pressure
-      if (now - dragThrottle.current < AGGRESSIVE_THROTTLE) {
-        return;
-      }
-      dragThrottle.current = now;
-
-      // Check memory periodically during drag
-      checkMemory();
-
-      // Progressive feature degradation
-      if (shouldEnableSnapConnect) {
-        snapConnectHooks.onNodeDrag(...params);
-      }
-
-      if (shouldEnableEdgeIntersection) {
-        nodeEdgeIntersectionSnapConnectHooks.onNodeDrag(...params);
-      }
+      snapConnectHooks.onNodeDrag(...params);
+      nodeEdgeIntersectionSnapConnectHooks.onNodeDrag(...params);
     },
-    [
-      shouldEnableSnapConnect,
-      shouldEnableEdgeIntersection,
-      checkMemory,
-      AGGRESSIVE_THROTTLE,
-      snapConnectHooks,
-      nodeEdgeIntersectionSnapConnectHooks,
-    ]
+    [snapConnectHooks, nodeEdgeIntersectionSnapConnectHooks]
   );
 
   const onNodeDragStop: OnNodeDrag = useCallback(
     (...params) => {
-      // Always allow drag stop for consistency
-      if (shouldEnableSnapConnect) {
-        snapConnectHooks.onNodeDragStop(...params);
-      }
-
-      if (shouldEnableEdgeIntersection) {
-        nodeEdgeIntersectionSnapConnectHooks.onNodeDragStop(...params);
-      }
-
-      // Force garbage collection hint for Safari
-      if (isSafari && window.gc) {
-        window.gc();
-      }
+      snapConnectHooks.onNodeDragStop(...params);
+      nodeEdgeIntersectionSnapConnectHooks.onNodeDragStop(...params);
     },
-    [
-      shouldEnableSnapConnect,
-      shouldEnableEdgeIntersection,
-      isSafari,
-      nodeEdgeIntersectionSnapConnectHooks,
-      snapConnectHooks,
-    ]
+    [nodeEdgeIntersectionSnapConnectHooks, snapConnectHooks]
   );
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
@@ -380,22 +294,6 @@ function FlowsPageInner() {
     }));
   }, [edges, flowIsRunning]);
 
-  // Status message based on active optimizations
-  const getStatusMessage = () => {
-    if (isSafari) {
-      return `Safari compatibility mode (Memory: ${memoryPressure})`;
-    }
-    if (memoryPressure === 'high') {
-      return 'High memory usage - some features disabled';
-    }
-    if (memoryPressure === 'medium') {
-      return 'Medium memory usage - reduced features';
-    }
-    return null;
-  };
-
-  const statusMessage = getStatusMessage();
-
   return (
     <div className="h-full w-full flex flex-col">
       <PageHeader
@@ -403,24 +301,6 @@ function FlowsPageInner() {
         subtitle={t('subtitle')}
         backTo={`/resources/${resourceId}`}
       />
-
-      {statusMessage && (
-        <div
-          className={`p-2 text-sm ${
-            memoryPressure === 'high'
-              ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-              : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
-          }`}
-        >
-          {statusMessage}
-          {memoryPressure !== 'low' && (
-            <span className="ml-2">
-              Features: Snap={shouldEnableSnapConnect ? '✓' : '✗'}
-              Intersect={shouldEnableEdgeIntersection ? '✓' : '✗'}
-            </span>
-          )}
-        </div>
-      )}
 
       <div className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
         <ReactFlow
@@ -435,10 +315,9 @@ function FlowsPageInner() {
           defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
-          // Progressive reconnect feature enablement
-          onReconnectStart={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnectStart : undefined}
-          onReconnect={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnect : undefined}
-          onReconnectEnd={shouldEnableEdgeIntersection ? removeEdgeOnDropHooks.onReconnectEnd : undefined}
+          onReconnectStart={removeEdgeOnDropHooks.onReconnectStart}
+          onReconnect={removeEdgeOnDropHooks.onReconnect}
+          onReconnectEnd={removeEdgeOnDropHooks.onReconnectEnd}
           edgeTypes={{
             'attraccess-edge': EdgeWithDeleteButton,
           }}
