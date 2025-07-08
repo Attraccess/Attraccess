@@ -1,4 +1,14 @@
-import { Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea, useDisclosure } from '@heroui/react';
+import {
+  Accordion,
+  AccordionItem,
+  Divider,
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  Textarea,
+  useDisclosure,
+} from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -8,17 +18,13 @@ import {
   useResourceFlowsServiceGetResourceFlowLogs,
 } from '@attraccess/react-query-client';
 import { useCallback, useMemo, useState } from 'react';
-import { getBaseUrl } from '../../../../../api';
-import { useAuth } from '../../../../../hooks/useAuth';
-import { useSSEQuery } from '../../../../../api/useSSEQuery';
-import { InfoIcon, LogsIcon } from 'lucide-react';
-import { Accordion } from '../../../../../components/accordion';
 
 import de from './de.json';
 import en from './en.json';
 
 import nodeTranslationsDe from '../nodes/de.json';
 import nodeTranslationsEn from '../nodes/en.json';
+import { useFlowContext } from '../flowContext';
 
 interface Props {
   children: (open: () => void) => React.ReactNode;
@@ -42,21 +48,7 @@ export function LogViewer(props: Props) {
   const [limit, setLimit] = useState(50);
   const [page, setPage] = useState(1);
 
-  const { token: authToken } = useAuth();
-
-  const { data: sseLogs } = useSSEQuery<ResourceFlowLog>({
-    queryKey: ['resource-flow-logs', props.resourceId],
-    url: `${getBaseUrl()}/api/resources/${props.resourceId}/flow/logs/live`,
-    init: {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    },
-    queryOptions: {
-      enabled: !!authToken,
-    },
-  });
+  const { liveLogs: sseLogs } = useFlowContext();
 
   const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
   const { data: logs } = useResourceFlowsServiceGetResourceFlowLogs({ limit, page, resourceId: props.resourceId });
@@ -74,7 +66,6 @@ export function LogViewer(props: Props) {
   }, [flowData, logs, sseLogs]);
 
   const logsOrdered = useMemo(() => {
-    // descending by id
     return logsWithNodes.sort((a, b) => a.id - b.id);
   }, [logsWithNodes]);
 
@@ -117,20 +108,17 @@ export function LogViewer(props: Props) {
                       noMargin
                     />
 
-                    <Accordion
-                      items={logsOfRun}
-                      itemKey={(log) => `${runId}-${log.id}`}
-                      itemTitle={(log) => `${t('nodes.' + log.node?.type + '.title')} -> ${log.type}`}
-                      variant="flat"
-                      className="mt-2"
-                    >
-                      {(log) => (
-                        <>
+                    <Accordion className="mt-2">
+                      {logsOfRun.map((log) => (
+                        <AccordionItem
+                          key={`${runId}-${log.id}`}
+                          title={`${t('nodes.' + log.node?.type + '.title')} -> ${log.type}`}
+                        >
                           {log.payload && (
                             <Textarea isReadOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
                           )}
-                        </>
-                      )}
+                        </AccordionItem>
+                      ))}
                     </Accordion>
                   </div>
                   {index < self.length - 1 && <Divider className="my-4" />}

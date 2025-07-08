@@ -11,7 +11,6 @@ import {
   Edge,
   useReactFlow,
   NodeTypes,
-  OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -23,29 +22,27 @@ import {
   useResourceFlowsServiceSaveResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
-import { CheckIcon, LayoutGridIcon, PlusIcon, SaveIcon } from 'lucide-react';
+import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
-
-import de from './de.json';
-import en from './en.json';
 import { AttraccessNodes } from './nodes';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSnapConnect } from './useSnapConnect';
-import { useRemoveEdgeOnDrop } from './useRemoveEdgeOnDrop';
-import { useNodeEdgeIntersectionSnapConnect } from './useNodeEdgeIntersectionSnapConnect';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
+import { LogViewer } from './logViewer';
 
-function getLayoutedElements(nodes: Node[], edges: Edge[], options: { direction: 'TB' | 'LR' }) {
+import de from './de.json';
+import en from './en.json';
+
+function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: options.direction });
+  g.setGraph({ rankdir: 'TB' });
 
   edges.forEach((edge) => g.setEdge(edge.source, edge.target));
   nodes.forEach((node) =>
@@ -87,6 +84,8 @@ function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdg
   return edge1.id === edge2.id && edge1.source === edge2.source && edge1.target === edge2.target;
 }
 
+const jsConfetti = new JSConfetti();
+
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
@@ -94,7 +93,6 @@ function FlowsPageInner() {
   const { t } = useTranslations('resources.details.flows', { de, en });
   const { setPullToRefreshIsEnabled } = usePtrStore();
   const queryClient = useQueryClient();
-  const jsConfetti = useRef<JSConfetti>(new JSConfetti());
 
   useEffect(() => {
     setPullToRefreshIsEnabled(false);
@@ -188,7 +186,6 @@ function FlowsPageInner() {
     return nodesHaveChanged || edgesHaveChanged;
   }, [nodesHaveChanged, edgesHaveChanged]);
 
-  // Memoize the save callback with stable dependencies
   const save = useCallback(() => {
     saveFlow({
       resourceId: Number(resourceId),
@@ -199,15 +196,13 @@ function FlowsPageInner() {
     });
   }, [nodes, edges, saveFlow, resourceId]);
 
-  // Memoize layout callback with stable dependencies
   const layout = useCallback(() => {
-    const layouted = getLayoutedElements(nodes, edges, { direction: 'TB' });
+    const layouted = getLayoutedElements(nodes, edges);
     setNodes([...layouted.nodes]);
     setEdges([...layouted.edges]);
     fitView();
   }, [nodes, edges, fitView, setNodes, setEdges]);
 
-  // Memoize addStartNode with stable dependency
   const addStartNode = useCallback(
     (nodeType: string) => {
       const newNode: Node = {
@@ -221,61 +216,56 @@ function FlowsPageInner() {
     [addNode]
   );
 
-  // Cache flow node types - this should rarely change
   const flowNodeTypes = useMemo(() => {
     const types: NodeTypes = {};
     Object.entries(AttraccessNodes).forEach(([key, value]) => {
       types[key] = value.component;
     });
     return types;
-  }, []); // Empty dependency array since AttraccessNodes is static
-
-  // Create hooks but only use them conditionally
-  const removeEdgeOnDropHooks = useRemoveEdgeOnDrop();
-  const snapConnectHooks = useSnapConnect();
-  const nodeEdgeIntersectionSnapConnectHooks = useNodeEdgeIntersectionSnapConnect();
-
-  // Memory-aware drag callbacks with progressive degradation
-  const onNodeDrag: OnNodeDrag = useCallback(
-    (...params) => {
-      snapConnectHooks.onNodeDrag(...params);
-      nodeEdgeIntersectionSnapConnectHooks.onNodeDrag(...params);
-    },
-    [snapConnectHooks, nodeEdgeIntersectionSnapConnectHooks]
-  );
-
-  const onNodeDragStop: OnNodeDrag = useCallback(
-    (...params) => {
-      snapConnectHooks.onNodeDragStop(...params);
-      nodeEdgeIntersectionSnapConnectHooks.onNodeDragStop(...params);
-    },
-    [nodeEdgeIntersectionSnapConnectHooks, snapConnectHooks]
-  );
+  }, []);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [flowExecutionHadError, setFlowExecutionHadError] = useState(false);
-
-  // Memory-aware live log callback
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
+      console.log('[FlowsPageInner] log.type:', log.type);
+
       if (log.type === 'node.processing.failed') {
+        console.log('[FlowsPageInner] Setting flow execution had error to true');
         setFlowExecutionHadError(true);
+        return;
       }
 
       if (log.type === 'flow.start') {
+        console.log('[FlowsPageInner] Flow started');
         setFlowIsRunning(true);
+        return;
       }
 
       if (log.type === 'flow.completed') {
+        console.log('[FlowsPageInner] Flow completed');
         setFlowIsRunning(false);
-        setFlowExecutionHadError(false);
 
-        if (!flowExecutionHadError) {
-          jsConfetti.current.addConfetti();
-        }
+        // Use functional state update to get current error state
+        setFlowExecutionHadError((currentErrorState) => {
+          console.log('[FlowsPageInner] Current error state:', currentErrorState);
+
+          if (!currentErrorState) {
+            jsConfetti.addConfetti();
+          } else {
+            jsConfetti.addConfetti({
+              emojis: ['❌', '😢', '💔', '😭', '🚫', '⚠️', '💥', '👎'],
+              emojiSize: 100,
+              confettiNumber: 2,
+            });
+          }
+
+          // Reset error state for next execution
+          return false;
+        });
       }
     },
-    [flowExecutionHadError]
+    [setFlowIsRunning, setFlowExecutionHadError]
   );
 
   useEffect(() => {
@@ -285,7 +275,6 @@ function FlowsPageInner() {
     };
   }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
 
-  // Memory-aware edges with conditional animations
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
       ...edge,
@@ -311,13 +300,8 @@ function FlowsPageInner() {
           onConnect={onConnect}
           colorMode={theme === 'dark' ? 'dark' : 'light'}
           fitView
-          nodeTypes={flowNodeTypes}
           defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
-          onNodeDrag={onNodeDrag}
-          onNodeDragStop={onNodeDragStop}
-          onReconnectStart={removeEdgeOnDropHooks.onReconnectStart}
-          onReconnect={removeEdgeOnDropHooks.onReconnect}
-          onReconnectEnd={removeEdgeOnDropHooks.onReconnectEnd}
+          nodeTypes={flowNodeTypes}
           edgeTypes={{
             'attraccess-edge': EdgeWithDeleteButton,
           }}
@@ -333,9 +317,10 @@ function FlowsPageInner() {
               onPress={save}
               isDisabled={!flowHasChanged}
             />
-            {/*<LogViewer resourceId={Number(resourceId)}>
+            <LogViewer resourceId={Number(resourceId)}>
               {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}
-            </LogViewer>*/}
+            </LogViewer>
+
             <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
             <NodePickerModal onSelect={addStartNode}>
               {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}

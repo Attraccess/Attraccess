@@ -348,6 +348,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
         payload: JSON.stringify({ output: responseOfNode }),
       });
+
+      await this.executeNextNodes(flowRunId, node, responseOfNode);
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.logger.error(
@@ -362,11 +364,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
         payload: JSON.stringify({ error }),
       });
-
-      throw error;
     }
-
-    await this.executeNextNodes(flowRunId, node, responseOfNode);
   }
 
   private async executeNextNodes(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: object) {
@@ -389,27 +387,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`
     );
 
-    const targetNodeIds = edgesFromThisNode.map((edge) => edge.target);
-    this.logger.debug(`Target node IDs from node ${node.id} (Type: ${node.type}): ${targetNodeIds.join(', ')}`);
+    // Execute each edge individually instead of deduplicating target nodes
+    const edgePromises = edgesFromThisNode.map(async (edge) => {
+      const targetNode = await this.flowNodeRepository.findOne({
+        where: { id: edge.target },
+      });
 
-    const nextNodes = await this.flowNodeRepository.find({
-      where: {
-        id: In(targetNodeIds),
-      },
+      if (!targetNode) {
+        this.logger.warn(`Target node ${edge.target} not found for edge from node ${node.id}`);
+        return;
+      }
+
+      return this.processNode(flowRunId, targetNode, resultOfPreviousNode);
     });
 
-    if (nextNodes.length !== targetNodeIds.length) {
-      this.logger.warn(
-        `Expected ${targetNodeIds.length} target nodes from node ${node.id} (Type: ${node.type}), but found ${nextNodes.length}. Some target nodes may be missing.`
-      );
-    }
-
-    this.logger.debug(`Executing ${nextNodes.length} next node(s) from node ID: ${node.id} (Type: ${node.type})`);
-
-    await Promise.all(nextNodes.map((nextNode) => this.processNode(flowRunId, nextNode, resultOfPreviousNode)));
-    this.logger.debug(
-      `Successfully executed all ${nextNodes.length} next node(s) from node ID: ${node.id} (Type: ${node.type})`
-    );
+    await Promise.all(edgePromises);
   }
 
   private async processWaitNode(node: ResourceFlowNode, input: object) {

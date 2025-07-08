@@ -1,8 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from '@xyflow/react';
-import { Button, cn } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { Trash2Icon } from 'lucide-react';
-import { useDebounce } from '../../../../hooks/useDebounce';
 
 export function EdgeWithDeleteButton(props: EdgeProps) {
   const {
@@ -18,14 +17,18 @@ export function EdgeWithDeleteButton(props: EdgeProps) {
     selected,
   } = props;
 
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
+  const [edgePath, labelX, labelY] = useMemo(
+    () =>
+      getBezierPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+      }),
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition]
+  );
 
   const { setEdges } = useReactFlow();
   const removeEdge = useCallback(() => {

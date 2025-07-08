@@ -1,9 +1,9 @@
-import { Button, Card, CardBody, CardHeader, cn, Textarea, useDisclosure } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, cn, useDisclosure } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Trash2Icon } from 'lucide-react';
 import { useFlowContext } from '../../flowContext';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeleteConfirmationModal } from '../../../../../../components/deleteConfirmationModal';
 import { ResourceFlowLog } from '@attraccess/react-query-client';
 
