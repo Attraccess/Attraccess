@@ -109,15 +109,15 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
 
   @OnEvent(ResourceUsageStartedEvent.eventName)
   handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
     // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resourceId)) {
+    if (!this.resourceSubjects.has(resource.id)) {
       return;
     }
 
     // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resourceId);
+    const subject = this.resourceSubjects.get(resource.id);
 
     // Create event data with inUse flag
     const eventData = {
@@ -129,20 +129,20 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.eventName} event for resource ${resourceId}`);
+    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.eventName} event for resource ${resource.id}`);
   }
 
   @OnEvent(ResourceUsageEndedEvent.eventName)
   handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
     // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resourceId)) {
+    if (!this.resourceSubjects.has(resource.id)) {
       return;
     }
 
     // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resourceId);
+    const subject = this.resourceSubjects.get(resource.id);
 
     // Create event data with inUse flag
     const eventData = {
@@ -154,6 +154,6 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted resource.usage.ended event for resource ${resourceId}`);
+    this.logger.debug(`Emitted resource.usage.ended event for resource ${resource.id}`);
   }
 }

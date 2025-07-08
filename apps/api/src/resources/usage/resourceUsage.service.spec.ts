@@ -14,7 +14,7 @@ import { ResourceGroupsIntroductionsService } from '../groups/introductions/reso
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
-import { ResourceUsageStartedEvent } from './events/resource-usage.events';
+import { ResourceUsageStartedEvent, ResourceUsageEndedEvent } from './events/resource-usage.events';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -368,7 +368,7 @@ describe('ResourceUsageService', () => {
         endTime: expect.any(Date),
         endNotes: 'Session completed',
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith('resource.usage.ended', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEndedEvent.eventName, expect.any(Object));
     });
 
     it('should throw error when no active session exists', async () => {

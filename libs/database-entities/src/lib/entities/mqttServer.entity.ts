@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { MqttResourceConfig } from './mqttResourceConfig.entity';
 
 @Entity()
 export class MqttServer {
@@ -74,7 +73,4 @@ export class MqttServer {
     description: 'When the MQTT server was last updated',
   })
   updatedAt!: Date;
-
-  @OneToMany(() => MqttResourceConfig, (config) => config.server)
-  resourceConfigs!: MqttResourceConfig[];
 }

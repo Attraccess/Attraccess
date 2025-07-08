@@ -1,6 +1,5 @@
 import { Navigate } from 'react-router-dom';
 import { ResourceDetails } from '../resources/details/resourceDetails';
-import { IoTSettings } from '../resources/iot-settings/iotSettings';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MqttServersPage, CreateMqttServerPage, EditMqttServerPage } from '../mqtt';
 import { SSOProvidersPage } from '../sso/SSOProvidersPage';
@@ -12,7 +11,6 @@ import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.stat
 import { FabreaderList } from '../fabreader/FabreaderList/FabreaderList';
 import { NfcCardList } from '../fabreader/NfcCardList/NfcCardList';
 import { CsvExport } from '../csv-export/csv-export';
-import { CreateMqttConfig, EditMqttConfig, TestMqttConfig } from '../resources/iot-settings/mqtt';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage'; // Placeholder - to be created
 import { EditEmailTemplatePage } from '../email-templates/EditEmailTemplatePage'; // Placeholder - to be created
@@ -44,29 +42,9 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
-    path: '/resources/:id/iot',
-    element: <IoTSettings />,
-    authRequired: 'canManageResources',
-  },
-  {
     path: '/resources/:id/flows',
     element: <FlowsPage />,
     authRequired: true,
-  },
-  {
-    path: '/resources/:resourceId/iot/mqtt/create',
-    element: <CreateMqttConfig />,
-    authRequired: 'canManageResources',
-  },
-  {
-    path: '/resources/:resourceId/iot/mqtt/:configId',
-    element: <EditMqttConfig />,
-    authRequired: 'canManageResources',
-  },
-  {
-    path: '/resources/:resourceId/iot/mqtt/test/:configId',
-    element: <TestMqttConfig />,
-    authRequired: 'canManageResources',
   },
   {
     path: '/resources/:id/documentation',

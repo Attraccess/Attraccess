@@ -15,7 +15,6 @@ import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { SSEModule } from './sse/sse.module';
-import { IotModule } from './iot/iot.module';
 import { ResourceGroupsModule } from './groups/resourceGroups.module';
 import { ResourcesService } from './resources.service';
 import { ResourceUsageModule } from './usage/resourceUsage.module';
@@ -40,7 +39,6 @@ import { ResourceFlowsModule } from './flows/resource-flows.module';
     ConfigModule,
     MqttModule,
     SSEModule,
-    IotModule,
     ResourceGroupsModule,
     ResourceUsageModule,
     FileStorageModule,

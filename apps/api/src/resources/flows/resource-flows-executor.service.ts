@@ -34,13 +34,14 @@ export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true }
 interface UsageEventData {
   resource: {
     id: number;
+    name: string;
   };
   event: {
-    timestamp: Date;
+    timestamp: string;
   };
   usage: {
-    start: Date;
-    end: Date;
+    start: string;
+    end: string;
   };
   user: {
     id: number;
@@ -134,17 +135,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @OnEvent(ResourceUsageStartedEvent.eventName)
   async handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
-    this.logger.log(`Handling resource usage started event for resource ID: ${resourceId}`);
+    this.logger.log(`Handling resource usage started event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED, {
         event: {
-          timestamp: event.startTime,
+          timestamp: event.startTime.toISOString(),
         },
         usage: {
-          start: event.startTime,
+          start: event.startTime.toISOString(),
           end: null,
         },
         user: {
@@ -153,29 +154,30 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           externalIdentifier: event.user.externalIdentifier,
         },
         resource: {
-          id: event.resourceId,
+          id: event.resource.id,
+          name: event.resource.name,
         },
       });
-      this.logger.log(`Successfully processed resource usage started event for resource ID: ${resourceId}`);
+      this.logger.log(`Successfully processed resource usage started event for resource ID: ${resource.id}`);
     } catch (error) {
-      this.logger.error(`Failed to handle resource usage started event for resource ID: ${resourceId}`, error.stack);
+      this.logger.error(`Failed to handle resource usage started event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }
 
   @OnEvent(ResourceUsageTakenOverEvent.eventName)
   async handleResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
-    this.logger.log(`Handling resource usage takeover event for resource ID: ${resourceId}`);
+    this.logger.log(`Handling resource usage takeover event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER, {
         event: {
-          timestamp: event.takeoverTime,
+          timestamp: event.takeoverTime.toISOString(),
         },
         usage: {
-          start: event.takeoverTime,
+          start: event.takeoverTime.toISOString(),
           end: null,
         },
         user: {
@@ -189,30 +191,31 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           externalIdentifier: event.previousUser.externalIdentifier,
         },
         resource: {
-          id: event.resourceId,
+          id: event.resource.id,
+          name: event.resource.name,
         },
       });
-      this.logger.log(`Successfully processed resource usage takeover event for resource ID: ${resourceId}`);
+      this.logger.log(`Successfully processed resource usage takeover event for resource ID: ${resource.id}`);
     } catch (error) {
-      this.logger.error(`Failed to handle resource usage takeover event for resource ID: ${resourceId}`, error.stack);
+      this.logger.error(`Failed to handle resource usage takeover event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }
 
   @OnEvent(ResourceUsageEndedEvent.eventName)
   async handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
-    this.logger.log(`Handling resource usage ended event for resource ID: ${resourceId}`);
+    this.logger.log(`Handling resource usage ended event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resourceId, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED, {
         event: {
-          timestamp: event.endTime,
+          timestamp: event.endTime.toISOString(),
         },
         usage: {
-          start: event.startTime,
-          end: event.endTime,
+          start: event.startTime.toISOString(),
+          end: event.endTime.toISOString(),
         },
         user: {
           id: event.user.id,
@@ -220,12 +223,13 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           externalIdentifier: event.user.externalIdentifier,
         },
         resource: {
-          id: event.resourceId,
+          id: event.resource.id,
+          name: event.resource.name,
         },
       });
-      this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resourceId}`);
+      this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resource.id}`);
     } catch (error) {
-      this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resourceId}`, error.stack);
+      this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }

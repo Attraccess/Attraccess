@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, Wifi, WorkflowIcon } from 'lucide-react';
+import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
 import { Button } from '@heroui/button';
 import { Spinner, Link } from '@heroui/react';
 import { useDisclosure } from '@heroui/modal';
@@ -144,16 +144,6 @@ function ResourceDetailsComponent() {
             {canManageResources && (
               <>
                 <ResourceQrCode resourceId={resourceId} variant="light" buttonIconSize={16} />
-
-                <Button
-                  as={Link}
-                  href={`/resources/${resourceId}/iot`}
-                  variant="light"
-                  startContent={<Wifi className="w-4 h-4" />}
-                  data-cy="iot-settings-button"
-                >
-                  {t('navItems.iotSettings')}
-                </Button>
 
                 <Button
                   as={Link}

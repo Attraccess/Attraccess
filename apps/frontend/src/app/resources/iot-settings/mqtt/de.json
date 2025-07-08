@@ -1,5 +1,0 @@
-{
-  "configurationTitle": "MQTT-Konfigurationen",
-  "createNewButton": "Neue Konfiguration erstellen",
-  "description": "Konfigurieren Sie MQTT-Integrationen für diese Ressource, um Statusaktualisierungen zu veröffentlichen, wenn eine Ressource verwendet wird oder nicht verwendet wird."
-}
