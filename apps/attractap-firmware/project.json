@@ -1,0 +1,35 @@
+{
+  "name": "attractap-firmware",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/attractap-firmware",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/attractap-firmware && python3 build_firmwares.py",
+        "cwd": "."
+      },
+      "outputs": ["{projectRoot}/firmware_output"],
+      "inputs": [
+        "{projectRoot}/platformio.ini",
+        "{projectRoot}/build_firmwares.py",
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/.pio/**/*",
+        "{projectRoot}/data/**/*",
+        "{workspaceRoot}/dist/apps/attractap-config-ui/**/*"
+      ],
+      "cache": true,
+      "dependsOn": ["copy-config-ui"]
+    },
+    "copy-config-ui": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["attractap-config-ui:build"],
+      "options": {
+        "cwd": ".",
+        "command": "rm -rf apps/attractap-firmware/data && mkdir -p apps/attractap-firmware/data && cp -r dist/apps/attractap-config-ui/* apps/attractap-firmware/data"
+      }
+    }
+  }
+}

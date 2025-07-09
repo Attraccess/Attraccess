@@ -9,10 +9,10 @@
         "resources": "Ressourcen"
       }
     },
-    "fabreader": {
-      "label": "FabReader",
+    "attractap": {
+      "label": "Attractap",
       "items": {
-        "FabReader": "FabReader",
+        "Attractap": "Attractap",
         "NFCCards": "NFC-Karten"
       }
     },

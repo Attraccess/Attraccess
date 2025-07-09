@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
@@ -130,11 +130,11 @@ export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: Quer
   filePath: string;
   pluginName: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetFrontendPluginFileKeyFn({ filePath, pluginName }), queryFn: () => PluginsService.getFrontendPluginFile({ filePath, pluginName }) });
-export const prefetchUseFabReaderServiceGetReaderById = (queryClient: QueryClient, { readerId }: {
+export const prefetchUseAttractapServiceGetReaderById = (queryClient: QueryClient, { readerId }: {
   readerId: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseFabReaderServiceGetReaderByIdKeyFn({ readerId }), queryFn: () => FabReaderService.getReaderById({ readerId }) });
-export const prefetchUseFabReaderServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFabReaderServiceGetReadersKeyFn(), queryFn: () => FabReaderService.getReaders() });
-export const prefetchUseFabReaderServiceGetAllCards = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseFabReaderServiceGetAllCardsKeyFn(), queryFn: () => FabReaderService.getAllCards() });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReaderByIdKeyFn({ readerId }), queryFn: () => AttractapService.getReaderById({ readerId }) });
+export const prefetchUseAttractapServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
+export const prefetchUseAttractapServiceGetAllCards = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
 export const prefetchUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;

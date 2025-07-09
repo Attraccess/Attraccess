@@ -1,0 +1,34 @@
+{
+  "workInProgress": "Dieses Feature ist noch in Arbeit, benutzung auf eigene Gefahr!",
+  "nfcCards": "NFC-Karten",
+  "noNfcCardsFound": "Keine NFC-Karten gefunden",
+  "nfcCardsTable": {
+    "headers": {
+      "id": "ID",
+      "uid": "UID",
+      "userId": "Benutzer",
+      "createdAt": "Erstellt am",
+      "actions": "Aktionen"
+    },
+    "actions": {
+      "delete": "Löschen"
+    },
+    "deleteModal": {
+      "title": "NFC-Karte löschen",
+      "description": "Sie sind dabei, die NFC-Karte mit der ID {{id}} zu löschen. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "readerLabel": "Attractap auswählen",
+      "readerPlaceholder": "Wählen Sie einen Attractap aus",
+      "cancel": "Abbrechen",
+      "delete": "Löschen"
+    }
+  },
+  "enroll": "NFC-Karte registrieren",
+  "enrollModal": {
+    "title": "NFC-Karte registrieren",
+    "description": "Um eine neue NFC-Karte zu registrieren, wählen Sie einen verbundenen Attractap aus der Liste unten aus. Klicken Sie dann auf die Schaltfläche \"Neue NFC-Karte registrieren\" und folgen dann den Anweisungen auf dem Attractap.",
+    "readerLabel": "Attractap auswählen",
+    "readerPlaceholder": "Wählen Sie einen Attractap aus",
+    "cancel": "Abbrechen",
+    "enroll": "Registrieren"
+  }
+}

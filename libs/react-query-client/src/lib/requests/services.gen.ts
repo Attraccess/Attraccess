@@ -1946,7 +1946,7 @@ export class PluginsService {
     
 }
 
-export class FabReaderService {
+export class AttractapService {
     /**
      * Enroll a new NFC card
      * @param data The data for the request.
@@ -1957,7 +1957,7 @@ export class FabReaderService {
     public static enrollNfcCard(data: EnrollNfcCardData): CancelablePromise<EnrollNfcCardResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/fabreader/readers/enroll-nfc-card',
+            url: '/api/attractap/readers/enroll-nfc-card',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -1976,7 +1976,7 @@ export class FabReaderService {
     public static resetNfcCard(data: ResetNfcCardData): CancelablePromise<ResetNfcCardResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/fabreader/readers/reset-nfc-card',
+            url: '/api/attractap/readers/reset-nfc-card',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -1996,7 +1996,7 @@ export class FabReaderService {
     public static updateReader(data: UpdateReaderData): CancelablePromise<UpdateReaderResponse> {
         return __request(OpenAPI, {
             method: 'PATCH',
-            url: '/api/fabreader/readers/{readerId}',
+            url: '/api/attractap/readers/{readerId}',
             path: {
                 readerId: data.readerId
             },
@@ -2013,13 +2013,13 @@ export class FabReaderService {
      * Get a reader by ID
      * @param data The data for the request.
      * @param data.readerId The ID of the reader to get
-     * @returns FabReader The reader
+     * @returns Attractap The reader
      * @throws ApiError
      */
     public static getReaderById(data: GetReaderByIdData): CancelablePromise<GetReaderByIdResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/fabreader/readers/{readerId}',
+            url: '/api/attractap/readers/{readerId}',
             path: {
                 readerId: data.readerId
             },
@@ -2032,13 +2032,13 @@ export class FabReaderService {
     
     /**
      * Get all readers
-     * @returns FabReader The list of readers
+     * @returns Attractap The list of readers
      * @throws ApiError
      */
     public static getReaders(): CancelablePromise<GetReadersResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/fabreader/readers',
+            url: '/api/attractap/readers',
             errors: {
                 401: 'Unauthorized'
             }
@@ -2055,7 +2055,7 @@ export class FabReaderService {
     public static getAppKeyByUid(data: GetAppKeyByUidData): CancelablePromise<GetAppKeyByUidResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/fabreader/cards/keys',
+            url: '/api/attractap/cards/keys',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -2072,7 +2072,7 @@ export class FabReaderService {
     public static getAllCards(): CancelablePromise<GetAllCardsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/fabreader/cards',
+            url: '/api/attractap/cards',
             errors: {
                 401: 'Unauthorized'
             }

@@ -1,9 +1,0 @@
-{
-  "name": "fabreader-config-ui",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/fabreader-config-ui/src",
-  "projectType": "application",
-  "tags": [],
-  "// targets": "to see all targets run: nx show project fabreader-config-ui --web",
-  "targets": {}
-}

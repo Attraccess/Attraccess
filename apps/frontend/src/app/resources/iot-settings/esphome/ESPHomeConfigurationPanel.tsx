@@ -34,7 +34,7 @@ function useEspHomeConfigSnippet(resourceId: number) {
     return `external_components:
     - source:
         type: git
-        url: https://github.com/FabInfra/Attraccess-esphome-components.git
+        url: https://github.com/Attraccess/Attraccess-esphome-components.git
       components: [attraccess_resource]
   
   attraccess_resource:
@@ -124,7 +124,7 @@ export function ESPHomeConfigurationPanel(props: ESPHomeConfigurationPanelProps)
               <div className="flex items-center mt-2 text-sm">
                 <InfoIcon className="w-4 h-4 mr-2 text-blue-500" />
                 <Link
-                  href="https://github.com/FabInfra/Attraccess-esphome-components"
+                  href="https://github.com/Attraccess/Attraccess-esphome-components"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-blue-500"
