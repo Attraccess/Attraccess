@@ -1,0 +1,34 @@
+{
+  "workInProgress": "This feature is still in development, use at your own risk!",
+  "nfcCards": "NFC Cards",
+  "noNfcCardsFound": "No NFC Cards found",
+  "nfcCardsTable": {
+    "headers": {
+      "id": "ID",
+      "uid": "UID",
+      "userId": "User",
+      "createdAt": "Created at",
+      "actions": "Actions"
+    },
+    "actions": {
+      "delete": "Delete"
+    },
+    "deleteModal": {
+      "title": "Delete NFC Card",
+      "description": "You are about to delete the NFC Card with the ID {{id}}. This action cannot be undone.",
+      "readerLabel": "Select Attractap",
+      "readerPlaceholder": "Select a Attractap",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    }
+  },
+  "enroll": "Enroll NFC Card",
+  "enrollModal": {
+    "title": "Enroll NFC Card",
+    "description": "To enroll a new NFC Card, choose a connected Attractap in the list below. Then click on the button \"Enroll new NFC Card\" and follow the instructions on the Attractap.",
+    "readerLabel": "Select Attractap",
+    "readerPlaceholder": "Select a Attractap",
+    "cancel": "Cancel",
+    "enroll": "Enroll"
+  }
+}

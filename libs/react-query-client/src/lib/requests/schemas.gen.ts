@@ -2530,7 +2530,7 @@ export const $UpdateReaderDto = {
     required: ['name', 'connectedResources']
 } as const;
 
-export const $FabReader = {
+export const $Attractap = {
     type: 'object',
     properties: {
         id: {
@@ -2578,7 +2578,7 @@ export const $UpdateReaderResponseDto = {
             description: 'The updated reader',
             allOf: [
                 {
-                    '$ref': '#/components/schemas/FabReader'
+                    '$ref': '#/components/schemas/Attractap'
                 }
             ]
         }

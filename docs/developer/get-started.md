@@ -57,7 +57,7 @@ Attraccess follows an Nx monorepo structure, organized into apps and libs:
 - **plugins-frontend-ui**: UI components for plugins
 - **plugins-frontend-sdk**: SDK for developing frontend plugins
 - **plugins-backend-sdk**: SDK for developing backend plugins
-- **plugin-fabreader**: Plugin that adds NFC reader functionalities to control machines
+- **plugin-attractap**: Plugin that adds NFC reader functionalities to control machines
 - **env**: Environment configuration
 
 ## Getting Started

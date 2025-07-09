@@ -16,7 +16,7 @@ import { RevokedToken } from './entities/revokedToken.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
-import { FabReader } from './entities/fabReader.entity';
+import { Attractap } from './entities/attractap.entity';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -53,7 +53,7 @@ export {
   SystemPermissions,
   SystemPermission,
   NFCCard,
-  FabReader,
+  Attractap,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -87,7 +87,7 @@ export const entities = {
   SSOProvider,
   SSOProviderOIDCConfiguration,
   NFCCard,
-  FabReader,
+  Attractap,
   EmailTemplate,
   ResourceFlowNode,
   ResourceFlowEdge,

@@ -1,0 +1,26 @@
+{
+  "page": {
+    "title": "Attractap",
+    "actions": {
+      "openFlasher": "Attractap flasher"
+    }
+  },
+  "workInProgress": "Dieses Feature ist noch in Arbeit, benutzung auf eigene Gefahr!",
+  "error": {
+    "fetchReaders": "Attractap konnten nicht abgerufen werden"
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "lastConnection": "Letzte Verbindung",
+      "connected": "Status",
+      "actions": "Aktionen"
+    },
+    "noData": "Keine Attractap gefunden",
+    "actions": {
+      "editReader": "Bearbeiten"
+    }
+  },
+  "connected": "Verbunden",
+  "disconnected": "Nicht verbunden"
+}

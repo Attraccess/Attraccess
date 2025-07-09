@@ -28,3 +28,4 @@ export * from './1750328235897-users-external-identifier';
 export * from './1751827827663-resource-flows';
 export * from './1752005121356-iot-to-flow';
 export * from './1752008417898-removal-of-iot-configs';
+export * from './1752093791700-rename-fabreader-to-attractap';

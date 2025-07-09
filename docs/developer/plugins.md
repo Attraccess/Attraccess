@@ -40,7 +40,7 @@ plugin-name/
 ├── plugin.json                # Plugin manifest
 ├── backend/                   # Compiled backend code
 │   └── src/
-│       ├── fabreader.module.js   # Compiled NestJS module
+│       ├── attractap.module.js   # Compiled NestJS module
 │       └── other compiled files  # Controllers, services, etc.
 └── frontend/                  # Compiled frontend code
     └── assets/
@@ -382,14 +382,14 @@ When a plugin is loaded:
 2. The frontend plugin is instantiated and its `init` method is called with the plugin store
 3. The plugin's `activate` method is called, allowing it to register functionality
 
-## Example: FABReader Plugin
+## Example: Attractap Plugin
 
-The FABReader plugin is a complete example that demonstrates how to implement both frontend and backend functionality:
+The Attractap plugin is a complete example that demonstrates how to implement both frontend and backend functionality:
 
 - Frontend: Provides a UI for managing FAB readers
 - Backend: Implements APIs for communicating with FAB reader devices
 
-You can examine the FABReader plugin code in `/libs/plugin-fabreader` as a reference for creating your own plugins.
+You can examine the Attractap plugin code in `/libs/plugin-attractap` as a reference for creating your own plugins.
 
 ## Best Practices
 

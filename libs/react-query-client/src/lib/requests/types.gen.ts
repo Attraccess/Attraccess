@@ -1684,7 +1684,7 @@ export type UpdateReaderDto = {
     connectedResources: Array<(number)>;
 };
 
-export type FabReader = {
+export type Attractap = {
     /**
      * The ID of the reader
      */
@@ -1719,7 +1719,7 @@ export type UpdateReaderResponseDto = {
     /**
      * The updated reader
      */
-    reader: FabReader;
+    reader: Attractap;
 };
 
 export type AppKeyRequestDto = {
@@ -2584,9 +2584,9 @@ export type GetReaderByIdData = {
     readerId: number;
 };
 
-export type GetReaderByIdResponse = FabReader;
+export type GetReaderByIdResponse = Attractap;
 
-export type GetReadersResponse = Array<FabReader>;
+export type GetReadersResponse = Array<Attractap>;
 
 export type GetAppKeyByUidData = {
     requestBody: AppKeyRequestDto;
@@ -4159,7 +4159,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/readers/enroll-nfc-card': {
+    '/api/attractap/readers/enroll-nfc-card': {
         post: {
             req: EnrollNfcCardData;
             res: {
@@ -4174,7 +4174,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/readers/reset-nfc-card': {
+    '/api/attractap/readers/reset-nfc-card': {
         post: {
             req: ResetNfcCardData;
             res: {
@@ -4189,7 +4189,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/readers/{readerId}': {
+    '/api/attractap/readers/{readerId}': {
         patch: {
             req: UpdateReaderData;
             res: {
@@ -4213,7 +4213,7 @@ export type $OpenApiTs = {
                 /**
                  * The reader
                  */
-                200: FabReader;
+                200: Attractap;
                 /**
                  * Unauthorized
                  */
@@ -4225,13 +4225,13 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/readers': {
+    '/api/attractap/readers': {
         get: {
             res: {
                 /**
                  * The list of readers
                  */
-                200: Array<FabReader>;
+                200: Array<Attractap>;
                 /**
                  * Unauthorized
                  */
@@ -4239,7 +4239,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/cards/keys': {
+    '/api/attractap/cards/keys': {
         post: {
             req: GetAppKeyByUidData;
             res: {
@@ -4254,7 +4254,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/fabreader/cards': {
+    '/api/attractap/cards': {
         get: {
             res: {
                 /**
