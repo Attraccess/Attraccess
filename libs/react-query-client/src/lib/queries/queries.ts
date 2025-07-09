@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMqttResourceConfigDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CreateWebhookConfigDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMqttResourceConfigDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UpdateWebhookConfigDto, UploadPluginDto, VerifyEmailDto, WebhookStatusDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
@@ -131,11 +131,11 @@ export const usePluginsServiceGetFrontendPluginFile = <TData = Common.PluginsSer
   filePath: string;
   pluginName: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePluginsServiceGetFrontendPluginFileKeyFn({ filePath, pluginName }, queryKey), queryFn: () => PluginsService.getFrontendPluginFile({ filePath, pluginName }) as TData, ...options });
-export const useFabReaderServiceGetReaderById = <TData = Common.FabReaderServiceGetReaderByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId }: {
+export const useAttractapServiceGetReaderById = <TData = Common.AttractapServiceGetReaderByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ readerId }: {
   readerId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFabReaderServiceGetReaderByIdKeyFn({ readerId }, queryKey), queryFn: () => FabReaderService.getReaderById({ readerId }) as TData, ...options });
-export const useFabReaderServiceGetReaders = <TData = Common.FabReaderServiceGetReadersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFabReaderServiceGetReadersKeyFn(queryKey), queryFn: () => FabReaderService.getReaders() as TData, ...options });
-export const useFabReaderServiceGetAllCards = <TData = Common.FabReaderServiceGetAllCardsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseFabReaderServiceGetAllCardsKeyFn(queryKey), queryFn: () => FabReaderService.getAllCards() as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReaderByIdKeyFn({ readerId }, queryKey), queryFn: () => AttractapService.getReaderById({ readerId }) as TData, ...options });
+export const useAttractapServiceGetReaders = <TData = Common.AttractapServiceGetReadersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(queryKey), queryFn: () => AttractapService.getReaders() as TData, ...options });
+export const useAttractapServiceGetAllCards = <TData = Common.AttractapServiceGetAllCardsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(queryKey), queryFn: () => AttractapService.getAllCards() as TData, ...options });
 export const useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange = <TData = Common.AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ end, start }: {
   end: string;
   start: string;
@@ -309,21 +309,21 @@ export const usePluginsServiceUploadPlugin = <TData = Common.PluginsServiceUploa
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   formData: UploadPluginDto;
 }, TContext>({ mutationFn: ({ formData }) => PluginsService.uploadPlugin({ formData }) as unknown as Promise<TData>, ...options });
-export const useFabReaderServiceEnrollNfcCard = <TData = Common.FabReaderServiceEnrollNfcCardMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+export const useAttractapServiceEnrollNfcCard = <TData = Common.AttractapServiceEnrollNfcCardMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: EnrollNfcCardDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: EnrollNfcCardDto;
-}, TContext>({ mutationFn: ({ requestBody }) => FabReaderService.enrollNfcCard({ requestBody }) as unknown as Promise<TData>, ...options });
-export const useFabReaderServiceResetNfcCard = <TData = Common.FabReaderServiceResetNfcCardMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+}, TContext>({ mutationFn: ({ requestBody }) => AttractapService.enrollNfcCard({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAttractapServiceResetNfcCard = <TData = Common.AttractapServiceResetNfcCardMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: ResetNfcCardDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: ResetNfcCardDto;
-}, TContext>({ mutationFn: ({ requestBody }) => FabReaderService.resetNfcCard({ requestBody }) as unknown as Promise<TData>, ...options });
-export const useFabReaderServiceGetAppKeyByUid = <TData = Common.FabReaderServiceGetAppKeyByUidMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+}, TContext>({ mutationFn: ({ requestBody }) => AttractapService.resetNfcCard({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAttractapServiceGetAppKeyByUid = <TData = Common.AttractapServiceGetAppKeyByUidMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: AppKeyRequestDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: AppKeyRequestDto;
-}, TContext>({ mutationFn: ({ requestBody }) => FabReaderService.getAppKeyByUid({ requestBody }) as unknown as Promise<TData>, ...options });
+}, TContext>({ mutationFn: ({ requestBody }) => AttractapService.getAppKeyByUid({ requestBody }) as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceUpdateOneSsoProvider = <TData = Common.AuthenticationServiceUpdateOneSsoProviderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;
   requestBody: UpdateSSOProviderDto;
@@ -400,13 +400,13 @@ export const useEmailTemplatesServiceEmailTemplateControllerUpdate = <TData = Co
   requestBody: UpdateEmailTemplateDto;
   type: "verify-email" | "reset-password";
 }, TContext>({ mutationFn: ({ requestBody, type }) => EmailTemplatesService.emailTemplateControllerUpdate({ requestBody, type }) as unknown as Promise<TData>, ...options });
-export const useFabReaderServiceUpdateReader = <TData = Common.FabReaderServiceUpdateReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+export const useAttractapServiceUpdateReader = <TData = Common.AttractapServiceUpdateReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   readerId: number;
   requestBody: UpdateReaderDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   readerId: number;
   requestBody: UpdateReaderDto;
-}, TContext>({ mutationFn: ({ readerId, requestBody }) => FabReaderService.updateReader({ readerId, requestBody }) as unknown as Promise<TData>, ...options });
+}, TContext>({ mutationFn: ({ readerId, requestBody }) => AttractapService.updateReader({ readerId, requestBody }) as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceEndSession = <TData = Common.AuthenticationServiceEndSessionMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => AuthenticationService.endSession() as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceDeleteOneSsoProvider = <TData = Common.AuthenticationServiceDeleteOneSsoProviderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;

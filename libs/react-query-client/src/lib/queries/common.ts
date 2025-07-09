@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AuthenticationService, EmailTemplatesService, FabReaderService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -249,20 +249,20 @@ export const UsePluginsServiceGetFrontendPluginFileKeyFn = ({ filePath, pluginNa
   filePath: string;
   pluginName: string;
 }, queryKey?: Array<unknown>) => [usePluginsServiceGetFrontendPluginFileKey, ...(queryKey ?? [{ filePath, pluginName }])];
-export type FabReaderServiceGetReaderByIdDefaultResponse = Awaited<ReturnType<typeof FabReaderService.getReaderById>>;
-export type FabReaderServiceGetReaderByIdQueryResult<TData = FabReaderServiceGetReaderByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFabReaderServiceGetReaderByIdKey = "FabReaderServiceGetReaderById";
-export const UseFabReaderServiceGetReaderByIdKeyFn = ({ readerId }: {
+export type AttractapServiceGetReaderByIdDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaderById>>;
+export type AttractapServiceGetReaderByIdQueryResult<TData = AttractapServiceGetReaderByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReaderByIdKey = "AttractapServiceGetReaderById";
+export const UseAttractapServiceGetReaderByIdKeyFn = ({ readerId }: {
   readerId: number;
-}, queryKey?: Array<unknown>) => [useFabReaderServiceGetReaderByIdKey, ...(queryKey ?? [{ readerId }])];
-export type FabReaderServiceGetReadersDefaultResponse = Awaited<ReturnType<typeof FabReaderService.getReaders>>;
-export type FabReaderServiceGetReadersQueryResult<TData = FabReaderServiceGetReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFabReaderServiceGetReadersKey = "FabReaderServiceGetReaders";
-export const UseFabReaderServiceGetReadersKeyFn = (queryKey?: Array<unknown>) => [useFabReaderServiceGetReadersKey, ...(queryKey ?? [])];
-export type FabReaderServiceGetAllCardsDefaultResponse = Awaited<ReturnType<typeof FabReaderService.getAllCards>>;
-export type FabReaderServiceGetAllCardsQueryResult<TData = FabReaderServiceGetAllCardsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useFabReaderServiceGetAllCardsKey = "FabReaderServiceGetAllCards";
-export const UseFabReaderServiceGetAllCardsKeyFn = (queryKey?: Array<unknown>) => [useFabReaderServiceGetAllCardsKey, ...(queryKey ?? [])];
+}, queryKey?: Array<unknown>) => [useAttractapServiceGetReaderByIdKey, ...(queryKey ?? [{ readerId }])];
+export type AttractapServiceGetReadersDefaultResponse = Awaited<ReturnType<typeof AttractapService.getReaders>>;
+export type AttractapServiceGetReadersQueryResult<TData = AttractapServiceGetReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetReadersKey = "AttractapServiceGetReaders";
+export const UseAttractapServiceGetReadersKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetReadersKey, ...(queryKey ?? [])];
+export type AttractapServiceGetAllCardsDefaultResponse = Awaited<ReturnType<typeof AttractapService.getAllCards>>;
+export type AttractapServiceGetAllCardsQueryResult<TData = AttractapServiceGetAllCardsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceGetAllCardsKey = "AttractapServiceGetAllCards";
+export const UseAttractapServiceGetAllCardsKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetAllCardsKey, ...(queryKey ?? [])];
 export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse = Awaited<ReturnType<typeof AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange>>;
 export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeQueryResult<TData = AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKey = "AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange";
@@ -297,9 +297,9 @@ export type AccessControlServiceResourceGroupIntroducersRevokeMutationResult = A
 export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersGrant>>;
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
-export type FabReaderServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof FabReaderService.enrollNfcCard>>;
-export type FabReaderServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof FabReaderService.resetNfcCard>>;
-export type FabReaderServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof FabReaderService.getAppKeyByUid>>;
+export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
+export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
+export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
@@ -310,7 +310,7 @@ export type WebhooksServiceWebhookConfigUpdateOneMutationResult = Awaited<Return
 export type WebhooksServiceWebhookConfigUpdateStatusMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigUpdateStatus>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
-export type FabReaderServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof FabReaderService.updateReader>>;
+export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;
 export type AuthenticationServiceDeleteOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.deleteOneSsoProvider>>;
 export type ResourcesServiceDeleteOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.deleteOneResource>>;

@@ -6,7 +6,7 @@
   "tags": [],
   "targets": {
     "build": {
-      "dependsOn": ["copy-fabreader-assets", "react-query-client:build", "copy-dependency-list"],
+      "dependsOn": ["copy-attractap-assets", "react-query-client:build", "copy-dependency-list"],
       "cache": true,
       "inputs": [
         "production",
@@ -17,14 +17,14 @@
       ],
       "outputs": ["{workspaceRoot}/dist/apps/frontend"]
     },
-    "copy-fabreader-assets": {
+    "copy-attractap-assets": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["fabreader-firmware:build"],
-      "inputs": ["{workspaceRoot}/apps/fabreader-firmware/firmware_output/**/*"],
-      "outputs": ["{projectRoot}/public/_fabreader_assets"],
+      "dependsOn": ["attractap-firmware:build"],
+      "inputs": ["{workspaceRoot}/apps/attractap-firmware/firmware_output/**/*"],
+      "outputs": ["{projectRoot}/public/_attractap_assets"],
       "options": {
-        "command": "rm -rf apps/frontend/public/_fabreader_assets && mkdir -p apps/frontend/public/_fabreader_assets && cp -r apps/fabreader-firmware/firmware_output/* apps/frontend/public/_fabreader_assets/"
+        "command": "rm -rf apps/frontend/public/_attractap_assets && mkdir -p apps/frontend/public/_attractap_assets && cp -r apps/attractap-firmware/firmware_output/* apps/frontend/public/_attractap_assets/"
       }
     },
     "copy-dependency-list": {

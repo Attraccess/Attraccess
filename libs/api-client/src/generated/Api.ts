@@ -1719,7 +1719,7 @@ export interface UpdateReaderDto {
   connectedResources: number[];
 }
 
-export interface FabReader {
+export interface Attractap {
   /** The ID of the reader */
   id: number;
   /** The name of the reader */
@@ -1747,7 +1747,7 @@ export interface UpdateReaderResponseDto {
    */
   message: string;
   /** The updated reader */
-  reader: FabReader;
+  reader: Attractap;
 }
 
 export interface AppKeyRequestDto {
@@ -2082,9 +2082,9 @@ export type ResetNfcCardData = ResetNfcCardResponseDto;
 
 export type UpdateReaderData = UpdateReaderResponseDto;
 
-export type GetReaderByIdData = FabReader;
+export type GetReaderByIdData = Attractap;
 
-export type GetReadersData = FabReader[];
+export type GetReadersData = Attractap[];
 
 export type GetAppKeyByUidData = AppKeyResponseDto;
 
@@ -3772,13 +3772,13 @@ export namespace Plugins {
   }
 }
 
-export namespace FabReader {
+export namespace Attractap {
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name EnrollNfcCard
    * @summary Enroll a new NFC card
-   * @request POST:/api/fabreader/readers/enroll-nfc-card
+   * @request POST:/api/attractap/readers/enroll-nfc-card
    * @secure
    */
   export namespace EnrollNfcCard {
@@ -3791,10 +3791,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name ResetNfcCard
    * @summary Reset an NFC card
-   * @request POST:/api/fabreader/readers/reset-nfc-card
+   * @request POST:/api/attractap/readers/reset-nfc-card
    * @secure
    */
   export namespace ResetNfcCard {
@@ -3807,10 +3807,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name UpdateReader
    * @summary Update reader name and connected resources
-   * @request PATCH:/api/fabreader/readers/{readerId}
+   * @request PATCH:/api/attractap/readers/{readerId}
    * @secure
    */
   export namespace UpdateReader {
@@ -3829,10 +3829,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name GetReaderById
    * @summary Get a reader by ID
-   * @request GET:/api/fabreader/readers/{readerId}
+   * @request GET:/api/attractap/readers/{readerId}
    * @secure
    */
   export namespace GetReaderById {
@@ -3851,10 +3851,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name GetReaders
    * @summary Get all readers
-   * @request GET:/api/fabreader/readers
+   * @request GET:/api/attractap/readers
    * @secure
    */
   export namespace GetReaders {
@@ -3867,10 +3867,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name GetAppKeyByUid
    * @summary Get the app key for a card by UID
-   * @request POST:/api/fabreader/cards/keys
+   * @request POST:/api/attractap/cards/keys
    * @secure
    */
   export namespace GetAppKeyByUid {
@@ -3883,10 +3883,10 @@ export namespace FabReader {
 
   /**
    * No description
-   * @tags FabReader
+   * @tags Attractap
    * @name GetAllCards
    * @summary Get all cards (to which you have access)
-   * @request GET:/api/fabreader/cards
+   * @request GET:/api/attractap/cards
    * @secure
    */
   export namespace GetAllCards {
@@ -5993,19 +5993,19 @@ export class Api<
         ...params,
       }),
   };
-  fabReader = {
+  attractap = {
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name EnrollNfcCard
      * @summary Enroll a new NFC card
-     * @request POST:/api/fabreader/readers/enroll-nfc-card
+     * @request POST:/api/attractap/readers/enroll-nfc-card
      * @secure
      */
     enrollNfcCard: (data: EnrollNfcCardDto, params: RequestParams = {}) =>
       this.request<EnrollNfcCardData, void>({
-        path: `/api/fabreader/readers/enroll-nfc-card`,
+        path: `/api/attractap/readers/enroll-nfc-card`,
         method: "POST",
         body: data,
         secure: true,
@@ -6017,15 +6017,15 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name ResetNfcCard
      * @summary Reset an NFC card
-     * @request POST:/api/fabreader/readers/reset-nfc-card
+     * @request POST:/api/attractap/readers/reset-nfc-card
      * @secure
      */
     resetNfcCard: (data: ResetNfcCardDto, params: RequestParams = {}) =>
       this.request<ResetNfcCardData, void>({
-        path: `/api/fabreader/readers/reset-nfc-card`,
+        path: `/api/attractap/readers/reset-nfc-card`,
         method: "POST",
         body: data,
         secure: true,
@@ -6037,10 +6037,10 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name UpdateReader
      * @summary Update reader name and connected resources
-     * @request PATCH:/api/fabreader/readers/{readerId}
+     * @request PATCH:/api/attractap/readers/{readerId}
      * @secure
      */
     updateReader: (
@@ -6049,7 +6049,7 @@ export class Api<
       params: RequestParams = {},
     ) =>
       this.request<UpdateReaderData, void>({
-        path: `/api/fabreader/readers/${readerId}`,
+        path: `/api/attractap/readers/${readerId}`,
         method: "PATCH",
         body: data,
         secure: true,
@@ -6061,15 +6061,15 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name GetReaderById
      * @summary Get a reader by ID
-     * @request GET:/api/fabreader/readers/{readerId}
+     * @request GET:/api/attractap/readers/{readerId}
      * @secure
      */
     getReaderById: (readerId: number, params: RequestParams = {}) =>
       this.request<GetReaderByIdData, void>({
-        path: `/api/fabreader/readers/${readerId}`,
+        path: `/api/attractap/readers/${readerId}`,
         method: "GET",
         secure: true,
         format: "json",
@@ -6079,15 +6079,15 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name GetReaders
      * @summary Get all readers
-     * @request GET:/api/fabreader/readers
+     * @request GET:/api/attractap/readers
      * @secure
      */
     getReaders: (params: RequestParams = {}) =>
       this.request<GetReadersData, void>({
-        path: `/api/fabreader/readers`,
+        path: `/api/attractap/readers`,
         method: "GET",
         secure: true,
         format: "json",
@@ -6097,15 +6097,15 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name GetAppKeyByUid
      * @summary Get the app key for a card by UID
-     * @request POST:/api/fabreader/cards/keys
+     * @request POST:/api/attractap/cards/keys
      * @secure
      */
     getAppKeyByUid: (data: AppKeyRequestDto, params: RequestParams = {}) =>
       this.request<GetAppKeyByUidData, void>({
-        path: `/api/fabreader/cards/keys`,
+        path: `/api/attractap/cards/keys`,
         method: "POST",
         body: data,
         secure: true,
@@ -6117,15 +6117,15 @@ export class Api<
     /**
      * No description
      *
-     * @tags FabReader
+     * @tags Attractap
      * @name GetAllCards
      * @summary Get all cards (to which you have access)
-     * @request GET:/api/fabreader/cards
+     * @request GET:/api/attractap/cards
      * @secure
      */
     getAllCards: (params: RequestParams = {}) =>
       this.request<GetAllCardsData, void>({
-        path: `/api/fabreader/cards`,
+        path: `/api/attractap/cards`,
         method: "GET",
         secure: true,
         format: "json",

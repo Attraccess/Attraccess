@@ -41,7 +41,7 @@ export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
     icon: DatabaseIcon,
   },
   {
-    translationKey: 'fabreader',
+    translationKey: 'attractap',
     isGroup: true,
     icon: ComputerIcon,
     items: [
@@ -51,8 +51,8 @@ export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
         icon: NfcIcon,
       },
       {
-        path: '/fabreader',
-        translationKey: 'FabReader',
+        path: '/attractap',
+        translationKey: 'Attractap',
         icon: ComputerIcon,
       },
     ],
@@ -107,7 +107,7 @@ export const useSidebarEndItems = () => {
   const { user } = useAuth();
 
   const reportBugUrl = newGithubIssueUrl({
-    user: 'FabInfra',
+    user: 'Attraccess',
     repo: 'Attraccess',
     title: '[Bug] ',
     labels: ['bug'],
@@ -128,7 +128,7 @@ export const useSidebarEndItems = () => {
   });
 
   const requestFeatureUrl = newGithubIssueUrl({
-    user: 'FabInfra',
+    user: 'Attraccess',
     repo: 'Attraccess',
     title: '[Feature Request] ',
     labels: ['enhancement'],

@@ -9,8 +9,8 @@ import { usePluginStore } from 'react-pluggable';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginsList } from '../plugins/PluginsList';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
-import { FabreaderList } from '../fabreader/FabreaderList/FabreaderList';
-import { NfcCardList } from '../fabreader/NfcCardList/NfcCardList';
+import { AttractapList } from '../attractap/AttractapList';
+import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export/csv-export';
 import { CreateMqttConfig, EditMqttConfig, TestMqttConfig } from '../resources/iot-settings/mqtt';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
@@ -107,8 +107,8 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
-    path: '/fabreader',
-    element: <FabreaderList />,
+    path: '/attractap',
+    element: <AttractapList />,
     authRequired: 'canManageSystemConfiguration',
   },
   {

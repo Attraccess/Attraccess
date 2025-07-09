@@ -1,0 +1,87 @@
+name: Plugin Attractap Build & Attach
+
+on:
+  # Run on pull requests
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'libs/plugin-attractap/**'
+
+  # Allow manual triggering
+  workflow_dispatch:
+
+  # Run on new releases
+  release:
+    types: [published]
+
+# Define permissions
+permissions:
+  contents: write # Needed to upload assets to releases
+  pull-requests: write # Needed to comment on PRs
+  actions: read # Needed to access artifacts
+
+env:
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  PLUGIN_NAME: plugin-attractap
+
+jobs:
+  build-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugin
+        run: pnpm nx build ${{ env.PLUGIN_NAME }}
+
+      - name: Create plugin zip
+        run: |
+          cd dist/libs/${{ env.PLUGIN_NAME }}
+          zip -r ../../${{ env.PLUGIN_NAME }}.zip ./*
+          cd ../../..
+
+      - name: Upload artifact
+        id: artifact-upload-step
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_NAME }}
+          path: dist/libs/${{ env.PLUGIN_NAME }}
+          retention-days: 7
+
+      # Attach to PR if it's a pull request
+      - name: Comment on PR with plugin link
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifactName = '${{ env.PLUGIN_NAME }}';
+            const workflowRunId = context.runId;
+            const artifactUrl = `${{ steps.artifact-upload-step.outputs.artifact-url }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `📦 Attractap plugin built and available as artifact: [${artifactName}.zip](${artifactUrl})`
+            });
+
+      # Attach to release
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/${{ env.PLUGIN_NAME }}.zip

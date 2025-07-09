@@ -18,7 +18,7 @@ import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
 import { WebhookConfig } from './entities/webhookConfig.entity';
-import { FabReader } from './entities/fabReader.entity';
+import { Attractap } from './entities/attractap.entity';
 
 // Export all entities individually
 export {
@@ -42,7 +42,7 @@ export {
   SystemPermission,
   WebhookConfig,
   NFCCard,
-  FabReader,
+  Attractap,
   EmailTemplate,
 };
 
@@ -64,6 +64,6 @@ export const entities = {
   SSOProvider,
   SSOProviderOIDCConfiguration,
   NFCCard,
-  FabReader,
+  Attractap,
   EmailTemplate,
 };

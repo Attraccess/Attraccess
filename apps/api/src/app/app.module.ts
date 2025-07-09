@@ -13,7 +13,7 @@ import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Module } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
-import { FabReaderModule } from '../fabreader/fabreader.module';
+import { AttractapModule } from '../attractap/attractap.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 
@@ -87,7 +87,7 @@ import { EmailTemplateModule } from '../email-template/email-template.module';
       },
     }),
     PluginModule.forRoot(),
-    FabReaderModule,
+    AttractapModule,
     AnalyticsModule,
     EmailTemplateModule,
   ],
