@@ -50,11 +50,11 @@ export function NodePickerModal(props: Props) {
 
   // Filter nodes by allowed types if specified
   const availableNodes = useMemo((): NodeEntry[] => {
-    if (!props.nodeTypes || props.nodeTypes.length === 0) {
+    if (!Array.isArray(props.nodeTypes) || props.nodeTypes.length === 0) {
       return allNodesArray;
     }
 
-    return allNodesArray.filter((nodeEntry) => props.nodeTypes!.includes(nodeEntry.node.type));
+    return allNodesArray.filter((nodeEntry) => (props.nodeTypes as AttraccessNodeType[]).includes(nodeEntry.node.type));
   }, [allNodesArray, props.nodeTypes]);
 
   // Group nodes by their type

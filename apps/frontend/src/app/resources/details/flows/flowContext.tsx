@@ -82,16 +82,6 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   );
 
   const { token: authToken } = useAuth();
-  const liveLogsRequestInit = useMemo(
-    () => ({
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    }),
-    [authToken]
-  );
-
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
 
   const publishLiveLog = useCallback((log: ResourceFlowLog) => {

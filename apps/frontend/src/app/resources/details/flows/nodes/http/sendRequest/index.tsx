@@ -111,31 +111,6 @@ export function HTTPRequestNode(
     onCloseEditor();
   }, [nodeId, updateNodeData, onCloseEditor, url, method, headers, body]);
 
-  const shortBody = useMemo(() => {
-    const bodyString = (node?.data.body ?? '') as string;
-    return bodyString.length > 100 ? bodyString.slice(0, 100) + '...' : bodyString;
-  }, [node?.data.body]);
-
-  const headersDisplay = useMemo(() => {
-    const nodeHeaders = node?.data.headers;
-    let headerObj: Record<string, string> = {};
-
-    // Handle backwards compatibility
-    if (typeof nodeHeaders === 'string') {
-      try {
-        headerObj = JSON.parse(nodeHeaders || '{}');
-      } catch {
-        headerObj = {};
-      }
-    } else {
-      headerObj = (nodeHeaders as Record<string, string>) || {};
-    }
-
-    const headerCount = Object.keys(headerObj).length;
-    if (headerCount === 0) return 'No headers';
-    return `${headerCount} header${headerCount === 1 ? '' : 's'}`;
-  }, [node?.data.headers]);
-
   const urlObject = useMemo(() => {
     const urlString = node?.data.url as string;
     if (!urlString) return null;

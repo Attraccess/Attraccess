@@ -7,6 +7,7 @@ import {
   Resource,
   ResourceFlowLog,
   getNodeDataSchema,
+  ResourceFlowNodeType,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -17,7 +18,7 @@ export interface ValidationError {
   nodeType: string;
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }
 
 export interface ResourceFlowResponse {
@@ -62,7 +63,11 @@ export class ResourceFlowsService {
     return { nodes, edges };
   }
 
-  private validateNodeData(nodeData: any): ValidationError[] {
+  private validateNodeData(nodeData: {
+    id: string;
+    type: ResourceFlowNodeType | string;
+    data: unknown;
+  }): ValidationError[] {
     const errors: ValidationError[] = [];
 
     try {
@@ -71,6 +76,7 @@ export class ResourceFlowsService {
     } catch (error) {
       // Handle Zod validation errors
       if (error.errors) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         error.errors.forEach((zodError: any) => {
           errors.push({
             nodeId: nodeData.id,

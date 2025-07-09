@@ -68,11 +68,10 @@ describe('ResourcesController', () => {
           introductions: [],
           usages: [],
           introducers: [],
-          mqttConfigs: [],
-          webhookConfigs: [],
           groups: [],
           flowNodes: [],
           flowEdges: [],
+          flowLogs: [],
         },
       ];
 
@@ -118,11 +117,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
@@ -167,11 +165,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
@@ -207,11 +204,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);

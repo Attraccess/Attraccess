@@ -86,6 +86,7 @@ describe('ResourcesService', () => {
       groups: [],
       flowNodes: [],
       flowEdges: [],
+      flowLogs: [],
     });
 
     beforeEach(() => {
@@ -445,6 +446,7 @@ describe('ResourcesService', () => {
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);
@@ -495,6 +497,7 @@ describe('ResourcesService', () => {
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       resourceRepository.create.mockReturnValue(newResource);
@@ -544,6 +547,7 @@ describe('ResourcesService', () => {
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       const updatedResource = {
@@ -598,6 +602,7 @@ describe('ResourcesService', () => {
         groups: [],
         flowNodes: [],
         flowEdges: [],
+        flowLogs: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);

@@ -1,5 +1,3 @@
-import { OpenAPI, CreateSessionResponse } from '@attraccess/react-query-client';
-
 function getInferredApiUrl() {
   const frontendUrl = new URL(window.location.href);
 

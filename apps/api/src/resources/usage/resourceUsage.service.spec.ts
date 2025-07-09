@@ -323,7 +323,7 @@ describe('ResourceUsageService', () => {
           resourceId: 1,
           endTime: IsNull(),
         },
-        relations: ['user'],
+        relations: ['user', 'resource'],
       });
     });
 

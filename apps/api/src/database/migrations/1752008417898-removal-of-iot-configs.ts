@@ -8,5 +8,7 @@ export class RemovalOfIotConfigs1752008417898 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "webhook_config"`);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {}
+  public async down(): Promise<void> {
+    throw new Error('Down migration is not supported');
+  }
 }

@@ -32,7 +32,7 @@ interface Props {
 }
 
 export function LogViewer(props: Props) {
-  const { isOpen, onOpenChange, onOpen, onClose } = useDisclosure();
+  const { isOpen, onOpenChange, onOpen } = useDisclosure();
 
   const { t } = useTranslations('resources.details.flows.logViewer', {
     de: {
@@ -45,8 +45,8 @@ export function LogViewer(props: Props) {
     },
   });
 
-  const [limit, setLimit] = useState(50);
-  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [page] = useState(1);
 
   const { liveLogs: sseLogs } = useFlowContext();
 

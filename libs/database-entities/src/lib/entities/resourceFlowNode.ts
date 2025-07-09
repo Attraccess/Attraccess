@@ -38,7 +38,7 @@ export const WaitNodeDataSchema = z.object({
 });
 
 // Helper function to get the appropriate schema for a node type
-export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
+export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
   switch (nodeType) {
     case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED:
     case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED:

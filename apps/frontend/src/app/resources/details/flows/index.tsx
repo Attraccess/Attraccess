@@ -225,7 +225,8 @@ function FlowsPageInner() {
   }, []);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
-  const [flowExecutionHadError, setFlowExecutionHadError] = useState(false);
+  const [, setFlowExecutionHadError] = useState(false);
+
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
       console.log('[FlowsPageInner] log.type:', log.type);

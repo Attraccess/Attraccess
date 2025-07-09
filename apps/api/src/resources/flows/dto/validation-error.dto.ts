@@ -30,5 +30,5 @@ export class ValidationErrorDto {
     required: false,
     example: 'invalid-url',
   })
-  value?: any;
+  value?: unknown;
 }

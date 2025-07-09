@@ -57,6 +57,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
     // if you didn't drop them in the up() method
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async convertMqttConfigToFlow(queryRunner: QueryRunner, config: any): Promise<void> {
     const resourceId = config.resourceId;
     const basePosition = { x: 100, y: 100 };
@@ -204,6 +205,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async convertWebhookConfigToFlow(queryRunner: QueryRunner, config: any): Promise<void> {
     const resourceId = config.resourceId;
     const basePosition = { x: 600, y: 100 }; // Position webhooks to the right of MQTT
@@ -276,7 +278,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
     if (config.headers) {
       try {
         headers = JSON.parse(config.headers);
-      } catch (e) {
+      } catch {
         console.warn(`Invalid headers JSON for webhook config ${config.id}: ${config.headers}`);
       }
     }

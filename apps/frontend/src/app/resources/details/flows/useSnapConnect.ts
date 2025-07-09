@@ -41,7 +41,7 @@ export function useSnapConnect(minDistance = MIN_DISTANCE) {
 
           if (d < res.distance && d < minDistance) {
             res.distance = d;
-            (res as unknown as { node: Node }).node = n;
+            res.node = n;
           }
 
           return res;

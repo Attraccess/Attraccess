@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, LessThan } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
