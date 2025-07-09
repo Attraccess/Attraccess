@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -144,7 +145,7 @@ export function ManageResourceGroups({
             items={currentPage}
             loadingState={loadingState}
             loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<TableEmptyState />}
+            emptyContent={<EmptyState />}
           >
             {(group) => (
               <TableRow

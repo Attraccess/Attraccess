@@ -157,14 +157,6 @@ export const $PaginatedUsersResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -172,7 +164,7 @@ export const $PaginatedUsersResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $UpdateUserPermissionsDto = {
@@ -762,14 +754,6 @@ export const $PaginatedResourceResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -777,7 +761,7 @@ export const $PaginatedResourceResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $UpdateResourceDto = {
@@ -1122,534 +1106,6 @@ export const $AllMqttServerStatusesDto = {
     required: ['servers']
 } as const;
 
-export const $WebhookConfigResponseDto = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the webhook configuration',
-            example: 1
-        },
-        resourceId: {
-            type: 'number',
-            description: 'The ID of the resource this webhook configuration is for',
-            example: 1
-        },
-        name: {
-            type: 'string',
-            description: 'Friendly name for the webhook',
-            example: 'Slack Notification'
-        },
-        url: {
-            type: 'string',
-            description: 'Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.',
-            example: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'
-        },
-        method: {
-            type: 'string',
-            description: 'HTTP method to use for the webhook request',
-            enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-            example: 'POST'
-        },
-        headers: {
-            type: 'string',
-            description: 'JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.',
-            example: '{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}'
-        },
-        inUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is in use',
-            example: '{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}'
-        },
-        notInUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is not in use',
-            example: '{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}'
-        },
-        active: {
-            type: 'boolean',
-            description: 'Whether the webhook is active',
-            example: true
-        },
-        retryEnabled: {
-            type: 'boolean',
-            description: 'Whether to enable retry mechanism for failed webhook requests',
-            example: true
-        },
-        maxRetries: {
-            type: 'number',
-            description: 'Number of retry attempts for failed webhook requests',
-            example: 3
-        },
-        retryDelay: {
-            type: 'number',
-            description: 'Delay in milliseconds between retries',
-            example: 1000
-        },
-        signatureHeader: {
-            type: 'string',
-            description: 'Name of the header that contains the signature',
-            example: 'X-Webhook-Signature'
-        },
-        sendOnStart: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage starts',
-            example: true
-        },
-        sendOnStop: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage stops',
-            example: true
-        },
-        sendOnTakeover: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage is taken over',
-            example: false
-        },
-        takeoverTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource usage is taken over',
-            example: '{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the webhook configuration was created'
-        },
-        updatedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the webhook configuration was last updated'
-        }
-    },
-    required: ['id', 'resourceId', 'name', 'url', 'method', 'headers', 'inUseTemplate', 'notInUseTemplate', 'active', 'retryEnabled', 'maxRetries', 'retryDelay', 'signatureHeader', 'sendOnStart', 'sendOnStop', 'sendOnTakeover', 'takeoverTemplate', 'createdAt', 'updatedAt']
-} as const;
-
-export const $CreateWebhookConfigDto = {
-    type: 'object',
-    properties: {
-        name: {
-            type: 'string',
-            description: 'Friendly name for the webhook',
-            example: 'Slack Notification'
-        },
-        url: {
-            type: 'string',
-            description: 'Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.',
-            example: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'
-        },
-        method: {
-            type: 'string',
-            description: 'HTTP method to use for the webhook request',
-            enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-            example: 'POST'
-        },
-        headers: {
-            type: 'string',
-            description: 'JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.',
-            example: '{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}'
-        },
-        inUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is in use',
-            example: '{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}'
-        },
-        notInUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is not in use',
-            example: '{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}'
-        },
-        active: {
-            type: 'boolean',
-            description: 'Whether the webhook is active',
-            example: true,
-            default: true
-        },
-        retryEnabled: {
-            type: 'boolean',
-            description: 'Whether to enable retry mechanism for failed webhook requests',
-            example: true,
-            default: false
-        },
-        maxRetries: {
-            type: 'number',
-            description: 'Number of retry attempts for failed webhook requests (maximum 10)',
-            example: 3,
-            default: 3
-        },
-        retryDelay: {
-            type: 'number',
-            description: 'Delay in milliseconds between retries (maximum 10000)',
-            example: 1000,
-            default: 1000
-        },
-        signatureHeader: {
-            type: 'string',
-            description: 'Name of the header that contains the signature',
-            example: 'X-Webhook-Signature',
-            default: 'X-Webhook-Signature'
-        },
-        sendOnStart: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage starts',
-            example: true,
-            default: true
-        },
-        sendOnStop: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage stops',
-            example: true,
-            default: true
-        },
-        sendOnTakeover: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage is taken over',
-            example: false,
-            default: false
-        },
-        takeoverTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource usage is taken over',
-            example: '{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        }
-    },
-    required: ['name', 'url', 'method', 'inUseTemplate', 'notInUseTemplate']
-} as const;
-
-export const $UpdateWebhookConfigDto = {
-    type: 'object',
-    properties: {
-        name: {
-            type: 'string',
-            description: 'Friendly name for the webhook',
-            example: 'Slack Notification'
-        },
-        url: {
-            type: 'string',
-            description: 'Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.',
-            example: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX'
-        },
-        method: {
-            type: 'string',
-            description: 'HTTP method to use for the webhook request',
-            enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-            example: 'POST'
-        },
-        headers: {
-            type: 'string',
-            description: 'JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.',
-            example: '{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}'
-        },
-        inUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is in use',
-            example: '{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}'
-        },
-        notInUseTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource is not in use',
-            example: '{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}'
-        },
-        retryEnabled: {
-            type: 'boolean',
-            description: 'Whether to enable retry mechanism for failed webhook requests',
-            example: true
-        },
-        maxRetries: {
-            type: 'number',
-            description: 'Number of retry attempts for failed webhook requests (maximum 10)',
-            example: 3
-        },
-        retryDelay: {
-            type: 'number',
-            description: 'Delay in milliseconds between retries (maximum 10000)',
-            example: 1000
-        },
-        signatureHeader: {
-            type: 'string',
-            description: 'Name of the header that contains the signature',
-            example: 'X-Webhook-Signature'
-        },
-        sendOnStart: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage starts',
-            example: true
-        },
-        sendOnStop: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage stops',
-            example: true
-        },
-        sendOnTakeover: {
-            type: 'boolean',
-            description: 'Whether to send a webhook when a resource usage is taken over',
-            example: false
-        },
-        takeoverTemplate: {
-            type: 'string',
-            description: 'Template for payload when resource usage is taken over',
-            example: '{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        }
-    }
-} as const;
-
-export const $WebhookStatusDto = {
-    type: 'object',
-    properties: {
-        active: {
-            type: 'boolean',
-            description: 'Whether the webhook is active',
-            example: true
-        }
-    },
-    required: ['active']
-} as const;
-
-export const $WebhookTestResponseDto = {
-    type: 'object',
-    properties: {
-        success: {
-            type: 'boolean',
-            description: 'Whether the test was successful',
-            example: true
-        },
-        message: {
-            type: 'string',
-            description: 'Message describing the test result',
-            example: 'Webhook test request sent successfully'
-        }
-    },
-    required: ['success', 'message']
-} as const;
-
-export const $MqttResourceConfig = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the MQTT resource configuration',
-            example: 1
-        },
-        resourceId: {
-            type: 'number',
-            description: 'The ID of the resource this configuration is for',
-            example: 1
-        },
-        name: {
-            type: 'string',
-            description: 'Name of this MQTT configuration',
-            example: 'Primary Status Feed'
-        },
-        serverId: {
-            type: 'number',
-            description: 'The ID of the MQTT server to publish to',
-            example: 1
-        },
-        inUseTopic: {
-            type: 'string',
-            description: 'Topic template using Handlebars for in-use status',
-            example: 'resources/{{id}}/status'
-        },
-        inUseMessage: {
-            type: 'string',
-            description: 'Message template using Handlebars for in-use status',
-            example: '{"status": "in_use", "resourceId": "{{id}}", "timestamp": "{{timestamp}}"}'
-        },
-        notInUseTopic: {
-            type: 'string',
-            description: 'Topic template using Handlebars for not-in-use status',
-            example: 'resources/{{id}}/status'
-        },
-        notInUseMessage: {
-            type: 'string',
-            description: 'Message template using Handlebars for not-in-use status',
-            example: '{"status": "not_in_use", "resourceId": "{{id}}", "timestamp": "{{timestamp}}"}'
-        },
-        onTakeoverSendStart: {
-            type: 'boolean',
-            description: 'Whether to send a start message when a resource is taken over',
-            example: true
-        },
-        onTakeoverSendStop: {
-            type: 'boolean',
-            description: 'Whether to send a stop message when a resource is taken over',
-            example: true
-        },
-        onTakeoverSendTakeover: {
-            type: 'boolean',
-            description: 'Whether to send an MQTT message when a resource usage is taken over',
-            example: false
-        },
-        takeoverTopic: {
-            type: 'string',
-            description: 'Topic template using Handlebars for takeover status',
-            example: 'resources/{{id}}/status'
-        },
-        takeoverMessage: {
-            type: 'string',
-            description: 'Message template using Handlebars for takeover status',
-            example: '{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the MQTT resource configuration was created'
-        },
-        updatedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the MQTT resource configuration was last updated'
-        }
-    },
-    required: ['id', 'resourceId', 'name', 'serverId', 'inUseTopic', 'inUseMessage', 'notInUseTopic', 'notInUseMessage', 'onTakeoverSendStart', 'onTakeoverSendStop', 'onTakeoverSendTakeover', 'createdAt', 'updatedAt']
-} as const;
-
-export const $CreateMqttResourceConfigDto = {
-    type: 'object',
-    properties: {
-        serverId: {
-            type: 'number',
-            description: 'ID of the MQTT server to use',
-            example: 1
-        },
-        name: {
-            type: 'string',
-            description: 'Name of this MQTT configuration',
-            example: 'Primary Status Feed'
-        },
-        inUseTopic: {
-            type: 'string',
-            description: 'Topic template for when resource is in use',
-            example: 'resources/{{id}}/status'
-        },
-        inUseMessage: {
-            type: 'string',
-            description: 'Message template for when resource is in use',
-            example: '{"status":"in_use","resourceId":{{id}},"resourceName":"{{name}}"}'
-        },
-        notInUseTopic: {
-            type: 'string',
-            description: 'Topic template for when resource is not in use',
-            example: 'resources/{{id}}/status'
-        },
-        notInUseMessage: {
-            type: 'string',
-            description: 'Message template for when resource is not in use',
-            example: '{"status":"not_in_use","resourceId":{{id}},"resourceName":"{{name}}"}'
-        },
-        onTakeoverSendStart: {
-            type: 'boolean',
-            description: 'Whether to send a start message when a resource is taken over',
-            example: false,
-            default: false
-        },
-        onTakeoverSendStop: {
-            type: 'boolean',
-            description: 'Whether to send a stop message when a resource is taken over',
-            example: false,
-            default: false
-        },
-        onTakeoverSendTakeover: {
-            type: 'boolean',
-            description: 'Whether to send an MQTT message when a resource usage is taken over',
-            example: true,
-            default: true
-        },
-        takeoverTopic: {
-            type: 'string',
-            description: 'Topic template for when resource usage is taken over',
-            example: 'resources/{{id}}/status'
-        },
-        takeoverMessage: {
-            type: 'string',
-            description: 'Message template for when resource usage is taken over',
-            example: '{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        }
-    },
-    required: ['serverId', 'name', 'inUseTopic', 'inUseMessage', 'notInUseTopic', 'notInUseMessage']
-} as const;
-
-export const $UpdateMqttResourceConfigDto = {
-    type: 'object',
-    properties: {
-        serverId: {
-            type: 'number',
-            description: 'ID of the MQTT server to use',
-            example: 1
-        },
-        name: {
-            type: 'string',
-            description: 'Name of this MQTT configuration',
-            example: 'Primary Status Feed'
-        },
-        inUseTopic: {
-            type: 'string',
-            description: 'Topic template for when resource is in use',
-            example: 'resources/{{id}}/status'
-        },
-        inUseMessage: {
-            type: 'string',
-            description: 'Message template for when resource is in use',
-            example: '{"status":"in_use","resourceId":{{id}},"resourceName":"{{name}}"}'
-        },
-        notInUseTopic: {
-            type: 'string',
-            description: 'Topic template for when resource is not in use',
-            example: 'resources/{{id}}/status'
-        },
-        notInUseMessage: {
-            type: 'string',
-            description: 'Message template for when resource is not in use',
-            example: '{"status":"not_in_use","resourceId":{{id}},"resourceName":"{{name}}"}'
-        },
-        onTakeoverSendStart: {
-            type: 'boolean',
-            description: 'Whether to send a start message when a resource is taken over',
-            example: false,
-            default: false
-        },
-        onTakeoverSendStop: {
-            type: 'boolean',
-            description: 'Whether to send a stop message when a resource is taken over',
-            example: false,
-            default: false
-        },
-        onTakeoverSendTakeover: {
-            type: 'boolean',
-            description: 'Whether to send an MQTT message when a resource usage is taken over',
-            example: true,
-            default: true
-        },
-        takeoverTopic: {
-            type: 'string',
-            description: 'Topic template for when resource usage is taken over',
-            example: 'resources/{{id}}/status'
-        },
-        takeoverMessage: {
-            type: 'string',
-            description: 'Message template for when resource usage is taken over',
-            example: '{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}'
-        }
-    }
-} as const;
-
-export const $TestMqttConfigResponseDto = {
-    type: 'object',
-    properties: {
-        success: {
-            type: 'boolean',
-            description: 'Whether the test was successful',
-            example: true
-        },
-        message: {
-            type: 'string',
-            description: 'Message describing the test result',
-            example: 'MQTT configuration is valid and connection to server was successful'
-        }
-    },
-    required: ['success', 'message']
-} as const;
-
 export const $CreateResourceGroupDto = {
     type: 'object',
     properties: {
@@ -1968,14 +1424,6 @@ export const $GetResourceHistoryResponseDto = {
         limit: {
             type: 'number'
         },
-        nextPage: {
-            type: 'integer',
-            nullable: true,
-            description: 'The next page number, or null if it is the last page.'
-        },
-        totalPages: {
-            type: 'number'
-        },
         data: {
             type: 'array',
             items: {
@@ -1983,7 +1431,7 @@ export const $GetResourceHistoryResponseDto = {
             }
         }
     },
-    required: ['total', 'page', 'limit', 'nextPage', 'totalPages', 'data']
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $GetActiveUsageSessionDto = {
@@ -2033,6 +1481,321 @@ export const $UpdateResourceIntroductionDto = {
             example: 'This is a comment'
         }
     }
+} as const;
+
+export const $ResourceFlowNodePositionDto = {
+    type: 'object',
+    properties: {
+        x: {
+            type: 'number',
+            description: 'The x position of the node',
+            example: 100
+        },
+        y: {
+            type: 'number',
+            description: 'The y position of the node',
+            example: 200
+        }
+    },
+    required: ['x', 'y']
+} as const;
+
+export const $ResourceFlowNodeDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The unique identifier of the resource flow node',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the node',
+            example: 'event.resource.usage.started',
+            enum: ['event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover', 'action.http.sendRequest', 'action.mqtt.sendMessage', 'action.util.wait']
+        },
+        position: {
+            description: 'The position of the node',
+            example: {
+                x: 100,
+                y: 200
+            },
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceFlowNodePositionDto'
+                }
+            ]
+        },
+        data: {
+            type: 'object',
+            description: 'The data of the node, depending on the type of the node',
+            example: {
+                url: 'https://example.com/webhook',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: '{"message": "Resource usage started"}'
+            },
+            additionalProperties: true
+        }
+    },
+    required: ['id', 'type', 'position', 'data']
+} as const;
+
+export const $ResourceFlowEdgeDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The unique identifier of the resource flow edge',
+            example: 'edge-abc123'
+        },
+        source: {
+            type: 'string',
+            description: 'The source node id',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        target: {
+            type: 'string',
+            description: 'The target node id',
+            example: 'TGVgqDzCKXKVr-XGUD5V4'
+        }
+    },
+    required: ['id', 'source', 'target']
+} as const;
+
+export const $ValidationErrorDto = {
+    type: 'object',
+    properties: {
+        nodeId: {
+            type: 'string',
+            description: 'The ID of the node that has the validation error',
+            example: 'node-123'
+        },
+        nodeType: {
+            type: 'string',
+            description: 'The type of the node that has the validation error',
+            example: 'action.http.sendRequest'
+        },
+        field: {
+            type: 'string',
+            description: 'The field that has the validation error',
+            example: 'url'
+        },
+        message: {
+            type: 'string',
+            description: 'The validation error message',
+            example: 'Invalid URL format'
+        },
+        value: {
+            type: 'object',
+            description: 'The invalid value that caused the error',
+            example: 'invalid-url'
+        }
+    },
+    required: ['nodeId', 'nodeType', 'field', 'message']
+} as const;
+
+export const $ResourceFlowResponseDto = {
+    type: 'object',
+    properties: {
+        nodes: {
+            description: 'Array of flow nodes defining the workflow steps',
+            example: [
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V3',
+                    type: 'event.resource.usage.started',
+                    position: {
+                        x: 100,
+                        y: 200
+                    },
+                    data: {}
+                },
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V4',
+                    type: 'action.http.sendRequest',
+                    position: {
+                        x: 300,
+                        y: 200
+                    },
+                    data: {
+                        url: 'https://example.com/webhook',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: '{"message": "Resource usage started"}'
+                    }
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowNodeDto'
+            }
+        },
+        edges: {
+            description: 'Array of flow edges connecting nodes to define the workflow flow',
+            example: [
+                {
+                    id: 'edge-abc123',
+                    source: 'TGVgqDzCKXKVr-XGUD5V3',
+                    target: 'TGVgqDzCKXKVr-XGUD5V4'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowEdgeDto'
+            }
+        },
+        validationErrors: {
+            description: 'Validation errors for nodes, if any',
+            example: [
+                {
+                    nodeId: 'TGVgqDzCKXKVr-XGUD5V4',
+                    nodeType: 'action.http.sendRequest',
+                    field: 'url',
+                    message: 'Invalid URL format',
+                    value: 'not-a-valid-url'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ValidationErrorDto'
+            }
+        }
+    },
+    required: ['nodes', 'edges']
+} as const;
+
+export const $ResourceFlowSaveDto = {
+    type: 'object',
+    properties: {
+        nodes: {
+            description: 'Array of flow nodes defining the workflow steps',
+            example: [
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V3',
+                    type: 'event.resource.usage.started',
+                    position: {
+                        x: 100,
+                        y: 200
+                    },
+                    data: {}
+                },
+                {
+                    id: 'TGVgqDzCKXKVr-XGUD5V4',
+                    type: 'action.http.sendRequest',
+                    position: {
+                        x: 300,
+                        y: 200
+                    },
+                    data: {
+                        url: 'https://example.com/webhook',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: '{"message": "Resource usage started"}'
+                    }
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowNodeDto'
+            }
+        },
+        edges: {
+            description: 'Array of flow edges connecting nodes to define the workflow flow',
+            example: [
+                {
+                    id: 'edge-abc123',
+                    source: 'TGVgqDzCKXKVr-XGUD5V3',
+                    target: 'TGVgqDzCKXKVr-XGUD5V4'
+                }
+            ],
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowEdgeDto'
+            }
+        }
+    },
+    required: ['nodes', 'edges']
+} as const;
+
+export const $ResourceFlowLog = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the resource flow log',
+            example: 42
+        },
+        nodeId: {
+            type: 'string',
+            description: 'The node id of the node that generated the log',
+            example: 'TGVgqDzCKXKVr-XGUD5V3',
+            nullable: true
+        },
+        flowRunId: {
+            type: 'string',
+            description: 'The run/execution id of the flow that generated the log',
+            example: '123e4567-e89b-12d3-a456-426614174000'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the log entry',
+            enum: ['flow.start', 'node.processing.started', 'node.processing.failed', 'node.processing.completed', 'flow.completed'],
+            example: 'node.processing.started'
+        },
+        payload: {
+            type: 'string',
+            description: 'Optional payload for additional user information',
+            example: 'Processing took longer than expected due to network latency'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the node was created'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The id of the resource that this log belongs to',
+            example: 1
+        },
+        resource: {
+            description: 'The resource being this log belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Resource'
+                }
+            ]
+        }
+    },
+    required: ['id', 'nodeId', 'flowRunId', 'type', 'createdAt', 'resourceId']
+} as const;
+
+export const $ResourceFlowLogsResponseDto = {
+    type: 'object',
+    properties: {
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        },
+        data: {
+            description: 'Array of flow log entries, ordered by creation time (newest first)',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceFlowLog'
+            }
+        }
+    },
+    required: ['total', 'page', 'limit', 'data']
 } as const;
 
 export const $PluginMainFrontend = {

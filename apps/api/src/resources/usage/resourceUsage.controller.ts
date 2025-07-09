@@ -5,7 +5,6 @@ import { ResourceUsage } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { makePaginatedResponse } from '../../types/response';
 import { GetResourceHistoryQueryDto } from './dtos/getResourceHistoryQuery.dto';
 import { GetResourceHistoryResponseDto } from './dtos/GetResourceHistoryResponse.dto';
 import { GetActiveUsageSessionDto } from './dtos/getActiveUsageSession.dto';
@@ -118,7 +117,12 @@ export class ResourceUsageController {
       query.userId
     );
 
-    return makePaginatedResponse({ page: query.page, limit: query.limit }, data, total);
+    return {
+      data,
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
   }
 
   @Get('active')

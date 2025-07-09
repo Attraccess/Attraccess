@@ -57,7 +57,6 @@ export function SSOLogin() {
 
     didExecuteSSOCallback.current = true;
 
-    console.log('jwt from sso login', authFromQuery);
     jwtTokenLoginMutate(authFromQuery);
   }, [jwtTokenLoginMutate, authFromQuery]);
 

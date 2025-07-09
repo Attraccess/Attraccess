@@ -5,7 +5,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import App from './app/app';
 import '@attraccess/plugins-frontend-ui';
 import { queryClient } from './api/queryClient';
-import setupApiParameters from './api';
 import { PluginProvider } from './app/plugins/plugin-provider';
 import { PWAInstall } from './components/pwaInstall';
 import { registerSW } from 'virtual:pwa-register';
@@ -48,8 +47,6 @@ registerSW({
     }
   },
 });
-
-setupApiParameters();
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 

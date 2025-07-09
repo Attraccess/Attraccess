@@ -107,11 +107,6 @@ export type PaginatedUsersResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<User>;
 };
 
@@ -519,11 +514,6 @@ export type PaginatedResourceResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<Resource>;
 };
 
@@ -766,404 +756,6 @@ export type AllMqttServerStatusesDto = {
     };
 };
 
-export type WebhookConfigResponseDto = {
-    /**
-     * The unique identifier of the webhook configuration
-     */
-    id: number;
-    /**
-     * The ID of the resource this webhook configuration is for
-     */
-    resourceId: number;
-    /**
-     * Friendly name for the webhook
-     */
-    name: string;
-    /**
-     * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-     */
-    url: string;
-    /**
-     * HTTP method to use for the webhook request
-     */
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    /**
-     * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-     */
-    headers: string;
-    /**
-     * Template for payload when resource is in use
-     */
-    inUseTemplate: string;
-    /**
-     * Template for payload when resource is not in use
-     */
-    notInUseTemplate: string;
-    /**
-     * Whether the webhook is active
-     */
-    active: boolean;
-    /**
-     * Whether to enable retry mechanism for failed webhook requests
-     */
-    retryEnabled: boolean;
-    /**
-     * Number of retry attempts for failed webhook requests
-     */
-    maxRetries: number;
-    /**
-     * Delay in milliseconds between retries
-     */
-    retryDelay: number;
-    /**
-     * Name of the header that contains the signature
-     */
-    signatureHeader: string;
-    /**
-     * Whether to send a webhook when a resource usage starts
-     */
-    sendOnStart: boolean;
-    /**
-     * Whether to send a webhook when a resource usage stops
-     */
-    sendOnStop: boolean;
-    /**
-     * Whether to send a webhook when a resource usage is taken over
-     */
-    sendOnTakeover: boolean;
-    /**
-     * Template for payload when resource usage is taken over
-     */
-    takeoverTemplate: string;
-    /**
-     * When the webhook configuration was created
-     */
-    createdAt: string;
-    /**
-     * When the webhook configuration was last updated
-     */
-    updatedAt: string;
-};
-
-/**
- * HTTP method to use for the webhook request
- */
-export enum method {
-    GET = 'GET',
-    POST = 'POST',
-    PUT = 'PUT',
-    PATCH = 'PATCH',
-    DELETE = 'DELETE'
-}
-
-export type CreateWebhookConfigDto = {
-    /**
-     * Friendly name for the webhook
-     */
-    name: string;
-    /**
-     * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-     */
-    url: string;
-    /**
-     * HTTP method to use for the webhook request
-     */
-    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    /**
-     * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-     */
-    headers?: string;
-    /**
-     * Template for payload when resource is in use
-     */
-    inUseTemplate: string;
-    /**
-     * Template for payload when resource is not in use
-     */
-    notInUseTemplate: string;
-    /**
-     * Whether the webhook is active
-     */
-    active?: boolean;
-    /**
-     * Whether to enable retry mechanism for failed webhook requests
-     */
-    retryEnabled?: boolean;
-    /**
-     * Number of retry attempts for failed webhook requests (maximum 10)
-     */
-    maxRetries?: number;
-    /**
-     * Delay in milliseconds between retries (maximum 10000)
-     */
-    retryDelay?: number;
-    /**
-     * Name of the header that contains the signature
-     */
-    signatureHeader?: string;
-    /**
-     * Whether to send a webhook when a resource usage starts
-     */
-    sendOnStart?: boolean;
-    /**
-     * Whether to send a webhook when a resource usage stops
-     */
-    sendOnStop?: boolean;
-    /**
-     * Whether to send a webhook when a resource usage is taken over
-     */
-    sendOnTakeover?: boolean;
-    /**
-     * Template for payload when resource usage is taken over
-     */
-    takeoverTemplate?: string;
-};
-
-export type UpdateWebhookConfigDto = {
-    /**
-     * Friendly name for the webhook
-     */
-    name?: string;
-    /**
-     * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-     */
-    url?: string;
-    /**
-     * HTTP method to use for the webhook request
-     */
-    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    /**
-     * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-     */
-    headers?: string;
-    /**
-     * Template for payload when resource is in use
-     */
-    inUseTemplate?: string;
-    /**
-     * Template for payload when resource is not in use
-     */
-    notInUseTemplate?: string;
-    /**
-     * Whether to enable retry mechanism for failed webhook requests
-     */
-    retryEnabled?: boolean;
-    /**
-     * Number of retry attempts for failed webhook requests (maximum 10)
-     */
-    maxRetries?: number;
-    /**
-     * Delay in milliseconds between retries (maximum 10000)
-     */
-    retryDelay?: number;
-    /**
-     * Name of the header that contains the signature
-     */
-    signatureHeader?: string;
-    /**
-     * Whether to send a webhook when a resource usage starts
-     */
-    sendOnStart?: boolean;
-    /**
-     * Whether to send a webhook when a resource usage stops
-     */
-    sendOnStop?: boolean;
-    /**
-     * Whether to send a webhook when a resource usage is taken over
-     */
-    sendOnTakeover?: boolean;
-    /**
-     * Template for payload when resource usage is taken over
-     */
-    takeoverTemplate?: string;
-};
-
-export type WebhookStatusDto = {
-    /**
-     * Whether the webhook is active
-     */
-    active: boolean;
-};
-
-export type WebhookTestResponseDto = {
-    /**
-     * Whether the test was successful
-     */
-    success: boolean;
-    /**
-     * Message describing the test result
-     */
-    message: string;
-};
-
-export type MqttResourceConfig = {
-    /**
-     * The unique identifier of the MQTT resource configuration
-     */
-    id: number;
-    /**
-     * The ID of the resource this configuration is for
-     */
-    resourceId: number;
-    /**
-     * Name of this MQTT configuration
-     */
-    name: string;
-    /**
-     * The ID of the MQTT server to publish to
-     */
-    serverId: number;
-    /**
-     * Topic template using Handlebars for in-use status
-     */
-    inUseTopic: string;
-    /**
-     * Message template using Handlebars for in-use status
-     */
-    inUseMessage: string;
-    /**
-     * Topic template using Handlebars for not-in-use status
-     */
-    notInUseTopic: string;
-    /**
-     * Message template using Handlebars for not-in-use status
-     */
-    notInUseMessage: string;
-    /**
-     * Whether to send a start message when a resource is taken over
-     */
-    onTakeoverSendStart: boolean;
-    /**
-     * Whether to send a stop message when a resource is taken over
-     */
-    onTakeoverSendStop: boolean;
-    /**
-     * Whether to send an MQTT message when a resource usage is taken over
-     */
-    onTakeoverSendTakeover: boolean;
-    /**
-     * Topic template using Handlebars for takeover status
-     */
-    takeoverTopic?: string;
-    /**
-     * Message template using Handlebars for takeover status
-     */
-    takeoverMessage?: string;
-    /**
-     * When the MQTT resource configuration was created
-     */
-    createdAt: string;
-    /**
-     * When the MQTT resource configuration was last updated
-     */
-    updatedAt: string;
-};
-
-export type CreateMqttResourceConfigDto = {
-    /**
-     * ID of the MQTT server to use
-     */
-    serverId: number;
-    /**
-     * Name of this MQTT configuration
-     */
-    name: string;
-    /**
-     * Topic template for when resource is in use
-     */
-    inUseTopic: string;
-    /**
-     * Message template for when resource is in use
-     */
-    inUseMessage: string;
-    /**
-     * Topic template for when resource is not in use
-     */
-    notInUseTopic: string;
-    /**
-     * Message template for when resource is not in use
-     */
-    notInUseMessage: string;
-    /**
-     * Whether to send a start message when a resource is taken over
-     */
-    onTakeoverSendStart?: boolean;
-    /**
-     * Whether to send a stop message when a resource is taken over
-     */
-    onTakeoverSendStop?: boolean;
-    /**
-     * Whether to send an MQTT message when a resource usage is taken over
-     */
-    onTakeoverSendTakeover?: boolean;
-    /**
-     * Topic template for when resource usage is taken over
-     */
-    takeoverTopic?: string;
-    /**
-     * Message template for when resource usage is taken over
-     */
-    takeoverMessage?: string;
-};
-
-export type UpdateMqttResourceConfigDto = {
-    /**
-     * ID of the MQTT server to use
-     */
-    serverId?: number;
-    /**
-     * Name of this MQTT configuration
-     */
-    name?: string;
-    /**
-     * Topic template for when resource is in use
-     */
-    inUseTopic?: string;
-    /**
-     * Message template for when resource is in use
-     */
-    inUseMessage?: string;
-    /**
-     * Topic template for when resource is not in use
-     */
-    notInUseTopic?: string;
-    /**
-     * Message template for when resource is not in use
-     */
-    notInUseMessage?: string;
-    /**
-     * Whether to send a start message when a resource is taken over
-     */
-    onTakeoverSendStart?: boolean;
-    /**
-     * Whether to send a stop message when a resource is taken over
-     */
-    onTakeoverSendStop?: boolean;
-    /**
-     * Whether to send an MQTT message when a resource usage is taken over
-     */
-    onTakeoverSendTakeover?: boolean;
-    /**
-     * Topic template for when resource usage is taken over
-     */
-    takeoverTopic?: string;
-    /**
-     * Message template for when resource usage is taken over
-     */
-    takeoverMessage?: string;
-};
-
-export type TestMqttConfigResponseDto = {
-    /**
-     * Whether the test was successful
-     */
-    success: boolean;
-    /**
-     * Message describing the test result
-     */
-    message: string;
-};
-
 export type CreateResourceGroupDto = {
     /**
      * The name of the resource group
@@ -1378,11 +970,6 @@ export type GetResourceHistoryResponseDto = {
     total: number;
     page: number;
     limit: number;
-    /**
-     * The next page number, or null if it is the last page.
-     */
-    nextPage: number | null;
-    totalPages: number;
     data: Array<ResourceUsage>;
 };
 
@@ -1412,6 +999,172 @@ export type UpdateResourceIntroductionDto = {
      * The comment for the action
      */
     comment?: string;
+};
+
+export type ResourceFlowNodePositionDto = {
+    /**
+     * The x position of the node
+     */
+    x: number;
+    /**
+     * The y position of the node
+     */
+    y: number;
+};
+
+export type ResourceFlowNodeDto = {
+    /**
+     * The unique identifier of the resource flow node
+     */
+    id: string;
+    /**
+     * The type of the node
+     */
+    type: 'event.resource.usage.started' | 'event.resource.usage.stopped' | 'event.resource.usage.takeover' | 'action.http.sendRequest' | 'action.mqtt.sendMessage' | 'action.util.wait';
+    /**
+     * The position of the node
+     */
+    position: ResourceFlowNodePositionDto;
+    /**
+     * The data of the node, depending on the type of the node
+     */
+    data: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * The type of the node
+ */
+export enum type2 {
+    EVENT_RESOURCE_USAGE_STARTED = 'event.resource.usage.started',
+    EVENT_RESOURCE_USAGE_STOPPED = 'event.resource.usage.stopped',
+    EVENT_RESOURCE_USAGE_TAKEOVER = 'event.resource.usage.takeover',
+    ACTION_HTTP_SEND_REQUEST = 'action.http.sendRequest',
+    ACTION_MQTT_SEND_MESSAGE = 'action.mqtt.sendMessage',
+    ACTION_UTIL_WAIT = 'action.util.wait'
+}
+
+export type ResourceFlowEdgeDto = {
+    /**
+     * The unique identifier of the resource flow edge
+     */
+    id: string;
+    /**
+     * The source node id
+     */
+    source: string;
+    /**
+     * The target node id
+     */
+    target: string;
+};
+
+export type ValidationErrorDto = {
+    /**
+     * The ID of the node that has the validation error
+     */
+    nodeId: string;
+    /**
+     * The type of the node that has the validation error
+     */
+    nodeType: string;
+    /**
+     * The field that has the validation error
+     */
+    field: string;
+    /**
+     * The validation error message
+     */
+    message: string;
+    /**
+     * The invalid value that caused the error
+     */
+    value?: {
+        [key: string]: unknown;
+    };
+};
+
+export type ResourceFlowResponseDto = {
+    /**
+     * Array of flow nodes defining the workflow steps
+     */
+    nodes: Array<ResourceFlowNodeDto>;
+    /**
+     * Array of flow edges connecting nodes to define the workflow flow
+     */
+    edges: Array<ResourceFlowEdgeDto>;
+    /**
+     * Validation errors for nodes, if any
+     */
+    validationErrors?: Array<ValidationErrorDto>;
+};
+
+export type ResourceFlowSaveDto = {
+    /**
+     * Array of flow nodes defining the workflow steps
+     */
+    nodes: Array<ResourceFlowNodeDto>;
+    /**
+     * Array of flow edges connecting nodes to define the workflow flow
+     */
+    edges: Array<ResourceFlowEdgeDto>;
+};
+
+export type ResourceFlowLog = {
+    /**
+     * The unique identifier of the resource flow log
+     */
+    id: number;
+    /**
+     * The node id of the node that generated the log
+     */
+    nodeId: string | null;
+    /**
+     * The run/execution id of the flow that generated the log
+     */
+    flowRunId: string;
+    /**
+     * The type of the log entry
+     */
+    type: 'flow.start' | 'node.processing.started' | 'node.processing.failed' | 'node.processing.completed' | 'flow.completed';
+    /**
+     * Optional payload for additional user information
+     */
+    payload?: string;
+    /**
+     * When the node was created
+     */
+    createdAt: string;
+    /**
+     * The id of the resource that this log belongs to
+     */
+    resourceId: number;
+    /**
+     * The resource being this log belongs to
+     */
+    resource?: Resource;
+};
+
+/**
+ * The type of the log entry
+ */
+export enum type3 {
+    FLOW_START = 'flow.start',
+    NODE_PROCESSING_STARTED = 'node.processing.started',
+    NODE_PROCESSING_FAILED = 'node.processing.failed',
+    NODE_PROCESSING_COMPLETED = 'node.processing.completed',
+    FLOW_COMPLETED = 'flow.completed'
+}
+
+export type ResourceFlowLogsResponseDto = {
+    total: number;
+    page: number;
+    limit: number;
+    /**
+     * Array of flow log entries, ordered by creation time (newest first)
+     */
+    data: Array<ResourceFlowLog>;
 };
 
 export type PluginMainFrontend = {
@@ -2042,147 +1795,6 @@ export type MqttServersGetStatusOfOneResponse = MqttServerStatusDto;
 
 export type MqttServersGetStatusOfAllResponse = AllMqttServerStatusesDto;
 
-export type MqttResourceConfigGetAllData = {
-    resourceId: number;
-};
-
-export type MqttResourceConfigGetAllResponse = Array<MqttResourceConfig>;
-
-export type MqttResourceConfigCreateData = {
-    requestBody: CreateMqttResourceConfigDto;
-    resourceId: number;
-};
-
-export type MqttResourceConfigCreateResponse = MqttResourceConfig;
-
-export type MqttResourceConfigGetOneData = {
-    configId: number;
-    resourceId: number;
-};
-
-export type MqttResourceConfigGetOneResponse = MqttResourceConfig;
-
-export type MqttResourceConfigUpdateData = {
-    configId: number;
-    requestBody: UpdateMqttResourceConfigDto;
-    resourceId: number;
-};
-
-export type MqttResourceConfigUpdateResponse = MqttResourceConfig;
-
-export type MqttResourceConfigDeleteOneData = {
-    configId: number;
-    resourceId: number;
-};
-
-export type MqttResourceConfigDeleteOneResponse = unknown;
-
-export type MqttResourceConfigTestOneData = {
-    configId: number;
-    resourceId: number;
-};
-
-export type MqttResourceConfigTestOneResponse = TestMqttConfigResponseDto;
-
-export type WebhookConfigGetAllData = {
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigGetAllResponse = Array<WebhookConfigResponseDto>;
-
-export type WebhookConfigCreateOneData = {
-    requestBody: CreateWebhookConfigDto;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigCreateOneResponse = WebhookConfigResponseDto;
-
-export type WebhookConfigGetOneByIdData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigGetOneByIdResponse = WebhookConfigResponseDto;
-
-export type WebhookConfigUpdateOneData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    requestBody: UpdateWebhookConfigDto;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigUpdateOneResponse = WebhookConfigResponseDto;
-
-export type WebhookConfigDeleteOneData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigDeleteOneResponse = void;
-
-export type WebhookConfigUpdateStatusData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    requestBody: WebhookStatusDto;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigUpdateStatusResponse = WebhookConfigResponseDto;
-
-export type WebhookConfigTestData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigTestResponse = WebhookTestResponseDto;
-
-export type WebhookConfigRegenerateSecretData = {
-    /**
-     * Webhook configuration ID
-     */
-    id: number;
-    /**
-     * Resource ID
-     */
-    resourceId: number;
-};
-
-export type WebhookConfigRegenerateSecretResponse = WebhookConfigResponseDto;
-
 export type ResourceGroupIntroductionsGetManyData = {
     /**
      * The ID of the resource group
@@ -2342,6 +1954,48 @@ export type ResourceIntroductionsGetHistoryData = {
 };
 
 export type ResourceIntroductionsGetHistoryResponse = Array<ResourceIntroductionHistoryItem>;
+
+export type GetResourceFlowData = {
+    /**
+     * The ID of the resource to get the flow for
+     */
+    resourceId: number;
+};
+
+export type GetResourceFlowResponse = ResourceFlowResponseDto;
+
+export type SaveResourceFlowData = {
+    requestBody: ResourceFlowSaveDto;
+    /**
+     * The ID of the resource to save the flow for
+     */
+    resourceId: number;
+};
+
+export type SaveResourceFlowResponse = ResourceFlowResponseDto;
+
+export type GetResourceFlowLogsData = {
+    /**
+     * Number of items per page
+     */
+    limit?: number;
+    /**
+     * Page number (1-based)
+     */
+    page?: number;
+    /**
+     * The ID of the resource to get the flow logs for
+     */
+    resourceId: number;
+};
+
+export type GetResourceFlowLogsResponse = ResourceFlowLogsResponseDto;
+
+export type ResourceFlowsControllerStreamEventsData = {
+    resourceId: number;
+};
+
+export type ResourceFlowsControllerStreamEventsResponse = unknown;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -3312,268 +2966,6 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/resources/{resourceId}/mqtt/config': {
-        get: {
-            req: MqttResourceConfigGetAllData;
-            res: {
-                /**
-                 * Returns all MQTT configurations for the resource
-                 */
-                200: Array<MqttResourceConfig>;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource not found
-                 */
-                404: unknown;
-            };
-        };
-        post: {
-            req: MqttResourceConfigCreateData;
-            res: {
-                /**
-                 * MQTT configuration created successfully
-                 */
-                201: MqttResourceConfig;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/mqtt/config/{configId}': {
-        get: {
-            req: MqttResourceConfigGetOneData;
-            res: {
-                /**
-                 * Returns the specific MQTT configuration
-                 */
-                200: MqttResourceConfig;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource or configuration not found
-                 */
-                404: unknown;
-            };
-        };
-        put: {
-            req: MqttResourceConfigUpdateData;
-            res: {
-                /**
-                 * MQTT configuration updated successfully
-                 */
-                200: MqttResourceConfig;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource or configuration not found
-                 */
-                404: unknown;
-            };
-        };
-        delete: {
-            req: MqttResourceConfigDeleteOneData;
-            res: {
-                /**
-                 * MQTT configuration deleted successfully
-                 */
-                200: unknown;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource or MQTT configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/mqtt/config/{configId}/test': {
-        post: {
-            req: MqttResourceConfigTestOneData;
-            res: {
-                /**
-                 * Test result
-                 */
-                200: TestMqttConfigResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource or MQTT configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/webhooks': {
-        get: {
-            req: WebhookConfigGetAllData;
-            res: {
-                /**
-                 * List of webhook configurations for the resource
-                 */
-                200: Array<WebhookConfigResponseDto>;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-        post: {
-            req: WebhookConfigCreateOneData;
-            res: {
-                /**
-                 * The webhook configuration has been created
-                 */
-                201: WebhookConfigResponseDto;
-                /**
-                 * Invalid input
-                 */
-                400: unknown;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Resource not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/webhooks/{id}': {
-        get: {
-            req: WebhookConfigGetOneByIdData;
-            res: {
-                /**
-                 * The webhook configuration
-                 */
-                200: WebhookConfigResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-        put: {
-            req: WebhookConfigUpdateOneData;
-            res: {
-                /**
-                 * The webhook configuration has been updated
-                 */
-                200: WebhookConfigResponseDto;
-                /**
-                 * Invalid input
-                 */
-                400: unknown;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-        delete: {
-            req: WebhookConfigDeleteOneData;
-            res: {
-                /**
-                 * The webhook configuration has been deleted
-                 */
-                204: void;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/webhooks/{id}/status': {
-        put: {
-            req: WebhookConfigUpdateStatusData;
-            res: {
-                /**
-                 * The webhook status has been updated
-                 */
-                200: WebhookConfigResponseDto;
-                /**
-                 * Invalid input
-                 */
-                400: unknown;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/webhooks/{id}/test': {
-        post: {
-            req: WebhookConfigTestData;
-            res: {
-                /**
-                 * Test result
-                 */
-                200: WebhookTestResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/resources/{resourceId}/webhooks/{id}/regenerate-secret': {
-        post: {
-            req: WebhookConfigRegenerateSecretData;
-            res: {
-                /**
-                 * The webhook secret has been regenerated
-                 */
-                200: WebhookConfigResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * Webhook configuration not found
-                 */
-                404: unknown;
-            };
-        };
-    };
     '/api/resource-groups/{groupId}/introductions': {
         get: {
             req: ResourceGroupIntroductionsGetManyData;
@@ -3823,6 +3215,101 @@ export type $OpenApiTs = {
                  * User does not have permission to introduce users to this resource
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow': {
+        get: {
+            req: GetResourceFlowData;
+            res: {
+                /**
+                 * Resource flow retrieved successfully
+                 */
+                200: ResourceFlowResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+        put: {
+            req: SaveResourceFlowData;
+            res: {
+                /**
+                 * Resource flow saved successfully. May include validation errors for individual nodes that have invalid configuration.
+                 */
+                200: ResourceFlowResponseDto;
+                /**
+                 * Invalid request data
+                 */
+                400: {
+                    message?: Array<(string)>;
+                    statusCode?: number;
+                };
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow/logs': {
+        get: {
+            req: GetResourceFlowLogsData;
+            res: {
+                /**
+                 * Resource flow logs retrieved successfully
+                 */
+                200: ResourceFlowLogsResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Insufficient permissions to manage resources
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: {
+                    message?: string;
+                    statusCode?: number;
+                };
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow/logs/live': {
+        get: {
+            req: ResourceFlowsControllerStreamEventsData;
+            res: {
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

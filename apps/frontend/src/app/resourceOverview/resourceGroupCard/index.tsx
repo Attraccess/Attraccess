@@ -13,6 +13,7 @@ import {
   Image,
   Link,
   Pagination,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -20,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { useMemo, useState } from 'react';
 import { filenameToUrl } from '../../../api';
@@ -36,8 +38,8 @@ import en from './en.json';
 import de from './de.json';
 
 interface Props {
-  groupId: number | 'none';
-  filter: Pick<FilterProps, 'search' | 'onlyInUseByMe' | 'onlyWithPermissions'>;
+  groupId: number | 'none' | 'empty';
+  filter?: Pick<FilterProps, 'search' | 'onlyInUseByMe' | 'onlyWithPermissions'>;
 }
 
 export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'children'>>) {
@@ -46,7 +48,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   const { t } = useTranslations('resourceGroupCard', { de, en });
   const { hasPermission, user } = useAuth();
 
-  const debouncedSearchValue = useDebounce(filter.search, 250);
+  const debouncedSearchValue = useDebounce(filter?.search, 250);
   const perPage = 10;
   const [page, setPage] = useState(1);
 
@@ -54,26 +56,26 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     { id: groupId as number },
     undefined,
     {
-      enabled: !!groupId && groupId !== 'none',
+      enabled: typeof groupId === 'number',
     }
   );
 
   const { data: resources, status: fetchStatus } = useResourcesServiceGetAllResources(
     {
-      groupId: groupId === 'none' ? -1 : groupId,
+      groupId: groupId === 'none' ? -1 : (groupId as number),
       search: debouncedSearchValue?.trim() || undefined,
-      onlyInUseByMe: filter.onlyInUseByMe,
-      onlyWithPermissions: filter.onlyWithPermissions,
+      onlyInUseByMe: filter?.onlyInUseByMe,
+      onlyWithPermissions: filter?.onlyWithPermissions,
       page,
       limit: perPage,
     },
     undefined,
     {
-      enabled: !!groupId,
+      enabled: groupId !== 'empty',
     }
   );
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
+  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(groupId === 'empty' ? 'success' : fetchStatus);
 
   const totalPages = useMemo(() => {
     if (!resources?.total) {
@@ -105,6 +107,10 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       return t('ungrouped');
     }
 
+    if (groupId === 'empty') {
+      return t('empty.title');
+    }
+
     return group?.name ?? '';
   }, [groupId, group, t]);
 
@@ -113,17 +119,30 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       return t('ungroupedDescription');
     }
 
+    if (groupId === 'empty') {
+      return t('empty.description');
+    }
+
     return group?.description ?? '';
   }, [groupId, group, t]);
 
-  if (fetchStatus === 'success' && fetchStatusGroup === 'success' && resources?.data.length === 0) {
+  const groupIsFetched = useMemo(() => {
+    return groupId === 'none' || fetchStatusGroup === 'success';
+  }, [groupId, fetchStatusGroup]);
+
+  if (groupId !== 'empty' && fetchStatus === 'success' && groupIsFetched && resources?.data.length === 0) {
     return null;
   }
 
   return (
     <Card aria-label={title ?? 'Resource Group Card'} {...cardProps}>
       <CardHeader className="flex flex-row justify-between">
-        <PageHeader title={title} subtitle={subtitle} noMargin />
+        {groupId === 'empty' || groupIsFetched ? (
+          <PageHeader title={title} subtitle={subtitle} noMargin />
+        ) : (
+          <Skeleton className="w-full h-10" />
+        )}
+
         {groupId !== 'none' && hasAccessToGroupSettings && (
           <Button as={Link} href={`/resource-groups/${groupId}`} isIconOnly startContent={<Settings2Icon />} />
         )}
@@ -143,7 +162,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             items={resources?.data ?? []}
             loadingState={loadingState}
             loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<TableEmptyState />}
+            emptyContent={<EmptyState />}
           >
             {(resource) => (
               <TableRow
@@ -159,6 +178,9 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                     isBlurred
                     src={filenameToUrl(resource.imageFilename)}
                     alt={resource.name}
+                    classNames={{
+                      img: 'object-contain',
+                    }}
                   />
                 </TableCell>
                 <TableCell>{resource.name}</TableCell>

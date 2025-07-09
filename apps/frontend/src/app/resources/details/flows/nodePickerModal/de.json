@@ -1,0 +1,8 @@
+{
+  "title": "Knoten hinzufügen",
+  "nodeType": {
+    "input": "Eingabe",
+    "output": "Ausgabe",
+    "input-output": "Eingabe/Ausgabe"
+  }
+}

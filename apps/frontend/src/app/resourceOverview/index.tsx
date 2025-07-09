@@ -6,11 +6,6 @@ import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
 import { useCallback, useMemo, useState } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
-import { Alert } from '@heroui/react';
-
-import de from './de.json';
-import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 function getLocalStorageFilterKey(filter: 'onlyInUseByMe' | 'onlyWithPermissions') {
   return `resourceOverview.toolbar.filter.${filter}`;
@@ -25,8 +20,6 @@ function getValueFromLocalStorage(filter: 'onlyInUseByMe' | 'onlyWithPermissions
 }
 
 export function ResourceOverview() {
-  const { t } = useTranslations('resourceOverview', { de, en });
-
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const [searchValue, setSearchValue] = useState('');
@@ -78,11 +71,7 @@ export function ResourceOverview() {
       />
 
       <div className="flex flex-row flex-wrap gap-4">
-        {!isLoadingAllResources && allResources?.data.length === 0 && (
-          <Alert color="warning" title={t('noResourcesFound.title')}>
-            <p>{t('noResourcesFound.description')}</p>
-          </Alert>
-        )}
+        {!isLoadingAllResources && allResources?.data.length === 0 && <ResourceGroupCard groupId={'empty'} />}
 
         {groupIds.map((id) => (
           <ResourceGroupCard

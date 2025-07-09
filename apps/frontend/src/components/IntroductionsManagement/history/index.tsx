@@ -2,7 +2,8 @@ import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-u
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/modal';
 import { Button, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { useMemo, useState } from 'react';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { IntroductionStatusChip } from '../../IntroductionStatusChip';
 import { ResourceIntroductionHistoryItem } from '@attraccess/react-query-client';
 
@@ -63,7 +64,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
               items={currentPage}
               loadingState={isLoading ? 'loading' : 'idle'}
               loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<TableEmptyState />}
+              emptyContent={<EmptyState />}
             >
               {(item) => (
                 <TableRow key={item.id}>

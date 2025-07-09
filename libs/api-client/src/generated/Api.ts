@@ -134,9 +134,6 @@ export interface PaginatedUsersResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: User[];
 }
 
@@ -578,9 +575,6 @@ export interface PaginatedResourceResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: Resource[];
 }
 
@@ -833,497 +827,6 @@ export interface AllMqttServerStatusesDto {
   servers: Record<string, MqttServerStatusDto>;
 }
 
-export interface WebhookConfigResponseDto {
-  /**
-   * The unique identifier of the webhook configuration
-   * @example 1
-   */
-  id: number;
-  /**
-   * The ID of the resource this webhook configuration is for
-   * @example 1
-   */
-  resourceId: number;
-  /**
-   * Friendly name for the webhook
-   * @example "Slack Notification"
-   */
-  name: string;
-  /**
-   * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-   * @example "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-   */
-  url: string;
-  /**
-   * HTTP method to use for the webhook request
-   * @example "POST"
-   */
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /**
-   * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-   * @example "{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}"
-   */
-  headers: string;
-  /**
-   * Template for payload when resource is in use
-   * @example "{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  inUseTemplate: string;
-  /**
-   * Template for payload when resource is not in use
-   * @example "{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}"
-   */
-  notInUseTemplate: string;
-  /**
-   * Whether the webhook is active
-   * @example true
-   */
-  active: boolean;
-  /**
-   * Whether to enable retry mechanism for failed webhook requests
-   * @example true
-   */
-  retryEnabled: boolean;
-  /**
-   * Number of retry attempts for failed webhook requests
-   * @example 3
-   */
-  maxRetries: number;
-  /**
-   * Delay in milliseconds between retries
-   * @example 1000
-   */
-  retryDelay: number;
-  /**
-   * Name of the header that contains the signature
-   * @example "X-Webhook-Signature"
-   */
-  signatureHeader: string;
-  /**
-   * Whether to send a webhook when a resource usage starts
-   * @example true
-   */
-  sendOnStart: boolean;
-  /**
-   * Whether to send a webhook when a resource usage stops
-   * @example true
-   */
-  sendOnStop: boolean;
-  /**
-   * Whether to send a webhook when a resource usage is taken over
-   * @example false
-   */
-  sendOnTakeover: boolean;
-  /**
-   * Template for payload when resource usage is taken over
-   * @example "{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverTemplate: string;
-  /**
-   * When the webhook configuration was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * When the webhook configuration was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-}
-
-export interface CreateWebhookConfigDto {
-  /**
-   * Friendly name for the webhook
-   * @example "Slack Notification"
-   */
-  name: string;
-  /**
-   * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-   * @example "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-   */
-  url: string;
-  /**
-   * HTTP method to use for the webhook request
-   * @example "POST"
-   */
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /**
-   * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-   * @example "{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}"
-   */
-  headers?: string;
-  /**
-   * Template for payload when resource is in use
-   * @example "{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  inUseTemplate: string;
-  /**
-   * Template for payload when resource is not in use
-   * @example "{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}"
-   */
-  notInUseTemplate: string;
-  /**
-   * Whether the webhook is active
-   * @default true
-   * @example true
-   */
-  active?: boolean;
-  /**
-   * Whether to enable retry mechanism for failed webhook requests
-   * @default false
-   * @example true
-   */
-  retryEnabled?: boolean;
-  /**
-   * Number of retry attempts for failed webhook requests (maximum 10)
-   * @default 3
-   * @example 3
-   */
-  maxRetries?: number;
-  /**
-   * Delay in milliseconds between retries (maximum 10000)
-   * @default 1000
-   * @example 1000
-   */
-  retryDelay?: number;
-  /**
-   * Name of the header that contains the signature
-   * @default "X-Webhook-Signature"
-   * @example "X-Webhook-Signature"
-   */
-  signatureHeader?: string;
-  /**
-   * Whether to send a webhook when a resource usage starts
-   * @default true
-   * @example true
-   */
-  sendOnStart?: boolean;
-  /**
-   * Whether to send a webhook when a resource usage stops
-   * @default true
-   * @example true
-   */
-  sendOnStop?: boolean;
-  /**
-   * Whether to send a webhook when a resource usage is taken over
-   * @default false
-   * @example false
-   */
-  sendOnTakeover?: boolean;
-  /**
-   * Template for payload when resource usage is taken over
-   * @example "{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverTemplate?: string;
-}
-
-export interface UpdateWebhookConfigDto {
-  /**
-   * Friendly name for the webhook
-   * @example "Slack Notification"
-   */
-  name?: string;
-  /**
-   * Destination URL for the webhook. Supports templating with variables like {{id}}, {{name}}, {{event}}, etc.
-   * @example "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-   */
-  url?: string;
-  /**
-   * HTTP method to use for the webhook request
-   * @example "POST"
-   */
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /**
-   * JSON object for custom headers. Values can include templates like {{id}}, {{name}}, etc.
-   * @example "{"Content-Type": "application/json", "Authorization": "Bearer token123", "X-Resource-Name": "{{name}}"}"
-   */
-  headers?: string;
-  /**
-   * Template for payload when resource is in use
-   * @example "{"status": "in_use", "resource": "{{name}}", "user": "{{user.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  inUseTemplate?: string;
-  /**
-   * Template for payload when resource is not in use
-   * @example "{"status": "not_in_use", "resource": "{{name}}", "timestamp": "{{timestamp}}"}"
-   */
-  notInUseTemplate?: string;
-  /**
-   * Whether to enable retry mechanism for failed webhook requests
-   * @example true
-   */
-  retryEnabled?: boolean;
-  /**
-   * Number of retry attempts for failed webhook requests (maximum 10)
-   * @example 3
-   */
-  maxRetries?: number;
-  /**
-   * Delay in milliseconds between retries (maximum 10000)
-   * @example 1000
-   */
-  retryDelay?: number;
-  /**
-   * Name of the header that contains the signature
-   * @example "X-Webhook-Signature"
-   */
-  signatureHeader?: string;
-  /**
-   * Whether to send a webhook when a resource usage starts
-   * @example true
-   */
-  sendOnStart?: boolean;
-  /**
-   * Whether to send a webhook when a resource usage stops
-   * @example true
-   */
-  sendOnStop?: boolean;
-  /**
-   * Whether to send a webhook when a resource usage is taken over
-   * @example false
-   */
-  sendOnTakeover?: boolean;
-  /**
-   * Template for payload when resource usage is taken over
-   * @example "{"status": "taken_over", "resource": "{{name}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverTemplate?: string;
-}
-
-export interface WebhookStatusDto {
-  /**
-   * Whether the webhook is active
-   * @example true
-   */
-  active: boolean;
-}
-
-export interface WebhookTestResponseDto {
-  /**
-   * Whether the test was successful
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Message describing the test result
-   * @example "Webhook test request sent successfully"
-   */
-  message: string;
-}
-
-export interface MqttResourceConfig {
-  /**
-   * The unique identifier of the MQTT resource configuration
-   * @example 1
-   */
-  id: number;
-  /**
-   * The ID of the resource this configuration is for
-   * @example 1
-   */
-  resourceId: number;
-  /**
-   * Name of this MQTT configuration
-   * @example "Primary Status Feed"
-   */
-  name: string;
-  /**
-   * The ID of the MQTT server to publish to
-   * @example 1
-   */
-  serverId: number;
-  /**
-   * Topic template using Handlebars for in-use status
-   * @example "resources/{{id}}/status"
-   */
-  inUseTopic: string;
-  /**
-   * Message template using Handlebars for in-use status
-   * @example "{"status": "in_use", "resourceId": "{{id}}", "timestamp": "{{timestamp}}"}"
-   */
-  inUseMessage: string;
-  /**
-   * Topic template using Handlebars for not-in-use status
-   * @example "resources/{{id}}/status"
-   */
-  notInUseTopic: string;
-  /**
-   * Message template using Handlebars for not-in-use status
-   * @example "{"status": "not_in_use", "resourceId": "{{id}}", "timestamp": "{{timestamp}}"}"
-   */
-  notInUseMessage: string;
-  /**
-   * Whether to send a start message when a resource is taken over
-   * @example true
-   */
-  onTakeoverSendStart: boolean;
-  /**
-   * Whether to send a stop message when a resource is taken over
-   * @example true
-   */
-  onTakeoverSendStop: boolean;
-  /**
-   * Whether to send an MQTT message when a resource usage is taken over
-   * @example false
-   */
-  onTakeoverSendTakeover: boolean;
-  /**
-   * Topic template using Handlebars for takeover status
-   * @example "resources/{{id}}/status"
-   */
-  takeoverTopic?: string;
-  /**
-   * Message template using Handlebars for takeover status
-   * @example "{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverMessage?: string;
-  /**
-   * When the MQTT resource configuration was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * When the MQTT resource configuration was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-}
-
-export interface CreateMqttResourceConfigDto {
-  /**
-   * ID of the MQTT server to use
-   * @example 1
-   */
-  serverId: number;
-  /**
-   * Name of this MQTT configuration
-   * @example "Primary Status Feed"
-   */
-  name: string;
-  /**
-   * Topic template for when resource is in use
-   * @example "resources/{{id}}/status"
-   */
-  inUseTopic: string;
-  /**
-   * Message template for when resource is in use
-   * @example "{"status":"in_use","resourceId":{{id}},"resourceName":"{{name}}"}"
-   */
-  inUseMessage: string;
-  /**
-   * Topic template for when resource is not in use
-   * @example "resources/{{id}}/status"
-   */
-  notInUseTopic: string;
-  /**
-   * Message template for when resource is not in use
-   * @example "{"status":"not_in_use","resourceId":{{id}},"resourceName":"{{name}}"}"
-   */
-  notInUseMessage: string;
-  /**
-   * Whether to send a start message when a resource is taken over
-   * @default false
-   * @example false
-   */
-  onTakeoverSendStart?: boolean;
-  /**
-   * Whether to send a stop message when a resource is taken over
-   * @default false
-   * @example false
-   */
-  onTakeoverSendStop?: boolean;
-  /**
-   * Whether to send an MQTT message when a resource usage is taken over
-   * @default true
-   * @example true
-   */
-  onTakeoverSendTakeover?: boolean;
-  /**
-   * Topic template for when resource usage is taken over
-   * @example "resources/{{id}}/status"
-   */
-  takeoverTopic?: string;
-  /**
-   * Message template for when resource usage is taken over
-   * @example "{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverMessage?: string;
-}
-
-export interface UpdateMqttResourceConfigDto {
-  /**
-   * ID of the MQTT server to use
-   * @example 1
-   */
-  serverId?: number;
-  /**
-   * Name of this MQTT configuration
-   * @example "Primary Status Feed"
-   */
-  name?: string;
-  /**
-   * Topic template for when resource is in use
-   * @example "resources/{{id}}/status"
-   */
-  inUseTopic?: string;
-  /**
-   * Message template for when resource is in use
-   * @example "{"status":"in_use","resourceId":{{id}},"resourceName":"{{name}}"}"
-   */
-  inUseMessage?: string;
-  /**
-   * Topic template for when resource is not in use
-   * @example "resources/{{id}}/status"
-   */
-  notInUseTopic?: string;
-  /**
-   * Message template for when resource is not in use
-   * @example "{"status":"not_in_use","resourceId":{{id}},"resourceName":"{{name}}"}"
-   */
-  notInUseMessage?: string;
-  /**
-   * Whether to send a start message when a resource is taken over
-   * @default false
-   * @example false
-   */
-  onTakeoverSendStart?: boolean;
-  /**
-   * Whether to send a stop message when a resource is taken over
-   * @default false
-   * @example false
-   */
-  onTakeoverSendStop?: boolean;
-  /**
-   * Whether to send an MQTT message when a resource usage is taken over
-   * @default true
-   * @example true
-   */
-  onTakeoverSendTakeover?: boolean;
-  /**
-   * Topic template for when resource usage is taken over
-   * @example "resources/{{id}}/status"
-   */
-  takeoverTopic?: string;
-  /**
-   * Message template for when resource usage is taken over
-   * @example "{"status": "taken_over", "resourceId": "{{id}}", "newUser": "{{user.name}}", "previousUser": "{{previousUser.name}}", "timestamp": "{{timestamp}}"}"
-   */
-  takeoverMessage?: string;
-}
-
-export interface TestMqttConfigResponseDto {
-  /**
-   * Whether the test was successful
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Message describing the test result
-   * @example "MQTT configuration is valid and connection to server was successful"
-   */
-  message: string;
-}
-
 export interface CreateResourceGroupDto {
   /**
    * The name of the resource group
@@ -1553,9 +1056,6 @@ export interface GetResourceHistoryResponseDto {
   total: number;
   page: number;
   limit: number;
-  /** The next page number, or null if it is the last page. */
-  nextPage: number | null;
-  totalPages: number;
   data: ResourceUsage[];
 }
 
@@ -1580,6 +1080,178 @@ export interface UpdateResourceIntroductionDto {
    * @example "This is a comment"
    */
   comment?: string;
+}
+
+export interface ResourceFlowNodePositionDto {
+  /**
+   * The x position of the node
+   * @example 100
+   */
+  x: number;
+  /**
+   * The y position of the node
+   * @example 200
+   */
+  y: number;
+}
+
+export interface ResourceFlowNodeDto {
+  /**
+   * The unique identifier of the resource flow node
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  id: string;
+  /**
+   * The type of the node
+   * @example "event.resource.usage.started"
+   */
+  type:
+    | "event.resource.usage.started"
+    | "event.resource.usage.stopped"
+    | "event.resource.usage.takeover"
+    | "action.http.sendRequest"
+    | "action.mqtt.sendMessage"
+    | "action.util.wait";
+  /**
+   * The position of the node
+   * @example {"x":100,"y":200}
+   */
+  position: ResourceFlowNodePositionDto;
+  /**
+   * The data of the node, depending on the type of the node
+   * @example {"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}
+   */
+  data: Record<string, any>;
+}
+
+export interface ResourceFlowEdgeDto {
+  /**
+   * The unique identifier of the resource flow edge
+   * @example "edge-abc123"
+   */
+  id: string;
+  /**
+   * The source node id
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  source: string;
+  /**
+   * The target node id
+   * @example "TGVgqDzCKXKVr-XGUD5V4"
+   */
+  target: string;
+}
+
+export interface ValidationErrorDto {
+  /**
+   * The ID of the node that has the validation error
+   * @example "node-123"
+   */
+  nodeId: string;
+  /**
+   * The type of the node that has the validation error
+   * @example "action.http.sendRequest"
+   */
+  nodeType: string;
+  /**
+   * The field that has the validation error
+   * @example "url"
+   */
+  field: string;
+  /**
+   * The validation error message
+   * @example "Invalid URL format"
+   */
+  message: string;
+  /**
+   * The invalid value that caused the error
+   * @example "invalid-url"
+   */
+  value?: object;
+}
+
+export interface ResourceFlowResponseDto {
+  /**
+   * Array of flow nodes defining the workflow steps
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   */
+  nodes: ResourceFlowNodeDto[];
+  /**
+   * Array of flow edges connecting nodes to define the workflow flow
+   * @example [{"id":"edge-abc123","source":"TGVgqDzCKXKVr-XGUD5V3","target":"TGVgqDzCKXKVr-XGUD5V4"}]
+   */
+  edges: ResourceFlowEdgeDto[];
+  /**
+   * Validation errors for nodes, if any
+   * @example [{"nodeId":"TGVgqDzCKXKVr-XGUD5V4","nodeType":"action.http.sendRequest","field":"url","message":"Invalid URL format","value":"not-a-valid-url"}]
+   */
+  validationErrors?: ValidationErrorDto[];
+}
+
+export interface ResourceFlowSaveDto {
+  /**
+   * Array of flow nodes defining the workflow steps
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   */
+  nodes: ResourceFlowNodeDto[];
+  /**
+   * Array of flow edges connecting nodes to define the workflow flow
+   * @example [{"id":"edge-abc123","source":"TGVgqDzCKXKVr-XGUD5V3","target":"TGVgqDzCKXKVr-XGUD5V4"}]
+   */
+  edges: ResourceFlowEdgeDto[];
+}
+
+export interface ResourceFlowLog {
+  /**
+   * The unique identifier of the resource flow log
+   * @example 42
+   */
+  id: number;
+  /**
+   * The node id of the node that generated the log
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  nodeId: string | null;
+  /**
+   * The run/execution id of the flow that generated the log
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
+  flowRunId: string;
+  /**
+   * The type of the log entry
+   * @example "node.processing.started"
+   */
+  type:
+    | "flow.start"
+    | "node.processing.started"
+    | "node.processing.failed"
+    | "node.processing.completed"
+    | "flow.completed";
+  /**
+   * Optional payload for additional user information
+   * @example "Processing took longer than expected due to network latency"
+   */
+  payload?: string;
+  /**
+   * When the node was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The id of the resource that this log belongs to
+   * @example 1
+   */
+  resourceId: number;
+  /** The resource being this log belongs to */
+  resource?: Resource;
+}
+
+export interface ResourceFlowLogsResponseDto {
+  total: number;
+  page: number;
+  limit: number;
+  /** Array of flow log entries, ordered by creation time (newest first) */
+  data: ResourceFlowLog[];
 }
 
 export interface PluginMainFrontend {
@@ -1961,34 +1633,6 @@ export type MqttServersGetStatusOfAllData = AllMqttServerStatusesDto;
 
 export type SseControllerStreamEventsData = any;
 
-export type WebhookConfigGetAllData = WebhookConfigResponseDto[];
-
-export type WebhookConfigCreateOneData = WebhookConfigResponseDto;
-
-export type WebhookConfigGetOneByIdData = WebhookConfigResponseDto;
-
-export type WebhookConfigUpdateOneData = WebhookConfigResponseDto;
-
-export type WebhookConfigDeleteOneData = any;
-
-export type WebhookConfigUpdateStatusData = WebhookConfigResponseDto;
-
-export type WebhookConfigTestData = WebhookTestResponseDto;
-
-export type WebhookConfigRegenerateSecretData = WebhookConfigResponseDto;
-
-export type MqttResourceConfigGetAllData = MqttResourceConfig[];
-
-export type MqttResourceConfigCreateData = MqttResourceConfig;
-
-export type MqttResourceConfigGetOneData = MqttResourceConfig;
-
-export type MqttResourceConfigUpdateData = MqttResourceConfig;
-
-export type MqttResourceConfigDeleteOneData = any;
-
-export type MqttResourceConfigTestOneData = TestMqttConfigResponseDto;
-
 export type ResourceGroupsCreateOneData = ResourceGroup;
 
 export type ResourceGroupsGetManyData = ResourceGroup[];
@@ -2069,6 +1713,63 @@ export type ResourceIntroductionsRevokeData = ResourceIntroductionHistoryItem;
 
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
+
+export type GetResourceFlowData = ResourceFlowResponseDto;
+
+export type GetResourceFlowError = {
+  /** @example "Resource not found" */
+  message?: string;
+  /** @example 404 */
+  statusCode?: number;
+};
+
+export type SaveResourceFlowData = ResourceFlowResponseDto;
+
+export type SaveResourceFlowError =
+  | {
+      /** @example ["nodes must be an array"] */
+      message?: string[];
+      /** @example 400 */
+      statusCode?: number;
+    }
+  | {
+      /** @example "Resource not found" */
+      message?: string;
+      /** @example 404 */
+      statusCode?: number;
+    };
+
+export interface GetResourceFlowLogsParams {
+  /**
+   * Page number (1-based)
+   * @min 1
+   * @default 1
+   */
+  page?: number;
+  /**
+   * Number of items per page
+   * @min 1
+   * @max 500
+   * @default 50
+   */
+  limit?: number;
+  /**
+   * The ID of the resource to get the flow logs for
+   * @example 1
+   */
+  resourceId: number;
+}
+
+export type GetResourceFlowLogsData = ResourceFlowLogsResponseDto;
+
+export type GetResourceFlowLogsError = {
+  /** @example "Resource not found" */
+  message?: string;
+  /** @example 404 */
+  statusCode?: number;
+};
+
+export type ResourceFlowsControllerStreamEventsData = any;
 
 export type GetPluginsData = LoadedPluginManifest[];
 
@@ -3110,284 +2811,6 @@ export namespace Mqtt {
     export type RequestHeaders = {};
     export type ResponseBody = MqttServersGetStatusOfAllData;
   }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigGetAll
-   * @summary Get all MQTT configurations for a resource
-   * @request GET:/api/resources/{resourceId}/mqtt/config
-   * @secure
-   */
-  export namespace MqttResourceConfigGetAll {
-    export type RequestParams = {
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigGetAllData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigCreate
-   * @summary Create a new MQTT configuration for a resource
-   * @request POST:/api/resources/{resourceId}/mqtt/config
-   * @secure
-   */
-  export namespace MqttResourceConfigCreate {
-    export type RequestParams = {
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = CreateMqttResourceConfigDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigCreateData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigGetOne
-   * @summary Get a specific MQTT configuration for a resource
-   * @request GET:/api/resources/{resourceId}/mqtt/config/{configId}
-   * @secure
-   */
-  export namespace MqttResourceConfigGetOne {
-    export type RequestParams = {
-      resourceId: number;
-      configId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigGetOneData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigUpdate
-   * @summary Update a specific MQTT configuration
-   * @request PUT:/api/resources/{resourceId}/mqtt/config/{configId}
-   * @secure
-   */
-  export namespace MqttResourceConfigUpdate {
-    export type RequestParams = {
-      resourceId: number;
-      configId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = UpdateMqttResourceConfigDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigUpdateData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigDeleteOne
-   * @summary Delete a specific MQTT configuration
-   * @request DELETE:/api/resources/{resourceId}/mqtt/config/{configId}
-   * @secure
-   */
-  export namespace MqttResourceConfigDeleteOne {
-    export type RequestParams = {
-      resourceId: number;
-      configId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigDeleteOneData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttResourceConfigTestOne
-   * @summary Test a specific MQTT configuration
-   * @request POST:/api/resources/{resourceId}/mqtt/config/{configId}/test
-   * @secure
-   */
-  export namespace MqttResourceConfigTestOne {
-    export type RequestParams = {
-      resourceId: number;
-      configId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttResourceConfigTestOneData;
-  }
-}
-
-export namespace Webhooks {
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigGetAll
-   * @summary Get all webhook configurations for a resource
-   * @request GET:/api/resources/{resourceId}/webhooks
-   * @secure
-   */
-  export namespace WebhookConfigGetAll {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigGetAllData;
-  }
-
-  /**
-   * @description Creates a new webhook configuration for a resource. ## URL Templating The webhook URL can include Handlebars templates that will be replaced with context values when the webhook is triggered. Example: `https://example.com/webhooks/{{id}}/{{event}}` ## Header Templating Header values can include Handlebars templates that will be replaced with context values when the webhook is triggered. Example: `{"Authorization": "Bearer {{user.id}}", "X-Resource-Name": "{{name}}"}` ## Available Template Variables Available template variables for URLs, headers, and payloads: - `id`: Resource ID - `name`: Resource name - `description`: Resource description - `timestamp`: ISO timestamp of the event - `user.id`: ID of the user who triggered the event - `event`: Either "started" or "ended" depending on the resource usage state
-   * @tags Webhooks
-   * @name WebhookConfigCreateOne
-   * @summary Create a new webhook configuration
-   * @request POST:/api/resources/{resourceId}/webhooks
-   * @secure
-   */
-  export namespace WebhookConfigCreateOne {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = CreateWebhookConfigDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigCreateOneData;
-  }
-
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigGetOneById
-   * @summary Get webhook configuration by ID
-   * @request GET:/api/resources/{resourceId}/webhooks/{id}
-   * @secure
-   */
-  export namespace WebhookConfigGetOneById {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigGetOneByIdData;
-  }
-
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigUpdateOne
-   * @summary Update webhook configuration
-   * @request PUT:/api/resources/{resourceId}/webhooks/{id}
-   * @secure
-   */
-  export namespace WebhookConfigUpdateOne {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = UpdateWebhookConfigDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigUpdateOneData;
-  }
-
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigDeleteOne
-   * @summary Delete webhook configuration
-   * @request DELETE:/api/resources/{resourceId}/webhooks/{id}
-   * @secure
-   */
-  export namespace WebhookConfigDeleteOne {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigDeleteOneData;
-  }
-
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigUpdateStatus
-   * @summary Enable or disable webhook
-   * @request PUT:/api/resources/{resourceId}/webhooks/{id}/status
-   * @secure
-   */
-  export namespace WebhookConfigUpdateStatus {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = WebhookStatusDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigUpdateStatusData;
-  }
-
-  /**
-   * No description
-   * @tags Webhooks
-   * @name WebhookConfigTest
-   * @summary Test webhook
-   * @request POST:/api/resources/{resourceId}/webhooks/{id}/test
-   * @secure
-   */
-  export namespace WebhookConfigTest {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigTestData;
-  }
-
-  /**
-   * @description When signature verification is enabled, each webhook request includes: 1. A timestamp header (X-Webhook-Timestamp) 2. A signature header (configurable, default: X-Webhook-Signature) To verify the signature: 1. Extract the timestamp from the X-Webhook-Timestamp header 2. Combine the timestamp and payload as "${timestamp}.${payload}" 3. Compute the HMAC-SHA256 signature using your webhook secret 4. Compare the resulting signature with the value in the signature header Example (Node.js): ```javascript const crypto = require('crypto'); function verifySignature(payload, timestamp, signature, secret) { const signaturePayload = `${timestamp}.${payload}`; const expectedSignature = crypto .createHmac('sha256', secret) .update(signaturePayload) .digest('hex'); return crypto.timingSafeEqual( Buffer.from(signature), Buffer.from(expectedSignature) ); } ```
-   * @tags Webhooks
-   * @name WebhookConfigRegenerateSecret
-   * @summary Regenerate webhook secret
-   * @request POST:/api/resources/{resourceId}/webhooks/{id}/regenerate-secret
-   * @secure
-   */
-  export namespace WebhookConfigRegenerateSecret {
-    export type RequestParams = {
-      /** Resource ID */
-      resourceId: number;
-      /** Webhook configuration ID */
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = WebhookConfigRegenerateSecretData;
-  }
 }
 
 export namespace AccessControl {
@@ -3700,6 +3123,105 @@ export namespace AccessControl {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroductionsGetHistoryData;
+  }
+}
+
+export namespace ResourceFlows {
+  /**
+   * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
+   * @tags Resource Flows
+   * @name GetResourceFlow
+   * @summary Get resource flow
+   * @request GET:/api/resources/{resourceId}/flow
+   * @secure
+   */
+  export namespace GetResourceFlow {
+    export type RequestParams = {
+      /**
+       * The ID of the resource to get the flow for
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceFlowData;
+  }
+
+  /**
+   * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
+   * @tags Resource Flows
+   * @name SaveResourceFlow
+   * @summary Save resource flow
+   * @request PUT:/api/resources/{resourceId}/flow
+   * @secure
+   */
+  export namespace SaveResourceFlow {
+    export type RequestParams = {
+      /**
+       * The ID of the resource to save the flow for
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ResourceFlowSaveDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SaveResourceFlowData;
+  }
+
+  /**
+   * @description Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+   * @tags Resource Flows
+   * @name GetResourceFlowLogs
+   * @summary Get resource flow logs
+   * @request GET:/api/resources/{resourceId}/flow/logs
+   * @secure
+   */
+  export namespace GetResourceFlowLogs {
+    export type RequestParams = {
+      /**
+       * The ID of the resource to get the flow logs for
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * Page number (1-based)
+       * @min 1
+       * @default 1
+       */
+      page?: number;
+      /**
+       * Number of items per page
+       * @min 1
+       * @max 500
+       * @default 50
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetResourceFlowLogsData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Flows
+   * @name ResourceFlowsControllerStreamEvents
+   * @request GET:/api/resources/{resourceId}/flow/logs/live
+   * @secure
+   */
+  export namespace ResourceFlowsControllerStreamEvents {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFlowsControllerStreamEventsData;
   }
 }
 
@@ -5256,321 +4778,6 @@ export class Api<
         format: "json",
         ...params,
       }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigGetAll
-     * @summary Get all MQTT configurations for a resource
-     * @request GET:/api/resources/{resourceId}/mqtt/config
-     * @secure
-     */
-    mqttResourceConfigGetAll: (
-      resourceId: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigGetAllData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigCreate
-     * @summary Create a new MQTT configuration for a resource
-     * @request POST:/api/resources/{resourceId}/mqtt/config
-     * @secure
-     */
-    mqttResourceConfigCreate: (
-      resourceId: number,
-      data: CreateMqttResourceConfigDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigCreateData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigGetOne
-     * @summary Get a specific MQTT configuration for a resource
-     * @request GET:/api/resources/{resourceId}/mqtt/config/{configId}
-     * @secure
-     */
-    mqttResourceConfigGetOne: (
-      resourceId: number,
-      configId: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigGetOneData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config/${configId}`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigUpdate
-     * @summary Update a specific MQTT configuration
-     * @request PUT:/api/resources/{resourceId}/mqtt/config/{configId}
-     * @secure
-     */
-    mqttResourceConfigUpdate: (
-      resourceId: number,
-      configId: number,
-      data: UpdateMqttResourceConfigDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigUpdateData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config/${configId}`,
-        method: "PUT",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigDeleteOne
-     * @summary Delete a specific MQTT configuration
-     * @request DELETE:/api/resources/{resourceId}/mqtt/config/{configId}
-     * @secure
-     */
-    mqttResourceConfigDeleteOne: (
-      resourceId: number,
-      configId: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigDeleteOneData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config/${configId}`,
-        method: "DELETE",
-        secure: true,
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttResourceConfigTestOne
-     * @summary Test a specific MQTT configuration
-     * @request POST:/api/resources/{resourceId}/mqtt/config/{configId}/test
-     * @secure
-     */
-    mqttResourceConfigTestOne: (
-      resourceId: number,
-      configId: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<MqttResourceConfigTestOneData, void>({
-        path: `/api/resources/${resourceId}/mqtt/config/${configId}/test`,
-        method: "POST",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-  };
-  webhooks = {
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigGetAll
-     * @summary Get all webhook configurations for a resource
-     * @request GET:/api/resources/{resourceId}/webhooks
-     * @secure
-     */
-    webhookConfigGetAll: (resourceId: number, params: RequestParams = {}) =>
-      this.request<WebhookConfigGetAllData, void>({
-        path: `/api/resources/${resourceId}/webhooks`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * @description Creates a new webhook configuration for a resource. ## URL Templating The webhook URL can include Handlebars templates that will be replaced with context values when the webhook is triggered. Example: `https://example.com/webhooks/{{id}}/{{event}}` ## Header Templating Header values can include Handlebars templates that will be replaced with context values when the webhook is triggered. Example: `{"Authorization": "Bearer {{user.id}}", "X-Resource-Name": "{{name}}"}` ## Available Template Variables Available template variables for URLs, headers, and payloads: - `id`: Resource ID - `name`: Resource name - `description`: Resource description - `timestamp`: ISO timestamp of the event - `user.id`: ID of the user who triggered the event - `event`: Either "started" or "ended" depending on the resource usage state
-     *
-     * @tags Webhooks
-     * @name WebhookConfigCreateOne
-     * @summary Create a new webhook configuration
-     * @request POST:/api/resources/{resourceId}/webhooks
-     * @secure
-     */
-    webhookConfigCreateOne: (
-      resourceId: number,
-      data: CreateWebhookConfigDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigCreateOneData, void>({
-        path: `/api/resources/${resourceId}/webhooks`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigGetOneById
-     * @summary Get webhook configuration by ID
-     * @request GET:/api/resources/{resourceId}/webhooks/{id}
-     * @secure
-     */
-    webhookConfigGetOneById: (
-      resourceId: number,
-      id: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigGetOneByIdData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigUpdateOne
-     * @summary Update webhook configuration
-     * @request PUT:/api/resources/{resourceId}/webhooks/{id}
-     * @secure
-     */
-    webhookConfigUpdateOne: (
-      resourceId: number,
-      id: number,
-      data: UpdateWebhookConfigDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigUpdateOneData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}`,
-        method: "PUT",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigDeleteOne
-     * @summary Delete webhook configuration
-     * @request DELETE:/api/resources/{resourceId}/webhooks/{id}
-     * @secure
-     */
-    webhookConfigDeleteOne: (
-      resourceId: number,
-      id: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigDeleteOneData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}`,
-        method: "DELETE",
-        secure: true,
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigUpdateStatus
-     * @summary Enable or disable webhook
-     * @request PUT:/api/resources/{resourceId}/webhooks/{id}/status
-     * @secure
-     */
-    webhookConfigUpdateStatus: (
-      resourceId: number,
-      id: number,
-      data: WebhookStatusDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigUpdateStatusData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}/status`,
-        method: "PUT",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Webhooks
-     * @name WebhookConfigTest
-     * @summary Test webhook
-     * @request POST:/api/resources/{resourceId}/webhooks/{id}/test
-     * @secure
-     */
-    webhookConfigTest: (
-      resourceId: number,
-      id: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigTestData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}/test`,
-        method: "POST",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * @description When signature verification is enabled, each webhook request includes: 1. A timestamp header (X-Webhook-Timestamp) 2. A signature header (configurable, default: X-Webhook-Signature) To verify the signature: 1. Extract the timestamp from the X-Webhook-Timestamp header 2. Combine the timestamp and payload as "${timestamp}.${payload}" 3. Compute the HMAC-SHA256 signature using your webhook secret 4. Compare the resulting signature with the value in the signature header Example (Node.js): ```javascript const crypto = require('crypto'); function verifySignature(payload, timestamp, signature, secret) { const signaturePayload = `${timestamp}.${payload}`; const expectedSignature = crypto .createHmac('sha256', secret) .update(signaturePayload) .digest('hex'); return crypto.timingSafeEqual( Buffer.from(signature), Buffer.from(expectedSignature) ); } ```
-     *
-     * @tags Webhooks
-     * @name WebhookConfigRegenerateSecret
-     * @summary Regenerate webhook secret
-     * @request POST:/api/resources/{resourceId}/webhooks/{id}/regenerate-secret
-     * @secure
-     */
-    webhookConfigRegenerateSecret: (
-      resourceId: number,
-      id: number,
-      params: RequestParams = {},
-    ) =>
-      this.request<WebhookConfigRegenerateSecretData, void>({
-        path: `/api/resources/${resourceId}/webhooks/${id}/regenerate-secret`,
-        method: "POST",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
   };
   accessControl = {
     /**
@@ -5917,6 +5124,90 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  resourceFlows = {
+    /**
+     * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
+     *
+     * @tags Resource Flows
+     * @name GetResourceFlow
+     * @summary Get resource flow
+     * @request GET:/api/resources/{resourceId}/flow
+     * @secure
+     */
+    getResourceFlow: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetResourceFlowData, GetResourceFlowError>({
+        path: `/api/resources/${resourceId}/flow`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
+     *
+     * @tags Resource Flows
+     * @name SaveResourceFlow
+     * @summary Save resource flow
+     * @request PUT:/api/resources/{resourceId}/flow
+     * @secure
+     */
+    saveResourceFlow: (
+      resourceId: number,
+      data: ResourceFlowSaveDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SaveResourceFlowData, SaveResourceFlowError>({
+        path: `/api/resources/${resourceId}/flow`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+     *
+     * @tags Resource Flows
+     * @name GetResourceFlowLogs
+     * @summary Get resource flow logs
+     * @request GET:/api/resources/{resourceId}/flow/logs
+     * @secure
+     */
+    getResourceFlowLogs: (
+      { resourceId, ...query }: GetResourceFlowLogsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetResourceFlowLogsData, GetResourceFlowLogsError>({
+        path: `/api/resources/${resourceId}/flow/logs`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Flows
+     * @name ResourceFlowsControllerStreamEvents
+     * @request GET:/api/resources/{resourceId}/flow/logs/live
+     * @secure
+     */
+    resourceFlowsControllerStreamEvents: (
+      resourceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFlowsControllerStreamEventsData, void>({
+        path: `/api/resources/${resourceId}/flow/logs/live`,
+        method: "GET",
+        secure: true,
         ...params,
       }),
   };

@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourcesService, SystemService, UsersService, WebhooksService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -160,32 +160,6 @@ export type MqttServiceMqttServersGetStatusOfAllDefaultResponse = Awaited<Return
 export type MqttServiceMqttServersGetStatusOfAllQueryResult<TData = MqttServiceMqttServersGetStatusOfAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useMqttServiceMqttServersGetStatusOfAllKey = "MqttServiceMqttServersGetStatusOfAll";
 export const UseMqttServiceMqttServersGetStatusOfAllKeyFn = (queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetStatusOfAllKey, ...(queryKey ?? [])];
-export type MqttServiceMqttResourceConfigGetAllDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttResourceConfigGetAll>>;
-export type MqttServiceMqttResourceConfigGetAllQueryResult<TData = MqttServiceMqttResourceConfigGetAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttResourceConfigGetAllKey = "MqttServiceMqttResourceConfigGetAll";
-export const UseMqttServiceMqttResourceConfigGetAllKeyFn = ({ resourceId }: {
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useMqttServiceMqttResourceConfigGetAllKey, ...(queryKey ?? [{ resourceId }])];
-export type MqttServiceMqttResourceConfigGetOneDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttResourceConfigGetOne>>;
-export type MqttServiceMqttResourceConfigGetOneQueryResult<TData = MqttServiceMqttResourceConfigGetOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttResourceConfigGetOneKey = "MqttServiceMqttResourceConfigGetOne";
-export const UseMqttServiceMqttResourceConfigGetOneKeyFn = ({ configId, resourceId }: {
-  configId: number;
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useMqttServiceMqttResourceConfigGetOneKey, ...(queryKey ?? [{ configId, resourceId }])];
-export type WebhooksServiceWebhookConfigGetAllDefaultResponse = Awaited<ReturnType<typeof WebhooksService.webhookConfigGetAll>>;
-export type WebhooksServiceWebhookConfigGetAllQueryResult<TData = WebhooksServiceWebhookConfigGetAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWebhooksServiceWebhookConfigGetAllKey = "WebhooksServiceWebhookConfigGetAll";
-export const UseWebhooksServiceWebhookConfigGetAllKeyFn = ({ resourceId }: {
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useWebhooksServiceWebhookConfigGetAllKey, ...(queryKey ?? [{ resourceId }])];
-export type WebhooksServiceWebhookConfigGetOneByIdDefaultResponse = Awaited<ReturnType<typeof WebhooksService.webhookConfigGetOneById>>;
-export type WebhooksServiceWebhookConfigGetOneByIdQueryResult<TData = WebhooksServiceWebhookConfigGetOneByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useWebhooksServiceWebhookConfigGetOneByIdKey = "WebhooksServiceWebhookConfigGetOneById";
-export const UseWebhooksServiceWebhookConfigGetOneByIdKeyFn = ({ id, resourceId }: {
-  id: number;
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useWebhooksServiceWebhookConfigGetOneByIdKey, ...(queryKey ?? [{ id, resourceId }])];
 export type AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGetMany>>;
 export type AccessControlServiceResourceGroupIntroductionsGetManyQueryResult<TData = AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAccessControlServiceResourceGroupIntroductionsGetManyKey = "AccessControlServiceResourceGroupIntroductionsGetMany";
@@ -238,6 +212,26 @@ export const UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn = ({ re
   resourceId: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useAccessControlServiceResourceIntroductionsGetHistoryKey, ...(queryKey ?? [{ resourceId, userId }])];
+export type ResourceFlowsServiceGetResourceFlowDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getResourceFlow>>;
+export type ResourceFlowsServiceGetResourceFlowQueryResult<TData = ResourceFlowsServiceGetResourceFlowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceGetResourceFlowKey = "ResourceFlowsServiceGetResourceFlow";
+export const UseResourceFlowsServiceGetResourceFlowKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetResourceFlowKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourceFlowsServiceGetResourceFlowLogsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getResourceFlowLogs>>;
+export type ResourceFlowsServiceGetResourceFlowLogsQueryResult<TData = ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceGetResourceFlowLogsKey = "ResourceFlowsServiceGetResourceFlowLogs";
+export const UseResourceFlowsServiceGetResourceFlowLogsKeyFn = ({ limit, page, resourceId }: {
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetResourceFlowLogsKey, ...(queryKey ?? [{ limit, page, resourceId }])];
+export type ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.resourceFlowsControllerStreamEvents>>;
+export type ResourceFlowsServiceResourceFlowsControllerStreamEventsQueryResult<TData = ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceResourceFlowsControllerStreamEventsKey = "ResourceFlowsServiceResourceFlowsControllerStreamEvents";
+export const UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceResourceFlowsControllerStreamEventsKey, ...(queryKey ?? [{ resourceId }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -285,11 +279,6 @@ export type ResourcesServiceResourceGroupsAddResourceMutationResult = Awaited<Re
 export type ResourcesServiceResourceUsageStartSessionMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageStartSession>>;
 export type MqttServiceMqttServersCreateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersCreateOne>>;
 export type MqttServiceMqttServersTestConnectionMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersTestConnection>>;
-export type MqttServiceMqttResourceConfigCreateMutationResult = Awaited<ReturnType<typeof MqttService.mqttResourceConfigCreate>>;
-export type MqttServiceMqttResourceConfigTestOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttResourceConfigTestOne>>;
-export type WebhooksServiceWebhookConfigCreateOneMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigCreateOne>>;
-export type WebhooksServiceWebhookConfigTestMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigTest>>;
-export type WebhooksServiceWebhookConfigRegenerateSecretMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigRegenerateSecret>>;
 export type AccessControlServiceResourceGroupIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGrant>>;
 export type AccessControlServiceResourceGroupIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsRevoke>>;
 export type AccessControlServiceResourceGroupIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroducersGrant>>;
@@ -305,9 +294,7 @@ export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
 export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageEndSession>>;
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
-export type MqttServiceMqttResourceConfigUpdateMutationResult = Awaited<ReturnType<typeof MqttService.mqttResourceConfigUpdate>>;
-export type WebhooksServiceWebhookConfigUpdateOneMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigUpdateOne>>;
-export type WebhooksServiceWebhookConfigUpdateStatusMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigUpdateStatus>>;
+export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
@@ -317,8 +304,6 @@ export type ResourcesServiceDeleteOneResourceMutationResult = Awaited<ReturnType
 export type ResourcesServiceResourceGroupsRemoveResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsRemoveResource>>;
 export type ResourcesServiceResourceGroupsDeleteOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsDeleteOne>>;
 export type MqttServiceMqttServersDeleteOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersDeleteOne>>;
-export type MqttServiceMqttResourceConfigDeleteOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttResourceConfigDeleteOne>>;
-export type WebhooksServiceWebhookConfigDeleteOneMutationResult = Awaited<ReturnType<typeof WebhooksService.webhookConfigDeleteOne>>;
 export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersRevoke>>;
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;

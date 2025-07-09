@@ -1,5 +1,0 @@
-{
-  "configurationTitle": "MQTT Configurations",
-  "createNewButton": "Create New Configuration",
-  "description": "Configure MQTT integrations for this resource to publish status updates when a resource is in use or not in use."
-}

@@ -31,7 +31,7 @@ export type SidebarItemGroup = {
   icon: React.FunctionComponent<LucideProps>;
   openByDefault?: boolean;
   items: SidebarItem[];
-  translationKey?: string;
+  translationKey: string;
 };
 
 export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
@@ -68,7 +68,7 @@ export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
         icon: KeyIcon,
       },
       {
-        path: '/users/management',
+        path: '/users',
         translationKey: 'userManagement',
         icon: UsersIcon,
       },

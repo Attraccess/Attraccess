@@ -1,0 +1,34 @@
+{
+  "action": {
+    "http": {
+      "sendRequest": {
+        "title": "Send HTTP request",
+        "description": "This node sends a HTTP request."
+      }
+    },
+    "mqtt": {
+      "sendMessage": {
+        "title": "MQTT message send",
+        "description": "This node sends a MQTT message."
+      }
+    }
+  },
+  "event": {
+    "resource": {
+      "usage": {
+        "started": {
+          "title": "Resource usage started",
+          "description": "This node is triggered when a resource is started."
+        },
+        "stopped": {
+          "title": "Resource usage stopped",
+          "description": "This node is triggered when a resource is stopped."
+        },
+        "takeover": {
+          "title": "Resource usage takeover",
+          "description": "This node is triggered when a resource is taken over."
+        }
+      }
+    }
+  }
+}

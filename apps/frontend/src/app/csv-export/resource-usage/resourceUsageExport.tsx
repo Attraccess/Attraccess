@@ -27,7 +27,8 @@ import {
 import { nanoid } from 'nanoid';
 import { RotateCwIcon } from 'lucide-react';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 
 import de from './de.json';
 import en from './en.json';
@@ -278,7 +279,7 @@ export function ResourceUsageExport(props: ExportProps) {
             items={csvRowsWithId}
             loadingState={loadingState}
             loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<TableEmptyState />}
+            emptyContent={<EmptyState />}
           >
             {(row) => (
               <TableRow key={row.id}>

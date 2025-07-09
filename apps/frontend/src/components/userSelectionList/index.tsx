@@ -14,7 +14,8 @@ import {
 } from '@heroui/react';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { PlusIcon } from 'lucide-react';
-import { TableDataLoadingIndicator, TableEmptyState } from '../tableComponents';
+import { TableDataLoadingIndicator } from '../tableComponents';
+import { EmptyState } from '../emptyState';
 
 import de from './de.json';
 import en from './en.json';
@@ -141,7 +142,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
           items={currentPage}
           loadingState={selectedUserIsLoading ? 'loading' : 'idle'}
           loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<TableEmptyState />}
+          emptyContent={<EmptyState />}
         >
           {(user) => (
             <TableRow key={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>

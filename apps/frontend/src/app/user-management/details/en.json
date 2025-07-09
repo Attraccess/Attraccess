@@ -1,0 +1,6 @@
+{
+  "details": {
+    "title": "User details",
+    "externalIdentifier": "External ID: {{identifier}}"
+  }
+}

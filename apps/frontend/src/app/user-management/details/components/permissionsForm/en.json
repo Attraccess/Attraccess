@@ -1,0 +1,11 @@
+{
+  "title": "Permissions",
+  "permissions": {
+    "canManageResources": "Manage resources",
+    "canManageSystemConfiguration": "Manage system configuration",
+    "canManageUsers": "Manage users"
+  },
+  "actions": {
+    "save": "Save"
+  }
+}

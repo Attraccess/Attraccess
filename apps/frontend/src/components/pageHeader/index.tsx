@@ -2,7 +2,7 @@ import React, { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@heroui/button';
-import { cn } from '@heroui/react';
+import { cn, Image } from '@heroui/react';
 
 interface PageHeaderProps {
   title: string;
@@ -11,9 +11,20 @@ interface PageHeaderProps {
   actions?: ReactNode;
   icon?: ReactNode;
   noMargin?: boolean;
+  thumbnailSrc?: string;
+  thumbnailAlt?: string;
 }
 
-export function PageHeader({ title, subtitle, backTo, actions, icon, noMargin }: Readonly<PageHeaderProps>) {
+export function PageHeader({
+  title,
+  subtitle,
+  backTo,
+  actions,
+  icon,
+  noMargin,
+  thumbnailSrc,
+  thumbnailAlt,
+}: Readonly<PageHeaderProps>) {
   const navigate = useNavigate();
 
   return (
@@ -35,6 +46,18 @@ export function PageHeader({ title, subtitle, backTo, actions, icon, noMargin }:
         <div className="flex-shrink">
           <div className="flex items-center gap-2">
             {icon}
+            {thumbnailSrc && (
+              <Image
+                classNames={{
+                  img: 'object-contain',
+                }}
+                height={48}
+                width={48}
+                isBlurred
+                src={thumbnailSrc}
+                alt={thumbnailAlt}
+              />
+            )}
             <h1 className="text-2xl font-bold">{title}</h1>
           </div>
           {subtitle && <p className="mt-1 text-sm text-foreground-500">{subtitle}</p>}

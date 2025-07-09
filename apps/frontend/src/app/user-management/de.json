@@ -1,0 +1,15 @@
+{
+  "title": "Benutzerverwaltung",
+  "subtitle": "Verwalten Sie Benutzerberechtigungen und Zugriffskontrolle",
+  "table": {
+    "inputs": {
+      "search": "Suche"
+    },
+    "columns": {
+      "isEmailVerified": "Email bestätigt",
+      "id": "ID",
+      "username": "Benutzername",
+      "externalIdentifier": "Externe ID"
+    }
+  }
+}

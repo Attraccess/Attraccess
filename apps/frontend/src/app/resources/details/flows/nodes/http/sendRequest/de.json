@@ -1,0 +1,27 @@
+{
+  "editor": {
+    "inputs": {
+      "url": {
+        "origin": {
+          "label": "Origin"
+        },
+        "pathname": {
+          "label": "Pfad"
+        }
+      },
+      "method": {
+        "label": "Methode"
+      },
+      "headers": {
+        "label": "Headers"
+      },
+      "body": {
+        "label": "Body"
+      }
+    },
+    "buttons": {
+      "close": "Schließen",
+      "save": "Speichern"
+    }
+  }
+}

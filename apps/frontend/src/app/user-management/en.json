@@ -1,0 +1,15 @@
+{
+  "title": "User Management",
+  "subtitle": "Manage user permissions and access control",
+  "table": {
+    "inputs": {
+      "search": "Search"
+    },
+    "columns": {
+      "isEmailVerified": "Email verified",
+      "id": "ID",
+      "username": "Username",
+      "externalIdentifier": "External ID"
+    }
+  }
+}

@@ -14,12 +14,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { ResourceUsage } from './resourceUsage.entity';
 import { ResourceIntroducer } from './resourceIntroducer.entity';
-import { MqttResourceConfig } from './mqttResourceConfig.entity';
-import { WebhookConfig } from './webhookConfig.entity';
 import { ResourceGroup } from './resourceGroup.entity';
-
-// Import the DocumentationType enum from the types directory
 import { DocumentationType } from '../types/documentationType.enum';
+import { ResourceFlowNode } from './resourceFlowNode';
+import { ResourceFlowEdge } from './resourceFlowEdge';
+import { ResourceFlowLog } from './resourceFlowLog';
 
 @Entity()
 export class Resource {
@@ -104,14 +103,17 @@ export class Resource {
   @OneToMany(() => ResourceUsage, (usage) => usage.resource)
   usages!: ResourceUsage[];
 
+  @OneToMany(() => ResourceFlowNode, (node) => node.resource)
+  flowNodes!: ResourceFlowNode[];
+
+  @OneToMany(() => ResourceFlowEdge, (edge) => edge.resource)
+  flowEdges!: ResourceFlowEdge[];
+
+  @OneToMany(() => ResourceFlowLog, (log) => log.resource)
+  flowLogs!: ResourceFlowLog[];
+
   @OneToMany(() => ResourceIntroducer, (introducer) => introducer.resource)
   introducers!: ResourceIntroducer[];
-
-  @OneToMany(() => MqttResourceConfig, (config) => config.resource)
-  mqttConfigs!: MqttResourceConfig[];
-
-  @OneToMany(() => WebhookConfig, (config) => config.resource)
-  webhookConfigs!: WebhookConfig[];
 
   @ManyToMany(() => ResourceGroup, (group) => group.resources)
   @JoinTable()

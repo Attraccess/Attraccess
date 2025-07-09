@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In } from 'typeorm';
 import { SystemPermissions, User } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
-import { makePaginatedResponse, PaginatedResponse } from '../../types/response';
+import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
 import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
@@ -178,14 +178,12 @@ export class UsersService {
 
     if (Array.isArray(options.ids)) {
       if (options.ids.length === 0) {
-        return makePaginatedResponse(
-          {
-            page: paginationOptions.page,
-            limit: paginationOptions.limit,
-          },
-          [],
-          0
-        );
+        return {
+          data: [],
+          total: 0,
+          page: paginationOptions.page,
+          limit: paginationOptions.limit,
+        };
       }
 
       whereCondition = { id: In(options.ids) };
@@ -207,14 +205,12 @@ export class UsersService {
     });
 
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);
-    return makePaginatedResponse(
-      {
-        page: paginationOptions.page,
-        limit: paginationOptions.limit,
-      },
-      users,
-      total
-    );
+    return {
+      data: users,
+      total,
+      page: paginationOptions.page,
+      limit: paginationOptions.limit,
+    };
   }
 
   async findByPermission(
@@ -253,13 +249,11 @@ export class UsersService {
     this.logger.debug(
       `Found ${total} total users with permission "${permission}", returning page ${page} with ${users.length} results`
     );
-    return makePaginatedResponse(
-      {
-        page: paginationOptions.page,
-        limit: paginationOptions.limit,
-      },
-      users,
-      total
-    );
+    return {
+      data: users,
+      total,
+      page: paginationOptions.page,
+      limit: paginationOptions.limit,
+    };
   }
 }

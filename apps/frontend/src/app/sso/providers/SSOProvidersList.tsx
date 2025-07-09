@@ -35,7 +35,8 @@ import {
   UseAuthenticationServiceGetAllSsoProvidersKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import * as en from './translations/en';
@@ -325,7 +326,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             items={providers}
             loadingState={loadingState}
             loadingContent={<TableDataLoadingIndicator />}
-            emptyContent={<TableEmptyState />}
+            emptyContent={<EmptyState />}
           >
             {(provider) => (
               <TableRow key={provider.id}>

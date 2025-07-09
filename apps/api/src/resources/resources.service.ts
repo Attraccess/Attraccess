@@ -4,7 +4,7 @@ import { Repository, In, Brackets } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
-import { PaginatedResponse, makePaginatedResponse } from '../types/response';
+import { PaginatedResponse } from '../types/response';
 import { ResourceImageService } from './resourceImage.service';
 import { FileUpload } from '../common/types/file-upload.types';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
@@ -266,6 +266,11 @@ export class ResourcesService {
       .take(limit)
       .getManyAndCount();
 
-    return makePaginatedResponse({ page, limit }, resources, total);
+    return {
+      data: resources,
+      total,
+      page,
+      limit,
+    };
   }
 }

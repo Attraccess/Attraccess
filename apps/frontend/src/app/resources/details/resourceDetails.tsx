@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, Wifi } from 'lucide-react';
+import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
 import { Button } from '@heroui/button';
 import { Spinner, Link } from '@heroui/react';
 import { useDisclosure } from '@heroui/modal';
@@ -27,6 +27,7 @@ import { ResoureIntroducerManagement } from '../IntroducerManagement';
 import { ResourceIntroductionsManagement } from '../IntroductionsManagement';
 import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
+import { filenameToUrl } from '../../../api';
 
 function ResourceDetailsComponent() {
   const { id } = useParams<{ id: string }>();
@@ -120,7 +121,9 @@ function ResourceDetailsComponent() {
     <div>
       <PageHeader
         title={resource.name}
-        icon={<ShapesIcon className="w-6 h-6" />}
+        icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
+        thumbnailSrc={resource.imageFilename ? filenameToUrl(resource.imageFilename) : undefined}
+        thumbnailAlt={resource.name}
         subtitle={resource.description ?? undefined}
         backTo="/resources"
         actions={
@@ -144,12 +147,12 @@ function ResourceDetailsComponent() {
 
                 <Button
                   as={Link}
-                  href={`/resources/${resourceId}/iot`}
+                  href={`/resources/${resourceId}/flows`}
                   variant="light"
-                  startContent={<Wifi className="w-4 h-4" />}
-                  data-cy="iot-settings-button"
+                  startContent={<WorkflowIcon className="w-4 h-4" />}
+                  data-cy="flows-button"
                 >
-                  {t('navItems.iotSettings')}
+                  {t('navItems.flows')}
                 </Button>
 
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>

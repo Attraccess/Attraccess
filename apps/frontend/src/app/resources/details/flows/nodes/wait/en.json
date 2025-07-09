@@ -1,0 +1,21 @@
+{
+  "units": {
+    "seconds": "seconds",
+    "minutes": "minutes",
+    "hours": "hours"
+  },
+  "editor": {
+    "inputs": {
+      "duration": {
+        "label": "Duration"
+      },
+      "unit": {
+        "label": "Unit"
+      }
+    },
+    "buttons": {
+      "close": "Close",
+      "save": "Save"
+    }
+  }
+}

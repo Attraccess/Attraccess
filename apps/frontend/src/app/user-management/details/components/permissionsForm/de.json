@@ -1,0 +1,11 @@
+{
+  "title": "Berechtigungen",
+  "permissions": {
+    "canManageResources": "Ressourcen verwalten",
+    "canManageSystemConfiguration": "Systemkonfiguration verwalten",
+    "canManageUsers": "Benutzer verwalten"
+  },
+  "actions": {
+    "save": "Speichern"
+  }
+}

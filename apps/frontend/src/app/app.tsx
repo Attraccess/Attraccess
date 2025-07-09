@@ -3,7 +3,7 @@ import { Unauthorized } from './unauthorized/unauthorized';
 import { useTheme } from '@heroui/use-theme';
 import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
-import { useAuth, usePersistedAuth, useRefreshSession } from '../hooks/useAuth';
+import { useAuth, usePersistedAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verifyEmail';
 import { ToastProvider } from '../components/toastProvider';
@@ -19,6 +19,8 @@ import { ResetPassword } from './reset-password/resetPassword';
 import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
 import { PWAUpdatePrompt } from '../components/PWAUpdatePrompt';
 import { BootScreen } from '../components/bootScreen';
+import { usePtrStore } from '../stores/ptr.store';
+import { ReactFlowProvider } from '@xyflow/react';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -75,6 +77,8 @@ function AppLayout(props: PropsWithChildren) {
 
   const { t } = useTranslations('app', { de, en });
 
+  const { pullToRefreshIsEnabled } = usePtrStore();
+
   return (
     <PullToRefresh
       onRefresh={() => queryClient.invalidateQueries()}
@@ -86,10 +90,13 @@ function AppLayout(props: PropsWithChildren) {
           <div style={{ fontSize: '24px' }}>↓</div>
         </div>
       }
+      isPullable={pullToRefreshIsEnabled}
     >
       <HeroUIProvider navigate={navigate} labelPlacement="inside">
         <ToastProvider>
-          <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+          <ReactFlowProvider>
+            <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+          </ReactFlowProvider>
         </ToastProvider>
       </HeroUIProvider>
     </PullToRefresh>
@@ -122,7 +129,7 @@ function AppContent() {
 
 export function App() {
   usePersistedAuth();
-  useRefreshSession();
+  // useRefreshSession();
   const { isInitialized } = useAuth();
   const { setTheme } = useTheme();
 

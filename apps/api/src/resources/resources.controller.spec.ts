@@ -68,13 +68,19 @@ describe('ResourcesController', () => {
           introductions: [],
           usages: [],
           introducers: [],
-          mqttConfigs: [],
-          webhookConfigs: [],
           groups: [],
+          flowNodes: [],
+          flowEdges: [],
+          flowLogs: [],
         },
       ];
 
-      const paginatedResponse = new PaginatedResponse(resources, 1, { page: 1, limit: 10 });
+      const paginatedResponse: PaginatedResponse<Resource> = {
+        data: resources,
+        total: 1,
+        page: 1,
+        limit: 10,
+      };
 
       jest.spyOn(service, 'listResources').mockResolvedValue(paginatedResponse);
 
@@ -111,9 +117,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
@@ -158,9 +165,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
@@ -196,9 +204,10 @@ describe('ResourcesController', () => {
         introductions: [],
         usages: [],
         introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
         groups: [],
+        flowNodes: [],
+        flowEdges: [],
+        flowLogs: [],
       };
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);

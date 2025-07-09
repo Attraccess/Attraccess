@@ -15,13 +15,13 @@ import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { SSEModule } from './sse/sse.module';
-import { IotModule } from './iot/iot.module';
 import { ResourceGroupsModule } from './groups/resourceGroups.module';
 import { ResourcesService } from './resources.service';
 import { ResourceUsageModule } from './usage/resourceUsage.module';
 import { ResourceImageService } from './resourceImage.service';
 import { ResourceIntroductionsModule } from './introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from './introducers/resourceIntroducers.module';
+import { ResourceFlowsModule } from './flows/resource-flows.module';
 
 @Module({
   imports: [
@@ -39,13 +39,13 @@ import { ResourceIntroducersModule } from './introducers/resourceIntroducers.mod
     ConfigModule,
     MqttModule,
     SSEModule,
-    IotModule,
     ResourceGroupsModule,
     ResourceUsageModule,
     FileStorageModule,
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
     ResourceUsageModule,
+    ResourceFlowsModule,
   ],
   controllers: [ResourcesController],
   providers: [ResourcesService, ResourceImageService],

@@ -24,7 +24,7 @@ import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
 import { useToastMessage } from '../../components/toastProvider';
-import { TableEmptyState } from '../../components/tableComponents';
+import { EmptyState } from '../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 
@@ -115,7 +115,7 @@ export function PluginsList() {
               items={plugins}
               loadingState={loadingState}
               loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<TableEmptyState />}
+              emptyContent={<EmptyState />}
             >
               {(plugin) => (
                 <TableRow key={plugin.name}>

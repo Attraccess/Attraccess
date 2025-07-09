@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { Cloud, CloudOff, CpuIcon } from 'lucide-react';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
@@ -86,7 +87,7 @@ export const AttractapList = () => {
           items={readers ?? []}
           loadingState={loadingState}
           loadingContent={<TableDataLoadingIndicator />}
-          emptyContent={<TableEmptyState />}
+          emptyContent={<EmptyState />}
         >
           {(reader) => (
             <TableRow key={reader.id}>

@@ -98,16 +98,29 @@ export class ResourceUsageService {
           `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`
         );
 
+        const takeoverEndTime = new Date();
+
         // End the existing session with a note about takeover
         await this.resourceUsageRepository
           .createQueryBuilder()
           .update(ResourceUsage)
           .set({
-            endTime: new Date(),
+            endTime: takeoverEndTime,
             endNotes: `Session ended due to takeover by user ${user.id}`,
           })
           .where('id = :id', { id: existingActiveSession.id })
           .execute();
+
+        // Emit event for the ended session
+        this.eventEmitter.emit(
+          ResourceUsageEndedEvent.eventName,
+          new ResourceUsageEndedEvent(
+            existingActiveSession.resource,
+            existingActiveSession.startTime,
+            takeoverEndTime,
+            existingActiveSession.user
+          )
+        );
       } else if (dto.forceTakeOver && !resource.allowTakeOver) {
         this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
         throw new BadRequestException('This resource does not allow overtaking');
@@ -153,14 +166,14 @@ export class ResourceUsageService {
       const now = new Date();
       // Emit event for the takeover
       this.eventEmitter.emit(
-        'resource.usage.taken_over',
-        new ResourceUsageTakenOverEvent(resourceId, now, user, existingActiveSession.user)
+        ResourceUsageTakenOverEvent.eventName,
+        new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user)
       );
     } else {
       // Emit event after successful save
       this.eventEmitter.emit(
-        'resource.usage.started',
-        new ResourceUsageStartedEvent(resourceId, usageData.startTime, user)
+        ResourceUsageStartedEvent.eventName,
+        new ResourceUsageStartedEvent(resource, usageData.startTime, user)
       );
     }
 
@@ -215,8 +228,8 @@ export class ResourceUsageService {
 
     // Emit event after successful save
     this.eventEmitter.emit(
-      'resource.usage.ended',
-      new ResourceUsageEndedEvent(resourceId, activeSession.startTime, endTime, activeSession.user)
+      ResourceUsageEndedEvent.eventName,
+      new ResourceUsageEndedEvent(activeSession.resource, activeSession.startTime, endTime, activeSession.user)
     );
 
     // Fetch the updated record
@@ -238,7 +251,7 @@ export class ResourceUsageService {
         resourceId,
         endTime: IsNull(),
       },
-      relations: ['user'],
+      relations: ['user', 'resource'],
     });
 
     if (activeSession) {

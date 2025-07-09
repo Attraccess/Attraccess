@@ -28,7 +28,8 @@ import {
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
-import { TableDataLoadingIndicator, TableEmptyState } from '../../../components/tableComponents';
+import { TableDataLoadingIndicator } from '../../../components/tableComponents';
+import { EmptyState } from '../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 import de from './de.json';
@@ -258,7 +259,7 @@ export function NfcCardList() {
               items={cards ?? []}
               loadingState={loadingState}
               loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<TableEmptyState />}
+              emptyContent={<EmptyState />}
             >
               {(card) => (
                 <TableRow key={card.id}>

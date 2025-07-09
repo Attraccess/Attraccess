@@ -107,42 +107,42 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     return !!activeUsage;
   }
 
-  @OnEvent('resource.usage.started')
+  @OnEvent(ResourceUsageStartedEvent.eventName)
   handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
     // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resourceId)) {
+    if (!this.resourceSubjects.has(resource.id)) {
       return;
     }
 
     // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resourceId);
+    const subject = this.resourceSubjects.get(resource.id);
 
     // Create event data with inUse flag
     const eventData = {
       ...event,
       inUse: true,
-      eventType: 'resource.usage.started',
+      eventType: ResourceUsageStartedEvent.eventName,
     };
 
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted resource.usage.started event for resource ${resourceId}`);
+    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.eventName} event for resource ${resource.id}`);
   }
 
-  @OnEvent('resource.usage.ended')
+  @OnEvent(ResourceUsageEndedEvent.eventName)
   handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
-    const { resourceId } = event;
+    const { resource } = event;
 
     // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resourceId)) {
+    if (!this.resourceSubjects.has(resource.id)) {
       return;
     }
 
     // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resourceId);
+    const subject = this.resourceSubjects.get(resource.id);
 
     // Create event data with inUse flag
     const eventData = {
@@ -154,6 +154,6 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted resource.usage.ended event for resource ${resourceId}`);
+    this.logger.debug(`Emitted resource.usage.ended event for resource ${resource.id}`);
   }
 }
