@@ -5,7 +5,7 @@
 import { Resource, User } from '@attraccess/database-entities';
 
 export class ResourceUsageStartedEvent {
-  public static readonly eventName = 'resource.usage.started';
+  public static readonly EVENT_NAME = 'resource.usage.started';
 
   constructor(
     public readonly resource: Pick<Resource, 'id' | 'name'>,
@@ -15,7 +15,7 @@ export class ResourceUsageStartedEvent {
 }
 
 export class ResourceUsageEndedEvent {
-  public static readonly eventName = 'resource.usage.ended';
+  public static readonly EVENT_NAME = 'resource.usage.ended';
 
   constructor(
     public readonly resource: Pick<Resource, 'id' | 'name'>,
@@ -28,7 +28,7 @@ export class ResourceUsageEndedEvent {
 }
 
 export class ResourceUsageTakenOverEvent {
-  public static readonly eventName = 'resource.usage.taken_over';
+  public static readonly EVENT_NAME = 'resource.usage.taken_over';
 
   constructor(
     public readonly resource: Pick<Resource, 'id' | 'name'>,

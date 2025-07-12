@@ -33,7 +33,7 @@ export class EnrollNTAG424State implements ReaderState {
   constructor(
     private readonly socket: AuthenticatedWebSocket,
     private readonly services: GatewayServices,
-    private readonly userId: User['id']
+    private readonly user: User
   ) {}
 
   public async onStateEnter(): Promise<void> {
@@ -43,7 +43,11 @@ export class EnrollNTAG424State implements ReaderState {
     };
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
-        message: 'Tap to enroll',
+        type: 'enroll-nfc-card',
+        user: {
+          id: this.user.id,
+          username: this.user.username,
+        },
       })
     );
   }
@@ -58,6 +62,12 @@ export class EnrollNTAG424State implements ReaderState {
       this.enrollment?.nextExpectedEvent === AttractapEventType.NFC_TAP
     ) {
       return this.onGetNfcUID(eventData);
+    }
+
+    if (eventData.type === AttractapEventType.CANCEL) {
+      this.logger.log('Enrollment cancelled by user. Transitioning to initial state.');
+      this.enrollment = undefined;
+      return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     this.logger.debug(`Unexpected event type ${eventData.type} in state ${this.enrollment?.nextExpectedEvent}`);
@@ -151,23 +161,34 @@ export class EnrollNTAG424State implements ReaderState {
       this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
           message: 'Enrollment failed',
-          duration: 10000,
         })
       );
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
       const nextState = new InitialReaderState(this.socket, this.services);
       return this.socket.transitionToState(nextState);
     }
 
-    const nfcCard = await this.services.attractapService.createNFCCard({
+    const user = await this.services.usersService.findOne({ id: this.user.id });
+
+    if (!user) {
+      this.logger.error('Enrollment failed: User not found', {
+        enrollmentState: this.enrollment,
+      });
+
+      this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
+      return;
+    }
+
+    const nfcCard = await this.services.attractapService.createNFCCard(user, {
       uid: this.enrollment.cardUID,
-      userId: this.userId,
       keys: {
         [this.KEY_ZERO_MASTER]: this.enrollment.data.newKeys[this.KEY_ZERO_MASTER],
       },
     });
 
-    this.logger.log(`Created NFC card ${nfcCard.id} for user ${this.userId}`);
+    this.logger.log(`Created NFC card ${nfcCard.id} for user ${this.user.id}`);
 
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {

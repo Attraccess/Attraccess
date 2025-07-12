@@ -1,7 +1,7 @@
 import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
-import { Button, Form, ModalBody, Modal, ModalContent, ModalHeader, ModalFooter } from '@heroui/react';
+import { Button, Form, ModalBody, Modal, ModalContent, ModalHeader, ModalFooter, Divider } from '@heroui/react';
 import { Input } from '@heroui/input';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,7 +34,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const toast = useToastMessage();
 
   const [name, setName] = useState('');
-  const [connectedResources, setConnectedResources] = useState<number[]>([]);
+  const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const updateReaderMutation = useAttractapServiceUpdateReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
@@ -55,7 +55,7 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   useEffect(() => {
     setName(reader?.name ?? '');
-    setConnectedResources(reader?.hasAccessToResourceIds ?? []);
+    setConnectedResourceIds(reader?.resources.map((r) => r.id) ?? []);
   }, [reader]);
 
   const save = useCallback(async () => {
@@ -67,10 +67,10 @@ export function AttractapEditor(props: Readonly<Props>) {
       readerId: props.readerId,
       requestBody: {
         name,
-        connectedResources,
+        connectedResourceIds,
       },
     });
-  }, [name, connectedResources, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -102,9 +102,10 @@ export function AttractapEditor(props: Readonly<Props>) {
                   className="w-full"
                   data-cy="attractap-editor-name-input"
                 />
+                <Divider className="my-6" />
                 <ResourceSelector
-                  selection={connectedResources}
-                  onSelectionChange={(selection) => setConnectedResources(selection)}
+                  selection={connectedResourceIds}
+                  onSelectionChange={(selection) => setConnectedResourceIds(selection)}
                   data-cy="attractap-editor-resource-selector"
                 />
               </ModalBody>

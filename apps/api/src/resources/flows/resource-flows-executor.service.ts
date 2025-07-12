@@ -133,7 +133,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  @OnEvent(ResourceUsageStartedEvent.eventName)
+  @OnEvent(ResourceUsageStartedEvent.EVENT_NAME)
   async handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
     const { resource } = event;
 
@@ -165,7 +165,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  @OnEvent(ResourceUsageTakenOverEvent.eventName)
+  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
   async handleResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
     const { resource } = event;
 
@@ -202,7 +202,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  @OnEvent(ResourceUsageEndedEvent.eventName)
+  @OnEvent(ResourceUsageEndedEvent.EVENT_NAME)
   async handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
     const { resource } = event;
 

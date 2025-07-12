@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Post, Req, Body } from '@nestjs/common';
-import { AttractapGateway } from './modules/websockets/websocket.gateway';
+import { AttractapGateway } from './websockets/websocket.gateway';
 import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';

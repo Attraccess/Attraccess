@@ -107,7 +107,7 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     return !!activeUsage;
   }
 
-  @OnEvent(ResourceUsageStartedEvent.eventName)
+  @OnEvent(ResourceUsageStartedEvent.EVENT_NAME)
   handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
     const { resource } = event;
 
@@ -123,16 +123,16 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     const eventData = {
       ...event,
       inUse: true,
-      eventType: ResourceUsageStartedEvent.eventName,
+      eventType: ResourceUsageStartedEvent.EVENT_NAME,
     };
 
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.eventName} event for resource ${resource.id}`);
+    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.EVENT_NAME} event for resource ${resource.id}`);
   }
 
-  @OnEvent(ResourceUsageEndedEvent.eventName)
+  @OnEvent(ResourceUsageEndedEvent.EVENT_NAME)
   handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
     const { resource } = event;
 

@@ -9,6 +9,7 @@ import {
   ViewColumn,
   ManyToMany,
   JoinTable,
+  ManyToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
@@ -19,6 +20,7 @@ import { DocumentationType } from '../types/documentationType.enum';
 import { ResourceFlowNode } from './resourceFlowNode';
 import { ResourceFlowEdge } from './resourceFlowEdge';
 import { ResourceFlowLog } from './resourceFlowLog';
+import { Attractap } from './attractap.entity';
 
 @Entity()
 export class Resource {
@@ -123,6 +125,9 @@ export class Resource {
     isArray: true,
   })
   groups!: ResourceGroup[];
+
+  @ManyToMany(() => Attractap, (reader) => reader.resources)
+  attractapReaders!: Attractap[];
 }
 
 @ViewEntity({

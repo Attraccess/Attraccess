@@ -86,9 +86,10 @@ export class WaitForResourceSelectionState implements ReaderState {
       this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
           message: 'Unknown resource',
-          duration: 3000,
         })
       );
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
       return await this.updateDisplay();
     }

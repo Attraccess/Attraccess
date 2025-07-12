@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
+import { Resource } from './resource.entity';
 
 @Entity()
 export class Attractap {
@@ -22,15 +23,10 @@ export class Attractap {
   @Exclude()
   apiTokenHash!: string;
 
-  @Column({
-    type: 'simple-array',
-    default: '',
-  })
-  @ApiProperty({
-    description: 'The IDs of the resources that the reader has access to',
-    type: [Number],
-  })
-  hasAccessToResourceIds!: number[];
+  @ManyToMany(() => Resource, (resource) => resource.attractapReaders)
+  @JoinTable()
+  @ApiProperty({ description: 'The resources that the reader has access to', type: () => Resource, isArray: true })
+  resources!: Resource[];
 
   @Column({
     type: 'datetime',

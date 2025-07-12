@@ -3,7 +3,7 @@ import { GatewayServices } from '../websocket.gateway';
 import { AuthenticatedWebSocket, AttractapEventType, AttractapResponse } from '../websocket.types';
 import { AttractapEvent } from '../websocket.types';
 import { ReaderState } from './reader-state.interface';
-import { NFCCard } from '@attraccess/database-entities';
+import { NFCCard, Resource, User } from '@attraccess/database-entities';
 
 export class WaitForNFCTapState implements ReaderState {
   private readonly logger = new Logger(WaitForNFCTapState.name);
@@ -27,17 +27,37 @@ export class WaitForNFCTapState implements ReaderState {
     const activeUsageSession = await this.services.resourceUsageService.getActiveSession(this.selectedResourceId);
     const resourceIsInUse = !!activeUsageSession;
 
+    const resource = await this.services.resourcesService.getResourceById(this.selectedResourceId);
+
+    const simplifiedResource = {
+      id: resource.id,
+      name: resource.name,
+      description: resource.description,
+      imageFilename: resource.imageFilename,
+    } as Pick<Resource, 'id' | 'name' | 'description' | 'imageFilename'>;
+
     if (resourceIsInUse) {
       return this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
-          message: `Tap to stop`,
+          type: 'toggle-resource-usage',
+          resource: simplifiedResource,
+          isActive: true,
+          activeUsageSession: {
+            user: {
+              id: activeUsageSession.userId,
+              username: activeUsageSession.user.username,
+            } as Pick<User, 'id' | 'username'>,
+          },
         })
       );
     }
 
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
-        message: `Tap to start`,
+        type: 'toggle-resource-usage',
+        resource: simplifiedResource,
+        isActive: false,
+        activeUsageSession: null,
       })
     );
   }
@@ -112,9 +132,10 @@ export class WaitForNFCTapState implements ReaderState {
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
         message: `Invalid card`,
-        duration: 3000,
       })
     );
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
     await this.restart();
   }
@@ -145,10 +166,10 @@ export class WaitForNFCTapState implements ReaderState {
       return;
     }
 
-    const userOfNFCCard = await this.services.usersService.findOne({ id: this.card.userId });
+    const userOfNFCCard = await this.services.usersService.findOne({ id: this.card.user.id });
 
     if (!userOfNFCCard) {
-      this.logger.debug(`User (of NFC Card with UID ${data.payload.cardUID}) with ID ${this.card.userId} not found`);
+      this.logger.debug(`User (of NFC Card with UID ${data.payload.cardUID}) with ID ${this.card.user.id} not found`);
       return this.onInvalidCard();
     }
 

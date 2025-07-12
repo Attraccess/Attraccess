@@ -113,7 +113,7 @@ export class ResourceUsageService {
 
         // Emit event for the ended session
         this.eventEmitter.emit(
-          ResourceUsageEndedEvent.eventName,
+          ResourceUsageEndedEvent.EVENT_NAME,
           new ResourceUsageEndedEvent(
             existingActiveSession.resource,
             existingActiveSession.startTime,
@@ -166,13 +166,13 @@ export class ResourceUsageService {
       const now = new Date();
       // Emit event for the takeover
       this.eventEmitter.emit(
-        ResourceUsageTakenOverEvent.eventName,
+        ResourceUsageTakenOverEvent.EVENT_NAME,
         new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user)
       );
     } else {
       // Emit event after successful save
       this.eventEmitter.emit(
-        ResourceUsageStartedEvent.eventName,
+        ResourceUsageStartedEvent.EVENT_NAME,
         new ResourceUsageStartedEvent(resource, usageData.startTime, user)
       );
     }
@@ -228,7 +228,7 @@ export class ResourceUsageService {
 
     // Emit event after successful save
     this.eventEmitter.emit(
-      ResourceUsageEndedEvent.eventName,
+      ResourceUsageEndedEvent.EVENT_NAME,
       new ResourceUsageEndedEvent(activeSession.resource, activeSession.startTime, endTime, activeSession.user)
     );
 

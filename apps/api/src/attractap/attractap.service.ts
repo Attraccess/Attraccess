@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { subtle } from 'crypto';
-import { NFCCard, Attractap } from '@attraccess/database-entities';
-import { DeleteResult, FindManyOptions, Repository } from 'typeorm';
+import { NFCCard, Attractap, Resource, User } from '@attraccess/database-entities';
+import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { nanoid } from 'nanoid';
-import { securelyHashToken } from './modules/websockets/websocket.utils';
+import { securelyHashToken } from './websockets/websocket.utils';
 import { ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -18,7 +18,9 @@ export class AttractapService {
     @InjectRepository(Attractap)
     private readonly readerRepository: Repository<Attractap>,
     @Inject(EventEmitter2)
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    @InjectRepository(Resource)
+    private readonly resourceRepository: Repository<Resource>
   ) {}
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
@@ -26,7 +28,7 @@ export class AttractapService {
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
-    return await this.nfcCardRepository.find({ where: { userId } });
+    return await this.nfcCardRepository.find({ where: { user: { id: userId } } });
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
@@ -38,15 +40,21 @@ export class AttractapService {
   }
 
   public async findReaderById(id: number): Promise<Attractap | undefined> {
-    return await this.readerRepository.findOne({ where: { id } });
+    return await this.readerRepository.findOne({ where: { id }, relations: ['resources'] });
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    return await this.nfcCardRepository.findOne({ where: { uid } });
+    return await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
   }
 
-  public async createNFCCard(data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt'>): Promise<NFCCard> {
-    return await this.nfcCardRepository.save(data);
+  public async createNFCCard(
+    user: User,
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user'>
+  ): Promise<NFCCard> {
+    return await this.nfcCardRepository.save({
+      ...data,
+      user,
+    });
   }
 
   public async deleteNFCCard(id: number): Promise<DeleteResult> {
@@ -70,7 +78,7 @@ export class AttractapService {
 
   public async updateReader(
     id: number,
-    updateData: { name?: string; connectedResources?: number[] }
+    updateData: { name?: string; connectedResourceIds?: number[] }
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 
@@ -82,13 +90,27 @@ export class AttractapService {
       reader.name = updateData.name;
     }
 
-    if (updateData.connectedResources) {
-      reader.hasAccessToResourceIds = updateData.connectedResources;
+    this.logger.debug('updateData', updateData);
+    if (updateData.connectedResourceIds) {
+      this.logger.debug('attaching resources to reader', updateData.connectedResourceIds);
+      let resources: Resource[] = [];
+      if (updateData.connectedResourceIds.length > 0) {
+        resources = await this.resourceRepository.find({
+          where: {
+            id: In(updateData.connectedResourceIds),
+          },
+        });
+
+        this.logger.debug('resources from db', resources);
+      }
+
+      this.logger.debug('resources for reader', resources);
+      reader.resources = resources;
     }
 
     const response = await this.readerRepository.save(reader);
 
-    this.eventEmitter.emit('reader.updated', new ReaderUpdatedEvent(response));
+    this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
 
     return response;
   }

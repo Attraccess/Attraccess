@@ -13,13 +13,15 @@ import { WebsocketService } from './websocket.service';
 import { InitialReaderState } from './reader-states/initial.state';
 import { EnrollNTAG424State } from './reader-states/enroll-ntag424.state';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage } from './websocket.types';
-import { AttractapService } from '../../attractap.service';
+import { AttractapService } from '../attractap.service';
 import { nanoid } from 'nanoid';
 import { ResetNTAG424State } from './reader-states/reset-ntag424.state';
 import { ReaderState } from './reader-states/reader-state.interface';
-import { UsersService } from '../../../users-and-auth/users/users.service';
-import { ResourcesService } from '../../../resources/resources.service';
-import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
+import { UsersService } from '../../users-and-auth/users/users.service';
+import { ResourcesService } from '../../resources/resources.service';
+import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
+import { WaitForResourceSelectionState } from './reader-states/wait-for-resource-selection.state';
+import { WaitForNFCTapState } from './reader-states/wait-for-nfc-tap.state';
 
 export interface GatewayServices {
   websocketService: WebsocketService;
@@ -135,7 +137,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    this.logger.debug(`Received event from client ${client.id}: ${eventData}`);
+    this.logger.debug(`Received event from client ${client.id}: ${JSON.stringify(eventData)}`);
 
     await this.clientWasActive(client);
 
@@ -194,7 +196,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
       },
-      data.userId
+      user
     );
 
     await socket.transitionToState(nextState);
@@ -260,6 +262,28 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         });
 
         await socket.transitionToState(nextState);
+      })
+    );
+  }
+
+  public async onResourceUsageChanged(resourceId: number) {
+    const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) =>
+      socket.reader?.resources.some((r) => r.id === resourceId)
+    );
+
+    await Promise.all(
+      sockets.map(async (socket) => {
+        if (socket.state instanceof WaitForNFCTapState || socket.state instanceof WaitForResourceSelectionState) {
+          await socket.transitionToState(
+            new InitialReaderState(socket, {
+              websocketService: this.websocketService,
+              attractapService: this.attractapService,
+              usersService: this.usersService,
+              resourceUsageService: this.resourceUsageService,
+              resourcesService: this.resourcesService,
+            })
+          );
+        }
       })
     );
   }

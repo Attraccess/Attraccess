@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
-import { Column, CreateDateColumn, Entity, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, UpdateDateColumn } from 'typeorm';
 
 import { PrimaryGeneratedColumn } from 'typeorm';
+import { User } from './user.entity';
 
 class NTag424Keys {
   @Column({
@@ -26,12 +27,10 @@ export class NFCCard {
   @ApiProperty({ description: 'The UID of the NFC card' })
   uid!: string;
 
-  @Column({
-    type: 'integer',
-    nullable: false,
-  })
+  @ManyToOne(() => User, (user) => user.nfcCards)
+  @JoinColumn({ name: 'userId' })
   @ApiProperty({ description: 'The ID of the user that owns the NFC card' })
-  userId!: number;
+  user!: User;
 
   @Column(() => NTag424Keys, { prefix: 'key_' })
   @Exclude()

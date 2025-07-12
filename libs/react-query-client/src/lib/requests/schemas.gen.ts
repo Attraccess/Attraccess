@@ -1991,7 +1991,7 @@ export const $UpdateReaderDto = {
             description: 'The name of the reader',
             example: 'Main Entrance Reader'
         },
-        connectedResources: {
+        connectedResourceIds: {
             description: 'The IDs of the resources that the reader has access to',
             type: 'array',
             items: {
@@ -1999,7 +1999,7 @@ export const $UpdateReaderDto = {
             }
         }
     },
-    required: ['name', 'connectedResources']
+    required: ['name', 'connectedResourceIds']
 } as const;
 
 export const $Attractap = {
@@ -2013,11 +2013,11 @@ export const $Attractap = {
             type: 'string',
             description: 'The name of the reader'
         },
-        hasAccessToResourceIds: {
-            description: 'The IDs of the resources that the reader has access to',
+        resources: {
+            description: 'The resources that the reader has access to',
             type: 'array',
             items: {
-                type: 'number'
+                '$ref': '#/components/schemas/Resource'
             }
         },
         lastConnection: {
@@ -2035,7 +2035,7 @@ export const $Attractap = {
             description: 'Whether the reader is currently connected'
         }
     },
-    required: ['id', 'name', 'hasAccessToResourceIds', 'lastConnection', 'firstConnection', 'connected']
+    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'connected']
 } as const;
 
 export const $UpdateReaderResponseDto = {

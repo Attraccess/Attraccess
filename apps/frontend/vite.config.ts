@@ -45,19 +45,23 @@ export default defineConfig({
     VitePWA({
       mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
       workbox: {
-        clientsClaim: true,
-        skipWaiting: true,
+        clientsClaim: process.env.NODE_ENV === 'production',
+        skipWaiting: process.env.NODE_ENV === 'production',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
       },
       includeAssets: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
       manifest: siteWebManifest,
-      registerType: 'prompt',
+      registerType: process.env.NODE_ENV === 'production' ? 'autoUpdate' : 'prompt',
       srcDir: 'src',
       filename: 'service-worker.ts',
       strategies: 'injectManifest',
       injectManifest: {
-        minify: false,
+        minify: process.env.NODE_ENV === 'production',
         enableWorkboxModulesLogs: true,
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
       },
     }),
   ],

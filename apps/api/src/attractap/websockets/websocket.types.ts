@@ -23,7 +23,9 @@ export enum AttractapEventType {
   DISABLE_CARD_CHECKING = 'DISABLE_CARD_CHECKING',
   DISPLAY_SUCCESS = 'DISPLAY_SUCCESS',
   DISPLAY_ERROR = 'DISPLAY_ERROR',
+  CLEAR_ERROR = 'CLEAR_ERROR',
   REAUTHENTICATE = 'REAUTHENTICATE',
+  CANCEL = 'CANCEL',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

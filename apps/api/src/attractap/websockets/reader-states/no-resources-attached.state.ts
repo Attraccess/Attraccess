@@ -13,13 +13,12 @@ export class NoResourcesAttachedState implements ReaderState {
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
         message: `No Resources`,
-        duration: 10000,
       })
     );
   }
 
   public async onStateExit(): Promise<void> {
-    return;
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
   }
 
   public async onEvent(/* data: AttractapEvent['data'] */) {

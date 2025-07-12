@@ -32,7 +32,14 @@ export class ResetNTAG424State implements ReaderState {
 
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
-        message: 'Tap your NFC card to reset it',
+        type: 'reset-nfc-card',
+        card: {
+          id: this.card.id,
+        },
+        user: {
+          id: this.card.user.id,
+          username: this.card.user.username,
+        },
       })
     );
   }
@@ -44,6 +51,11 @@ export class ResetNTAG424State implements ReaderState {
   public async onEvent(eventData: AttractapEvent['data']): Promise<void> {
     if (eventData.type === AttractapEventType.NFC_TAP) {
       return this.onGetNfcUID(eventData);
+    }
+
+    if (eventData.type === AttractapEventType.CANCEL) {
+      this.logger.log('Reset cancelled by user. Transitioning to initial state.');
+      return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     this.logger.warn(`Unexpected event type ${eventData.type}`);

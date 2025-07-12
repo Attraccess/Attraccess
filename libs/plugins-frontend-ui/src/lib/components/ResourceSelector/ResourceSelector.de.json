@@ -1,7 +1,14 @@
 {
   "search": {
-    "label": "Ressourcen auswählen",
+    "label": "Ressourcen",
     "placeholder": "Tippe um zu suchen"
+  },
+  "table": {
+    "columns": {
+      "name": {
+        "header": "Name"
+      }
+    }
   },
   "list": {
     "label": "Zugewiesen an"

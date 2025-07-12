@@ -1283,7 +1283,7 @@ export type UpdateReaderDto = {
     /**
      * The IDs of the resources that the reader has access to
      */
-    connectedResources: Array<(number)>;
+    connectedResourceIds: Array<(number)>;
 };
 
 export type Attractap = {
@@ -1296,9 +1296,9 @@ export type Attractap = {
      */
     name: string;
     /**
-     * The IDs of the resources that the reader has access to
+     * The resources that the reader has access to
      */
-    hasAccessToResourceIds: Array<(number)>;
+    resources: Array<Resource>;
     /**
      * The last time the reader connected to the server
      */

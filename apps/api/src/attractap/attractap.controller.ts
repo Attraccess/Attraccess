@@ -13,10 +13,10 @@ import {
   ClassSerializerInterceptor,
   UseInterceptors,
 } from '@nestjs/common';
-import { AttractapGateway } from './modules/websockets/websocket.gateway';
+import { AttractapGateway } from './websockets/websocket.gateway';
 import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backend-sdk';
 import { ApiOperation, ApiResponse, ApiParam, ApiTags, ApiBody } from '@nestjs/swagger';
-import { WebsocketService } from './modules/websockets/websocket.service';
+import { WebsocketService } from './websockets/websocket.service';
 import { AttractapService } from './attractap.service';
 import { EnrollNfcCardDto } from './dtos/enroll-nfc-card.dto';
 import { ResetNfcCardDto } from './dtos/reset-nfc-card.dto';

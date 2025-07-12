@@ -46,25 +46,29 @@ export class InitialReaderState implements ReaderState {
   }
 
   private async onIsAuthenticated(): Promise<void> {
-    this.logger.debug('Getting resources of reader', this.socket.reader.hasAccessToResourceIds);
-    const resourcesOfReader = await this.services.resourcesService.getResourceById(
-      this.socket.reader.hasAccessToResourceIds
-    );
-    if (resourcesOfReader.length === 0) {
+    // refresh reader from database
+    this.socket.reader = await this.services.attractapService.findReaderById(this.socket.reader.id);
+
+    const authenticatedResponse = new AttractapResponse(AttractapEventType.READER_AUTHENTICATED, {
+      name: this.socket.reader.name,
+    });
+    this.socket.sendMessage(authenticatedResponse);
+
+    if (this.socket.reader.resources.length === 0) {
       this.logger.debug('No resources attached to reader, moving reader to NoResourcesAttachedState');
       const nextState = new NoResourcesAttachedState(this.socket, this.services);
       return this.socket.transitionToState(nextState);
     }
 
-    if (resourcesOfReader.length > 1) {
+    if (this.socket.reader.resources.length > 1) {
       this.logger.debug('Resources attached to reader, moving reader to WaitForResourceSelectionState');
 
-      const nextState = new WaitForResourceSelectionState(this.socket, this.services, resourcesOfReader);
+      const nextState = new WaitForResourceSelectionState(this.socket, this.services, this.socket.reader.resources);
       return this.socket.transitionToState(nextState);
     }
 
     this.logger.debug('Reader has only one resource attached, moving reader to WaitForNFCTapState');
-    const nextState = new WaitForNFCTapState(this.socket, this.services, resourcesOfReader[0].id);
+    const nextState = new WaitForNFCTapState(this.socket, this.services, this.socket.reader.resources[0].id);
     return this.socket.transitionToState(nextState);
   }
 
@@ -100,11 +104,6 @@ export class InitialReaderState implements ReaderState {
       this.logger.error('Invalid token, sending UNAUTHORIZED response to client');
       return this.socket.sendMessage(unauthorizedResponse);
     }
-
-    const authenticatedResponse = new AttractapResponse(AttractapEventType.READER_AUTHENTICATED, {
-      name: reader.name,
-    });
-    this.socket.sendMessage(authenticatedResponse);
 
     this.socket.reader = reader;
 
