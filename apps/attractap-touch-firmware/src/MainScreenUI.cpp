@@ -4,6 +4,7 @@
 #include "nfc_icon.c"
 #include "AttraccessService.h" // Add this include
 #include <ArduinoJson.h>       // For JsonDocument
+#include "api_icon.c"          // Add this include for the API icon
 
 MainScreenUI::MainScreenUI(ScreenManager *screenManager)
     : screenManager(screenManager), mainScreen(nullptr), statusBar(nullptr),
@@ -75,22 +76,23 @@ void MainScreenUI::updateAttraccessStatus(bool connected, bool authenticated, co
         Serial.printf("MainScreenUI: App name updated to: %s\n", displayName.c_str());
     }
 
+    // Set icon color based on status
     if (authenticated)
     {
-        lv_label_set_text(attraccessStatusIcon, LV_SYMBOL_CALL);
-        lv_obj_set_style_text_color(attraccessStatusIcon, lv_color_hex(0x00FF00), 0);
+        // lv_obj_set_style_img_recolor_opa(attraccessStatusIcon, LV_OPA_COVER, 0);
+        lv_obj_set_style_img_recolor(attraccessStatusIcon, lv_color_hex(0x00FF00), 0);
         Serial.printf("MainScreenUI: Attraccess status updated - Authenticated (%s)\n", status.c_str());
     }
     else if (connected)
     {
-        lv_label_set_text(attraccessStatusIcon, LV_SYMBOL_CALL);
-        lv_obj_set_style_text_color(attraccessStatusIcon, lv_color_hex(0xFFFF00), 0);
+        // lv_obj_set_style_img_recolor_opa(attraccessStatusIcon, LV_OPA_COVER, 0);
+        lv_obj_set_style_img_recolor(attraccessStatusIcon, lv_color_hex(0xFFFF00), 0);
         Serial.printf("MainScreenUI: Attraccess status updated - Connected but not authenticated (%s)\n", status.c_str());
     }
     else
     {
-        lv_label_set_text(attraccessStatusIcon, LV_SYMBOL_CALL);
-        lv_obj_set_style_text_color(attraccessStatusIcon, lv_color_hex(0xFF0000), 0);
+        // lv_obj_set_style_img_recolor_opa(attraccessStatusIcon, LV_OPA_COVER, 0);
+        lv_obj_set_style_img_recolor(attraccessStatusIcon, lv_color_hex(0xFF0000), 0);
         Serial.printf("MainScreenUI: Attraccess status updated - Disconnected (%s)\n", status.c_str());
     }
 }
@@ -152,12 +154,13 @@ void MainScreenUI::createStatusBar()
     lv_obj_set_style_text_font(wifiStatusIcon, &lv_font_montserrat_14, 0);
     lv_obj_align(wifiStatusIcon, LV_ALIGN_RIGHT_MID, 0, 0);
 
-    // Attraccess status icon (next to WiFi icon)
-    attraccessStatusIcon = lv_label_create(statusBar);
-    lv_label_set_text(attraccessStatusIcon, LV_SYMBOL_CALL);
-    lv_obj_set_style_text_color(attraccessStatusIcon, lv_color_hex(0xFF0000), 0);
-    lv_obj_set_style_text_font(attraccessStatusIcon, &lv_font_montserrat_14, 0);
+    // Attraccess status icon (next to WiFi icon) - now an image
+    attraccessStatusIcon = lv_img_create(statusBar);
+    lv_img_set_src(attraccessStatusIcon, &api_icon);
     lv_obj_align(attraccessStatusIcon, LV_ALIGN_RIGHT_MID, -20, 0);
+    // Default color (red, disconnected)
+    lv_obj_set_style_img_recolor_opa(attraccessStatusIcon, LV_OPA_COVER, 0);
+    lv_obj_set_style_img_recolor(attraccessStatusIcon, lv_color_hex(0xFF0000), 0);
 }
 
 void MainScreenUI::createContent()
@@ -187,6 +190,16 @@ void MainScreenUI::createContent()
     lv_obj_align(mainContentLabel, LV_ALIGN_TOP_MID, 0, 100);
     lv_label_set_long_mode(mainContentLabel, LV_LABEL_LONG_WRAP);
 
+    // Sub-label for sub-message (smaller font)
+    mainContentSubLabel = lv_label_create(mainContentContainer);
+    lv_obj_set_width(mainContentSubLabel, 200);
+    lv_obj_set_style_text_font(mainContentSubLabel, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(0xAAAAAA), 0);
+    lv_obj_set_style_text_align(mainContentSubLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(mainContentSubLabel, "");
+    lv_obj_align(mainContentSubLabel, LV_ALIGN_TOP_MID, 0, 130);
+    lv_label_set_long_mode(mainContentSubLabel, LV_LABEL_LONG_WRAP);
+
     // Cancel button (hidden by default)
     cancelButton = lv_btn_create(mainContentContainer);
     lv_obj_set_size(cancelButton, 120, 40);
@@ -201,7 +214,7 @@ void MainScreenUI::createContent()
 
     // Subtle hint label for user guidance
     lv_obj_t *hintLabel = lv_label_create(mainContentContainer);
-    lv_label_set_text(hintLabel, "← Swipe to access settings →");
+    lv_label_set_text(hintLabel, "\u2190 Swipe to access settings \u2192");
     lv_obj_set_style_text_color(hintLabel, lv_color_hex(0x444444), 0);
     lv_obj_set_style_text_font(hintLabel, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_align(hintLabel, LV_TEXT_ALIGN_CENTER, 0);
@@ -233,6 +246,7 @@ void MainScreenUI::updateMainContent()
     // Hide all by default
     lv_obj_add_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text(mainContentLabel, "");
+    lv_label_set_text(mainContentSubLabel, ""); // Clear sub-label
 
     if (cancelButton)
     {
@@ -253,7 +267,9 @@ void MainScreenUI::updateMainContent()
         break;
     case CONTENT_ERROR:
         lv_label_set_text(mainContentLabel, currentContent.message.c_str());
-        lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(0xFF4444), 0);
+        lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
+        lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
         break;
     case CONTENT_CARD_CHECKING:
         lv_label_set_text(mainContentLabel, currentContent.message.c_str());

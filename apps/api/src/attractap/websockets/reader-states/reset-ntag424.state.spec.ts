@@ -42,6 +42,12 @@ describe('ResetNTAG424State', () => {
       id: mockCardId,
       uid: mockCardUID,
       keys: { 0: mockMasterKey },
+      user: {
+        id: 1,
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'password',
+      },
     });
 
     resetState = new ResetNTAG424State(mockSocket, mockServices, mockCardId);
@@ -57,7 +63,14 @@ describe('ResetNTAG424State', () => {
           data: expect.objectContaining({
             type: AttractapEventType.ENABLE_CARD_CHECKING,
             payload: expect.objectContaining({
-              message: 'Tap your NFC card to reset it',
+              type: 'reset-nfc-card',
+              card: expect.objectContaining({
+                id: mockCardId,
+              }),
+              user: expect.objectContaining({
+                id: 1,
+                username: undefined,
+              }),
             }),
           }),
         })
@@ -88,6 +101,12 @@ describe('ResetNTAG424State', () => {
         id: mockCardId,
         uid: mockCardUID,
         keys: { 0: mockMasterKey },
+        user: {
+          id: 1,
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password',
+        },
       });
 
       // Test
@@ -292,11 +311,23 @@ describe('ResetNTAG424State - Full Flow', () => {
           id: mockCardId,
           uid: mockCardUID,
           keys: { 0: mockMasterKey },
+          user: {
+            id: 1,
+            name: 'Test User',
+            email: 'test@example.com',
+            password: 'password',
+          },
         }),
         getNFCCardByUID: jest.fn().mockResolvedValue({
           id: mockCardId,
           uid: mockCardUID,
           keys: { 0: mockMasterKey },
+          user: {
+            id: 1,
+            name: 'Test User',
+            email: 'test@example.com',
+            password: 'password',
+          },
         }),
         deleteNFCCard: jest.fn().mockResolvedValue(undefined),
         uint8ArrayToHexString: jest.fn().mockReturnValue(mockDefaultMasterKey),
@@ -322,7 +353,14 @@ describe('ResetNTAG424State - Full Flow', () => {
         data: expect.objectContaining({
           type: AttractapEventType.ENABLE_CARD_CHECKING,
           payload: expect.objectContaining({
-            message: 'Tap your NFC card to reset it',
+            type: 'reset-nfc-card',
+            card: expect.objectContaining({
+              id: mockCardId,
+            }),
+            user: expect.objectContaining({
+              id: 1,
+              username: undefined,
+            }),
           }),
         }),
       })

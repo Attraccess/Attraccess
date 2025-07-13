@@ -37,8 +37,8 @@ export class ResetNTAG424State implements ReaderState {
           id: this.card.id,
         },
         user: {
-          id: this.card.user.id,
-          username: this.card.user.username,
+          id: this.card.user?.id,
+          username: this.card.user?.username,
         },
       })
     );

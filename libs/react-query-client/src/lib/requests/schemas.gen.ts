@@ -2098,9 +2098,13 @@ export const $NFCCard = {
             type: 'string',
             description: 'The UID of the NFC card'
         },
-        userId: {
-            type: 'number',
-            description: 'The ID of the user that owns the NFC card'
+        user: {
+            description: 'The ID of the user that owns the NFC card',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
         },
         createdAt: {
             format: 'date-time',
@@ -2113,5 +2117,5 @@ export const $NFCCard = {
             description: 'The date and time the NFC card was last updated'
         }
     },
-    required: ['id', 'uid', 'userId', 'createdAt', 'updatedAt']
+    required: ['id', 'uid', 'user', 'createdAt', 'updatedAt']
 } as const;

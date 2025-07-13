@@ -203,7 +203,7 @@ describe('ResourceUsageService', () => {
         endNotes: null,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageStartedEvent.eventName, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageStartedEvent.EVENT_NAME, expect.any(Object));
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -368,7 +368,7 @@ describe('ResourceUsageService', () => {
         endTime: expect.any(Date),
         endNotes: 'Session completed',
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEndedEvent.eventName, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEndedEvent.EVENT_NAME, expect.any(Object));
     });
 
     it('should throw error when no active session exists', async () => {

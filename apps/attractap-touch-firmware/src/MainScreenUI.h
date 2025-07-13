@@ -23,10 +23,12 @@ public:
     {
         MainContentType type;
         String message;
+        String subMessage;     // New: sub-message for secondary label
         uint32_t durationMs;   // Only used for error
         uint32_t textColor;    // New: text color for message (hex RGB)
+        uint32_t subTextColor; // New: text color for sub-message
         bool showCancelButton; // Show cancel button (for enroll/reset NFC card)
-        MainContent() : type(CONTENT_NONE), message(""), durationMs(0), textColor(0xFFFFFF), showCancelButton(false) {}
+        MainContent() : type(CONTENT_NONE), message(""), subMessage(""), durationMs(0), textColor(0xFFFFFF), subTextColor(0xAAAAAA), showCancelButton(false) {}
     };
 
     MainScreenUI(ScreenManager *screenManager);
@@ -56,8 +58,9 @@ private:
     // Main content area
     lv_obj_t *mainContentContainer;
     lv_obj_t *mainContentLabel;
-    lv_obj_t *mainContentIcon; // For card checking
-    lv_obj_t *cancelButton;    // Cancel button for enroll/reset NFC card
+    lv_obj_t *mainContentSubLabel; // New: sub-label for secondary message
+    lv_obj_t *mainContentIcon;     // For card checking
+    lv_obj_t *cancelButton;        // Cancel button for enroll/reset NFC card
 
     // State
     MainContent currentContent;

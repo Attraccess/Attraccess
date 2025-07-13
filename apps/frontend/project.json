@@ -19,12 +19,9 @@
     },
     "copy-attractap-assets": {
       "executor": "nx:run-commands",
-      "cache": true,
-      "dependsOn": ["attractap-firmware:build"],
-      "inputs": ["{workspaceRoot}/apps/attractap-firmware/firmware_output/**/*"],
-      "outputs": ["{projectRoot}/public/_attractap_assets"],
+      "dependsOn": ["attractap-firmware:build", "attractap-touch-firmware:build"],
       "options": {
-        "command": "rm -rf apps/frontend/public/_attractap_assets && mkdir -p apps/frontend/public/_attractap_assets && cp -r apps/attractap-firmware/firmware_output/* apps/frontend/public/_attractap_assets/"
+        "command": "node apps/frontend/copy-attractap-assets.js"
       }
     },
     "copy-dependency-list": {

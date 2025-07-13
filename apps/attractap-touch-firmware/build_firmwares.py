@@ -19,6 +19,12 @@ def extract_define_value(flags, define_name):
         return value
     return None
 
+def hex_to_int(hex_str):
+    """Convert hex string to integer"""
+    if isinstance(hex_str, str):
+        return int(hex_str, 16)
+    return hex_str
+
 def main():
     # Load configuration
     config = configparser.ConfigParser()
@@ -125,7 +131,8 @@ def main():
         # Build filesystem image
         try:
             print(f"Building filesystem image for {env}...")
-            subprocess.run(['platformio', 'run', '--target', 'buildfs', '-e', env], check=True)
+            subprocess.run(['platformio', 'run', '--environment', env], check=True)
+            subprocess.run(['platformio', 'run', '--environment', env, '--target', 'idedata'], check=True)
         except subprocess.CalledProcessError:
             print(f"Error: Filesystem build failed for environment '{env}'")
             sys.exit(1)
@@ -138,96 +145,86 @@ def main():
         firmware_path = f".pio/build/{env}/firmware.bin"
         bootloader_path = f".pio/build/{env}/bootloader.bin"
         partitions_path = f".pio/build/{env}/partitions.bin"
-        filesystem_path = f".pio/build/{env}/littlefs.bin"
+        idedata_path = f".pio/build/{env}/idedata.json"
+
+        # Check if idedata.json exists
+        if not os.path.exists(idedata_path):
+            print(f"Error: idedata.json not found for environment '{env}' at {idedata_path}")
+            sys.exit(1)
+
+        # Read idedata.json for offsets and extra images
+        with open(idedata_path, 'r') as f:
+            idedata = json.load(f)
+
+        # Collect flash images and offsets, sort by offset
+        flash_images = []
+        if 'extra' in idedata and 'flash_images' in idedata['extra']:
+            for img in idedata['extra']['flash_images']:
+                offset = img['offset']
+                path = img['path']
+                flash_images.append((hex_to_int(offset), offset, path))
         
+        # Add application (main firmware) 
+        app_offset = idedata['extra'].get('application_offset', '0x10000')
+        flash_images.append((hex_to_int(app_offset), app_offset, firmware_path))
+        
+        # Sort by integer offset to ensure correct order
+        flash_images.sort(key=lambda x: x[0])
+        
+        print(f"Flash layout for {env}:")
+        for int_offset, hex_offset, path in flash_images:
+            print(f"  {hex_offset}: {os.path.basename(path)}")
+
         # Check if any file is missing
         missing_files = []
-        for file_path in [firmware_path, bootloader_path, partitions_path, filesystem_path]:
+        for _, _, file_path in flash_images:
             if not os.path.exists(file_path):
                 missing_files.append(file_path)
-                
         if missing_files:
             print(f"Error: The following files are missing for environment '{env}':")
             for file_path in missing_files:
                 print(f"  - {file_path}")
             sys.exit(1)
-        
+
         # Copy individual files for reference
         try:
             subprocess.run(['cp', firmware_path, os.path.join(env_dir, "firmware.bin")], check=True)
             subprocess.run(['cp', bootloader_path, os.path.join(env_dir, "bootloader.bin")], check=True)
             subprocess.run(['cp', partitions_path, os.path.join(env_dir, "partitions.bin")], check=True)
-            subprocess.run(['cp', filesystem_path, os.path.join(env_dir, "littlefs.bin")], check=True)
         except subprocess.CalledProcessError:
             print(f"Error: Failed to copy firmware files for environment '{env}'")
             sys.exit(1)
-        
-        # Get partition information to find the filesystem offset
-        try:
-            print(f"Getting partition information for {env}...")
-            partinfo = subprocess.check_output(['python', '-m', 'esptool', 'partition_table', partitions_path]).decode('utf-8')
-            print(partinfo)
-            
-            # Find the spiffs/littlefs partition
-            fs_offset = None
-            for line in partinfo.split('\n'):
-                if 'spiffs' in line.lower() or 'littlefs' in line.lower():
-                    parts = line.split()
-                    for i, part in enumerate(parts):
-                        if part.startswith('0x'):
-                            fs_offset = part
-                            break
-                    if fs_offset:
-                        break
-                        
-            if not fs_offset:
-                print("Warning: Could not find filesystem partition offset, using default 0x290000")
-                fs_offset = "0x290000"
-                
-            print(f"Filesystem offset: {fs_offset}")
-        except Exception as e:
-            print(f"Warning: Failed to get partition information: {e}")
-            print("Using default filesystem offset 0x290000")
-            fs_offset = "0x290000"
-            
-        # Create merged firmware bin using esptool
+
+        # Create merged firmware bin using esptool and idedata.json offsets
         merged_bin_path = os.path.join(env_dir, "merged-firmware.bin")
         try:
-            print(f"Creating merged firmware for {env}...")
-            # For ESP32-C3, we need to adapt the command
-            if "ESP32-C3" in board_family or "ESP32_C3" in board_family:
-                merge_cmd = [
-                    'python', '-m', 'esptool', '--chip', 'esp32c3', 'merge_bin',
-                    '-o', merged_bin_path,
-                    '--flash_mode', 'dio',  # Use dio for most compatibility
-                    '--flash_freq', '80m',  # ESP32-C3 typically uses 80MHz
-                    '--flash_size', '4MB',
-                    '0x0', bootloader_path,  # bootloader at 0x0 for ESP32-C3
-                    '0x8000', partitions_path,
-                    '0x10000', firmware_path,
-                    fs_offset, filesystem_path  # Add filesystem to the merged binary
-                ]
-            else:
-                # Default command for ESP32
-                chip_type = board_family.lower().replace('_', '-')
-                merge_cmd = [
-                    'python', '-m', 'esptool', '--chip', chip_type, 'merge_bin',
-                    '-o', merged_bin_path,
-                    '--flash_mode', 'dio',
-                    '--flash_freq', '40m',
-                    '--flash_size', '4MB',
-                    '0x1000', bootloader_path,
-                    '0x8000', partitions_path,
-                    '0x10000', firmware_path,
-                    fs_offset, filesystem_path  # Add filesystem to the merged binary
-                ]
+            print(f"Creating merged firmware for {env} using idedata.json offsets...")
+            merge_cmd = [
+                'python', '-m', 'esptool', '--chip', board_family.lower().replace('_', '-'), 'merge_bin',
+                '-o', merged_bin_path,
+                '--flash_mode', 'dio',
+                '--flash_freq', '40m',
+                '--flash_size', '4MB',
+            ]
             
+            # Add flash images in sorted order
+            for int_offset, hex_offset, path in flash_images:
+                merge_cmd.extend([hex_offset, path])
+                
             print(f"Running: {' '.join(merge_cmd)}")
-            subprocess.run(merge_cmd, check=True)
+            result = subprocess.run(merge_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print(f"Error: Failed to create merged firmware for environment '{env}'")
+                print(f"Command: {' '.join(merge_cmd)}")
+                print(f"Return code: {result.returncode}")
+                print(f"STDOUT: {result.stdout}")
+                print(f"STDERR: {result.stderr}")
+                sys.exit(1)
+            
             print(f"Merged firmware created at: {merged_bin_path}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error: Failed to create merged firmware for environment '{env}'")
-            print(f"Command failed: {e}")
+        except Exception as e:
+            print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
             sys.exit(1)
         
         # Create manifest with the merged firmware
@@ -238,7 +235,7 @@ def main():
             "builds": [{
                 "chipFamily": board_family.replace('_', '-'),
                 "parts": [
-                    {"path": f"/_attractap_assets/{env}/merged-firmware.bin", "offset": 0}
+                    {"path": f"/{env}/merged-firmware.bin", "offset": 0}
                 ]
             }]
         }
@@ -254,7 +251,7 @@ def main():
             "friendly_name": friendly_name or env,
             "version": full_version,
             "board_family": board_family,
-            "manifest_path": f"/_attractap_assets/{env}/manifest.json"
+            "manifest_path": f"/{env}/manifest.json"
         })
     
     # Create index.json
@@ -267,7 +264,6 @@ def main():
     
     print(f"Build completed. Output in {output_dir}")
     print(f"Total environments built: {len(firmware_info)}")
-    print(f"Copy the contents of {output_dir} to your frontend public/_attractap_assets directory")
 
 if __name__ == "__main__":
     main() 

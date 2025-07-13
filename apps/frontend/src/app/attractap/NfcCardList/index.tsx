@@ -100,7 +100,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     en,
   });
 
-  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.userId }, undefined, {
+  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.user.id }, undefined, {
     enabled: props.header === 'userId',
   });
 
@@ -128,6 +128,10 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 
   if (props.header === 'createdAt') {
     return new Date(props.card.createdAt).toLocaleDateString();
+  }
+
+  if (props.header === 'user') {
+    return <AttraccessUser user={props.card.user} />;
   }
 
   return props.card[props.header as keyof NFCCard] as React.ReactNode;
@@ -222,7 +226,7 @@ export function NfcCardList() {
   const headers = useMemo(() => {
     const headers: Array<keyof NFCCard | 'actions'> = ['id', 'uid'];
     if (userCanManage) {
-      headers.push('userId');
+      headers.push('user');
     }
 
     headers.push('createdAt', 'actions');

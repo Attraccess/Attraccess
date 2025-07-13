@@ -9,7 +9,6 @@ import {
   ViewColumn,
   ManyToMany,
   JoinTable,
-  ManyToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';

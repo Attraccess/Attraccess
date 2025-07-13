@@ -238,7 +238,7 @@ def main():
             "builds": [{
                 "chipFamily": board_family.replace('_', '-'),
                 "parts": [
-                    {"path": f"/_attractap_assets/{env}/merged-firmware.bin", "offset": 0}
+                    {"path": f"/{env}/merged-firmware.bin", "offset": 0}
                 ]
             }]
         }
@@ -254,7 +254,7 @@ def main():
             "friendly_name": friendly_name or env,
             "version": full_version,
             "board_family": board_family,
-            "manifest_path": f"/_attractap_assets/{env}/manifest.json"
+            "manifest_path": f"/{env}/manifest.json"
         })
     
     # Create index.json
@@ -267,7 +267,6 @@ def main():
     
     print(f"Build completed. Output in {output_dir}")
     print(f"Total environments built: {len(firmware_info)}")
-    print(f"Copy the contents of {output_dir} to your frontend public/_attractap_assets directory")
 
 if __name__ == "__main__":
     main() 

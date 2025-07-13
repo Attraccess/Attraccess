@@ -2,6 +2,7 @@ import { EnrollmentState, EnrollNTAG424State } from './enroll-ntag424.state';
 import { InitialReaderState } from './initial.state';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
 import { GatewayServices } from '../websocket.gateway';
+import { User } from '@attraccess/database-entities';
 
 // Mock crypto.subtle
 const mockDigest = jest.fn();
@@ -22,7 +23,12 @@ describe('EnrollNTAG424State', () => {
   let enrollState: EnrollNTAG424State;
   let mockSocket: AuthenticatedWebSocket & { enrollment?: EnrollmentState };
   let mockServices: GatewayServices;
-  const mockUserId = 1;
+  const mockUser = {
+    id: 1,
+    name: 'Test User',
+    email: 'test@example.com',
+    password: 'password',
+  } as unknown as User;
   const mockCardUID = 'card-uid-123';
   const mockNewMasterKey = 'aaaabbbbccccddddeeeeffffgggghhhh';
 
@@ -44,6 +50,9 @@ describe('EnrollNTAG424State', () => {
         uint8ArrayToHexString: jest.fn().mockReturnValue('aaaabbbbccccddddeeeeffffgggghhhh'),
         generateNTAG424Key: jest.fn(),
       },
+      usersService: {
+        findOne: jest.fn().mockResolvedValue(mockUser),
+      },
     } as unknown as GatewayServices;
 
     // Setup subtle.digest mock to return a consistent value for testing
@@ -57,7 +66,7 @@ describe('EnrollNTAG424State', () => {
       );
     });
 
-    enrollState = new EnrollNTAG424State(mockSocket, mockServices, mockUserId);
+    enrollState = new EnrollNTAG424State(mockSocket, mockServices, mockUser);
   });
 
   describe('onStateEnter', () => {
@@ -69,7 +78,11 @@ describe('EnrollNTAG424State', () => {
           data: expect.objectContaining({
             type: AttractapEventType.ENABLE_CARD_CHECKING,
             payload: expect.objectContaining({
-              message: 'Tap to enroll',
+              type: 'enroll-nfc-card',
+              user: expect.objectContaining({
+                id: 1,
+                username: undefined,
+              }),
             }),
           }),
         })
@@ -250,9 +263,8 @@ describe('EnrollNTAG424State', () => {
       // Don't expect enrollment to be undefined since the implementation doesn't clear it
 
       // Verify card creation
-      expect(mockServices.attractapService.createNFCCard).toHaveBeenCalledWith({
+      expect(mockServices.attractapService.createNFCCard).toHaveBeenCalledWith(mockUser, {
         uid: mockCardUID,
-        userId: mockUserId,
         keys: {
           0: mockNewMasterKey,
         },
@@ -276,6 +288,12 @@ describe('EnrollNTAG424State', () => {
     });
 
     it('should handle failed authentication', async () => {
+      // Mock setTimeout to avoid the 5-second delay
+      jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
+        callback();
+        return {} as NodeJS.Timeout;
+      });
+
       // Setup
       await enrollState.onStateEnter();
       (mockSocket.sendMessage as jest.Mock).mockClear();
@@ -329,7 +347,12 @@ describe('EnrollNTAG424State - Full Flow', () => {
   let enrollState: EnrollNTAG424State;
   let mockSocket: AuthenticatedWebSocket & { enrollment?: EnrollmentState };
   let mockServices: GatewayServices;
-  const mockUserId = 1;
+  const mockUser = {
+    id: 1,
+    name: 'Test User',
+    email: 'test@example.com',
+    password: 'password',
+  } as unknown as User;
   const mockCardUID = 'card-uid-123';
 
   beforeEach(async () => {
@@ -349,6 +372,9 @@ describe('EnrollNTAG424State - Full Flow', () => {
         uint8ArrayToHexString: jest.fn(),
         generateNTAG424Key: jest.fn(),
       },
+      usersService: {
+        findOne: jest.fn().mockResolvedValue(mockUser),
+      },
     } as unknown as GatewayServices;
 
     mockDigest.mockImplementation(() => {
@@ -361,7 +387,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
       );
     });
 
-    enrollState = new EnrollNTAG424State(mockSocket, mockServices, mockUserId);
+    enrollState = new EnrollNTAG424State(mockSocket, mockServices, mockUser);
   });
 
   it('should complete successful enrollment flow', async () => {
@@ -487,6 +513,12 @@ describe('EnrollNTAG424State - Full Flow', () => {
   });
 
   it('should handle authentication failure and NOT store card data', async () => {
+    // Mock setTimeout to avoid the 5-second delay
+    jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
+      callback();
+      return {} as NodeJS.Timeout;
+    });
+
     // Initialize and tap card
     await enrollState.onStateEnter();
     (mockServices.attractapService.getNFCCardByUID as jest.Mock).mockResolvedValue(null);

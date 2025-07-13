@@ -1354,7 +1354,7 @@ export type NFCCard = {
     /**
      * The ID of the user that owns the NFC card
      */
-    userId: number;
+    user: User;
     /**
      * The date and time the NFC card was created
      */

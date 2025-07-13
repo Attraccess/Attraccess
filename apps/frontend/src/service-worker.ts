@@ -14,6 +14,6 @@ setupPrecaching(wb_manifest);
 // Only handle navigation requests that aren't for API routes
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL('index.html'), {
-    denylist: [/^\/api\/.*$/, /^\/docs\/.*$/, /^\/cdn\/.*$/],
+    denylist: [/^\/api\/.*$/, /^\/docs\/.*$/, /^\/cdn\/.*$/, /^\/_attractap_assets\/.*$/],
   })
 );

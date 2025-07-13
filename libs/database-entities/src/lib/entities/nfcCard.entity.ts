@@ -29,7 +29,7 @@ export class NFCCard {
 
   @ManyToOne(() => User, (user) => user.nfcCards)
   @JoinColumn({ name: 'userId' })
-  @ApiProperty({ description: 'The ID of the user that owns the NFC card' })
+  @ApiProperty({ description: 'The ID of the user that owns the NFC card', type: () => User })
   user!: User;
 
   @Column(() => NTag424Keys, { prefix: 'key_' })

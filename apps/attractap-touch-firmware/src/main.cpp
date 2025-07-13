@@ -180,6 +180,20 @@ void onAttraccessConnectionChange(AttraccessService::ConnectionState state, cons
   // Update main screen status
   mainScreenUI.updateAttraccessStatus(connected, authenticated, attraccessService.getConnectionStateString(), attraccessService.getReaderName());
 
+  // Show not available message if disconnected or connection failed
+  if (state == AttraccessService::DISCONNECTED || state == AttraccessService::ERROR_FAILED)
+  {
+    MainScreenUI::MainContent content;
+    content.type = MainScreenUI::CONTENT_ERROR;
+    content.message = "Sorry, this reader is currently not available";
+    content.textColor = 0xFFFF00; // Yellow
+    content.subMessage = "please contact an attraccess administrator";
+    content.subTextColor = 0xAAAAAA; // Light gray
+    content.durationMs = 0;          // Persistent
+    content.showCancelButton = false;
+    mainScreenUI.setMainContent(content);
+  }
+
   // Update settings screen status if visible
   settingsManager.handleAttraccessConnectionChange(connected, authenticated, attraccessService.getConnectionStateString());
 }

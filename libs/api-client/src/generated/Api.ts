@@ -1388,7 +1388,7 @@ export interface UpdateReaderDto {
    */
   name: string;
   /** The IDs of the resources that the reader has access to */
-  connectedResources: number[];
+  connectedResourceIds: number[];
 }
 
 export interface Attractap {
@@ -1396,8 +1396,8 @@ export interface Attractap {
   id: number;
   /** The name of the reader */
   name: string;
-  /** The IDs of the resources that the reader has access to */
-  hasAccessToResourceIds: number[];
+  /** The resources that the reader has access to */
+  resources: Resource[];
   /**
    * The last time the reader connected to the server
    * @format date-time
@@ -1449,7 +1449,7 @@ export interface NFCCard {
   /** The UID of the NFC card */
   uid: string;
   /** The ID of the user that owns the NFC card */
-  userId: number;
+  user: object;
   /**
    * The date and time the NFC card was created
    * @format date-time
