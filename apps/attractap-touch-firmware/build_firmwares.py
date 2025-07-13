@@ -30,19 +30,31 @@ def main():
     config = configparser.ConfigParser()
     config.read('platformio.ini')
     
-    # Get base version from build_flags
+    # Get firmware information from build_flags
     if 'env' not in config or 'build_flags' not in config['env']:
         print("Error: build_flags is missing in [env] section of platformio.ini")
         sys.exit(1)
         
     env_build_flags = config['env']['build_flags']
-    base_version = extract_define_value(env_build_flags, 'BASE_VERSION')
+    firmware_name = extract_define_value(env_build_flags, 'FIRMWARE_NAME')
+    firmware_friendly_name = extract_define_value(env_build_flags, 'FIRMWARE_FRIENDLY_NAME')
+    firmware_version = extract_define_value(env_build_flags, 'FIRMWARE_VERSION')
     
-    if not base_version:
-        print("Error: BASE_VERSION is not defined in build_flags of [env] section")
+    if not firmware_name:
+        print("Error: FIRMWARE_NAME is not defined in build_flags of [env] section")
         sys.exit(1)
         
-    print(f"Base version: {base_version}")
+    if not firmware_version:
+        print("Error: FIRMWARE_VERSION is not defined in build_flags of [env] section")
+        sys.exit(1)
+        
+    if not firmware_friendly_name:
+        print("Error: FIRMWARE_FRIENDLY_NAME is not defined in build_flags of [env] section")
+        sys.exit(1)
+        
+    print(f"Base firmware name: {firmware_name}")
+    print(f"Base firmware friendly name: {firmware_friendly_name}")
+    print(f"Firmware version: {firmware_version}")
     
     # Find all environments
     environments = []
@@ -84,8 +96,16 @@ def main():
             
         # Extract values from build flags
         env_build_flags = config[env_section]['build_flags']
-        env_version = extract_define_value(env_build_flags, 'ENV_VERSION')
-        friendly_name = extract_define_value(env_build_flags, 'FRIENDLY_NAME')
+        firmware_variant = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT')
+        firmware_variant_friendly_name = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
+        
+        if not firmware_variant:
+            print(f"Error: FIRMWARE_VARIANT is not defined in build_flags for environment '{env}'")
+            sys.exit(1)
+            
+        if not firmware_variant_friendly_name:
+            print(f"Error: FIRMWARE_VARIANT_FRIENDLY_NAME is not defined in build_flags for environment '{env}'")
+            sys.exit(1)
         
         # Look for CHIP_FAMILY in this environment or inherited ones
         board_family = None
@@ -111,14 +131,10 @@ def main():
             print(f"Warning: Could not determine board family for '{env}', defaulting to ESP32")
             board_family = "ESP32"
             
-        # Verify required values are present
-        if not env_version:
-            print(f"Error: ENV_VERSION is not defined for environment '{env}'")
-            sys.exit(1)
-            
-        full_version = f"{base_version}-{env_version}"
-        print(f"  Version for {env}: {full_version}")
-        print(f"  Friendly name: {friendly_name or env}")
+        print(f"  Firmware name: {firmware_name}")
+        print(f"  Firmware variant: {firmware_variant}")
+        print(f"  Firmware variant friendly name: {firmware_variant_friendly_name}")
+        print(f"  Firmware version: {firmware_version}")
         print(f"  Board family: {board_family}")
         
         # Build firmware
@@ -136,10 +152,6 @@ def main():
         except subprocess.CalledProcessError:
             print(f"Error: Filesystem build failed for environment '{env}'")
             sys.exit(1)
-        
-        # Create environment-specific directory
-        env_dir = os.path.join(output_dir, env)
-        os.makedirs(env_dir, exist_ok=True)
         
         # Check firmware files
         firmware_path = f".pio/build/{env}/firmware.bin"
@@ -186,17 +198,10 @@ def main():
                 print(f"  - {file_path}")
             sys.exit(1)
 
-        # Copy individual files for reference
-        try:
-            subprocess.run(['cp', firmware_path, os.path.join(env_dir, "firmware.bin")], check=True)
-            subprocess.run(['cp', bootloader_path, os.path.join(env_dir, "bootloader.bin")], check=True)
-            subprocess.run(['cp', partitions_path, os.path.join(env_dir, "partitions.bin")], check=True)
-        except subprocess.CalledProcessError:
-            print(f"Error: Failed to copy firmware files for environment '{env}'")
-            sys.exit(1)
-
         # Create merged firmware bin using esptool and idedata.json offsets
-        merged_bin_path = os.path.join(env_dir, "merged-firmware.bin")
+        # Name the file after the firmware_name and variant
+        firmware_filename = f"{firmware_name}_{firmware_variant}.bin"
+        merged_bin_path = os.path.join(output_dir, firmware_filename)
         try:
             print(f"Creating merged firmware for {env} using idedata.json offsets...")
             merge_cmd = [
@@ -226,41 +231,24 @@ def main():
         except Exception as e:
             print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
             sys.exit(1)
-        
-        # Create manifest with the merged firmware
-        manifest = {
-            "name": friendly_name or env,
-            "version": full_version,
-            "new_install_prompt_erase": True,
-            "builds": [{
-                "chipFamily": board_family.replace('_', '-'),
-                "parts": [
-                    {"path": f"/{env}/merged-firmware.bin", "offset": 0}
-                ]
-            }]
-        }
-        
-        # Save manifest
-        manifest_path = os.path.join(env_dir, "manifest.json")
-        with open(manifest_path, 'w') as f:
-            json.dump(manifest, f, indent=2)
-        
-        # Add to firmware info
+
         firmware_info.append({
-            "environment": env,
-            "friendly_name": friendly_name or env,
-            "version": full_version,
+            "name": firmware_name,
+            "friendly_name": firmware_friendly_name,
+            "variant": firmware_variant,
+            "variant_friendly_name": firmware_variant_friendly_name,
+            "version": firmware_version,
             "board_family": board_family,
-            "manifest_path": f"/{env}/manifest.json"
+            "filename": firmware_filename
         })
     
-    # Create index.json
-    index = {
+    # Create single consolidated firmware manifest
+    consolidated_manifest = {
         "firmwares": firmware_info
     }
     
-    with open(os.path.join(output_dir, "index.json"), 'w') as f:
-        json.dump(index, f, indent=2)
+    with open(os.path.join(output_dir, "firmwares.json"), 'w') as f:
+        json.dump(consolidated_manifest, f, indent=2)
     
     print(f"Build completed. Output in {output_dir}")
     print(f"Total environments built: {len(firmware_info)}")

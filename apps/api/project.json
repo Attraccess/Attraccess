@@ -6,10 +6,17 @@
   "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
   "tags": [],
   "targets": {
+    "copy-attractap-assets": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["attractap-firmware:build", "attractap-touch-firmware:build"],
+      "options": {
+        "command": "node {projectRoot}/copy-attractap-assets.js"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["^build"],
+      "dependsOn": ["copy-attractap-assets"],
       "inputs": [
         "production",
         "^production",
@@ -45,10 +52,11 @@
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
+      "continuous": true,
       "dependsOn": [],
       "options": {
         "buildTarget": "api:build",
-        "watch": true
+        "watch": false
       },
       "configurations": {
         "development": {

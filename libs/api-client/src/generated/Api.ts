@@ -1391,6 +1391,8 @@ export interface UpdateReaderDto {
   connectedResourceIds: number[];
 }
 
+export type AttractapFirmwareVersion = object;
+
 export interface Attractap {
   /** The ID of the reader */
   id: number;
@@ -1410,6 +1412,8 @@ export interface Attractap {
   firstConnection: string;
   /** Whether the reader is currently connected */
   connected: boolean;
+  /** The firmware of the reader */
+  firmware: AttractapFirmwareVersion;
 }
 
 export interface UpdateReaderResponseDto {
@@ -1449,7 +1453,7 @@ export interface NFCCard {
   /** The UID of the NFC card */
   uid: string;
   /** The ID of the user that owns the NFC card */
-  user: object;
+  user: User;
   /**
    * The date and time the NFC card was created
    * @format date-time
@@ -1460,6 +1464,44 @@ export interface NFCCard {
    * @format date-time
    */
   updatedAt: string;
+}
+
+export interface AttractapFirmware {
+  /**
+   * The name of the firmware
+   * @example "attractap"
+   */
+  name: string;
+  /**
+   * The friendly name of the firmware
+   * @example "Attractap (Ethernet)"
+   */
+  friendlyName: string;
+  /**
+   * The variant of the firmware
+   * @example "eth"
+   */
+  variant: string;
+  /**
+   * The variant of the firmware
+   * @example "eth"
+   */
+  variantFriendlyName: string;
+  /**
+   * The version of the firmware
+   * @example "1.0.0"
+   */
+  version: string;
+  /**
+   * The board family of the firmware
+   * @example "ESP32_C3"
+   */
+  boardFamily: string;
+  /**
+   * The filename of the firmware
+   * @example "attractap_eth.bin"
+   */
+  filename: string;
 }
 
 export interface InfoData {
@@ -1790,6 +1832,8 @@ export type GetReadersData = Attractap[];
 export type GetAppKeyByUidData = AppKeyResponseDto;
 
 export type GetAllCardsData = NFCCard[];
+
+export type AttractapFirmwareControllerGetFirmwaresData = AttractapFirmware[];
 
 export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
   /**
@@ -3417,6 +3461,22 @@ export namespace Attractap {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetAllCardsData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
+   * @name AttractapFirmwareControllerGetFirmwares
+   * @summary Get all firmwares
+   * @request GET:/api/attractap/firmware
+   * @secure
+   */
+  export namespace AttractapFirmwareControllerGetFirmwares {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = AttractapFirmwareControllerGetFirmwaresData;
   }
 }
 
@@ -5417,6 +5477,24 @@ export class Api<
     getAllCards: (params: RequestParams = {}) =>
       this.request<GetAllCardsData, void>({
         path: `/api/attractap/cards`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
+     * @name AttractapFirmwareControllerGetFirmwares
+     * @summary Get all firmwares
+     * @request GET:/api/attractap/firmware
+     * @secure
+     */
+    attractapFirmwareControllerGetFirmwares: (params: RequestParams = {}) =>
+      this.request<AttractapFirmwareControllerGetFirmwaresData, void>({
+        path: `/api/attractap/firmware`,
         method: "GET",
         secure: true,
         format: "json",

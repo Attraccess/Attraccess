@@ -43,13 +43,9 @@ void ImprovManager::updateDeviceInfo()
         Serial.println("[Improv] No network connection, device URL not set");
     }
 
-    // Get version from platformio.ini via macros
-    char version[16];
-    sprintf(version, "%s.%d", BASE_VERSION, ENV_VERSION);
-
-    // Check if FRIENDLY_NAME is defined
-#ifndef FRIENDLY_NAME
-#error "FRIENDLY_NAME must be defined in platformio.ini"
+    // Check if FIRMWARE_VARIANT_FRIENDLY_NAME is defined
+#ifndef FIRMWARE_VARIANT_FRIENDLY_NAME
+#error "FIRMWARE_VARIANT_FRIENDLY_NAME must be defined in platformio.ini"
 #endif
 
     // Default to ESP32 chip family, check for specific models
@@ -66,20 +62,18 @@ void ImprovManager::updateDeviceInfo()
         // Setup Improv with device information
         improvSerial.setDeviceInfo(
             chipFamily,
-            "Attractap",  // Device name
-            version,      // Firmware version
-            FRIENDLY_NAME // Hardware name from platformio.ini
-        );
+            FIRMWARE_FRIENDLY_NAME "_" FIRMWARE_VARIANT_FRIENDLY_NAME,
+            FIRMWARE_VERSION,
+            FIRMWARE_FRIENDLY_NAME "_" FIRMWARE_VARIANT_FRIENDLY_NAME);
     }
 
     // Setup Improv with device information
     improvSerial.setDeviceInfo(
         chipFamily,
-        "Attractap",   // Device name
-        version,       // Firmware version
-        FRIENDLY_NAME, // Hardware name from platformio.ini
-        deviceUrl      // Device URL (will be empty if no valid IP)
-    );
+        FIRMWARE_FRIENDLY_NAME "_" FIRMWARE_VARIANT_FRIENDLY_NAME,
+        FIRMWARE_VERSION,
+        FIRMWARE_FRIENDLY_NAME "_" FIRMWARE_VARIANT_FRIENDLY_NAME,
+        deviceUrl);
 }
 
 void ImprovManager::loop()

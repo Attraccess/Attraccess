@@ -2002,6 +2002,11 @@ export const $UpdateReaderDto = {
     required: ['name', 'connectedResourceIds']
 } as const;
 
+export const $AttractapFirmwareVersion = {
+    type: 'object',
+    properties: {}
+} as const;
+
 export const $Attractap = {
     type: 'object',
     properties: {
@@ -2033,9 +2038,17 @@ export const $Attractap = {
         connected: {
             type: 'boolean',
             description: 'Whether the reader is currently connected'
+        },
+        firmware: {
+            description: 'The firmware of the reader',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/AttractapFirmwareVersion'
+                }
+            ]
         }
     },
-    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'connected']
+    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'connected', 'firmware']
 } as const;
 
 export const $UpdateReaderResponseDto = {
@@ -2118,4 +2131,46 @@ export const $NFCCard = {
         }
     },
     required: ['id', 'uid', 'user', 'createdAt', 'updatedAt']
+} as const;
+
+export const $AttractapFirmware = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'The name of the firmware',
+            example: 'attractap'
+        },
+        friendlyName: {
+            type: 'string',
+            description: 'The friendly name of the firmware',
+            example: 'Attractap (Ethernet)'
+        },
+        variant: {
+            type: 'string',
+            description: 'The variant of the firmware',
+            example: 'eth'
+        },
+        variantFriendlyName: {
+            type: 'string',
+            description: 'The variant of the firmware',
+            example: 'eth'
+        },
+        version: {
+            type: 'string',
+            description: 'The version of the firmware',
+            example: '1.0.0'
+        },
+        boardFamily: {
+            type: 'string',
+            description: 'The board family of the firmware',
+            example: 'ESP32_C3'
+        },
+        filename: {
+            type: 'string',
+            description: 'The filename of the firmware',
+            example: 'attractap_eth.bin'
+        }
+    },
+    required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename']
 } as const;

@@ -13,6 +13,8 @@ import { Attractap, NFCCard, Resource } from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
+import { AttractapFirmwareController } from './firmware.controller';
+import { AttractapFirmwareService } from './firmware.service';
 
 @Module({
   imports: [
@@ -22,7 +24,7 @@ import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
     ResourcesModule,
     ResourceUsageModule,
   ],
-  providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService],
-  controllers: [AttractapController, AttractapNfcCardsController],
+  providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService, AttractapFirmwareService],
+  controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
 })
 export class AttractapModule {}

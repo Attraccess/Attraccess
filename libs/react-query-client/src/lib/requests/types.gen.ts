@@ -1286,6 +1286,10 @@ export type UpdateReaderDto = {
     connectedResourceIds: Array<(number)>;
 };
 
+export type AttractapFirmwareVersion = {
+    [key: string]: unknown;
+};
+
 export type Attractap = {
     /**
      * The ID of the reader
@@ -1311,6 +1315,10 @@ export type Attractap = {
      * Whether the reader is currently connected
      */
     connected: boolean;
+    /**
+     * The firmware of the reader
+     */
+    firmware: AttractapFirmwareVersion;
 };
 
 export type UpdateReaderResponseDto = {
@@ -1363,6 +1371,37 @@ export type NFCCard = {
      * The date and time the NFC card was last updated
      */
     updatedAt: string;
+};
+
+export type AttractapFirmware = {
+    /**
+     * The name of the firmware
+     */
+    name: string;
+    /**
+     * The friendly name of the firmware
+     */
+    friendlyName: string;
+    /**
+     * The variant of the firmware
+     */
+    variant: string;
+    /**
+     * The variant of the firmware
+     */
+    variantFriendlyName: string;
+    /**
+     * The version of the firmware
+     */
+    version: string;
+    /**
+     * The board family of the firmware
+     */
+    boardFamily: string;
+    /**
+     * The filename of the firmware
+     */
+    filename: string;
 };
 
 export type InfoResponse = {
@@ -2056,6 +2095,8 @@ export type GetAppKeyByUidData = {
 export type GetAppKeyByUidResponse = AppKeyResponseDto;
 
 export type GetAllCardsResponse = Array<NFCCard>;
+
+export type AttractapFirmwareControllerGetFirmwaresResponse = Array<AttractapFirmware>;
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
     /**
@@ -3460,6 +3501,20 @@ export type $OpenApiTs = {
                  * The list of all cards
                  */
                 200: Array<NFCCard>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/attractap/firmware': {
+        get: {
+            res: {
+                /**
+                 * Firmwares fetched successfully
+                 */
+                200: Array<AttractapFirmware>;
                 /**
                  * Unauthorized
                  */

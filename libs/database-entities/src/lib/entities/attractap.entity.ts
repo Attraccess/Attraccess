@@ -3,6 +3,26 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { Resource } from './resource.entity';
 
+export class AttractapFirmwareVersion {
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  name!: string;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  variant!: string;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  version!: string;
+}
+
 @Entity()
 export class Attractap {
   @PrimaryGeneratedColumn()
@@ -44,4 +64,8 @@ export class Attractap {
 
   @ApiProperty({ description: 'Whether the reader is currently connected' })
   connected?: boolean;
+
+  @Column(() => AttractapFirmwareVersion, { prefix: 'firmware' })
+  @ApiProperty({ description: 'The firmware of the reader', type: () => AttractapFirmwareVersion })
+  firmware!: AttractapFirmwareVersion;
 }

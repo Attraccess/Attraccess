@@ -16,7 +16,7 @@ import { RevokedToken } from './entities/revokedToken.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
-import { Attractap } from './entities/attractap.entity';
+import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -69,6 +69,7 @@ export {
   ResourceFlowActionHttpSendRequestNodeData,
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
+  AttractapFirmwareVersion,
 };
 
 // Export the entities object

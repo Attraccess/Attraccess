@@ -132,6 +132,7 @@ export const prefetchUseAttractapServiceGetReaderById = (queryClient: QueryClien
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReaderByIdKeyFn({ readerId }), queryFn: () => AttractapService.getReaderById({ readerId }) });
 export const prefetchUseAttractapServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const prefetchUseAttractapServiceGetAllCards = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
+export const prefetchUseAttractapServiceAttractapFirmwareControllerGetFirmwares = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceAttractapFirmwareControllerGetFirmwaresKeyFn(), queryFn: () => AttractapService.attractapFirmwareControllerGetFirmwares() });
 export const prefetchUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;

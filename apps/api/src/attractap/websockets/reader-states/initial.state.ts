@@ -105,6 +105,13 @@ export class InitialReaderState implements ReaderState {
       return this.socket.sendMessage(unauthorizedResponse);
     }
 
+    // Update firmware version and type if provided in the authentication payload
+    if (data.payload.firmware) {
+      this.logger.debug('Updating reader firmware info', data.payload.firmware);
+
+      await this.services.attractapService.updateReaderFirmware(reader.id, data.payload.firmware);
+    }
+
     this.socket.reader = reader;
 
     return this.onIsAuthenticated();

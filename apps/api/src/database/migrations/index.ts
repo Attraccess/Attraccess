@@ -31,3 +31,4 @@ export * from './1752008417898-removal-of-iot-configs';
 export * from './1752093791700-rename-fabreader-to-attractap';
 export * from './1752243159017-attractap-resource-mapping';
 export * from './1752315655063-nfc-card-user-relation';
+export * from './1752412011032-attractap-firmware';

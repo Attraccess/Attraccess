@@ -154,6 +154,9 @@ bool AttraccessService::connect()
         doc["data"]["type"] = "AUTHENTICATE";
         doc["data"]["payload"]["id"] = deviceId;
         doc["data"]["payload"]["token"] = authToken;
+        doc["data"]["payload"]["firmware"]["name"] = FIRMWARE_NAME;
+        doc["data"]["payload"]["firmware"]["variant"] = FIRMWARE_VARIANT;
+        doc["data"]["payload"]["firmware"]["version"] = FIRMWARE_VERSION;
 
         if (sendJSONMessage(doc.as<JsonObject>()))
         {
@@ -239,7 +242,9 @@ void AttraccessService::registerDevice()
     doc["event"] = "EVENT";
     doc["data"]["type"] = "REGISTER";
     doc["data"]["payload"]["deviceType"] = "ESP32_CYD";
-    doc["data"]["payload"]["version"] = "1.0.0";
+    doc["data"]["payload"]["firmware"]["name"] = FIRMWARE_NAME;
+    doc["data"]["payload"]["firmware"]["variant"] = FIRMWARE_VARIANT;
+    doc["data"]["payload"]["firmware"]["version"] = FIRMWARE_VERSION;
 
     if (sendJSONMessage(doc.as<JsonObject>()))
     {

@@ -6,7 +6,7 @@
   "tags": [],
   "targets": {
     "build": {
-      "dependsOn": ["copy-attractap-assets", "react-query-client:build", "copy-dependency-list"],
+      "dependsOn": ["react-query-client:build", "copy-dependency-list"],
       "cache": true,
       "inputs": [
         "production",
@@ -16,13 +16,6 @@
         }
       ],
       "outputs": ["{workspaceRoot}/dist/apps/frontend"]
-    },
-    "copy-attractap-assets": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["attractap-firmware:build", "attractap-touch-firmware:build"],
-      "options": {
-        "command": "node apps/frontend/copy-attractap-assets.js"
-      }
     },
     "copy-dependency-list": {
       "executor": "nx:run-commands",

@@ -132,6 +132,7 @@ export const ensureUseAttractapServiceGetReaderByIdData = (queryClient: QueryCli
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReaderByIdKeyFn({ readerId }), queryFn: () => AttractapService.getReaderById({ readerId }) });
 export const ensureUseAttractapServiceGetReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const ensureUseAttractapServiceGetAllCardsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
+export const ensureUseAttractapServiceAttractapFirmwareControllerGetFirmwaresData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceAttractapFirmwareControllerGetFirmwaresKeyFn(), queryFn: () => AttractapService.attractapFirmwareControllerGetFirmwares() });
 export const ensureUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeData = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;

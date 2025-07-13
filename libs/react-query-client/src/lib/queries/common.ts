@@ -257,6 +257,10 @@ export type AttractapServiceGetAllCardsDefaultResponse = Awaited<ReturnType<type
 export type AttractapServiceGetAllCardsQueryResult<TData = AttractapServiceGetAllCardsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetAllCardsKey = "AttractapServiceGetAllCards";
 export const UseAttractapServiceGetAllCardsKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetAllCardsKey, ...(queryKey ?? [])];
+export type AttractapServiceAttractapFirmwareControllerGetFirmwaresDefaultResponse = Awaited<ReturnType<typeof AttractapService.attractapFirmwareControllerGetFirmwares>>;
+export type AttractapServiceAttractapFirmwareControllerGetFirmwaresQueryResult<TData = AttractapServiceAttractapFirmwareControllerGetFirmwaresDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceAttractapFirmwareControllerGetFirmwaresKey = "AttractapServiceAttractapFirmwareControllerGetFirmwares";
+export const UseAttractapServiceAttractapFirmwareControllerGetFirmwaresKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceAttractapFirmwareControllerGetFirmwaresKey, ...(queryKey ?? [])];
 export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse = Awaited<ReturnType<typeof AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange>>;
 export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeQueryResult<TData = AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKey = "AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange";

@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid';
 import { securelyHashToken } from './websockets/websocket.utils';
 import { ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 
 @Injectable()
 export class AttractapService {
@@ -78,7 +79,7 @@ export class AttractapService {
 
   public async updateReader(
     id: number,
-    updateData: { name?: string; connectedResourceIds?: number[] }
+    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion }
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 
@@ -88,6 +89,10 @@ export class AttractapService {
 
     if (updateData.name) {
       reader.name = updateData.name;
+    }
+
+    if (updateData.firmware) {
+      reader.firmware = updateData.firmware;
     }
 
     this.logger.debug('updateData', updateData);
@@ -113,6 +118,20 @@ export class AttractapService {
     this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
 
     return response;
+  }
+
+  /**
+   * Updates the firmware version and type for a reader
+   * @param id The reader ID
+   * @param firmwareVersion The firmware version
+   * @param firmwareType The firmware type
+   * @returns Promise<Attractap>
+   */
+  public async updateReaderFirmware(
+    id: number,
+    firmware: { name: string; variant: string; version: string }
+  ): Promise<Attractap> {
+    return await this.updateReader(id, firmware);
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
