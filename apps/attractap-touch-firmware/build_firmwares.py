@@ -6,6 +6,8 @@ import configparser
 import sys
 import shutil
 import re
+import zlib
+from os.path import basename, getsize
 
 def extract_define_value(flags, define_name):
     """Extract a -D define value from build_flags"""
@@ -24,6 +26,24 @@ def hex_to_int(hex_str):
     if isinstance(hex_str, str):
         return int(hex_str, 16)
     return hex_str
+
+def zlib_compress(source):
+    """Compress firmware file using zlib compression"""
+    imgfile = source
+    print(f"Compressing {basename(imgfile)} file...")
+    try:
+        with open(imgfile, 'rb') as img:
+            with open(imgfile + '.zz', 'wb') as deflated:
+                data = zlib.compress(img.read(), zlib.Z_BEST_COMPRESSION)
+                deflated.write(data)
+                original_size = getsize(imgfile)
+                compressed_size = getsize(imgfile + '.zz')
+                compress_ratio = (float(original_size) - float(compressed_size)) / float(original_size) * 100
+                print(f"Compress ratio {compress_ratio:.1f}% (original: {original_size} bytes, compressed: {compressed_size} bytes)")
+                return imgfile + '.zz'
+    except Exception as e:
+        print(f"Error compressing {imgfile}: {e}")
+        return None
 
 def main():
     # Load configuration
@@ -228,19 +248,40 @@ def main():
                 sys.exit(1)
             
             print(f"Merged firmware created at: {merged_bin_path}")
+            
+            # Compress the original firmware.bin file and store it in output directory
+            compressed_filename = None
+            if os.path.exists(firmware_path):
+                print(f"Compressing original firmware.bin for {env}...")
+                compressed_path = zlib_compress(firmware_path)
+                if compressed_path:
+                    # Copy compressed file to output directory with proper naming
+                    compressed_filename = f"{firmware_name}_{firmware_variant}.bin.zz"
+                    output_compressed_path = os.path.join(output_dir, compressed_filename)
+                    shutil.copy2(compressed_path, output_compressed_path)
+                    print(f"Compressed firmware copied to: {output_compressed_path}")
+                    # Clean up temporary compressed file
+                    os.remove(compressed_path)
+            
         except Exception as e:
             print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
             sys.exit(1)
 
-        firmware_info.append({
+        firmware_entry = {
             "name": firmware_name,
-            "friendly_name": firmware_friendly_name,
+            "friendlyName": firmware_friendly_name,
             "variant": firmware_variant,
-            "variant_friendly_name": firmware_variant_friendly_name,
+            "variantFriendlyName": firmware_variant_friendly_name,
             "version": firmware_version,
-            "board_family": board_family,
+            "boardFamily": board_family,
             "filename": firmware_filename
-        })
+        }
+        
+        # Add compressed filename if compression was successful
+        if compressed_filename:
+            firmware_entry["filenameFlashz"] = compressed_filename
+            
+        firmware_info.append(firmware_entry)
     
     # Create single consolidated firmware manifest
     consolidated_manifest = {

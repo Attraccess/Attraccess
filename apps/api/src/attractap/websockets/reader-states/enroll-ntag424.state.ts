@@ -193,9 +193,11 @@ export class EnrollNTAG424State implements ReaderState {
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {
         message: 'Enrollment successful',
-        duration: 10000,
       })
     );
+
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     const nextState = new InitialReaderState(this.socket, this.services);
     this.socket.transitionToState(nextState);

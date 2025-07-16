@@ -1,5 +1,6 @@
 #include "AttraccessService.h"
 #include "MainScreenUI.h"
+#include "nfc.hpp"
 
 AttraccessService::AttraccessService()
     : wsClient(tcpClient, "/api/attractap/websocket"),
@@ -149,24 +150,20 @@ bool AttraccessService::connect()
     {
         setState(AUTHENTICATING, "Authenticating...");
 
-        JsonDocument doc;
-        doc["event"] = "EVENT";
-        doc["data"]["type"] = "AUTHENTICATE";
-        doc["data"]["payload"]["id"] = deviceId;
-        doc["data"]["payload"]["token"] = authToken;
-        doc["data"]["payload"]["firmware"]["name"] = FIRMWARE_NAME;
-        doc["data"]["payload"]["firmware"]["variant"] = FIRMWARE_VARIANT;
-        doc["data"]["payload"]["firmware"]["version"] = FIRMWARE_VERSION;
+        JsonDocument authDoc;
+        authDoc["event"] = "EVENT";
+        authDoc["data"]["type"] = "AUTHENTICATE";
+        authDoc["data"]["payload"]["id"] = deviceId;
+        authDoc["data"]["payload"]["token"] = authToken;
 
-        if (sendJSONMessage(doc.as<JsonObject>()))
-        {
-            Serial.println("AttraccessService: Authentication request sent");
-        }
-        else
+        if (!sendJSONMessage(authDoc.as<JsonObject>()))
         {
             Serial.println("AttraccessService: Failed to send authentication");
             setState(ERROR_FAILED, "Authentication send failed");
+            return false;
         }
+
+        Serial.println("AttraccessService: Authentication request sent");
     }
     else
     {
@@ -241,10 +238,7 @@ void AttraccessService::registerDevice()
     JsonDocument doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "REGISTER";
-    doc["data"]["payload"]["deviceType"] = "ESP32_CYD";
-    doc["data"]["payload"]["firmware"]["name"] = FIRMWARE_NAME;
-    doc["data"]["payload"]["firmware"]["variant"] = FIRMWARE_VARIANT;
-    doc["data"]["payload"]["firmware"]["version"] = FIRMWARE_VERSION;
+    doc["data"]["payload"]["deviceType"] = String("ESP32_CYD").c_str();
 
     if (sendJSONMessage(doc.as<JsonObject>()))
     {
@@ -290,6 +284,13 @@ void AttraccessService::processIncomingMessage(const String &message)
 
 // --- Private handler methods ---
 
+void AttraccessService::setNFC(NFC *nfc)
+{
+    Serial.printf("[DEBUG] setNFC called with nfc=%p\n", nfc);
+
+    this->nfc = nfc;
+}
+
 void AttraccessService::handleResponseEvent(const String &type, const JsonObject &data)
 {
     if (type == "REGISTER")
@@ -316,6 +317,14 @@ void AttraccessService::handleEventType(const String &type, const JsonObject &da
     {
         handleClearErrorEvent();
     }
+    else if (type == "DISPLAY_SUCCESS")
+    {
+        handleDisplaySuccessEvent(data);
+    }
+    else if (type == "CLEAR_SUCCESS")
+    {
+        handleClearSuccessEvent();
+    }
     else if (type == "ENABLE_CARD_CHECKING")
     {
         handleEnableCardCheckingEvent(data);
@@ -324,6 +333,55 @@ void AttraccessService::handleEventType(const String &type, const JsonObject &da
     {
         handleDisableCardCheckingEvent();
     }
+    else if (type == "FIRMWARE_UPDATE_REQUIRED")
+    {
+        handleFirmwareUpdateRequired(data);
+    }
+    else if (type == "FIRMWARE_INFO")
+    {
+        onRequestFirmwareInfo();
+    }
+    else if (type == "CHANGE_KEYS")
+    {
+        this->onChangeKeysEvent(data);
+    }
+    else if (type == "AUTHENTICATE")
+    {
+        this->onAuthenticateNfcEvent(data);
+    }
+    else if (type == "SHOW_TEXT")
+    {
+        this->handleShowTextEvent(data);
+    }
+    else if (type == "SELECT_ITEM")
+    {
+        this->handleSelectItemEvent(data);
+    }
+}
+
+// --- New: handle SELECT_ITEM event ---
+void AttraccessService::handleSelectItemEvent(const JsonObject &data)
+{
+    if (!selectItemCallback)
+    {
+        Serial.println("AttraccessService: Received SELECT_ITEM event but no callback set");
+        return;
+    }
+
+    if (!data["payload"])
+    {
+        Serial.println("AttraccessService: Received SELECT_ITEM event but no payload");
+        return;
+    }
+
+    String label = data["payload"]["label"].as<String>();
+    JsonArray options = data["payload"]["options"].as<JsonArray>();
+    selectItemCallback(label, options);
+}
+
+void AttraccessService::setSelectItemCallback(SelectItemCallback cb)
+{
+    selectItemCallback = cb;
 }
 
 void AttraccessService::handleHeartbeatEvent()
@@ -377,10 +435,48 @@ void AttraccessService::handleClearErrorEvent()
     }
 }
 
+void AttraccessService::handleDisplaySuccessEvent(const JsonObject &data)
+{
+    if (mainContentCallback && data["payload"]["message"])
+    {
+        MainScreenUI::MainContent content;
+        content.type = MainScreenUI::CONTENT_SUCCESS;
+        content.message = data["payload"]["message"].as<String>();
+        // durationMs is no longer used, so do not set it
+        mainContentCallback(content);
+    }
+}
+
+void AttraccessService::handleClearSuccessEvent()
+{
+    if (mainContentCallback)
+    {
+        MainScreenUI::MainContent content;
+        content.type = MainScreenUI::CONTENT_NONE;
+        mainContentCallback(content);
+    }
+}
+
+void AttraccessService::handleShowTextEvent(const JsonObject &data)
+{
+    if (mainContentCallback && data["payload"]["message"])
+    {
+        MainScreenUI::MainContent content;
+        content.type = MainScreenUI::CONTENT_TEXT;
+        content.message = data["payload"]["message"].as<String>();
+        // durationMs is no longer used, so do not set it
+        mainContentCallback(content);
+    }
+}
+
 void AttraccessService::handleEnableCardCheckingEvent(const JsonObject &data)
 {
+    Serial.println("[DEBUG] Entered handleEnableCardCheckingEvent");
+    Serial.printf("[DEBUG] mainContentCallback=%p, data.hasPayload=%d\n", mainContentCallback, (bool)data["payload"]);
+
     if (!(mainContentCallback && data["payload"]))
     {
+        Serial.println("[DEBUG] mainContentCallback is null or payload missing");
         return;
     }
 
@@ -389,6 +485,7 @@ void AttraccessService::handleEnableCardCheckingEvent(const JsonObject &data)
     content.message = "";
 
     JsonObject payload = data["payload"];
+    Serial.printf("[DEBUG] payload type: %s\n", payload["type"].as<String>().c_str());
 
     if (payload["type"] == "toggle-resource-usage")
     {
@@ -437,7 +534,22 @@ void AttraccessService::handleEnableCardCheckingEvent(const JsonObject &data)
         return;
     }
 
+    Serial.println("[DEBUG] Calling mainContentCallback");
     mainContentCallback(content);
+    Serial.println("[DEBUG] Returned from mainContentCallback");
+
+    Serial.printf("[DEBUG] nfc pointer: %p\n", nfc);
+    // Enable card checking via NFC
+    if (nfc)
+    {
+        Serial.println("[DEBUG] Calling nfc->enableCardChecking()");
+        nfc->enableCardChecking();
+        Serial.println("[DEBUG] Returned from nfc->enableCardChecking()");
+    }
+    else
+    {
+        Serial.println("[DEBUG] nfc pointer is null!");
+    }
 }
 
 void AttraccessService::handleDisableCardCheckingEvent()
@@ -446,6 +558,41 @@ void AttraccessService::handleDisableCardCheckingEvent()
     {
         MainScreenUI::MainContent content;
         content.type = MainScreenUI::CONTENT_NONE;
+        mainContentCallback(content);
+    }
+    // Disable card checking via NFC
+    if (nfc)
+        nfc->disableCardChecking();
+}
+
+void AttraccessService::handleFirmwareUpdateRequired(const JsonObject &data)
+{
+    if (mainContentCallback)
+    {
+        String currentVersion = data["payload"]["current"]["version"].as<String>();
+        String availableVersion = data["payload"]["available"]["version"].as<String>();
+        String url = data["payload"]["firmware"]["flashz"].as<String>();
+
+        // test if url is set
+        if (!url.isEmpty())
+        {
+            Serial.printf("AttraccessService: Firmware update required - downloading from %s\n", url.c_str());
+            fz.fetch_async(url.c_str());
+
+            MainScreenUI::MainContent content;
+            content.type = MainScreenUI::CONTENT_ERROR;
+            content.message = String("Downloading and installing firmware...") + "\n\n" + "Current: " + currentVersion + "\n" + "Available: " + availableVersion;
+            mainContentCallback(content);
+            return;
+        }
+        else
+        {
+            Serial.println("AttraccessService: Firmware update required but no url set");
+        }
+
+        MainScreenUI::MainContent content;
+        content.type = MainScreenUI::CONTENT_ERROR;
+        content.message = String("Firmware Update required") + "\n\n" + "Current: " + currentVersion + "\n" + "Available: " + availableVersion;
         mainContentCallback(content);
     }
 }
@@ -672,4 +819,178 @@ String AttraccessService::generateDeviceId()
 bool AttraccessService::isRateLimited() const
 {
     return millis() - lastConnectionAttempt < CONNECTION_RETRY_INTERVAL;
+}
+
+void AttraccessService::onNFCTapped(const uint8_t *uid, uint8_t uidLength)
+{
+    JsonDocument doc;
+    doc["event"] = "EVENT";
+    doc["data"]["type"] = "NFC_TAP";
+
+    // Convert UID to hex string
+    String uidHex = "";
+    for (uint8_t i = 0; i < uidLength; i++)
+    {
+        if (uid[i] < 0x10)
+        {
+            uidHex += "0";
+        }
+        uidHex += String(uid[i], HEX);
+    }
+    doc["data"]["payload"]["cardUID"] = uidHex;
+
+    this->sendJSONMessage(doc.as<JsonObject>());
+}
+
+void AttraccessService::onRequestFirmwareInfo()
+{
+    JsonDocument firmwareDoc;
+    firmwareDoc["event"] = "RESPONSE";
+    firmwareDoc["data"]["type"] = "FIRMWARE_INFO";
+    firmwareDoc["data"]["payload"]["name"] = String(FIRMWARE_NAME).c_str();
+    firmwareDoc["data"]["payload"]["variant"] = String(FIRMWARE_VARIANT).c_str();
+    firmwareDoc["data"]["payload"]["version"] = FIRMWARE_VERSION;
+
+    sendJSONMessage(firmwareDoc.as<JsonObject>());
+}
+
+void AttraccessService::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength)
+{
+    // Initialize array with zeros
+    memset(byteArray, 0, byteArrayLength);
+
+    // Process the hex string - 2 characters per byte
+    for (size_t i = 0; i < byteArrayLength && i * 2 + 1 < hexString.length(); i++)
+    {
+        String byteHex = hexString.substring(i * 2, i * 2 + 2);
+        byteArray[i] = strtol(byteHex.c_str(), NULL, 16);
+    }
+}
+
+void AttraccessService::onChangeKeysEvent(const JsonObject &data)
+{
+    Serial.println("[API] CHANGE_KEYS");
+
+    // Parse authentication key from hex string
+    uint8_t authKey[16];
+    String authKeyHex = data["payload"]["authenticationKey"].as<String>();
+    this->hexStringToBytes(authKeyHex, authKey, sizeof(authKey));
+
+    JsonObject response = JsonObject();
+    response["failedKeys"] = JsonArray();
+    response["successfulKeys"] = JsonArray();
+
+    JsonDocument doc;
+    JsonObject responsePayload = doc.to<JsonObject>();
+    responsePayload["failedKeys"] = JsonArray();
+    responsePayload["successfulKeys"] = JsonArray();
+
+    // TODO: if change includes key 0, we need to change it first using provided auth key
+    // TODO: if more keys are provided, we need to change them afterwards using new key 0 as auth key
+
+    bool doesChangeKey0 = false;
+    for (JsonPair key : data["payload"]["keys"].as<JsonObject>())
+    {
+        uint8_t keyNumber = key.key().c_str()[0] - '0';
+        if (keyNumber == 0)
+        {
+            doesChangeKey0 = true;
+
+            uint8_t newKey[16];
+            String newKeyHex = key.value().as<String>();
+            this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
+
+            Serial.println("Change Key Call 1");
+            bool success = this->nfc->changeKey(0, authKey, newKey);
+            if (!success)
+            {
+                responsePayload["failedKeys"].add(0);
+                break;
+            }
+
+            responsePayload["successfulKeys"].add(0);
+
+            // replace authkey with newkey for further operations
+            for (int i = 0; i < 16; i++)
+            {
+                authKey[i] = newKey[i];
+            }
+
+            break;
+        }
+    }
+
+    // for each key in "keys" object (key = key number as string, value = next key as hex string)
+    for (JsonPair key : data["payload"]["keys"].as<JsonObject>())
+    {
+        uint8_t keyNumber = key.key().c_str()[0] - '0';
+
+        if (keyNumber == 0)
+        {
+            continue;
+        }
+
+        uint8_t newKey[16];
+        String newKeyHex = key.value().as<String>();
+        this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
+
+        Serial.print("[API] executing change key for key number ");
+        Serial.print(keyNumber);
+        Serial.print(" using current key xxxx");
+        for (int i = 10; i < 16; i++)
+        {
+            Serial.print(authKey[i]);
+        }
+        Serial.print(" to new key ");
+        for (int i = 10; i < 16; i++)
+        {
+            Serial.print(newKey[i]);
+        }
+        Serial.println();
+
+        Serial.println("Change key call 3");
+        bool success = this->nfc->changeKey(keyNumber, authKey, newKey);
+        if (success)
+        {
+            responsePayload["successfulKeys"].add(keyNumber);
+        }
+        else
+        {
+            responsePayload["failedKeys"].add(keyNumber);
+        }
+    }
+
+    doc["event"] = "RESPONSE";
+    doc["data"]["type"] = "CHANGE_KEYS";
+    doc["data"]["payload"] = responsePayload;
+
+    this->sendJSONMessage(doc.as<JsonObject>());
+}
+
+void AttraccessService::onAuthenticateNfcEvent(const JsonObject &data)
+{
+    Serial.println("[API] AUTHENTICATE");
+
+    uint8_t authenticationKey[16];
+    String authKeyHex = data["payload"]["authenticationKey"].as<String>();
+    this->hexStringToBytes(authKeyHex, authenticationKey, sizeof(authenticationKey));
+
+    uint8_t keyNumber = data["payload"]["keyNumber"].as<uint8_t>();
+
+    bool success = this->nfc->authenticate(keyNumber, authenticationKey);
+    if (success)
+    {
+        Serial.println("[API] Authentication successful.");
+    }
+    else
+    {
+        Serial.println("[API] Authentication failed.");
+    }
+
+    JsonDocument doc;
+    doc["event"] = "RESPONSE";
+    doc["data"]["type"] = "AUTHENTICATE";
+    doc["data"]["payload"]["authenticationSuccessful"] = success;
+
+    this->sendJSONMessage(doc.as<JsonObject>());
 }

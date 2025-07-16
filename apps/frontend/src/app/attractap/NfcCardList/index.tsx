@@ -100,7 +100,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     en,
   });
 
-  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.user.id }, undefined, {
+  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.user?.id }, undefined, {
     enabled: props.header === 'userId',
   });
 

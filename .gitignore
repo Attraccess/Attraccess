@@ -26,3 +26,4 @@ log/
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+apps/api/src/assets/attractap-firmwares/*

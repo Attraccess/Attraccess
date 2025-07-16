@@ -4,12 +4,15 @@
 #include <TFT_eSPI.h>
 #include <lv_conf.h>
 #include <lvgl.h>
+#include <Wire.h>
+#include <ArduinoJson.h>
 
 #include "ScreenManager.h"
 #include "MainScreenUI.h"
 #include "WiFiService.h"
 #include "SettingsManager.h"
 #include "AttraccessService.h"
+#include "nfc.hpp"
 
 // for XPT2046 Touch ////////////////////////////////
 SPIClass xptSPI = SPIClass(VSPI);                 // SPI-Interface for XPT2046_Touchscreen
@@ -32,6 +35,7 @@ MainScreenUI mainScreenUI(&screenManager);
 WiFiService wifiService;
 SettingsManager settingsManager;
 AttraccessService attraccessService;
+NFC nfc;
 
 // Initialization state
 bool setupComplete = false;
@@ -216,6 +220,9 @@ void setup()
   Serial.print(".");
   Serial.println(lv_version_patch());
 
+  // Initialize I2C for NFC
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
+
   // Start the SPI for the touch screen and init the XPT2046 library
   Serial.println("1. Initializing SPI and Touch...");
   xptSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
@@ -312,6 +319,23 @@ void setup()
   attraccessService.setMainContentCallback(onMainContentEvent);
   attraccessService.begin();
 
+  // --- Wire up SELECT_ITEM event ---
+  attraccessService.setSelectItemCallback([](const String &label, const JsonArray &options)
+                                          { mainScreenUI.showSelectItemDialog(label, options, [](const String &selectedId)
+                                                                              {
+                                                                                // Send SELECT_ITEM response with selectedId
+                                                                                StaticJsonDocument<64> doc;
+                                                                                doc["selectedId"] = selectedId;
+                                                                                extern AttraccessService attraccessService;
+                                                                                attraccessService.sendMessage("SELECT_ITEM", doc.as<JsonObject>()); // Note: event type is SELECT_ITEM (response)
+                                                                              }); });
+
+  // Initialize NFC
+  Serial.println("8b. Initializing NFC...");
+  nfc.setup();
+  nfc.setNFCTappedCallback([](const uint8_t *uid, uint8_t uidLength)
+                           { attraccessService.onNFCTapped(uid, uidLength); });
+
   // Pass Attraccess service to settings manager
   settingsManager.setAttraccessService(&attraccessService);
 
@@ -324,11 +348,17 @@ void setup()
                                 wifiService.getConnectedSSID(),
                                 wifiService.getLocalIP());
 
+  // Inject NFC into AttraccessService for direct event-based control
+  attraccessService.setNFC(&nfc);
+
   // Update initial Attraccess status
   mainScreenUI.updateAttraccessStatus(attraccessService.isConnected(),
                                       attraccessService.isAuthenticated(),
                                       attraccessService.getConnectionStateString(),
                                       attraccessService.getReaderName());
+
+  // Initialize OTA
+  Serial.println("9a. Initializing OTA...");
 
   // Mark setup as complete
   setupComplete = true;
@@ -344,6 +374,7 @@ void loop()
 
   wifiService.update();       // Update WiFi service
   settingsManager.update();   // Update Settings manager
+  nfc.loop();                 // Update NFC service
   attraccessService.update(); // Update Attraccess service
 
   // Handle navigation back to main screen from settings
@@ -379,6 +410,4 @@ void loop()
                                     wifiService.getLocalIP());
     }
   }
-
-  delay(5);
 }

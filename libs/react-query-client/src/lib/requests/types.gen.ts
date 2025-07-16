@@ -1402,6 +1402,10 @@ export type AttractapFirmware = {
      * The filename of the firmware
      */
     filename: string;
+    /**
+     * The filename of the firmware for Flashz (zlib compressed)
+     */
+    filenameFlashz: string;
 };
 
 export type InfoResponse = {
@@ -2096,7 +2100,15 @@ export type GetAppKeyByUidResponse = AppKeyResponseDto;
 
 export type GetAllCardsResponse = Array<NFCCard>;
 
-export type AttractapFirmwareControllerGetFirmwaresResponse = Array<AttractapFirmware>;
+export type GetFirmwaresResponse = Array<AttractapFirmware>;
+
+export type GetFirmwareBinaryData = {
+    filename: string;
+    firmwareName: string;
+    variantName: string;
+};
+
+export type GetFirmwareBinaryResponse = string;
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
     /**
@@ -3515,6 +3527,21 @@ export type $OpenApiTs = {
                  * Firmwares fetched successfully
                  */
                 200: Array<AttractapFirmware>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}': {
+        get: {
+            req: GetFirmwareBinaryData;
+            res: {
+                /**
+                 * Firmware fetched successfully
+                 */
+                200: string;
                 /**
                  * Unauthorized
                  */

@@ -19,6 +19,9 @@ jest.mock('./initial.state', () => ({
   })),
 }));
 
+// Mock setTimeout to avoid actual delays in tests
+jest.useFakeTimers();
+
 describe('EnrollNTAG424State', () => {
   let enrollState: EnrollNTAG424State;
   let mockSocket: AuthenticatedWebSocket & { enrollment?: EnrollmentState };
@@ -251,13 +254,17 @@ describe('EnrollNTAG424State', () => {
         },
       };
 
-      // Call method
-      await enrollState.onResponse({
+      // Call method and advance timers
+      const responsePromise = enrollState.onResponse({
         type: AttractapEventType.AUTHENTICATE,
         payload: {
           authenticationSuccessful: true,
         },
       });
+
+      // Fast-forward through all timers and await the promise
+      await jest.runAllTimersAsync();
+      await responsePromise;
 
       // Assert
       // Don't expect enrollment to be undefined since the implementation doesn't clear it
@@ -282,18 +289,22 @@ describe('EnrollNTAG424State', () => {
         })
       );
 
+      // Verify clear success message was sent
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.CLEAR_SUCCESS,
+            payload: undefined,
+          }),
+        })
+      );
+
       // Verify transition to initial state
       expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
       expect(mockSocket.transitionToState).toHaveBeenCalled();
     });
 
     it('should handle failed authentication', async () => {
-      // Mock setTimeout to avoid the 5-second delay
-      jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
-        callback();
-        return {} as NodeJS.Timeout;
-      });
-
       // Setup
       await enrollState.onStateEnter();
       (mockSocket.sendMessage as jest.Mock).mockClear();
@@ -308,12 +319,16 @@ describe('EnrollNTAG424State', () => {
       };
 
       // Call method
-      await enrollState.onResponse({
+      const responsePromise = enrollState.onResponse({
         type: AttractapEventType.AUTHENTICATE,
         payload: {
           authenticationSuccessful: false,
         },
       });
+
+      // Fast-forward through all timers and await the promise
+      await jest.runAllTimersAsync();
+      await responsePromise;
 
       // Assert
       // Don't expect enrollment to be undefined since the implementation doesn't clear it
@@ -390,6 +405,11 @@ describe('EnrollNTAG424State - Full Flow', () => {
     enrollState = new EnrollNTAG424State(mockSocket, mockServices, mockUser);
   });
 
+  afterEach(() => {
+    // Clean up timers
+    jest.clearAllTimers();
+  });
+
   it('should complete successful enrollment flow', async () => {
     // Reset call history
     (mockSocket.sendMessage as jest.Mock).mockClear();
@@ -456,16 +476,20 @@ describe('EnrollNTAG424State - Full Flow', () => {
     );
 
     // Step 4: Authentication successful
-    await enrollState.onResponse({
+    const authPromise = enrollState.onResponse({
       type: AttractapEventType.AUTHENTICATE,
       payload: {
         authenticationSuccessful: true,
       },
     });
 
+    // Fast-forward through the 10 second delay
+    await jest.runAllTimersAsync();
+    await authPromise;
+
     // Verify success message and card creation
     expect(mockServices.attractapService.createNFCCard).toHaveBeenCalled();
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(5);
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(6);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
       5,
       expect.objectContaining({
@@ -474,6 +498,15 @@ describe('EnrollNTAG424State - Full Flow', () => {
           payload: expect.objectContaining({
             message: 'Enrollment successful',
           }),
+        }),
+      })
+    );
+    expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
+      6,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: AttractapEventType.CLEAR_SUCCESS,
+          payload: undefined,
         }),
       })
     );
@@ -513,12 +546,6 @@ describe('EnrollNTAG424State - Full Flow', () => {
   });
 
   it('should handle authentication failure and NOT store card data', async () => {
-    // Mock setTimeout to avoid the 5-second delay
-    jest.spyOn(global, 'setTimeout').mockImplementation((callback) => {
-      callback();
-      return {} as NodeJS.Timeout;
-    });
-
     // Initialize and tap card
     await enrollState.onStateEnter();
     (mockServices.attractapService.getNFCCardByUID as jest.Mock).mockResolvedValue(null);
@@ -541,12 +568,16 @@ describe('EnrollNTAG424State - Full Flow', () => {
     (mockSocket.sendMessage as jest.Mock).mockClear();
 
     // Simulate authentication failure
-    await enrollState.onResponse({
+    const responsePromise = enrollState.onResponse({
       type: AttractapEventType.AUTHENTICATE,
       payload: {
         authenticationSuccessful: false,
       },
     });
+
+    // Fast-forward through all timers and await the promise
+    await jest.runAllTimersAsync();
+    await responsePromise;
 
     // Verify card was NOT created when authentication fails
     expect(mockServices.attractapService.createNFCCard).not.toHaveBeenCalled();

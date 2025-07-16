@@ -22,6 +22,7 @@ import { ResourcesService } from '../../resources/resources.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { WaitForResourceSelectionState } from './reader-states/wait-for-resource-selection.state';
 import { WaitForNFCTapState } from './reader-states/wait-for-nfc-tap.state';
+import { AttractapFirmwareService } from '../firmware.service';
 
 export interface GatewayServices {
   websocketService: WebsocketService;
@@ -29,6 +30,7 @@ export interface GatewayServices {
   resourcesService: ResourcesService;
   resourceUsageService: ResourceUsageService;
   usersService: UsersService;
+  firmwareService: AttractapFirmwareService;
 }
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
@@ -55,6 +57,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(ResourceUsageService)
   private resourceUsageService: ResourceUsageService;
 
+  @Inject(AttractapFirmwareService)
+  private firmwareService: AttractapFirmwareService;
+
   public async handleConnection(client: AuthenticatedWebSocket) {
     this.logger.log('Client connected via WebSocket');
 
@@ -80,6 +85,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         usersService: this.usersService,
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
+        firmwareService: this.firmwareService,
       })
     );
 
@@ -102,18 +108,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async clientWasActive(client: AuthenticatedWebSocket) {
-    if (client.disconnectTimeout) {
-      clearTimeout(client.disconnectTimeout);
-    }
-
-    client.disconnectTimeout = setTimeout(() => {
-      this.logger.debug(
-        `Client ${client.id} did not send heartbeat within ${AttractapGateway.SOCKET_HEARTBEAT_TIMEOUT}ms. Closing connection.`
-      );
-      client.close();
-      this.handleDisconnect(client);
-    }, AttractapGateway.SOCKET_HEARTBEAT_TIMEOUT);
-
     if (client.reader) {
       await this.attractapService.updateLastReaderConnection(client.reader.id);
     }
@@ -133,7 +127,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     if (!client.state) {
       this.logger.error('Client has no state attached. Closing connection.');
-      client.close();
       return;
     }
 
@@ -153,7 +146,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     if (!client.state) {
       this.logger.error('Client has no state attached. Closing connection.');
-      client.close();
       return;
     }
 
@@ -195,6 +187,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         usersService: this.usersService,
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
+        firmwareService: this.firmwareService,
       },
       user
     );
@@ -237,6 +230,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         usersService: this.usersService,
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
+        firmwareService: this.firmwareService,
       },
       nfcCard.id
     );
@@ -259,6 +253,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           usersService: this.usersService,
           resourceUsageService: this.resourceUsageService,
           resourcesService: this.resourcesService,
+          firmwareService: this.firmwareService,
         });
 
         await socket.transitionToState(nextState);
@@ -274,6 +269,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(
       sockets.map(async (socket) => {
         if (socket.state instanceof WaitForNFCTapState || socket.state instanceof WaitForResourceSelectionState) {
+          if ((socket.state as WaitForNFCTapState).isInProgress) {
+            return;
+          }
           await socket.transitionToState(
             new InitialReaderState(socket, {
               websocketService: this.websocketService,
@@ -281,6 +279,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
               usersService: this.usersService,
               resourceUsageService: this.resourceUsageService,
               resourcesService: this.resourcesService,
+              firmwareService: this.firmwareService,
             })
           );
         }

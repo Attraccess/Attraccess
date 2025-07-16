@@ -24,10 +24,13 @@ export class AttractapFirmwareController {
   })
   @Auth('canManageSystemConfiguration')
   async getFirmwares(): Promise<AttractapFirmware[]> {
-    return this.attractapFirmwareService.getFirmwares();
+    this.logger.debug('GET /attractap/firmware - Fetching all firmwares');
+    const firmwares = await this.attractapFirmwareService.getFirmwares();
+    this.logger.debug(`Returning ${firmwares.length} firmwares`);
+    return firmwares;
   }
 
-  @Get('/:firmwareName/variants/:variantName/firmware.bin')
+  @Get('/:firmwareName/variants/:variantName/:filename')
   @ApiOperation({ summary: 'Get a firmware by name and variant', operationId: 'getFirmwareBinary' })
   @ApiResponse({
     status: 200,
@@ -38,17 +41,32 @@ export class AttractapFirmwareController {
   async getFirmwareBinary(
     @Param('firmwareName') firmwareName: string,
     @Param('variantName') variantName: string,
+    @Param('filename') filename: string,
     @Res() res: Response
   ): Promise<void> {
+    this.logger.debug(
+      `GET /attractap/firmware/${firmwareName}/variants/${variantName}/${filename} - Fetching firmware binary`
+    );
+    this.logger.debug(`Parameters: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`);
+
     try {
-      const stream = this.attractapFirmwareService.getFirmwareBinaryStream(firmwareName, variantName);
+      const stream = this.attractapFirmwareService.getFirmwareBinaryStream(firmwareName, variantName, filename);
+
+      this.logger.debug('Setting response headers for firmware binary download');
       res.set({
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="firmware.bin"`,
       });
+
+      this.logger.debug('Piping firmware binary stream to response');
       stream.pipe(res);
+
+      this.logger.debug('Firmware binary stream piped successfully');
     } catch (err) {
-      this.logger.error(err);
+      this.logger.error(`Error serving firmware binary: ${err.message}`, err.stack);
+      this.logger.debug(
+        `Error occurred for request: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`
+      );
       res.status(404).send('Firmware binary not found');
     }
   }

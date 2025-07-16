@@ -138,7 +138,9 @@ void SystemSettingsScreen::updateSystemInfo()
     uint32_t seconds = uptime % 60;
 
     String sysInfo = "Device: ESP32 CYD\n";
-    sysInfo += "Firmware: v1.0.0\n";
+    sysInfo += "Firmware: " + String(FIRMWARE_FRIENDLY_NAME) + "\n";
+    sysInfo += "Variant: " + String(FIRMWARE_VARIANT_FRIENDLY_NAME) + "\n";
+    sysInfo += "Version: " + String(FIRMWARE_VERSION) + "\n";
     sysInfo += "Free Memory: " + String(freeHeap / 1024) + " KB\n";
     sysInfo += "Uptime: " + String(hours) + "h " + String(minutes) + "m " + String(seconds) + "s";
 

@@ -62,13 +62,14 @@ export class AttractapService {
     return await this.nfcCardRepository.delete(id);
   }
 
-  public async createNewReader(): Promise<{ reader: Attractap; token: string }> {
+  public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
     const token = nanoid(16);
     const apiTokenHash = await securelyHashToken(token);
 
     const reader = await this.readerRepository.save({
       apiTokenHash,
       name: nanoid(4),
+      firmware,
     });
 
     return {
@@ -79,7 +80,8 @@ export class AttractapService {
 
   public async updateReader(
     id: number,
-    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion }
+    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion },
+    emitEvent = true
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 
@@ -92,6 +94,7 @@ export class AttractapService {
     }
 
     if (updateData.firmware) {
+      this.logger.debug('Updating reader firmware info', updateData.firmware);
       reader.firmware = updateData.firmware;
     }
 
@@ -115,7 +118,9 @@ export class AttractapService {
 
     const response = await this.readerRepository.save(reader);
 
-    this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
+    if (emitEvent) {
+      this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
+    }
 
     return response;
   }
@@ -127,11 +132,8 @@ export class AttractapService {
    * @param firmwareType The firmware type
    * @returns Promise<Attractap>
    */
-  public async updateReaderFirmware(
-    id: number,
-    firmware: { name: string; variant: string; version: string }
-  ): Promise<Attractap> {
-    return await this.updateReader(id, firmware);
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion): Promise<Attractap> {
+    return await this.updateReader(id, { firmware }, false);
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {

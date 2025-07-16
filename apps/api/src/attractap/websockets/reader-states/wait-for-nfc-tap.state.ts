@@ -6,6 +6,7 @@ import { ReaderState } from './reader-state.interface';
 import { NFCCard, Resource, User } from '@attraccess/database-entities';
 
 export class WaitForNFCTapState implements ReaderState {
+  public isInProgress = false;
   private readonly logger = new Logger(WaitForNFCTapState.name);
 
   private timeout?: NodeJS.Timeout;
@@ -65,7 +66,6 @@ export class WaitForNFCTapState implements ReaderState {
   public async onStateExit(): Promise<void> {
     clearTimeout(this.timeout);
     this.sendDisableCardChecking();
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.HIDE_TEXT));
   }
 
   public async restart(): Promise<void> {
@@ -113,17 +113,8 @@ export class WaitForNFCTapState implements ReaderState {
     }, this.timeout_ms);
   }
 
-  private sendDisableCardChecking(textToDisplay?: string): void {
+  private sendDisableCardChecking(): void {
     this.socket.sendMessage(new AttractapEvent(AttractapEventType.DISABLE_CARD_CHECKING));
-
-    if (textToDisplay) {
-      this.socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SHOW_TEXT, {
-          lineOne: textToDisplay,
-          lineTwo: '',
-        })
-      );
-    }
   }
 
   private async onInvalidCard(): Promise<void> {
@@ -141,7 +132,11 @@ export class WaitForNFCTapState implements ReaderState {
   }
 
   private async onNFCTap(data: AttractapEvent<{ cardUID: string }>['data']): Promise<void> {
-    this.sendDisableCardChecking('Do not remove card!');
+    this.socket.sendMessage(
+      new AttractapEvent(AttractapEventType.SHOW_TEXT, {
+        message: 'Do not remove card!',
+      })
+    );
 
     const nfcCard = await this.services.attractapService.getNFCCardByUID(data.payload.cardUID);
 
@@ -166,44 +161,60 @@ export class WaitForNFCTapState implements ReaderState {
       return;
     }
 
-    const userOfNFCCard = await this.services.usersService.findOne({ id: this.card.user.id });
+    this.isInProgress = true;
 
-    if (!userOfNFCCard) {
-      this.logger.debug(`User (of NFC Card with UID ${data.payload.cardUID}) with ID ${this.card.user.id} not found`);
-      return this.onInvalidCard();
-    }
+    try {
+      const userOfNFCCard = await this.services.usersService.findOne({ id: this.card.user.id });
 
-    const activeUsageSession = await this.services.resourceUsageService.getActiveSession(this.selectedResourceId);
+      if (!userOfNFCCard) {
+        this.logger.debug(`User (of NFC Card with UID ${data.payload.cardUID}) with ID ${this.card.user.id} not found`);
+        return this.onInvalidCard();
+      }
 
-    const resourceIsInUse = !!activeUsageSession;
+      const activeUsageSession = await this.services.resourceUsageService.getActiveSession(this.selectedResourceId);
 
-    let responseMessage = '-';
-    if (resourceIsInUse) {
-      responseMessage = 'Resource stopped';
-      this.logger.debug(`Stopping resource usage for user ${userOfNFCCard.id} on resource ${this.selectedResourceId}`);
-      await this.services.resourceUsageService.endSession(this.selectedResourceId, userOfNFCCard, {
-        notes: `-- by Attractap (ID: ${this.socket.reader.id}) with NFC Card (ID: ${this.card.id}) --`,
-      });
-    } else {
-      responseMessage = 'Resource started';
-      this.logger.debug(`Starting resource usage for user ${userOfNFCCard.id} on resource ${this.selectedResourceId}`);
-      await this.services.resourceUsageService.startSession(this.selectedResourceId, userOfNFCCard, {
-        notes: `-- by Attractap (ID: ${this.socket.reader.id}) with NFC Card (ID: ${this.card.id}) --`,
-      });
-    }
+      const resourceIsInUse = !!activeUsageSession;
 
-    this.restartTimeout();
+      let responseMessage = '-';
+      if (resourceIsInUse) {
+        responseMessage = 'Resource stopped';
+        this.logger.debug(
+          `Stopping resource usage for user ${userOfNFCCard.id} on resource ${this.selectedResourceId}`
+        );
+        await this.services.resourceUsageService.endSession(this.selectedResourceId, userOfNFCCard, {
+          notes: `-- by Attractap (ID: ${this.socket.reader.id}) with NFC Card (ID: ${this.card.id}) --`,
+        });
+      } else {
+        responseMessage = 'Resource started';
+        this.logger.debug(
+          `Starting resource usage for user ${userOfNFCCard.id} on resource ${this.selectedResourceId}`
+        );
+        await this.services.resourceUsageService.startSession(this.selectedResourceId, userOfNFCCard, {
+          notes: `-- by Attractap (ID: ${this.socket.reader.id}) with NFC Card (ID: ${this.card.id}) --`,
+        });
+      }
 
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {
-        message: responseMessage,
-        duration: 3000,
-      })
-    );
+      this.restartTimeout();
 
-    if (this.success_transition_state) {
-      this.socket.state = this.success_transition_state;
-      return await this.socket.transitionToState(this.success_transition_state);
+      this.socket.sendMessage(
+        new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {
+          message: responseMessage,
+        })
+      );
+
+      this.logger.debug(`Waiting for 10 seconds before clearing success message`);
+      const before = new Date();
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      const after = new Date();
+      this.logger.debug(`Cleared success message after ${after.getTime() - before.getTime()}ms`);
+      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
+
+      if (this.success_transition_state) {
+        this.socket.state = this.success_transition_state;
+        return await this.socket.transitionToState(this.success_transition_state);
+      }
+    } finally {
+      this.isInProgress = false;
     }
 
     return await this.restart();

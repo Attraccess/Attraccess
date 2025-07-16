@@ -4,19 +4,20 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include "ScreenManager.h"
+#include <ArduinoJson.h>
+#include <functional>
 
 class MainScreenUI
 {
 public:
-    // Callback types for user interactions
-    typedef void (*SettingsButtonCallback)();
-
     // Types of main content that can be shown
     enum MainContentType
     {
         CONTENT_NONE,
         CONTENT_ERROR,
-        CONTENT_CARD_CHECKING
+        CONTENT_SUCCESS,
+        CONTENT_CARD_CHECKING,
+        CONTENT_TEXT
     };
 
     struct MainContent
@@ -31,13 +32,17 @@ public:
         MainContent() : type(CONTENT_NONE), message(""), subMessage(""), durationMs(0), textColor(0xFFFFFF), subTextColor(0xAAAAAA), showCancelButton(false) {}
     };
 
+    typedef std::function<void(const String &selectedId)> SelectItemResultCallback;
+    void showSelectItemDialog(const String &label, const ArduinoJson::JsonArray &options, SelectItemResultCallback cb);
+    typedef std::function<void()> SettingsButtonCallback;
+    void setSettingsButtonCallback(SettingsButtonCallback cb);
+
     MainScreenUI(ScreenManager *screenManager);
     ~MainScreenUI();
 
     void init();
     void updateWiFiStatus(bool connected, const String &ssid = "", const String &ip = "");
     void updateAttraccessStatus(bool connected, bool authenticated, const String &status = "", const String &readerName = "");
-    void setSettingsButtonCallback(SettingsButtonCallback callback);
 
     // New: Set the main content area (replaces dialogs/popups)
     void setMainContent(const MainContent &content);
@@ -81,6 +86,10 @@ private:
     static void onSwipeGesture(lv_event_t *e);
     static void onAutoClearTimer(lv_timer_t *timer);
     static void onCancelButtonClicked(lv_event_t *e);
+    static void onSelectItemButtonClicked(lv_event_t *e);
+    static void onSelectItemCancelClicked(lv_event_t *e);
+
+    lv_obj_t *selectItemDialog = nullptr;
 };
 
 #endif // MAIN_SCREEN_UI_H

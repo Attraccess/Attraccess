@@ -1502,6 +1502,11 @@ export interface AttractapFirmware {
    * @example "attractap_eth.bin"
    */
   filename: string;
+  /**
+   * The filename of the firmware for Flashz (zlib compressed)
+   * @example "attractap_eth_flashz.bin.zz"
+   */
+  filenameFlashz: string;
 }
 
 export interface InfoData {
@@ -1833,7 +1838,9 @@ export type GetAppKeyByUidData = AppKeyResponseDto;
 
 export type GetAllCardsData = NFCCard[];
 
-export type AttractapFirmwareControllerGetFirmwaresData = AttractapFirmware[];
+export type GetFirmwaresData = AttractapFirmware[];
+
+export type GetFirmwareBinaryData = string;
 
 export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
   /**
@@ -3466,17 +3473,37 @@ export namespace Attractap {
   /**
    * No description
    * @tags Attractap
-   * @name AttractapFirmwareControllerGetFirmwares
+   * @name GetFirmwares
    * @summary Get all firmwares
    * @request GET:/api/attractap/firmware
    * @secure
    */
-  export namespace AttractapFirmwareControllerGetFirmwares {
+  export namespace GetFirmwares {
     export type RequestParams = {};
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = AttractapFirmwareControllerGetFirmwaresData;
+    export type ResponseBody = GetFirmwaresData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
+   * @name GetFirmwareBinary
+   * @summary Get a firmware by name and variant
+   * @request GET:/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}
+   * @secure
+   */
+  export namespace GetFirmwareBinary {
+    export type RequestParams = {
+      firmwareName: string;
+      variantName: string;
+      filename: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetFirmwareBinaryData;
   }
 }
 
@@ -5487,14 +5514,37 @@ export class Api<
      * No description
      *
      * @tags Attractap
-     * @name AttractapFirmwareControllerGetFirmwares
+     * @name GetFirmwares
      * @summary Get all firmwares
      * @request GET:/api/attractap/firmware
      * @secure
      */
-    attractapFirmwareControllerGetFirmwares: (params: RequestParams = {}) =>
-      this.request<AttractapFirmwareControllerGetFirmwaresData, void>({
+    getFirmwares: (params: RequestParams = {}) =>
+      this.request<GetFirmwaresData, void>({
         path: `/api/attractap/firmware`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
+     * @name GetFirmwareBinary
+     * @summary Get a firmware by name and variant
+     * @request GET:/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}
+     * @secure
+     */
+    getFirmwareBinary: (
+      firmwareName: string,
+      variantName: string,
+      filename: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetFirmwareBinaryData, void>({
+        path: `/api/attractap/firmware/${firmwareName}/variants/${variantName}/${filename}`,
         method: "GET",
         secure: true,
         format: "json",

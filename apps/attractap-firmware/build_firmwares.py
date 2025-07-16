@@ -310,11 +310,11 @@ def main():
 
         firmware_info.append({
             "name": firmware_name,
-            "friendly_name": firmware_friendly_name,
+            "friendlyName": firmware_friendly_name,
             "variant": firmware_variant,
-            "variant_friendly_name": firmware_variant_friendly_name,
+            "variantFriendlyName": firmware_variant_friendly_name,
             "version": firmware_version,
-            "board_family": board_family,
+            "boardFamily": board_family,
             "filename": firmware_filename
         })
     

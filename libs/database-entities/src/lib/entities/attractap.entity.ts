@@ -8,19 +8,19 @@ export class AttractapFirmwareVersion {
     type: 'text',
     nullable: true,
   })
-  name!: string;
+  name!: string | null;
 
   @Column({
     type: 'text',
     nullable: true,
   })
-  variant!: string;
+  variant!: string | null;
 
   @Column({
     type: 'text',
     nullable: true,
   })
-  version!: string;
+  version!: string | null;
 }
 
 @Entity()

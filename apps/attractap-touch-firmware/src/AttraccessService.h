@@ -8,6 +8,9 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include "MainScreenUI.h"
+#include <functional>
+#include "nfc.hpp"
+#include "flashz-http.hpp"
 
 class AttraccessService
 {
@@ -30,6 +33,9 @@ public:
 
     // Main content callback (replaces error/card checking callbacks)
     typedef void (*MainContentCallback)(const MainScreenUI::MainContent &content);
+
+    typedef std::function<void(const String &label, const JsonArray &options)> SelectItemCallback;
+    void setSelectItemCallback(SelectItemCallback cb);
 
     AttraccessService();
     ~AttraccessService();
@@ -58,11 +64,23 @@ public:
     void setConnectionStateCallback(ConnectionStateCallback callback) { stateCallback = callback; }
     void setMainContentCallback(MainContentCallback cb) { mainContentCallback = cb; }
 
+    void onNFCTapped(const uint8_t *uid, uint8_t uidLength);
+
+    void setNFC(NFC *nfc);
+
+    void setCurrentIP(IPAddress ip);
+
 private:
+    FlashZhttp fz;
+    NFC *nfc = nullptr;
+    std::function<void()> enableCardCheckingCallback;
+    std::function<void()> disableCardCheckingCallback;
     // Core components
     WiFiClient tcpClient;
     PicoWebsocket::Client wsClient;
     Preferences preferences;
+
+    IPAddress currentIp;
 
     // Configuration
     String serverHostname;
@@ -88,6 +106,7 @@ private:
     // Callbacks
     ConnectionStateCallback stateCallback;
     MainContentCallback mainContentCallback;
+    SelectItemCallback selectItemCallback;
 
     // Private methods
     bool checkTCPConnection();
@@ -110,9 +129,18 @@ private:
     void handleHeartbeatEvent();
     void handleUnauthorizedEvent();
     void handleDisplayErrorEvent(const JsonObject &data);
+    void handleDisplaySuccessEvent(const JsonObject &data);
     void handleEnableCardCheckingEvent(const JsonObject &data);
     void handleDisableCardCheckingEvent();
     void handleClearErrorEvent();
+    void handleClearSuccessEvent();
+    void handleFirmwareUpdateRequired(const JsonObject &data);
+    void onRequestFirmwareInfo();
+    void onChangeKeysEvent(const JsonObject &data);
+    void onAuthenticateNfcEvent(const JsonObject &data);
+    void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
+    void handleShowTextEvent(const JsonObject &data);
+    void handleSelectItemEvent(const JsonObject &data);
 
     // Utility methods
     String generateDeviceId();

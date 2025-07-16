@@ -132,7 +132,12 @@ export const prefetchUseAttractapServiceGetReaderById = (queryClient: QueryClien
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReaderByIdKeyFn({ readerId }), queryFn: () => AttractapService.getReaderById({ readerId }) });
 export const prefetchUseAttractapServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const prefetchUseAttractapServiceGetAllCards = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
-export const prefetchUseAttractapServiceAttractapFirmwareControllerGetFirmwares = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceAttractapFirmwareControllerGetFirmwaresKeyFn(), queryFn: () => AttractapService.attractapFirmwareControllerGetFirmwares() });
+export const prefetchUseAttractapServiceGetFirmwares = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetFirmwaresKeyFn(), queryFn: () => AttractapService.getFirmwares() });
+export const prefetchUseAttractapServiceGetFirmwareBinary = (queryClient: QueryClient, { filename, firmwareName, variantName }: {
+  filename: string;
+  firmwareName: string;
+  variantName: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetFirmwareBinaryKeyFn({ filename, firmwareName, variantName }), queryFn: () => AttractapService.getFirmwareBinary({ filename, firmwareName, variantName }) });
 export const prefetchUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;

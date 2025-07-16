@@ -5,6 +5,26 @@
 #include "AttraccessService.h" // Add this include
 #include <ArduinoJson.h>       // For JsonDocument
 #include "api_icon.c"          // Add this include for the API icon
+#include <vector>
+
+// class to handle the select item dialog button click
+class SelectItemDialogButtonClickHandler
+{
+    typedef std::function<void(const String &selectedId)> SelectItemResultCallback;
+    String elementId;
+    SelectItemResultCallback selectItemResultCallback;
+
+public:
+    SelectItemDialogButtonClickHandler(String elementId, SelectItemResultCallback cb) : elementId(elementId), selectItemResultCallback(cb) {}
+
+    void handle()
+    {
+        if (selectItemResultCallback)
+        {
+            selectItemResultCallback(elementId);
+        }
+    }
+};
 
 MainScreenUI::MainScreenUI(ScreenManager *screenManager)
     : screenManager(screenManager), mainScreen(nullptr), statusBar(nullptr),
@@ -212,6 +232,14 @@ void MainScreenUI::createContent()
     // Attach event handler for cancel button
     lv_obj_add_event_cb(cancelButton, onCancelButtonClicked, LV_EVENT_CLICKED, this);
 
+    // Firmware version label
+    lv_obj_t *versionLabel = lv_label_create(mainContentContainer);
+    lv_label_set_text(versionLabel, ("v" + String(FIRMWARE_VERSION)).c_str());
+    lv_obj_set_style_text_color(versionLabel, lv_color_hex(0x666666), 0);
+    lv_obj_set_style_text_font(versionLabel, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_align(versionLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(versionLabel, LV_ALIGN_BOTTOM_MID, 0, -30);
+
     // Subtle hint label for user guidance
     lv_obj_t *hintLabel = lv_label_create(mainContentContainer);
     lv_label_set_text(hintLabel, "\u2190 Swipe to access settings \u2192");
@@ -225,6 +253,7 @@ void MainScreenUI::createContent()
 
 void MainScreenUI::setMainContent(const MainContent &content)
 {
+    Serial.printf("[DEBUG] MainScreenUI::setMainContent type=%d, message=%s, duration=%lu\n", (int)content.type, content.message.c_str(), (unsigned long)content.durationMs);
     // Cancel any previous auto-clear timer
     if (autoClearTimer)
     {
@@ -243,10 +272,32 @@ void MainScreenUI::setMainContent(const MainContent &content)
 
 void MainScreenUI::updateMainContent()
 {
+    Serial.println("[DEBUG] MainScreenUI::updateMainContent");
     // Hide all by default
-    lv_obj_add_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(mainContentLabel, "");
-    lv_label_set_text(mainContentSubLabel, ""); // Clear sub-label
+    if (!mainContentIcon)
+    {
+        Serial.println("[ERROR] mainContentIcon is null!");
+    }
+    else
+    {
+        lv_obj_add_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (!mainContentLabel)
+    {
+        Serial.println("[ERROR] mainContentLabel is null!");
+    }
+    else
+    {
+        lv_label_set_text(mainContentLabel, "");
+    }
+    if (!mainContentSubLabel)
+    {
+        Serial.println("[ERROR] mainContentSubLabel is null!");
+    }
+    else
+    {
+        lv_label_set_text(mainContentSubLabel, ""); // Clear sub-label
+    }
 
     if (cancelButton)
     {
@@ -259,20 +310,57 @@ void MainScreenUI::updateMainContent()
             lv_obj_add_flag(cancelButton, LV_OBJ_FLAG_HIDDEN);
         }
     }
+    else
+    {
+        Serial.println("[ERROR] cancelButton is null!");
+    }
 
     switch (currentContent.type)
     {
     case CONTENT_NONE:
+        Serial.println("[DEBUG] CONTENT_NONE: No UI update");
         // Show nothing
         break;
     case CONTENT_ERROR:
-        lv_label_set_text(mainContentLabel, currentContent.message.c_str());
-        lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
-        lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
-        lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
+        Serial.printf("[DEBUG] CONTENT_ERROR: mainContentLabel=%p, message='%s'\n", mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_label_set_text(mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        Serial.printf("[DEBUG] mainContentSubLabel=%p, subMessage='%s'\n", mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
+        break;
+    case CONTENT_SUCCESS:
+        Serial.printf("[DEBUG] CONTENT_SUCCESS: mainContentLabel=%p, message='%s'\n", mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_label_set_text(mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        Serial.printf("[DEBUG] mainContentSubLabel=%p, subMessage='%s'\n", mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
+        break;
+    case CONTENT_TEXT:
+        Serial.printf("[DEBUG] CONTENT_TEXT: mainContentLabel=%p, message='%s'\n", mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_label_set_text(mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        Serial.printf("[DEBUG] mainContentSubLabel=%p, subMessage='%s'\n", mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
+        if (mainContentSubLabel)
+            lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
         break;
     case CONTENT_CARD_CHECKING:
-        lv_label_set_text(mainContentLabel, currentContent.message.c_str());
+        Serial.printf("[DEBUG] CONTENT_CARD_CHECKING: mainContentLabel=%p, message='%s'\n", mainContentLabel, currentContent.message.c_str());
+        if (mainContentLabel)
+            lv_label_set_text(mainContentLabel, currentContent.message.c_str());
         lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
         lv_obj_clear_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
         break;
@@ -332,5 +420,71 @@ void MainScreenUI::onCancelButtonClicked(lv_event_t *e)
         JsonObject payload = doc.to<JsonObject>();
         extern AttraccessService attraccessService; // Use the global instance
         attraccessService.sendMessage("CANCEL", payload);
+    }
+}
+
+void MainScreenUI::onSelectItemButtonClicked(lv_event_t *e)
+{
+    Serial.println("MainScreenUI: Select item button clicked");
+    SelectItemDialogButtonClickHandler *handler = (SelectItemDialogButtonClickHandler *)lv_event_get_user_data(e);
+    Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
+    if (handler)
+    {
+        Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
+        handler->handle();
+        Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
+        delete handler; // Clean up the allocated memory
+    }
+    Serial.println("MainScreenUI: Select item button done");
+}
+
+void MainScreenUI::showSelectItemDialog(const String &label, const ArduinoJson::JsonArray &options, SelectItemResultCallback cb)
+{
+    // Remove any previous selection UI (if any)
+    if (selectItemDialog)
+    {
+        lv_obj_del(selectItemDialog);
+        selectItemDialog = nullptr;
+    }
+
+    // Clear main content area
+    lv_obj_clean(mainContentContainer);
+
+    // Label at the top
+    lv_obj_t *titleLabel = lv_label_create(mainContentContainer);
+    lv_label_set_text(titleLabel, label.c_str());
+    lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(titleLabel, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(titleLabel, LV_ALIGN_TOP_MID, 0, 10);
+
+    // Container for buttons (vertical flex)
+    lv_obj_t *buttonContainer = lv_obj_create(mainContentContainer);
+    lv_obj_set_size(buttonContainer, 200, LV_SIZE_CONTENT);
+    lv_obj_align(buttonContainer, LV_ALIGN_TOP_MID, 0, 50);
+    lv_obj_set_style_bg_opa(buttonContainer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(buttonContainer, 0, 0);
+    lv_obj_set_style_pad_all(buttonContainer, 0, 0);
+    lv_obj_set_flex_flow(buttonContainer, LV_FLEX_FLOW_COLUMN);
+    lv_obj_clear_flag(buttonContainer, LV_OBJ_FLAG_SCROLLABLE);
+
+    // For each option, create a button
+    for (JsonObject option : options)
+    {
+        String optId = option["id"].as<String>();
+        String optLabel = option["label"].as<String>();
+        lv_obj_t *btn = lv_btn_create(buttonContainer);
+        lv_obj_set_size(btn, 200, 36);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x2196F3), 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(0x1976D2), LV_STATE_PRESSED);
+        lv_obj_set_style_radius(btn, 6, 0);
+
+        // Create handler and store it as user data
+        SelectItemDialogButtonClickHandler *handler = new SelectItemDialogButtonClickHandler(optId, cb);
+        lv_obj_add_event_cb(btn, onSelectItemButtonClicked, LV_EVENT_CLICKED, handler);
+
+        lv_obj_t *lbl = lv_label_create(btn);
+        lv_label_set_text(lbl, optLabel.c_str());
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_center(lbl);
     }
 }

@@ -1,10 +1,10 @@
 import { Button, ButtonProps } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+// import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import 'esp-web-tools';
-import de from './de.json';
-import en from './en.json';
+// import de from './de.json';
+// import en from './en.json';
 import React from 'react';
-import { Firmware } from '../types';
+import { AttractapFirmware } from '@attraccess/react-query-client';
 
 // Add declaration for the custom element
 declare global {
@@ -22,15 +22,18 @@ declare global {
 }
 
 interface Props extends Omit<ButtonProps, 'slot' | 'onPress' | 'children'> {
-  firmware: Firmware;
+  firmware: AttractapFirmware;
 }
 
 export function AttractapFlashButton(props: Readonly<Props>) {
-  const { t } = useTranslations('attractap-flash-button', {
+  /*const { t } = useTranslations('attractap-flash-button', {
     de,
     en,
-  });
+  });*/
 
+  return <Button isDisabled>ESP Flasher WIP</Button>;
+
+  /*
   return (
     <esp-web-install-button manifest={props.firmware.manifest_path} data-cy="attractap-flash-esp-web-install-button">
       <Button {...props} slot="activate" data-cy="attractap-flash-activate-button">
@@ -43,5 +46,5 @@ export function AttractapFlashButton(props: Readonly<Props>) {
         {t('errors.notAllowed')}
       </Button>
     </esp-web-install-button>
-  );
+  );*/
 }

@@ -25,7 +25,6 @@ const AppEnvSchema = z
       .string()
       .url({ message: 'FRONTEND_URL must be a valid URL' })
       .default(process.env.VITE_ATTRACCESS_URL),
-    GLOBAL_PREFIX: z.string().default('api'),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     AUTH_JWT_SECRET: z.string(),
     AUTH_JWT_ORIGIN: z.string().optional(),
@@ -58,11 +57,16 @@ const AppEnvSchema = z
     { message: 'Invalid SSL configuration' }
   );
 
-export type AppConfigType = z.infer<typeof AppEnvSchema>;
+export type AppConfigType = z.infer<typeof AppEnvSchema> & { GLOBAL_PREFIX: string };
 
 const appConfigFactory = (): AppConfigType => {
   try {
-    return AppEnvSchema.parse(process.env);
+    const env = AppEnvSchema.parse(process.env);
+
+    return {
+      ...env,
+      GLOBAL_PREFIX: 'api',
+    };
   } catch (e) {
     console.error('Failed to parse App Environment Variables:', e.errors);
     throw new Error('Invalid application environment configuration.');

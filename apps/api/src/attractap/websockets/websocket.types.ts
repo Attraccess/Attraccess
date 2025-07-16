@@ -15,17 +15,19 @@ export enum AttractapEventType {
   UNAUTHORIZED = 'UNAUTHORIZED',
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   SHOW_TEXT = 'SHOW_TEXT',
-  HIDE_TEXT = 'HIDE_TEXT',
-  KEY_PRESSED = 'KEY_PRESSED',
   NFC_TAP = 'NFC_TAP',
   CHANGE_KEYS = 'CHANGE_KEYS',
   ENABLE_CARD_CHECKING = 'ENABLE_CARD_CHECKING',
   DISABLE_CARD_CHECKING = 'DISABLE_CARD_CHECKING',
   DISPLAY_SUCCESS = 'DISPLAY_SUCCESS',
+  CLEAR_SUCCESS = 'CLEAR_SUCCESS',
   DISPLAY_ERROR = 'DISPLAY_ERROR',
   CLEAR_ERROR = 'CLEAR_ERROR',
   REAUTHENTICATE = 'REAUTHENTICATE',
   CANCEL = 'CANCEL',
+  FIRMWARE_UPDATE_REQUIRED = 'FIRMWARE_UPDATE_REQUIRED',
+  FIRMWARE_INFO = 'FIRMWARE_INFO',
+  SELECT_ITEM = 'SELECT_ITEM',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,7 +73,6 @@ export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPaylo
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   id: string;
-  disconnectTimeout?: NodeJS.Timeout;
   reader?: Attractap;
   state?: ReaderState;
   transitionToState: (state: ReaderState) => Promise<void>;

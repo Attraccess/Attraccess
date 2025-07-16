@@ -3,5 +3,5 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-firmware_output/
+firmware_output/*
 /data/

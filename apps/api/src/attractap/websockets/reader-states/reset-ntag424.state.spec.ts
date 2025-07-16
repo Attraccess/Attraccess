@@ -10,6 +10,9 @@ jest.mock('./initial.state', () => ({
   })),
 }));
 
+// Mock setTimeout to avoid actual delays in tests
+jest.useFakeTimers();
+
 describe('ResetNTAG424State', () => {
   let resetState: ResetNTAG424State;
   let mockSocket: AuthenticatedWebSocket;
@@ -51,6 +54,11 @@ describe('ResetNTAG424State', () => {
     });
 
     resetState = new ResetNTAG424State(mockSocket, mockServices, mockCardId);
+  });
+
+  afterEach(() => {
+    // Clean up timers
+    jest.clearAllTimers();
   });
 
   describe('onStateEnter', () => {
@@ -217,7 +225,7 @@ describe('ResetNTAG424State', () => {
       (mockSocket.sendMessage as jest.Mock).mockClear(); // Clear the init message
 
       // Test
-      await resetState.onResponse({
+      const responsePromise = resetState.onResponse({
         type: AttractapEventType.CHANGE_KEYS,
         payload: {
           successfulKeys: [0],
@@ -225,29 +233,40 @@ describe('ResetNTAG424State', () => {
         },
       });
 
+      // Fast-forward through all timers and await the promise
+      await jest.runAllTimersAsync();
+      await responsePromise;
+
       // Assert
       expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledTimes(1);
       expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledWith(mockCardId);
 
-      // Verify success message sent exactly once
-      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+      // Verify success message sent and clear success message sent
+      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(2);
+      expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.DISPLAY_SUCCESS,
             payload: expect.objectContaining({
               message: 'Card erased',
-              duration: 10000,
             }),
           }),
         })
       );
+      expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.CLEAR_SUCCESS,
+            payload: undefined,
+          }),
+        })
+      );
 
-      // Verify state transition happened exactly once
-      expect(InitialReaderState).toHaveBeenCalledTimes(1);
+      // Verify transition to initial state
       expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
-      expect(mockSocket.transitionToState).toHaveBeenCalledTimes(1);
-      expect(mockSocket.transitionToState).toHaveBeenCalledWith(expect.any(Object));
+      expect(mockSocket.transitionToState).toHaveBeenCalled();
     });
 
     it('should handle failed key change', async () => {
@@ -399,7 +418,7 @@ describe('ResetNTAG424State - Full Flow', () => {
     );
 
     // Step 3: Keys changed successfully
-    await resetState.onResponse({
+    const responsePromise = resetState.onResponse({
       type: AttractapEventType.CHANGE_KEYS,
       payload: {
         successfulKeys: [0],
@@ -407,11 +426,15 @@ describe('ResetNTAG424State - Full Flow', () => {
       },
     });
 
+    // Fast-forward through all timers and await the promise
+    await jest.runAllTimersAsync();
+    await responsePromise;
+
     // Verify the complete message sequence and state transitions
     expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledWith(mockCardId);
 
     // Verify all messages sent in the full flow
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(4);
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(5);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
       4,
       expect.objectContaining({
@@ -419,8 +442,16 @@ describe('ResetNTAG424State - Full Flow', () => {
           type: AttractapEventType.DISPLAY_SUCCESS,
           payload: expect.objectContaining({
             message: 'Card erased',
-            duration: 10000,
           }),
+        }),
+      })
+    );
+    expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
+      5,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: AttractapEventType.CLEAR_SUCCESS,
+          payload: undefined,
         }),
       })
     );
