@@ -2,7 +2,7 @@
   "page": {
     "title": "Attractaps",
     "actions": {
-      "openFlasher": "Attractap flasher"
+      "openFlasher": "new Attractap"
     }
   },
   "workInProgress": "This feature is still in development, use at your own risk!",

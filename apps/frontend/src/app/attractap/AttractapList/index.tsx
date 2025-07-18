@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { Cloud, CloudOff, CpuIcon } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -8,8 +8,10 @@ import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
-import { AttractapFlasher } from '../AttractapFlasher';
+import { AttractapInstaller } from '../Installer';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
+import { ESPLoaderProvider } from 'esptool-react';
+import SparkMD5 from 'spark-md5';
 
 import de from './de.json';
 import en from './en.json';
@@ -45,12 +47,18 @@ export const AttractapList = () => {
 
   const formatDateTime = useDateTimeFormatter();
 
+  const calculateMD5Hash = (image: Uint8Array): string => {
+    const spark = new SparkMD5.ArrayBuffer();
+    spark.append(image.buffer as ArrayBuffer);
+    return spark.end();
+  };
+
   return (
-    <>
+    <ESPLoaderProvider initialBaudrate={115200} calculateMD5Hash={calculateMD5Hash} initialDebugLogging={false}>
       <PageHeader
         title={t('page.title')}
         actions={
-          <AttractapFlasher>
+          <AttractapInstaller>
             {(onOpen) => (
               <Button
                 variant="light"
@@ -61,7 +69,7 @@ export const AttractapList = () => {
                 {t('page.actions.openFlasher')}
               </Button>
             )}
-          </AttractapFlasher>
+          </AttractapInstaller>
         }
       />
 
@@ -110,6 +118,6 @@ export const AttractapList = () => {
           )}
         </TableBody>
       </Table>
-    </>
+    </ESPLoaderProvider>
   );
 };

@@ -1,0 +1,82 @@
+{
+  "title": "Firmware Flasher",
+  "subtitle": "Flash firmware to the Attractap device",
+  "connection": {
+    "title": "Device Connection",
+    "connect": "Connect Device",
+    "disconnect": "Disconnect Device",
+    "status": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "connecting": "Connecting..."
+    },
+    "error": {
+      "notSupported": "WebSerial is not supported in this browser. Please use Chrome or Edge.",
+      "connectionFailed": "Failed to connect to device",
+      "disconnectionFailed": "Failed to disconnect from device"
+    }
+  },
+  "flashing": {
+    "title": "Flash Firmware",
+    "start": "Start Flashing",
+    "stop": "Stop Flashing",
+    "erase": "Erase Device",
+    "progress": "Progress: {{progress}}%",
+    "status": {
+      "idle": "Ready",
+      "downloading": "Downloading firmware...",
+      "erasing": "Erasing device...",
+      "flashing": "Flashing firmware...",
+      "verifying": "Verifying firmware...",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "success": "Firmware flashed successfully!",
+    "error": {
+      "downloadFailed": "Failed to download firmware",
+      "flashingFailed": "Flashing failed",
+      "verificationFailed": "Firmware verification failed"
+    }
+  },
+  "console": {
+    "title": "Console",
+    "placeholder": "Console output will appear here...",
+    "input": "Enter command...",
+    "send": "Send",
+    "clear": "Clear",
+    "start": "Start",
+    "stop": "Stop"
+  },
+  "deviceControls": {
+    "title": "Device Controls",
+    "hardReset": "Hard Reset",
+    "softReset": "Soft Reset",
+    "enterBootloader": "Enter Bootloader",
+    "description": {
+      "hardReset": "Uses DTR/RTS signals for physical reset",
+      "softReset": "Sends control characters to restart firmware",
+      "enterBootloader": "Puts device in bootloader mode for flashing"
+    }
+  },
+  "info": {
+    "title": "Device Information",
+    "chipType": "Chip Type",
+    "macAddress": "MAC Address",
+    "flashSize": "Flash Size",
+    "flashMode": "Flash Mode",
+    "flashFreq": "Flash Frequency",
+    "features": "Features",
+    "refresh": "Refresh",
+    "loading": "Loading device information..."
+  },
+  "steps": {
+    "connect": "1. Connect Device",
+    "flash": "2. Flash Firmware",
+    "verify": "3. Verify"
+  },
+  "warnings": {
+    "httpsRequired": "HTTPS is required for WebSerial",
+    "browserSupport": "Only Chrome/Edge support WebSerial",
+    "doNotDisconnect": "Do not disconnect during flashing"
+  }
+}

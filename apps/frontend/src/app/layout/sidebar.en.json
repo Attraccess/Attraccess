@@ -10,8 +10,8 @@
     "attractap": {
       "label": "Attractap",
       "items": {
-        "Attractap": "Attractap",
-        "NFCCards": "NFC-Cards"
+        "readers": "Readers",
+        "nfcCards": "NFC-Cards"
       }
     },
     "auth": {

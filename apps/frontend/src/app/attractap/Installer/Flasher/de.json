@@ -1,0 +1,82 @@
+{
+  "title": "Firmware-Flasher",
+  "subtitle": "Firmware auf das Attractap-Gerät flashen",
+  "connection": {
+    "title": "Geräteverbindung",
+    "connect": "Gerät verbinden",
+    "disconnect": "Gerät trennen",
+    "status": {
+      "connected": "Verbunden",
+      "disconnected": "Getrennt",
+      "connecting": "Verbinde..."
+    },
+    "error": {
+      "notSupported": "WebSerial wird in diesem Browser nicht unterstützt. Bitte verwenden Sie Chrome oder Edge.",
+      "connectionFailed": "Verbindung zum Gerät fehlgeschlagen",
+      "disconnectionFailed": "Trennung vom Gerät fehlgeschlagen"
+    }
+  },
+  "flashing": {
+    "title": "Firmware flashen",
+    "start": "Flashen starten",
+    "stop": "Flashen stoppen",
+    "erase": "Gerät löschen",
+    "progress": "Fortschritt: {{progress}}%",
+    "status": {
+      "idle": "Bereit",
+      "downloading": "Firmware herunterladen...",
+      "erasing": "Gerät wird gelöscht...",
+      "flashing": "Firmware wird geflasht...",
+      "verifying": "Firmware wird überprüft...",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen"
+    },
+    "success": "Firmware erfolgreich geflasht!",
+    "error": {
+      "downloadFailed": "Firmware-Download fehlgeschlagen",
+      "flashingFailed": "Flashen fehlgeschlagen",
+      "verificationFailed": "Firmware-Überprüfung fehlgeschlagen"
+    }
+  },
+  "console": {
+    "title": "Konsole",
+    "placeholder": "Konsolen-Ausgabe wird hier angezeigt...",
+    "input": "Befehl eingeben...",
+    "send": "Senden",
+    "clear": "Löschen",
+    "start": "Starten",
+    "stop": "Stoppen"
+  },
+  "deviceControls": {
+    "title": "Gerätesteuerung",
+    "hardReset": "Hardware-Reset",
+    "softReset": "Software-Reset",
+    "enterBootloader": "Bootloader-Modus",
+    "description": {
+      "hardReset": "Verwendet DTR/RTS-Signale für physischen Reset",
+      "softReset": "Sendet Steurzeichen zum Neustarten der Firmware",
+      "enterBootloader": "Versetzt das Gerät in den Bootloader-Modus zum Flashen"
+    }
+  },
+  "info": {
+    "title": "Geräteinformationen",
+    "chipType": "Chip-Typ",
+    "macAddress": "MAC-Adresse",
+    "flashSize": "Flash-Größe",
+    "flashMode": "Flash-Modus",
+    "flashFreq": "Flash-Frequenz",
+    "features": "Features",
+    "refresh": "Aktualisieren",
+    "loading": "Geräteinformationen werden geladen..."
+  },
+  "steps": {
+    "connect": "1. Gerät verbinden",
+    "flash": "2. Firmware flashen",
+    "verify": "3. Überprüfen"
+  },
+  "warnings": {
+    "httpsRequired": "HTTPS ist für WebSerial erforderlich",
+    "browserSupport": "Nur Chrome/Edge unterstützen WebSerial",
+    "doNotDisconnect": "Während des Flashens nicht trennen"
+  }
+}

@@ -8,6 +8,7 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   backTo?: string;
+  onBack?: () => void;
   actions?: ReactNode;
   icon?: ReactNode;
   noMargin?: boolean;
@@ -19,6 +20,7 @@ export function PageHeader({
   title,
   subtitle,
   backTo,
+  onBack,
   actions,
   icon,
   noMargin,
@@ -30,9 +32,9 @@ export function PageHeader({
   return (
     <div className={cn('flex items-center justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
       <div className="flex items-center">
-        {backTo && (
+        {(backTo || onBack) && (
           <Button
-            onPress={() => navigate(backTo)}
+            onPress={() => (backTo ? navigate(backTo) : onBack?.())}
             variant="ghost"
             isIconOnly
             aria-label="Go back"
