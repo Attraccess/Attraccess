@@ -6,6 +6,7 @@ import { ResourceUsage } from './resourceUsage.entity';
 import { AuthenticationDetail } from './authenticationDetail.entity';
 import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { NFCCard } from './nfcCard.entity';
+import { Session } from './session.entity';
 
 export class SystemPermissions {
   @Column({ default: false, type: 'boolean' })
@@ -134,4 +135,9 @@ export class User {
     onDelete: 'CASCADE',
   })
   nfcCards!: NFCCard[];
+
+  @OneToMany(() => Session, (session) => session.user, {
+    onDelete: 'CASCADE',
+  })
+  sessions!: Session[];
 }

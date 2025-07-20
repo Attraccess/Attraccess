@@ -216,6 +216,7 @@ describe('UsersService', () => {
           authenticationDetails: [],
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
+          sessions: [],
         } as User,
         {
           id: 2,
@@ -241,6 +242,7 @@ describe('UsersService', () => {
           authenticationDetails: [],
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
+          sessions: [],
         } as User,
       ];
 

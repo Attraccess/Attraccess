@@ -10,10 +10,12 @@ import { UsersService } from './users/users.service';
 import { UsersController } from './users/users.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
+import { SessionService } from './auth/session.service';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { SessionStrategy } from './strategies/session.strategy';
 
 // Constants and Entities
 
@@ -23,6 +25,7 @@ import {
   RevokedToken,
   SSOProviderOIDCConfiguration,
   SSOProvider,
+  Session,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
@@ -34,7 +37,7 @@ import { AppConfigType } from '../config/app.config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthenticationDetail, RevokedToken, SSOProvider, SSOProviderOIDCConfiguration]),
+    TypeOrmModule.forFeature([User, AuthenticationDetail, RevokedToken, SSOProvider, SSOProviderOIDCConfiguration, Session]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -79,8 +82,10 @@ import { AppConfigType } from '../config/app.config';
   providers: [
     UsersService,
     AuthService,
+    SessionService,
     LocalStrategy,
     JwtStrategy,
+    SessionStrategy,
     SSOService,
     {
       provide: SSOOIDCStrategy,
@@ -107,6 +112,6 @@ import { AppConfigType } from '../config/app.config';
     },
   ],
   controllers: [UsersController, AuthController, SSOController],
-  exports: [UsersService, AuthService],
+  exports: [UsersService, AuthService, SessionService],
 })
 export class UsersAndAuthModule {}
