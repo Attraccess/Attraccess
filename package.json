@@ -55,6 +55,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "clsx": "^2.1.1",
+    "cookie-parser": "^1.4.7",
     "date-fns": "^4.1.0",
     "decompress": "^4.2.1",
     "docsify-cli": "^4.4.4",

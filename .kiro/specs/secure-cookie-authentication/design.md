@@ -14,18 +14,18 @@ graph TB
         WEB[Web Browser]
         API[API Client/Script]
     end
-    
+
     subgraph "Authentication Layer"
         AUTH[Auth Controller]
         GUARD[Cookie/Token Guard]
         STRATEGY[Session Strategy]
     end
-    
+
     subgraph "Session Management"
         SERVICE[Session Service]
         DB[(Session Database)]
     end
-    
+
     WEB -->|HTTP-only Cookies| AUTH
     API -->|Authorization Header| AUTH
     AUTH --> GUARD
@@ -43,21 +43,21 @@ sequenceDiagram
     participant SessionService
     participant Database
     participant Response
-    
+
     Note over Client,Response: Login Flow
     Client->>AuthController: POST /auth/session/local
     AuthController->>SessionService: createSession(user)
     SessionService->>Database: INSERT session token
     Database-->>SessionService: session created
     SessionService-->>AuthController: session token
-    
+
     alt Web Browser Request
         AuthController->>Response: Set HTTP-only cookie
         AuthController-->>Client: User data (no token)
     else Programmatic Request
         AuthController-->>Client: User data + token
     end
-    
+
     Note over Client,Response: Authenticated Request Flow
     Client->>AuthController: Request with cookie/header
     AuthController->>SessionService: validateSession(token)
@@ -165,7 +165,7 @@ interface CookieConfig {
 const cookieConfig: CookieConfig = {
   name: 'auth-session',
   httpOnly: true,
-  secure: process.env.VITE_ATTRACCESS_URL?.startsWith('https://') ?? false,
+  secure: process.env.ATTRACCESS_URL?.startsWith('https://') ?? false,
   sameSite: 'lax',
   maxAge: 24 * 60 * 60 * 1000, // 24 hours
   path: '/',
@@ -183,19 +183,19 @@ export class DualAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    
+
     // Priority: Authorization header > Cookie
     const authHeader = request.headers.authorization;
     const sessionCookie = request.cookies['auth-session'];
-    
+
     let token: string | null = null;
-    
+
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.substring(7);
     } else if (sessionCookie) {
       token = sessionCookie;
     }
-    
+
     if (token) {
       const user = await this.sessionStrategy.validate(request, token);
       if (user) {
@@ -203,7 +203,7 @@ export class DualAuthGuard implements CanActivate {
         return true;
       }
     }
-    
+
     return false;
   }
 }
@@ -284,12 +284,14 @@ interface AuthErrorResponse {
 ### Unit Tests
 
 1. **Session Service Tests**
+
    - Token generation uniqueness
    - Session creation and validation
    - Expiration handling
    - Cleanup operations
 
 2. **Authentication Strategy Tests**
+
    - Cookie extraction and validation
    - Header token processing
    - User resolution from sessions
@@ -302,12 +304,14 @@ interface AuthErrorResponse {
 ### Integration Tests
 
 1. **Authentication Flow Tests**
+
    - Login with cookie setting
    - Authenticated requests with cookies
    - Programmatic authentication with headers
    - Logout and session cleanup
 
 2. **Security Tests**
+
    - Cookie security attributes
    - Session token randomness
    - Concurrent session handling
@@ -321,6 +325,7 @@ interface AuthErrorResponse {
 ### End-to-End Tests
 
 1. **Web Browser Flow**
+
    - Complete login/logout cycle
    - Session persistence across requests
    - Automatic cookie handling
@@ -343,16 +348,19 @@ interface AuthErrorResponse {
 ### Code Migration
 
 1. **Phase 1**: Implement session infrastructure
+
    - Add Session entity and service
    - Create session strategy
    - Implement dual authentication guard
 
 2. **Phase 2**: Update authentication endpoints
+
    - Modify login endpoints to support both modes
    - Add session refresh endpoint
    - Update logout to handle sessions
 
 3. **Phase 3**: Frontend integration
+
    - Remove localStorage token handling
    - Update API client configuration
    - Test cookie-based authentication

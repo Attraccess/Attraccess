@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AuthenticationType, User } from '@attraccess/database-entities';
 import { UsersService } from '../users-and-auth/users/users.service';
 import { AuthService } from '../users-and-auth/auth/auth.service';
+import { SessionService } from '../users-and-auth/auth/session.service';
 import { nanoid } from 'nanoid';
 
 export class TestSetup {
@@ -11,6 +12,7 @@ export class TestSetup {
   private static instantiations = 0;
   protected static usersService: UsersService;
   protected static authService: AuthService;
+  protected static sessionService: SessionService;
   public testInstanceIdentifier: string;
 
   public constructor() {
@@ -28,6 +30,7 @@ export class TestSetup {
       await app.init();
       TestSetup.usersService = app.get(UsersService);
       TestSetup.authService = app.get(AuthService);
+      TestSetup.sessionService = app.get(SessionService);
     }
 
     let waitTime = 0;
@@ -85,7 +88,10 @@ export class TestSetup {
       this.users.push(user);
     }
 
-    return await TestSetup.authService.createJWT(user);
+    return await TestSetup.sessionService.createSession(user, {
+      userAgent: 'test-user-agent',
+      ipAddress: '127.0.0.1',
+    });
   }
 
   async cleanupApp() {

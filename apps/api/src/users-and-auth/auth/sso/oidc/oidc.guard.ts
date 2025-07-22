@@ -32,7 +32,7 @@ export class SSOOIDCGuard implements CanActivate {
       // Consider throwing an InternalServerErrorException for clearer error handling upstream
       return false;
     }
-    const requestURL = new URL(appConfig.FRONTEND_URL + req.url);
+    const requestURL = new URL(appConfig.ATTRACCESS_FRONTEND_URL + req.url);
 
     // e.g. something/sso/oidc/156/login
     const urlPathParts = requestURL.pathname.split('/');
@@ -72,7 +72,7 @@ export class SSOOIDCGuard implements CanActivate {
 
     const redirectTo = requestURL.searchParams.get('redirectTo');
 
-    const callbackURL = new URL(appConfig.VITE_ATTRACCESS_URL);
+    const callbackURL = new URL(appConfig.ATTRACCESS_URL);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
     callbackURL.searchParams.set('redirectTo', redirectTo);
 

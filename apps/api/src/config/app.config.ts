@@ -2,6 +2,10 @@ import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import { LogLevel } from '@nestjs/common';
 
+// fallback for old instances
+process.env.ATTRACCESS_FRONTEND_URL ??= process.env.FRONTEND_URL;
+process.env.ATTRACCESS_URL ??= process.env.VITE_ATTRACCESS_URL;
+
 const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -20,14 +24,12 @@ const AppEnvSchema = z
         message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
       }),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
-    VITE_ATTRACCESS_URL: z.string().url({ message: 'VITE_ATTRACCESS_URL must be a valid URL' }),
-    FRONTEND_URL: z
+    ATTRACCESS_URL: z.string().url({ message: 'ATTRACCESS_URL must be a valid URL' }),
+    ATTRACCESS_FRONTEND_URL: z
       .string()
-      .url({ message: 'FRONTEND_URL must be a valid URL' })
-      .default(process.env.VITE_ATTRACCESS_URL),
+      .url({ message: 'ATTRACCESS_FRONTEND_URL must be a valid URL' })
+      .default(process.env.ATTRACCESS_URL),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
-    AUTH_JWT_SECRET: z.string(),
-    AUTH_JWT_ORIGIN: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
     PLUGIN_DIR: z.string().optional(),

@@ -79,10 +79,8 @@ docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /va
 
 | Variable            | Value                                   |
 | ------------------- | --------------------------------------- |
-| AUTH_JWT_ORIGIN     | ENV                                     |
-| AUTH_JWT_SECRET     | replace_with_a_long_random_string       |
 | AUTH_SESSION_SECRET | replace_with_another_long_random_string |
-| VITE_ATTRACCESS_URL | http://your-server-ip:3000              |
+| ATTRACCESS_URL      | http://your-server-ip:3000              |
 | SMTP_SERVICE        | SMTP                                    |
 | SMTP_FROM           | your-email@example.com                  |
 | SMTP_HOST           | smtp.example.com                        |
@@ -91,7 +89,7 @@ docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /va
 | SMTP_PASS           | your-email-password                     |
 | LOG_LEVELS          | error,warn,log                          |
 
-> ⚠️ **Security Note**: Generate strong random strings for `AUTH_JWT_SECRET` and `AUTH_SESSION_SECRET`. You can use a password generator or run `openssl rand -base64 32` in a terminal.
+> ⚠️ **Security Note**: Generate strong random strings for `AUTH_SESSION_SECRET`. You can use a password generator or run `openssl rand -base64 32` in a terminal.
 
 4. Click "Deploy the container"
 
@@ -117,10 +115,8 @@ services:
       - '3000:3000'
     environment:
       # Authentication & Security
-      - AUTH_JWT_ORIGIN=ENV
-      - AUTH_JWT_SECRET=replace_with_a_long_random_string
       - AUTH_SESSION_SECRET=replace_with_another_long_random_string
-      - VITE_ATTRACCESS_URL=http://your-server-ip:3000
+      - ATTRACCESS_URL=http://your-server-ip:3000
 
       # Email Configuration
       - SMTP_SERVICE=SMTP

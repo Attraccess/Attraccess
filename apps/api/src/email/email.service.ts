@@ -23,10 +23,10 @@ export class EmailService {
 
     const appConfig = this.configService.get<AppConfigType>('app');
 
-    this.frontendUrl = appConfig.FRONTEND_URL;
-    this.backendUrl = appConfig.VITE_ATTRACCESS_URL;
+    this.frontendUrl = appConfig.ATTRACCESS_FRONTEND_URL;
+    this.backendUrl = appConfig.ATTRACCESS_URL;
 
-    this.logger.debug(`EmailService initialized with FRONTEND_URL: ${this.frontendUrl}`);
+    this.logger.debug(`EmailService initialized with ATTRACCESS_FRONTEND_URL: ${this.frontendUrl}`);
   }
 
   private convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {

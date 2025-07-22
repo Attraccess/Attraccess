@@ -73,7 +73,7 @@
       "cache": true,
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"],
       "options": {
-        "command": "AUTH_SESSION_SECRET=super-secret VITE_ATTRACCESS_URL=http://localhost:3000 AUTH_JWT_ORIGIN=ENV AUTH_JWT_SECRET=swagger-export-dummy-jwt-secret123 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org FRONTEND_URL=http://localhost:4200 node dist/apps/api-swagger/main.js"
+        "command": "AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org ATTRACCESS_FRONTEND_URL=http://localhost:4200 node dist/apps/api-swagger/main.js"
       }
     },
     "test": {

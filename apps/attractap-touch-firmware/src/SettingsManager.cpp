@@ -5,6 +5,7 @@
 #include "SystemSettingsScreen.h"
 #include "AttraccessSettingsScreen.h"
 #include "WiFiPasswordDialog.h"
+#include "WiFiHiddenNetworkDialog.h"
 #include "WiFiService.h"
 #include "AttraccessService.h"
 
@@ -17,6 +18,7 @@ SettingsManager::SettingsManager()
       systemSettingsScreen(nullptr),
       attraccessSettingsScreen(nullptr),
       passwordDialog(nullptr),
+      hiddenNetworkDialog(nullptr),
       wifiService(nullptr),
       attraccessService(nullptr),
       currentScreenType(SCREEN_NONE),
@@ -34,6 +36,7 @@ SettingsManager::~SettingsManager()
     delete systemSettingsScreen;
     delete attraccessSettingsScreen;
     delete passwordDialog;
+    delete hiddenNetworkDialog;
 }
 
 void SettingsManager::begin()
@@ -49,6 +52,7 @@ void SettingsManager::begin()
     systemSettingsScreen = new SystemSettingsScreen();
     attraccessSettingsScreen = new AttraccessSettingsScreen();
     passwordDialog = new WiFiPasswordDialog();
+    hiddenNetworkDialog = new WiFiHiddenNetworkDialog();
 
     // Initialize all components
     pinEntryScreen->begin();
@@ -56,6 +60,7 @@ void SettingsManager::begin()
     systemSettingsScreen->begin();
     attraccessSettingsScreen->begin(&keyboardManager);
     passwordDialog->begin(&keyboardManager);
+    hiddenNetworkDialog->begin(&keyboardManager);
 
     // Set up PIN entry callbacks
     pinEntryScreen->setPinValidationCallback([this](bool success)
@@ -162,14 +167,14 @@ void SettingsManager::setWiFiManager(WiFiService *service)
     Serial.println("SettingsManager: WiFiService reference set");
 
     // Initialize WiFi settings screen with dependencies
-    if (wifiSettingsScreen && passwordDialog)
+    if (wifiSettingsScreen && passwordDialog && hiddenNetworkDialog)
     {
-        Serial.printf("SettingsManager: Initializing WiFiSettingsScreen with wifiService=%p, passwordDialog=%p\n", wifiService, passwordDialog);
-        wifiSettingsScreen->begin(wifiService, passwordDialog);
+        Serial.printf("SettingsManager: Initializing WiFiSettingsScreen with wifiService=%p, passwordDialog=%p, hiddenNetworkDialog=%p\n", wifiService, passwordDialog, hiddenNetworkDialog);
+        wifiSettingsScreen->begin(wifiService, passwordDialog, hiddenNetworkDialog);
     }
     else
     {
-        Serial.printf("SettingsManager: Cannot initialize WiFiSettingsScreen - wifiSettingsScreen=%p, passwordDialog=%p\n", wifiSettingsScreen, passwordDialog);
+        Serial.printf("SettingsManager: Cannot initialize WiFiSettingsScreen - wifiSettingsScreen=%p, passwordDialog=%p, hiddenNetworkDialog=%p\n", wifiSettingsScreen, passwordDialog, hiddenNetworkDialog);
     }
 
     // Set up callbacks for UI updates

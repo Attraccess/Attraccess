@@ -1,4 +1,4 @@
-import { OpenAPI, LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
+import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { createPluginStore, PluginProvider as PluginProviderBase, RendererPlugin } from 'react-pluggable';
 import usePluginState from './plugin.state';
@@ -121,7 +121,7 @@ export function PluginProvider(props: PropsWithChildren) {
     plugins.forEach((plugin) => {
       plugin.plugin.onApiEndpointChange(getBaseUrl());
       plugin.plugin.onApiAuthStateChange({
-        authToken: OpenAPI.TOKEN as string,
+        authToken: '', // No longer using tokens - authentication is handled by cookies
         user: user as unknown as AttraccessFrontendPluginAuthData['user'],
       });
     });

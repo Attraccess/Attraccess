@@ -36,6 +36,7 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
       login({
         username,
         password,
+        tokenLocation: 'cookie',
       });
     },
     [login]

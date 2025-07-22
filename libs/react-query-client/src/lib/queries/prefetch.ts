@@ -22,7 +22,9 @@ export const prefetchUseUsersServiceGetAllWithPermission = (queryClient: QueryCl
   page?: number;
   permission?: "canManageResources" | "canManageSystemConfiguration" | "canManageUsers";
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) });
-export const prefetchUseAuthenticationServiceRefreshSession = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceRefreshSessionKeyFn(), queryFn: () => AuthenticationService.refreshSession() });
+export const prefetchUseAuthenticationServiceRefreshSession = (queryClient: QueryClient, { tokenLocation }: {
+  tokenLocation: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceRefreshSessionKeyFn({ tokenLocation }), queryFn: () => AuthenticationService.refreshSession({ tokenLocation }) });
 export const prefetchUseAuthenticationServiceGetAllSsoProviders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceGetAllSsoProvidersKeyFn(), queryFn: () => AuthenticationService.getAllSsoProviders() });
 export const prefetchUseAuthenticationServiceGetOneSsoProviderById = (queryClient: QueryClient, { id }: {
   id: number;
@@ -31,14 +33,15 @@ export const prefetchUseAuthenticationServiceLoginWithOidc = (queryClient: Query
   providerId: string;
   redirectTo?: unknown;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceLoginWithOidcKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithOidc({ providerId, redirectTo }) });
-export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state }: {
+export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state, tokenLocation }: {
   code: unknown;
   iss: unknown;
   providerId: string;
   redirectTo: string;
   sessionState: unknown;
   state: unknown;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
+  tokenLocation: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }) });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
   type: "verify-email" | "reset-password";

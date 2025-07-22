@@ -12,14 +12,14 @@ import { Reflector } from '@nestjs/core';
 import { SystemPermission, User } from '@attraccess/database-entities';
 
 import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { JwtGuard } from './jwt.guard';
+import { DualAuthGuard } from './dual-auth.guard';
 
 const NeedsSystemPermissions = Reflector.createDecorator<SystemPermission[]>();
 
 export function Auth(...permissions: SystemPermission[]) {
   return applyDecorators(
     NeedsSystemPermissions(permissions),
-    UseGuards(JwtGuard, SystemPermissionsGuard),
+    UseGuards(DualAuthGuard, SystemPermissionsGuard),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'Unauthorized' })
   );

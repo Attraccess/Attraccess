@@ -1513,10 +1513,15 @@ export type CreateSessionData = {
     requestBody: {
         username?: string;
         password?: string;
+        tokenLocation?: 'cookie' | 'body';
     };
 };
 
 export type CreateSessionResponse2 = CreateSessionResponse;
+
+export type RefreshSessionData = {
+    tokenLocation: string;
+};
 
 export type RefreshSessionResponse = CreateSessionResponse;
 
@@ -1594,6 +1599,7 @@ export type OidcLoginCallbackData = {
     redirectTo: string;
     sessionState: unknown;
     state: unknown;
+    tokenLocation: string;
 };
 
 export type OidcLoginCallbackResponse = CreateSessionResponse;
@@ -2364,6 +2370,7 @@ export type $OpenApiTs = {
     };
     '/api/auth/session/refresh': {
         get: {
+            req: RefreshSessionData;
             res: {
                 /**
                  * The session has been refreshed

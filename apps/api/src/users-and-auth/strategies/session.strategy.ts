@@ -15,14 +15,14 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
 
   async validate(req: Request): Promise<User> {
     const token = this.extractTokenFromRequest(req);
-    
+
     if (!token) {
       this.logger.debug('No session token found in request');
       throw new UnauthorizedException('No session token provided');
     }
 
     const user = await this.sessionService.validateSession(token);
-    
+
     if (!user) {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
@@ -55,6 +55,8 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       this.logger.debug('Token extracted from session cookie');
       return sessionCookie;
     }
+
+    this.logger.debug('No token found in request', { headers: req.headers, cookies: req.cookies });
 
     return null;
   }

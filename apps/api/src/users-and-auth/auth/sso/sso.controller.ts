@@ -15,12 +15,14 @@ import {
   UseFilters,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from '../auth.types';
 import { AuthService } from '../auth.service';
+import { SessionService } from '../session.service';
 import { SSOService } from './sso.service';
 import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
@@ -29,6 +31,7 @@ import { Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
+import { AppConfigType } from '../../../config/app.config';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -37,9 +40,42 @@ export class SSOController {
 
   constructor(
     private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
     private readonly usersService: UsersService,
-    private readonly ssoService: SSOService
+    private readonly ssoService: SSOService,
+    private readonly configService: ConfigService
   ) {}
+
+  /**
+   * Gets cookie configuration based on environment
+   */
+  private getCookieConfig() {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
+
+    return {
+      name: 'auth-session',
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax' as const,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      path: '/',
+    };
+  }
+
+  /**
+   * Sets authentication cookie on the response
+   */
+  private setAuthCookie(res: Response, token: string): void {
+    const cookieConfig = this.getCookieConfig();
+    res.cookie(cookieConfig.name, token, {
+      httpOnly: cookieConfig.httpOnly,
+      secure: cookieConfig.secure,
+      sameSite: cookieConfig.sameSite,
+      maxAge: cookieConfig.maxAge,
+      path: cookieConfig.path,
+    });
+  }
 
   @Get('providers')
   @ApiOperation({ summary: 'Get all SSO providers', operationId: 'getAllSSOProviders' })
@@ -249,13 +285,33 @@ export class SSOController {
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectTo: string,
-    @Res() response: Response
+    @Res({ passthrough: true }) response: Response,
+    @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
   ): Promise<CreateSessionResponse | void> {
-    const authToken = await this.authService.createJWT(request.user);
-    const auth: CreateSessionResponse = {
-      user: request.user,
-      authToken,
-    };
+    // Create session token using SessionService
+    const sessionToken = await this.sessionService.createSession(request.user, {
+      userAgent: request.headers['user-agent'],
+      ipAddress: request.ip || request.connection.remoteAddress,
+    });
+
+    let auth: CreateSessionResponse;
+
+    if (tokenLocation === 'cookie') {
+      // Set HTTP-only cookie for web browsers
+      this.setAuthCookie(response, sessionToken);
+
+      // Return user data without token for web browsers using cookies
+      auth = {
+        user: request.user,
+        authToken: '', // Empty token for web browsers using cookies
+      };
+    } else {
+      // Return token in response body for programmatic clients
+      auth = {
+        user: request.user,
+        authToken: sessionToken,
+      };
+    }
 
     if (redirectTo) {
       const urlWithAuth = new URL(redirectTo);
@@ -264,7 +320,16 @@ export class SSOController {
       urlWithAuth.searchParams.delete('externalId');
       urlWithAuth.searchParams.delete('ssoProviderId');
       urlWithAuth.searchParams.delete('ssoProviderType');
-      urlWithAuth.searchParams.set('auth', JSON.stringify(auth));
+
+      if (tokenLocation === 'cookie') {
+        // For web browsers, don't include auth in URL since we're using cookies
+        // Just include user data for frontend initialization
+        urlWithAuth.searchParams.set('user', JSON.stringify(auth.user));
+      } else {
+        // For programmatic clients, include full auth data
+        urlWithAuth.searchParams.set('auth', JSON.stringify(auth));
+      }
+
       this.logger.debug('Redirecting to', urlWithAuth.toString());
       return response.redirect(urlWithAuth.toString());
     }

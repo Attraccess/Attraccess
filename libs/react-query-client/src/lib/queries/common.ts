@@ -42,7 +42,9 @@ export const UseUsersServiceGetAllWithPermissionKeyFn = ({ limit, page, permissi
 export type AuthenticationServiceRefreshSessionDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.refreshSession>>;
 export type AuthenticationServiceRefreshSessionQueryResult<TData = AuthenticationServiceRefreshSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceRefreshSessionKey = "AuthenticationServiceRefreshSession";
-export const UseAuthenticationServiceRefreshSessionKeyFn = (queryKey?: Array<unknown>) => [useAuthenticationServiceRefreshSessionKey, ...(queryKey ?? [])];
+export const UseAuthenticationServiceRefreshSessionKeyFn = ({ tokenLocation }: {
+  tokenLocation: string;
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceRefreshSessionKey, ...(queryKey ?? [{ tokenLocation }])];
 export type AuthenticationServiceGetAllSsoProvidersDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getAllSsoProviders>>;
 export type AuthenticationServiceGetAllSsoProvidersQueryResult<TData = AuthenticationServiceGetAllSsoProvidersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceGetAllSsoProvidersKey = "AuthenticationServiceGetAllSsoProviders";
@@ -63,14 +65,15 @@ export const UseAuthenticationServiceLoginWithOidcKeyFn = ({ providerId, redirec
 export type AuthenticationServiceOidcLoginCallbackDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.oidcLoginCallback>>;
 export type AuthenticationServiceOidcLoginCallbackQueryResult<TData = AuthenticationServiceOidcLoginCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceOidcLoginCallbackKey = "AuthenticationServiceOidcLoginCallback";
-export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, providerId, redirectTo, sessionState, state }: {
+export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }: {
   code: unknown;
   iss: unknown;
   providerId: string;
   redirectTo: string;
   sessionState: unknown;
   state: unknown;
-}, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state }])];
+  tokenLocation: string;
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }])];
 export type EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerFindAll>>;
 export type EmailTemplatesServiceEmailTemplateControllerFindAllQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindAllKey = "EmailTemplatesServiceEmailTemplateControllerFindAll";

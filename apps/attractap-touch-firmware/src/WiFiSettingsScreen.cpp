@@ -4,6 +4,7 @@ WiFiSettingsScreen::WiFiSettingsScreen()
     : screen(nullptr),
       header(nullptr),
       refreshButton(nullptr),
+      addNetworkButton(nullptr),
       wifiStatusLabel(nullptr),
       wifiCurrentNetworkCard(nullptr),
       wifiNetworksList(nullptr),
@@ -17,6 +18,7 @@ WiFiSettingsScreen::WiFiSettingsScreen()
       connectionTimeoutTimer(nullptr),
       wifiService(nullptr),
       passwordDialog(nullptr),
+      hiddenNetworkDialog(nullptr),
       onBackToSettings(nullptr)
 {
 }
@@ -43,11 +45,12 @@ WiFiSettingsScreen::~WiFiSettingsScreen()
     }
 }
 
-void WiFiSettingsScreen::begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg)
+void WiFiSettingsScreen::begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg)
 {
-    Serial.printf("WiFiSettingsScreen: begin() called with wifiSvc=%p, passwordDlg=%p\n", wifiSvc, passwordDlg);
+    Serial.printf("WiFiSettingsScreen: begin() called with wifiSvc=%p, passwordDlg=%p, hiddenNetworkDlg=%p\n", wifiSvc, passwordDlg, hiddenNetworkDlg);
     wifiService = wifiSvc;
     passwordDialog = passwordDlg;
+    hiddenNetworkDialog = hiddenNetworkDlg;
 
     // Set up password dialog callbacks
     if (passwordDialog)
@@ -73,6 +76,32 @@ void WiFiSettingsScreen::begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwor
 
         passwordDialog->setCancelCallback([this]()
                                           { Serial.println("WiFiSettingsScreen: Password dialog cancelled"); });
+    }
+
+    // Set up hidden network dialog callbacks
+    if (hiddenNetworkDialog)
+    {
+        hiddenNetworkDialog->setConnectCallback([this](const String &ssid, const String &password)
+                                                {
+            Serial.printf("WiFiSettingsScreen: Connecting to hidden network '%s'\n", ssid.c_str());
+            
+            // Set connecting network for visual indicator
+            connectingNetworkSSID = ssid;
+            
+            // Show immediate connection feedback
+            showWiFiConnectionProgress(ssid, "Attempting to connect...");
+            
+            // Start connection timeout
+            startConnectionTimeout(ssid);
+            
+            // Connect to network
+            if (wifiService)
+            {
+                wifiService->connectToNetwork(ssid, password);
+            } });
+
+        hiddenNetworkDialog->setCancelCallback([this]()
+                                               { Serial.println("WiFiSettingsScreen: Hidden network dialog cancelled"); });
     }
 
     // UI will be created when first shown
@@ -205,6 +234,21 @@ void WiFiSettingsScreen::createUI()
     lv_label_set_text(refreshIcon, LV_SYMBOL_REFRESH);
     lv_obj_set_style_text_font(refreshIcon, &lv_font_montserrat_14, 0);
     lv_obj_center(refreshIcon);
+
+    // Add "Add Network" button next to refresh button
+    addNetworkButton = lv_btn_create(headerContainer);
+    lv_obj_set_size(addNetworkButton, 30, 30);
+    lv_obj_align(addNetworkButton, LV_ALIGN_RIGHT_MID, -35, 0); // 35px left of refresh button
+    lv_obj_set_style_bg_color(addNetworkButton, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_color(addNetworkButton, lv_color_hex(0x555555), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(addNetworkButton, 15, 0);
+    lv_obj_set_style_border_width(addNetworkButton, 0, 0);
+    lv_obj_add_event_cb(addNetworkButton, onAddNetworkClicked, LV_EVENT_CLICKED, this);
+
+    lv_obj_t *addIcon = lv_label_create(addNetworkButton);
+    lv_label_set_text(addIcon, LV_SYMBOL_PLUS);
+    lv_obj_set_style_text_font(addIcon, &lv_font_montserrat_14, 0);
+    lv_obj_center(addIcon);
 
     // Main scroll area - single scroll container for everything
     lv_obj_t *scrollArea = lv_obj_create(screen);
@@ -751,6 +795,27 @@ void WiFiSettingsScreen::onRefreshNetworksClicked(lv_event_t *e)
 
     Serial.println("WiFiSettingsScreen: Refresh networks button clicked");
     screen->refreshNetworkScan();
+}
+
+void WiFiSettingsScreen::onAddNetworkClicked(lv_event_t *e)
+{
+    Serial.println("WiFiSettingsScreen: onAddNetworkClicked callback triggered");
+    WiFiSettingsScreen *screen = (WiFiSettingsScreen *)lv_event_get_user_data(e);
+    if (!screen)
+    {
+        Serial.println("WiFiSettingsScreen: ERROR - screen pointer is null in add network callback!");
+        return;
+    }
+
+    Serial.println("WiFiSettingsScreen: Add Network button clicked");
+    if (screen->hiddenNetworkDialog)
+    {
+        screen->hiddenNetworkDialog->show();
+    }
+    else
+    {
+        Serial.println("WiFiSettingsScreen: ERROR - hiddenNetworkDialog is null!");
+    }
 }
 
 void WiFiSettingsScreen::onForgetWiFiButtonClicked(lv_event_t *e)

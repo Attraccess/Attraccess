@@ -22,6 +22,9 @@
   },
   "not_nxCloudId": "68232b3a5aa475a0500b5174",
   "neverConnectToCloud": true,
+  "tui": {
+    "enabled": false
+  },
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",
