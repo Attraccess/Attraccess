@@ -12,7 +12,6 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import { ResourceFlowLog } from '@attraccess/react-query-client';
-import { useAuth } from '../../../../hooks/useAuth';
 import { getBaseUrl } from '../../../../api';
 import { events } from 'fetch-event-stream';
 
@@ -81,7 +80,6 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     [setNodes]
   );
 
-  const { token: authToken } = useAuth();
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
 
   const publishLiveLog = useCallback((log: ResourceFlowLog) => {
@@ -110,9 +108,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
 
     const res = await fetch(url, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
+      credentials: 'include', // Include cookies for authentication
       signal: abortController.signal,
     });
 
@@ -137,7 +133,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
         console.error('[FlowContext] Error parsing event data:', parseError, event);
       }
     }
-  }, [publishLiveLog, authToken, resourceId]);
+  }, [publishLiveLog, resourceId]);
 
   useEffect(() => {
     connectToLiveLogs();

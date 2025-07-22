@@ -32,7 +32,7 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
 export function SSOLogin() {
   const { isLoading, data: providers } = useAuthenticationServiceGetAllSsoProviders();
   const location = useLocation();
-  const { jwtTokenLoginMutate } = useAuth();
+  const { sessionLoginMutate } = useAuth();
 
   const didExecuteSSOCallback = useRef(false);
 
@@ -57,8 +57,8 @@ export function SSOLogin() {
 
     didExecuteSSOCallback.current = true;
 
-    jwtTokenLoginMutate(authFromQuery);
-  }, [jwtTokenLoginMutate, authFromQuery]);
+    sessionLoginMutate(authFromQuery);
+  }, [sessionLoginMutate, authFromQuery]);
 
   const ssoLinkingIsRequired = useMemo(() => {
     return query.get('accountLinking') === 'required';

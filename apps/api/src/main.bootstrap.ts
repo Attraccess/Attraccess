@@ -16,6 +16,7 @@ import { existsSync } from 'fs';
 import { createCA, createCert } from 'mkcert';
 import { join } from 'path';
 import { StorageConfigType } from './config/storage.config';
+import cookieParser from 'cookie-parser';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -60,7 +61,7 @@ export async function bootstrap() {
   if (appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES) {
     const storageDir = storageConfig.root;
 
-    const host = appConfig.VITE_ATTRACCESS_URL;
+    const host = appConfig.ATTRACCESS_URL;
     const hostUrl = new URL(host);
     const domain = hostUrl.hostname;
 
@@ -86,10 +87,13 @@ export async function bootstrap() {
   });
   bootstrapLogger.log('Main application instance created.');
 
+  app.use(cookieParser());
+
   app.enableCors({
-    origin: '*',
+    origin: appConfig.ATTRACCESS_FRONTEND_URL,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    credentials: true, // Allow cookies to be sent
   });
 
   if (!appConfig) {
@@ -140,6 +144,9 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
+  // We dont use this for actual sessions/authentication
+  // we need this for SSO logins since for those we need to persist some state between requests
+  // TODO: if possible, refactor to use cookies or other less "hacky" methods
   app.use(
     session({
       secret: appConfig.AUTH_SESSION_SECRET,

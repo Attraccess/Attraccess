@@ -1,6 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { JwtService } from '@nestjs/jwt';
 import { nanoid } from 'nanoid';
 import { Repository } from 'typeorm';
 import { User, RevokedToken, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
@@ -43,7 +42,6 @@ export class AuthService {
 
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
@@ -63,21 +61,7 @@ export class AuthService {
       .execute();
   }
 
-  async isJWTRevoked({ tokenId }: { tokenId: string }): Promise<boolean> {
-    const revokedToken = await this.revokedTokenRepository.findOne({
-      where: { tokenId },
-    });
-    const isRevoked = !!revokedToken;
-    return isRevoked;
-  }
 
-  async revokeJWT({ tokenId }: { tokenId: string }): Promise<void> {
-    this.logger.debug(`Revoking JWT token: ${tokenId}`);
-    const revokedToken = new RevokedToken();
-    revokedToken.tokenId = tokenId;
-    await this.revokedTokenRepository.save(revokedToken);
-    this.logger.debug(`Successfully revoked token: ${tokenId}`);
-  }
 
   private async getAuthenticationDetail(
     authenticationType: AuthenticationType,
@@ -167,12 +151,7 @@ export class AuthService {
     return user;
   }
 
-  async createJWT(user: User): Promise<string> {
-    const tokenId = nanoid();
-    const payload = { username: user.username, sub: user.id, tokenId };
-    const token = this.jwtService.sign(payload);
-    return token;
-  }
+
 
   async generateEmailVerificationToken(user: User): Promise<string> {
     const token = nanoid();

@@ -110,7 +110,6 @@ describe('UsersController', () => {
       } as User;
 
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
-      jest.spyOn(authService, 'createJWT').mockResolvedValue('jwt-token');
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({
         id: 1,

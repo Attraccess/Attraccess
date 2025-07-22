@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include "WiFiService.h"
 #include "WiFiPasswordDialog.h"
+#include "WiFiHiddenNetworkDialog.h"
 #include "SettingsHeader.h"
 
 class WiFiSettingsScreen
@@ -17,7 +18,7 @@ public:
     WiFiSettingsScreen();
     ~WiFiSettingsScreen();
 
-    void begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg);
+    void begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg);
     void show();
     void hide();
     void update();
@@ -39,6 +40,7 @@ private:
     lv_obj_t *screen;
     SettingsHeader *header;
     lv_obj_t *refreshButton;
+    lv_obj_t *addNetworkButton;
     lv_obj_t *wifiStatusLabel;
     lv_obj_t *wifiCurrentNetworkCard;
     lv_obj_t *wifiNetworksList;
@@ -56,6 +58,7 @@ private:
     // Dependencies
     WiFiService *wifiService;
     WiFiPasswordDialog *passwordDialog;
+    WiFiHiddenNetworkDialog *hiddenNetworkDialog;
 
     // Callbacks
     BackToSettingsCallback onBackToSettings;
@@ -71,6 +74,7 @@ private:
     // Event handlers
     static void onNetworkItemClicked(lv_event_t *e);
     static void onRefreshNetworksClicked(lv_event_t *e);
+    static void onAddNetworkClicked(lv_event_t *e);
     static void onForgetWiFiButtonClicked(lv_event_t *e);
 };
 

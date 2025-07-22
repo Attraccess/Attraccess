@@ -368,13 +368,37 @@ void setup()
 
 void loop()
 {
+  // CRITICAL: LVGL must be processed first to ensure UI responsiveness
   lv_tick_inc(millis() - lv_lastTick); // Update the tick timer. Tick is new for LVGL 9
   lv_lastTick = millis();
-  lv_timer_handler(); // Update the GUI
+  lv_timer_handler(); // Update the GUI - HIGHEST PRIORITY
 
-  wifiService.update();       // Update WiFi service
-  settingsManager.update();   // Update Settings manager
-  nfc.loop();                 // Update NFC service
+  // Process other services with lower priority
+  wifiService.update();     // Update WiFi service
+  settingsManager.update(); // Update Settings manager
+
+  // NFC processing with additional safety measures
+  static uint32_t lastNFCUpdate = 0;
+  static uint32_t nfcStatusCheckInterval = 10000; // Check NFC status every 10 seconds
+
+  // Limit NFC updates to prevent excessive I2C traffic
+  if (millis() - lastNFCUpdate >= 50) // Minimum 50ms between NFC updates
+  {
+    lastNFCUpdate = millis();
+    nfc.loop(); // Update NFC service (now with error handling)
+  }
+
+  // Monitor NFC status and log periodically
+  static uint32_t lastNFCStatusLog = 0;
+  if (millis() - lastNFCStatusLog >= nfcStatusCheckInterval)
+  {
+    lastNFCStatusLog = millis();
+    if (nfc.isNFCDisabled() || nfc.getConsecutiveErrors() > 0)
+    {
+      Serial.printf("[MAIN] NFC Status: %s\n", nfc.getStatusString().c_str());
+    }
+  }
+
   attraccessService.update(); // Update Attraccess service
 
   // Handle navigation back to main screen from settings

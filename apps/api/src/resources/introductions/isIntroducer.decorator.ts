@@ -1,6 +1,6 @@
 import { UseGuards, applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { JwtGuard } from '@attraccess/plugins-backend-sdk';
+import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerGuard } from './isIntroducerGuard';
 
 /**
@@ -12,7 +12,7 @@ import { IsResourceIntroducerGuard } from './isIntroducerGuard';
  */
 export function IsResourceIntroducer() {
   return applyDecorators(
-    UseGuards(JwtGuard, IsResourceIntroducerGuard),
+    UseGuards(DualAuthGuard, IsResourceIntroducerGuard),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'User is not authenticated' }),
     ApiForbiddenResponse({

@@ -31,7 +31,7 @@ export class AttractapFirmwareService {
     this.logger.debug(`Loaded ${this.firmwares.length} firmware definitions`);
 
     const appConfig = this.configService.get<AppConfigType>('app');
-    this.apiUrl = appConfig.VITE_ATTRACCESS_URL;
+    this.apiUrl = appConfig.ATTRACCESS_URL;
     this.logger.debug(`API URL configured: ${this.apiUrl}`);
   }
 

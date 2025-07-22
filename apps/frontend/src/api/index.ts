@@ -10,7 +10,7 @@ function getInferredApiUrl() {
 }
 
 export function getBaseUrl() {
-  return import.meta.env.VITE_ATTRACCESS_URL || getInferredApiUrl();
+  return import.meta.env.ATTRACCESS_URL || getInferredApiUrl();
 }
 
 export function filenameToUrl(name?: string) {

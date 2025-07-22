@@ -3,7 +3,6 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { AuthenticationDetail, AuthenticationType, User, RevokedToken } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import * as bcrypt from 'bcrypt';
@@ -19,8 +18,6 @@ describe('AuthService', () => {
   let authService: AuthService;
   let usersService: UsersService;
   let authenticationDetailRepository: Repository<AuthenticationDetail>;
-  let revokedTokenRepository: Repository<RevokedToken>;
-  let jwtService: JwtService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,12 +37,7 @@ describe('AuthService', () => {
             findOne: jest.fn(),
           },
         },
-        {
-          provide: JwtService,
-          useValue: {
-            sign: jest.fn(),
-          },
-        },
+
         {
           provide: EmailService,
           useValue: {
@@ -65,8 +57,6 @@ describe('AuthService', () => {
     authService = module.get<AuthService>(AuthService);
     usersService = module.get<UsersService>(UsersService);
     authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
-    revokedTokenRepository = module.get<typeof revokedTokenRepository>(RevokedTokenRepository);
-    jwtService = module.get<JwtService>(JwtService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -156,47 +146,7 @@ describe('AuthService', () => {
     expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', 'hashed-password');
   });
 
-  it('should create a JWT for a valid user', async () => {
-    const user = {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-      systemPermissions: {},
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      resourceIntroductions: [],
-      resourceUsages: [],
-      authenticationDetails: [],
-      resourceIntroducerPermissions: [],
-    } as User;
 
-    jest.spyOn(jwtService, 'sign').mockReturnValue('test-token');
-
-    const token = await authService.createJWT(user);
-
-    expect(token).toBeDefined();
-    expect(token).toEqual('test-token');
-
-    expect(jwtService.sign).toHaveBeenCalledWith({
-      username: user.username,
-      sub: user.id,
-      tokenId: expect.any(String),
-    });
-  });
-
-  it('should revoke a JWT and identify it as revoked', async () => {
-    const tokenId = 'testTokenId';
-    jest.spyOn(revokedTokenRepository, 'findOne').mockResolvedValue({ id: 1, tokenId } as RevokedToken);
-    await authService.revokeJWT({ tokenId });
-
-    const isRevoked = await authService.isJWTRevoked({ tokenId });
-    expect(isRevoked).toBe(true);
-  });
 
   it('should not authenticate a non-existent user', async () => {
     jest.spyOn(usersService, 'findOne').mockResolvedValue(null);

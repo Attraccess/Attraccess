@@ -1,14 +1,61 @@
-import { Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
+import { SessionService } from './session.service';
 import { LoginGuard } from '../strategies/login.guard';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { AppConfigType } from '../../config/app.config';
 
 @ApiTags('Authentication')
 @Controller('/auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private sessionService: SessionService, private configService: ConfigService) {}
+
+  /**
+   * Gets cookie configuration based on environment
+   */
+  private getCookieConfig() {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
+
+    return {
+      name: 'auth-session',
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: 'lax' as const,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      path: '/',
+    };
+  }
+
+  /**
+   * Sets authentication cookie on the response
+   */
+  private setAuthCookie(res: Response, token: string): void {
+    const cookieConfig = this.getCookieConfig();
+    res.cookie(cookieConfig.name, token, {
+      httpOnly: cookieConfig.httpOnly,
+      secure: cookieConfig.secure,
+      sameSite: cookieConfig.sameSite,
+      maxAge: cookieConfig.maxAge,
+      path: cookieConfig.path,
+    });
+  }
+
+  /**
+   * Clears authentication cookie from the response
+   */
+  private clearAuthCookie(res: Response): void {
+    const cookieConfig = this.getCookieConfig();
+    res.clearCookie(cookieConfig.name, {
+      httpOnly: cookieConfig.httpOnly,
+      secure: cookieConfig.secure,
+      sameSite: cookieConfig.sameSite,
+      path: cookieConfig.path,
+    });
+  }
 
   @Post('/session/local')
   @UseGuards(LoginGuard)
@@ -28,16 +75,37 @@ export class AuthController {
       properties: {
         username: { type: 'string' },
         password: { type: 'string' },
+        tokenLocation: { type: 'string', enum: ['cookie', 'body'] },
       },
     },
   })
-  async createSession(@Req() request: AuthenticatedRequest): Promise<CreateSessionResponse> {
-    const authToken = await this.authService.createJWT(request.user);
+  async createSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: { tokenLocation: 'cookie' | 'body' }
+  ): Promise<CreateSessionResponse> {
+    // Create session token using SessionService
+    const sessionToken = await this.sessionService.createSession(request.user, {
+      userAgent: request.headers['user-agent'],
+      ipAddress: request.ip || request.connection.remoteAddress,
+    });
 
-    return {
-      user: request.user,
-      authToken,
-    };
+    if (body.tokenLocation === 'cookie') {
+      // Set HTTP-only cookie for web browsers
+      this.setAuthCookie(response, sessionToken);
+
+      // Return user data without token for web browsers
+      return {
+        user: request.user,
+        authToken: '', // Empty token for web browsers using cookies
+      };
+    } else {
+      // Return token in response body for programmatic clients
+      return {
+        user: request.user,
+        authToken: sessionToken,
+      };
+    }
   }
 
   @Get('/session/refresh')
@@ -47,13 +115,70 @@ export class AuthController {
     description: 'The session has been refreshed',
     type: CreateSessionResponse,
   })
-  async refreshSession(@Req() request: AuthenticatedRequest): Promise<CreateSessionResponse> {
-    const authToken = await this.authService.createJWT(request.user);
-    await this.authService.revokeJWT({ tokenId: request.user.jwtTokenId });
-    return {
-      user: request.user,
-      authToken,
-    };
+  async refreshSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
+  ): Promise<CreateSessionResponse> {
+    // Get current session token from cookie or header
+    const cookieToken = request.cookies?.['auth-session'];
+    const headerToken = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7)
+      : null;
+
+    const currentToken = headerToken || cookieToken;
+
+    if (!currentToken) {
+      // Create a new session if no current token exists
+      const sessionToken = await this.sessionService.createSession(request.user, {
+        userAgent: request.headers['user-agent'],
+        ipAddress: request.ip || request.connection.remoteAddress,
+      });
+
+      return {
+        user: request.user,
+        authToken: sessionToken,
+      };
+    }
+
+    // Refresh the session token
+    const newToken = await this.sessionService.refreshSession(currentToken);
+
+    if (!newToken) {
+      // If session refresh failed, create a new session
+      const sessionToken = await this.sessionService.createSession(request.user, {
+        userAgent: request.headers['user-agent'],
+        ipAddress: request.ip || request.connection.remoteAddress,
+      });
+
+      if (tokenLocation === 'cookie') {
+        this.setAuthCookie(response, sessionToken);
+        return {
+          user: request.user,
+          authToken: '',
+        };
+      } else {
+        return {
+          user: request.user,
+          authToken: sessionToken,
+        };
+      }
+    }
+
+    if (tokenLocation === 'cookie') {
+      // Update cookie with new token
+      this.setAuthCookie(response, newToken);
+      return {
+        user: request.user,
+        authToken: '',
+      };
+    } else {
+      // Return new token for programmatic clients
+      return {
+        user: request.user,
+        authToken: newToken,
+      };
+    }
   }
 
   @Delete('/session')
@@ -70,11 +195,27 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized - User is not authenticated',
   })
-  async endSession(@Req() request: AuthenticatedRequest): Promise<void> {
-    const tokenId = request.user.jwtTokenId;
-    await new Promise<void>((resolve) => request.logout(resolve));
-    if (tokenId) {
-      await this.authService.revokeJWT({ tokenId });
+  async endSession(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<void> {
+    // Get session token from cookie or header
+    const cookieToken = request.cookies?.['auth-session'];
+    const headerToken = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7)
+      : null;
+
+    const sessionToken = headerToken || cookieToken;
+
+    // Clear authentication cookie regardless of request type
+    this.clearAuthCookie(response);
+
+    // Revoke session token if present
+    if (sessionToken) {
+      await this.sessionService.revokeSession(sessionToken);
     }
+
+    // Logout from passport session
+    await new Promise<void>((resolve) => request.logout(resolve));
   }
 }

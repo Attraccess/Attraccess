@@ -11,6 +11,7 @@ import { AppConfigType } from '../config/app.config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { Module } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
@@ -25,6 +26,7 @@ import { EmailTemplateModule } from '../email-template/email-template.module';
     }),
 
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     UsersAndAuthModule,
     TypeOrmModule.forRoot(dataSourceConfig),
     ResourcesModule,

@@ -16,6 +16,7 @@ import { RevokedToken } from './entities/revokedToken.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
+import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 import {
   ResourceFlowNode,
@@ -52,6 +53,7 @@ export {
   User,
   SystemPermissions,
   SystemPermission,
+  Session,
   NFCCard,
   Attractap,
   EmailTemplate,
@@ -77,6 +79,7 @@ export const entities = {
   User,
   AuthenticationDetail,
   RevokedToken,
+  Session,
   Resource,
   ResourceComputedView,
   ResourceGroup,

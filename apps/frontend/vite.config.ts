@@ -12,6 +12,7 @@ import siteWebManifest from './src/service-worker/site.webmanifest.json';
 export default defineConfig({
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/frontend',
+  envPrefix: 'ATTRACCESS_',
   server: {
     port: 4200,
     host: '0.0.0.0',

@@ -1573,9 +1573,14 @@ export type GetAllWithPermissionData = PaginatedUsersResponseDto;
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
+  tokenLocation?: "cookie" | "body";
 }
 
 export type CreateSessionData = CreateSessionResponse;
+
+export interface RefreshSessionParams {
+  tokenLocation: string;
+}
 
 export type RefreshSessionData = CreateSessionResponse;
 
@@ -1607,6 +1612,7 @@ export type LoginWithOidcData = any;
 
 export interface OidcLoginCallbackParams {
   redirectTo: string;
+  tokenLocation: string;
   code: any;
   iss: any;
   "session-state": any;
@@ -2104,7 +2110,9 @@ export namespace Authentication {
    */
   export namespace RefreshSession {
     export type RequestParams = {};
-    export type RequestQuery = {};
+    export type RequestQuery = {
+      tokenLocation: string;
+    };
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = RefreshSessionData;
@@ -2264,6 +2272,7 @@ export namespace Authentication {
     };
     export type RequestQuery = {
       redirectTo: string;
+      tokenLocation: string;
       code: any;
       iss: any;
       "session-state": any;
@@ -4057,10 +4066,11 @@ export class Api<
      * @request GET:/api/auth/session/refresh
      * @secure
      */
-    refreshSession: (params: RequestParams = {}) =>
+    refreshSession: (query: RefreshSessionParams, params: RequestParams = {}) =>
       this.request<RefreshSessionData, void>({
         path: `/api/auth/session/refresh`,
         method: "GET",
+        query: query,
         secure: true,
         format: "json",
         ...params,

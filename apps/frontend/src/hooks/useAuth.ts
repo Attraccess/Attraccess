@@ -10,12 +10,13 @@ import {
   useAuthenticationServiceRefreshSessionKey,
   useUsersServiceGetCurrent,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getBaseUrl } from '../api';
 
 interface LoginCredentials {
   username: string;
   password: string;
+  tokenLocation: 'cookie' | 'body';
 }
 
 export function usePersistedAuth() {
@@ -24,44 +25,39 @@ export function usePersistedAuth() {
 }
 
 export function useRefreshSession() {
-  const { isInitialized, jwtTokenLoginMutate } = useAuth();
-  const { data: refreshedSession } = useAuthenticationServiceRefreshSession(undefined, {
+  const { isInitialized } = useAuth();
+  const { data: refreshedSession } = useAuthenticationServiceRefreshSession({ tokenLocation: 'cookie' }, undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes,
     enabled: isInitialized,
     retryOnMount: false,
     refetchOnWindowFocus: false,
   });
 
-  const lastRefreshedSessionToken = useRef<string | null>(null);
-
+  // Session refresh is now handled automatically by cookies
+  // No need to manually update tokens or localStorage
   useEffect(() => {
-    if (!refreshedSession) {
-      return;
+    if (refreshedSession) {
+      // Session was refreshed successfully, cookies are automatically updated by the server
+      // No client-side token management needed
     }
-
-    if (lastRefreshedSessionToken.current === refreshedSession.authToken) {
-      return;
-    }
-    lastRefreshedSessionToken.current = refreshedSession.authToken;
-
-    jwtTokenLoginMutate(refreshedSession);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshedSession]);
 }
 
 export function useLogin() {
-  const { jwtTokenLoginMutate } = useAuth();
+  const { sessionLoginMutate } = useAuth();
 
   const login = useAuthenticationServiceCreateSession({
     onSuccess: (data) => {
-      jwtTokenLoginMutate(data);
+      sessionLoginMutate(data);
     },
   });
 
   return {
     ...login,
     mutate: async (data: LoginCredentials) => {
-      return login.mutate({ requestBody: { username: data.username, password: data.password } });
+      return login.mutate({
+        requestBody: { username: data.username, password: data.password, tokenLocation: data.tokenLocation },
+      });
     },
     mutateAsync: async (data: { username: string; password: string }) => {
       return login.mutateAsync({ requestBody: { username: data.username, password: data.password } });
@@ -74,63 +70,44 @@ export function useAuth() {
   const navigate = useNavigate();
 
   const [isInitialized, setIsInitialized] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
 
-  // Initialize token from storage on mount
+  // Initialize API base URL and configure for cookie-based authentication
   useEffect(() => {
     const initializeAuth = () => {
       OpenAPI.BASE = getBaseUrl();
+      // Remove manual token setting - cookies will be handled automatically
+      OpenAPI.TOKEN = '';
+      // Enable credentials to include cookies in requests
+      OpenAPI.WITH_CREDENTIALS = true;
 
-      // Check both storage locations
-      const authFromLocalStorage = localStorage.getItem('auth');
-      const authFromSessionStorage = sessionStorage.getItem('auth');
-      const authData = authFromLocalStorage || authFromSessionStorage;
+      // Clean up any existing localStorage/sessionStorage auth data
+      localStorage.removeItem('auth');
+      sessionStorage.removeItem('auth');
 
-      if (authData) {
-        try {
-          const auth = JSON.parse(authData) as CreateSessionResponse;
-          if (auth.authToken) {
-            OpenAPI.TOKEN = auth.authToken;
-            setToken(auth.authToken);
-          }
-        } catch (e) {
-          console.error('Error parsing persisted auth:', e);
-        }
-      } else {
-        // No token found, we're initialized but not authenticated
-        setIsInitialized(true);
-      }
+      setIsInitialized(true);
     };
 
     initializeAuth();
   }, []);
 
-  const { data: currentUser, error: currentUserError } = useUsersServiceGetCurrent(undefined, {
+  // Check authentication status by trying to fetch current user
+  // This will work with cookies automatically
+  const { data: currentUser } = useUsersServiceGetCurrent(undefined, {
     refetchInterval: 1000 * 60 * 20, // 20 minutes
     retry: false,
-    enabled: !!token, // Only fetch when we have a token
+    enabled: isInitialized, // Only fetch when initialized
   });
 
-  useEffect(() => {
-    if (token && (currentUser || currentUserError)) {
-      setIsInitialized(true);
-    }
-  }, [currentUser, currentUserError, token]);
-
-  const { mutate: jwtTokenLoginMutate } = useMutation({
+  const { mutate: sessionLoginMutate } = useMutation({
     mutationFn: async (auth: CreateSessionResponse) => {
-      // Store the auth data in the appropriate storage
+      // No need to store auth data - cookies are handled automatically by the server
       if (!auth) {
-        console.error('[jwtTokenLoginMutate] auth is null');
+        console.error('[sessionLoginMutate] auth is null');
         throw new Error('Auth is null');
       }
 
-      localStorage.setItem('auth', JSON.stringify(auth));
-
-      OpenAPI.TOKEN = auth.authToken;
-      setToken(auth.authToken);
-
-      setIsInitialized(true);
+      // No manual token setting needed - cookies handle authentication
+      // The server will have set the HTTP-only cookie automatically
 
       return auth;
     },
@@ -149,11 +126,8 @@ export function useAuth() {
 
   const { mutate: deleteSession } = useAuthenticationServiceEndSession({
     onSuccess: async () => {
-      localStorage.removeItem('auth');
-      sessionStorage.removeItem('auth');
-
-      OpenAPI.TOKEN = '';
-      setToken(null);
+      // No need to remove localStorage/sessionStorage - cookies are cleared by server
+      // No manual token clearing needed - server clears the HTTP-only cookie
 
       navigate('/', { replace: true });
       window.location.reload();
@@ -168,7 +142,7 @@ export function useAuth() {
     user: currentUser ?? null,
     isAuthenticated: !!currentUser,
     isInitialized,
-    jwtTokenLoginMutate,
+    sessionLoginMutate,
     logout,
     hasPermission: (permission: keyof SystemPermissions) => {
       if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {
@@ -176,6 +150,5 @@ export function useAuth() {
       }
       return (currentUser.systemPermissions as SystemPermissions)[permission] ?? false;
     },
-    token,
   };
 }

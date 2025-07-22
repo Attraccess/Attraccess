@@ -12,15 +12,50 @@ void NFC::enableCardChecking()
 {
     Serial.println("[DEBUG] Entered NFC::enableCardChecking");
     this->is_card_checking_enabled = true;
-    Serial.println("[DEBUG] NFC card checking enabled");}
+    Serial.println("[DEBUG] NFC card checking enabled");
+}
 
 void NFC::disableCardChecking()
 {
     this->is_card_checking_enabled = false;
 }
 
+String NFC::getStatusString() const
+{
+    if (nfc_disabled)
+    {
+        uint32_t time_remaining = (NFC_DISABLE_DURATION - (millis() - last_error_time)) / 1000;
+        return "NFC Disabled (" + String(time_remaining) + "s remaining)";
+    }
+    else if (consecutive_errors > 0)
+    {
+        return "NFC Errors: " + String(consecutive_errors);
+    }
+    else if (state == NFC_STATE_INIT)
+    {
+        return "NFC Initializing";
+    }
+    else if (state == NFC_STATE_READY)
+    {
+        return "NFC Ready";
+    }
+    else
+    {
+        return "NFC Active";
+    }
+}
+
 void NFC::loop()
 {
+    // Check for error recovery first
+    checkErrorRecovery();
+
+    // Skip all operations if NFC is disabled due to errors
+    if (nfc_disabled)
+    {
+        return;
+    }
+
     switch (this->state)
     {
     case NFC_STATE_INIT:
@@ -51,19 +86,47 @@ void NFC::loop()
 
 void NFC::handleInitState()
 {
-    // Only check firmware version every 500ms to avoid hammering the bus
-    if (millis() - this->last_state_time < 500)
+    // Check if we should retry the operation
+    if (!shouldRetryOperation())
     {
         return;
     }
 
     this->last_state_time = millis();
-    uint32_t versiondata = nfc.getFirmwareVersion();
 
-    if (versiondata)
+    // Non-blocking check: attempt to get firmware version with timeout protection
+    Serial.println("[NFC] Attempting to detect PN532...");
+    uint32_t start_time = millis();
+    uint32_t versiondata = 0;
+
+    // Yield to scheduler before potentially blocking operation
+    yield();
+
+    // Try to get firmware version with our own timeout wrapper
+    bool operation_success = false;
+    uint32_t operation_start = millis();
+
+    try
+    {
+        versiondata = nfc.getFirmwareVersion();
+        operation_success = (versiondata != 0);
+    }
+    catch (...)
+    {
+        operation_success = false;
+    }
+
+    // Additional safety: if operation took too long, consider it failed
+    if (millis() - operation_start > 1000)
+    { // 1 second safety timeout
+        operation_success = false;
+        versiondata = 0;
+    }
+
+    if (operation_success && versiondata)
     {
         // Print board info
-        Serial.print("Found PN53x board version: ");
+        Serial.print("[NFC] Found PN53x board version: ");
         Serial.print((versiondata >> 24) & 0xFF, HEX);
         Serial.print('.');
         Serial.print((versiondata >> 16) & 0xFF, DEC);
@@ -71,15 +134,34 @@ void NFC::handleInitState()
         Serial.println((versiondata >> 8) & 0xFF, DEC);
 
         // Configure the PN532 to read ISO14443A tags
-        nfc.SAMConfig();
+        bool sam_config_success = false;
+        try
+        {
+            sam_config_success = nfc.SAMConfig();
+        }
+        catch (...)
+        {
+            sam_config_success = false;
+        }
 
-        // Move to ready state
-        this->state = NFC_STATE_READY;
-        this->last_state_time = millis();
+        if (sam_config_success)
+        {
+            recordSuccess();
+            // Move to ready state
+            this->state = NFC_STATE_READY;
+            this->last_state_time = millis();
+            Serial.println("[NFC] Successfully initialized PN532");
+        }
+        else
+        {
+            recordError();
+            Serial.println("[NFC] Error: SAMConfig failed");
+        }
     }
     else
     {
-        Serial.println("Error: Didn't find PN53x board. Check wiring.");
+        recordError();
+        Serial.println("[NFC] Error: Didn't find PN53x board. Check wiring.");
     }
 }
 
@@ -87,7 +169,8 @@ void NFC::handleReadyState()
 {
     if (this->is_card_checking_enabled)
     {
-        if (millis() - this->last_state_time >= 100)
+        // Use longer delay to reduce I2C bus load
+        if (millis() - this->last_state_time >= 200) // Increased from 100ms
         {
             this->state = NFC_STATE_SCANNING;
             this->scan_start_time = millis();
@@ -97,16 +180,47 @@ void NFC::handleReadyState()
 
 void NFC::handleScanningState()
 {
-    // Start the card detection process
+    // Check if we should retry the operation
+    if (!shouldRetryOperation())
+    {
+        this->state = NFC_STATE_READY;
+        this->last_state_time = millis();
+        return;
+    }
+
+    // Start the card detection process with timeout protection
     uint8_t uid[7];
     uint8_t uidLength;
+    bool foundCard = false;
 
-    // Use a smaller timeout for each scan attempt (250ms)
-    bool foundCard = this->nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 250);
+    // Yield to scheduler before potentially blocking operation
+    yield();
+
+    uint32_t operation_start = millis();
+
+    try
+    {
+        // Use a smaller timeout for each scan attempt (200ms instead of 250ms)
+        foundCard = this->nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 200);
+    }
+    catch (...)
+    {
+        foundCard = false;
+    }
+
+    // Additional safety: if operation took too long, consider it failed
+    if (millis() - operation_start > 300)
+    { // 300ms safety timeout
+        foundCard = false;
+        recordError();
+        Serial.println("[NFC] Warning: Card scan operation timed out");
+    }
 
     if (foundCard)
     {
-        if (this->onNFCTapped) {
+        recordSuccess();
+        if (this->onNFCTapped)
+        {
             this->onNFCTapped(uid, uidLength);
         }
     }
@@ -407,4 +521,66 @@ void NFC::waitForCardRemoval()
     // To be implemented based on specific requirements
     // For now, we just return immediately to avoid blocking
     return;
+}
+
+// Error handling methods
+void NFC::recordError()
+{
+    consecutive_errors++;
+    last_error_time = millis();
+
+    Serial.printf("[NFC] Error recorded. Consecutive errors: %d\n", consecutive_errors);
+
+    if (consecutive_errors >= MAX_CONSECUTIVE_ERRORS)
+    {
+        nfc_disabled = true;
+        Serial.printf("[NFC] Too many consecutive errors (%d). Disabling NFC for %d seconds.\n",
+                      consecutive_errors, NFC_DISABLE_DURATION / 1000);
+    }
+}
+
+void NFC::recordSuccess()
+{
+    if (consecutive_errors > 0)
+    {
+        Serial.printf("[NFC] Success after %d errors. Resetting error count.\n", consecutive_errors);
+    }
+    consecutive_errors = 0;
+    last_error_time = 0;
+}
+
+bool NFC::shouldRetryOperation()
+{
+    if (nfc_disabled)
+        return false;
+
+    if (consecutive_errors == 0)
+        return true;
+
+    uint32_t backoff_delay = getBackoffDelay();
+    return (millis() - last_error_time >= backoff_delay);
+}
+
+uint32_t NFC::getBackoffDelay()
+{
+    if (consecutive_errors == 0)
+        return 0;
+
+    // Exponential backoff with cap
+    uint32_t delay = ERROR_BACKOFF_BASE * (1 << min(consecutive_errors - 1, 5)); // Cap at 32x base delay
+    return min(delay, MAX_ERROR_BACKOFF);
+}
+
+void NFC::checkErrorRecovery()
+{
+    if (nfc_disabled && (millis() - last_error_time >= NFC_DISABLE_DURATION))
+    {
+        Serial.println("[NFC] Recovery time elapsed. Re-enabling NFC with reset error count.");
+        nfc_disabled = false;
+        consecutive_errors = 0;
+        last_error_time = 0;
+        // Reset to init state to re-detect hardware
+        this->state = NFC_STATE_INIT;
+        this->last_state_time = millis();
+    }
 }

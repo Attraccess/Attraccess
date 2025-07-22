@@ -14,6 +14,7 @@ class WiFiSettingsScreen;
 class SystemSettingsScreen;
 class AttraccessSettingsScreen;
 class WiFiPasswordDialog;
+class WiFiHiddenNetworkDialog;
 class WiFiService;
 class AttraccessService;
 struct WiFiNetwork;
@@ -58,6 +59,7 @@ private:
     SystemSettingsScreen *systemSettingsScreen;
     AttraccessSettingsScreen *attraccessSettingsScreen;
     WiFiPasswordDialog *passwordDialog;
+    WiFiHiddenNetworkDialog *hiddenNetworkDialog;
 
     // Dependencies
     WiFiService *wifiService;

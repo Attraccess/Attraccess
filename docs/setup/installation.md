@@ -27,15 +27,13 @@ Attraccess requires several environment variables to function properly:
 
 #### Authentication & Security
 
-| Variable              | Description                               | Required               | Default |
-| --------------------- | ----------------------------------------- | ---------------------- | ------- |
-| `AUTH_JWT_ORIGIN`     | JWT secret source, either "ENV" or "FILE" | Yes                    | -       |
-| `AUTH_JWT_SECRET`     | JWT secret when using ENV origin          | If AUTH_JWT_ORIGIN=ENV | -       |
-| `AUTH_SESSION_SECRET` | Secret for encrypting sessions            | Yes                    | -       |
-| `VITE_ATTRACCESS_URL` | URL/hostname of your Attraccess instance  | Yes                    | -       |
+| Variable              | Description                              | Required | Default |
+| --------------------- | ---------------------------------------- | -------- | ------- |
+| `AUTH_SESSION_SECRET` | Secret for encrypting sessions           | Yes      | -       |
+| `ATTRACCESS_URL`      | URL/hostname of your Attraccess instance | Yes      | -       |
 
 > [!WARNING]
-> Always use strong, unique secrets for `AUTH_JWT_SECRET` and `AUTH_SESSION_SECRET`. These are critical for your application's security.
+> Always use strong, unique secrets for `AUTH_SESSION_SECRET`. These are critical for your application's security.
 
 #### Email Configuration
 
@@ -83,10 +81,8 @@ Start Attraccess with your configured environment variables:
 docker run -d \
   --name attraccess \
   -p 3000:3000 \
-  -e AUTH_JWT_ORIGIN=ENV \
-  -e AUTH_JWT_SECRET=your_secure_jwt_secret \
   -e AUTH_SESSION_SECRET=your_secure_session_secret \
-  -e VITE_ATTRACCESS_URL=https://attraccess.yourdomain.com \
+  -e ATTRACCESS_URL=https://attraccess.yourdomain.com \
   -e SMTP_SERVICE=SMTP \
   -e SMTP_FROM=no-reply@yourdomain.com \
   -e SMTP_HOST=smtp.yourdomain.com \
@@ -117,36 +113,6 @@ This directory contains:
 > [!ATTENTION]
 > Mounting the storage volume is **essential** to ensure data persistence across container restarts and updates. Failure to mount this volume will result in data loss when the container is updated or restarted.
 
-### 🔒 JWT Authentication Options
-
-You can provide the JWT secret in two ways:
-
-1. **Environment Variable (AUTH_JWT_ORIGIN=ENV)**:
-
-   - Set `AUTH_JWT_ORIGIN=ENV`
-   - Provide the JWT secret via `AUTH_JWT_SECRET`
-
-2. **File (AUTH_JWT_ORIGIN=FILE)**:
-   - Set `AUTH_JWT_ORIGIN=FILE`
-   - Mount a volume containing the secret at `/app/secrets/jwt.key`
-
-Example using file-based JWT secret:
-
-```bash
-docker run -d \
-  --name attraccess \
-  -p 3000:3000 \
-  -e AUTH_JWT_ORIGIN=FILE \
-  -e AUTH_SESSION_SECRET=your_secure_session_secret \
-  -e VITE_ATTRACCESS_URL=https://attraccess.yourdomain.com \
-  -v /path/to/jwt/secret:/app/secrets \
-  -v /path/to/storage:/app/storage \
-  attraccess/attraccess:latest
-```
-
-> [!NOTE]
-> Using the file-based approach (`AUTH_JWT_ORIGIN=FILE`) is recommended for production environments as it provides better security by keeping sensitive information out of environment variables.
-
 ### 📋 Available Log Levels
 
 The `LOG_LEVELS` environment variable accepts a comma-separated list of these values:
@@ -168,10 +134,8 @@ Attraccess supports plugins that extend its functionality. Mount your plugins di
 docker run -d \
   --name attraccess \
   -p 3000:3000 \
-  -e AUTH_JWT_ORIGIN=ENV \
-  -e AUTH_JWT_SECRET=your_secure_jwt_secret \
   -e AUTH_SESSION_SECRET=your_secure_session_secret \
-  -e VITE_ATTRACCESS_URL=https://attraccess.yourdomain.com \
+  -e ATTRACCESS_URL=https://attraccess.yourdomain.com \
   -v /path/to/plugins:/app/plugins \
   -v /path/to/storage:/app/storage \
   attraccess/attraccess:latest
