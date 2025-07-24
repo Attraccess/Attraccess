@@ -1,0 +1,8 @@
+{
+    "title": "Serielle Konsole",
+    "actions": {
+        "connect": "Verbinden",
+        "disconnect": "Trennen",
+        "reset": "Gerät neustarten"
+    }
+}

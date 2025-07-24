@@ -2,7 +2,8 @@
   "page": {
     "title": "Attractaps",
     "actions": {
-      "openFlasher": "new Attractap"
+      "openFlasher": "new Attractap",
+      "openSerialConsole": "Serial Console"
     }
   },
   "workInProgress": "This feature is still in development, use at your own risk!",

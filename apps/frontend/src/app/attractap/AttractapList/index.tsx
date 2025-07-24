@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
-import { Cloud, CloudOff, CpuIcon } from 'lucide-react';
+import { Cloud, CloudOff, CpuIcon, LogsIcon } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -10,8 +10,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { AttractapInstaller } from '../Installer';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import { ESPLoaderProvider } from 'esptool-react';
-import SparkMD5 from 'spark-md5';
+import { WebSerialConsole } from '../../../components/WebSerialConsole';
 
 import de from './de.json';
 import en from './en.json';
@@ -47,17 +46,13 @@ export const AttractapList = () => {
 
   const formatDateTime = useDateTimeFormatter();
 
-  const calculateMD5Hash = (image: Uint8Array): string => {
-    const spark = new SparkMD5.ArrayBuffer();
-    spark.append(image.buffer as ArrayBuffer);
-    return spark.end();
-  };
+
 
   return (
-    <ESPLoaderProvider initialBaudrate={115200} calculateMD5Hash={calculateMD5Hash} initialDebugLogging={false}>
+    <>
       <PageHeader
         title={t('page.title')}
-        actions={
+        actions={<>
           <AttractapInstaller>
             {(onOpen) => (
               <Button
@@ -70,7 +65,19 @@ export const AttractapList = () => {
               </Button>
             )}
           </AttractapInstaller>
-        }
+          <WebSerialConsole baudRate={115200}>
+            {(onOpen) => (
+              <Button
+                variant="light"
+                startContent={<LogsIcon className="w-4 h-4" />}
+                onPress={onOpen}
+                data-cy="attractap-list-open-console-button"
+              >
+                {t('page.actions.openSerialConsole')}
+              </Button>
+            )}
+          </WebSerialConsole>
+        </>}
       />
 
       <Alert color="danger" className="mb-4">
@@ -118,6 +125,6 @@ export const AttractapList = () => {
           )}
         </TableBody>
       </Table>
-    </ESPLoaderProvider>
+    </>
   );
 };

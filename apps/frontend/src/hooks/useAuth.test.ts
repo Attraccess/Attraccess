@@ -1,25 +1,26 @@
+import { vi } from 'vitest';
 import { useAuth } from './useAuth';
 
 // Mock all dependencies to avoid complex setup issues
-jest.mock('../api', () => ({
+vi.mock('../api', () => ({
   getBaseUrl: () => 'http://localhost:3000',
 }));
 
-jest.mock('@attraccess/react-query-client', () => ({
+vi.mock('@attraccess/react-query-client', () => ({
   OpenAPI: { BASE: '', TOKEN: '', WITH_CREDENTIALS: false },
   useUsersServiceGetCurrent: () => ({ data: null }),
-  useAuthenticationServiceEndSession: () => ({ mutate: jest.fn() }),
+  useAuthenticationServiceEndSession: () => ({ mutate: vi.fn() }),
   useAuthenticationServiceRefreshSession: () => ({ data: null }),
-  useAuthenticationServiceCreateSession: () => ({ mutate: jest.fn(), mutateAsync: jest.fn() }),
+  useAuthenticationServiceCreateSession: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }));
 
-jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
 }));
 
-jest.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ mutate: jest.fn(), mutateAsync: jest.fn() }),
-  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
+vi.mock('@tanstack/react-query', () => ({
+  useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 describe('useAuth', () => {

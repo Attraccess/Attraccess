@@ -1,0 +1,8 @@
+{
+    "title": "Serial Console",
+    "actions": {
+        "connect": "Connect",
+        "disconnect": "Disconnect",
+        "reset": "Restart device"
+    }
+}

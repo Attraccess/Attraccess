@@ -1,13 +1,14 @@
 import { mockToastHooks } from './mocks';
+import { vi } from 'vitest';
 
-jest.mock('../components/toastProvider', () => ({
+vi.mock('../components/toastProvider', () => ({
   __esModule: true,
   ToastProvider: mockToastHooks.ToastProvider,
   useToastMessage: mockToastHooks.useToastMessage,
 }));
 
 // Mock auth hook
-jest.mock('../hooks/useAuth', () => ({
+vi.mock('../hooks/useAuth', () => ({
   __esModule: true,
   useAuth: () => ({
     isAuthenticated: true,
@@ -17,20 +18,19 @@ jest.mock('../hooks/useAuth', () => ({
 }));
 
 // Mock theme hook
-jest.mock('@heroui/use-theme', () => ({
+vi.mock('@heroui/use-theme', () => ({
   __esModule: true,
   useTheme: () => ({
     theme: 'light',
-    setTheme: jest.fn(),
+    setTheme: vi.fn(),
   }),
 }));
 
 // Mock the API module to handle import.meta
-jest.mock('../api/index', () => ({
+vi.mock('../api/index', () => ({
   __esModule: true,
   default: {
     baseUrl: 'http://localhost:3000',
   },
-  filenameToUrl: (filename: string) =>
-    `http://localhost:3000/resources/images/${filename}`,
+  filenameToUrl: (filename: string) => `http://localhost:3000/resources/images/${filename}`,
 }));

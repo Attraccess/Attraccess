@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 import './test-utils/setupIntegrationTests';
 
 // Mock import.meta for Vite environment variables
@@ -14,26 +15,26 @@ import './test-utils/setupIntegrationTests';
 // Mock window methods
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation((query) => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
   })),
 });
 
 // Mock scrollTo
-window.scrollTo = jest.fn();
+window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
 
 // Mock ResizeObserver
 class MockResizeObserver implements ResizeObserver {
-  observe = jest.fn();
-  unobserve = jest.fn();
-  disconnect = jest.fn();
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
 }
 global.ResizeObserver = MockResizeObserver;
 
@@ -52,12 +53,12 @@ class MockIntersectionObserver implements IntersectionObserver {
     // This is a mock implementation, so we don't need to use the callback or options
   }
 
-  observe = jest.fn();
-  unobserve = jest.fn();
-  disconnect = jest.fn();
-  takeRecords = jest.fn().mockReturnValue([]);
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+  takeRecords = vi.fn().mockReturnValue([]);
 }
 global.IntersectionObserver = MockIntersectionObserver;
 
 // Suppress console errors during tests
-console.error = jest.fn();
+console.error = vi.fn();

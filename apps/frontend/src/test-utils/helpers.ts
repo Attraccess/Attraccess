@@ -1,4 +1,5 @@
 import { act, screen, waitForElementToBeRemoved } from '@testing-library/react';
+import { vi } from 'vitest';
 
 /**
  * Waits for all loading states to be removed from the DOM
@@ -16,10 +17,7 @@ export async function waitForLoadingToFinish() {
 /**
  * Creates a mock error response
  */
-export function createErrorResponse(
-  message: string,
-  statusCode = 500
-): { message: string; statusCode: number } {
+export function createErrorResponse(message: string, statusCode = 500): { message: string; statusCode: number } {
   return {
     message,
     statusCode,
@@ -29,10 +27,7 @@ export function createErrorResponse(
 /**
  * Creates a mock API error
  */
-export function createApiError(
-  message: string,
-  statusCode = 500
-): Error & { statusCode: number } {
+export function createApiError(message: string, statusCode = 500): Error & { statusCode: number } {
   const error = new Error(message) as Error & { statusCode: number };
   error.statusCode = statusCode;
   return error;
@@ -55,22 +50,14 @@ export function formatTestDate(date: Date): string {
 /**
  * Creates a mock file for testing file uploads
  */
-export function createMockFile(
-  name = 'test.jpg',
-  type = 'image/jpeg',
-  size = 1024
-): File {
+export function createMockFile(name = 'test.jpg', type = 'image/jpeg', size = 1024): File {
   return new File(['test'], name, { type });
 }
 
 /**
  * Creates a mock response for testing fetch requests
  */
-export function createMockResponse<T>(
-  data: T,
-  ok = true,
-  status = 200
-): Response {
+export function createMockResponse<T>(data: T, ok = true, status = 200): Response {
   return {
     ok,
     status,
@@ -88,8 +75,8 @@ export function createMockEvent(
 ): Partial<Event> {
   return {
     type,
-    preventDefault: jest.fn(),
-    stopPropagation: jest.fn(),
+    preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
     ...values,
   };
 }
@@ -104,8 +91,8 @@ export function createMockKeyboardEvent(
 ): Partial<KeyboardEvent> {
   return {
     key,
-    preventDefault: jest.fn(),
-    stopPropagation: jest.fn(),
+    preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
     ...values,
   };
 }

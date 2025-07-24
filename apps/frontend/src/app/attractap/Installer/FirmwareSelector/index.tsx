@@ -1,5 +1,5 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Card, CardHeader } from '@heroui/react';
+import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {
@@ -12,10 +12,17 @@ export function FirmwareSelector(props: Props) {
   return (
     <div className="flex flex-col gap-4">
       {firmwares?.map((firmware) => (
-        <Card onPress={() => props.onSelect(firmware)} isPressable>
+        <Card onPress={() => props.onSelect(firmware)} isPressable key={`${firmware.name}-${firmware.variant}`}>
           <CardHeader>
-            <PageHeader title={firmware.friendlyName} subtitle={firmware.variantFriendlyName} noMargin />
+            <PageHeader title={firmware.friendlyName} noMargin />
           </CardHeader>
+          <CardBody className="flex flex-wrap gap-2 flex-row">
+            {firmware.variantFriendlyName.split(',').map((variantFeature) => (
+              <Chip color="primary" key={`${firmware.name}-${firmware.variant}-${variantFeature}`}>
+                {variantFeature}
+              </Chip>
+            ))}
+          </CardBody>
         </Card>
       ))}
     </div>
