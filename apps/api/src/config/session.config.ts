@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const SessionEnvSchema = z.object({
   AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
-  SESSION_COOKIE_MAX_AGE: z.number().default(7 * 24 * 60 * 60 * 1000), // 7 days in milliseconds
+  SESSION_COOKIE_MAX_AGE: z.coerce.number().default(7 * 24 * 60 * 60 * 1000), // 7 days in milliseconds
 });
 
 export type SessionConfigType = z.infer<typeof SessionEnvSchema> & {};
