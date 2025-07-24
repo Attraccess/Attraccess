@@ -24,7 +24,15 @@ const AppEnvSchema = z
       .string()
       .url({ message: 'ATTRACCESS_URL must be a valid URL' })
       .default(process.env.VITE_ATTRACCESS_URL || ''),
-    ATTRACCESS_FRONTEND_URL: z.string().optional(),
+    ATTRACCESS_FRONTEND_URL: z
+      .string()
+      .url({ message: 'ATTRACCESS_FRONTEND_URL must be a valid URL' })
+      .default(
+        process.env.FRONTEND_URL ||
+        process.env.VITE_ATTRACCESS_URL ||
+        process.env.ATTRACCESS_URL ||
+        ''
+      ),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
@@ -34,23 +42,6 @@ const AppEnvSchema = z
     SSL_GENERATE_SELF_SIGNED_CERTIFICATES: z.coerce.boolean().default(false),
     SSL_KEY_FILE: z.string().optional(),
     SSL_CERT_FILE: z.string().optional(),
-  })
-  .transform((config) => ({
-    ...config,
-    ATTRACCESS_FRONTEND_URL: config.ATTRACCESS_FRONTEND_URL || process.env.FRONTEND_URL || config.ATTRACCESS_URL,
-  }))
-  .refine((config) => {
-    if (!config.ATTRACCESS_FRONTEND_URL || !z.string().url().safeParse(config.ATTRACCESS_FRONTEND_URL).success) {
-      throw new z.ZodError([
-        {
-          code: 'invalid_string',
-          validation: 'url',
-          message: 'ATTRACCESS_FRONTEND_URL must be a valid URL',
-          path: ['ATTRACCESS_FRONTEND_URL'],
-        },
-      ]);
-    }
-    return true;
   })
   .refine(
     (config) => {
