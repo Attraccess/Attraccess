@@ -33,6 +33,10 @@ import {
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
+import { FormTemplate } from './entities/formTemplate.entity';
+import { FormField, FormFieldType, FormFieldOptions } from './entities/formField.entity';
+import { ResourceFormAssignment, ResourceActionType } from './entities/resourceFormAssignment.entity';
+import { FormSubmission } from './entities/formSubmission.entity';
 
 // Export all entities individually
 export {
@@ -72,6 +76,13 @@ export {
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
   AttractapFirmwareVersion,
+  FormTemplate,
+  FormField,
+  FormFieldType,
+  FormFieldOptions,
+  ResourceFormAssignment,
+  ResourceActionType,
+  FormSubmission,
 };
 
 // Export the entities object
@@ -96,4 +107,8 @@ export const entities = {
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowLog,
+  FormTemplate,
+  FormField,
+  ResourceFormAssignment,
+  FormSubmission,
 };

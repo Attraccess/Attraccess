@@ -84,13 +84,13 @@
 
   - run `pnpm nx run-many -t lint` and if any issues occur, fix them
 
-- [ ] 10-4 Run test and if any issues occur, fix them
+- [x] 10-4 Run test and if any issues occur, fix them
 
   - run `pnpm nx run-many -t test` and if any issues occur, fix them
 
-- [ ] 10-5 Run e2e and if any issues occur, fix them
+- [x] 10-5 Run e2e and if any issues occur, fix them
   - run `pnpm nx run-many -t e2e` and if any issues occur, fix them
-- [ ] 11. Update documentation and cleanup
+- [x] 11. Update documentation and cleanup
   - Update OpenAPI documentation to reflect both authentication methods
   - Add examples for both cookie-based and token-based authentication
   - Remove references to JWT tokens in documentation
