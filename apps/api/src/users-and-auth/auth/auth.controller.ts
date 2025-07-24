@@ -1,76 +1,19 @@
 import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginGuard } from '../strategies/login.guard';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { AppConfigType } from '../../config/app.config';
-import { SessionConfigType } from '../../config/session.config';
-
-type CookieConfigType = {
-  name: string;
-  httpOnly: boolean;
-  secure: boolean;
-  sameSite: 'lax' | 'strict' | 'none';
-  maxAge: number;
-  path: string;
-};
+import { CookieConfigService } from '../../common/services/cookie-config.service';
 
 @ApiTags('Authentication')
 @Controller('/auth')
 export class AuthController {
-  private readonly cookieConfig: CookieConfigType;
-
-  constructor(private sessionService: SessionService, private configService: ConfigService) {
-    this.cookieConfig = this.getCookieConfig();
-  }
-
-  /**
-   * Gets cookie configuration based on environment
-   */
-  private getCookieConfig() {
-    const appConfig = this.configService.get<AppConfigType>('app');
-    const sessionConfig = this.configService.get<SessionConfigType>('session');
-    const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
-
-    return {
-      name: 'auth-session',
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax' as const,
-      maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
-      path: '/',
-    };
-  }
-
-  /**
-   * Sets authentication cookie on the response
-   */
-  private setAuthCookie(res: Response, token: string): void {
-    const cookieConfig = this.getCookieConfig();
-    res.cookie(cookieConfig.name, token, {
-      httpOnly: cookieConfig.httpOnly,
-      secure: cookieConfig.secure,
-      sameSite: cookieConfig.sameSite,
-      maxAge: cookieConfig.maxAge,
-      path: cookieConfig.path,
-    });
-  }
-
-  /**
-   * Clears authentication cookie from the response
-   */
-  private clearAuthCookie(res: Response): void {
-    const cookieConfig = this.getCookieConfig();
-    res.clearCookie(cookieConfig.name, {
-      httpOnly: cookieConfig.httpOnly,
-      secure: cookieConfig.secure,
-      sameSite: cookieConfig.sameSite,
-      path: cookieConfig.path,
-    });
-  }
+  constructor(
+    private readonly sessionService: SessionService,
+    private readonly cookieConfigService: CookieConfigService
+  ) {}
 
   @Post('/session/local')
   @UseGuards(LoginGuard)
@@ -107,7 +50,7 @@ export class AuthController {
 
     if (body.tokenLocation === 'cookie') {
       // Set HTTP-only cookie for web browsers
-      this.setAuthCookie(response, sessionToken);
+      this.cookieConfigService.setAuthCookie(response, sessionToken);
 
       // Return user data without token for web browsers
       return {
@@ -136,7 +79,7 @@ export class AuthController {
     @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
   ): Promise<CreateSessionResponse> {
     // Get current session token from cookie or header
-    const cookieToken = request.cookies?.['auth-session'];
+    const cookieToken = request.cookies?.[this.cookieConfigService.getConfig().name];
     const headerToken = request.headers.authorization?.startsWith('Bearer ')
       ? request.headers.authorization.substring(7)
       : null;
@@ -167,7 +110,7 @@ export class AuthController {
       });
 
       if (tokenLocation === 'cookie') {
-        this.setAuthCookie(response, sessionToken);
+        this.cookieConfigService.setAuthCookie(response, sessionToken);
         return {
           user: request.user,
           authToken: '',
@@ -182,7 +125,7 @@ export class AuthController {
 
     if (tokenLocation === 'cookie') {
       // Update cookie with new token
-      this.setAuthCookie(response, newToken);
+      this.cookieConfigService.setAuthCookie(response, newToken);
       return {
         user: request.user,
         authToken: '',
@@ -215,7 +158,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response
   ): Promise<void> {
     // Get session token from cookie or header
-    const cookieToken = request.cookies?.['auth-session'];
+    const cookieToken = request.cookies?.[this.cookieConfigService.getConfig().name];
     const headerToken = request.headers.authorization?.startsWith('Bearer ')
       ? request.headers.authorization.substring(7)
       : null;
@@ -223,7 +166,7 @@ export class AuthController {
     const sessionToken = headerToken || cookieToken;
 
     // Clear authentication cookie regardless of request type
-    this.clearAuthCookie(response);
+    this.cookieConfigService.clearAuthCookie(response);
 
     // Revoke session token if present
     if (sessionToken) {

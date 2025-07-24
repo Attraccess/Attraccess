@@ -30,6 +30,7 @@ import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { SSOController } from './auth/sso/sso.controller';
 import { AppConfigType } from '../config/app.config';
+import { CookieConfigService } from '../common/services/cookie-config.service';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AppConfigType } from '../config/app.config';
     LocalStrategy,
     SessionStrategy,
     SSOService,
+    CookieConfigService,
     {
       provide: SSOOIDCStrategy,
       useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {

@@ -16,7 +16,11 @@ const sessionConfigFactory = (): SessionConfigType => {
       ...env,
     };
   } catch (e) {
-    console.error('Failed to parse Session Environment Variables:', e.errors);
+    if (e instanceof z.ZodError) {
+      console.error('Failed to parse Session Environment Variables:', e.errors);
+    } else {
+      console.error('Failed to parse Session Environment Variables:', e);
+    }
     throw new Error('Invalid session environment configuration.');
   }
 };
