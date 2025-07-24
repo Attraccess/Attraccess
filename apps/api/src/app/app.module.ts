@@ -17,11 +17,12 @@ import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
+import sessionConfig from '../config/session.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [appConfiguration, storageConfigObject],
+      load: [appConfiguration, storageConfigObject, sessionConfig],
       isGlobal: true,
     }),
 

@@ -30,8 +30,18 @@ describe('AuthController', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue({
-              ATTRACCESS_URL: 'https://localhost:3000',
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'app') {
+                return {
+                  ATTRACCESS_URL: 'https://localhost:3000',
+                };
+              }
+              if (key === 'session') {
+                return {
+                  SESSION_COOKIE_MAX_AGE: 24 * 60 * 60 * 1000, // 1 day in milliseconds
+                };
+              }
+              return undefined;
             }),
           },
         },

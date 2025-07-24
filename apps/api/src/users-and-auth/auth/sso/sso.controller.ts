@@ -32,6 +32,7 @@ import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
 import { AppConfigType } from '../../../config/app.config';
+import { SessionConfigType } from '../../../config/session.config';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -51,6 +52,7 @@ export class SSOController {
    */
   private getCookieConfig() {
     const appConfig = this.configService.get<AppConfigType>('app');
+    const sessionConfig = this.configService.get<SessionConfigType>('session');
     const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
 
     return {
@@ -58,7 +60,7 @@ export class SSOController {
       httpOnly: true,
       secure: isSecure,
       sameSite: 'lax' as const,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
       path: '/',
     };
   }

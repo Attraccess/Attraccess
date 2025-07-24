@@ -7,17 +7,32 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AppConfigType } from '../../config/app.config';
+import { SessionConfigType } from '../../config/session.config';
+
+type CookieConfigType = {
+  name: string;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: 'lax' | 'strict' | 'none';
+  maxAge: number;
+  path: string;
+};
 
 @ApiTags('Authentication')
 @Controller('/auth')
 export class AuthController {
-  constructor(private sessionService: SessionService, private configService: ConfigService) {}
+  private readonly cookieConfig: CookieConfigType;
+
+  constructor(private sessionService: SessionService, private configService: ConfigService) {
+    this.cookieConfig = this.getCookieConfig();
+  }
 
   /**
    * Gets cookie configuration based on environment
    */
   private getCookieConfig() {
     const appConfig = this.configService.get<AppConfigType>('app');
+    const sessionConfig = this.configService.get<SessionConfigType>('session');
     const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
 
     return {
@@ -25,7 +40,7 @@ export class AuthController {
       httpOnly: true,
       secure: isSecure,
       sameSite: 'lax' as const,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
       path: '/',
     };
   }

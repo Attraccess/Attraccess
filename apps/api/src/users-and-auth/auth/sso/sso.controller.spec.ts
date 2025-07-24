@@ -75,6 +75,13 @@ describe('SsoController', () => {
                   ATTRACCESS_URL: 'http://localhost:3000',
                 };
               }
+
+              if (key === 'session') {
+                return {
+                  SESSION_COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
+                };
+              }
+
               return null;
             }),
           },
@@ -201,7 +208,7 @@ describe('SsoController', () => {
         httpOnly: true,
         secure: false, // HTTP in test config
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
       });
 
