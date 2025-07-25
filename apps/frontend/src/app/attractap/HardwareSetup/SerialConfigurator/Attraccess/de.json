@@ -4,7 +4,10 @@
   },
   "connected": {
     "title": "Attraccess verbunden",
-    "description": "Geräte ID: {{deviceId}}"
+    "description": "Geräte ID: {{deviceId}}",
+    "openDeviceSettings": {
+      "button": "Geräteeinstellungen öffnen"
+    }
   },
   "connecting": {
     "tcp": {

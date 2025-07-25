@@ -133,8 +133,16 @@ export class ESPTools {
   }): Promise<ESPToolsResult<void>> {
     const { firmware, terminal, onProgress } = options;
 
+    console.log('calling useTransport');
     return await this.useTransport(async (transport) => {
       try {
+        console.log('calling esploader');
+        try {
+          await transport.disconnect();
+        } catch (err) {
+          console.error(err);
+        }
+
         const esploader = new ESPLoader({
           transport,
           baudrate: 115200,

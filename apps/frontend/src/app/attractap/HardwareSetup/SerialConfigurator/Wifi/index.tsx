@@ -21,7 +21,13 @@ interface WifiNetwork {
   isOpen: boolean;
 }
 
-export function AttractapSerialConfiguratorWifi() {
+interface Props {
+  onConnected: (isConnected: boolean) => void;
+}
+
+export function AttractapSerialConfiguratorWifi(props: Props) {
+  const { onConnected } = props;
+
   const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.wifi', {
     de,
     en,
@@ -34,30 +40,34 @@ export function AttractapSerialConfiguratorWifi() {
   const [wifiPassword, setWifiPassword] = useState<string | null>(null);
   const [isUpdatingWifiStatus, setIsUpdatingWifiStatus] = useState(false);
 
-  const updateWifiStatus = useCallback(async (repeatWhileConnecting = false) => {
+  const updateWifiStatus = useCallback(async () => {
     setIsUpdatingWifiStatus(true);
 
     const espTools = ESPTools.getInstance();
-    const response = await espTools.sendCommand({ topic: 'network.wifi.status', type: 'GET' });
+    const response = await espTools.sendCommand({ topic: 'network.wifi.status', type: 'GET' }, true, 2000);
 
     if (!response) {
       console.error('No response from ESP');
+      setTimeout(() => {
+        updateWifiStatus();
+      }, 3000);
       return;
     }
 
     const data = JSON.parse(response) as WifiStatusData;
 
     setSelectedWifiSSID(data.ssid);
-    setWifiStatus(data);
 
+    setWifiStatus(data);
+    onConnected(data.status === 'connected');
     setIsUpdatingWifiStatus(false);
 
-    if (repeatWhileConnecting && data.status === 'connecting') {
+    if (data.status === 'connecting') {
       setTimeout(() => {
-        updateWifiStatus(true);
+        updateWifiStatus();
       }, 1000);
     }
-  }, []);
+  }, [onConnected]);
 
   const scanForWifiNetworks = useCallback(async () => {
     setIsScanningWifiNetworks(true);
@@ -114,7 +124,7 @@ export function AttractapSerialConfiguratorWifi() {
     });
 
     setTimeout(() => {
-      updateWifiStatus(true);
+      updateWifiStatus();
     }, 1000);
   }, [selectedWifiSSID, wifiPassword, updateWifiStatus]);
 

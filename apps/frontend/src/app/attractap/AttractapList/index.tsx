@@ -10,7 +10,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import { WebSerialConsole } from '../../../components/WebSerialConsole';
+import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 
 import de from './de.json';
 import en from './en.json';
@@ -52,7 +52,11 @@ export const AttractapList = () => {
         title={t('page.title')}
         actions={
           <>
-            <AttractapHardwareSetup>
+            <AttractapHardwareSetup
+              openDeviceSettings={(deviceId) => {
+                setOpenedReaderEditor(Number(deviceId));
+              }}
+            >
               {(onOpen) => (
                 <Button
                   variant="light"
@@ -64,7 +68,7 @@ export const AttractapList = () => {
                 </Button>
               )}
             </AttractapHardwareSetup>
-            <WebSerialConsole baudRate={115200}>
+            <WebSerialConsole>
               {(onOpen) => (
                 <Button
                   variant="light"

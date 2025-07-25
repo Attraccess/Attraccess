@@ -1,6 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, Button, Progress } from '@heroui/react';
+import { Accordion, AccordionItem, Alert, Button, CircularProgress, Progress } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -21,16 +21,16 @@ export function FirmwareFlasher(props: Props) {
     filename: props.firmware.filename,
   });
 
-  const {t} = useTranslations('attractap.firmwareFlasher', {
+  const { t } = useTranslations('attractap.firmwareFlasher', {
     de,
-    en
+    en,
   });
 
   const toast = useToastMessage();
 
   const [flashProgress, setFlashProgress] = useState<number>(0);
   const [logLines, setLogLines] = useState<string[]>([]);
-  const [flashError, setFlashError] = useState<{type: ESPToolsErrorType, details?: unknown} | null>(null);
+  const [flashError, setFlashError] = useState<{ type: ESPToolsErrorType; details?: unknown } | null>(null);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
 
   const flashFirmware = useCallback(async () => {
@@ -43,7 +43,7 @@ export function FirmwareFlasher(props: Props) {
     setFlashProgress(0);
 
     const espTools = ESPTools.getInstance();
-    
+
     // Connect to device
     const connectionResult = await espTools.connectToDevice();
     if (!connectionResult.success) {
@@ -54,7 +54,6 @@ export function FirmwareFlasher(props: Props) {
 
     // Flash firmware
     const flashResult = await espTools.flashFirmware({
-      port: connectionResult.data as SerialPort,
       firmware: firmwareBinary as unknown as Blob,
       onProgress: (progressPct) => {
         setFlashProgress(progressPct);
@@ -89,14 +88,18 @@ export function FirmwareFlasher(props: Props) {
     }
   }, [firmwareBinary, props, toast, t]);
 
+  if (isDownloadingFirmware) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <CircularProgress isIndeterminate label={t('downloading.label')} />
+      </div>
+    );
+  }
+
   if (flashProgress === 0 && logLines.length === 0 && !flashError) {
     return (
       <div className="space-y-4">
-        <Button 
-          isLoading={isDownloadingFirmware || isFlashing} 
-          onPress={flashFirmware}
-          color="primary"
-        >
+        <Button isLoading={isFlashing} onPress={flashFirmware} color="primary">
           {t('action.flash')}
         </Button>
       </div>
@@ -106,10 +109,8 @@ export function FirmwareFlasher(props: Props) {
   return (
     <div className="space-y-4">
       {flashError && (
-        <Alert title={t('errors.' + flashError.type)} color="danger" className='flex-row flex-wrap flex-gap-2'>
-          <div>
-            {flashError.details as string || 'Unknown error occurred'}
-          </div>
+        <Alert title={t('errors.' + flashError.type)} color="danger" className="flex-row flex-wrap flex-gap-2">
+          <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
           <Button size="sm" color="primary" onPress={flashFirmware}>
             {t('action.retryFlash')}
@@ -118,11 +119,17 @@ export function FirmwareFlasher(props: Props) {
       )}
 
       {!flashError && (
-        <Progress isIndeterminate={flashProgress === 0} value={flashProgress} minValue={0} maxValue={100} showValueLabel={true} />
+        <Progress
+          isIndeterminate={flashProgress === 0}
+          value={flashProgress}
+          minValue={0}
+          maxValue={100}
+          showValueLabel={true}
+        />
       )}
 
       <Accordion>
-        <AccordionItem key="terminal" title="Advanced Terminal Output">
+        <AccordionItem key="terminal" title={t('terminal.title')}>
           <Terminal logLines={logLines} maxHeight="30vh" />
         </AccordionItem>
       </Accordion>

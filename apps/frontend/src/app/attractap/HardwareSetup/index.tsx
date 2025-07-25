@@ -16,10 +16,11 @@ interface ContentProps {
   state: State;
   setState: (state: State) => void;
   onClose: () => void;
+  openDeviceSettings: (deviceId: string) => void;
 }
 
 function Content(props: ContentProps) {
-  const { state, setState, onClose } = props;
+  const { state, setState, openDeviceSettings } = props;
 
   const { t } = useTranslations('attractap.hardwareSetup', {
     de,
@@ -52,11 +53,13 @@ function Content(props: ContentProps) {
   }
 
   if (state === 'flash') {
-    return <FirmwareFlasher firmware={selectedFirmware as AttractapFirmware} onCompleted={onClose} />;
+    return (
+      <FirmwareFlasher firmware={selectedFirmware as AttractapFirmware} onCompleted={() => setState('configure')} />
+    );
   }
 
   if (state === 'configure') {
-    return <AttractapSerialConfigurator />;
+    return <AttractapSerialConfigurator openDeviceSettings={openDeviceSettings} />;
   }
 
   return null;
@@ -64,15 +67,18 @@ function Content(props: ContentProps) {
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
+  openDeviceSettings: (deviceId: string) => void;
 }
 
-export function AttractapHardwareSetup({ children }: Props) {
+export function AttractapHardwareSetup(props: Props) {
+  const { children, openDeviceSettings } = props;
+
   const { t } = useTranslations('attractap.hardwareSetup', {
     de,
     en,
   });
 
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const [state, setState] = useState<State>('init');
 
   const onBack = useCallback(() => {
@@ -105,7 +111,15 @@ export function AttractapHardwareSetup({ children }: Props) {
           </ModalHeader>
 
           <ModalBody>
-            <Content state={state} setState={setState} onClose={onOpenChange} />
+            <Content
+              state={state}
+              setState={setState}
+              onClose={onOpenChange}
+              openDeviceSettings={(deviceId) => {
+                onClose();
+                openDeviceSettings(deviceId);
+              }}
+            />
           </ModalBody>
         </ModalContent>
       </Modal>

@@ -8,7 +8,13 @@ import { AttractapSerialConfiguratorAttraccess } from './Attraccess';
 import de from './de.json';
 import en from './en.json';
 
-export function AttractapSerialConfigurator() {
+interface Props {
+  openDeviceSettings: (deviceId: string) => void;
+}
+
+export function AttractapSerialConfigurator(props: Props) {
+  const { openDeviceSettings } = props;
+
   const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator', {
     de,
     en,
@@ -19,6 +25,7 @@ export function AttractapSerialConfigurator() {
   const [state, setState] = useState<'idle' | 'connecting' | 'connected' | 'error'>(
     espTools.current?.isConnected ? 'connected' : 'idle'
   );
+  const [wifiConnected, setWifiConnected] = useState(false);
 
   const connect = useCallback(async () => {
     try {
@@ -63,10 +70,14 @@ export function AttractapSerialConfigurator() {
   return (
     <div>
       <h2 className="text-2xl font-bold">{t('title.wifi')}</h2>
-      <AttractapSerialConfiguratorWifi />
-      <Divider className="my-4" />
-      <h2 className="text-2xl font-bold">{t('title.attraccess')}</h2>
-      <AttractapSerialConfiguratorAttraccess />
+      <AttractapSerialConfiguratorWifi onConnected={setWifiConnected} />
+      {wifiConnected && (
+        <>
+          <Divider className="my-4" />
+          <h2 className="text-2xl font-bold">{t('title.attraccess')}</h2>
+          <AttractapSerialConfiguratorAttraccess openDeviceSettings={openDeviceSettings} />
+        </>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
+import { Card, CardBody, CardHeader, Chip, CircularProgress } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {
@@ -7,10 +7,11 @@ interface Props {
 }
 
 export function FirmwareSelector(props: Props) {
-  const { data: firmwares } = useAttractapServiceGetFirmwares();
+  const { data: firmwares, isLoading } = useAttractapServiceGetFirmwares();
 
   return (
     <div className="flex flex-col gap-4">
+      {isLoading && <CircularProgress isIndeterminate />}
       {firmwares?.map((firmware) => (
         <Card onPress={() => props.onSelect(firmware)} isPressable key={`${firmware.name}-${firmware.variant}`}>
           <CardHeader>

@@ -8,7 +8,7 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verifyEmail';
 import { ToastProvider } from '../components/toastProvider';
 import { HeroUIProvider, Spinner } from '@heroui/react';
-import { SystemPermissions } from '@attraccess/react-query-client';
+import { SystemPermissions, useSystemServiceInfo } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import { PWAUpdatePrompt } from '../components/PWAUpdatePrompt';
 import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
+import { ServerNotAvailable } from './serverNotAvailable';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -79,6 +80,11 @@ function AppLayout(props: PropsWithChildren) {
 
   const { pullToRefreshIsEnabled } = usePtrStore();
 
+  const { isError: serverIsNotAvailable } = useSystemServiceInfo(undefined, {
+    refetchInterval: 5000,
+    retry: false,
+  });
+
   return (
     <PullToRefresh
       onRefresh={() => queryClient.invalidateQueries()}
@@ -95,7 +101,9 @@ function AppLayout(props: PropsWithChildren) {
       <HeroUIProvider navigate={navigate} labelPlacement="inside">
         <ToastProvider>
           <ReactFlowProvider>
-            <Layout noLayout={!isAuthenticated}>{props.children}</Layout>
+            <Layout noLayout={!isAuthenticated || serverIsNotAvailable}>
+              {serverIsNotAvailable ? <ServerNotAvailable /> : props.children}
+            </Layout>
           </ReactFlowProvider>
         </ToastProvider>
       </HeroUIProvider>
