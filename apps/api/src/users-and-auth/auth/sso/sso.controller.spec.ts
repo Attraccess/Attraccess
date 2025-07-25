@@ -6,16 +6,20 @@ import { SessionService } from '../session.service';
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 import { UsersService } from '../../users/users.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import type { Response } from 'express';
+import { CookieConfigService } from '../../../common/services/cookie-config.service';
+import { SSOOIDCGuard } from './oidc/oidc.guard';
 
 describe('SsoController', () => {
   let controller: SSOController;
   let ssoService: SSOService;
   let module: TestingModule;
+  let cookieConfigService: CookieConfigService;
 
   const mockSSOProvider: SSOProvider = {
     id: 1,
@@ -67,24 +71,55 @@ describe('SsoController', () => {
           useValue: {},
         },
         {
+          provide: CookieConfigService,
+          useValue: {
+            getConfig: jest.fn().mockReturnValue({
+              name: 'auth-session',
+              httpOnly: true,
+              secure: false,
+              sameSite: 'lax',
+              maxAge: 7 * 24 * 60 * 60 * 1000,
+              path: '/',
+            }),
+            setAuthCookie: jest.fn(),
+            clearAuthCookie: jest.fn(),
+          },
+        },
+        {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
               if (key === 'app') {
                 return {
                   ATTRACCESS_URL: 'http://localhost:3000',
+                  ATTRACCESS_FRONTEND_URL: 'http://localhost:3000',
                 };
               }
+
+              if (key === 'session') {
+                return {
+                  SESSION_COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
+                };
+              }
+
               return null;
             }),
           },
         },
+        {
+          provide: ModuleRef,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
+        SSOOIDCGuard,
       ],
       controllers: [SSOController],
     }).compile();
 
     controller = module.get<SSOController>(SSOController);
     ssoService = module.get<SSOService>(SSOService);
+    cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
   });
 
   it('should be defined', () => {
@@ -197,13 +232,7 @@ describe('SsoController', () => {
         ipAddress: mockRequest.ip,
       });
 
-      expect(mockResponse.cookie).toHaveBeenCalledWith('auth-session', 'mock-session-token', {
-        httpOnly: true,
-        secure: false, // HTTP in test config
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000,
-        path: '/',
-      });
+      expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
 
       expect(result).toEqual({
         user: mockRequest.user,
@@ -246,7 +275,7 @@ describe('SsoController', () => {
         'cookie'
       );
 
-      expect(mockResponse.cookie).toHaveBeenCalled();
+      expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
       expect(mockResponse.redirect).toHaveBeenCalledWith(
         expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user)))
       );

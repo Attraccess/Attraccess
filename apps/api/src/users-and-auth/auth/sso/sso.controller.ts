@@ -15,7 +15,6 @@ import {
   UseFilters,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
@@ -31,7 +30,7 @@ import { Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
-import { AppConfigType } from '../../../config/app.config';
+import { CookieConfigService } from '../../../common/services/cookie-config.service';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -43,39 +42,8 @@ export class SSOController {
     private readonly sessionService: SessionService,
     private readonly usersService: UsersService,
     private readonly ssoService: SSOService,
-    private readonly configService: ConfigService
+    private readonly cookieConfigService: CookieConfigService
   ) {}
-
-  /**
-   * Gets cookie configuration based on environment
-   */
-  private getCookieConfig() {
-    const appConfig = this.configService.get<AppConfigType>('app');
-    const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
-
-    return {
-      name: 'auth-session',
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax' as const,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/',
-    };
-  }
-
-  /**
-   * Sets authentication cookie on the response
-   */
-  private setAuthCookie(res: Response, token: string): void {
-    const cookieConfig = this.getCookieConfig();
-    res.cookie(cookieConfig.name, token, {
-      httpOnly: cookieConfig.httpOnly,
-      secure: cookieConfig.secure,
-      sameSite: cookieConfig.sameSite,
-      maxAge: cookieConfig.maxAge,
-      path: cookieConfig.path,
-    });
-  }
 
   @Get('providers')
   @ApiOperation({ summary: 'Get all SSO providers', operationId: 'getAllSSOProviders' })
@@ -298,7 +266,7 @@ export class SSOController {
 
     if (tokenLocation === 'cookie') {
       // Set HTTP-only cookie for web browsers
-      this.setAuthCookie(response, sessionToken);
+      this.cookieConfigService.setAuthCookie(response, sessionToken);
 
       // Return user data without token for web browsers using cookies
       auth = {

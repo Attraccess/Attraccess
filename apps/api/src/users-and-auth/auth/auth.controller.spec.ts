@@ -1,15 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { CookieConfigService } from '../../common/services/cookie-config.service';
 
 describe('AuthController', () => {
   let authController: AuthController;
   let sessionService: SessionService;
+  let cookieConfigService: CookieConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -28,11 +29,18 @@ describe('AuthController', () => {
           },
         },
         {
-          provide: ConfigService,
+          provide: CookieConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue({
-              ATTRACCESS_URL: 'https://localhost:3000',
+            getConfig: jest.fn().mockReturnValue({
+              name: 'auth-session',
+              httpOnly: true,
+              secure: true,
+              sameSite: 'lax',
+              maxAge: 24 * 60 * 60 * 1000,
+              path: '/',
             }),
+            setAuthCookie: jest.fn(),
+            clearAuthCookie: jest.fn(),
           },
         },
       ],
@@ -40,6 +48,7 @@ describe('AuthController', () => {
 
     authController = module.get<AuthController>(AuthController);
     sessionService = module.get<SessionService>(SessionService);
+    cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
   });
 
   it('should be defined', () => {
@@ -119,13 +128,7 @@ describe('AuthController', () => {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       ipAddress: '127.0.0.1',
     });
-    expect(mockResponse.cookie).toHaveBeenCalledWith('auth-session', 'test-session-token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'test-session-token');
   });
 
   it('should delete a session and revoke session token', async () => {
@@ -153,12 +156,7 @@ describe('AuthController', () => {
 
     expect(mockRequest.logout).toHaveBeenCalled();
     expect(sessionService.revokeSession).toHaveBeenCalledWith('test-session-token');
-    expect(mockResponse.clearCookie).toHaveBeenCalledWith('auth-session', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-    });
+    expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
   });
 
   it('should delete a session with cookie token', async () => {
@@ -186,12 +184,7 @@ describe('AuthController', () => {
 
     expect(mockRequest.logout).toHaveBeenCalled();
     expect(sessionService.revokeSession).toHaveBeenCalledWith('cookie-session-token');
-    expect(mockResponse.clearCookie).toHaveBeenCalledWith('auth-session', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-    });
+    expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
   });
 
   it('should refresh session for programmatic client', async () => {
@@ -258,12 +251,6 @@ describe('AuthController', () => {
       user: mockUser,
     });
     expect(sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
-    expect(mockResponse.cookie).toHaveBeenCalledWith('auth-session', 'new-session-token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'new-session-token');
   });
 });
