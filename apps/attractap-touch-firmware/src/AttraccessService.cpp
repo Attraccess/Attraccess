@@ -31,15 +31,12 @@ void AttraccessService::begin()
     // Load server configuration from settings
     Preferences settingsPrefs;
     settingsPrefs.begin("attraccess", true);
-    String hostname = settingsPrefs.getString("hostname", "");
-    String portStr = settingsPrefs.getString("port", "");
+    String hostnameFromPrefs = settingsPrefs.getString("hostname", "");
+    int16_t portFromPrefs = settingsPrefs.getShort("port", 0);
     settingsPrefs.end();
 
-    if (!hostname.isEmpty() && !portStr.isEmpty())
-    {
-        setServerConfig(hostname, portStr.toInt());
-        Serial.printf("AttraccessService: Loaded config - %s:%d\n", hostname.c_str(), portStr.toInt());
-    }
+    setServerConfig(hostnameFromPrefs, portFromPrefs);
+    Serial.printf("AttraccessService: Loaded config - %s:%d\n", hostnameFromPrefs.c_str(), portFromPrefs);
 
     setState(DISCONNECTED, "Service initialized");
     Serial.println("AttraccessService: Ready");
@@ -993,4 +990,19 @@ void AttraccessService::onAuthenticateNfcEvent(const JsonObject &data)
     doc["data"]["payload"]["authenticationSuccessful"] = success;
 
     this->sendJSONMessage(doc.as<JsonObject>());
+}
+
+String AttraccessService::getHostname()
+{
+    return serverHostname;
+}
+
+uint16_t AttraccessService::getPort()
+{
+    return serverPort;
+}
+
+String AttraccessService::getDeviceId()
+{
+    return deviceId;
 }

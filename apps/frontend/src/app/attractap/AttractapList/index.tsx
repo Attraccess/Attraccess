@@ -8,7 +8,7 @@ import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
-import { AttractapInstaller } from '../Installer';
+import { AttractapHardwareSetup } from '../HardwareSetup';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { WebSerialConsole } from '../../../components/WebSerialConsole';
 
@@ -46,38 +46,38 @@ export const AttractapList = () => {
 
   const formatDateTime = useDateTimeFormatter();
 
-
-
   return (
     <>
       <PageHeader
         title={t('page.title')}
-        actions={<>
-          <AttractapInstaller>
-            {(onOpen) => (
-              <Button
-                variant="light"
-                startContent={<CpuIcon className="w-4 h-4" />}
-                onPress={onOpen}
-                data-cy="attractap-list-open-flasher-button"
-              >
-                {t('page.actions.openFlasher')}
-              </Button>
-            )}
-          </AttractapInstaller>
-          <WebSerialConsole baudRate={115200}>
-            {(onOpen) => (
-              <Button
-                variant="light"
-                startContent={<LogsIcon className="w-4 h-4" />}
-                onPress={onOpen}
-                data-cy="attractap-list-open-console-button"
-              >
-                {t('page.actions.openSerialConsole')}
-              </Button>
-            )}
-          </WebSerialConsole>
-        </>}
+        actions={
+          <>
+            <AttractapHardwareSetup>
+              {(onOpen) => (
+                <Button
+                  variant="light"
+                  startContent={<CpuIcon className="w-4 h-4" />}
+                  onPress={onOpen}
+                  data-cy="attractap-list-open-flasher-button"
+                >
+                  {t('page.actions.openHardwareSetup')}
+                </Button>
+              )}
+            </AttractapHardwareSetup>
+            <WebSerialConsole baudRate={115200}>
+              {(onOpen) => (
+                <Button
+                  variant="light"
+                  startContent={<LogsIcon className="w-4 h-4" />}
+                  onPress={onOpen}
+                  data-cy="attractap-list-open-console-button"
+                >
+                  {t('page.actions.openSerialConsole')}
+                </Button>
+              )}
+            </WebSerialConsole>
+          </>
+        }
       />
 
       <Alert color="danger" className="mb-4">

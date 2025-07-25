@@ -69,6 +69,9 @@ public:
     void setNFC(NFC *nfc);
 
     void setCurrentIP(IPAddress ip);
+    String getHostname();
+    uint16_t getPort();
+    String getDeviceId();
 
 private:
     FlashZhttp fz;

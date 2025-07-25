@@ -1,0 +1,28 @@
+{
+  "updating": {
+    "label": "Daten werden aktualisiert..."
+  },
+  "connected": {
+    "title": "Attraccess verbunden",
+    "description": "Geräte ID: {{deviceId}}"
+  },
+  "connecting": {
+    "tcp": {
+      "label": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+    },
+    "websocket": {
+      "label": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+    }
+  },
+  "disconnected": {
+    "title": "Attraccess nicht verbunden",
+    "description": "Hostname: {{hostname}}, Port: {{port}}"
+  },
+  "attraccessDataDoesNotMatchesServer": {
+    "alert": {
+      "title": "Attraccess Daten stimmen nicht mit Server überein",
+      "description": "Die Daten vom Leser stimmen nicht mit den Server-Daten überein. Bitte aktualisieren Sie die Daten.",
+      "button": "Daten aktualisieren"
+    }
+  }
+}

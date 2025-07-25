@@ -13,6 +13,7 @@
 #include "SettingsManager.h"
 #include "AttraccessService.h"
 #include "nfc.hpp"
+#include "CLIService.h"
 
 // for XPT2046 Touch ////////////////////////////////
 SPIClass xptSPI = SPIClass(VSPI);                 // SPI-Interface for XPT2046_Touchscreen
@@ -36,6 +37,7 @@ WiFiService wifiService;
 SettingsManager settingsManager;
 AttraccessService attraccessService;
 NFC nfc;
+CLIService cliService;
 
 // Initialization state
 bool setupComplete = false;
@@ -360,6 +362,12 @@ void setup()
   // Initialize OTA
   Serial.println("9a. Initializing OTA...");
 
+  // Initialize CLI Service
+  Serial.println("9b. Initializing CLI Service...");
+  cliService.setWiFiService(&wifiService);
+  cliService.setAttraccessService(&attraccessService);
+  cliService.begin();
+
   // Mark setup as complete
   setupComplete = true;
   Serial.println("=== SETUP COMPLETE ===");
@@ -400,6 +408,7 @@ void loop()
   }
 
   attraccessService.update(); // Update Attraccess service
+  cliService.update();        // Update CLI service
 
   // Handle navigation back to main screen from settings
   static bool wasSettingsVisible = false;

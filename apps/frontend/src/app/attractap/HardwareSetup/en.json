@@ -1,0 +1,10 @@
+{
+  "title": "Attractap Hardware Setup",
+  "init": {
+    "actions": {
+      "selectFirmware": "Install firmware",
+      "configure": "Configure"
+    },
+    "description": "If you have a completely new Attractap, select \"Install firmware\" to install the latest firmware on your Attractap. If you have an already configured Attractap, select \"Configure\" to configure your Attractap."
+  }
+}

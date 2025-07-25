@@ -64,6 +64,8 @@ public:
     void setScanCompleteCallback(ScanCompleteCallback callback) { scanCompleteCallback = callback; }
     void setScanProgressCallback(ScanProgressCallback callback) { scanProgressCallback = callback; }
 
+    WiFiCredentials getCurrentCredentials() { return currentCredentials; }
+
 private:
     WiFiNetwork availableNetworks[MAX_WIFI_NETWORKS];
     uint8_t networkCount;

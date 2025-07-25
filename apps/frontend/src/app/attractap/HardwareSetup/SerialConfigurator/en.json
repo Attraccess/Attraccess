@@ -1,0 +1,15 @@
+{
+  "actions": {
+    "connect": "Connect",
+    "retryConnect": "Retry"
+  },
+  "connecting": {
+    "progress": {
+      "label": "Connecting..."
+    }
+  },
+  "title": {
+    "wifi": "WiFi",
+    "attraccess": "Attraccess"
+  }
+}

@@ -2,7 +2,7 @@
   "page": {
     "title": "Attractaps",
     "actions": {
-      "openFlasher": "new Attractap",
+      "openHardwareSetup": "Setup Attractap",
       "openSerialConsole": "Serial Console"
     }
   },
