@@ -104,13 +104,18 @@ export function AttractapHardwareSetup(props: Props) {
     <>
       {children(onOpen)}
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        size={state === 'configure' ? '5xl' : undefined}
+        scrollBehavior="inside"
+      >
         <ModalContent>
           <ModalHeader>
             <PageHeader title={t('title')} noMargin onBack={onBack} />
           </ModalHeader>
 
-          <ModalBody>
+          <ModalBody className="mb-4">
             <Content
               state={state}
               setState={setState}

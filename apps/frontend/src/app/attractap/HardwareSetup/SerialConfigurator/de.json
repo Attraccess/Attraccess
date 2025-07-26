@@ -7,9 +7,5 @@
     "progress": {
       "label": "Verbindung wird hergestellt..."
     }
-  },
-  "title": {
-    "wifi": "WiFi",
-    "attraccess": "Attraccess"
   }
 }

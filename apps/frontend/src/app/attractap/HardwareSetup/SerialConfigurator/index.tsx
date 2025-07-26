@@ -1,4 +1,4 @@
-import { Alert, Button, CircularProgress, Divider } from '@heroui/react';
+import { Alert, Button, CircularProgress } from '@heroui/react';
 import { ESPTools, ESPToolsResult } from '../../../../utils/esp-tools';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -25,7 +25,6 @@ export function AttractapSerialConfigurator(props: Props) {
   const [state, setState] = useState<'idle' | 'connecting' | 'connected' | 'error'>(
     espTools.current?.isConnected ? 'connected' : 'idle'
   );
-  const [wifiConnected, setWifiConnected] = useState(false);
 
   const connect = useCallback(async () => {
     try {
@@ -68,16 +67,9 @@ export function AttractapSerialConfigurator(props: Props) {
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold">{t('title.wifi')}</h2>
-      <AttractapSerialConfiguratorWifi onConnected={setWifiConnected} />
-      {wifiConnected && (
-        <>
-          <Divider className="my-4" />
-          <h2 className="text-2xl font-bold">{t('title.attraccess')}</h2>
-          <AttractapSerialConfiguratorAttraccess openDeviceSettings={openDeviceSettings} />
-        </>
-      )}
+    <div className="flex gap-4 flex-wrap w-full items-stretch">
+      <AttractapSerialConfiguratorWifi className="flex-1" />
+      <AttractapSerialConfiguratorAttraccess openDeviceSettings={openDeviceSettings} className="flex-1" />
     </div>
   );
 }

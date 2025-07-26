@@ -22,9 +22,7 @@ export class ResourceUsageEndedEvent {
     public readonly startTime: Date,
     public readonly endTime: Date,
     public readonly user: User
-  ) {
-    console.log('ResourceUsageEndedEvent', resource, startTime, endTime, user);
-  }
+  ) {}
 }
 
 export class ResourceUsageTakenOverEvent {

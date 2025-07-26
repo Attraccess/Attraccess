@@ -1,25 +1,45 @@
 {
+  "title": "Attraccess",
   "updating": {
     "label": "Daten werden aktualisiert..."
   },
-  "connected": {
-    "title": "Attraccess verbunden",
-    "description": "Geräte ID: {{deviceId}}",
-    "openDeviceSettings": {
-      "button": "Geräteeinstellungen öffnen"
-    }
-  },
-  "connecting": {
-    "tcp": {
-      "label": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+
+  "status": {
+    "connected": {
+      "title": "Attraccess verbunden",
+      "description": "Geräte ID: {{deviceId}}",
+      "openDeviceSettings": {
+        "button": "Geräteeinstellungen öffnen"
+      }
     },
-    "websocket": {
-      "label": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+    "connecting_tcp": {
+      "title": "TCP Verbindung wird hergestellt",
+      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+    },
+    "connecting_websocket": {
+      "title": "Websocket Verbindung wird hergestellt",
+      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+    },
+    "disconnected": {
+      "title": "Attraccess nicht verbunden",
+      "description": "Hostname: {{hostname}}, Port: {{port}}"
+    },
+    "error_failed": {
+      "title": "Fehler beim Verbinden",
+      "description": "Hostname: {{hostname}}, Port: {{port}}"
+    },
+    "error_timed_out": {
+      "title": "Verbindung zu Attraccess Server fehlgeschlagen (Timeout)",
+      "description": "Hostname: {{hostname}}, Port: {{port}}"
+    },
+    "error_invalid_server": {
+      "title": "Ungültiger Attraccess Server",
+      "description": "Hostname: {{hostname}}, Port: {{port}}"
     }
   },
-  "disconnected": {
-    "title": "Attraccess nicht verbunden",
-    "description": "Hostname: {{hostname}}, Port: {{port}}"
+  "statusNotYetFetched": {
+    "title": "Status wird geladen...",
+    "description": "Dies kann einige Sekunden dauern..."
   },
   "attraccessDataDoesNotMatchesServer": {
     "alert": {

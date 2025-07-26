@@ -1,4 +1,5 @@
 {
+  "title": "Attraccess",
   "updating": {
     "label": "Updating..."
   },
@@ -20,6 +21,9 @@
   "disconnected": {
     "title": "Attraccess disconnected",
     "description": "Hostname: {{hostname}}, Port: {{port}}"
+  },
+  "statusNotYetFetched": {
+    "description": "Status is loading..."
   },
   "attraccessDataDoesNotMatchesServer": {
     "alert": {

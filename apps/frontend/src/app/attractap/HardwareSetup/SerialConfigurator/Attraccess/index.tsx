@@ -1,8 +1,9 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Progress } from '@heroui/react';
+import { Alert, Button, CircularProgress, cn } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ESPTools } from '../../../../../utils/esp-tools';
 import { getBaseUrl } from '../../../../../api';
+import { PageHeader } from '../../../../../components/pageHeader';
 
 import de from './de.json';
 import en from './en.json';
@@ -25,9 +26,12 @@ interface AttraccessStatusData {
 
 interface Props {
   openDeviceSettings: (deviceId: string) => void;
+  className?: string;
 }
 
 export function AttractapSerialConfiguratorAttraccess(props: Props) {
+  const { className } = props;
+
   const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.attraccess', {
     de,
     en,
@@ -57,26 +61,19 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       return null;
     }
 
-    console.log({
-      statusHostname: status.hostname,
-      apiUrlHostname: apiHostnameAndPort.hostname,
-      statusPort: status.port,
-      apiUrlPort: apiHostnameAndPort.port,
-    });
-
     return status.hostname === apiHostnameAndPort.hostname && status.port === apiHostnameAndPort.port;
   }, [status, apiHostnameAndPort]);
 
   const updateStatus = useCallback(async () => {
-    console.log('fetching status');
+    console.debug('Attraccess-Status: fetching status');
     setIsUpdatingStatus(true);
 
     const espTools = ESPTools.getInstance();
     const response = await espTools.sendCommand({ topic: 'attraccess.status', type: 'GET' }, true, 2000);
 
     if (!response) {
-      console.error('No response from ESP');
-      console.log('retrying fetch status in 3s');
+      console.error('Attraccess-Status: No response from ESP');
+      console.debug('Attraccess-Status: retrying fetch status in 3s');
       setTimeout(() => {
         updateStatus();
       }, 3000);
@@ -84,35 +81,35 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
     }
 
     const data = JSON.parse(response) as AttraccessStatusData;
-    console.log('status', data);
+    console.debug('Attraccess-Status: status', data);
 
     setStatus(data);
     setIsUpdatingStatus(false);
 
     if (data.status === 'connected') {
-      console.log('connected, exiting');
+      console.debug('Attraccess-Status: connected, exiting');
       return;
     }
 
     if (data.status === 'authenticated') {
-      console.log('authenticated, exiting');
+      console.debug('Attraccess-Status: authenticated, exiting');
       return;
     }
 
     if (data.status === 'disconnected' && data.hostname === '') {
-      console.log('disconnected, exiting');
+      console.debug('Attraccess-Status: disconnected, exiting');
       return;
     }
 
     if (data.status === 'error_failed' || data.status === 'error_timed_out' || data.status === 'error_invalid_server') {
-      console.log('error, exiting', data.status);
+      console.debug('Attraccess-Status: error, exiting', data.status);
       setTimeout(() => {
         updateStatus();
       }, 5000);
       return;
     }
 
-    console.log('retrying fetch status in 1s');
+    console.debug('Attraccess-Status: retrying fetch status in 1s');
     setTimeout(() => {
       updateStatus();
     }, 1000);
@@ -125,7 +122,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
   const updateAttraccessData = useCallback(async () => {
     const payload = { hostname: apiHostnameAndPort.hostname, port: apiHostnameAndPort.port };
 
-    console.log('updating attraccess data', payload);
+    console.debug('Attraccess-Status: updating attraccess data', payload);
 
     const espTools = ESPTools.getInstance();
     const response = await espTools.sendCommand({
@@ -134,7 +131,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       payload: JSON.stringify(payload),
     });
 
-    console.log('updated attraccess data', response);
+    console.debug('Attraccess-Status: updated attraccess data', response);
 
     setStatus({
       status: 'connecting_tcp',
@@ -155,31 +152,54 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
     props.openDeviceSettings(status.deviceId);
   }, [status, props]);
 
+  const alertDescription = useMemo(() => {
+    if (!status) {
+      return t('statusNotYetFetched.description');
+    }
+
+    return t(`status.${status.status}.description`, {
+      hostname: status.hostname,
+      port: status.port,
+      deviceId: status.deviceId,
+    });
+  }, [status, t]);
+
+  const alertTitle = useMemo(() => {
+    if (!status) {
+      return t('statusNotYetFetched.title');
+    }
+
+    return t(`status.${status.status}.title`, {
+      hostname: status.hostname,
+      port: status.port,
+      deviceId: status.deviceId,
+    });
+  }, [status, t]);
+
+  const alertColor = useMemo(() => {
+    if (status?.status === 'authenticated') {
+      return 'success';
+    }
+
+    return 'warning';
+  }, [status]);
+
   return (
-    <div className="flex flex-col gap-4">
-      {isUpdatingStatus && <Progress isIndeterminate label={t('updating.label')} />}
-      {status?.status === 'authenticated' && (
-        <Alert color="success" title={t('connected.title')}>
-          {t('connected.description', { deviceId: status.deviceId })}
+    <div className={cn('flex flex-col gap-4', className)}>
+      <PageHeader
+        noMargin
+        title={t('title')}
+        actions={isUpdatingStatus ? <CircularProgress isIndeterminate /> : undefined}
+      />
+
+      <Alert color={alertColor} title={alertTitle}>
+        {alertDescription}
+        {status?.status === 'authenticated' && (
           <Button onPress={openDeviceSettings} color="primary">
             {t('connected.openDeviceSettings.button')}
           </Button>
-        </Alert>
-      )}
-      {status?.status === 'connecting_tcp' && (
-        <Progress isIndeterminate label={t('connecting.tcp.label', { hostname: status.hostname, port: status.port })} />
-      )}
-      {status?.status === 'connecting_websocket' && (
-        <Progress
-          isIndeterminate
-          label={t('connecting.websocket.label', { hostname: status.hostname, port: status.port })}
-        />
-      )}
-      {status?.status === 'disconnected' && (
-        <Alert color="danger" title={t('disconnected.title')}>
-          {t('disconnected.description', { hostname: status.hostname, port: status.port })}
-        </Alert>
-      )}
+        )}
+      </Alert>
 
       {attraccessDataMatchesServer === false && (
         <Alert color="primary" title={t('attraccessDataDoesNotMatchesServer.alert.title')}>

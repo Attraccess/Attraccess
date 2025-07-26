@@ -1,8 +1,9 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Autocomplete, AutocompleteItem, Button, Progress } from '@heroui/react';
+import { Alert, Autocomplete, AutocompleteItem, Button, CircularProgress, cn, Progress } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ESPTools } from '../../../../../utils/esp-tools';
 import { PasswordInput } from '../../../../../components/PasswordInput';
+import { PageHeader } from '../../../../../components/pageHeader';
 
 import de from './de.json';
 import en from './en.json';
@@ -22,11 +23,11 @@ interface WifiNetwork {
 }
 
 interface Props {
-  onConnected: (isConnected: boolean) => void;
+  className?: string;
 }
 
 export function AttractapSerialConfiguratorWifi(props: Props) {
-  const { onConnected } = props;
+  const { className } = props;
 
   const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.wifi', {
     de,
@@ -47,7 +48,8 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
     const response = await espTools.sendCommand({ topic: 'network.wifi.status', type: 'GET' }, true, 2000);
 
     if (!response) {
-      console.error('No response from ESP');
+      console.error('Wifi-Status: No response from ESP');
+      console.debug('Wifi-Status: retrying fetch status in 3s');
       setTimeout(() => {
         updateWifiStatus();
       }, 3000);
@@ -59,7 +61,6 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
     setSelectedWifiSSID(data.ssid);
 
     setWifiStatus(data);
-    onConnected(data.status === 'connected');
     setIsUpdatingWifiStatus(false);
 
     if (data.status === 'connecting') {
@@ -67,23 +68,31 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
         updateWifiStatus();
       }, 1000);
     }
-  }, [onConnected]);
+  }, []);
 
   const scanForWifiNetworks = useCallback(async () => {
+    console.debug('Wifi-Status: scanning for wifi networks');
     setIsScanningWifiNetworks(true);
 
-    const espTools = ESPTools.getInstance();
-    const response = await espTools.sendCommand({ topic: 'network.wifi.scan', type: 'GET' });
+    try {
+      const espTools = ESPTools.getInstance();
+      const response = await espTools.sendCommand({ topic: 'network.wifi.scan', type: 'GET' });
 
-    if (!response) {
-      console.error('No response from ESP');
-      return;
+      if (!response) {
+        console.error('Wifi-Scan: No response from ESP');
+        console.debug('Wifi-Scan: retrying scan in 5s');
+        setTimeout(() => {
+          scanForWifiNetworks();
+        }, 5000);
+        return;
+      }
+
+      const data = JSON.parse(response) as WifiNetwork[];
+
+      setAvailableWifiNetworks(data);
+    } finally {
+      setIsScanningWifiNetworks(false);
     }
-
-    const data = JSON.parse(response) as WifiNetwork[];
-
-    setAvailableWifiNetworks(data);
-    setIsScanningWifiNetworks(false);
   }, []);
 
   useEffect(() => {
@@ -129,8 +138,13 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
   }, [selectedWifiSSID, wifiPassword, updateWifiStatus]);
 
   return (
-    <div className="flex flex-col gap-4">
-      {isUpdatingWifiStatus && <Progress isIndeterminate />}
+    <div className={cn('flex flex-col gap-4', className)}>
+      <PageHeader
+        title={t('title')}
+        noMargin
+        actions={isUpdatingWifiStatus ? <CircularProgress isIndeterminate /> : undefined}
+      />
+
       {wifiStatus?.status === 'connected' && (
         <Alert color="success" title={t('connected.title')}>
           {t('connected.description', { ssid: wifiStatus.ssid, ip: wifiStatus.ip })}

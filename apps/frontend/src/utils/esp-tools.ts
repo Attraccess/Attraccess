@@ -1,4 +1,5 @@
 import { Transport, ESPLoader, IEspLoaderTerminal } from 'esptool-js';
+import { nanoid } from 'nanoid';
 
 export enum ESPToolsErrorType {
   NO_PORT_SELECTED = 'NO_PORT_SELECTED',
@@ -24,34 +25,47 @@ export interface Command {
   payload?: string;
 }
 
+interface UseTransportOptionsBlocking<TResult = unknown> {
+  blocking: true;
+  fn: (transport: Transport, release: () => void) => Promise<TResult>;
+}
+
+interface UseTransportOptionsNonBlocking<TResult = unknown> {
+  blocking: false;
+  fn: (transport: Transport) => Promise<TResult>;
+}
+
 export class ESPTools {
   private static _instance: ESPTools;
   private _transport: Transport | null = null;
-  private _transportIsInUse = false;
+
+  private _transportQueue: Set<string> = new Set();
 
   public get isConnected(): boolean {
     return !!this._transport;
   }
 
-  public get isTransportInUse(): boolean {
-    return this._transportIsInUse;
-  }
-
-  private async useTransport<TResult = unknown>(fn: (transport: Transport) => Promise<TResult>): Promise<TResult> {
-    while (this.isTransportInUse) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
+  private async useTransport<TResult = unknown>(
+    opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>
+  ): Promise<TResult> {
     if (!this._transport) {
       throw new Error('No transport available');
     }
 
-    this._transportIsInUse = true;
+    const usageId = nanoid();
+    this._transportQueue.add(usageId);
+    while (this._transportQueue.values().next().value !== usageId) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
 
     try {
-      return await fn(this._transport);
+      if (opts.blocking) {
+        return await opts.fn(this._transport, () => this._transportQueue.delete(usageId));
+      }
+
+      return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(this._transport);
     } finally {
-      this._transportIsInUse = false;
+      this._transportQueue.delete(usageId);
     }
   }
 
@@ -133,113 +147,112 @@ export class ESPTools {
   }): Promise<ESPToolsResult<void>> {
     const { firmware, terminal, onProgress } = options;
 
-    console.log('calling useTransport');
-    return await this.useTransport(async (transport) => {
-      try {
-        console.log('calling esploader');
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport) => {
         try {
-          await transport.disconnect();
-        } catch (err) {
-          console.error(err);
-        }
+          try {
+            await transport.disconnect();
+          } catch (err) {
+            console.error(err);
+          }
 
-        const esploader = new ESPLoader({
-          transport,
-          baudrate: 115200,
-          romBaudrate: 115200,
-          enableTracing: false,
-          terminal,
-        });
-
-        await esploader.main();
-        await esploader.flashId();
-
-        const ERASE_FIRST = true;
-
-        if (ERASE_FIRST) {
-          await esploader.eraseFlash();
-        }
-
-        const totalSize = firmware.size;
-        let totalWritten = 0;
-
-        let firmwareDataString: string;
-        try {
-          firmwareDataString = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsBinaryString(firmware);
+          const esploader = new ESPLoader({
+            transport,
+            baudrate: 115200,
+            romBaudrate: 115200,
+            enableTracing: false,
+            terminal,
           });
+
+          await esploader.main();
+          await esploader.flashId();
+
+          const ERASE_FIRST = true;
+
+          if (ERASE_FIRST) {
+            await esploader.eraseFlash();
+          }
+
+          const totalSize = firmware.size;
+          let totalWritten = 0;
+
+          let firmwareDataString: string;
+          try {
+            firmwareDataString = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsBinaryString(firmware);
+            });
+          } catch (err) {
+            return {
+              success: false,
+              error: { type: ESPToolsErrorType.FIRMWARE_READ_FAILED, details: err },
+              data: null,
+            };
+          }
+
+          await esploader.writeFlash({
+            fileArray: [{ data: firmwareDataString, address: 0 }],
+            flashSize: 'keep',
+            flashMode: 'keep',
+            flashFreq: 'keep',
+            eraseAll: false,
+            compress: true,
+            reportProgress: (_fileIndex: number, written: number, total: number) => {
+              const uncompressedWritten = (written / total) * firmwareDataString.length;
+              const currentProgress = totalWritten + uncompressedWritten;
+              const percentage = Math.floor((currentProgress / totalSize) * 100);
+
+              // Ensure we don't skip 99% - cap at 99% until we're truly done
+              const cappedPercentage = Math.min(percentage, 99);
+
+              console.debug(`Writing firmware: ${cappedPercentage}%`);
+              if (onProgress) {
+                onProgress(cappedPercentage);
+              }
+
+              if (written === total) {
+                totalWritten += uncompressedWritten;
+              }
+            },
+          });
+
+          // Call onProgress with 100% after flashing is complete
+          console.debug('Writing firmware: 100%');
+          if (onProgress) {
+            onProgress(100);
+          }
+
+          try {
+            await this._hardReset(transport);
+          } catch (err) {
+            return {
+              success: false,
+              error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
+              data: null,
+            };
+          }
+
+          return {
+            success: true,
+            error: null,
+            data: undefined,
+          };
         } catch (err) {
+          const error = err as Error;
           return {
             success: false,
-            error: { type: ESPToolsErrorType.FIRMWARE_READ_FAILED, details: err },
+            error: { type: ESPToolsErrorType.FLASH_FAILED, details: error.message },
             data: null,
           };
         }
-
-        await esploader.writeFlash({
-          fileArray: [{ data: firmwareDataString, address: 0 }],
-          flashSize: 'keep',
-          flashMode: 'keep',
-          flashFreq: 'keep',
-          eraseAll: false,
-          compress: true,
-          reportProgress: (_fileIndex: number, written: number, total: number) => {
-            const uncompressedWritten = (written / total) * firmwareDataString.length;
-            const currentProgress = totalWritten + uncompressedWritten;
-            const percentage = Math.floor((currentProgress / totalSize) * 100);
-
-            // Ensure we don't skip 99% - cap at 99% until we're truly done
-            const cappedPercentage = Math.min(percentage, 99);
-
-            console.debug(`Writing firmware: ${cappedPercentage}%`);
-            if (onProgress) {
-              onProgress(cappedPercentage);
-            }
-
-            if (written === total) {
-              totalWritten += uncompressedWritten;
-            }
-          },
-        });
-
-        // Call onProgress with 100% after flashing is complete
-        console.debug('Writing firmware: 100%');
-        if (onProgress) {
-          onProgress(100);
-        }
-
-        try {
-          await this._hardReset(transport);
-        } catch (err) {
-          return {
-            success: false,
-            error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
-            data: null,
-          };
-        }
-
-        return {
-          success: true,
-          error: null,
-          data: undefined,
-        };
-      } catch (err) {
-        const error = err as Error;
-        return {
-          success: false,
-          error: { type: ESPToolsErrorType.FLASH_FAILED, details: error.message },
-          data: null,
-        };
-      }
+      },
     });
   }
 
   private async _hardReset(transport: Transport): Promise<void> {
-    console.log('Resetting device...');
-
     await transport.device.setSignals({
       dataTerminalReady: false,
       requestToSend: true,
@@ -264,96 +277,107 @@ export class ESPTools {
   }
 
   public async hardReset(): Promise<void> {
-    return await this.useTransport(async (transport) => {
-      await this._hardReset(transport);
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport) => {
+        await this._hardReset(transport);
+      },
     });
   }
 
   public async getSerialOutput(onWrite: (data: Uint8Array) => unknown) {
-    return await this.useTransport(async (transport) => {
-      let isConsoleClosed = false;
+    return await this.useTransport({
+      blocking: false,
+      fn: async (transport) => {
+        let isConsoleClosed = false;
 
-      setTimeout(async () => {
-        while (!isConsoleClosed) {
-          const readLoop = transport.rawRead();
-          const { value, done } = await readLoop.next();
+        setTimeout(async () => {
+          while (!isConsoleClosed) {
+            const readLoop = transport.rawRead();
+            const { value, done } = await readLoop.next();
 
-          if (done || !value) {
-            break;
+            if (done || !value) {
+              break;
+            }
+            onWrite(value);
           }
-          onWrite(value);
-        }
-      }, 1);
+        }, 1);
 
-      return () => {
-        isConsoleClosed = true;
-      };
+        return () => {
+          isConsoleClosed = true;
+        };
+      },
     });
   }
 
   public async sendCommand(command: Command, waitForResponse = true, timeout = 15000): Promise<string | null> {
-    return await this.useTransport(async (transport) => {
-      let commandString = `CMND ${command.type} ${command.topic}`;
-      if (command.payload) {
-        commandString += ` ${command.payload}`;
-      }
-
-      commandString += '\n';
-
-      const commandBuffer = new TextEncoder().encode(commandString);
-      await transport.write(commandBuffer);
-
-      if (!waitForResponse) {
-        return null;
-      }
-
-      let continueReading = true;
-      let buffer = '';
-
-      const timeoutId = setTimeout(() => {
-        continueReading = false;
-      }, timeout);
-
-      const readLoop = transport.rawRead();
-      while (continueReading) {
-        const { value, done } = await readLoop.next();
-        if (done || !value) {
-          break;
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport, release) => {
+        let commandString = `CMND ${command.type} ${command.topic}`;
+        if (command.payload) {
+          commandString += ` ${command.payload}`;
         }
 
-        // Convert Uint8Array to string and add to buffer
-        const chunk = new TextDecoder().decode(value);
-        buffer += chunk;
+        commandString += '\n';
 
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        const commandBuffer = new TextEncoder().encode(commandString);
+        await transport.write(commandBuffer);
 
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
+        if (!waitForResponse) {
+          return null;
+        }
 
-          // Check if line matches expected RESP format: RESP <topic> <payload>
-          const respMatch = trimmedLine.match(/^RESP\s+(\S+)\s+(.+)$/);
-          if (!respMatch) {
-            continue;
-          }
+        release();
 
-          const [, responseTopic, payload] = respMatch;
+        let continueReading = true;
+        let buffer = '';
 
-          // Check if the response topic matches our command topic
-          if (responseTopic !== command.topic) {
-            continue;
-          }
-
-          clearTimeout(timeoutId);
+        const timeoutId = setTimeout(() => {
           continueReading = false;
-          return payload;
-        }
-      }
+        }, timeout);
 
-      clearTimeout(timeoutId);
-      return null;
+        const readLoop = transport.rawRead();
+        while (continueReading) {
+          const { value, done } = await readLoop.next();
+          if (done || !value) {
+            break;
+          }
+
+          // Convert Uint8Array to string and add to buffer
+          const chunk = new TextDecoder().decode(value);
+          buffer += chunk;
+
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            // Check if line matches expected RESP format: RESP <topic> <payload>
+            const respMatch = trimmedLine.match(/^RESP\s+(\S+)\s+(.+)$/);
+            if (!respMatch) {
+              continue;
+            }
+
+            const [, responseTopic, payload] = respMatch;
+
+            // Check if the response topic matches our command topic
+            if (responseTopic !== command.topic) {
+              continue;
+            }
+
+            clearTimeout(timeoutId);
+            continueReading = false;
+            return payload;
+          }
+        }
+
+        clearTimeout(timeoutId);
+        return null;
+      },
     });
   }
 }
