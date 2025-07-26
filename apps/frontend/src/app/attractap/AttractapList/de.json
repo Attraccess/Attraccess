@@ -2,7 +2,8 @@
   "page": {
     "title": "Attractap",
     "actions": {
-      "openFlasher": "Attractap flasher"
+      "openHardwareSetup": "Attractap Einrichten",
+      "openSerialConsole": "Serielle Konsole"
     }
   },
   "workInProgress": "Dieses Feature ist noch in Arbeit, benutzung auf eigene Gefahr!",

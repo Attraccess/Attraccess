@@ -14,10 +14,11 @@ interface SelectProps {
   items: SelectItem[];
   id?: string;
   name?: string;
+  isLoading?: boolean;
 }
 
 export function Select(props: SelectProps) {
-  const { selectedKey, onSelectionChange, items, label, id, name } = props;
+  const { selectedKey, onSelectionChange, items, label, id, name, isLoading } = props;
 
   const selectedItem = useMemo(() => {
     return items.find((item) => item.key === selectedKey);
@@ -29,7 +30,7 @@ export function Select(props: SelectProps) {
       <input type="hidden" id={id} name={name} value={selectedKey} />
       <Dropdown>
         <DropdownTrigger>
-          <Button endContent={<ChevronDown size={16} />} data-cy="select-trigger-button">
+          <Button endContent={<ChevronDown size={16} />} data-cy="select-trigger-button" isLoading={isLoading}>
             <span>{selectedItem?.label}</span>
           </Button>
         </DropdownTrigger>

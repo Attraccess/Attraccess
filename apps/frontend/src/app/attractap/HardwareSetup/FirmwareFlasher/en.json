@@ -1,0 +1,28 @@
+{
+  "success": {
+    "toast": {
+      "title": "Installation successful",
+      "description": "You can now set up and use the NFC reader."
+    }
+  },
+  "action": {
+    "flash": "Install Now",
+    "retryFlash": "Retry Installation"
+  },
+  "errors": {
+    "NO_PORT_SELECTED": "No port selected",
+    "CONNECTION_FAILED": "Connection failed",
+    "PORT_OPEN_FAILED": "Port could not be opened",
+    "FLASH_FAILED": "Installation failed",
+    "DEVICE_NOT_FOUND": "Device not found",
+    "FIRMWARE_READ_FAILED": "Firmware could not be read",
+    "RESET_FAILED": "NFC reader restart failed",
+    "UNKNOWN_ERROR": "Unknown error"
+  },
+  "downloading": {
+    "label": "Firmware is being downloaded..."
+  },
+  "terminal": {
+    "title": "Terminal Output"
+  }
+}

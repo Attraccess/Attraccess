@@ -229,28 +229,21 @@ function FlowsPageInner() {
 
   const onLiveLog = useCallback(
     (log: ResourceFlowLog) => {
-      console.log('[FlowsPageInner] log.type:', log.type);
-
       if (log.type === 'node.processing.failed') {
-        console.log('[FlowsPageInner] Setting flow execution had error to true');
         setFlowExecutionHadError(true);
         return;
       }
 
       if (log.type === 'flow.start') {
-        console.log('[FlowsPageInner] Flow started');
         setFlowIsRunning(true);
         return;
       }
 
       if (log.type === 'flow.completed') {
-        console.log('[FlowsPageInner] Flow completed');
         setFlowIsRunning(false);
 
         // Use functional state update to get current error state
         setFlowExecutionHadError((currentErrorState) => {
-          console.log('[FlowsPageInner] Current error state:', currentErrorState);
-
           if (!currentErrorState) {
             jsConfetti.addConfetti();
           } else {

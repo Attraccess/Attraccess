@@ -12,8 +12,8 @@
     "attractap": {
       "label": "Attractap",
       "items": {
-        "Attractap": "Attractap",
-        "NFCCards": "NFC-Karten"
+        "readers": "Lesegeräte",
+        "nfcCards": "NFC-Karten"
       }
     },
     "auth": {

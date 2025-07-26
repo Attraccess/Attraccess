@@ -20,19 +20,8 @@ const AppEnvSchema = z
         message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
       }),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
-    ATTRACCESS_URL: z
-      .string()
-      .url({ message: 'ATTRACCESS_URL must be a valid URL' })
-      .default(process.env.VITE_ATTRACCESS_URL || ''),
-    ATTRACCESS_FRONTEND_URL: z
-      .string()
-      .url({ message: 'ATTRACCESS_FRONTEND_URL must be a valid URL' })
-      .default(
-        process.env.FRONTEND_URL ||
-        process.env.VITE_ATTRACCESS_URL ||
-        process.env.ATTRACCESS_URL ||
-        ''
-      ),
+    ATTRACCESS_URL: z.string().url({ message: 'ATTRACCESS_URL must be a valid URL' }),
+    ATTRACCESS_FRONTEND_URL: z.string().url({ message: 'ATTRACCESS_FRONTEND_URL must be a valid URL' }),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
@@ -67,7 +56,15 @@ export type AppConfigType = z.infer<typeof AppEnvSchema> & { GLOBAL_PREFIX: stri
 
 const appConfigFactory = (): AppConfigType => {
   try {
-    const env = AppEnvSchema.parse(process.env);
+    const env = AppEnvSchema.parse({
+      ...process.env,
+      ATTRACCESS_FRONTEND_URL:
+        process.env.ATTRACCESS_FRONTEND_URL ??
+        process.env.FRONTEND_URL ??
+        process.env.ATTRACCESS_URL ??
+        process.env.VITE_ATTRACCESS_URL,
+      ATTRACCESS_URL: process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL,
+    });
 
     return {
       ...env,

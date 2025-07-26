@@ -47,12 +47,12 @@ export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
     items: [
       {
         path: '/nfc-cards',
-        translationKey: 'NFCCards',
+        translationKey: 'nfcCards',
         icon: NfcIcon,
       },
       {
         path: '/attractap',
-        translationKey: 'Attractap',
+        translationKey: 'readers',
         icon: ComputerIcon,
       },
     ],

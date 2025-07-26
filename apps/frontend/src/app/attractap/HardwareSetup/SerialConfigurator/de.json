@@ -1,0 +1,11 @@
+{
+  "actions": {
+    "connect": "Verbinden",
+    "retryConnect": "Erneut versuchen"
+  },
+  "connecting": {
+    "progress": {
+      "label": "Verbindung wird hergestellt..."
+    }
+  }
+}

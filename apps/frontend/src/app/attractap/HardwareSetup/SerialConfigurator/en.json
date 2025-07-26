@@ -1,0 +1,11 @@
+{
+  "actions": {
+    "connect": "Connect",
+    "retryConnect": "Retry"
+  },
+  "connecting": {
+    "progress": {
+      "label": "Connecting..."
+    }
+  }
+}

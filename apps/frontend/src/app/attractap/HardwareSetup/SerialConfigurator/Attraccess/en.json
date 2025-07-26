@@ -1,0 +1,35 @@
+{
+  "title": "Attraccess",
+  "updating": {
+    "label": "Updating..."
+  },
+  "connected": {
+    "title": "Attraccess connected",
+    "description": "Device ID: {{deviceId}}",
+    "openDeviceSettings": {
+      "button": "Open device settings"
+    }
+  },
+  "connecting": {
+    "tcp": {
+      "label": "Connecting to Attraccess Server ({{hostname}}:{{port}})..."
+    },
+    "websocket": {
+      "label": "Connecting to Attraccess Server ({{hostname}}:{{port}})..."
+    }
+  },
+  "disconnected": {
+    "title": "Attraccess disconnected",
+    "description": "Hostname: {{hostname}}, Port: {{port}}"
+  },
+  "statusNotYetFetched": {
+    "description": "Status is loading..."
+  },
+  "attraccessDataDoesNotMatchesServer": {
+    "alert": {
+      "title": "Attraccess data does not match server",
+      "description": "The data from the reader does not match the server data. Please update the data.",
+      "button": "Update data"
+    }
+  }
+}

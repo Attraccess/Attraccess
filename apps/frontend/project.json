@@ -42,13 +42,15 @@
       "outputs": ["{options.outputFile}"]
     },
     "test": {
+      "options": {
+        "watch": false
+      },
       "cache": true,
       "inputs": [
         "default",
         "^production",
-        "{workspaceRoot}/jest.preset.js",
         {
-          "externalDependencies": ["jest"]
+          "externalDependencies": ["vitest"]
         }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"]

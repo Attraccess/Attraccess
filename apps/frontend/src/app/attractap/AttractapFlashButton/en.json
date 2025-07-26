@@ -1,9 +1,0 @@
-{
-  "errors": {
-    "unsupported": "Flashing not possible",
-    "notAllowed": "Flasher requires HTTPS"
-  },
-  "button": {
-    "flash": "Flash"
-  }
-}

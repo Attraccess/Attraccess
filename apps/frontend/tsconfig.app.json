@@ -8,7 +8,8 @@
       "@nx/react/typings/cssmodule.d.ts",
       "@nx/react/typings/image.d.ts",
       "vite/client",
-      "vite-plugin-pwa/client"
+      "vite-plugin-pwa/client",
+      "w3c-web-serial"
     ],
     "moduleResolution": "Bundler",
     "resolveJsonModule": true
@@ -21,8 +22,7 @@
     "src/**/*.spec.js",
     "src/**/*.test.js",
     "src/**/*.spec.jsx",
-    "src/**/*.test.jsx",
-    "jest.config.ts",
+    "src/**/*.test.jsx"
   ],
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "../../libs/plugins-frontend-ui/src/lib/components/attraccess-user/attraccessUser.de.ts", "../../libs/plugins-frontend-ui/src/lib/components/attraccess-user/attraccessUser.en.ts"]
 }

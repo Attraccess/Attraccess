@@ -1,0 +1,23 @@
+{
+  "title": "WiFi",
+  "ssidSelect": {
+    "label": "SSID auswählen"
+  },
+  "password": {
+    "label": "Passwort"
+  },
+  "connected": {
+    "title": "WiFi verbunden",
+    "description": "SSID: {{ssid}}, IP: {{ip}}"
+  },
+  "connecting": {
+    "label": "Verbindung zu {{ssid}} wird hergestellt..."
+  },
+  "disconnected": {
+    "title": "WiFi nicht verbunden",
+    "description": "SSID: {{ssid}}"
+  },
+  "setCredentials": {
+    "label": "SSID und Passwort setzen"
+  }
+}
