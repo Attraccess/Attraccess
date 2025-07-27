@@ -80,8 +80,18 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       return;
     }
 
-    const data = JSON.parse(response) as AttraccessStatusData;
-    console.debug('Attraccess-Status: status', data);
+    let data: AttraccessStatusData;
+    try {
+      data = JSON.parse(response) as AttraccessStatusData;
+      console.debug('Attraccess-Status: status', data);
+    } catch (err) {
+      console.error('Attraccess-Status: Invalid JSON response', response, err);
+      console.debug('Attraccess-Status: retrying fetch status in 3s');
+      setTimeout(() => {
+        updateStatus();
+      }, 3000);
+      return;
+    }
 
     setStatus(data);
     setIsUpdatingStatus(false);
@@ -119,31 +129,34 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
     updateStatus();
   }, [updateStatus]);
 
-  const updateAttraccessData = useCallback(async () => {
-    const payload = { hostname: apiHostnameAndPort.hostname, port: apiHostnameAndPort.port };
+  const updateAttraccessData = useCallback(
+    async (data?: { hostname: string; port: number }) => {
+      const payload = data ?? { hostname: apiHostnameAndPort.hostname, port: apiHostnameAndPort.port };
 
-    console.debug('Attraccess-Status: updating attraccess data', payload);
+      console.debug('Attraccess-Status: updating attraccess data', payload);
 
-    const espTools = ESPTools.getInstance();
-    const response = await espTools.sendCommand({
-      topic: 'attraccess.configuration',
-      type: 'SET',
-      payload: JSON.stringify(payload),
-    });
+      const espTools = ESPTools.getInstance();
+      const response = await espTools.sendCommand({
+        topic: 'attraccess.configuration',
+        type: 'SET',
+        payload: JSON.stringify(payload),
+      });
 
-    console.debug('Attraccess-Status: updated attraccess data', response);
+      console.debug('Attraccess-Status: updated attraccess data', response);
 
-    setStatus({
-      status: 'connecting_tcp',
-      hostname: apiHostnameAndPort.hostname,
-      port: apiHostnameAndPort.port,
-      deviceId: '',
-    });
+      setStatus({
+        status: 'connecting_tcp',
+        hostname: apiHostnameAndPort.hostname,
+        port: apiHostnameAndPort.port,
+        deviceId: '',
+      });
 
-    setTimeout(() => {
-      updateStatus();
-    }, 1000);
-  }, [updateStatus, apiHostnameAndPort]);
+      setTimeout(() => {
+        updateStatus();
+      }, 1000);
+    },
+    [updateStatus, apiHostnameAndPort]
+  );
 
   const openDeviceSettings = useCallback(() => {
     if (!status) {
@@ -184,11 +197,29 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
     return 'warning';
   }, [status]);
 
+  const manualUpdateAttraccessData = useCallback(() => {
+    const hostname = prompt('Hostname');
+    if (!hostname) {
+      console.debug('Attraccess-Status: no hostname provided', typeof hostname, hostname);
+      return;
+    }
+    const port = prompt('Port');
+
+    if (!port) {
+      console.debug('Attraccess-Status: no port provided', typeof port, port);
+      return;
+    }
+
+    const payload = { hostname, port: Number(port) };
+    console.debug('Attraccess-Status: updating attraccess data manually', payload);
+    updateAttraccessData(payload);
+  }, [updateAttraccessData]);
+
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       <PageHeader
         noMargin
-        title={t('title')}
+        title={<span onDoubleClick={manualUpdateAttraccessData}>{t('title')}</span>}
         actions={isUpdatingStatus ? <CircularProgress isIndeterminate /> : undefined}
       />
 
@@ -196,7 +227,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
         {alertDescription}
         {status?.status === 'authenticated' && (
           <Button onPress={openDeviceSettings} color="primary">
-            {t('connected.openDeviceSettings.button')}
+            {t('status.authenticated.openDeviceSettings.button')}
           </Button>
         )}
       </Alert>
@@ -205,7 +236,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
         <Alert color="primary" title={t('attraccessDataDoesNotMatchesServer.alert.title')}>
           <div className="flex flex-row flex-wrap gap-4">
             <div>{t('attraccessDataDoesNotMatchesServer.alert.description')}</div>
-            <Button onPress={updateAttraccessData} color="primary">
+            <Button onPress={() => updateAttraccessData()} color="primary">
               {t('attraccessDataDoesNotMatchesServer.alert.button')}
             </Button>
           </div>

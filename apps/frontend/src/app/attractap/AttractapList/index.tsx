@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Chip, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
-import { Cloud, CloudOff, CpuIcon, LogsIcon } from 'lucide-react';
+import {
+  Alert,
+  Button,
+  Chip,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from '@heroui/react';
+import { Cloud, CloudOff, CpuIcon, LogsIcon, MoreVertical } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -51,36 +65,44 @@ export const AttractapList = () => {
       <PageHeader
         title={t('page.title')}
         actions={
-          <>
-            <AttractapHardwareSetup
-              openDeviceSettings={(deviceId) => {
-                setOpenedReaderEditor(Number(deviceId));
-              }}
-            >
-              {(onOpen) => (
-                <Button
-                  variant="light"
-                  startContent={<CpuIcon className="w-4 h-4" />}
-                  onPress={onOpen}
-                  data-cy="attractap-list-open-flasher-button"
-                >
-                  {t('page.actions.openHardwareSetup')}
-                </Button>
-              )}
-            </AttractapHardwareSetup>
-            <WebSerialConsole>
-              {(onOpen) => (
-                <Button
-                  variant="light"
-                  startContent={<LogsIcon className="w-4 h-4" />}
-                  onPress={onOpen}
-                  data-cy="attractap-list-open-console-button"
-                >
-                  {t('page.actions.openSerialConsole')}
-                </Button>
-              )}
-            </WebSerialConsole>
-          </>
+          <AttractapHardwareSetup
+            openDeviceSettings={(deviceId) => {
+              setOpenedReaderEditor(Number(deviceId));
+            }}
+          >
+            {(onOpenHardwareSetup) => (
+              <WebSerialConsole>
+                {(onOpenSerialConsole) => (
+                  <Dropdown>
+                    <DropdownTrigger>
+                      <Button variant="light" startContent={<MoreVertical className="w-4 h-4" />}>
+                        {t('page.actions.menu')}
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label="Attractap actions">
+                      <DropdownItem
+                        key="serial-console"
+                        startContent={<LogsIcon className="w-4 h-4" />}
+                        onPress={onOpenSerialConsole}
+                        data-cy="attractap-list-open-console-button"
+                      >
+                        {t('page.actions.openSerialConsole')}
+                      </DropdownItem>
+
+                      <DropdownItem
+                        key="hardware-setup"
+                        startContent={<CpuIcon className="w-4 h-4" />}
+                        onPress={onOpenHardwareSetup}
+                        data-cy="attractap-list-open-flasher-button"
+                      >
+                        {t('page.actions.openHardwareSetup')}
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                )}
+              </WebSerialConsole>
+            )}
+          </AttractapHardwareSetup>
         }
       />
 

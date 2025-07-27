@@ -49,6 +49,7 @@
     "@vercel/ncc": "^0.38.3",
     "@xyflow/react": "^12.8.1",
     "@yudiel/react-qr-scanner": "^2.3.1",
+    "async-mutex": "^0.5.0",
     "axios": "^1.9.0",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",

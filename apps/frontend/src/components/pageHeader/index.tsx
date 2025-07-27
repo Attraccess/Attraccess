@@ -5,7 +5,7 @@ import { Button } from '@heroui/button';
 import { cn, Image } from '@heroui/react';
 
 interface PageHeaderProps {
-  title: string;
+  title: string | ReactNode;
   subtitle?: string;
   backTo?: string;
   onBack?: () => void;

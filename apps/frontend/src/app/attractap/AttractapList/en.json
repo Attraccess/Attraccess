@@ -2,7 +2,8 @@
   "page": {
     "title": "Attractaps",
     "actions": {
-      "openHardwareSetup": "Setup Attractap",
+      "menu": "Hardware Setup",
+      "openHardwareSetup": "Setup NFC-Reader",
       "openSerialConsole": "Serial Console"
     }
   },

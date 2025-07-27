@@ -56,7 +56,17 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
       return;
     }
 
-    const data = JSON.parse(response) as WifiStatusData;
+    let data: WifiStatusData;
+    try {
+      data = JSON.parse(response) as WifiStatusData;
+    } catch (error) {
+      console.error('Wifi-Status: Invalid JSON response', response, error);
+      console.debug('Wifi-Status: retrying fetch status in 3s');
+      setTimeout(() => {
+        updateWifiStatus();
+      }, 3000);
+      return;
+    }
 
     setSelectedWifiSSID(data.ssid);
 
@@ -74,22 +84,27 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
     console.debug('Wifi-Status: scanning for wifi networks');
     setIsScanningWifiNetworks(true);
 
+    const espTools = ESPTools.getInstance();
+    const response = await espTools.sendCommand({ topic: 'network.wifi.scan', type: 'GET' });
+
+    if (!response) {
+      console.error('Wifi-Scan: No response from ESP');
+      console.debug('Wifi-Scan: retrying scan in 5s');
+      setTimeout(() => {
+        scanForWifiNetworks();
+      }, 5000);
+      return;
+    }
+
     try {
-      const espTools = ESPTools.getInstance();
-      const response = await espTools.sendCommand({ topic: 'network.wifi.scan', type: 'GET' });
-
-      if (!response) {
-        console.error('Wifi-Scan: No response from ESP');
-        console.debug('Wifi-Scan: retrying scan in 5s');
-        setTimeout(() => {
-          scanForWifiNetworks();
-        }, 5000);
-        return;
-      }
-
       const data = JSON.parse(response) as WifiNetwork[];
-
       setAvailableWifiNetworks(data);
+    } catch (error) {
+      console.error('Wifi-Scan: Invalid JSON response', response, error);
+      console.debug('Wifi-Scan: retrying scan in 5s');
+      setTimeout(() => {
+        scanForWifiNetworks();
+      }, 5000);
     } finally {
       setIsScanningWifiNetworks(false);
     }

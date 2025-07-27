@@ -325,9 +325,12 @@ void setup()
   attraccessService.setSelectItemCallback([](const String &label, const JsonArray &options)
                                           { mainScreenUI.showSelectItemDialog(label, options, [](const String &selectedId)
                                                                               {
+                                                                                Serial.printf("SELECT_ITEM callback: selectedId: %s\n", selectedId.c_str());
+                                                                                // Clean up the select dialog UI
+                                                                                mainScreenUI.cleanupSelectDialog();
                                                                                 // Send SELECT_ITEM response with selectedId
                                                                                 StaticJsonDocument<64> doc;
-                                                                                doc["selectedId"] = selectedId;
+                                                                                doc["selectedId"] = selectedId.c_str();
                                                                                 extern AttraccessService attraccessService;
                                                                                 attraccessService.sendMessage("SELECT_ITEM", doc.as<JsonObject>()); // Note: event type is SELECT_ITEM (response)
                                                                               }); });

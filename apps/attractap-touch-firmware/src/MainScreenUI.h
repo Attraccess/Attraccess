@@ -47,6 +47,12 @@ public:
     // New: Set the main content area (replaces dialogs/popups)
     void setMainContent(const MainContent &content);
 
+    // Restore main content UI after select dialog
+    void restoreMainContentUI();
+
+    // Clean up select dialog UI
+    void cleanupSelectDialog();
+
     // UI state
     bool isCreated() const { return mainScreen != nullptr; }
 
@@ -88,6 +94,9 @@ private:
     static void onCancelButtonClicked(lv_event_t *e);
     static void onSelectItemButtonClicked(lv_event_t *e);
     static void onSelectItemCancelClicked(lv_event_t *e);
+
+    static SelectItemResultCallback selectItemResultCallback;
+    static String selectItemOptions[50];
 
     lv_obj_t *selectItemDialog = nullptr;
 };

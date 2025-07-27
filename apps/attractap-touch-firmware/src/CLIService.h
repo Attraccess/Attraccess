@@ -6,56 +6,15 @@
 #include <map>
 #include "WiFiService.h"
 #include "AttraccessService.h"
+#include "CommandParser.h"
+#include "CommandExecutor.h"
 #include <Preferences.h>
-
-/**
- * Command types supported by the CLI service
- */
-enum CommandType
-{
-    CMD_GET,
-    CMD_SET,
-    CMD_INVALID
-};
-
-/**
- * Structure representing a parsed command
- */
-struct ParsedCommand
-{
-    CommandType type;
-    String action;
-    String payload;
-    bool isValid;
-    String errorMessage;
-
-    ParsedCommand() : type(CMD_INVALID), isValid(false) {}
-};
 
 /**
  * Function type for command handlers
  * Takes payload as input and returns response string
  */
 typedef std::function<String(const String &payload)> CommandHandler;
-
-/**
- * Command parser class responsible for parsing incoming serial commands
- */
-class CommandParser
-{
-public:
-    /**
-     * Parse a command string into a ParsedCommand structure
-     * @param input The raw command string from serial
-     * @return ParsedCommand structure with parsed data
-     */
-    ParsedCommand parse(const String &input);
-
-private:
-    bool isValidCommandFormat(const String &input);
-    CommandType parseCommandType(const String &typeStr);
-    void extractActionAndPayload(const String &input, String &action, String &payload);
-};
 
 /**
  * Response formatter class responsible for formatting and sending responses
@@ -79,35 +38,6 @@ public:
 
 private:
     static void sendLine(const String &line);
-};
-
-/**
- * Command executor class responsible for executing parsed commands
- */
-class CommandExecutor
-{
-public:
-    CommandExecutor();
-
-    /**
-     * Execute a parsed command
-     * @param command The parsed command to execute
-     * @return Response string from the command handler
-     */
-    String execute(const ParsedCommand &command);
-
-    /**
-     * Register a command handler for a specific action
-     * @param action The action string (e.g., "firmware.version")
-     * @param handler The function to handle this command
-     */
-    void registerHandler(const String &action, CommandHandler handler);
-
-private:
-    std::map<String, CommandHandler> handlers;
-
-    String handleGetCommand(const String &action, const String &payload);
-    String handleSetCommand(const String &action, const String &payload);
 };
 
 /**

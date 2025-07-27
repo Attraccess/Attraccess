@@ -15,7 +15,7 @@ export class WaitForResourceSelectionState implements ReaderState {
       new AttractapEvent(AttractapEventType.SELECT_ITEM, {
         label: 'Select a resource',
         options: this.socket.reader.resources.map((resource) => ({
-          id: resource.id,
+          id: String(resource.id),
           label: resource.name,
         })),
       })

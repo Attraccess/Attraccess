@@ -7,6 +7,10 @@
   "status": {
     "connected": {
       "title": "Attraccess verbunden",
+      "description": "-> Versuche authentifizierung..."
+    },
+    "authenticated": {
+      "title": "Verbunden & authentifiziert",
       "description": "Geräte ID: {{deviceId}}",
       "openDeviceSettings": {
         "button": "Geräteeinstellungen öffnen"

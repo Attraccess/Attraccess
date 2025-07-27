@@ -18,13 +18,16 @@ export class InitialReaderState implements ReaderState {
 
   public async onStateEnter(forceInit = false) {
     if (forceInit === true) {
+      this.logger.debug('InitialReaderState: forceInit is true, resetting reader');
       this.socket.reader = null;
-      this.socket.sendMessage(new AttractapEvent(AttractapEventType.REAUTHENTICATE, {}));
     }
 
     if (this.socket.reader) {
       return await this.onIsAuthenticated();
     }
+
+    this.logger.debug('InitialReaderState: not yet authenticated');
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.REAUTHENTICATE, {}));
   }
 
   public async onStateExit(): Promise<void> {

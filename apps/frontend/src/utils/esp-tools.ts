@@ -1,5 +1,5 @@
 import { Transport, ESPLoader, IEspLoaderTerminal } from 'esptool-js';
-import { nanoid } from 'nanoid';
+import { Mutex } from 'async-mutex';
 
 export enum ESPToolsErrorType {
   NO_PORT_SELECTED = 'NO_PORT_SELECTED',
@@ -38,6 +38,7 @@ interface UseTransportOptionsNonBlocking<TResult = unknown> {
 export class ESPTools {
   private static _instance: ESPTools;
   private _transport: Transport | null = null;
+  private _transportMutex = new Mutex();
 
   private _transportQueue: Set<string> = new Set();
 
@@ -52,20 +53,16 @@ export class ESPTools {
       throw new Error('No transport available');
     }
 
-    const usageId = nanoid();
-    this._transportQueue.add(usageId);
-    while (this._transportQueue.values().next().value !== usageId) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    const release = await this._transportMutex.acquire();
 
     try {
       if (opts.blocking) {
-        return await opts.fn(this._transport, () => this._transportQueue.delete(usageId));
+        return await opts.fn(this._transport, release);
       }
 
       return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(this._transport);
     } finally {
-      this._transportQueue.delete(usageId);
+      release();
     }
   }
 
@@ -181,9 +178,17 @@ export class ESPTools {
           try {
             firmwareDataString = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
+              reader.onload = () => {
+                const arrayBuffer = reader.result as ArrayBuffer;
+                const uint8Array = new Uint8Array(arrayBuffer);
+                // Convert to binary string for compatibility with esploader
+                const binaryString = Array.from(uint8Array)
+                  .map((byte) => String.fromCharCode(byte))
+                  .join('');
+                resolve(binaryString);
+              };
               reader.onerror = () => reject(reader.error);
-              reader.readAsBinaryString(firmware);
+              reader.readAsArrayBuffer(firmware);
             });
           } catch (err) {
             return {
@@ -290,8 +295,9 @@ export class ESPTools {
       blocking: false,
       fn: async (transport) => {
         let isConsoleClosed = false;
+        let readLoopPromise: Promise<void> | null = null;
 
-        setTimeout(async () => {
+        const startReadLoop = async () => {
           while (!isConsoleClosed) {
             const readLoop = transport.rawRead();
             const { value, done } = await readLoop.next();
@@ -301,10 +307,15 @@ export class ESPTools {
             }
             onWrite(value);
           }
-        }, 1);
+        };
 
-        return () => {
+        readLoopPromise = startReadLoop();
+
+        return async () => {
           isConsoleClosed = true;
+          if (readLoopPromise) {
+            await readLoopPromise;
+          }
         };
       },
     });

@@ -7,24 +7,9 @@
 #include "api_icon.c"          // Add this include for the API icon
 #include <vector>
 
-// class to handle the select item dialog button click
-class SelectItemDialogButtonClickHandler
-{
-    typedef std::function<void(const String &selectedId)> SelectItemResultCallback;
-    String elementId;
-    SelectItemResultCallback selectItemResultCallback;
-
-public:
-    SelectItemDialogButtonClickHandler(String elementId, SelectItemResultCallback cb) : elementId(elementId), selectItemResultCallback(cb) {}
-
-    void handle()
-    {
-        if (selectItemResultCallback)
-        {
-            selectItemResultCallback(elementId);
-        }
-    }
-};
+// Define the static members
+String MainScreenUI::selectItemOptions[50];
+MainScreenUI::SelectItemResultCallback MainScreenUI::selectItemResultCallback = nullptr;
 
 MainScreenUI::MainScreenUI(ScreenManager *screenManager)
     : screenManager(screenManager), mainScreen(nullptr), statusBar(nullptr),
@@ -273,6 +258,10 @@ void MainScreenUI::setMainContent(const MainContent &content)
 void MainScreenUI::updateMainContent()
 {
     Serial.println("[DEBUG] MainScreenUI::updateMainContent");
+
+    // Ensure UI elements exist before updating
+    restoreMainContentUI();
+
     // Hide all by default
     if (!mainContentIcon)
     {
@@ -360,11 +349,86 @@ void MainScreenUI::updateMainContent()
     case CONTENT_CARD_CHECKING:
         Serial.printf("[DEBUG] CONTENT_CARD_CHECKING: mainContentLabel=%p, message='%s'\n", mainContentLabel, currentContent.message.c_str());
         if (mainContentLabel)
+        {
             lv_label_set_text(mainContentLabel, currentContent.message.c_str());
-        lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
-        lv_obj_clear_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        }
+        if (mainContentIcon)
+            lv_obj_clear_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
         break;
     }
+}
+
+void MainScreenUI::restoreMainContentUI()
+{
+    // Recreate the main content UI elements if they were destroyed
+    if (!mainContentLabel)
+    {
+        mainContentLabel = lv_label_create(mainContentContainer);
+        lv_obj_set_width(mainContentLabel, 200);
+        lv_obj_set_style_text_font(mainContentLabel, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_text_align(mainContentLabel, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(mainContentLabel, "");
+        lv_obj_align(mainContentLabel, LV_ALIGN_TOP_MID, 0, 100);
+        lv_label_set_long_mode(mainContentLabel, LV_LABEL_LONG_WRAP);
+    }
+
+    if (!mainContentSubLabel)
+    {
+        mainContentSubLabel = lv_label_create(mainContentContainer);
+        lv_obj_set_width(mainContentSubLabel, 200);
+        lv_obj_set_style_text_font(mainContentSubLabel, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(0xAAAAAA), 0);
+        lv_obj_set_style_text_align(mainContentSubLabel, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(mainContentSubLabel, "");
+        lv_obj_align(mainContentSubLabel, LV_ALIGN_TOP_MID, 0, 130);
+        lv_label_set_long_mode(mainContentSubLabel, LV_LABEL_LONG_WRAP);
+    }
+
+    if (!mainContentIcon)
+    {
+        mainContentIcon = lv_img_create(mainContentContainer);
+        lv_img_set_src(mainContentIcon, &nfc_icon);
+        lv_obj_align(mainContentIcon, LV_ALIGN_TOP_MID, 0, 20);
+        lv_obj_add_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (!cancelButton)
+    {
+        cancelButton = lv_btn_create(mainContentContainer);
+        lv_obj_set_size(cancelButton, 120, 40);
+        lv_obj_align(cancelButton, LV_ALIGN_BOTTOM_MID, 0, -50);
+        lv_obj_set_style_bg_color(cancelButton, lv_color_hex(0xF44336), 0); // Red
+        lv_obj_add_flag(cancelButton, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_t *label = lv_label_create(cancelButton);
+        lv_label_set_text(label, "Cancel");
+        lv_obj_center(label);
+        // Attach event handler for cancel button
+        lv_obj_add_event_cb(cancelButton, onCancelButtonClicked, LV_EVENT_CLICKED, this);
+    }
+}
+
+void MainScreenUI::cleanupSelectDialog()
+{
+    Serial.println("MainScreenUI: Cleaning up select dialog UI");
+
+    // Remove all child objects from mainContentContainer (this removes the select dialog)
+    lv_obj_clean(mainContentContainer);
+
+    // Reset the UI element pointers since they were deleted
+    mainContentLabel = nullptr;
+    mainContentSubLabel = nullptr;
+    mainContentIcon = nullptr;
+    cancelButton = nullptr;
+
+    // Restore the main content UI
+    restoreMainContentUI();
+
+    // Clear the select item callback
+    selectItemResultCallback = nullptr;
+
+    Serial.println("MainScreenUI: Select dialog cleanup complete");
 }
 
 void MainScreenUI::clearMainContent()
@@ -426,20 +490,56 @@ void MainScreenUI::onCancelButtonClicked(lv_event_t *e)
 void MainScreenUI::onSelectItemButtonClicked(lv_event_t *e)
 {
     Serial.println("MainScreenUI: Select item button clicked");
-    SelectItemDialogButtonClickHandler *handler = (SelectItemDialogButtonClickHandler *)lv_event_get_user_data(e);
-    Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
-    if (handler)
+    uint64_t buttonIndex = (uint64_t)lv_event_get_user_data(e);
+    if (buttonIndex == 0)
     {
-        Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
-        handler->handle();
-        Serial.printf("MainScreenUI: Select item button clicked, handler=%p\n", handler);
-        delete handler; // Clean up the allocated memory
+        Serial.printf("Cannot process select item button click: buttonIndex is 0");
+        return;
     }
-    Serial.println("MainScreenUI: Select item button done");
+
+    buttonIndex--;
+
+    Serial.println("buttonIndex:");
+    Serial.println(buttonIndex);
+
+    if (buttonIndex >= 50)
+    {
+        Serial.printf("Cannot process select item button click: buttonIndex is out of range");
+        return;
+    }
+
+    // Check if the option at this index is valid (not empty)
+    if (MainScreenUI::selectItemOptions[buttonIndex].length() == 0)
+    {
+        Serial.printf("Cannot process select item button click: option at index %llu is empty", buttonIndex);
+        return;
+    }
+
+    Serial.printf("selectItemOptions[%llu]: %s\n", buttonIndex, MainScreenUI::selectItemOptions[buttonIndex].c_str());
+    if (selectItemResultCallback)
+    {
+        // Store the callback and selected ID before cleanup
+        SelectItemResultCallback callback = selectItemResultCallback;
+        String selectedId = MainScreenUI::selectItemOptions[buttonIndex];
+
+        // Clear the callback first to prevent recursive calls
+        selectItemResultCallback = nullptr;
+
+        // Then call the callback (cleanup will be handled by the callback)
+        callback(selectedId);
+    }
 }
 
 void MainScreenUI::showSelectItemDialog(const String &label, const ArduinoJson::JsonArray &options, SelectItemResultCallback cb)
 {
+    selectItemResultCallback = cb;
+
+    // Clear previous options array to prevent stale data
+    for (int i = 0; i < 50; i++)
+    {
+        selectItemOptions[i] = "";
+    }
+
     // Remove any previous selection UI (if any)
     if (selectItemDialog)
     {
@@ -447,8 +547,16 @@ void MainScreenUI::showSelectItemDialog(const String &label, const ArduinoJson::
         selectItemDialog = nullptr;
     }
 
-    // Clear main content area
-    lv_obj_clean(mainContentContainer);
+    // Clear main content area but preserve the basic UI structure
+    // Hide existing elements instead of cleaning the container
+    if (mainContentLabel)
+        lv_obj_add_flag(mainContentLabel, LV_OBJ_FLAG_HIDDEN);
+    if (mainContentSubLabel)
+        lv_obj_add_flag(mainContentSubLabel, LV_OBJ_FLAG_HIDDEN);
+    if (mainContentIcon)
+        lv_obj_add_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
+    if (cancelButton)
+        lv_obj_add_flag(cancelButton, LV_OBJ_FLAG_HIDDEN);
 
     // Label at the top
     lv_obj_t *titleLabel = lv_label_create(mainContentContainer);
@@ -468,6 +576,7 @@ void MainScreenUI::showSelectItemDialog(const String &label, const ArduinoJson::
     lv_obj_clear_flag(buttonContainer, LV_OBJ_FLAG_SCROLLABLE);
 
     // For each option, create a button
+    uint64_t i = 0;
     for (JsonObject option : options)
     {
         String optId = option["id"].as<String>();
@@ -479,8 +588,11 @@ void MainScreenUI::showSelectItemDialog(const String &label, const ArduinoJson::
         lv_obj_set_style_radius(btn, 6, 0);
 
         // Create handler and store it as user data
-        SelectItemDialogButtonClickHandler *handler = new SelectItemDialogButtonClickHandler(optId, cb);
-        lv_obj_add_event_cb(btn, onSelectItemButtonClicked, LV_EVENT_CLICKED, handler);
+        Serial.println("Adding event callback to button with optId:");
+        Serial.println(optId.c_str());
+        lv_obj_add_event_cb(btn, onSelectItemButtonClicked, LV_EVENT_CLICKED, (void *)(i + 1));
+        MainScreenUI::selectItemOptions[i] = optId;
+        i++;
 
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, optLabel.c_str());

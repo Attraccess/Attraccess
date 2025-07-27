@@ -72,6 +72,9 @@ export function FirmwareFlasher(props: Props) {
         },
         write: (line) => {
           setLogLines((prev) => {
+            if (prev.length === 0) {
+              return [line];
+            }
             const lastLine = prev[prev.length - 1];
             return [...prev.slice(0, -1), `${lastLine} ${line}`];
           });

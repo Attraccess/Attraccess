@@ -2,7 +2,8 @@
   "page": {
     "title": "Attractap",
     "actions": {
-      "openHardwareSetup": "Attractap Einrichten",
+      "menu": "Geräte-Einrichtung",
+      "openHardwareSetup": "NFC-Leser Einrichten",
       "openSerialConsole": "Serielle Konsole"
     }
   },
