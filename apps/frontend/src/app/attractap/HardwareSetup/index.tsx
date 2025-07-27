@@ -3,12 +3,13 @@ import { Alert, Button, Modal, ModalBody, ModalContent, ModalHeader, useDisclosu
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AttractapFirmware } from '@attraccess/react-query-client';
+import { AttractapSerialConfigurator } from './SerialConfigurator';
+import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
 
 import de from './de.json';
 import en from './en.json';
-import { AttractapSerialConfigurator } from './SerialConfigurator';
 
 type State = 'init' | 'select' | 'flash' | 'configure';
 
@@ -27,7 +28,36 @@ function Content(props: ContentProps) {
     en,
   });
 
+  const espTools = useRef(ESPTools.getInstance());
+  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
+
+  useEffect(() => {
+    const onConnectionState = (event: ConnectionStateEvent) => {
+      setIsConnected(event.connected);
+    };
+
+    const tools = espTools.current;
+
+    tools.on('connectionState', onConnectionState);
+
+    return () => {
+      if (!tools) {
+        return;
+      }
+
+      tools.off('connectionState', onConnectionState);
+    };
+  }, []);
+
   const [selectedFirmware, setSelectedFirmware] = useState<AttractapFirmware | null>(null);
+
+  if (!isConnected) {
+    return (
+      <Button color="primary" onPress={() => espTools.current.connectToDevice()}>
+        {t('actions.connect')}
+      </Button>
+    );
+  }
 
   if (state === 'init') {
     return (
@@ -112,7 +142,7 @@ export function AttractapHardwareSetup(props: Props) {
       >
         <ModalContent>
           <ModalHeader>
-            <PageHeader title={t('title')} noMargin onBack={onBack} />
+            <PageHeader title={t('title.' + state)} subtitle={t('subtitle.' + state)} noMargin onBack={onBack} />
           </ModalHeader>
 
           <ModalBody className="mb-4">

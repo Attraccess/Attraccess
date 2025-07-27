@@ -35,8 +35,6 @@ export interface GatewayServices {
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  private static readonly SOCKET_HEARTBEAT_TIMEOUT = 30000;
-
   @WebSocketServer()
   server: Server;
 

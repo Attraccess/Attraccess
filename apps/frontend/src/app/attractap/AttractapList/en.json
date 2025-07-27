@@ -21,6 +21,14 @@
     "noData": "No Attractaps found",
     "actions": {
       "editReader": "Edit"
+    },
+    "active": {
+      "title": "Active Attractaps",
+      "description": "Connected within the last 24 hours"
+    },
+    "stale": {
+      "title": "Stale Attractaps",
+      "description": "No connection for more than 24 hours"
     }
   },
   "connected": "Connected",

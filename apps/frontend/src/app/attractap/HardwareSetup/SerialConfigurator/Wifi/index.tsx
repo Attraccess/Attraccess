@@ -111,8 +111,9 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
   }, []);
 
   useEffect(() => {
-    updateWifiStatus();
-    scanForWifiNetworks();
+    updateWifiStatus().then(() => {
+      scanForWifiNetworks();
+    });
   }, [updateWifiStatus, scanForWifiNetworks]);
 
   const networkSelectItems = useMemo(() => {

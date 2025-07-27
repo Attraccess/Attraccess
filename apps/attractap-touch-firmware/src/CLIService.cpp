@@ -286,7 +286,7 @@ void CLIService::registerBuiltinHandlers()
     registerCommandHandler("network.wifi.status", [this](const String &payload) -> String
                            { return handleWiFiStatus(payload); });
 
-    // Register Attraaccess status handler
+    // Register Attraccess status handler
     registerCommandHandler("attraccess.status", [this](const String &payload) -> String
                            { return handleAttraccessStatus(payload); });
 
@@ -665,7 +665,7 @@ String CLIService::getEncryptionTypeString(wifi_auth_mode_t encType)
 
 String CLIService::handleAttraccessStatus(const String &payload)
 {
-    // Validate that Attraaccess service is available
+    // Validate that Attraccess service is available
     if (!attraccessService)
     {
         return "error attraccess_service_unavailable";

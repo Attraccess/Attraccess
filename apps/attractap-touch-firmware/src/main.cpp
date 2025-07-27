@@ -14,6 +14,7 @@
 #include "AttraccessService.h"
 #include "nfc.hpp"
 #include "CLIService.h"
+#include "LEDService.h"
 
 // for XPT2046 Touch ////////////////////////////////
 SPIClass xptSPI = SPIClass(VSPI);                 // SPI-Interface for XPT2046_Touchscreen
@@ -38,6 +39,7 @@ SettingsManager settingsManager;
 AttraccessService attraccessService;
 NFC nfc;
 CLIService cliService;
+LEDService ledService;
 
 // Initialization state
 bool setupComplete = false;
@@ -224,6 +226,10 @@ void setup()
 
   // Initialize I2C for NFC
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
+
+  // Initialize LED Service
+  Serial.println("0. Initializing LED Service...");
+  ledService.begin();
 
   // Start the SPI for the touch screen and init the XPT2046 library
   Serial.println("1. Initializing SPI and Touch...");

@@ -2035,10 +2035,6 @@ export const $Attractap = {
             type: 'string',
             description: 'The first time the reader connected to the server'
         },
-        connected: {
-            type: 'boolean',
-            description: 'Whether the reader is currently connected'
-        },
         firmware: {
             description: 'The firmware of the reader',
             allOf: [
@@ -2048,7 +2044,7 @@ export const $Attractap = {
             ]
         }
     },
-    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'connected', 'firmware']
+    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'firmware']
 } as const;
 
 export const $UpdateReaderResponseDto = {

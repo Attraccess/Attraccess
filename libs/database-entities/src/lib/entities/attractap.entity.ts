@@ -62,9 +62,6 @@ export class Attractap {
   @ApiProperty({ description: 'The first time the reader connected to the server' })
   firstConnection!: Date;
 
-  @ApiProperty({ description: 'Whether the reader is currently connected' })
-  connected?: boolean;
-
   @Column(() => AttractapFirmwareVersion, { prefix: 'firmware' })
   @ApiProperty({ description: 'The firmware of the reader', type: () => AttractapFirmwareVersion })
   firmware!: AttractapFirmwareVersion;

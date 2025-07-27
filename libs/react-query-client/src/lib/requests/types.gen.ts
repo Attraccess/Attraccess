@@ -1312,10 +1312,6 @@ export type Attractap = {
      */
     firstConnection: string;
     /**
-     * Whether the reader is currently connected
-     */
-    connected: boolean;
-    /**
      * The firmware of the reader
      */
     firmware: AttractapFirmwareVersion;

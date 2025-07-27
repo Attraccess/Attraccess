@@ -1,10 +1,24 @@
 {
-  "title": "Attractap Hardware Setup",
+  "title": {
+    "init": "Attractap Hardware Setup",
+    "select": "Select Firmware",
+    "flash": "Install Firmware",
+    "configure": "Configure Attractap"
+  },
+  "subtitle": {
+    "init": "What do you want to do?",
+    "select": "Select the firmware that matches your Attractap",
+    "flash": "This process can take several minutes. Please wait until the process is complete.",
+    "configure": "Configure your Attractap so that it can connect to a network and the Attraccess-Server."
+  },
   "init": {
     "actions": {
       "selectFirmware": "Install firmware",
       "configure": "Configure"
     },
     "description": "If you have a completely new Attractap, select \"Install firmware\" to install the latest firmware on your Attractap. If you have an already configured Attractap, select \"Configure\" to configure your Attractap."
+  },
+  "actions": {
+    "connect": "Connect"
   }
 }

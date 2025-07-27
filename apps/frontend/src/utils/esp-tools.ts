@@ -25,6 +25,11 @@ export interface Command {
   payload?: string;
 }
 
+export interface ConnectionStateEvent {
+  connected: boolean;
+  timestamp: number;
+}
+
 interface UseTransportOptionsBlocking<TResult = unknown> {
   blocking: true;
   fn: (transport: Transport, release: () => void) => Promise<TResult>;
@@ -35,32 +40,103 @@ interface UseTransportOptionsNonBlocking<TResult = unknown> {
   fn: (transport: Transport) => Promise<TResult>;
 }
 
+type EventListener<T = unknown> = (data: T) => void;
+
+export type ESPToolsEvent = 'connectionState';
+
+export type ESPToolsEventData = {
+  connectionState: ConnectionStateEvent;
+};
+
 export class ESPTools {
   private static _instance: ESPTools;
   private _transport: Transport | null = null;
   private _transportMutex = new Mutex();
-
-  private _transportQueue: Set<string> = new Set();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _eventListeners: Map<string, Set<EventListener<any>>> = new Map();
 
   public get isConnected(): boolean {
     return !!this._transport;
   }
 
+  private emit<TEvent extends ESPToolsEvent>(event: TEvent, data: ESPToolsEventData[TEvent]): void {
+    const listeners = this._eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach((listener) => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
+  }
+
+  public on<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
+    if (!this._eventListeners.has(event)) {
+      this._eventListeners.set(event, new Set());
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this._eventListeners.get(event) as Set<EventListener<any>>).add(listener);
+  }
+
+  public off<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
+    const listeners = this._eventListeners.get(event);
+    if (listeners) {
+      listeners.delete(listener);
+      if (listeners.size === 0) {
+        this._eventListeners.delete(event);
+      }
+    }
+  }
+
+  private setConnectionState(connected: boolean): void {
+    this.emit('connectionState', {
+      connected,
+      timestamp: Date.now(),
+    } as ConnectionStateEvent);
+  }
+
   private async useTransport<TResult = unknown>(
     opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>
   ): Promise<TResult> {
+    let transport: Transport = this._transport as Transport;
+
     if (!this._transport) {
-      throw new Error('No transport available');
+      const connectionResult = await this.connectToDevice();
+      if (!connectionResult.success) {
+        throw new Error('Failed to connect to device');
+      }
+      transport = this._transport as unknown as Transport;
     }
 
     const release = await this._transportMutex.acquire();
 
     try {
       if (opts.blocking) {
-        return await opts.fn(this._transport, release);
+        return await opts.fn(transport, release);
       }
 
-      return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(this._transport);
+      return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(transport);
+    } catch (err) {
+      if (!transport.device.connected) {
+        console.debug('Device disconnected, disconnecting transport');
+        this.setConnectionState(false);
+        this._transport = null;
+        throw err;
+      }
+
+      console.error('Error using transport:', err);
+      if (
+        err instanceof Error &&
+        (err.message.includes('The port is closed') || err.message.includes('The device has been lost.'))
+      ) {
+        this.disconnect().catch((err) => {
+          console.error('Error disconnecting transport:', err);
+        });
+      }
+
+      throw err;
     } finally {
       release();
     }
@@ -90,6 +166,11 @@ export class ESPTools {
       // Request port from user
       const port = await navigator.serial.requestPort();
 
+      port.addEventListener('disconnect', () => {
+        this._transport = null;
+        this.setConnectionState(false);
+      });
+
       try {
         // Open connection with ESP-specific settings
         await port.open({
@@ -114,6 +195,7 @@ export class ESPTools {
 
       this._transport = new Transport(port);
       await this._transport.connect(baudRate);
+      this.setConnectionState(true);
     } catch (err) {
       const error = err as Error;
       if (error.name === 'NotFoundError') {
@@ -144,10 +226,35 @@ export class ESPTools {
   }): Promise<ESPToolsResult<void>> {
     const { firmware, terminal, onProgress } = options;
 
-    return await this.useTransport({
-      blocking: true,
-      fn: async (transport) => {
-        try {
+    let firmwareDataString: string;
+    try {
+      firmwareDataString = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          // Convert to binary string for compatibility with esploader
+          const binaryString = Array.from(uint8Array)
+            .map((byte) => String.fromCharCode(byte))
+            .join('');
+          resolve(binaryString);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(firmware);
+      });
+    } catch (err) {
+      return {
+        success: false,
+        error: { type: ESPToolsErrorType.FIRMWARE_READ_FAILED, details: err },
+        data: null,
+      };
+    }
+
+    let result: ESPToolsResult<void>;
+    try {
+      result = await this.useTransport({
+        blocking: true,
+        fn: async (transport) => {
           try {
             await transport.disconnect();
           } catch (err) {
@@ -173,30 +280,6 @@ export class ESPTools {
 
           const totalSize = firmware.size;
           let totalWritten = 0;
-
-          let firmwareDataString: string;
-          try {
-            firmwareDataString = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const arrayBuffer = reader.result as ArrayBuffer;
-                const uint8Array = new Uint8Array(arrayBuffer);
-                // Convert to binary string for compatibility with esploader
-                const binaryString = Array.from(uint8Array)
-                  .map((byte) => String.fromCharCode(byte))
-                  .join('');
-                resolve(binaryString);
-              };
-              reader.onerror = () => reject(reader.error);
-              reader.readAsArrayBuffer(firmware);
-            });
-          } catch (err) {
-            return {
-              success: false,
-              error: { type: ESPToolsErrorType.FIRMWARE_READ_FAILED, details: err },
-              data: null,
-            };
-          }
 
           await esploader.writeFlash({
             fileArray: [{ data: firmwareDataString, address: 0 }],
@@ -230,26 +313,33 @@ export class ESPTools {
             onProgress(100);
           }
 
-          try {
-            await this._hardReset(transport);
-          } catch (err) {
-            return {
-              success: false,
-              error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
-              data: null,
-            };
-          }
-
           return {
             success: true,
             error: null,
             data: undefined,
           };
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      return {
+        success: false,
+        error: { type: ESPToolsErrorType.FLASH_FAILED, details: error.message },
+        data: null,
+      };
+    }
+
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport) => {
+        try {
+          await this._hardReset(transport);
+
+          return result;
         } catch (err) {
-          const error = err as Error;
           return {
             success: false,
-            error: { type: ESPToolsErrorType.FLASH_FAILED, details: error.message },
+            error: { type: ESPToolsErrorType.RESET_FAILED, details: err },
             data: null,
           };
         }
@@ -288,6 +378,21 @@ export class ESPTools {
         await this._hardReset(transport);
       },
     });
+  }
+
+  public async disconnect(): Promise<void> {
+    if (!this._transport) {
+      return;
+    }
+
+    try {
+      await this._transport.disconnect();
+    } catch (err) {
+      console.error('Error disconnecting transport:', err);
+    } finally {
+      this._transport = null;
+      this.setConnectionState(false);
+    }
   }
 
   public async getSerialOutput(onWrite: (data: Uint8Array) => unknown) {
@@ -339,7 +444,7 @@ export class ESPTools {
           return null;
         }
 
-        release();
+        // release();
 
         let continueReading = true;
         let buffer = '';

@@ -1,6 +1,6 @@
 import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
 import { Select, SelectItem } from '@heroui/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Props {
   selection: number | null | undefined;
@@ -27,9 +27,22 @@ export function AttractapSelect(props: Props) {
     // eslint-disable-next-line
   }, [value]);
 
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const connectedReaders = useMemo(() => {
+    // last connection within 30s
+    return readers?.filter((r) => r.lastConnection && new Date(r.lastConnection).getTime() > now - 30000);
+  }, [readers, now]);
+
   return (
     <Select
-      items={readers ?? []}
+      items={connectedReaders ?? []}
       label={props.label}
       placeholder={readers?.find((r) => r.id === props.selection)?.name ?? props.placeholder}
       selectedKeys={value}
@@ -37,12 +50,7 @@ export function AttractapSelect(props: Props) {
       data-cy="attractap-select"
     >
       {(reader) => (
-        <SelectItem
-          aria-disabled={!reader.connected}
-          aria-label={reader.name}
-          key={reader.id}
-          data-cy={`attractap-select-item-${reader.id}`}
-        >
+        <SelectItem aria-label={reader.name} key={reader.id} data-cy={`attractap-select-item-${reader.id}`}>
           {reader.name} ({reader.id})
         </SelectItem>
       )}
