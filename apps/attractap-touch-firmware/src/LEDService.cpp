@@ -7,7 +7,7 @@ bool LEDService::waitForResourceSelection = false;
 uint8_t LEDService::updateFrequencyFps = 60;
 
 LEDService::LEDService()
-    : redPin(LED_RED_PIN), greenPin(LED_GREEN_PIN), bluePin(LED_BLUE_PIN), red(0), green(0), blue(0), lastBlinkToggle(0), breatheDuration(1000), rainbowSpeed(250), rainbowHue(0)
+    : redPin(LED_RED_PIN), greenPin(LED_GREEN_PIN), bluePin(LED_BLUE_PIN), red(0), green(0), blue(0), baseRed(0), baseGreen(0), baseBlue(0), lastBlinkToggle(0), breatheDuration(1000), rainbowSpeed(250), rainbowHue(0)
 {
 }
 
@@ -55,6 +55,9 @@ void LEDService::update()
             red = 255;
             green = 165;
             blue = 0;
+            baseRed = 255;
+            baseGreen = 165;
+            baseBlue = 0;
         }
 
         updateBreathing();
@@ -65,6 +68,11 @@ void LEDService::update()
     {
         currentState = LEDServiceState::WAITING_FOR_RESOURCE_SELECTION;
         // rainbow
+        if (oldState != LEDServiceState::WAITING_FOR_RESOURCE_SELECTION)
+        {
+            rainbowStartTime = millis();
+            rainbowHue = 0;
+        }
         updateRainbow();
         return;
     }
@@ -79,6 +87,9 @@ void LEDService::update()
             red = 0;
             green = 0;
             blue = 255;
+            baseRed = 0;
+            baseGreen = 0;
+            baseBlue = 255;
         }
 
         updateBlinking(500);
@@ -95,6 +106,9 @@ void LEDService::update()
             red = 128;
             green = 0;
             blue = 128;
+            baseRed = 128;
+            baseGreen = 0;
+            baseBlue = 128;
         }
 
         updateBlinking(500);
@@ -111,6 +125,11 @@ void LEDService::update()
             red = 0;
             green = 255;
             blue = 0;
+            baseRed = 0;
+            baseGreen = 255;
+            baseBlue = 0;
+
+            breatheStartTime = millis();
         }
 
         updateBreathing();
@@ -127,6 +146,11 @@ void LEDService::update()
             red = 255;
             green = 0;
             blue = 0;
+            baseRed = 255;
+            baseGreen = 0;
+            baseBlue = 0;
+
+            breatheStartTime = millis();
         }
 
         updateBreathing();
@@ -140,6 +164,9 @@ void LEDService::update()
         red = 0;
         green = 0;
         blue = 0;
+        baseRed = 0;
+        baseGreen = 0;
+        baseBlue = 0;
     }
 
     updateLed();
@@ -178,10 +205,16 @@ void LEDService::updateBreathing()
     float intensity = (sinf((elapsed * 2 * PI) / breatheDuration) + 1) / 2;
     uint8_t brightness = (uint8_t)(intensity * 255);
 
-    // map brightness to red, green, blue current colors
-    red = (uint8_t)(brightness * (red / 255.0));
-    green = (uint8_t)(brightness * (green / 255.0));
-    blue = (uint8_t)(brightness * (blue / 255.0));
+    // Apply breathing effect to base colors using temporary variables
+    // This prevents color drift by not modifying the base colors directly
+    uint8_t tempRed = (uint8_t)(brightness * (baseRed / 255.0));
+    uint8_t tempGreen = (uint8_t)(brightness * (baseGreen / 255.0));
+    uint8_t tempBlue = (uint8_t)(brightness * (baseBlue / 255.0));
+
+    // Update current colors with the breathing-modified values
+    red = tempRed;
+    green = tempGreen;
+    blue = tempBlue;
 
     updateLed();
 }
@@ -189,10 +222,13 @@ void LEDService::updateBreathing()
 void LEDService::updateRainbow()
 {
     uint32_t currentTime = millis();
-    if (currentTime - rainbowStartTime >= rainbowSpeed)
+    uint32_t elapsed = currentTime - rainbowStartTime;
+    if (elapsed >= rainbowSpeed)
     {
-        rainbowStartTime = currentTime;
-        rainbowHue = (rainbowHue + 1) % 256;
+        // Calculate how many hue steps to advance
+        uint32_t steps = elapsed / rainbowSpeed;
+        rainbowStartTime += steps * rainbowSpeed;
+        rainbowHue = (rainbowHue + steps) % 256;
 
         hsvToRgb(rainbowHue, 255, 255, red, green, blue);
         updateLed();
@@ -201,12 +237,16 @@ void LEDService::updateRainbow()
 
 void LEDService::updateLed()
 {
-    // Set individual LED values (active LOW)
+    // Clamp color values to 0-255
+    uint8_t clampedRed = red > 255 ? 255 : (red < 0 ? 0 : red);
+    uint8_t clampedGreen = green > 255 ? 255 : (green < 0 ? 0 : green);
+    uint8_t clampedBlue = blue > 255 ? 255 : (blue < 0 ? 0 : blue);
 
+    // Set individual LED values (active LOW)
     // since leds are active LOW, we need to invert the values
-    analogWrite(redPin, 255 - red);
-    analogWrite(greenPin, 255 - green);
-    analogWrite(bluePin, 255 - blue);
+    analogWrite(redPin, 255 - clampedRed);
+    analogWrite(greenPin, 255 - clampedGreen);
+    analogWrite(bluePin, 255 - clampedBlue);
 }
 
 void LEDService::hsvToRgb(uint16_t h, uint8_t s, uint8_t v, uint8_t &r, uint8_t &g, uint8_t &b)

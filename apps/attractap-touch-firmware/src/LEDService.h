@@ -50,6 +50,11 @@ private:
     uint8_t green;
     uint8_t blue;
 
+    // base colors for breathing effect (to prevent color drift)
+    uint8_t baseRed;
+    uint8_t baseGreen;
+    uint8_t baseBlue;
+
     // Blinking state
     bool isBlinking;
     uint32_t lastBlinkToggle;
