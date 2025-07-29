@@ -11,6 +11,7 @@ import { AttractapFirmware } from '../../dtos/firmware.dto';
 
 export class InitialReaderState implements ReaderState {
   private waitingForFirmwareInfo = false;
+  private reauthenticateInterval: NodeJS.Timeout | null = null;
 
   private readonly logger = new Logger(InitialReaderState.name);
 
@@ -28,9 +29,21 @@ export class InitialReaderState implements ReaderState {
 
     this.logger.debug('InitialReaderState: not yet authenticated');
     this.socket.sendMessage(new AttractapEvent(AttractapEventType.REAUTHENTICATE, {}));
+
+    this.reauthenticateInterval = setInterval(() => {
+      if (this.socket.reader) {
+        clearInterval(this.reauthenticateInterval);
+        return;
+      }
+
+      this.socket.sendMessage(new AttractapEvent(AttractapEventType.REAUTHENTICATE, {}));
+    }, 1000 * 10);
   }
 
   public async onStateExit(): Promise<void> {
+    if (this.reauthenticateInterval) {
+      clearInterval(this.reauthenticateInterval);
+    }
     return;
   }
 

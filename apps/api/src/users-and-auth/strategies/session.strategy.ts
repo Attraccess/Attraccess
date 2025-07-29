@@ -28,7 +28,6 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       throw new UnauthorizedException('Invalid or expired session');
     }
 
-    this.logger.debug(`Session validated for user: ${user.username} (ID: ${user.id})`);
     return user;
   }
 
@@ -44,7 +43,6 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
       if (token) {
-        this.logger.debug('Token extracted from Authorization header');
         return token;
       }
     }
@@ -52,7 +50,6 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     // Priority 2: Session cookie
     const sessionCookie = req.cookies?.['auth-session'];
     if (sessionCookie) {
-      this.logger.debug('Token extracted from session cookie');
       return sessionCookie;
     }
 
