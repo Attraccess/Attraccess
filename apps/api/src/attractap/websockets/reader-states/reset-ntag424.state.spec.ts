@@ -69,7 +69,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.ENABLE_CARD_CHECKING,
+            type: AttractapEventType.NFC_ENABLE_CARD_CHECKING,
             payload: expect.objectContaining({
               type: 'reset-nfc-card',
               card: expect.objectContaining({
@@ -127,7 +127,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.DISABLE_CARD_CHECKING,
+            type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
           }),
         })
       );
@@ -137,7 +137,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEYS,
             payload: expect.objectContaining({
               authenticationKey: mockMasterKey,
               keys: expect.objectContaining({
@@ -167,7 +167,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEYS,
             payload: expect.objectContaining({
               authenticationKey: mockDefaultMasterKey,
               keys: expect.objectContaining({
@@ -193,7 +193,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).not.toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEYS,
           }),
         })
       );
@@ -226,7 +226,7 @@ describe('ResetNTAG424State', () => {
 
       // Test
       const responsePromise = resetState.onResponse({
-        type: AttractapEventType.CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEYS,
         payload: {
           successfulKeys: [0],
           failedKeys: [],
@@ -272,7 +272,7 @@ describe('ResetNTAG424State', () => {
     it('should handle failed key change', async () => {
       // Test
       await resetState.onResponse({
-        type: AttractapEventType.CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEYS,
         payload: {
           successfulKeys: [],
           failedKeys: [0],
@@ -291,7 +291,7 @@ describe('ResetNTAG424State', () => {
 
     it('should ignore unexpected response types', async () => {
       await resetState.onResponse({
-        type: AttractapEventType.AUTHENTICATE,
+        type: AttractapEventType.NFC_AUTHENTICATE,
         payload: {},
       });
 
@@ -370,7 +370,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       1,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.ENABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_ENABLE_CARD_CHECKING,
           payload: expect.objectContaining({
             type: 'reset-nfc-card',
             card: expect.objectContaining({
@@ -398,7 +398,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.DISABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
         }),
       })
     );
@@ -406,7 +406,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEYS,
           payload: expect.objectContaining({
             authenticationKey: mockMasterKey,
             keys: expect.objectContaining({
@@ -419,7 +419,7 @@ describe('ResetNTAG424State - Full Flow', () => {
 
     // Step 3: Keys changed successfully
     const responsePromise = resetState.onResponse({
-      type: AttractapEventType.CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEYS,
       payload: {
         successfulKeys: [0],
         failedKeys: [],
@@ -475,7 +475,7 @@ describe('ResetNTAG424State - Full Flow', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.ENABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_ENABLE_CARD_CHECKING,
         }),
       })
     );
@@ -514,7 +514,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.DISABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
         }),
       })
     );
@@ -522,14 +522,14 @@ describe('ResetNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEYS,
         }),
       })
     );
 
     // Keys failed to change
     await resetState.onResponse({
-      type: AttractapEventType.CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEYS,
       payload: {
         successfulKeys: [],
         failedKeys: [0],

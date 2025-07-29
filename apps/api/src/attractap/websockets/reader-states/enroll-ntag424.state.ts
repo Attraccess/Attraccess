@@ -42,7 +42,7 @@ export class EnrollNTAG424State implements ReaderState {
       data: {},
     };
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
+      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
         type: 'enroll-nfc-card',
         user: {
           id: this.user.id,
@@ -79,11 +79,11 @@ export class EnrollNTAG424State implements ReaderState {
       return;
     }
 
-    if (responseData.type === AttractapEventType.CHANGE_KEYS) {
+    if (responseData.type === AttractapEventType.NFC_CHANGE_KEYS) {
       return this.onKeysChanged(responseData);
     }
 
-    if (responseData.type === AttractapEventType.AUTHENTICATE) {
+    if (responseData.type === AttractapEventType.NFC_AUTHENTICATE) {
       return this.onAuthenticate(responseData);
     }
 
@@ -91,7 +91,7 @@ export class EnrollNTAG424State implements ReaderState {
   }
 
   private async onGetNfcUID(responseData: AttractapResponse['data']): Promise<void> {
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.DISABLE_CARD_CHECKING));
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
 
     const cardUID = responseData.payload.cardUID;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -116,9 +116,9 @@ export class EnrollNTAG424State implements ReaderState {
       authenticationKey: masterKey,
       keys: this.enrollment.data.newKeys,
     });
-    this.enrollment.nextExpectedEvent = AttractapEventType.CHANGE_KEYS;
+    this.enrollment.nextExpectedEvent = AttractapEventType.NFC_CHANGE_KEYS;
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.CHANGE_KEYS, {
+      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEYS, {
         authenticationKey: masterKey,
         keys: this.enrollment.data.newKeys,
       })
@@ -141,9 +141,9 @@ export class EnrollNTAG424State implements ReaderState {
       return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
-    this.enrollment.nextExpectedEvent = AttractapEventType.AUTHENTICATE;
+    this.enrollment.nextExpectedEvent = AttractapEventType.NFC_AUTHENTICATE;
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.AUTHENTICATE, {
+      new AttractapEvent(AttractapEventType.NFC_AUTHENTICATE, {
         authenticationKey: this.enrollment.data.newKeys[this.KEY_ZERO_MASTER],
         keyNumber: this.KEY_ZERO_MASTER,
       })

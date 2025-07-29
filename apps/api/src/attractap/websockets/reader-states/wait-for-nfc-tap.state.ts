@@ -39,7 +39,7 @@ export class WaitForNFCTapState implements ReaderState {
 
     if (resourceIsInUse) {
       return this.socket.sendMessage(
-        new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
+        new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
           type: 'toggle-resource-usage',
           resource: simplifiedResource,
           isActive: true,
@@ -54,7 +54,7 @@ export class WaitForNFCTapState implements ReaderState {
     }
 
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
+      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
         type: 'toggle-resource-usage',
         resource: simplifiedResource,
         isActive: false,
@@ -84,7 +84,7 @@ export class WaitForNFCTapState implements ReaderState {
   }
 
   public async onResponse(data: AttractapResponse['data']): Promise<void> {
-    if (data.type === AttractapEventType.AUTHENTICATE) {
+    if (data.type === AttractapEventType.NFC_AUTHENTICATE) {
       this.restartTimeout();
 
       return await this.onAuthenticate(data);
@@ -114,7 +114,7 @@ export class WaitForNFCTapState implements ReaderState {
   }
 
   private sendDisableCardChecking(): void {
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.DISABLE_CARD_CHECKING));
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
   }
 
   private async onInvalidCard(): Promise<void> {
@@ -148,7 +148,7 @@ export class WaitForNFCTapState implements ReaderState {
     this.card = nfcCard;
 
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.AUTHENTICATE, {
+      new AttractapEvent(AttractapEventType.NFC_AUTHENTICATE, {
         authenticationKey: nfcCard.keys[0],
         keyNumber: 0,
       })

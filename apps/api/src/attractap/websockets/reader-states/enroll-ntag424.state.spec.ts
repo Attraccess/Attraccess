@@ -79,7 +79,7 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.ENABLE_CARD_CHECKING,
+            type: AttractapEventType.NFC_ENABLE_CARD_CHECKING,
             payload: expect.objectContaining({
               type: 'enroll-nfc-card',
               user: expect.objectContaining({
@@ -126,7 +126,7 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.DISABLE_CARD_CHECKING,
+            type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
           }),
         })
       );
@@ -134,7 +134,7 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEYS,
             payload: expect.any(Object),
           }),
         })
@@ -161,13 +161,13 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the expected event
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.AUTHENTICATE,
+        nextExpectedEvent: AttractapEventType.NFC_AUTHENTICATE,
         data: {},
       };
 
       // Send a different response type
       await enrollState.onResponse({
-        type: AttractapEventType.CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEYS,
         payload: {},
       });
 
@@ -182,7 +182,7 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.CHANGE_KEYS,
+        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEYS,
         data: {
           newKeys: { 0: mockNewMasterKey },
         },
@@ -190,7 +190,7 @@ describe('EnrollNTAG424State', () => {
 
       // Call method
       await enrollState.onResponse({
-        type: AttractapEventType.CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEYS,
         payload: {
           successfulKeys: [0],
           failedKeys: [],
@@ -198,11 +198,11 @@ describe('EnrollNTAG424State', () => {
       });
 
       // Assert
-      expect(enrollState['enrollment'].nextExpectedEvent).toBe(AttractapEventType.AUTHENTICATE);
+      expect(enrollState['enrollment'].nextExpectedEvent).toBe(AttractapEventType.NFC_AUTHENTICATE);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.AUTHENTICATE,
+            type: AttractapEventType.NFC_AUTHENTICATE,
             payload: expect.objectContaining({
               authenticationKey: mockNewMasterKey,
               keyNumber: 0,
@@ -219,7 +219,7 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.CHANGE_KEYS,
+        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEYS,
         data: {
           newKeys: { 0: mockNewMasterKey },
         },
@@ -227,7 +227,7 @@ describe('EnrollNTAG424State', () => {
 
       // Call method
       await enrollState.onResponse({
-        type: AttractapEventType.CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEYS,
         payload: {
           successfulKeys: [],
           failedKeys: [0],
@@ -247,7 +247,7 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.AUTHENTICATE,
+        nextExpectedEvent: AttractapEventType.NFC_AUTHENTICATE,
         cardUID: mockCardUID,
         data: {
           newKeys: { 0: mockNewMasterKey },
@@ -256,7 +256,7 @@ describe('EnrollNTAG424State', () => {
 
       // Call method and advance timers
       const responsePromise = enrollState.onResponse({
-        type: AttractapEventType.AUTHENTICATE,
+        type: AttractapEventType.NFC_AUTHENTICATE,
         payload: {
           authenticationSuccessful: true,
         },
@@ -311,7 +311,7 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.AUTHENTICATE,
+        nextExpectedEvent: AttractapEventType.NFC_AUTHENTICATE,
         cardUID: mockCardUID,
         data: {
           newKeys: { 0: mockNewMasterKey },
@@ -320,7 +320,7 @@ describe('EnrollNTAG424State', () => {
 
       // Call method
       const responsePromise = enrollState.onResponse({
-        type: AttractapEventType.AUTHENTICATE,
+        type: AttractapEventType.NFC_AUTHENTICATE,
         payload: {
           authenticationSuccessful: false,
         },
@@ -423,7 +423,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.ENABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_ENABLE_CARD_CHECKING,
         }),
       })
     );
@@ -442,7 +442,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.DISABLE_CARD_CHECKING,
+          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
         }),
       })
     );
@@ -450,14 +450,14 @@ describe('EnrollNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEYS,
         }),
       })
     );
 
     // Step 3: Keys changed successfully
     await enrollState.onResponse({
-      type: AttractapEventType.CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEYS,
       payload: {
         successfulKeys: [0],
         failedKeys: [],
@@ -470,14 +470,14 @@ describe('EnrollNTAG424State - Full Flow', () => {
       4,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.AUTHENTICATE,
+          type: AttractapEventType.NFC_AUTHENTICATE,
         }),
       })
     );
 
     // Step 4: Authentication successful
     const authPromise = enrollState.onResponse({
-      type: AttractapEventType.AUTHENTICATE,
+      type: AttractapEventType.NFC_AUTHENTICATE,
       payload: {
         authenticationSuccessful: true,
       },
@@ -532,7 +532,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
 
     // Simulate key change failure
     await enrollState.onResponse({
-      type: AttractapEventType.CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEYS,
       payload: {
         successfulKeys: [],
         failedKeys: [0],
@@ -557,7 +557,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
 
     // Successfully change keys
     await enrollState.onResponse({
-      type: AttractapEventType.CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEYS,
       payload: {
         successfulKeys: [0],
         failedKeys: [],
@@ -569,7 +569,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
 
     // Simulate authentication failure
     const responsePromise = enrollState.onResponse({
-      type: AttractapEventType.AUTHENTICATE,
+      type: AttractapEventType.NFC_AUTHENTICATE,
       payload: {
         authenticationSuccessful: false,
       },
@@ -621,7 +621,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEYS,
           payload: expect.objectContaining({
             authenticationKey: 'existingMasterKey',
           }),

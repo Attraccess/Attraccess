@@ -31,7 +31,7 @@ export class ResetNTAG424State implements ReaderState {
     }
 
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.ENABLE_CARD_CHECKING, {
+      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
         type: 'reset-nfc-card',
         card: {
           id: this.card.id,
@@ -62,7 +62,7 @@ export class ResetNTAG424State implements ReaderState {
   }
 
   public async onResponse(responseData: AttractapResponse['data']): Promise<void> {
-    if (responseData.type === AttractapEventType.CHANGE_KEYS) {
+    if (responseData.type === AttractapEventType.NFC_CHANGE_KEYS) {
       return await this.onKeysChanged(responseData);
     }
 
@@ -77,7 +77,7 @@ export class ResetNTAG424State implements ReaderState {
     }
 
     // Only if the card UID matches, disable card checking
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.DISABLE_CARD_CHECKING));
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
 
     const nfcCard = await this.services.attractapService.getNFCCardByUID(cardUID);
 
@@ -97,7 +97,7 @@ export class ResetNTAG424State implements ReaderState {
     });
 
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.CHANGE_KEYS, {
+      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEYS, {
         authenticationKey: masterKey,
         keys: newKeys,
       })

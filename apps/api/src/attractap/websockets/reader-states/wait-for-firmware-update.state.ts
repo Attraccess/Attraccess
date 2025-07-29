@@ -12,7 +12,7 @@ export class WaitForFirmwareUpdateState implements ReaderState {
     );
 
     this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.FIRMWARE_UPDATE_REQUIRED, {
+      new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
         current: this.socket.reader.firmware,
         available: this.services.firmwareService.getFirmwareDefinition(
           this.socket.reader.firmware.name,
