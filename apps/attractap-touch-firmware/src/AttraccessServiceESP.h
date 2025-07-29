@@ -1,10 +1,7 @@
-#ifndef ATTRACCESS_SERVICE_H
-#define ATTRACCESS_SERVICE_H
+#ifndef ATTRACCESS_SERVICE_ESP_H
+#define ATTRACCESS_SERVICE_ESP_H
 
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <PicoWebsocket.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include "MainScreenUI.h"
@@ -12,7 +9,22 @@
 #include "nfc.hpp"
 #include "flashz-http.hpp"
 
-class AttraccessService
+// ESP-IDF includes
+#include "esp_websocket_client.h"
+#include "esp_wifi.h"
+
+// Firmware constants
+#ifndef FIRMWARE_NAME
+#define FIRMWARE_NAME "attractap-touch-firmware"
+#endif
+#ifndef FIRMWARE_VARIANT
+#define FIRMWARE_VARIANT "ESP32"
+#endif
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION 1
+#endif
+
+class AttraccessServiceESP
 {
 public:
     enum ConnectionState
@@ -35,10 +47,9 @@ public:
     typedef void (*MainContentCallback)(const MainScreenUI::MainContent &content);
 
     typedef std::function<void(const String &label, const JsonArray &options)> SelectItemCallback;
-    void setSelectItemCallback(SelectItemCallback cb);
 
-    AttraccessService();
-    ~AttraccessService();
+    AttraccessServiceESP();
+    ~AttraccessServiceESP();
 
     void begin();
     void update();
@@ -63,6 +74,7 @@ public:
     // Callbacks
     void setConnectionStateCallback(ConnectionStateCallback callback) { stateCallback = callback; }
     void setMainContentCallback(MainContentCallback cb) { mainContentCallback = cb; }
+    void setSelectItemCallback(SelectItemCallback cb);
 
     void onNFCTapped(const uint8_t *uid, uint8_t uidLength);
 
@@ -78,9 +90,9 @@ private:
     NFC *nfc = nullptr;
     std::function<void()> enableCardCheckingCallback;
     std::function<void()> disableCardCheckingCallback;
-    // Core components
-    WiFiClient tcpClient;
-    PicoWebsocket::Client wsClient;
+
+    // ESP-IDF WebSocket client
+    esp_websocket_client_handle_t ws_client;
     Preferences preferences;
 
     IPAddress currentIp;
@@ -94,6 +106,7 @@ private:
     ConnectionState currentState;
     bool connecting;
     bool authenticated;
+    bool needsCleanup;
     String deviceId;
     String authToken;
     String readerName;
@@ -111,8 +124,13 @@ private:
     MainContentCallback mainContentCallback;
     SelectItemCallback selectItemCallback;
 
+    // WebSocket event handling
+    static void websocket_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static AttraccessServiceESP *instance; // For static event handlers
+
     // Private methods
-    bool checkTCPConnection();
+    bool isWiFiConnected();
+    bool checkWebSocketConnection();
     bool establishWebSocketConnection();
     void handleWebSocketMessage(const String &message);
     void sendHeartbeat();
@@ -147,7 +165,11 @@ private:
 
     // Utility methods
     String generateDeviceId();
+
+    String buildWebSocketURL();
+
+    // Rate limiting helpers
     bool isRateLimited() const;
 };
 
-#endif // ATTRACCESS_SERVICE_H
+#endif // ATTRACCESS_SERVICE_ESP_H

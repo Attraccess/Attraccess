@@ -1,5 +1,5 @@
 #include "CLIService.h"
-#include "AttraccessService.h"
+#include "AttraccessServiceESP.h"
 #include "CommandParser.h"
 #include "CommandExecutor.h"
 #include <ArduinoJson.h>
@@ -145,12 +145,12 @@ void CLIService::registerCommandHandler(const String &action, CommandHandler han
     executor.registerHandler(action, handler);
 }
 
-void CLIService::setWiFiService(WiFiService *service)
+void CLIService::setWiFiServiceESP(WiFiServiceESP *service)
 {
     wifiService = service;
 }
 
-void CLIService::setAttraccessService(AttraccessService *service)
+void CLIService::setAttraccessServiceESP(AttraccessServiceESP *service)
 {
     attraccessService = service;
 }
@@ -683,36 +683,36 @@ String CLIService::handleAttraccessStatus(const String &payload)
         JsonDocument doc;
 
         // Get connection state
-        AttraccessService::ConnectionState state = attraccessService->getConnectionState();
+        AttraccessServiceESP::ConnectionState state = attraccessService->getConnectionState();
         String status;
 
         switch (state)
         {
-        case AttraccessService::DISCONNECTED:
+        case AttraccessServiceESP::DISCONNECTED:
             status = "disconnected";
             break;
-        case AttraccessService::CONNECTING_TCP:
+        case AttraccessServiceESP::CONNECTING_TCP:
             status = "connecting_tcp";
             break;
-        case AttraccessService::CONNECTING_WEBSOCKET:
+        case AttraccessServiceESP::CONNECTING_WEBSOCKET:
             status = "connecting_websocket";
             break;
-        case AttraccessService::CONNECTED:
+        case AttraccessServiceESP::CONNECTED:
             status = "connected";
             break;
-        case AttraccessService::AUTHENTICATING:
+        case AttraccessServiceESP::AUTHENTICATING:
             status = "authenticating";
             break;
-        case AttraccessService::AUTHENTICATED:
+        case AttraccessServiceESP::AUTHENTICATED:
             status = "authenticated";
             break;
-        case AttraccessService::ERROR_FAILED:
+        case AttraccessServiceESP::ERROR_FAILED:
             status = "error_failed";
             break;
-        case AttraccessService::ERROR_TIMED_OUT:
+        case AttraccessServiceESP::ERROR_TIMED_OUT:
             status = "error_timed_out";
             break;
-        case AttraccessService::ERROR_INVALID_SERVER:
+        case AttraccessServiceESP::ERROR_INVALID_SERVER:
             status = "error_invalid_server";
             break;
         default:
@@ -782,7 +782,7 @@ String CLIService::handleAttraccessConfiguration(const String &payload)
 
         preferences.begin("attraccess", false);
         preferences.putString("hostname", hostname);
-        preferences.putShort("port", port);
+        preferences.putString("port", String(port));
         preferences.end();
 
         attraccessService->setServerConfig(hostname, port);

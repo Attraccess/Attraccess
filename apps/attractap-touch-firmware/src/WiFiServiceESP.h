@@ -1,8 +1,11 @@
-#ifndef WIFI_SERVICE_H
-#define WIFI_SERVICE_H
+#ifndef WIFI_SERVICE_ESP_H
+#define WIFI_SERVICE_ESP_H
 
-#include <WiFi.h>
+#include <Arduino.h>
 #include <Preferences.h>
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_netif.h"
 
 #define MAX_WIFI_NETWORKS 20
 
@@ -21,7 +24,7 @@ struct WiFiCredentials
     String password;
 };
 
-class WiFiService
+class WiFiServiceESP
 {
 public:
     // State change callback types
@@ -29,8 +32,8 @@ public:
     typedef void (*ScanCompleteCallback)(WiFiNetwork *networks, uint8_t count);
     typedef void (*ScanProgressCallback)(const String &status);
 
-    WiFiService();
-    ~WiFiService();
+    WiFiServiceESP();
+    ~WiFiServiceESP();
 
     void begin();
     void update();
@@ -66,6 +69,9 @@ public:
 
     WiFiCredentials getCurrentCredentials() { return currentCredentials; }
 
+    // ESP-IDF specific methods for memory optimization
+    void configureMemorySettings();
+
 private:
     WiFiNetwork availableNetworks[MAX_WIFI_NETWORKS];
     uint8_t networkCount;
@@ -74,6 +80,10 @@ private:
     bool connecting;
     uint32_t connectionStartTime;
     uint32_t lastConnectionUpdate;
+    bool wifi_initialized;
+
+    // ESP network interface
+    esp_netif_t *sta_netif;
 
     // Secure credential storage
     Preferences preferences;
@@ -83,7 +93,13 @@ private:
     ScanCompleteCallback scanCompleteCallback;
     ScanProgressCallback scanProgressCallback;
 
+    // Event handlers
+    static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+    static WiFiServiceESP *instance; // For static event handlers
+
     // Internal methods
+    void initWiFi();
     void handleScanComplete();
     void handleConnectionTimeout();
     void notifyConnectionState(bool connected, const String &ssid);
@@ -92,6 +108,9 @@ private:
     // Utility methods
     String getEncryptionTypeString(wifi_auth_mode_t encType);
     int getSignalStrength(int32_t rssi);
+
+    // ESP-IDF conversion helpers
+    wifi_config_t createWiFiConfig(const String &ssid, const String &password);
 };
 
-#endif // WIFI_SERVICE_H
+#endif // WIFI_SERVICE_ESP_H

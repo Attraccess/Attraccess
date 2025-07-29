@@ -4,8 +4,8 @@
 #include <Arduino.h>
 #include <functional>
 #include <map>
-#include "WiFiService.h"
-#include "AttraccessService.h"
+#include "WiFiServiceESP.h"
+#include "AttraccessServiceESP.h"
 #include "CommandParser.h"
 #include "CommandExecutor.h"
 #include <Preferences.h>
@@ -68,15 +68,15 @@ public:
 
     /**
      * Set the WiFi service reference for WiFi-related commands
-     * @param service Pointer to the WiFiService instance
+     * @param service Pointer to the WiFiServiceESP instance
      */
-    void setWiFiService(WiFiService *service);
+    void setWiFiServiceESP(WiFiServiceESP *service);
 
     /**
      * Set the Attraccess service reference for Attraccess-related commands
-     * @param service Pointer to the AttraccessService instance
+     * @param service Pointer to the AttraccessServiceESP instance
      */
-    void setAttraccessService(AttraccessService *service);
+    void setAttraccessServiceESP(AttraccessServiceESP *service);
 
 private:
     CommandParser parser;
@@ -110,10 +110,10 @@ private:
     String handleAttraccessConfiguration(const String &payload);
 
     // WiFi service reference
-    WiFiService *wifiService;
+    WiFiServiceESP *wifiService;
 
     // Attraccess service reference
-    AttraccessService *attraccessService;
+    AttraccessServiceESP *attraccessService;
 
     // Dependencies
     Preferences preferences;

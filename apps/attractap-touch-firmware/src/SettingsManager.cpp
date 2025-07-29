@@ -6,8 +6,8 @@
 #include "AttraccessSettingsScreen.h"
 #include "WiFiPasswordDialog.h"
 #include "WiFiHiddenNetworkDialog.h"
-#include "WiFiService.h"
-#include "AttraccessService.h"
+#include "WiFiServiceESP.h"
+#include "AttraccessServiceESP.h"
 
 static SettingsManager *g_settingsManager = nullptr;
 
@@ -161,15 +161,15 @@ bool SettingsManager::isSettingsVisible() const
     return uiVisible;
 }
 
-void SettingsManager::setWiFiManager(WiFiService *service)
+void SettingsManager::setWiFiManager(WiFiServiceESP *service)
 {
     wifiService = service;
-    Serial.println("SettingsManager: WiFiService reference set");
+    Serial.println("SettingsManager: WiFiServiceESP reference set");
 
     // Initialize WiFi settings screen with dependencies
     if (wifiSettingsScreen && passwordDialog && hiddenNetworkDialog)
     {
-        Serial.printf("SettingsManager: Initializing WiFiSettingsScreen with wifiService=%p, passwordDialog=%p, hiddenNetworkDialog=%p\n", wifiService, passwordDialog, hiddenNetworkDialog);
+        Serial.printf("SettingsManager: Initializing WiFiSettingsScreen with WiFiServiceESP=%p, passwordDialog=%p, hiddenNetworkDialog=%p\n", wifiService, passwordDialog, hiddenNetworkDialog);
         wifiSettingsScreen->begin(wifiService, passwordDialog, hiddenNetworkDialog);
     }
     else
@@ -180,13 +180,13 @@ void SettingsManager::setWiFiManager(WiFiService *service)
     // Set up callbacks for UI updates
     if (wifiService)
     {
-        Serial.println("SettingsManager: Setting up WiFiService callbacks");
+        Serial.println("SettingsManager: Setting up WiFiServiceESP callbacks");
         wifiService->setScanCompleteCallback(onWiFiScanComplete);
         wifiService->setScanProgressCallback(onWiFiScanProgress);
 
         // Set up connection callback to forward to our onWiFiConnectionChange method
         wifiService->setConnectionCallback(onWiFiConnectionChange);
-        Serial.println("SettingsManager: WiFiService callbacks registered successfully");
+        Serial.println("SettingsManager: WiFiServiceESP callbacks registered successfully");
     }
     else
     {
@@ -194,10 +194,10 @@ void SettingsManager::setWiFiManager(WiFiService *service)
     }
 }
 
-void SettingsManager::setAttraccessService(AttraccessService *service)
+void SettingsManager::setAttraccessServiceESP(AttraccessServiceESP *service)
 {
     attraccessService = service;
-    Serial.println("SettingsManager: AttraccessService reference set");
+    Serial.println("SettingsManager: AttraccessServiceESP reference set");
 
     // Set up the settings saved callback
     if (attraccessSettingsScreen && attraccessService)
@@ -363,7 +363,7 @@ void SettingsManager::onBackToSettings()
     returnToSettingsList();
 }
 
-// Static WiFiService callbacks
+// Static WiFiServiceESP callbacks
 void SettingsManager::onWiFiScanComplete(WiFiNetwork *networks, uint8_t count)
 {
     Serial.printf("SettingsManager: Scan complete callback - %d networks found\n", count);

@@ -1,4 +1,6 @@
 #include "WiFiSettingsScreen.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
 
 WiFiSettingsScreen::WiFiSettingsScreen()
     : screen(nullptr),
@@ -45,7 +47,7 @@ WiFiSettingsScreen::~WiFiSettingsScreen()
     }
 }
 
-void WiFiSettingsScreen::begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg)
+void WiFiSettingsScreen::begin(WiFiServiceESP *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg)
 {
     Serial.printf("WiFiSettingsScreen: begin() called with wifiSvc=%p, passwordDlg=%p, hiddenNetworkDlg=%p\n", wifiSvc, passwordDlg, hiddenNetworkDlg);
     wifiService = wifiSvc;
@@ -427,7 +429,7 @@ void WiFiSettingsScreen::updateWiFiStatus()
             lv_obj_add_flag(forgetWiFiButton, LV_OBJ_FLAG_HIDDEN);
         }
     }
-    else if (WiFi.isConnected())
+    else if (isWiFiConnected())
     {
         // Show connected network card
         if (wifiCurrentNetworkCard)
@@ -440,8 +442,8 @@ void WiFiSettingsScreen::updateWiFiStatus()
         }
 
         // Update status with network name and IP
-        String statusText = WiFi.SSID() + "\n" + WiFi.localIP().toString();
-        int rssi = WiFi.RSSI();
+        String statusText = getConnectedSSID() + "\n" + getLocalIP().toString();
+        int rssi = getRSSI();
         if (rssi >= -50)
             statusText += "\nExcellent signal";
         else if (rssi >= -60)
@@ -526,7 +528,7 @@ void WiFiSettingsScreen::updateAvailableNetworks()
         WiFiNetwork &network = networks[i];
 
         // Skip current network (it's shown at the top)
-        if (WiFi.isConnected() && network.ssid.equals(WiFi.SSID()))
+        if (isWiFiConnected() && network.ssid.equals(getConnectedSSID()))
         {
             continue;
         }
@@ -701,7 +703,7 @@ void WiFiSettingsScreen::hideWiFiConnectionProgress()
     }
 
     // Restore normal connected network card visibility if connected
-    if (WiFi.isConnected() && wifiCurrentNetworkCard)
+    if (isWiFiConnected() && wifiCurrentNetworkCard)
     {
         lv_obj_clear_flag(wifiCurrentNetworkCard, LV_OBJ_FLAG_HIDDEN);
     }
@@ -844,4 +846,51 @@ void WiFiSettingsScreen::onForgetWiFiButtonClicked(lv_event_t *e)
     screen->wifiService->disconnect();
     screen->updateWiFiStatus();
     Serial.println("WiFiSettingsScreen: WiFi credentials forgotten");
+}
+
+// ESP-IDF WiFi helper methods
+bool WiFiSettingsScreen::isWiFiConnected()
+{
+    wifi_ap_record_t ap_info;
+    esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+    return ret == ESP_OK;
+}
+
+String WiFiSettingsScreen::getConnectedSSID()
+{
+    if (!isWiFiConnected())
+        return "";
+
+    wifi_ap_record_t ap_info;
+    esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+    if (ret == ESP_OK)
+    {
+        return String((char *)ap_info.ssid);
+    }
+    return "";
+}
+
+IPAddress WiFiSettingsScreen::getLocalIP()
+{
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK)
+    {
+        return IPAddress(ip_info.ip.addr);
+    }
+    return IPAddress(0, 0, 0, 0);
+}
+
+int WiFiSettingsScreen::getRSSI()
+{
+    if (!isWiFiConnected())
+        return 0;
+
+    wifi_ap_record_t ap_info;
+    esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+    if (ret == ESP_OK)
+    {
+        return ap_info.rssi;
+    }
+    return 0;
 }

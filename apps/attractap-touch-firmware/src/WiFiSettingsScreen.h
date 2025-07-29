@@ -3,11 +3,11 @@
 
 #include <Arduino.h>
 #include <lvgl.h>
-#include <WiFi.h>
-#include "WiFiService.h"
+#include "WiFiServiceESP.h"
 #include "WiFiPasswordDialog.h"
 #include "WiFiHiddenNetworkDialog.h"
 #include "SettingsHeader.h"
+#include "esp_wifi.h"
 
 class WiFiSettingsScreen
 {
@@ -18,7 +18,7 @@ public:
     WiFiSettingsScreen();
     ~WiFiSettingsScreen();
 
-    void begin(WiFiService *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg);
+    void begin(WiFiServiceESP *wifiSvc, WiFiPasswordDialog *passwordDlg, WiFiHiddenNetworkDialog *hiddenNetworkDlg);
     void show();
     void hide();
     void update();
@@ -56,7 +56,7 @@ private:
     lv_timer_t *connectionTimeoutTimer;
 
     // Dependencies
-    WiFiService *wifiService;
+    WiFiServiceESP *wifiService;
     WiFiPasswordDialog *passwordDialog;
     WiFiHiddenNetworkDialog *hiddenNetworkDialog;
 
@@ -70,6 +70,12 @@ private:
     void showWiFiConnectionProgress(const String &ssid, const String &status, bool isError = false);
     void hideWiFiConnectionProgress();
     void startConnectionTimeout(const String &ssid);
+
+    // ESP-IDF WiFi helper methods
+    bool isWiFiConnected();
+    String getConnectedSSID();
+    IPAddress getLocalIP();
+    int getRSSI();
 
     // Event handlers
     static void onNetworkItemClicked(lv_event_t *e);

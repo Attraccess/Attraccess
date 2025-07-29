@@ -9,9 +9,9 @@
 
 #include "ScreenManager.h"
 #include "MainScreenUI.h"
-#include "WiFiService.h"
+#include "WiFiServiceESP.h"
 #include "SettingsManager.h"
-#include "AttraccessService.h"
+#include "AttraccessServiceESP.h"
 #include "nfc.hpp"
 #include "CLIService.h"
 #include "LEDService.h"
@@ -34,9 +34,9 @@ uint32_t lv_lastTick = 0; // Used to track the tick timer
 // New Architecture: Services and UI
 ScreenManager screenManager;
 MainScreenUI mainScreenUI(&screenManager);
-WiFiService wifiService;
+WiFiServiceESP wifiService;
 SettingsManager settingsManager;
-AttraccessService attraccessService;
+AttraccessServiceESP attraccessService;
 NFC nfc;
 CLIService cliService;
 LEDService ledService;
@@ -177,7 +177,7 @@ void onWiFiConnectionChange(bool connected, const String &ssid)
   settingsManager.handleWiFiConnectionChange(connected, ssid);
 }
 
-void onAttraccessConnectionChange(AttraccessService::ConnectionState state, const String &message)
+void onAttraccessConnectionChange(AttraccessServiceESP::ConnectionState state, const String &message)
 {
   Serial.printf("Application: Attraccess connection state changed: %s (%s)\n",
                 attraccessService.getConnectionStateString().c_str(), message.c_str());
@@ -189,7 +189,7 @@ void onAttraccessConnectionChange(AttraccessService::ConnectionState state, cons
   mainScreenUI.updateAttraccessStatus(connected, authenticated, attraccessService.getConnectionStateString(), attraccessService.getReaderName());
 
   // Show not available message if disconnected or connection failed
-  if (state == AttraccessService::DISCONNECTED || state == AttraccessService::ERROR_FAILED)
+  if (state == AttraccessServiceESP::DISCONNECTED || state == AttraccessServiceESP::ERROR_FAILED)
   {
     MainScreenUI::MainContent content;
     content.type = MainScreenUI::CONTENT_ERROR;
@@ -337,7 +337,7 @@ void setup()
                                                                                 // Send SELECT_ITEM response with selectedId
                                                                                 StaticJsonDocument<64> doc;
                                                                                 doc["selectedId"] = selectedId.c_str();
-                                                                                extern AttraccessService attraccessService;
+                                                                                extern AttraccessServiceESP attraccessService;
                                                                                 attraccessService.sendMessage("SELECT_ITEM", doc.as<JsonObject>()); // Note: event type is SELECT_ITEM (response)
                                                                               }); });
 
@@ -348,7 +348,7 @@ void setup()
                            { attraccessService.onNFCTapped(uid, uidLength); });
 
   // Pass Attraccess service to settings manager
-  settingsManager.setAttraccessService(&attraccessService);
+  settingsManager.setAttraccessServiceESP(&attraccessService);
 
   // Show main screen
   Serial.println("9. Showing Main Screen...");
@@ -359,7 +359,7 @@ void setup()
                                 wifiService.getConnectedSSID(),
                                 wifiService.getLocalIP());
 
-  // Inject NFC into AttraccessService for direct event-based control
+  // Inject NFC into AttraccessServiceESP for direct event-based control
   attraccessService.setNFC(&nfc);
 
   // Update initial Attraccess status
@@ -373,8 +373,8 @@ void setup()
 
   // Initialize CLI Service
   Serial.println("9b. Initializing CLI Service...");
-  cliService.setWiFiService(&wifiService);
-  cliService.setAttraccessService(&attraccessService);
+  cliService.setWiFiServiceESP(&wifiService);
+  cliService.setAttraccessServiceESP(&attraccessService);
   cliService.begin();
 
   // Mark setup as complete

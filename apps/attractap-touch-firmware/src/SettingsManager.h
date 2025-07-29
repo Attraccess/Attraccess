@@ -2,10 +2,12 @@
 #define SETTINGS_MANAGER_H
 
 #include <Arduino.h>
-#include <WiFi.h>
 #include <Preferences.h>
 #include <lvgl.h>
 #include "KeyboardManager.h"
+#include "WiFiServiceESP.h"
+#include "AttraccessServiceESP.h"
+#include "esp_wifi.h"
 
 // Forward declarations for the new screen classes
 class PinEntryScreen;
@@ -15,8 +17,8 @@ class SystemSettingsScreen;
 class AttraccessSettingsScreen;
 class WiFiPasswordDialog;
 class WiFiHiddenNetworkDialog;
-class WiFiService;
-class AttraccessService;
+class WiFiServiceESP;
+class AttraccessServiceESP;
 struct WiFiNetwork;
 
 class SettingsManager
@@ -34,8 +36,8 @@ public:
     bool isSettingsVisible() const;
 
     // Set external dependencies
-    void setWiFiManager(WiFiService *service);
-    void setAttraccessService(AttraccessService *service);
+    void setWiFiManager(WiFiServiceESP *service);
+    void setAttraccessServiceESP(AttraccessServiceESP *service);
 
     // External event handlers
     void handleWiFiConnectionChange(bool connected, const String &ssid);
@@ -62,8 +64,8 @@ private:
     WiFiHiddenNetworkDialog *hiddenNetworkDialog;
 
     // Dependencies
-    WiFiService *wifiService;
-    AttraccessService *attraccessService;
+    WiFiServiceESP *wifiService;
+    AttraccessServiceESP *attraccessService;
     KeyboardManager keyboardManager;
 
     // State
@@ -88,7 +90,7 @@ private:
     void onBackToMain();
     void onBackToSettings();
 
-    // Static WiFiService callbacks
+    // Static WiFiServiceESP callbacks
     static void onWiFiScanComplete(WiFiNetwork *networks, uint8_t count);
     static void onWiFiScanProgress(const String &status);
     static void onWiFiConnectionChange(bool connected, const String &ssid);

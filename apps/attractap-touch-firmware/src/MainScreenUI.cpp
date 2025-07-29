@@ -2,9 +2,9 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include "nfc_icon.c"
-#include "AttraccessService.h" // Add this include
-#include <ArduinoJson.h>       // For JsonDocument
-#include "api_icon.c"          // Add this include for the API icon
+#include "AttraccessServiceESP.h" // Add this include
+#include <ArduinoJson.h>          // For JsonDocument
+#include "api_icon.c"             // Add this include for the API icon
 #include <vector>
 
 // Define the static members
@@ -482,7 +482,7 @@ void MainScreenUI::onCancelButtonClicked(lv_event_t *e)
         // Prepare empty payload
         StaticJsonDocument<64> doc;
         JsonObject payload = doc.to<JsonObject>();
-        extern AttraccessService attraccessService; // Use the global instance
+        extern AttraccessServiceESP attraccessService; // Use the global instance
         attraccessService.sendMessage("CANCEL", payload);
     }
 }
