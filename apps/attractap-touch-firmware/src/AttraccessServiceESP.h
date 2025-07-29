@@ -102,20 +102,24 @@ private:
     uint16_t serverPort;
     bool configValid;
 
-    // Connection state
+    // Connection state management
     ConnectionState currentState;
     bool connecting;
     bool authenticated;
     bool needsCleanup;
+    bool needsCertificateRetry;
+    uint32_t lastConnectionAttempt;
+    uint32_t lastHeartbeat;
+    uint32_t lastStateChange;
+    uint32_t connectionReadyTime; // Time when WebSocket is ready for sending
+
+    // Reader information
     String deviceId;
     String authToken;
     String readerName;
 
-    // Timing
-    uint32_t lastConnectionAttempt;
-    uint32_t lastHeartbeat;
-    uint32_t lastStateChange;
-    static const uint32_t CONNECTION_RETRY_INTERVAL = 5000; // 5 seconds
+    // Timing constants
+    static const uint32_t CONNECTION_RETRY_INTERVAL = 1000; // 1 second
     static const uint32_t HEARTBEAT_INTERVAL = 25000;       // 25 seconds (server timeout is 30s)
     static const uint32_t CONNECTION_TIMEOUT = 10000;       // 10 seconds
 
@@ -162,9 +166,6 @@ private:
     void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
     void handleShowTextEvent(const JsonObject &data);
     void handleSelectItemEvent(const JsonObject &data);
-
-    // Utility methods
-    String generateDeviceId();
 
     String buildWebSocketURL();
 

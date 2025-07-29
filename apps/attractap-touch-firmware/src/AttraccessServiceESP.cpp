@@ -7,7 +7,7 @@
 #include "esp_netif.h"
 #include "esp_crt_bundle.h"
 #include "esp_tls.h"
-#include "cert_pem.h"
+#include "AdaptiveCertManager.h"
 
 static const char *TAG = "AttraccessServiceESP";
 
@@ -22,9 +22,11 @@ AttraccessServiceESP::AttraccessServiceESP()
       connecting(false),
       authenticated(false),
       needsCleanup(false),
+      needsCertificateRetry(false),
       lastConnectionAttempt(millis() - CONNECTION_RETRY_INTERVAL),
       lastHeartbeat(0),
       lastStateChange(0),
+      connectionReadyTime(0),
       stateCallback(nullptr)
 {
     instance = this;
@@ -41,6 +43,13 @@ void AttraccessServiceESP::begin()
     Serial.println("AttraccessServiceESP: Initializing...");
 
     preferences.begin("attraccess", false);
+
+    // Initialize adaptive certificate manager
+    if (!adaptiveCertManager.begin())
+    {
+        Serial.println("AttraccessServiceESP: WARNING - Failed to initialize certificate manager");
+    }
+
     loadCredentials();
 
     // Load server configuration from settings
@@ -143,8 +152,23 @@ bool AttraccessServiceESP::establishWebSocketConnection()
     websocket_cfg.uri = wsUrl.c_str();
     websocket_cfg.port = serverPort;
 
-    websocket_cfg.cert_pem = (const char *)websocket_org_pem_start;
-    Serial.println("AttraccessServiceESP: Using embedded certificate");
+    // Configure buffer sizes to prevent ENOBUFS errors
+    websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
+    websocket_cfg.task_stack = 8192;  // Increase task stack size for stability
+    websocket_cfg.task_prio = 5;      // Set appropriate task priority
+
+    // Configure connection timeouts
+    websocket_cfg.ping_interval_sec = 5;     // Send ping every 30 seconds
+    websocket_cfg.pingpong_timeout_sec = 15; // Timeout for pong response
+
+    // Configure SSL with adaptive certificate manager
+    if (!adaptiveCertManager.configureWebSocketSSL(&websocket_cfg))
+    {
+        Serial.println("AttraccessServiceESP: Failed to configure SSL certificates");
+        setState(ERROR_FAILED, "SSL configuration failed");
+        connecting = false;
+        return false;
+    }
 
     ws_client = esp_websocket_client_init(&websocket_cfg);
     if (!ws_client)
@@ -190,44 +214,46 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
     case WEBSOCKET_EVENT_CONNECTED:
         Serial.println("AttraccessServiceESP: WebSocket connected");
         self->connecting = false;
+
+        // Mark current certificate as successful
+        adaptiveCertManager.markSuccess();
+
         self->setState(CONNECTED, "WebSocket connected");
 
-        // Step 3: Authentication - try existing credentials first, then register if needed
-        if (!self->deviceId.isEmpty() && !self->authToken.isEmpty())
-        {
-            self->setState(AUTHENTICATING, "Authenticating...");
-
-            JsonDocument authDoc;
-            authDoc["event"] = "EVENT";
-            authDoc["data"]["type"] = "AUTHENTICATE";
-            authDoc["data"]["payload"]["id"] = self->deviceId;
-            authDoc["data"]["payload"]["token"] = self->authToken;
-
-            if (!self->sendJSONMessage(authDoc.as<JsonObject>()))
-            {
-                Serial.println("AttraccessServiceESP: Failed to send authentication");
-                self->setState(ERROR_FAILED, "Authentication send failed");
-            }
-            else
-            {
-                Serial.println("AttraccessServiceESP: Authentication request sent");
-            }
-        }
-        else
-        {
-            // New device - register
-            self->registerDevice();
-        }
+        // Add a small delay to ensure WebSocket is fully ready for sending
+        // This helps prevent the 0x58 send error that causes the infinite loop
+        self->connectionReadyTime = millis() + 100; // 100ms delay
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
+    {
         Serial.println("AttraccessServiceESP: WebSocket disconnected");
         self->authenticated = false;
         self->readerName = "";
-        self->connecting = false;  // Ensure connecting flag is reset
-        self->needsCleanup = true; // Mark for safe cleanup in update()
+        self->connecting = false;
+
+        // Check if this might be an SSL certificate error and we should try next certificate
+        static uint32_t lastCertRetryAttempt = 0;
+        uint32_t now = millis();
+
+        if (self->serverPort == 443 &&
+            (now - lastCertRetryAttempt > 200))
+        { // Avoid rapid retries, wait at least 200ms
+
+            Serial.println("AttraccessServiceESP: SSL connection failure detected, scheduling certificate retry...");
+            lastCertRetryAttempt = now;
+
+            // Schedule certificate retry to happen in update() method
+            self->needsCertificateRetry = true;
+            self->needsCleanup = true; // Clean up current client
+            return;                    // Don't set disconnected state yet, let retry handle it
+        }
+
+        // If not SSL or no more certificates to try, proceed with normal disconnection handling
+        self->needsCleanup = true;
         self->setState(DISCONNECTED, "WebSocket disconnected");
         break;
+    }
 
     case WEBSOCKET_EVENT_DATA:
         if (data->op_code == 0x01)
@@ -240,8 +266,8 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
 
     case WEBSOCKET_EVENT_ERROR:
         Serial.println("AttraccessServiceESP: WebSocket error");
-        self->connecting = false;  // Ensure connecting flag is reset before state change
-        self->needsCleanup = true; // Mark for safe cleanup in update()
+        self->connecting = false;
+        self->needsCleanup = true;
         self->setState(ERROR_FAILED, "WebSocket error");
         break;
 
@@ -258,7 +284,35 @@ void AttraccessServiceESP::update()
         esp_websocket_client_destroy(ws_client);
         ws_client = nullptr;
         needsCleanup = false;
+        connectionReadyTime = 0; // Reset ready time when cleaning up
         Serial.println("AttraccessServiceESP: WebSocket client safely cleaned up");
+    }
+
+    // Handle certificate retry outside of event handler context
+    if (needsCertificateRetry)
+    {
+        needsCertificateRetry = false;
+        Serial.println("AttraccessServiceESP: Executing certificate retry...");
+
+        if (adaptiveCertManager.tryNextCertificate())
+        {
+            Serial.printf("AttraccessServiceESP: Retrying connection with certificate: %s\n",
+                          adaptiveCertManager.getCurrentCertName());
+
+            // Reset connecting state and try again
+            connecting = false;
+
+            // Small delay before retry to avoid overwhelming the system
+            delay(1000);
+
+            connect();
+        }
+        else
+        {
+            Serial.println("AttraccessServiceESP: No more certificates to try, connection failed");
+            setState(ERROR_FAILED, "All certificates failed");
+        }
+        return; // Skip other update logic this cycle
     }
 
     LEDService::attraccessAuthenticated = currentState == AttraccessServiceESP::AUTHENTICATED;
@@ -267,6 +321,34 @@ void AttraccessServiceESP::update()
     if (authenticated && millis() - lastHeartbeat > HEARTBEAT_INTERVAL)
     {
         sendHeartbeat();
+    }
+
+    // Handle delayed authentication/registration when connection becomes ready
+    if (currentState == AUTHENTICATING && connectionReadyTime > 0 && millis() >= connectionReadyTime)
+    {
+        Serial.println("AttraccessServiceESP: Connection now ready, attempting delayed authentication/registration");
+
+        if (!deviceId.isEmpty() && !authToken.isEmpty())
+        {
+            // Try authentication with saved credentials
+            JsonDocument authDoc;
+            authDoc["event"] = "EVENT";
+            authDoc["data"]["type"] = "READER_AUTHENTICATE";
+            authDoc["data"]["payload"]["id"] = deviceId;
+            authDoc["data"]["payload"]["token"] = authToken;
+
+            if (!sendJSONMessage(authDoc.as<JsonObject>()))
+            {
+                Serial.println("AttraccessServiceESP: Failed to send delayed authentication");
+            }
+        }
+        else
+        {
+            // Try registration
+            registerDevice();
+        }
+
+        connectionReadyTime = 0; // Clear the delay
     }
 
     // Auto-reconnect logic with detailed debugging
@@ -434,6 +516,13 @@ bool AttraccessServiceESP::sendJSONMessage(const JsonObject &messageObj)
         return false;
     }
 
+    // Check if connection is ready for sending (prevents 0x58 error)
+    if (connectionReadyTime > 0 && millis() < connectionReadyTime)
+    {
+        Serial.println("AttraccessServiceESP: WebSocket not ready for sending yet, waiting...");
+        return false;
+    }
+
     String jsonString;
     serializeJson(messageObj, jsonString);
 
@@ -445,12 +534,40 @@ bool AttraccessServiceESP::sendJSONMessage(const JsonObject &messageObj)
 
     Serial.printf("AttraccessServiceESP: Sending: %s\n", jsonString.c_str());
 
-    // Send JSON message via WebSocket
-    esp_err_t ret = esp_websocket_client_send_text(ws_client, jsonString.c_str(), jsonString.length(), portMAX_DELAY);
+    // Send JSON message via WebSocket with shorter timeout to detect issues faster
+    esp_err_t ret = esp_websocket_client_send_text(ws_client, jsonString.c_str(), jsonString.length(), pdMS_TO_TICKS(5000));
 
     if (ret != ESP_OK)
     {
-        Serial.printf("AttraccessServiceESP: Send error: %s\n", esp_err_to_name(ret));
+        Serial.printf("AttraccessServiceESP: Send error: %s (0x%x)\n", esp_err_to_name(ret), ret);
+        Serial.printf("AttraccessServiceESP: WebSocket connected: %s\n",
+                      esp_websocket_client_is_connected(ws_client) ? "true" : "false");
+
+        // For error 0x58 (common send error), try a short retry instead of immediate disconnection
+        if (ret == 0x58)
+        {
+            Serial.println("AttraccessServiceESP: Detected 0x58 error, attempting retry in 500ms...");
+            delay(500);
+
+            // Try one more time
+            esp_err_t retry_ret = esp_websocket_client_send_text(ws_client, jsonString.c_str(), jsonString.length(), pdMS_TO_TICKS(2000));
+            if (retry_ret == ESP_OK)
+            {
+                Serial.println("AttraccessServiceESP: Retry successful");
+                return true;
+            }
+            Serial.printf("AttraccessServiceESP: Retry also failed: %s (0x%x)\n", esp_err_to_name(retry_ret), retry_ret);
+        }
+
+        // If we get a send error but WebSocket still reports connected,
+        // the connection is likely broken - schedule cleanup
+        if (esp_websocket_client_is_connected(ws_client))
+        {
+            Serial.println("AttraccessServiceESP: Send error on 'connected' WebSocket - scheduling cleanup");
+            needsCleanup = true;
+            setState(ERROR_FAILED, "WebSocket send error - connection broken");
+        }
+
         return false;
     }
 
@@ -459,9 +576,31 @@ bool AttraccessServiceESP::sendJSONMessage(const JsonObject &messageObj)
 
 void AttraccessServiceESP::registerDevice()
 {
+    // Add debug logging to diagnose connection state
+    Serial.printf("AttraccessServiceESP: registerDevice() called - currentState=%d, ws_client=%p\n",
+                  currentState, ws_client);
+
+    if (ws_client)
+    {
+        Serial.printf("AttraccessServiceESP: WebSocket connected check: %s\n",
+                      esp_websocket_client_is_connected(ws_client) ? "true" : "false");
+    }
+
     if (!isConnected())
     {
         Serial.println("AttraccessServiceESP: Cannot register - not connected");
+        Serial.printf("AttraccessServiceESP: Connection check failed - state: %s, ws_client: %p, esp_connected: %s\n",
+                      getConnectionStateString().c_str(),
+                      ws_client,
+                      ws_client ? (esp_websocket_client_is_connected(ws_client) ? "true" : "false") : "null");
+        return;
+    }
+
+    // Check if connection is ready for sending
+    if (connectionReadyTime > 0 && millis() < connectionReadyTime)
+    {
+        Serial.printf("AttraccessServiceESP: WebSocket not ready for registration yet, waiting %lu ms...\n",
+                      connectionReadyTime - millis());
         return;
     }
 
@@ -471,7 +610,7 @@ void AttraccessServiceESP::registerDevice()
 
     JsonDocument doc;
     doc["event"] = "EVENT";
-    doc["data"]["type"] = "REGISTER";
+    doc["data"]["type"] = "READER_REGISTER";
     doc["data"]["payload"]["deviceType"] = String("ESP32_CYD").c_str();
 
     if (sendJSONMessage(doc.as<JsonObject>()))
@@ -481,7 +620,17 @@ void AttraccessServiceESP::registerDevice()
     else
     {
         Serial.println("AttraccessServiceESP: Failed to send registration");
-        setState(ERROR_FAILED, "Registration send failed");
+
+        // Don't immediately set error state if it's just a timing issue
+        if (connectionReadyTime > 0 && millis() < connectionReadyTime + 1000)
+        {
+            Serial.println("AttraccessServiceESP: Registration send failed, but connection might not be ready yet");
+            // Will retry on next update cycle
+        }
+        else
+        {
+            setState(ERROR_FAILED, "Registration send failed");
+        }
     }
 }
 
@@ -550,13 +699,7 @@ bool AttraccessServiceESP::isWiFiConnected()
 
 String AttraccessServiceESP::getDeviceId()
 {
-    // Use ESP-IDF WiFi MAC address
-    uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
-    char macStr[18];
-    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    return "ESP32_" + String(macStr);
+    return this->deviceId;
 }
 
 String AttraccessServiceESP::getHostname()
@@ -585,6 +728,8 @@ void AttraccessServiceESP::processIncomingMessage(const String &message)
 
     String event = doc["event"].as<String>();
     JsonObject data = doc["data"].as<JsonObject>();
+
+    Serial.printf("AttraccessServiceESP: Received message of type: %s\n", event.c_str());
 
     if (event == "RESPONSE")
     {
@@ -642,53 +787,79 @@ void AttraccessServiceESP::handleRegistration(const JsonObject &data)
 
 void AttraccessServiceESP::handleAuthentication(const JsonObject &data)
 {
-    // READER_AUTHENTICATED response contains a "name" field on success
-    if (data["payload"]["name"])
+    // if READER_AUTHENTICATED response does not contain a "name" field -> ignore it
+    if (!data["payload"]["name"])
     {
-        readerName = data["payload"]["name"].as<String>();
-        Serial.printf("AttraccessServiceESP: Authentication successful - Reader name: %s\n", readerName.c_str());
-        authenticated = true;
-
-        // Always call setState, but also force callback if we're already authenticated
-        // to ensure UI is updated with the latest reader name
-        ConnectionState oldState = currentState;
-        setState(AUTHENTICATED, "Authenticated");
-
-        // If state didn't change (we were already authenticated), manually trigger callback
-        // to ensure UI gets updated with the new reader name
-        if (oldState == AUTHENTICATED && stateCallback)
-        {
-            Serial.println("AttraccessServiceESP: Reauthentication detected - forcing UI update");
-            stateCallback(AUTHENTICATED, "Reauthenticated");
-        }
+        Serial.println("AttraccessServiceESP: Authentication successful - Reader name not set");
+        return;
     }
-    else
+
+    readerName = data["payload"]["name"].as<String>();
+    Serial.printf("AttraccessServiceESP: Authentication successful - Reader name: %s\n", readerName.c_str());
+    authenticated = true;
+
+    // Always call setState, but also force callback if we're already authenticated
+    // to ensure UI is updated with the latest reader name
+    ConnectionState oldState = currentState;
+    setState(AUTHENTICATED, "Authenticated");
+
+    // If state didn't change (we were already authenticated), manually trigger callback
+    // to ensure UI gets updated with the new reader name
+    if (oldState == AUTHENTICATED && stateCallback)
     {
-        String errorMsg = data["message"] | data["error"] | "Authentication failed";
-        Serial.printf("AttraccessServiceESP: Authentication failed: %s\n", errorMsg.c_str());
-
-        // Clear invalid credentials and try registering again
-        deviceId = "";
-        authToken = "";
-        readerName = ""; // Clear reader name on auth failure
-        saveCredentials();
-
-        // Force UI update to clear reader name even if state doesn't change
-        if (stateCallback)
-        {
-            Serial.println("AttraccessServiceESP: Authentication failed - forcing UI update to clear reader name");
-            stateCallback(currentState, errorMsg);
-        }
-
-        registerDevice();
+        Serial.println("AttraccessServiceESP: Reauthentication detected - forcing UI update");
+        stateCallback(AUTHENTICATED, "Reauthenticated");
     }
 }
 
 void AttraccessServiceESP::handleEventType(const String &type, const JsonObject &data)
 {
-    if (type == "UNAUTHORIZED")
+    if (type == "READER_UNAUTHORIZED")
     {
         handleUnauthorizedEvent();
+    }
+    else if (type == "READER_AUTHENTICATE")
+    {
+        Serial.println("AttraccessServiceESP: Server requested authentication");
+        // Reset authentication state and try again
+        authenticated = false;
+        setState(AUTHENTICATING, "Authenticating...");
+
+        // Send authentication request with existing credentials
+        if (!deviceId.isEmpty() && !authToken.isEmpty())
+        {
+            // Check if connection is ready before sending authentication
+            if (connectionReadyTime > 0 && millis() < connectionReadyTime)
+            {
+                Serial.printf("AttraccessServiceESP: Delaying authentication until connection ready (%lu ms)\n",
+                              connectionReadyTime - millis());
+                return; // Will retry on next update cycle
+            }
+
+            JsonDocument authDoc;
+            authDoc["event"] = "EVENT";
+            authDoc["data"]["type"] = "READER_AUTHENTICATE";
+            authDoc["data"]["payload"]["id"] = deviceId;
+            authDoc["data"]["payload"]["token"] = authToken;
+
+            if (!sendJSONMessage(authDoc.as<JsonObject>()))
+            {
+                Serial.println("AttraccessServiceESP: Failed to send authentication");
+            }
+        }
+        else
+        {
+            // Only register if connection is ready
+            if (connectionReadyTime == 0 || millis() >= connectionReadyTime)
+            {
+                this->registerDevice();
+            }
+            else
+            {
+                Serial.printf("AttraccessServiceESP: Delaying registration until connection ready (%lu ms)\n",
+                              connectionReadyTime - millis());
+            }
+        }
     }
     else if (type == "DISPLAY_ERROR")
     {
@@ -706,28 +877,28 @@ void AttraccessServiceESP::handleEventType(const String &type, const JsonObject 
     {
         handleClearSuccessEvent();
     }
-    else if (type == "ENABLE_CARD_CHECKING")
+    else if (type == "NFC_ENABLE_CARD_CHECKING")
     {
         handleEnableCardCheckingEvent(data);
     }
-    else if (type == "DISABLE_CARD_CHECKING")
+    else if (type == "NFC_DISABLE_CARD_CHECKING")
     {
         LEDService::waitForNFCTap = LEDService::WAIT_FOR_NFC_TAP_NONE;
         handleDisableCardCheckingEvent();
     }
-    else if (type == "FIRMWARE_UPDATE_REQUIRED")
+    else if (type == "READER_FIRMWARE_UPDATE_REQUIRED")
     {
         handleFirmwareUpdateRequired(data);
     }
-    else if (type == "FIRMWARE_INFO")
+    else if (type == "READER_FIRMWARE_INFO")
     {
         onRequestFirmwareInfo();
     }
-    else if (type == "CHANGE_KEYS")
+    else if (type == "NFC_CHANGE_KEYS")
     {
         onChangeKeysEvent(data);
     }
-    else if (type == "AUTHENTICATE")
+    else if (type == "NFC_AUTHENTICATE")
     {
         onAuthenticateNfcEvent(data);
     }
@@ -763,7 +934,7 @@ void AttraccessServiceESP::handleHeartbeatEvent()
 
 void AttraccessServiceESP::handleUnauthorizedEvent()
 {
-    Serial.println("AttraccessServiceESP: Received UNAUTHORIZED - clearing credentials and re-registering");
+    Serial.println("AttraccessServiceESP: Received READER_UNAUTHORIZED - clearing credentials and re-registering");
     // Clear invalid credentials
     deviceId = "";
     authToken = "";
@@ -771,15 +942,7 @@ void AttraccessServiceESP::handleUnauthorizedEvent()
     saveCredentials();
     authenticated = false;
 
-    // Force UI update to clear reader name
-    if (stateCallback)
-    {
-        Serial.println("AttraccessServiceESP: UNAUTHORIZED - forcing UI update to clear reader name");
-        stateCallback(currentState, "Unauthorized - clearing credentials");
-    }
-
-    // Try registering again
-    registerDevice();
+    ESP.restart();
 }
 
 void AttraccessServiceESP::handleDisplayErrorEvent(const JsonObject &data)
@@ -977,7 +1140,7 @@ void AttraccessServiceESP::onRequestFirmwareInfo()
 {
     JsonDocument firmwareDoc;
     firmwareDoc["event"] = "RESPONSE";
-    firmwareDoc["data"]["type"] = "FIRMWARE_INFO";
+    firmwareDoc["data"]["type"] = "READER_FIRMWARE_INFO";
     firmwareDoc["data"]["payload"]["name"] = String(FIRMWARE_NAME).c_str();
     firmwareDoc["data"]["payload"]["variant"] = String(FIRMWARE_VARIANT).c_str();
     firmwareDoc["data"]["payload"]["version"] = FIRMWARE_VERSION;
@@ -1092,7 +1255,7 @@ void AttraccessServiceESP::onChangeKeysEvent(const JsonObject &data)
     }
 
     doc["event"] = "RESPONSE";
-    doc["data"]["type"] = "CHANGE_KEYS";
+    doc["data"]["type"] = "NFC_CHANGE_KEYS";
     doc["data"]["payload"] = responsePayload;
 
     this->sendJSONMessage(doc.as<JsonObject>());
@@ -1120,7 +1283,7 @@ void AttraccessServiceESP::onAuthenticateNfcEvent(const JsonObject &data)
 
     JsonDocument doc;
     doc["event"] = "RESPONSE";
-    doc["data"]["type"] = "AUTHENTICATE";
+    doc["data"]["type"] = "NFC_AUTHENTICATE";
     doc["data"]["payload"]["authenticationSuccessful"] = success;
 
     this->sendJSONMessage(doc.as<JsonObject>());
