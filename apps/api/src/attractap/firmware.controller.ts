@@ -37,7 +37,6 @@ export class AttractapFirmwareController {
     description: 'Firmware fetched successfully',
     type: String,
   })
-  @Auth('canManageSystemConfiguration')
   async getFirmwareBinary(
     @Param('firmwareName') firmwareName: string,
     @Param('variantName') variantName: string,
@@ -51,14 +50,47 @@ export class AttractapFirmwareController {
 
     try {
       const stream = this.attractapFirmwareService.getFirmwareBinaryStream(firmwareName, variantName, filename);
+      const fileSize = this.attractapFirmwareService.getFirmwareBinarySize(firmwareName, variantName, filename);
 
       this.logger.debug('Setting response headers for firmware binary download');
       res.set({
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="firmware.bin"`,
+        'Content-Length': fileSize.toString(),
+        Connection: 'keep-alive',
+        'Cache-Control': 'no-cache',
       });
 
       this.logger.debug('Piping firmware binary stream to response');
+
+      // Add stream event handlers for better debugging
+      stream.on('error', (error) => {
+        this.logger.error(`Stream error during firmware download: ${error.message}`, error.stack);
+        if (!res.headersSent) {
+          res.status(500).send('Stream error during firmware download');
+        }
+      });
+
+      stream.on('end', () => {
+        this.logger.debug('Firmware binary stream completed successfully');
+      });
+
+      let bytesTransferred = 0;
+      const logInterval = 128 * 1024; // Log every 128KB
+      let nextLogPoint = logInterval;
+
+      stream.on('data', (chunk) => {
+        bytesTransferred += chunk.length;
+        if (bytesTransferred >= nextLogPoint) {
+          this.logger.debug(
+            `Firmware download progress: ${bytesTransferred} / ${fileSize} bytes (${Math.round(
+              (bytesTransferred / fileSize) * 100
+            )}%)`
+          );
+          nextLogPoint += logInterval;
+        }
+      });
+
       stream.pipe(res);
 
       this.logger.debug('Firmware binary stream piped successfully');

@@ -44,6 +44,11 @@ void AttraccessServiceESP::begin()
 {
     Serial.println("AttraccessServiceESP: Initializing...");
 
+    // Enable debug logging for flashz library
+    esp_log_level_set("FLASHZ", ESP_LOG_DEBUG);
+    esp_log_level_set("FZ-HTTP", ESP_LOG_DEBUG);
+    Serial.println("AttraccessServiceESP: Enabled debug logging for flashz library");
+
     preferences.begin("attraccess", false);
 
     // Initialize adaptive certificate manager
@@ -1169,7 +1174,9 @@ void AttraccessServiceESP::handleFirmwareUpdateRequired(const JsonObject &data)
         if (!url.isEmpty())
         {
             Serial.printf("AttraccessServiceESP: Firmware update required - downloading from %s\n", url.c_str());
+            Serial.printf("AttraccessServiceESP: Calling fz.fetch_async() with URL: %s\n", url.c_str());
             fz.fetch_async(url.c_str());
+            Serial.println("AttraccessServiceESP: fz.fetch_async() call completed, update should start in background");
 
             MainScreenUI::MainContent content;
             content.type = MainScreenUI::CONTENT_ERROR;

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AttractapFirmware } from './dtos/firmware.dto';
-import { readFileSync, createReadStream, existsSync } from 'fs';
+import { readFileSync, createReadStream, existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../config/app.config';
@@ -86,7 +86,41 @@ export class AttractapFirmwareService {
     }
 
     this.logger.debug(`Creating read stream for firmware binary: ${firmwarePath}`);
-    return createReadStream(firmwarePath);
+    // Use larger buffer size for faster streaming to ESP32 devices
+    // This reduces the number of disk read operations and prevents timeouts
+    return createReadStream(firmwarePath, {
+      highWaterMark: 64 * 1024, // 64KB buffer for better streaming performance
+    });
+  }
+
+  public getFirmwareBinarySize(firmwareName: string, variantName: string, filename: string): number {
+    this.logger.debug(
+      `Getting firmware binary size for: ${firmwareName}, variant: ${variantName}, filename: ${filename}`
+    );
+
+    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
+    if (!firmwareDefinition) {
+      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
+      throw new Error('Firmware definition not found');
+    }
+
+    if (![firmwareDefinition.filename, firmwareDefinition.filenameFlashz].includes(filename)) {
+      this.logger.error(
+        `Requested filename '${filename}' not found in firmware definition. Available: ${firmwareDefinition.filename}, ${firmwareDefinition.filenameFlashz}`
+      );
+      throw new Error('Firmware binary not found');
+    }
+
+    const firmwarePath = join(this.firmwareAssetsDirectory, filename);
+
+    if (!existsSync(firmwarePath)) {
+      this.logger.error(`Firmware binary file does not exist: ${firmwarePath}`);
+      throw new Error('Firmware binary not found');
+    }
+
+    const stats = statSync(firmwarePath);
+    this.logger.debug(`Firmware binary size: ${stats.size} bytes`);
+    return stats.size;
   }
 
   public getFirmwareDownloadUrl(firmwareName: string, variantName: string, filename: string): string {
