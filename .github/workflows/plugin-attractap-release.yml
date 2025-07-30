@@ -46,6 +46,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build plugin
+        env:
+          NODE_ENV: production
         run: pnpm nx build ${{ env.PLUGIN_NAME }}
 
       - name: Create plugin zip

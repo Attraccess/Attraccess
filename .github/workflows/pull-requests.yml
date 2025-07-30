@@ -53,6 +53,8 @@ jobs:
           pip install platformio esptool
 
       - name: Run build steps (adjust target as needed)
+        env:
+          NODE_ENV: production
         run: pnpm nx run-many --target=build # Assuming only build is needed for the image
 
       # Upload build artifacts to be used in Docker build

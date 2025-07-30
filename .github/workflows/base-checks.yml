@@ -52,4 +52,6 @@ jobs:
 
       # Modified to run lint with max-warnings=0 to fail on warnings
       - name: Run lint, test, build and e2e
+        env:
+          NODE_ENV: production
         run: pnpm exec nx affected -t lint, test, build, e2e

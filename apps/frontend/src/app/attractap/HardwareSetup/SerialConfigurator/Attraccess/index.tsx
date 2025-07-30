@@ -98,7 +98,6 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
 
     if (data.status === 'connected') {
       console.debug('Attraccess-Status: connected, exiting');
-      return;
     }
 
     if (data.status === 'authenticated') {

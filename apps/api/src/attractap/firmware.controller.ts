@@ -6,7 +6,7 @@ import { AttractapFirmware } from './dtos/firmware.dto';
 import { Response } from 'express';
 
 @ApiTags('Attractap')
-@Controller('attractap/firmware')
+@Controller('attractap/firmwares')
 export class AttractapFirmwareController {
   private readonly logger = new Logger(AttractapFirmwareController.name);
 
@@ -24,7 +24,7 @@ export class AttractapFirmwareController {
   })
   @Auth('canManageSystemConfiguration')
   async getFirmwares(): Promise<AttractapFirmware[]> {
-    this.logger.debug('GET /attractap/firmware - Fetching all firmwares');
+    this.logger.debug('GET /attractap/firmwares - Fetching all firmwares');
     const firmwares = await this.attractapFirmwareService.getFirmwares();
     this.logger.debug(`Returning ${firmwares.length} firmwares`);
     return firmwares;
@@ -45,7 +45,7 @@ export class AttractapFirmwareController {
     @Res() res: Response
   ): Promise<void> {
     this.logger.debug(
-      `GET /attractap/firmware/${firmwareName}/variants/${variantName}/${filename} - Fetching firmware binary`
+      `GET /attractap/firmwares/${firmwareName}/variants/${variantName}/${filename} - Fetching firmware binary`
     );
     this.logger.debug(`Parameters: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`);
 
