@@ -9,6 +9,7 @@ import sys
 import requests
 import re
 import hashlib
+import shutil
 from pathlib import Path
 
 # Configuration
@@ -272,7 +273,12 @@ def create_ca_data_file(cert_files, certificates_map):
     return '\n'.join(cpp_content)
 
 def main():
-    # Create output directory
+    # Clean and create output directory
+    if OUTPUT_DIR.exists():
+        print(f"Cleaning existing output directory: {OUTPUT_DIR}")
+        shutil.rmtree(OUTPUT_DIR)
+    
+    print(f"Creating output directory: {OUTPUT_DIR}")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     # Download and parse certificates

@@ -18,7 +18,10 @@
     },
     "description": "Haben Sie einen komplett neuen Attractap, dann wählen Sie \"Firmware installieren\" um die neuste Firmware auf Ihren Attractap zu installieren. Wenn Sie einen bereits eingerichteten Attractap haben, dann wählen Sie \"Konfiguration vornehmen\" um die Konfiguration Ihres Attractap zu ändern."
   },
-  "actions": {
-    "connect": "Verbinden"
+  "connect": {
+    "description": "Bitte schließen Sie ihren Attractap an den USB-Port Ihres Computers an und klicken auf \"Verbinden\", im folgenden Dialog müssen Sie dann den richtigen Seriellen Port auswählen.",
+    "button": {
+      "label": "Verbinden"
+    }
   }
 }

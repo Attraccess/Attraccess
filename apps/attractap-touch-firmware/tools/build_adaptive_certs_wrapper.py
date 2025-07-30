@@ -24,12 +24,6 @@ def generate_certificates(target=None, source=None, env=None):
     # Change to project root directory
     os.chdir(project_root)
     
-    # Check if certificates already exist and are recent
-    ca_index_file = project_root / "data" / "cert" / "individual" / "ca_index.h"
-    if ca_index_file.exists():
-        print("✅ CA certificates already exist")
-        return
-    
     # Install requirements if needed
     try:
         import requests

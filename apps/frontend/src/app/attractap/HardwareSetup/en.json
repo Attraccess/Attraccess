@@ -18,7 +18,10 @@
     },
     "description": "If you have a completely new Attractap, select \"Install firmware\" to install the latest firmware on your Attractap. If you have an already configured Attractap, select \"Configure\" to configure your Attractap."
   },
-  "actions": {
-    "connect": "Connect"
+  "connect": {
+    "description": "Please connect your Attractap to the USB port of your computer and click \"Connect\", in the following dialog you need to select the correct serial port.",
+    "button": {
+      "label": "Connect"
+    }
   }
 }

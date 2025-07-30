@@ -53,9 +53,13 @@ function Content(props: ContentProps) {
 
   if (!isConnected) {
     return (
-      <Button color="primary" onPress={() => espTools.current.connectToDevice()}>
-        {t('actions.connect')}
-      </Button>
+      <div className="flex flex-col gap-4">
+        <Alert color="primary">{t('connect.description')}</Alert>
+
+        <Button color="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
+          {t('connect.button.label')}
+        </Button>
+      </div>
     );
   }
 

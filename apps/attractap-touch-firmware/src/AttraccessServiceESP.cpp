@@ -153,13 +153,13 @@ bool AttraccessServiceESP::establishWebSocketConnection()
     websocket_cfg.port = serverPort;
 
     // Configure buffer sizes to prevent ENOBUFS errors
-    websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
-    websocket_cfg.task_stack = 8192;  // Increase task stack size for stability
-    websocket_cfg.task_prio = 5;      // Set appropriate task priority
+    // websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
+    // websocket_cfg.task_stack = 8192;  // Increase task stack size for stability
+    // websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
     // Configure connection timeouts
-    websocket_cfg.ping_interval_sec = 5;     // Send ping every 30 seconds
-    websocket_cfg.pingpong_timeout_sec = 15; // Timeout for pong response
+    // websocket_cfg.ping_interval_sec = 5;     // Send ping every 30 seconds
+    // websocket_cfg.pingpong_timeout_sec = 15; // Timeout for pong response
 
     // Configure SSL with adaptive certificate manager
     if (!adaptiveCertManager.configureWebSocketSSL(&websocket_cfg))
@@ -543,32 +543,7 @@ bool AttraccessServiceESP::sendJSONMessage(const JsonObject &messageObj)
         Serial.printf("AttraccessServiceESP: WebSocket connected: %s\n",
                       esp_websocket_client_is_connected(ws_client) ? "true" : "false");
 
-        // For error 0x58 (common send error), try a short retry instead of immediate disconnection
-        if (ret == 0x58)
-        {
-            Serial.println("AttraccessServiceESP: Detected 0x58 error, attempting retry in 500ms...");
-            delay(500);
-
-            // Try one more time
-            esp_err_t retry_ret = esp_websocket_client_send_text(ws_client, jsonString.c_str(), jsonString.length(), pdMS_TO_TICKS(2000));
-            if (retry_ret == ESP_OK)
-            {
-                Serial.println("AttraccessServiceESP: Retry successful");
-                return true;
-            }
-            Serial.printf("AttraccessServiceESP: Retry also failed: %s (0x%x)\n", esp_err_to_name(retry_ret), retry_ret);
-        }
-
-        // If we get a send error but WebSocket still reports connected,
-        // the connection is likely broken - schedule cleanup
-        if (esp_websocket_client_is_connected(ws_client))
-        {
-            Serial.println("AttraccessServiceESP: Send error on 'connected' WebSocket - scheduling cleanup");
-            needsCleanup = true;
-            setState(ERROR_FAILED, "WebSocket send error - connection broken");
-        }
-
-        return false;
+        Serial.println("AttraccessServiceESP: ignoring send error");
     }
 
     return true;
