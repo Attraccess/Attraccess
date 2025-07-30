@@ -122,6 +122,13 @@ void WiFiSettingsScreen::show()
     lv_scr_load(screen);
     visible = true;
 
+    // Disable auto-reconnection while WiFi settings are visible to avoid interference
+    if (wifiService)
+    {
+        wifiService->enableAutoReconnect(false);
+        Serial.println("WiFiSettingsScreen: Disabled auto-reconnection during UI interaction");
+    }
+
     // Start network scan if not already scanning
     if (wifiService && !wifiService->isScanning())
     {
@@ -133,6 +140,13 @@ void WiFiSettingsScreen::show()
 void WiFiSettingsScreen::hide()
 {
     visible = false;
+
+    // Re-enable auto-reconnection when leaving WiFi settings
+    if (wifiService)
+    {
+        wifiService->enableAutoReconnect(true);
+        Serial.println("WiFiSettingsScreen: Re-enabled auto-reconnection after UI interaction");
+    }
 }
 
 void WiFiSettingsScreen::update()

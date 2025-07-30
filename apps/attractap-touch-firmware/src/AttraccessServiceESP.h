@@ -13,6 +13,9 @@
 #include "esp_websocket_client.h"
 #include "esp_wifi.h"
 
+// Forward declaration
+class WiFiServiceESP;
+
 // Firmware constants
 #ifndef FIRMWARE_NAME
 #define FIRMWARE_NAME "attractap-touch-firmware"
@@ -79,6 +82,7 @@ public:
     void onNFCTapped(const uint8_t *uid, uint8_t uidLength);
 
     void setNFC(NFC *nfc);
+    void setWiFiService(WiFiServiceESP *wifiSvc);
 
     void setCurrentIP(IPAddress ip);
     String getHostname();
@@ -88,6 +92,7 @@ public:
 private:
     FlashZhttp fz;
     NFC *nfc = nullptr;
+    WiFiServiceESP *wifiService = nullptr;
     std::function<void()> enableCardCheckingCallback;
     std::function<void()> disableCardCheckingCallback;
 
@@ -106,6 +111,7 @@ private:
     ConnectionState currentState;
     bool connecting;
     bool authenticated;
+    bool registering;
     bool needsCleanup;
     bool needsCertificateRetry;
     uint32_t lastConnectionAttempt;
@@ -140,6 +146,7 @@ private:
     void sendHeartbeat();
     void loadCredentials();
     void saveCredentials();
+    void clearDeviceCredentials();
     void setState(ConnectionState newState, const String &message = "");
     void handleAuthentication(const JsonObject &data);
     void handleRegistration(const JsonObject &data);

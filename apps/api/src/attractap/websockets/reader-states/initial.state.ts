@@ -135,6 +135,9 @@ export class InitialReaderState implements ReaderState {
         token: response.token,
       })
     );
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return this.onStateEnter(true);
   }
 
   public async handleAuthenticateEvent(data: AttractapEvent['data']): Promise<void> {

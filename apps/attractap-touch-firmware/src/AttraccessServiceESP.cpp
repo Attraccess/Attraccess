@@ -8,6 +8,7 @@
 #include "esp_crt_bundle.h"
 #include "esp_tls.h"
 #include "AdaptiveCertManager.h"
+#include "WiFiServiceESP.h"
 
 static const char *TAG = "AttraccessServiceESP";
 
@@ -21,6 +22,7 @@ AttraccessServiceESP::AttraccessServiceESP()
       currentState(DISCONNECTED),
       connecting(false),
       authenticated(false),
+      registering(false),
       needsCleanup(false),
       needsCertificateRetry(false),
       lastConnectionAttempt(millis() - CONNECTION_RETRY_INTERVAL),
@@ -229,6 +231,7 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
     {
         Serial.println("AttraccessServiceESP: WebSocket disconnected");
         self->authenticated = false;
+        self->registering = false; // Clear registration flag on disconnection
         self->readerName = "";
         self->connecting = false;
 
@@ -267,6 +270,7 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
     case WEBSOCKET_EVENT_ERROR:
         Serial.println("AttraccessServiceESP: WebSocket error");
         self->connecting = false;
+        self->registering = false; // Clear registration flag on error
         self->needsCleanup = true;
         self->setState(ERROR_FAILED, "WebSocket error");
         break;
@@ -423,6 +427,25 @@ void AttraccessServiceESP::update()
                                   isWiFiConnected() ? "connected" : "disconnected",
                                   isRateLimited() ? "yes" : "no",
                                   connecting ? "true" : "false");
+
+                    // Backup WiFi reconnection mechanism - trigger WiFi reconnection if WiFi is down
+                    // and we have a WiFiService reference and it's not already connecting
+                    if (!isWiFiConnected() && wifiService && !wifiService->isConnecting())
+                    {
+                        if (wifiService->isAutoReconnectEnabled())
+                        {
+                            Serial.println("AttraccessServiceESP: WiFiService auto-reconnect is enabled, waiting for it to handle reconnection");
+                        }
+                        else if (wifiService->hasSavedCredentials())
+                        {
+                            Serial.println("AttraccessServiceESP: BACKUP - Triggering WiFi reconnection as fallback mechanism");
+                            wifiService->tryAutoConnect();
+                        }
+                        else
+                        {
+                            Serial.println("AttraccessServiceESP: No saved WiFi credentials available for backup reconnection");
+                        }
+                    }
                 }
             }
         }
@@ -461,6 +484,18 @@ void AttraccessServiceESP::update()
             }
         }
     }
+
+    // Safety mechanism: Reset registering flag if stuck
+    if (registering && (currentState == ERROR_FAILED || currentState == ERROR_TIMED_OUT || currentState == DISCONNECTED))
+    {
+        static uint32_t lastRegisteringStuckCheck = 0;
+        if (millis() - lastRegisteringStuckCheck > 15000) // Check every 15 seconds
+        {
+            lastRegisteringStuckCheck = millis();
+            Serial.println("AttraccessServiceESP: Safety reset - registering flag was stuck, resetting");
+            registering = false;
+        }
+    }
 }
 
 void AttraccessServiceESP::disconnect()
@@ -469,6 +504,7 @@ void AttraccessServiceESP::disconnect()
 
     connecting = false;
     authenticated = false;
+    registering = false;  // Clear registration flag
     needsCleanup = false; // Clear cleanup flag
     readerName = "";
 
@@ -552,8 +588,15 @@ bool AttraccessServiceESP::sendJSONMessage(const JsonObject &messageObj)
 void AttraccessServiceESP::registerDevice()
 {
     // Add debug logging to diagnose connection state
-    Serial.printf("AttraccessServiceESP: registerDevice() called - currentState=%d, ws_client=%p\n",
-                  currentState, ws_client);
+    Serial.printf("AttraccessServiceESP: registerDevice() called - currentState=%d, ws_client=%p, registering=%s\n",
+                  currentState, ws_client, registering ? "true" : "false");
+
+    // Prevent multiple simultaneous registration attempts
+    if (registering)
+    {
+        Serial.println("AttraccessServiceESP: Registration already in progress, skipping duplicate attempt");
+        return;
+    }
 
     if (ws_client)
     {
@@ -581,6 +624,8 @@ void AttraccessServiceESP::registerDevice()
 
     Serial.println("AttraccessServiceESP: Registering new device...");
 
+    // Set registration flag to prevent duplicate attempts
+    registering = true;
     setState(AUTHENTICATING, "Registering device...");
 
     JsonDocument doc;
@@ -595,6 +640,9 @@ void AttraccessServiceESP::registerDevice()
     else
     {
         Serial.println("AttraccessServiceESP: Failed to send registration");
+
+        // Clear registration flag on send failure
+        registering = false;
 
         // Don't immediately set error state if it's just a timing issue
         if (connectionReadyTime > 0 && millis() < connectionReadyTime + 1000)
@@ -652,12 +700,38 @@ bool AttraccessServiceESP::isRateLimited() const
 // Configuration and state management (similar to original)
 void AttraccessServiceESP::setServerConfig(const String &hostname, uint16_t port)
 {
+    // Check if the configuration is actually changing from a previously valid config
+    // Don't consider it a change if we're setting up the initial configuration
+    bool hadPreviousConfig = !serverHostname.isEmpty() && serverPort > 0;
+    bool configChanged = hadPreviousConfig && (serverHostname != hostname || serverPort != port);
+
     serverHostname = hostname;
     serverPort = port;
     configValid = !hostname.isEmpty() && port > 0 && port <= 65535;
 
     Serial.printf("AttraccessServiceESP: Server config updated - %s:%d (valid: %s)\n",
                   hostname.c_str(), port, configValid ? "yes" : "no");
+
+    // If configuration changed and we have an active connection, disconnect to reconnect with new settings
+    if (configChanged && (isConnected() || connecting))
+    {
+        Serial.println("AttraccessServiceESP: Server configuration changed - disconnecting to reconnect with new settings");
+        disconnect();
+        // The auto-reconnect mechanism in update() will handle reconnection with the new configuration
+    }
+
+    // Only clear device credentials if server configuration actually changed from a previous valid config
+    // Don't clear credentials during initial setup
+    if (configChanged)
+    {
+        Serial.println("AttraccessServiceESP: Server configuration changed - clearing device credentials for re-registration");
+        deviceId = "";
+        authToken = "";
+        readerName = "";
+        authenticated = false;
+        registering = false; // Clear registration flag
+        saveCredentials();
+    }
 }
 
 bool AttraccessServiceESP::hasValidConfig() const
@@ -728,7 +802,7 @@ void AttraccessServiceESP::processIncomingMessage(const String &message)
 
 void AttraccessServiceESP::handleResponseEvent(const String &type, const JsonObject &data)
 {
-    if (type == "REGISTER")
+    if (type == "READER_REGISTER")
     {
         handleRegistration(data);
     }
@@ -740,6 +814,9 @@ void AttraccessServiceESP::handleResponseEvent(const String &type, const JsonObj
 
 void AttraccessServiceESP::handleRegistration(const JsonObject &data)
 {
+    // Clear registration flag as we're now handling the response
+    registering = false;
+
     // Check if payload contains id and token (indicates success)
     if (data["payload"]["id"] && data["payload"]["token"])
     {
@@ -914,8 +991,9 @@ void AttraccessServiceESP::handleUnauthorizedEvent()
     deviceId = "";
     authToken = "";
     readerName = ""; // Clear reader name on unauthorized
-    saveCredentials();
     authenticated = false;
+    registering = false; // Clear registration flag
+    saveCredentials();
 
     ESP.restart();
 }
@@ -1309,6 +1387,11 @@ void AttraccessServiceESP::loadCredentials()
     if (!deviceId.isEmpty())
     {
         Serial.printf("AttraccessServiceESP: Loaded device ID: %s\n", deviceId.c_str());
+        Serial.println("AttraccessServiceESP: Auth token loaded successfully");
+    }
+    else
+    {
+        Serial.println("AttraccessServiceESP: No saved credentials found - device will register as new");
     }
 }
 
@@ -1316,7 +1399,20 @@ void AttraccessServiceESP::saveCredentials()
 {
     preferences.putString("deviceId", deviceId);
     preferences.putString("authToken", authToken);
-    Serial.println("AttraccessServiceESP: Credentials saved");
+    Serial.println("AttraccessServiceESP: Credentials saved successfully");
+}
+
+void AttraccessServiceESP::clearDeviceCredentials()
+{
+    // Clear device credentials (for device unpairing)
+    preferences.remove("deviceId");
+    preferences.remove("authToken");
+    Serial.println("AttraccessServiceESP: Device credentials cleared - device will register as new on next connection");
+
+    // Clear in-memory credentials too
+    deviceId = "";
+    authToken = "";
+    authenticated = false;
 }
 
 // Stub implementations for missing methods
@@ -1352,6 +1448,11 @@ void AttraccessServiceESP::onNFCTapped(const uint8_t *uid, uint8_t uidLength)
 void AttraccessServiceESP::setNFC(NFC *nfc)
 {
     this->nfc = nfc;
+}
+
+void AttraccessServiceESP::setWiFiService(WiFiServiceESP *wifiSvc)
+{
+    this->wifiService = wifiSvc;
 }
 
 void AttraccessServiceESP::setCurrentIP(IPAddress ip)

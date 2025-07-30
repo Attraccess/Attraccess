@@ -12,6 +12,8 @@ WiFiServiceESP *WiFiServiceESP::instance = nullptr;
 WiFiServiceESP::WiFiServiceESP()
     : networkCount(0), scanning(false), connecting(false), connectionStartTime(0),
       lastConnectionUpdate(0), wifi_initialized(false), sta_netif(nullptr),
+      autoReconnectEnabled(true), lastReconnectAttempt(0), reconnectInterval(30000),
+      reconnectAttempts(0), maxReconnectAttempts(10),
       connectionCallback(nullptr), scanCompleteCallback(nullptr), scanProgressCallback(nullptr)
 {
     instance = this;
@@ -94,12 +96,23 @@ void WiFiServiceESP::wifi_event_handler(void *arg, esp_event_base_t event_base, 
     case WIFI_EVENT_STA_CONNECTED:
         Serial.println("WiFiServiceESP: Connected to AP");
         self->connecting = false;
+        // Reset reconnection attempts on successful connection
+        self->reconnectAttempts = 0;
         break;
 
     case WIFI_EVENT_STA_DISCONNECTED:
     {
         Serial.println("WiFiServiceESP: Disconnected from AP");
         self->connecting = false;
+
+        // If we were previously connected (not a connection failure), reset reconnect attempts
+        // to allow immediate reconnection attempts
+        if (self->reconnectAttempts == 0)
+        {
+            Serial.println("WiFiServiceESP: Unexpected disconnection, enabling auto-reconnect");
+            self->lastReconnectAttempt = 0; // Allow immediate reconnect attempt
+        }
+
         self->notifyConnectionState(false, "");
         break;
     }
@@ -131,6 +144,8 @@ void WiFiServiceESP::ip_event_handler(void *arg, esp_event_base_t event_base, in
     Serial.printf("WiFiServiceESP: Got IP: " IPSTR "\n", IP2STR(&event->ip_info.ip));
 
     self->connecting = false;
+    // Reset reconnection attempts on successful IP acquisition
+    self->reconnectAttempts = 0;
     self->notifyConnectionState(true, self->getConnectedSSID());
 
     // Save credentials if connection successful
@@ -146,6 +161,47 @@ void WiFiServiceESP::update()
     if (connecting)
     {
         handleConnectionTimeout();
+    }
+
+    // Handle automatic WiFi reconnection
+    if (autoReconnectEnabled && !connecting && !isConnected())
+    {
+        uint32_t currentTime = millis();
+
+        // Check if it's time to attempt reconnection
+        if (currentTime - lastReconnectAttempt >= reconnectInterval)
+        {
+            // Only attempt if we have saved credentials and haven't exceeded max attempts
+            if (hasSavedCredentials() && reconnectAttempts < maxReconnectAttempts)
+            {
+                Serial.printf("WiFiServiceESP: Auto-reconnect attempt %d/%d\n",
+                              reconnectAttempts + 1, maxReconnectAttempts);
+
+                lastReconnectAttempt = currentTime;
+                reconnectAttempts++;
+
+                // Try auto-connect with saved credentials
+                if (tryAutoConnect())
+                {
+                    Serial.println("WiFiServiceESP: Auto-reconnect initiated");
+                }
+                else
+                {
+                    Serial.println("WiFiServiceESP: Auto-reconnect failed to initiate");
+                }
+            }
+            else if (reconnectAttempts >= maxReconnectAttempts)
+            {
+                // Only log this once every 5 minutes to avoid spam
+                static uint32_t lastMaxAttemptsLog = 0;
+                if (currentTime - lastMaxAttemptsLog > 300000) // 5 minutes
+                {
+                    lastMaxAttemptsLog = currentTime;
+                    Serial.printf("WiFiServiceESP: Max reconnect attempts (%d) reached. Will retry after successful manual connection.\n",
+                                  maxReconnectAttempts);
+                }
+            }
+        }
     }
 }
 
@@ -196,6 +252,9 @@ void WiFiServiceESP::connectToNetwork(const String &ssid, const String &password
     connecting = true;
     connectionStartTime = millis();
     lastConnectionUpdate = 0;
+
+    // Reset reconnection attempts on manual connection
+    reconnectAttempts = 0;
 
     Serial.println("WiFiServiceESP: Connecting to " + ssid + "...");
     notifyScanProgress("Connecting to " + ssid + "...");

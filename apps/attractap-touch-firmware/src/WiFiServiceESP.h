@@ -62,6 +62,14 @@ public:
     bool isConnecting() const { return connecting; }
     uint32_t getConnectionStartTime() const { return connectionStartTime; }
 
+    // Auto-reconnection control
+    void enableAutoReconnect(bool enable) { autoReconnectEnabled = enable; }
+    bool isAutoReconnectEnabled() const { return autoReconnectEnabled; }
+    void setReconnectInterval(uint32_t intervalMs) { reconnectInterval = intervalMs; }
+    void setMaxReconnectAttempts(uint8_t maxAttempts) { maxReconnectAttempts = maxAttempts; }
+    uint8_t getReconnectAttempts() const { return reconnectAttempts; }
+    void resetReconnectAttempts() { reconnectAttempts = 0; }
+
     // Callback registration
     void setConnectionCallback(ConnectionCallback callback) { connectionCallback = callback; }
     void setScanCompleteCallback(ScanCompleteCallback callback) { scanCompleteCallback = callback; }
@@ -84,6 +92,13 @@ private:
 
     // ESP network interface
     esp_netif_t *sta_netif;
+
+    // Auto-reconnection state
+    bool autoReconnectEnabled;
+    uint32_t lastReconnectAttempt;
+    uint32_t reconnectInterval;   // milliseconds between reconnect attempts
+    uint8_t reconnectAttempts;    // current attempt count
+    uint8_t maxReconnectAttempts; // max attempts before giving up
 
     // Secure credential storage
     Preferences preferences;

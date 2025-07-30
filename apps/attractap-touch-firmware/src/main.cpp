@@ -350,6 +350,9 @@ void setup()
   // Pass Attraccess service to settings manager
   settingsManager.setAttraccessServiceESP(&attraccessService);
 
+  // Pass WiFi service to Attraccess service for backup reconnection
+  attraccessService.setWiFiService(&wifiService);
+
   // Show main screen
   Serial.println("9. Showing Main Screen...");
   screenManager.showScreen(ScreenManager::SCREEN_MAIN);

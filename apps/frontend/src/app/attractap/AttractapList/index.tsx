@@ -72,9 +72,15 @@ export const AttractapList = () => {
   }, []);
 
   const { stale: staleReaders, active: activeReaders } = useMemo(() => {
+    const readersSortedByLastConnection = (allReaders ?? []).sort((a, b) => {
+      const aLastConnection = new Date(a.lastConnection);
+      const bLastConnection = new Date(b.lastConnection);
+      return bLastConnection.getTime() - aLastConnection.getTime();
+    });
+
     const stale = [];
     const active = [];
-    for (const reader of allReaders ?? []) {
+    for (const reader of readersSortedByLastConnection) {
       const lastConnection = new Date(reader.lastConnection);
       const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
       if (isStale) {
