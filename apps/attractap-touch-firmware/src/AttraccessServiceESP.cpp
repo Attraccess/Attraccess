@@ -305,7 +305,16 @@ void AttraccessServiceESP::update()
         uint32_t now = millis();
         if (now - lastFirmwareChunkRequestTime > FIRMWARE_CHUNK_REQUEST_TIMEOUT_MS)
         {
+            if (firmwareDownloadRetryCount >= MAX_FIRMWARE_CHUNK_DOWNLOAD_RETRY_ATTEMPTS)
+            {
+                Serial.println("AttraccessServiceESP: Firmware chunk download failed, restarting esp");
+                ESP.restart();
+                return;
+            }
+
+            firmwareDownloadRetryCount++;
             Serial.println("AttraccessServiceESP: Firmware chunk request timeout, requesting again");
+            firmwareDownloadRetryCount++;
             requestFirmwareChunk();
         }
     }
@@ -1250,6 +1259,8 @@ void AttraccessServiceESP::requestFirmwareChunk()
 
 void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t len)
 {
+    firmwareDownloadRetryCount = 0;
+
     Serial.printf("AttraccessServiceESP: received firmware chunk %d, size: %zu bytes\n", currentChunk, len);
 
     if (!otaStarted || updatePartition == NULL)

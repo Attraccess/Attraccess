@@ -173,6 +173,8 @@ private:
     void handleSelectItemEvent(const JsonObject &data);
 
     bool firmwareDownloadInProgress;
+    uint8_t firmwareDownloadRetryCount;
+    static const uint8_t MAX_FIRMWARE_CHUNK_DOWNLOAD_RETRY_ATTEMPTS = 10;
     // last time we requested a firmware chunk
     uint32_t lastFirmwareChunkRequestTime;
     // timeout to rerequest the same chunk
