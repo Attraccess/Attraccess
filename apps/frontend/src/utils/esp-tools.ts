@@ -403,8 +403,8 @@ export class ESPTools {
         let readLoopPromise: Promise<void> | null = null;
 
         const startReadLoop = async () => {
+          const readLoop = transport.rawRead();
           while (!isConsoleClosed) {
-            const readLoop = transport.rawRead();
             const { value, done } = await readLoop.next();
 
             if (done || !value) {
