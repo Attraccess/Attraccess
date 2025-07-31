@@ -24,7 +24,7 @@
         "{projectRoot}/tools/**/*.py",
         "{projectRoot}/tools/requirements.txt"
       ],
-      "cache": true,
+      "cache": false,
       "parallelism": true
     }
   }
