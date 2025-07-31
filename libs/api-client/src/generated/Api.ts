@@ -1501,10 +1501,10 @@ export interface AttractapFirmware {
    */
   filename: string;
   /**
-   * The filename of the firmware for Flashz (zlib compressed)
-   * @example "attractap_eth_flashz.bin.zz"
+   * The filename of the firmware for OTA updates (zlib compressed)
+   * @example "attractap_eth.bin.zz"
    */
-  filenameFlashz: string;
+  filenameOTA: string;
 }
 
 export interface InfoData {
@@ -3482,7 +3482,7 @@ export namespace Attractap {
    * @tags Attractap
    * @name GetFirmwares
    * @summary Get all firmwares
-   * @request GET:/api/attractap/firmware
+   * @request GET:/api/attractap/firmwares
    * @secure
    */
   export namespace GetFirmwares {
@@ -3498,8 +3498,7 @@ export namespace Attractap {
    * @tags Attractap
    * @name GetFirmwareBinary
    * @summary Get a firmware by name and variant
-   * @request GET:/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}
-   * @secure
+   * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}
    */
   export namespace GetFirmwareBinary {
     export type RequestParams = {
@@ -5524,12 +5523,12 @@ export class Api<
      * @tags Attractap
      * @name GetFirmwares
      * @summary Get all firmwares
-     * @request GET:/api/attractap/firmware
+     * @request GET:/api/attractap/firmwares
      * @secure
      */
     getFirmwares: (params: RequestParams = {}) =>
       this.request<GetFirmwaresData, void>({
-        path: `/api/attractap/firmware`,
+        path: `/api/attractap/firmwares`,
         method: "GET",
         secure: true,
         format: "json",
@@ -5542,8 +5541,7 @@ export class Api<
      * @tags Attractap
      * @name GetFirmwareBinary
      * @summary Get a firmware by name and variant
-     * @request GET:/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}
-     * @secure
+     * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}
      */
     getFirmwareBinary: (
       firmwareName: string,
@@ -5551,10 +5549,9 @@ export class Api<
       filename: string,
       params: RequestParams = {},
     ) =>
-      this.request<GetFirmwareBinaryData, void>({
-        path: `/api/attractap/firmware/${firmwareName}/variants/${variantName}/${filename}`,
+      this.request<GetFirmwareBinaryData, any>({
+        path: `/api/attractap/firmwares/${firmwareName}/variants/${variantName}/${filename}`,
         method: "GET",
-        secure: true,
         format: "json",
         ...params,
       }),
