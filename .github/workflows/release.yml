@@ -53,7 +53,7 @@ jobs:
       - name: Run everything
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build --parallel=false
+        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build
 
       # Upload build artifacts to be used in Docker build
       - name: Upload build artifacts
