@@ -1,0 +1,11 @@
+{
+  "version": "468e7a6a",
+  "generated_at": "unknown",
+  "sources": [
+    "/Users/jappy/code/Attraccess/apps/attractap-touch-firmware/src",
+    "/Users/jappy/code/Attraccess/apps/attractap-touch-firmware/lib",
+    "/Users/jappy/code/Attraccess/apps/attractap-touch-firmware/include",
+    "/Users/jappy/code/Attraccess/apps/attractap-touch-firmware/data",
+    "/Users/jappy/code/Attraccess/apps/attractap-touch-firmware/platformio.ini"
+  ]
+}

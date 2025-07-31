@@ -1399,9 +1399,9 @@ export type AttractapFirmware = {
      */
     filename: string;
     /**
-     * The filename of the firmware for Flashz (zlib compressed)
+     * The filename of the firmware for OTA updates (zlib compressed)
      */
-    filenameFlashz: string;
+    filenameOTA: string;
 };
 
 export type InfoResponse = {
@@ -3523,7 +3523,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/attractap/firmware': {
+    '/api/attractap/firmwares': {
         get: {
             res: {
                 /**
@@ -3537,7 +3537,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}': {
+    '/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}': {
         get: {
             req: GetFirmwareBinaryData;
             res: {
@@ -3545,10 +3545,6 @@ export type $OpenApiTs = {
                  * Firmware fetched successfully
                  */
                 200: string;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
             };
         };
     };

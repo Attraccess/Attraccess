@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>          // For JsonDocument
 #include "api_icon.c"             // Add this include for the API icon
 #include <vector>
+#include "version.h"
 
 // Define the static members
 String MainScreenUI::selectItemOptions[50];

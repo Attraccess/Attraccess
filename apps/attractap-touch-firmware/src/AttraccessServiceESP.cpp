@@ -9,6 +9,8 @@
 #include "esp_tls.h"
 #include "AdaptiveCertManager.h"
 #include "WiFiServiceESP.h"
+#include "esp_task_wdt.h"
+#include "version.h"
 
 static const char *TAG = "AttraccessServiceESP";
 
@@ -1217,11 +1219,17 @@ void AttraccessServiceESP::handleFirmwareUpdateRequired(const JsonObject &data)
     Serial.printf("AttraccessServiceESP: Writing to partition subtype %d at offset 0x%x\n",
                   updatePartition->subtype, updatePartition->address);
 
+    // Temporarily increase watchdog timeout for firmware update
+    esp_task_wdt_init(30, false); // 30 seconds timeout for OTA operations
+
     esp_err_t err = esp_ota_begin(updatePartition, OTA_SIZE_UNKNOWN, &otaHandle);
     if (err != ESP_OK)
     {
         Serial.printf("AttraccessServiceESP: esp_ota_begin failed: %s\n", esp_err_to_name(err));
         updatePartition = NULL;
+
+        // Restore normal watchdog timeout
+        esp_task_wdt_init(5, false); // 5 seconds normal timeout
         return;
     }
 
@@ -1273,9 +1281,15 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
 
     Serial.printf("AttraccessServiceESP: About to write chunk %d to OTA\n", currentChunk);
 
+    // Feed the watchdog before flash operation to prevent timeout
+    esp_task_wdt_reset();
+
     // Write data directly using ESP-IDF OTA
     bool isFinal = (currentChunk == totalChunkCount - 1);
     esp_err_t err = esp_ota_write(otaHandle, data, len);
+
+    // Feed the watchdog again after flash operation
+    esp_task_wdt_reset();
 
     Serial.printf("AttraccessServiceESP: esp_ota_write result: %s\n", esp_err_to_name(err));
     if (err != ESP_OK)
@@ -1301,6 +1315,9 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
         otaStarted = false;
         updatePartition = NULL;
         firmwareDownloadInProgress = false;
+
+        // Restore normal watchdog timeout
+        esp_task_wdt_init(5, false); // 5 seconds normal timeout
         return;
     }
 
@@ -1317,22 +1334,30 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
         Serial.println("AttraccessServiceESP: Final firmware chunk received");
 
         // Finalize ESP-IDF OTA
+        esp_task_wdt_reset(); // Feed watchdog before finalization
         err = esp_ota_end(otaHandle);
         if (err != ESP_OK)
         {
             Serial.printf("AttraccessServiceESP: esp_ota_end failed: %s\n", esp_err_to_name(err));
             otaStarted = false;
             updatePartition = NULL;
+
+            // Restore normal watchdog timeout
+            esp_task_wdt_init(5, false); // 5 seconds normal timeout
             return;
         }
 
         // Set boot partition to the new firmware
+        esp_task_wdt_reset(); // Feed watchdog before setting boot partition
         err = esp_ota_set_boot_partition(updatePartition);
         if (err != ESP_OK)
         {
             Serial.printf("AttraccessServiceESP: esp_ota_set_boot_partition failed: %s\n", esp_err_to_name(err));
             otaStarted = false;
             updatePartition = NULL;
+
+            // Restore normal watchdog timeout
+            esp_task_wdt_init(5, false); // 5 seconds normal timeout
             return;
         }
 
@@ -1354,6 +1379,9 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
 
         otaStarted = false;
         updatePartition = NULL;
+
+        // Restore normal watchdog timeout before reboot
+        esp_task_wdt_init(5, false); // 5 seconds normal timeout
         vTaskDelay(pdMS_TO_TICKS(3000));
         ESP.restart();
         return;

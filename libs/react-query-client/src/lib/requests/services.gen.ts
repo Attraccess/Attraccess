@@ -1806,7 +1806,7 @@ export class AttractapService {
     public static getFirmwares(): CancelablePromise<GetFirmwaresResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/attractap/firmware',
+            url: '/api/attractap/firmwares',
             errors: {
                 401: 'Unauthorized'
             }
@@ -1825,14 +1825,11 @@ export class AttractapService {
     public static getFirmwareBinary(data: GetFirmwareBinaryData): CancelablePromise<GetFirmwareBinaryResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/attractap/firmware/{firmwareName}/variants/{variantName}/{filename}',
+            url: '/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}',
             path: {
                 firmwareName: data.firmwareName,
                 variantName: data.variantName,
                 filename: data.filename
-            },
-            errors: {
-                401: 'Unauthorized'
             }
         });
     }

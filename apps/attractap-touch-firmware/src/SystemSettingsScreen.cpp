@@ -1,5 +1,6 @@
 #include "SystemSettingsScreen.h"
 #include "WiFiServiceESP.h"
+#include "version.h"
 
 SystemSettingsScreen::SystemSettingsScreen()
     : screen(nullptr),

@@ -1,4 +1,5 @@
 #include "CLIService.h"
+#include "version.h"
 #include "AttraccessServiceESP.h"
 #include "CommandParser.h"
 #include "CommandExecutor.h"

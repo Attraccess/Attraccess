@@ -2167,11 +2167,11 @@ export const $AttractapFirmware = {
             description: 'The filename of the firmware',
             example: 'attractap_eth.bin'
         },
-        filenameFlashz: {
+        filenameOTA: {
             type: 'string',
-            description: 'The filename of the firmware for Flashz (zlib compressed)',
-            example: 'attractap_eth_flashz.bin.zz'
+            description: 'The filename of the firmware for OTA updates (zlib compressed)',
+            example: 'attractap_eth.bin.zz'
         }
     },
-    required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameFlashz']
+    required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA']
 } as const;
