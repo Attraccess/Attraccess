@@ -20,8 +20,7 @@
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
   },
-  "not_nxCloudId": "68232b3a5aa475a0500b5174",
-  "neverConnectToCloud": true,
+  "neverConnectToCloud": false,
   "tui": { "enabled": false },
   "plugins": [
     {
