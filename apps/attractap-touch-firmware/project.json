@@ -11,15 +11,21 @@
         "command": "cd apps/attractap-touch-firmware && python3 build_firmwares.py",
         "cwd": "."
       },
-      "outputs": ["{projectRoot}/firmware_output"],
+      "outputs": ["{projectRoot}/firmware_output", "{projectRoot}/.pio/build"],
       "inputs": [
         "{projectRoot}/platformio.ini",
+        "{projectRoot}/idf_component.yml",
         "{projectRoot}/build_firmwares.py",
         "{projectRoot}/src/**/*",
-        "{projectRoot}/.pio/**/*",
-        "{projectRoot}/data/**/*"
+        "{projectRoot}/include/**/*",
+        "{projectRoot}/lib/**/*",
+        "{projectRoot}/data/**/*",
+        "{projectRoot}/partitions/**/*",
+        "{projectRoot}/tools/**/*.py",
+        "{projectRoot}/tools/requirements.txt"
       ],
-      "cache": true
+      "cache": true,
+      "parallelism": true
     }
   }
 }

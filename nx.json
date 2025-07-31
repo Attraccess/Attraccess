@@ -21,7 +21,7 @@
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
   },
   "neverConnectToCloud": false,
-  "tui": { "enabled": false },
+  "tui": { "enabled": true },
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",

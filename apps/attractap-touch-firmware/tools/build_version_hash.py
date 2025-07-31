@@ -42,7 +42,8 @@ def generate_and_inject_version(target=None, source=None, env=None):
             
             print(f"✅ Injected FIRMWARE_VERSION={version_hash} into build flags")
         
-        return version_hash
+        # Return 0 for success when used as PlatformIO pre-action
+        return 0
         
     except Exception as e:
         print(f"❌ Error generating version hash: {e}")
@@ -53,7 +54,8 @@ def generate_and_inject_version(target=None, source=None, env=None):
             filtered_flags.append('-DFIRMWARE_VERSION=\\"DEFAULT\\"')
             env.Replace(BUILD_FLAGS=filtered_flags)
             print("⚠️  Using DEFAULT version due to error")
-        return "DEFAULT"
+        # Return 1 for error when used as PlatformIO pre-action
+        return 1
 
 # Try different PlatformIO integration approaches
 try:
@@ -72,9 +74,15 @@ except ImportError:
 
 # Also add as main function for standalone execution
 def main():
-    version = generate_and_inject_version()
-    print(f"Generated version: {version}")
-    return version
+    # For standalone execution, we want the actual version hash
+    try:
+        from generate_version_hash import generate_version_hash
+        version = generate_version_hash()
+        print(f"Generated version: {version}")
+        return version
+    except Exception as e:
+        print(f"Error: {e}")
+        return "DEFAULT"
 
 if __name__ == "__main__":
     main()
