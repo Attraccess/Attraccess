@@ -132,8 +132,8 @@ export class AttractapService {
    * @param firmwareType The firmware type
    * @returns Promise<Attractap>
    */
-  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion): Promise<Attractap> {
-    return await this.updateReader(id, { firmware }, false);
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion) {
+    await this.updateReader(id, { firmware }, false);
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {

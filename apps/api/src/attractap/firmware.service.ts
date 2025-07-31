@@ -86,10 +86,10 @@ export class AttractapFirmwareService {
     }
 
     this.logger.debug(`Creating read stream for firmware binary: ${firmwarePath}`);
-    // Use larger buffer size for faster streaming to ESP32 devices
-    // This reduces the number of disk read operations and prevents timeouts
+    // Use smaller buffer size for ESP32 compatibility
+    // ESP32 WebSocket client works better with smaller chunks
     return createReadStream(firmwarePath, {
-      highWaterMark: 64 * 1024, // 64KB buffer for better streaming performance
+      highWaterMark: 1024, // 1KB chunks for ESP32 compatibility
     });
   }
 
@@ -127,5 +127,15 @@ export class AttractapFirmwareService {
     const url = `${this.apiUrl}/api/attractap/firmwares/${firmwareName}/variants/${variantName}/${filename}`;
     this.logger.debug(`Generated firmware download URL: ${url}`);
     return url;
+  }
+
+  // WebSocket firmware update methods (aliases for existing methods)
+  public getFirmwareStream(firmwareName: string, variantName: string, filename: string): NodeJS.ReadableStream {
+    return this.getFirmwareBinaryStream(firmwareName, variantName, filename);
+  }
+
+  public getFirmwareStats(firmwareName: string, variantName: string, filename: string): { size: number } {
+    const size = this.getFirmwareBinarySize(firmwareName, variantName, filename);
+    return { size };
   }
 }

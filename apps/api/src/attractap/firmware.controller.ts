@@ -4,6 +4,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AttractapFirmwareService } from './firmware.service';
 import { AttractapFirmware } from './dtos/firmware.dto';
 import { Response } from 'express';
+import { AttractapGateway } from './websockets/websocket.gateway';
 
 @ApiTags('Attractap')
 @Controller('attractap/firmwares')
@@ -12,7 +13,9 @@ export class AttractapFirmwareController {
 
   public constructor(
     @Inject(AttractapFirmwareService)
-    private readonly attractapFirmwareService: AttractapFirmwareService
+    private readonly attractapFirmwareService: AttractapFirmwareService,
+    @Inject(AttractapGateway)
+    private readonly attractapGateway: AttractapGateway
   ) {}
 
   @Get()

@@ -95,6 +95,7 @@ export class InitialReaderState implements ReaderState {
     }
 
     await this.services.attractapService.updateReaderFirmware(this.socket.reader.id, responseData.payload);
+    this.socket.reader = await this.services.attractapService.findReaderById(this.socket.reader.id);
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(responseData.payload);
     if (!firmwareIsUpToDate) {

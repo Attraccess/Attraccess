@@ -7,7 +7,7 @@
 #include "MainScreenUI.h"
 #include <functional>
 #include "nfc.hpp"
-#include "flashz-http.hpp"
+#include "flashz.hpp"
 
 // ESP-IDF includes
 #include "esp_websocket_client.h"
@@ -15,17 +15,6 @@
 
 // Forward declaration
 class WiFiServiceESP;
-
-// Firmware constants
-#ifndef FIRMWARE_NAME
-#define FIRMWARE_NAME "attractap-touch-firmware"
-#endif
-#ifndef FIRMWARE_VARIANT
-#define FIRMWARE_VARIANT "ESP32"
-#endif
-#ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION 1
-#endif
 
 class AttraccessServiceESP
 {
@@ -90,7 +79,6 @@ public:
     String getDeviceId();
 
 private:
-    FlashZhttp fz;
     NFC *nfc = nullptr;
     WiFiServiceESP *wifiService = nullptr;
     std::function<void()> enableCardCheckingCallback;
@@ -118,6 +106,15 @@ private:
     uint32_t lastHeartbeat;
     uint32_t lastStateChange;
     uint32_t connectionReadyTime; // Time when WebSocket is ready for sending
+
+    uint32_t totalChunkCount;
+    uint32_t currentChunk;
+    String firmwareChecksum;
+    uint32_t firmwareUpdateStartTime;
+    uint32_t lastDataReceivedTime;
+    uint8_t firmwareUpdateRetryCount;
+    static const uint8_t MAX_FIRMWARE_RETRY_ATTEMPTS = 3;
+    static const uint32_t FIRMWARE_DATA_TIMEOUT_MS = 30000; // 30 seconds without data
 
     // Reader information
     String deviceId;
@@ -173,6 +170,17 @@ private:
     void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
     void handleShowTextEvent(const JsonObject &data);
     void handleSelectItemEvent(const JsonObject &data);
+
+    bool firmwareDownloadInProgress;
+    // last time we requested a firmware chunk
+    uint32_t lastFirmwareChunkRequestTime;
+    // timeout to rerequest the same chunk
+    static const uint32_t FIRMWARE_CHUNK_REQUEST_TIMEOUT_MS = 10000; // 10 seconds
+    void requestFirmwareChunk();
+    void handleFirmwareStreamChunk(const uint8_t *data, size_t len);
+
+    // Helper method to update firmware progress display
+    void updateFirmwareProgressDisplay(const String &status, int progressPercent = -1);
 
     String buildWebSocketURL();
 

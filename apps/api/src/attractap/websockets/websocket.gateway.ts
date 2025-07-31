@@ -31,6 +31,7 @@ export interface GatewayServices {
   resourceUsageService: ResourceUsageService;
   usersService: UsersService;
   firmwareService: AttractapFirmwareService;
+  gateway: AttractapGateway;
 }
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
@@ -76,6 +77,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       (client as unknown as WebSocket).send(JSON.stringify(message));
     };
 
+    client.sendBinaryData = (data: Buffer) => {
+      this.logger.debug(`Sending binary data: ${data.length} bytes`);
+      (client as unknown as WebSocket).send(data);
+    };
+
     this.websocketService.sockets.set(client.id, client);
 
     this.logger.debug('Transitioning to initial state');
@@ -87,6 +93,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
+        gateway: this,
       })
     );
 
@@ -187,6 +194,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
+        gateway: this,
       },
       user
     );
@@ -230,6 +238,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourceUsageService: this.resourceUsageService,
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
+        gateway: this,
       },
       nfcCard.id
     );
@@ -253,6 +262,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           resourceUsageService: this.resourceUsageService,
           resourcesService: this.resourcesService,
           firmwareService: this.firmwareService,
+          gateway: this,
         });
 
         await socket.transitionToState(nextState);
@@ -279,6 +289,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
               resourceUsageService: this.resourceUsageService,
               resourcesService: this.resourcesService,
               firmwareService: this.firmwareService,
+              gateway: this,
             })
           );
         }

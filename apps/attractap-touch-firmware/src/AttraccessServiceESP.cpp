@@ -29,7 +29,13 @@ AttraccessServiceESP::AttraccessServiceESP()
       lastHeartbeat(0),
       lastStateChange(0),
       connectionReadyTime(0),
-      stateCallback(nullptr)
+      totalChunkCount(0),
+      currentChunk(0),
+      firmwareUpdateStartTime(0),
+      lastDataReceivedTime(0),
+      firmwareUpdateRetryCount(0),
+      stateCallback(nullptr),
+      firmwareDownloadInProgress(false)
 {
     instance = this;
 }
@@ -270,6 +276,11 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
             Serial.printf("AttraccessServiceESP: Received: %s\n", message.c_str());
             self->processIncomingMessage(message);
         }
+        else if (data->op_code == 0x02)
+        { // Binary frame
+            Serial.printf("AttraccessServiceESP: Received binary data: %zu bytes\n", data->data_len);
+            self->handleFirmwareStreamChunk((const uint8_t *)data->data_ptr, data->data_len);
+        }
         break;
 
     case WEBSOCKET_EVENT_ERROR:
@@ -287,6 +298,16 @@ void AttraccessServiceESP::websocket_event_handler(void *arg, esp_event_base_t e
 
 void AttraccessServiceESP::update()
 {
+    if (firmwareDownloadInProgress)
+    {
+        uint32_t now = millis();
+        if (now - lastFirmwareChunkRequestTime > FIRMWARE_CHUNK_REQUEST_TIMEOUT_MS)
+        {
+            Serial.println("AttraccessServiceESP: Firmware chunk request timeout, requesting again");
+            requestFirmwareChunk();
+        }
+    }
+
     // Safe WebSocket cleanup (avoid destroying client from within its own event handler)
     if (needsCleanup && ws_client)
     {
@@ -1164,34 +1185,144 @@ void AttraccessServiceESP::handleDisableCardCheckingEvent()
 
 void AttraccessServiceESP::handleFirmwareUpdateRequired(const JsonObject &data)
 {
+    totalChunkCount = data["payload"]["firmware"]["chunks"].as<uint32_t>();
+    currentChunk = 0;
+
+    String currentVersion = String(FIRMWARE_VERSION);
+    String availableVersion = data["payload"]["available"]["version"].as<String>();
+
+    // Use chunk-based method for firmware updates
+    Serial.printf("AttraccessServiceESP: Firmware update required - using chunk-based method\n");
+    Serial.printf("AttraccessServiceESP: Current: v%s → Available: v%s\n", currentVersion.c_str(), availableVersion.c_str());
+
+    // Initialize FlashZ for compressed firmware
+    if (!FlashZ::getInstance().beginz(UPDATE_SIZE_UNKNOWN, U_FLASH))
+    {
+        Serial.printf("AttraccessServiceESP: Failed to initialize FlashZ: %s\n", FlashZ::getInstance().errorString());
+        return;
+    }
+
     if (mainContentCallback)
     {
-        String currentVersion = data["payload"]["current"]["version"].as<String>();
-        String availableVersion = data["payload"]["available"]["version"].as<String>();
-        String url = data["payload"]["firmware"]["flashz"].as<String>();
+        MainScreenUI::MainContent content;
+        content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
+        content.message = "Firmware Update Available";
+        content.subMessage = String("Current: v") + currentVersion + " → Available: v" + availableVersion;
+        content.textColor = 0x00FFFF;    // Cyan
+        content.subTextColor = 0xAAAAAA; // Light gray
+        content.progressPercent = 0;
+        content.statusText = "Requesting update...";
+        mainContentCallback(content);
+    }
 
-        // test if url is set
-        if (!url.isEmpty())
+    this->requestFirmwareChunk();
+}
+
+void AttraccessServiceESP::requestFirmwareChunk()
+{
+    firmwareDownloadInProgress = true;
+    lastFirmwareChunkRequestTime = millis();
+
+    Serial.printf("AttraccessServiceESP: requesting firmware chunk %d of %d\n", currentChunk, totalChunkCount);
+
+    JsonDocument requestDoc;
+    requestDoc["event"] = "EVENT";
+    requestDoc["data"]["type"] = "READER_FIRMWARE_STREAM_CHUNK";
+    requestDoc["data"]["payload"]["chunkIndex"] = currentChunk;
+    sendJSONMessage(requestDoc.as<JsonObject>());
+}
+
+void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t len)
+{
+    Serial.println("AttraccessServiceESP: received firmware chunk");
+
+    // Feed data directly to FlashZ - maintains same memory efficiency!
+    bool isFinal = (currentChunk == totalChunkCount - 1);
+    size_t written = FlashZ::getInstance().writez(data, len, isFinal);
+    if (written != len)
+    {
+        Serial.printf("AttraccessServiceESP: FlashZ write error: %s (wrote %zu of %zu bytes)\n",
+                      FlashZ::getInstance().errorString(), written, len);
+
+        // Update UI to show the specific error
+        if (mainContentCallback)
         {
-            Serial.printf("AttraccessServiceESP: Firmware update required - downloading from %s\n", url.c_str());
-            Serial.printf("AttraccessServiceESP: Calling fz.fetch_async() with URL: %s\n", url.c_str());
-            fz.fetch_async(url.c_str());
-            Serial.println("AttraccessServiceESP: fz.fetch_async() call completed, update should start in background");
-
             MainScreenUI::MainContent content;
-            content.type = MainScreenUI::CONTENT_ERROR;
-            content.message = String("Downloading and installing firmware...") + "\n\n" + "Current: " + currentVersion + "\n" + "Available: " + availableVersion;
+            content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
+            content.message = "Firmware Update Failed";
+            content.subMessage = String("Error: ") + FlashZ::getInstance().errorString();
+            content.textColor = 0xFF0000;    // Red
+            content.subTextColor = 0xFF0000; // Red
+            content.progressPercent = 0;
+            content.statusText = "Not enough flash space";
             mainContentCallback(content);
+        }
+
+        // Clean up FlashZ instance
+        FlashZ::getInstance().endz();
+        firmwareDownloadInProgress = false;
+        return;
+    }
+
+    int progress = (int)(((float)currentChunk / (float)totalChunkCount) * 100.0f);
+    // only update every 5%
+    if (progress % 5 == 0)
+    {
+        updateFirmwareProgressDisplay("Installing...", progress);
+    }
+
+    if (isFinal)
+    {
+        firmwareDownloadInProgress = false;
+        Serial.println("AttraccessServiceESP: Final firmware chunk received");
+
+        // Finalize FlashZ
+        if (!FlashZ::getInstance().endz())
+        {
+            Serial.printf("AttraccessServiceESP: FlashZ finalization failed: %s\n", FlashZ::getInstance().errorString());
             return;
         }
-        else
+
+        Serial.println("AttraccessServiceESP: rebooting in 3 seconds...");
+
+        // Update UI to show completion
+        if (mainContentCallback)
         {
-            Serial.println("AttraccessServiceESP: Firmware update required but no url set");
+            MainScreenUI::MainContent content;
+            content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
+            content.message = "Firmware Update";
+            content.subMessage = String("Completed: ") + String(currentChunk) + " of " + String(totalChunkCount) + " chunks";
+            content.textColor = 0x00FF00;    // Green
+            content.subTextColor = 0xAAAAAA; // Light gray
+            content.progressPercent = 100;
+            content.statusText = "Complete! Rebooting...";
+            mainContentCallback(content);
         }
 
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        ESP.restart();
+        return;
+    }
+
+    Serial.printf("AttraccessServiceESP: processed chunk %d of %d\n", currentChunk, totalChunkCount);
+    currentChunk++;
+
+    Serial.println("AttraccessServiceESP: requesting next firmware chunk");
+    requestFirmwareChunk();
+}
+
+void AttraccessServiceESP::updateFirmwareProgressDisplay(const String &status, int progressPercent)
+{
+    if (mainContentCallback)
+    {
         MainScreenUI::MainContent content;
-        content.type = MainScreenUI::CONTENT_ERROR;
-        content.message = String("Firmware Update required") + "\n\n" + "Current: " + currentVersion + "\n" + "Available: " + availableVersion;
+        content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
+        content.message = "Firmware Update";
+        content.subMessage = String(currentChunk) + " / " + String(totalChunkCount) + " chunks";
+        content.textColor = 0x00FFFF;    // Cyan
+        content.subTextColor = 0xAAAAAA; // Light gray
+        content.progressPercent = progressPercent >= 0 ? progressPercent : (int)((float)currentChunk / (float)totalChunkCount * 100.0f);
+        content.statusText = status;
         mainContentCallback(content);
     }
 }

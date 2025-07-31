@@ -17,7 +17,8 @@ public:
         CONTENT_ERROR,
         CONTENT_SUCCESS,
         CONTENT_CARD_CHECKING,
-        CONTENT_TEXT
+        CONTENT_TEXT,
+        CONTENT_FIRMWARE_UPDATE
     };
 
     struct MainContent
@@ -29,7 +30,12 @@ public:
         uint32_t textColor;    // New: text color for message (hex RGB)
         uint32_t subTextColor; // New: text color for sub-message
         bool showCancelButton; // Show cancel button (for enroll/reset NFC card)
-        MainContent() : type(CONTENT_NONE), message(""), subMessage(""), durationMs(0), textColor(0xFFFFFF), subTextColor(0xAAAAAA), showCancelButton(false) {}
+
+        // Progress bar support for firmware updates
+        int progressPercent; // Progress percentage (0-100)
+        String statusText;   // Status text (e.g., "Downloading...")
+
+        MainContent() : type(CONTENT_NONE), message(""), subMessage(""), durationMs(0), textColor(0xFFFFFF), subTextColor(0xAAAAAA), showCancelButton(false), progressPercent(0), statusText("") {}
     };
 
     typedef std::function<void(const String &selectedId)> SelectItemResultCallback;
@@ -72,6 +78,10 @@ private:
     lv_obj_t *mainContentSubLabel; // New: sub-label for secondary message
     lv_obj_t *mainContentIcon;     // For card checking
     lv_obj_t *cancelButton;        // Cancel button for enroll/reset NFC card
+
+    // Progress bar for firmware updates
+    lv_obj_t *progressBar;
+    lv_obj_t *statusLabel;
 
     // State
     MainContent currentContent;

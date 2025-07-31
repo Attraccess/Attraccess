@@ -202,7 +202,7 @@ void MainScreenUI::createContent()
     lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(0xAAAAAA), 0);
     lv_obj_set_style_text_align(mainContentSubLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(mainContentSubLabel, "");
-    lv_obj_align(mainContentSubLabel, LV_ALIGN_TOP_MID, 0, 130);
+    lv_obj_align(mainContentSubLabel, LV_ALIGN_TOP_MID, 0, 170);
     lv_label_set_long_mode(mainContentSubLabel, LV_LABEL_LONG_WRAP);
 
     // Cancel button (hidden by default)
@@ -224,6 +224,33 @@ void MainScreenUI::createContent()
     lv_obj_set_style_text_font(versionLabel, &lv_font_montserrat_10, 0);
     lv_obj_set_style_text_align(versionLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(versionLabel, LV_ALIGN_BOTTOM_MID, 0, -30);
+
+    // Progress bar for firmware updates (hidden by default)
+    progressBar = lv_bar_create(mainContentContainer);
+    lv_obj_set_size(progressBar, 200, 20);
+    lv_obj_align(progressBar, LV_ALIGN_TOP_MID, 0, 140);
+    lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_opa(progressBar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(progressBar, 1, 0);
+    lv_obj_set_style_border_color(progressBar, lv_color_hex(0x666666), 0);
+    lv_obj_set_style_border_side(progressBar, LV_BORDER_SIDE_FULL, 0);
+    lv_obj_set_style_radius(progressBar, 10, 0);
+    // Set the fill color for the progress bar
+    lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x00FF00), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(progressBar, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_bar_set_range(progressBar, 0, 100);
+    lv_bar_set_value(progressBar, 0, LV_ANIM_ON);
+    lv_obj_add_flag(progressBar, LV_OBJ_FLAG_HIDDEN);
+
+    // Status label (status text)
+    statusLabel = lv_label_create(mainContentContainer);
+    lv_obj_set_width(statusLabel, 200);
+    lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFFFF00), 0); // Yellow
+    lv_obj_set_style_text_align(statusLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(statusLabel, "");
+    lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 200);
+    lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
 
     // Subtle hint label for user guidance
     lv_obj_t *hintLabel = lv_label_create(mainContentContainer);
@@ -356,6 +383,40 @@ void MainScreenUI::updateMainContent()
         if (mainContentIcon)
             lv_obj_clear_flag(mainContentIcon, LV_OBJ_FLAG_HIDDEN);
         break;
+    case CONTENT_FIRMWARE_UPDATE:
+        Serial.printf("[DEBUG] CONTENT_FIRMWARE_UPDATE: message='%s', progress=%d%%\n", currentContent.message.c_str(), currentContent.progressPercent);
+
+        // Show main message
+        if (mainContentLabel)
+        {
+            lv_label_set_text(mainContentLabel, currentContent.message.c_str());
+            lv_obj_set_style_text_color(mainContentLabel, lv_color_hex(currentContent.textColor), 0);
+        }
+
+        // Show sub-message
+        if (mainContentSubLabel)
+        {
+            lv_label_set_text(mainContentSubLabel, currentContent.subMessage.c_str());
+            lv_obj_set_style_text_color(mainContentSubLabel, lv_color_hex(currentContent.subTextColor), 0);
+        }
+
+        // Show progress bar
+        if (progressBar)
+        {
+            lv_obj_clear_flag(progressBar, LV_OBJ_FLAG_HIDDEN);
+            // Set the range to 0-100 for percentage
+            lv_bar_set_range(progressBar, 0, 100);
+            lv_bar_set_value(progressBar, currentContent.progressPercent, LV_ANIM_ON);
+            Serial.printf("[DEBUG] Progress bar updated: %d%%\n", currentContent.progressPercent);
+        }
+
+        // Show status text
+        if (statusLabel)
+        {
+            lv_obj_clear_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(statusLabel, currentContent.statusText.c_str());
+        }
+        break;
     }
 }
 
@@ -407,6 +468,37 @@ void MainScreenUI::restoreMainContentUI()
         // Attach event handler for cancel button
         lv_obj_add_event_cb(cancelButton, onCancelButtonClicked, LV_EVENT_CLICKED, this);
     }
+
+    if (!progressBar)
+    {
+        progressBar = lv_bar_create(mainContentContainer);
+        lv_obj_set_size(progressBar, 200, 20);
+        lv_obj_align(progressBar, LV_ALIGN_TOP_MID, 0, 140);
+        lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x333333), 0);
+        lv_obj_set_style_bg_opa(progressBar, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(progressBar, 1, 0);
+        lv_obj_set_style_border_color(progressBar, lv_color_hex(0x666666), 0);
+        lv_obj_set_style_border_side(progressBar, LV_BORDER_SIDE_FULL, 0);
+        lv_obj_set_style_radius(progressBar, 10, 0);
+        // Set the fill color for the progress bar
+        lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x00FF00), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(progressBar, LV_OPA_COVER, LV_PART_INDICATOR);
+        lv_bar_set_range(progressBar, 0, 100);
+        lv_bar_set_value(progressBar, 0, LV_ANIM_ON);
+        lv_obj_add_flag(progressBar, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (!statusLabel)
+    {
+        statusLabel = lv_label_create(mainContentContainer);
+        lv_obj_set_width(statusLabel, 200);
+        lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFFFF00), 0); // Yellow
+        lv_obj_set_style_text_align(statusLabel, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(statusLabel, "");
+        lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 200);
+        lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void MainScreenUI::cleanupSelectDialog()
@@ -434,6 +526,13 @@ void MainScreenUI::cleanupSelectDialog()
 void MainScreenUI::clearMainContent()
 {
     currentContent = MainContent();
+
+    // Hide progress bar elements
+    if (progressBar)
+        lv_obj_add_flag(progressBar, LV_OBJ_FLAG_HIDDEN);
+    if (statusLabel)
+        lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
+
     updateMainContent();
 }
 
