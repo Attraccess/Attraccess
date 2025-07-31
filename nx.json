@@ -22,31 +22,14 @@
   },
   "not_nxCloudId": "68232b3a5aa475a0500b5174",
   "neverConnectToCloud": true,
-  "tui": {
-    "enabled": false
-  },
+  "tui": { "enabled": false },
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",
-      "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "previewTargetName": "preview"
-      }
+      "options": { "buildTargetName": "build", "serveTargetName": "serve", "previewTargetName": "preview" }
     },
-    {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      },
-      "exclude": ["apps/api-e2e/**/*"]
-    },
+    { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
+    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" }, "exclude": ["apps/api-e2e/**/*"] },
     {
       "plugin": "@nx/vite/plugin",
       "options": {
@@ -88,63 +71,29 @@
     }
   ],
   "targetDefaults": {
-    "@nx/js:tsc": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
-    "e2e-ci--**/*": {
-      "dependsOn": ["^build"]
-    },
+    "@nx/js:tsc": { "cache": true, "dependsOn": ["^build"], "inputs": ["production", "^production"] },
+    "e2e-ci--**/*": { "dependsOn": ["^build"] },
     "lint": {
       "cache": true,
-      "options": {
-        "max-warnings": 0
-      },
+      "options": { "max-warnings": 0 },
       "inputs": [
         "default",
         "^default",
         "{workspaceRoot}/eslint.config.cjs",
         "{projectRoot}/eslint.config.cjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
-        {
-          "externalDependencies": ["eslint"]
-        }
+        { "externalDependencies": ["eslint"] }
       ],
       "outputs": ["{options.outputFile}"]
     },
-    "@nx/esbuild:esbuild": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
-    "build": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
+    "@nx/esbuild:esbuild": { "cache": true, "dependsOn": ["^build"], "inputs": ["production", "^production"] },
+    "build": { "cache": true, "dependsOn": ["^build"], "inputs": ["production", "^production"] },
     "test": {
       "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
     },
-    "typecheck": {
-      "cache": true,
-      "inputs": [
-        "production",
-        "^production",
-        {
-          "externalDependencies": ["typescript"]
-        }
-      ]
-    },
+    "typecheck": { "cache": true, "inputs": ["production", "^production", { "externalDependencies": ["typescript"] }] },
     "swagger-build": {
       "cache": true,
       "inputs": ["swagger", "^production"],
@@ -178,26 +127,13 @@
   },
   "generators": {
     "@nx/react": {
-      "application": {
-        "babel": true,
-        "style": "tailwind",
-        "linter": "eslint",
-        "bundler": "vite"
-      },
-      "component": {
-        "style": "tailwind"
-      },
-      "library": {
-        "style": "tailwind",
-        "linter": "eslint",
-        "unitTestRunner": "vitest"
-      }
+      "application": { "babel": true, "style": "tailwind", "linter": "eslint", "bundler": "vite" },
+      "component": { "style": "tailwind" },
+      "library": { "style": "tailwind", "linter": "eslint", "unitTestRunner": "vitest" }
     }
   },
   "release": {
-    "version": {
-      "preVersionCommand": "pnpm nx run-many -t build"
-    },
+    "version": { "preVersionCommand": "pnpm nx run-many -t build" },
     "projects": [
       "api-client",
       "database-entities",
@@ -207,5 +143,6 @@
       "react-query-client",
       "env"
     ]
-  }
+  },
+  "nxCloudId": "688bc2bf431a85dc91337685"
 }
