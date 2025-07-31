@@ -170,9 +170,9 @@ bool AttraccessServiceESP::establishWebSocketConnection()
     websocket_cfg.port = serverPort;
 
     // Configure buffer sizes to prevent ENOBUFS errors
-    // websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
-    // websocket_cfg.task_stack = 8192;  // Increase task stack size for stability
-    // websocket_cfg.task_prio = 5;      // Set appropriate task priority
+    websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
+    websocket_cfg.task_stack = 8192;  // Increase task stack size for stability
+    websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
     // Configure connection timeouts
     // websocket_cfg.ping_interval_sec = 5;     // Send ping every 30 seconds
