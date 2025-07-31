@@ -7,7 +7,8 @@
 #include "MainScreenUI.h"
 #include <functional>
 #include "nfc.hpp"
-#include "flashz.hpp"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 
 // ESP-IDF includes
 #include "esp_websocket_client.h"
@@ -176,6 +177,12 @@ private:
     uint32_t lastFirmwareChunkRequestTime;
     // timeout to rerequest the same chunk
     static const uint32_t FIRMWARE_CHUNK_REQUEST_TIMEOUT_MS = 10000; // 10 seconds
+
+    // ESP-IDF OTA variables
+    esp_ota_handle_t otaHandle;
+    const esp_partition_t *updatePartition;
+    bool otaStarted;
+
     void requestFirmwareChunk();
     void handleFirmwareStreamChunk(const uint8_t *data, size_t len);
 

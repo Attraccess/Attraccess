@@ -44,8 +44,8 @@ export class AttractapFirmware {
   filename: string;
 
   @ApiProperty({
-    description: 'The filename of the firmware for Flashz (zlib compressed)',
-    example: 'attractap_eth_flashz.bin.zz',
+    description: 'The filename of the firmware for OTA updates (zlib compressed)',
+    example: 'attractap_eth.bin.zz',
   })
-  filenameFlashz: string;
+  filenameOTA: string;
 }

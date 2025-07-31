@@ -2,21 +2,28 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../w
 import { ReaderState } from './reader-state.interface';
 import { GatewayServices } from '../websocket.gateway';
 import { Logger } from '@nestjs/common';
+import { AttractapFirmware } from '../../dtos/firmware.dto';
+
+type FirmwareIdentifier = {
+  name: string;
+  variant: string;
+};
 
 export class WaitForFirmwareUpdateState implements ReaderState {
+  private firmwareDefinition: AttractapFirmware;
   private readonly logger = new Logger(WaitForFirmwareUpdateState.name);
-  private chunks: Buffer[] = [];
+  private readonly chunks: Map<FirmwareIdentifier, Buffer[]> = new Map();
   private firmwareSize = 0;
 
   public constructor(private readonly socket: AuthenticatedWebSocket, private readonly services: GatewayServices) {}
 
   public async onStateEnter(): Promise<void> {
-    const firmwareDefinition = this.services.firmwareService.getFirmwareDefinition(
+    this.firmwareDefinition = this.services.firmwareService.getFirmwareDefinition(
       this.socket.reader.firmware.name,
       this.socket.reader.firmware.variant
     );
 
-    await this.loadFirmware(firmwareDefinition.name, firmwareDefinition.variant, firmwareDefinition.filenameFlashz);
+    const chunks = await this.loadFirmware();
 
     this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
@@ -26,7 +33,7 @@ export class WaitForFirmwareUpdateState implements ReaderState {
           this.socket.reader.firmware.variant
         ),
         firmware: {
-          chunks: this.chunks.length,
+          chunks: chunks.length,
           totalSize: this.firmwareSize,
         },
       })
@@ -45,18 +52,43 @@ export class WaitForFirmwareUpdateState implements ReaderState {
     return undefined;
   }
 
-  private async loadFirmware(firmwareName: string, variantName: string, filename: string): Promise<void> {
-    this.chunks = [];
+  private async loadFirmware(): Promise<Buffer[]> {
+    if (this.chunks.has({ name: this.firmwareDefinition.name, variant: this.firmwareDefinition.variant })) {
+      return this.chunks.get({ name: this.firmwareDefinition.name, variant: this.firmwareDefinition.variant });
+    }
 
-    this.firmwareSize = await this.services.firmwareService.getFirmwareBinarySize(firmwareName, variantName, filename);
-    const currentStream = this.services.firmwareService.getFirmwareStream(firmwareName, variantName, filename);
+    const chunks: Buffer[] = [];
 
+    this.logger.debug(`Loading firmware: ${this.firmwareDefinition.name}, variant: ${this.firmwareDefinition.variant}`);
+    this.firmwareSize = await this.services.firmwareService.getFirmwareBinarySize(
+      this.firmwareDefinition.name,
+      this.firmwareDefinition.variant
+    );
+    this.logger.debug(`Firmware size: ${this.firmwareSize} bytes`);
+
+    const currentStream = this.services.firmwareService.getFirmwareStream(
+      this.firmwareDefinition.name,
+      this.firmwareDefinition.variant
+    );
+
+    let totalBytesLoaded = 0;
     currentStream.on('data', (chunk: Buffer) => {
-      this.chunks.push(chunk);
+      chunks.push(chunk);
+      totalBytesLoaded += chunk.length;
+
+      // Log first chunk's first few bytes to verify it's valid ESP32 firmware
+      if (chunks.length === 1) {
+        const firstBytes = chunk.slice(0, 16);
+        this.logger.debug(`First chunk loaded - size: ${chunk.length}, first bytes: ${firstBytes.toString('hex')}`);
+        this.logger.debug(`Expected ESP32 magic byte: 0xE9, actual first byte: 0x${chunk[0].toString(16)}`);
+      }
     });
 
     await new Promise<void>((resolve) => {
       currentStream.on('end', () => {
+        this.logger.debug(
+          `Firmware loading complete - Total chunks: ${chunks.length}, Total bytes: ${totalBytesLoaded}`
+        );
         resolve();
       });
 
@@ -65,6 +97,10 @@ export class WaitForFirmwareUpdateState implements ReaderState {
         resolve();
       });
     });
+
+    this.chunks.set({ name: this.firmwareDefinition.name, variant: this.firmwareDefinition.variant }, chunks);
+
+    return chunks;
   }
 
   private async onStreamChunk(eventData: AttractapEvent['data']): Promise<void> {
@@ -75,12 +111,23 @@ export class WaitForFirmwareUpdateState implements ReaderState {
       return;
     }
 
-    if (chunkIndex >= this.chunks.length) {
+    const chunks = await this.loadFirmware();
+
+    if (chunkIndex >= chunks.length) {
       this.logger.error(`Chunk index is out of bounds for firmware update`);
       return;
     }
 
-    const chunk = this.chunks[chunkIndex];
+    const chunk = chunks[chunkIndex];
+    this.logger.debug(`Sending chunk ${chunkIndex}/${chunks.length - 1} - size: ${chunk.length} bytes`);
+
+    // Log first few bytes of first chunk to verify what's being sent
+    if (chunkIndex === 0) {
+      const firstBytes = chunk.slice(0, 16);
+      this.logger.debug(`First chunk being sent - first bytes: ${firstBytes.toString('hex')}`);
+      this.logger.debug(`First byte: 0x${chunk[0].toString(16)} (expected ESP32 magic: 0xE9)`);
+    }
+
     this.socket.sendBinaryData(chunk);
   }
 

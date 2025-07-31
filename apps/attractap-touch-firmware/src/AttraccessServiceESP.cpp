@@ -35,7 +35,10 @@ AttraccessServiceESP::AttraccessServiceESP()
       lastDataReceivedTime(0),
       firmwareUpdateRetryCount(0),
       stateCallback(nullptr),
-      firmwareDownloadInProgress(false)
+      firmwareDownloadInProgress(false),
+      otaHandle(0),
+      updatePartition(nullptr),
+      otaStarted(false)
 {
     instance = this;
 }
@@ -50,10 +53,9 @@ void AttraccessServiceESP::begin()
 {
     Serial.println("AttraccessServiceESP: Initializing...");
 
-    // Enable debug logging for flashz library
-    esp_log_level_set("FLASHZ", ESP_LOG_DEBUG);
-    esp_log_level_set("FZ-HTTP", ESP_LOG_DEBUG);
-    Serial.println("AttraccessServiceESP: Enabled debug logging for flashz library");
+    // Enable debug logging for OTA operations
+    esp_log_level_set("esp_ota_ops", ESP_LOG_DEBUG);
+    Serial.println("AttraccessServiceESP: Enabled debug logging for OTA operations");
 
     preferences.begin("attraccess", false);
 
@@ -1195,12 +1197,26 @@ void AttraccessServiceESP::handleFirmwareUpdateRequired(const JsonObject &data)
     Serial.printf("AttraccessServiceESP: Firmware update required - using chunk-based method\n");
     Serial.printf("AttraccessServiceESP: Current: v%s → Available: v%s\n", currentVersion.c_str(), availableVersion.c_str());
 
-    // Initialize FlashZ for compressed firmware
-    if (!FlashZ::getInstance().beginz(UPDATE_SIZE_UNKNOWN, U_FLASH))
+    // Initialize ESP-IDF OTA for firmware update
+    updatePartition = esp_ota_get_next_update_partition(NULL);
+    if (updatePartition == NULL)
     {
-        Serial.printf("AttraccessServiceESP: Failed to initialize FlashZ: %s\n", FlashZ::getInstance().errorString());
+        Serial.println("AttraccessServiceESP: Failed to find OTA update partition");
         return;
     }
+
+    Serial.printf("AttraccessServiceESP: Writing to partition subtype %d at offset 0x%x\n",
+                  updatePartition->subtype, updatePartition->address);
+
+    esp_err_t err = esp_ota_begin(updatePartition, OTA_SIZE_UNKNOWN, &otaHandle);
+    if (err != ESP_OK)
+    {
+        Serial.printf("AttraccessServiceESP: esp_ota_begin failed: %s\n", esp_err_to_name(err));
+        updatePartition = NULL;
+        return;
+    }
+
+    otaStarted = true;
 
     if (mainContentCallback)
     {
@@ -1234,15 +1250,26 @@ void AttraccessServiceESP::requestFirmwareChunk()
 
 void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t len)
 {
-    Serial.println("AttraccessServiceESP: received firmware chunk");
+    Serial.printf("AttraccessServiceESP: received firmware chunk %d, size: %zu bytes\n", currentChunk, len);
 
-    // Feed data directly to FlashZ - maintains same memory efficiency!
-    bool isFinal = (currentChunk == totalChunkCount - 1);
-    size_t written = FlashZ::getInstance().writez(data, len, isFinal);
-    if (written != len)
+    if (!otaStarted || updatePartition == NULL)
     {
-        Serial.printf("AttraccessServiceESP: FlashZ write error: %s (wrote %zu of %zu bytes)\n",
-                      FlashZ::getInstance().errorString(), written, len);
+        Serial.printf("AttraccessServiceESP: OTA not started (%s) or no update partition (%s)\n",
+                      otaStarted ? "true" : "false",
+                      updatePartition ? "valid" : "null");
+        return;
+    }
+
+    Serial.printf("AttraccessServiceESP: About to write chunk %d to OTA\n", currentChunk);
+
+    // Write data directly using ESP-IDF OTA
+    bool isFinal = (currentChunk == totalChunkCount - 1);
+    esp_err_t err = esp_ota_write(otaHandle, data, len);
+
+    Serial.printf("AttraccessServiceESP: esp_ota_write result: %s\n", esp_err_to_name(err));
+    if (err != ESP_OK)
+    {
+        Serial.printf("AttraccessServiceESP: esp_ota_write failed: %s\n", esp_err_to_name(err));
 
         // Update UI to show the specific error
         if (mainContentCallback)
@@ -1250,16 +1277,18 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
             MainScreenUI::MainContent content;
             content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
             content.message = "Firmware Update Failed";
-            content.subMessage = String("Error: ") + FlashZ::getInstance().errorString();
+            content.subMessage = String("OTA Write Error: ") + esp_err_to_name(err);
             content.textColor = 0xFF0000;    // Red
             content.subTextColor = 0xFF0000; // Red
             content.progressPercent = 0;
-            content.statusText = "Not enough flash space";
+            content.statusText = "Flash write failed";
             mainContentCallback(content);
         }
 
-        // Clean up FlashZ instance
-        FlashZ::getInstance().endz();
+        // Clean up OTA operation
+        esp_ota_abort(otaHandle);
+        otaStarted = false;
+        updatePartition = NULL;
         firmwareDownloadInProgress = false;
         return;
     }
@@ -1276,14 +1305,27 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
         firmwareDownloadInProgress = false;
         Serial.println("AttraccessServiceESP: Final firmware chunk received");
 
-        // Finalize FlashZ
-        if (!FlashZ::getInstance().endz())
+        // Finalize ESP-IDF OTA
+        err = esp_ota_end(otaHandle);
+        if (err != ESP_OK)
         {
-            Serial.printf("AttraccessServiceESP: FlashZ finalization failed: %s\n", FlashZ::getInstance().errorString());
+            Serial.printf("AttraccessServiceESP: esp_ota_end failed: %s\n", esp_err_to_name(err));
+            otaStarted = false;
+            updatePartition = NULL;
             return;
         }
 
-        Serial.println("AttraccessServiceESP: rebooting in 3 seconds...");
+        // Set boot partition to the new firmware
+        err = esp_ota_set_boot_partition(updatePartition);
+        if (err != ESP_OK)
+        {
+            Serial.printf("AttraccessServiceESP: esp_ota_set_boot_partition failed: %s\n", esp_err_to_name(err));
+            otaStarted = false;
+            updatePartition = NULL;
+            return;
+        }
+
+        Serial.println("AttraccessServiceESP: OTA update successful, rebooting in 3 seconds...");
 
         // Update UI to show completion
         if (mainContentCallback)
@@ -1291,7 +1333,7 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
             MainScreenUI::MainContent content;
             content.type = MainScreenUI::CONTENT_FIRMWARE_UPDATE;
             content.message = "Firmware Update";
-            content.subMessage = String("Completed: ") + String(currentChunk) + " of " + String(totalChunkCount) + " chunks";
+            content.subMessage = String("Completed: ") + String(currentChunk + 1) + " of " + String(totalChunkCount) + " chunks";
             content.textColor = 0x00FF00;    // Green
             content.subTextColor = 0xAAAAAA; // Light gray
             content.progressPercent = 100;
@@ -1299,15 +1341,18 @@ void AttraccessServiceESP::handleFirmwareStreamChunk(const uint8_t *data, size_t
             mainContentCallback(content);
         }
 
+        otaStarted = false;
+        updatePartition = NULL;
         vTaskDelay(pdMS_TO_TICKS(3000));
         ESP.restart();
         return;
     }
 
     Serial.printf("AttraccessServiceESP: processed chunk %d of %d\n", currentChunk, totalChunkCount);
+    Serial.printf("AttraccessServiceESP: About to increment currentChunk from %d to %d\n", currentChunk, currentChunk + 1);
     currentChunk++;
 
-    Serial.println("AttraccessServiceESP: requesting next firmware chunk");
+    Serial.printf("AttraccessServiceESP: requesting next firmware chunk (chunk %d)\n", currentChunk);
     requestFirmwareChunk();
 }
 

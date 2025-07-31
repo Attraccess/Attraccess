@@ -249,19 +249,23 @@ def main():
             
             print(f"Merged firmware created at: {merged_bin_path}")
             
-            # Compress the original firmware.bin file and store it in output directory
-            compressed_filename = None
+            # Copy the original firmware.bin file for OTA updates (uncompressed)
+            ota_filename = None
             if os.path.exists(firmware_path):
-                print(f"Compressing original firmware.bin for {env}...")
-                compressed_path = zlib_compress(firmware_path)
-                if compressed_path:
-                    # Copy compressed file to output directory with proper naming
-                    compressed_filename = f"{firmware_name}_{firmware_variant}.bin.zz"
-                    output_compressed_path = os.path.join(output_dir, compressed_filename)
-                    shutil.copy2(compressed_path, output_compressed_path)
-                    print(f"Compressed firmware copied to: {output_compressed_path}")
-                    # Clean up temporary compressed file
-                    os.remove(compressed_path)
+                print(f"Copying original firmware.bin for OTA updates for {env}...")
+                # Copy uncompressed application firmware for OTA updates
+                ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+                output_ota_path = os.path.join(output_dir, ota_filename)
+                shutil.copy2(firmware_path, output_ota_path)
+                print(f"OTA firmware copied to: {output_ota_path}")
+                
+                # Verify the OTA firmware starts with ESP32 magic byte
+                with open(output_ota_path, 'rb') as f:
+                    first_byte = f.read(1)
+                    if first_byte == b'\xe9':
+                        print(f"✓ OTA firmware verified - starts with ESP32 magic byte (0xE9)")
+                    else:
+                        print(f"⚠ WARNING: OTA firmware does not start with ESP32 magic byte (got 0x{first_byte.hex() if first_byte else 'empty'})")
             
         except Exception as e:
             print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
@@ -277,9 +281,9 @@ def main():
             "filename": firmware_filename
         }
         
-        # Add compressed filename if compression was successful
-        if compressed_filename:
-            firmware_entry["filenameFlashz"] = compressed_filename
+        # Add OTA filename if creation was successful
+        if ota_filename:
+            firmware_entry["filenameOTA"] = ota_filename
             
         firmware_info.append(firmware_entry)
     

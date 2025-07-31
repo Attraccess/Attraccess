@@ -52,8 +52,8 @@ export class AttractapFirmwareController {
     this.logger.debug(`Parameters: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`);
 
     try {
-      const stream = this.attractapFirmwareService.getFirmwareBinaryStream(firmwareName, variantName, filename);
-      const fileSize = this.attractapFirmwareService.getFirmwareBinarySize(firmwareName, variantName, filename);
+      const stream = this.attractapFirmwareService.getFirmwareBinaryStream(firmwareName, variantName);
+      const fileSize = this.attractapFirmwareService.getFirmwareBinarySize(firmwareName, variantName);
 
       this.logger.debug('Setting response headers for firmware binary download');
       res.set({

@@ -55,10 +55,8 @@ export class AttractapFirmwareService {
     return firmware;
   }
 
-  public getFirmwareBinaryStream(firmwareName: string, variantName: string, filename: string): NodeJS.ReadableStream {
-    this.logger.debug(
-      `Getting firmware binary stream for: ${firmwareName}, variant: ${variantName}, filename: ${filename}`
-    );
+  public getFirmwareBinaryStream(firmwareName: string, variantName: string): NodeJS.ReadableStream {
+    this.logger.debug(`Getting firmware binary stream for: ${firmwareName}, variant: ${variantName}`);
 
     const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
     if (!firmwareDefinition) {
@@ -66,18 +64,7 @@ export class AttractapFirmwareService {
       throw new Error('Firmware definition not found');
     }
 
-    this.logger.debug(
-      `Firmware definition found. Available files: ${firmwareDefinition.filename}, ${firmwareDefinition.filenameFlashz}`
-    );
-
-    if (![firmwareDefinition.filename, firmwareDefinition.filenameFlashz].includes(filename)) {
-      this.logger.error(
-        `Requested filename '${filename}' not found in firmware definition. Available: ${firmwareDefinition.filename}, ${firmwareDefinition.filenameFlashz}`
-      );
-      throw new Error('Firmware binary not found');
-    }
-
-    const firmwarePath = join(this.firmwareAssetsDirectory, filename);
+    const firmwarePath = join(this.firmwareAssetsDirectory, firmwareDefinition.filename);
     this.logger.debug(`Checking firmware binary path: ${firmwarePath}`);
 
     if (!existsSync(firmwarePath)) {
@@ -93,10 +80,8 @@ export class AttractapFirmwareService {
     });
   }
 
-  public getFirmwareBinarySize(firmwareName: string, variantName: string, filename: string): number {
-    this.logger.debug(
-      `Getting firmware binary size for: ${firmwareName}, variant: ${variantName}, filename: ${filename}`
-    );
+  public getFirmwareBinarySize(firmwareName: string, variantName: string): number {
+    this.logger.debug(`Getting firmware binary size for: ${firmwareName}, variant: ${variantName}`);
 
     const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
     if (!firmwareDefinition) {
@@ -104,14 +89,7 @@ export class AttractapFirmwareService {
       throw new Error('Firmware definition not found');
     }
 
-    if (![firmwareDefinition.filename, firmwareDefinition.filenameFlashz].includes(filename)) {
-      this.logger.error(
-        `Requested filename '${filename}' not found in firmware definition. Available: ${firmwareDefinition.filename}, ${firmwareDefinition.filenameFlashz}`
-      );
-      throw new Error('Firmware binary not found');
-    }
-
-    const firmwarePath = join(this.firmwareAssetsDirectory, filename);
+    const firmwarePath = join(this.firmwareAssetsDirectory, firmwareDefinition.filename);
 
     if (!existsSync(firmwarePath)) {
       this.logger.error(`Firmware binary file does not exist: ${firmwarePath}`);
@@ -123,19 +101,60 @@ export class AttractapFirmwareService {
     return stats.size;
   }
 
-  public getFirmwareDownloadUrl(firmwareName: string, variantName: string, filename: string): string {
-    const url = `${this.apiUrl}/api/attractap/firmwares/${firmwareName}/variants/${variantName}/${filename}`;
+  public getFirmwareDownloadUrl(firmwareName: string, variantName: string): string {
+    const url = `${this.apiUrl}/api/attractap/firmwares/${firmwareName}/variants/${variantName}`;
     this.logger.debug(`Generated firmware download URL: ${url}`);
     return url;
   }
 
-  // WebSocket firmware update methods (aliases for existing methods)
-  public getFirmwareStream(firmwareName: string, variantName: string, filename: string): NodeJS.ReadableStream {
-    return this.getFirmwareBinaryStream(firmwareName, variantName, filename);
+  // WebSocket firmware update methods - use OTA-specific firmware
+  public getFirmwareStream(firmwareName: string, variantName: string): NodeJS.ReadableStream {
+    this.logger.debug(`Getting firmware stream for OTA: ${firmwareName}, variant: ${variantName}`);
+
+    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
+    if (!firmwareDefinition) {
+      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
+      throw new Error('Firmware definition not found');
+    }
+
+    // Use OTA-specific firmware file if available, otherwise fall back to main firmware
+    const otaFilename = firmwareDefinition.filenameOTA || firmwareDefinition.filename;
+    const firmwarePath = join(this.firmwareAssetsDirectory, otaFilename);
+
+    this.logger.debug(`Using firmware file for OTA: ${otaFilename}`);
+    this.logger.debug(`Checking OTA firmware path: ${firmwarePath}`);
+
+    if (!existsSync(firmwarePath)) {
+      this.logger.error(`OTA firmware binary file does not exist: ${firmwarePath}`);
+      throw new Error('OTA firmware binary not found');
+    }
+
+    this.logger.debug(`Creating read stream for OTA firmware: ${firmwarePath}`);
+    return createReadStream(firmwarePath, {
+      highWaterMark: 1024, // 1KB chunks for ESP32 compatibility
+    });
   }
 
-  public getFirmwareStats(firmwareName: string, variantName: string, filename: string): { size: number } {
-    const size = this.getFirmwareBinarySize(firmwareName, variantName, filename);
-    return { size };
+  public getFirmwareStats(firmwareName: string, variantName: string): { size: number } {
+    this.logger.debug(`Getting firmware stats for OTA: ${firmwareName}, variant: ${variantName}`);
+
+    const firmwareDefinition = this.getFirmwareDefinition(firmwareName, variantName);
+    if (!firmwareDefinition) {
+      this.logger.error(`Firmware definition not found for: ${firmwareName}, variant: ${variantName}`);
+      throw new Error('Firmware definition not found');
+    }
+
+    // Use OTA-specific firmware file if available, otherwise fall back to main firmware
+    const otaFilename = firmwareDefinition.filenameOTA || firmwareDefinition.filename;
+    const firmwarePath = join(this.firmwareAssetsDirectory, otaFilename);
+
+    if (!existsSync(firmwarePath)) {
+      this.logger.error(`OTA firmware binary file does not exist: ${firmwarePath}`);
+      throw new Error('OTA firmware binary not found');
+    }
+
+    const stats = statSync(firmwarePath);
+    this.logger.debug(`OTA firmware size: ${stats.size} bytes (file: ${otaFilename})`);
+    return { size: stats.size };
   }
 }
