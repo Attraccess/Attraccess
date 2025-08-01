@@ -169,7 +169,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                 key={resource.id}
                 as={Link}
                 href={`/resources/${resource.id}`}
-                className="cursor-pointer hover:scale-105 hover:shadow-lg transition-all duration-300"
+                className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
               >
                 <TableCell>
                   <Image

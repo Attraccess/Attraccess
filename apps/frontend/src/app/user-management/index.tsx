@@ -82,7 +82,11 @@ export const UserManagementPage: React.FC = () => {
               loadingContent={<TableDataLoadingIndicator />}
             >
               {(user) => (
-                <TableRow key={user.id} href={`/users/${user.id}`} className="cursor-pointer hover:scale-105">
+                <TableRow
+                  key={user.id}
+                  href={`/users/${user.id}`}
+                  className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                >
                   <TableCell className="hidden md:table-cell">
                     {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                   </TableCell>

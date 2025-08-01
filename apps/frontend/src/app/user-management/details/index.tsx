@@ -28,7 +28,7 @@ export function UserManagementDetailsPage() {
         backTo="/users"
       />
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-row flex-wrap gap-4">
         {user && <UserPermissionForm user={user} />}
         {user && <SetPasswordForm user={user} />}
       </div>

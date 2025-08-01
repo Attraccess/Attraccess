@@ -101,7 +101,7 @@ export function NodePickerModal(props: Props) {
                       <div
                         key={nodeEntry.key}
                         onClick={() => onSelect(nodeEntry.key)}
-                        className="cursor-pointer hover:scale-105 transition-all"
+                        className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
                       >
                         <nodeEntry.node.component {...({ previewMode: true } as unknown as NodeProps)} />
                       </div>

@@ -114,7 +114,7 @@ export const HistoryTable = ({
         {(usageHistory?.data ?? []).map((session: ResourceUsage) => (
           <TableRow
             key={session.id}
-            className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
             onClick={() => onSessionClick(session)}
           >
             {generateRowCells(session, t, showAllUsers, canManageResources)}

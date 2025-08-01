@@ -22,6 +22,7 @@ import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { ServerNotAvailable } from './serverNotAvailable';
+import { AccessDenied } from './unauthorized/accessDenied';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -54,7 +55,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
       if (!userHasAllRequiredPermissions) {
         return {
           ...route,
-          element: <Unauthorized />,
+          element: <AccessDenied />,
         };
       }
 

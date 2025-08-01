@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Checkbox, Button, Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
+import { Button, Card, CardHeader, CardBody, CardFooter, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import {
@@ -88,33 +88,33 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
         <PageHeader title={t('title')} noMargin />
       </CardHeader>
 
-      <CardBody>
-        <Checkbox
+      <CardBody className="flex flex-col gap-2">
+        <Switch
           isSelected={permissions.canManageResources}
           onValueChange={handlePermissionChange('canManageResources')}
           color="primary"
           data-cy="user-permission-form-canManageResources-checkbox"
         >
           {t('permissions.canManageResources')}
-        </Checkbox>
+        </Switch>
 
-        <Checkbox
+        <Switch
           isSelected={permissions.canManageSystemConfiguration}
           onValueChange={handlePermissionChange('canManageSystemConfiguration')}
           color="primary"
           data-cy="user-permission-form-canManageSystemConfiguration-checkbox"
         >
           {t('permissions.canManageSystemConfiguration')}
-        </Checkbox>
+        </Switch>
 
-        <Checkbox
+        <Switch
           isSelected={permissions.canManageUsers}
           onValueChange={handlePermissionChange('canManageUsers')}
           color="primary"
           data-cy="user-permission-form-canManageUsers-checkbox"
         >
           {t('permissions.canManageUsers')}
-        </Checkbox>
+        </Switch>
       </CardBody>
 
       <CardFooter className="flex justify-end">
