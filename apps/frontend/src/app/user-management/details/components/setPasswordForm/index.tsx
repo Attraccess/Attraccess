@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Button, Card, CardHeader, CardBody, CardFooter } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -38,35 +38,25 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
 
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordsDontMatch, setPasswordsDontMatch] = useState(false);
-  const [passwordTooShort, setPasswordTooShort] = useState(false);
+
+  const passwordWasEntered = useMemo(() => {
+    return password.length > 0 || confirmPassword.length > 0;
+  }, [password, confirmPassword]);
+
+  const passwordTooShort = useMemo(() => {
+    return password.length < 8;
+  }, [password]);
+
+  const passwordsDontMatch = useMemo(() => {
+    return password !== confirmPassword;
+  }, [password, confirmPassword]);
 
   const handleSubmit = useCallback(() => {
-    let valid = true;
-
-    if (password !== confirmPassword) {
-      setPasswordsDontMatch(true);
-      valid = false;
-    } else {
-      setPasswordsDontMatch(false);
-    }
-
-    if (password.length < 8) {
-      setPasswordTooShort(true);
-      valid = false;
-    } else {
-      setPasswordTooShort(false);
-    }
-
-    if (!valid) {
-      return;
-    }
-
     setPasswordMutate({
       id: user.id,
       requestBody: { password },
     });
-  }, [password, confirmPassword, setPasswordMutate, user]);
+  }, [password, setPasswordMutate, user]);
 
   return (
     <Card data-cy="set-password-form-card">
@@ -81,8 +71,8 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
             value={password}
             onValueChange={setPassword}
             data-cy="set-password-form-new-password"
-            errorMessage={passwordTooShort ? t('errors.passwordTooShort') : undefined}
-            isInvalid={passwordTooShort}
+            errorMessage={t('errors.passwordTooShort')}
+            isInvalid={passwordTooShort && passwordWasEntered}
           />
 
           <PasswordInput
@@ -90,8 +80,8 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
             value={confirmPassword}
             onValueChange={setConfirmPassword}
             data-cy="set-password-form-confirm-password"
-            errorMessage={passwordsDontMatch ? t('errors.passwordsDoNotMatch') : undefined}
-            isInvalid={passwordsDontMatch}
+            errorMessage={t('errors.passwordsDoNotMatch')}
+            isInvalid={passwordsDontMatch && passwordWasEntered}
           />
         </div>
       </CardBody>
@@ -102,6 +92,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
           onPress={handleSubmit}
           isLoading={isSettingPassword}
           data-cy="set-password-form-save-button"
+          isDisabled={passwordTooShort || passwordsDontMatch}
         >
           {t('actions.setPassword')}
         </Button>

@@ -21,7 +21,7 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
+    <div className="flex flex-col items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader className="flex flex-col items-center justify-center">
           {/* Icon */}
