@@ -73,3 +73,5 @@ Dieses Projekt basiert teilweise auf einem MIT-lizenzierten Projekt. Diese Kompo
 
 **Für kommerzielle Nutzung oder Lizenzanfragen:**  
 Bitte kontaktiere [contact@attraccess.org](mailto:contact@attraccess.org).
+
+this was written by openhands
