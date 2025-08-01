@@ -143,6 +143,13 @@ export type BulkUpdateUserPermissionsDto = {
     updates: Array<UserPermissionsUpdateItem>;
 };
 
+export type SetUserPasswordDto = {
+    /**
+     * The new password for the user
+     */
+    password: string;
+};
+
 export type CreateSessionResponse = {
     /**
      * The user that has been logged in
@@ -1505,6 +1512,15 @@ export type GetAllWithPermissionData = {
 
 export type GetAllWithPermissionResponse = PaginatedUsersResponseDto;
 
+export type SetUserPasswordData = {
+    id: number;
+    requestBody: SetUserPasswordDto;
+};
+
+export type SetUserPasswordResponse = {
+    message?: string;
+};
+
 export type CreateSessionData = {
     requestBody: {
         username?: string;
@@ -2346,6 +2362,35 @@ export type $OpenApiTs = {
                  * Forbidden - User does not have permission to manage users.
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/set-password': {
+        post: {
+            req: SetUserPasswordData;
+            res: {
+                /**
+                 * The password has been successfully updated.
+                 */
+                200: {
+                    message?: string;
+                };
+                /**
+                 * Invalid input data.
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to manage users.
+                 */
+                403: unknown;
+                /**
+                 * User not found.
+                 */
+                404: unknown;
             };
         };
     };

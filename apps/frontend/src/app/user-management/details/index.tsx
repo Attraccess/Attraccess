@@ -2,6 +2,7 @@ import { useUsersServiceGetOneUserById } from '@attraccess/react-query-client';
 import { PageHeader } from '../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm';
+import { SetPasswordForm } from './components/setPasswordForm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import en from './en.json';
@@ -27,7 +28,10 @@ export function UserManagementDetailsPage() {
         backTo="/users"
       />
 
-      <div className="flex flex-col gap-4">{user && <UserPermissionForm user={user} />}</div>
+      <div className="flex flex-col gap-4">
+        {user && <UserPermissionForm user={user} />}
+        {user && <SetPasswordForm user={user} />}
+      </div>
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { BulkUpdateUserPermissionsDto } from './dtos/bulkUpdateUserPermissions.d
 import { GetUsersWithPermissionQueryDto, PermissionFilter } from './dtos/getUsersWithPermissionQuery.dto';
 import { ResetPasswordDto } from './dtos/resetPassword.dto';
 import { ChangePasswordDto } from './dtos/changePassword.dto';
+import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -499,5 +500,55 @@ export class UsersController {
     );
 
     return result;
+  }
+
+  @Post(':id/set-password')
+  @Auth('canManageUsers')
+  @ApiOperation({ summary: "Set a user's password directly", operationId: 'setUserPassword' })
+  @ApiResponse({
+    status: 200,
+    description: 'The password has been successfully updated.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Password updated successfully' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User does not have permission to manage users.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found.',
+  })
+  async setUserPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SetUserPasswordDto,
+    @Req() request: AuthenticatedRequest
+  ): Promise<{ message: string }> {
+    this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${request.user.id}`);
+
+    // Prevent users from updating their own password through this endpoint
+    if (request.user.id === id) {
+      this.logger.warn(`User ${id} attempted to set their own password through admin endpoint`);
+      throw new ForbiddenException('You cannot set your own password through this endpoint');
+    }
+
+    const user = await this.usersService.findOne({ id });
+    if (!user) {
+      this.logger.debug(`User not found with ID: ${id}`);
+      throw new UserNotFoundException(id);
+    }
+
+    await this.authService.changePassword(user, body.password);
+
+    this.logger.debug(`Password successfully updated for user ID: ${id}`);
+    return { message: 'Password updated successfully' };
   }
 }

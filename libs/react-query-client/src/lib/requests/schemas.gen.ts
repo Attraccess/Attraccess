@@ -227,6 +227,18 @@ export const $BulkUpdateUserPermissionsDto = {
     required: ['updates']
 } as const;
 
+export const $SetUserPasswordDto = {
+    type: 'object',
+    properties: {
+        password: {
+            type: 'string',
+            description: 'The new password for the user',
+            example: 'newSecurePassword123'
+        }
+    },
+    required: ['password']
+} as const;
+
 export const $CreateSessionResponse = {
     type: 'object',
     properties: {

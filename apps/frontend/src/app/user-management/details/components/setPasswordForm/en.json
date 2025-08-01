@@ -1,0 +1,15 @@
+
+{
+  "title": "Set User Password",
+  "newPassword": "New Password",
+  "confirmPassword": "Confirm Password",
+  "actions": {
+    "setPassword": "Set Password"
+  },
+  "errors": {
+    "passwordsDoNotMatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 8 characters"
+  },
+  "passwordUpdated": "Password updated successfully",
+  "errorUpdatingPassword": "Error updating password"
+}
