@@ -136,6 +136,10 @@ export class User {
   })
   nfcCards!: NFCCard[];
 
+  @Column({ type: 'text', nullable: true })
+  @Exclude()
+  nfcKeySeedToken!: string | null;
+
   @OneToMany(() => Session, (session) => session.user, {
     onDelete: 'CASCADE',
   })

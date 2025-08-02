@@ -147,14 +147,34 @@ export class AttractapService {
   }
 
   /**
-   * Generates a new key for the NFC card based on a seed which is based on the current month,
-   * the keyNo and the cardUID.
+   * Generates a new key for the NFC card based on a secure seed that includes:
+   * - A unique random token per user (stored in user.nfcKeySeedToken)
+   * - The key number
+   * - The card UID
    * @param keyNo The key number to generate
    * @param cardUID The UID of the NFC card
+   * @param userId The ID of the user who owns the card
    * @returns 16 bytes Uint8Array
    */
-  public async generateNTAG424Key(data: { keyNo: number; cardUID: string }) {
-    const seed = `${new Date().getMonth()}${data.keyNo}${data.cardUID}`;
+  public async generateNTAG424Key(data: { keyNo: number; cardUID: string; userId: number }) {
+    // Get the user to access their secure token
+    const user = await this.nfcCardRepository.manager.findOne(User, {
+      where: { id: data.userId },
+      select: ['nfcKeySeedToken']
+    });
+
+    if (!user) {
+      throw new Error(`User with ID ${data.userId} not found`);
+    }
+
+    // Generate a secure token if it doesn't exist
+    if (!user.nfcKeySeedToken) {
+      user.nfcKeySeedToken = nanoid(32); // 32 characters = ~192 bits of entropy
+      await this.nfcCardRepository.manager.save(User, user);
+    }
+
+    // Create a secure seed using the user's unique token, key number, and card UID
+    const seed = `${user.nfcKeySeedToken}${data.keyNo}${data.cardUID}`;
     const seedBytes = new TextEncoder().encode(seed);
     const key = await subtle.digest('SHA-256', seedBytes);
     return new Uint8Array(key).slice(0, 16);
