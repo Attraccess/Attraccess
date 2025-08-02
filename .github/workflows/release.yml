@@ -46,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: v22.18.0
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -172,7 +172,7 @@ jobs:
       # Cache node_modules
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: v22.18.0
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
