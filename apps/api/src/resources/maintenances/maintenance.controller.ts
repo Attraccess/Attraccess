@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ResourceMaintenanceService } from './maintenance.service';
@@ -206,7 +207,13 @@ export class ResourceMaintenanceController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('maintenanceId', ParseIntPipe) maintenanceId: number
   ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.getMaintenanceById(maintenanceId);
+    const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
+
+    if (maintenance.resourceId !== resourceId) {
+      throw new NotFoundException('Maintenance not found');
+    }
+
+    return maintenance;
   }
 
   @Put(':maintenanceId')
@@ -252,6 +259,12 @@ export class ResourceMaintenanceController {
     @Param('maintenanceId', ParseIntPipe) maintenanceId: number,
     @Body() dto: UpdateMaintenanceDto
   ): Promise<ResourceMaintenance> {
+    const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
+
+    if (maintenance.resourceId !== resourceId) {
+      throw new NotFoundException('Maintenance not found');
+    }
+
     return await this.maintenanceService.updateMaintenance(maintenanceId, dto);
   }
 
@@ -293,6 +306,12 @@ export class ResourceMaintenanceController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('maintenanceId', ParseIntPipe) maintenanceId: number
   ): Promise<void> {
+    const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
+
+    if (maintenance.resourceId !== resourceId) {
+      throw new NotFoundException('Maintenance not found');
+    }
+
     await this.maintenanceService.cancelMaintenance(maintenanceId);
   }
 }

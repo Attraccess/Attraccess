@@ -16,6 +16,7 @@ const mockResource = {
 
 const mockMaintenance = {
   id: 1,
+  resourceId: 1,
   startTime: new Date('2025-01-01T10:00:00.000Z'),
   endTime: null,
   reason: 'Test maintenance',
@@ -109,11 +110,13 @@ describe('ResourceMaintenanceController', () => {
 
       const updatedMaintenance = { ...mockMaintenance, reason: dto.reason };
 
+      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
       jest.spyOn(service, 'updateMaintenance').mockResolvedValue(updatedMaintenance);
 
       const result = await controller.updateMaintenance(1, 1, dto);
 
       expect(result).toEqual(updatedMaintenance);
+      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.updateMaintenance).toHaveBeenCalledWith(1, dto);
     });
 
@@ -132,21 +135,25 @@ describe('ResourceMaintenanceController', () => {
 
       const updatedMaintenance = { ...mockMaintenance, ...dto };
 
+      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
       jest.spyOn(service, 'updateMaintenance').mockResolvedValue(updatedMaintenance);
 
       const result = await controller.updateMaintenance(1, 1, dto);
 
       expect(result).toEqual(updatedMaintenance);
+      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.updateMaintenance).toHaveBeenCalledWith(1, dto);
     });
   });
 
   describe('cancelMaintenance', () => {
     it('should cancel a maintenance', async () => {
+      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
       jest.spyOn(service, 'cancelMaintenance').mockResolvedValue(undefined);
 
       await controller.cancelMaintenance(1, 1);
 
+      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.cancelMaintenance).toHaveBeenCalledWith(1);
     });
   });

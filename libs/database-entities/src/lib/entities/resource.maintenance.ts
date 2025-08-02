@@ -23,6 +23,8 @@ export class ResourceMaintenance {
   })
   updatedAt!: Date;
 
+  resourceId!: number;
+
   @ManyToOne(() => Resource, (resource) => resource.maintenances)
   resource!: Resource;
 
