@@ -229,22 +229,6 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Get the active maintenance window for a resource if it exists
-   */
-  async getActiveMaintenance(resourceId: number): Promise<ResourceMaintenance | null> {
-    const now = new Date();
-
-    const activeMaintenance = await this.maintenanceRepository
-      .createQueryBuilder('maintenance')
-      .where('maintenance.resourceId = :resourceId', { resourceId })
-      .andWhere('maintenance.startTime <= :now', { now })
-      .andWhere('maintenance.endTime IS NULL')
-      .getOne();
-
-    return activeMaintenance;
-  }
-
-  /**
    * Check if a user can manage maintenance for a specific resource
    */
   async canManageMaintenance(user: User, resourceId: number): Promise<boolean> {

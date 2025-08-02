@@ -15,6 +15,7 @@ import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
 import { AttractapFirmwareController } from './firmware.controller';
 import { AttractapFirmwareService } from './firmware.service';
+import { ResourceMaintenanceModule } from '../resources/maintenances/maintenance.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AttractapFirmwareService } from './firmware.service';
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
+    ResourceMaintenanceModule,
   ],
   providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService, AttractapFirmwareService],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],

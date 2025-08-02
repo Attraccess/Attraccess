@@ -1119,6 +1119,8 @@ void AttraccessServiceESP::handleEnableCardCheckingEvent(const JsonObject &data)
         String resourceName = resource["name"].as<String>();
         bool isActive = payload["isActive"].as<bool>();
 
+        bool hasActiveMaintenance = payload["hasActiveMaintenance"].as<bool>();
+
         if (isActive && activeUsageSession)
         {
             LEDService::waitForNFCTap = LEDService::WAIT_FOR_NFC_TAP_USAGE_END;
@@ -1132,8 +1134,16 @@ void AttraccessServiceESP::handleEnableCardCheckingEvent(const JsonObject &data)
         else
         {
             LEDService::waitForNFCTap = LEDService::WAIT_FOR_NFC_TAP_USAGE_START;
-            content.message = resourceName + "\n\n" + "Tap to start using";
-            content.textColor = 0x4CAF50; // Green (usage start)
+            if (hasActiveMaintenance)
+            {
+                content.message = resourceName + "\n\n" + "Maintenance in progress";
+                content.textColor = 0xF44336; // Red (not allowed for normal users)
+            }
+            else
+            {
+                content.message = resourceName + "\n\n" + "Tap to start using";
+                content.textColor = 0x4CAF50; // Green (usage start)
+            }
         }
     }
     else if (payload["type"] == "enroll-nfc-card")

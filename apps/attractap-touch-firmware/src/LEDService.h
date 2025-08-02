@@ -14,7 +14,7 @@ public:
         WAIT_FOR_NFC_TAP_ENROLL,
         WAIT_FOR_NFC_TAP_RESET,
         WAIT_FOR_NFC_TAP_USAGE_START,
-        WAIT_FOR_NFC_TAP_USAGE_END
+        WAIT_FOR_NFC_TAP_USAGE_END,
     };
 
     enum LEDServiceState

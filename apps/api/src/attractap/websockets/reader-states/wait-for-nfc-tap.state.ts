@@ -37,30 +37,34 @@ export class WaitForNFCTapState implements ReaderState {
       imageFilename: resource.imageFilename,
     } as Pick<Resource, 'id' | 'name' | 'description' | 'imageFilename'>;
 
+    const maintenances = await this.services.resourceMaintenanceService.findMaintenances(this.selectedResourceId, {
+      includeActive: true,
+      includePast: false,
+      includeUpcoming: false,
+    });
+
+    const hasActiveMaintenance = maintenances.data.length > 0;
+
+    const payload = {
+      type: 'toggle-resource-usage',
+      resource: simplifiedResource,
+      isActive: false,
+      activeUsageSession: null,
+      hasActiveMaintenance,
+      maintenances: maintenances.data,
+    };
+
     if (resourceIsInUse) {
-      return this.socket.sendMessage(
-        new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
-          type: 'toggle-resource-usage',
-          resource: simplifiedResource,
-          isActive: true,
-          activeUsageSession: {
-            user: {
-              id: activeUsageSession.userId,
-              username: activeUsageSession.user.username,
-            } as Pick<User, 'id' | 'username'>,
-          },
-        })
-      );
+      payload.isActive = true;
+      payload.activeUsageSession = {
+        user: {
+          id: activeUsageSession.userId,
+          username: activeUsageSession.user.username,
+        } as Pick<User, 'id' | 'username'>,
+      };
     }
 
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
-        type: 'toggle-resource-usage',
-        resource: simplifiedResource,
-        isActive: false,
-        activeUsageSession: null,
-      })
-    );
+    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, payload));
   }
 
   public async onStateExit(): Promise<void> {

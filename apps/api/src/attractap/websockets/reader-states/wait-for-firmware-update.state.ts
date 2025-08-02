@@ -130,7 +130,7 @@ export class WaitForFirmwareUpdateState implements ReaderState {
     }
 
     const chunk = chunks[chunkIndex];
-    this.logger.debug(`Sending chunk ${chunkIndex}/${chunks.length - 1} - size: ${chunk.length} bytes`);
+    this.logger.verbose(`Sending chunk ${chunkIndex}/${chunks.length - 1} - size: ${chunk.length} bytes`);
 
     // Log first few bytes of first chunk to verify what's being sent
     if (chunkIndex === 0) {
