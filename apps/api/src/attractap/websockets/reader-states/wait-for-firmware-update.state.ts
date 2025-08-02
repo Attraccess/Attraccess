@@ -4,15 +4,10 @@ import { GatewayServices } from '../websocket.gateway';
 import { Logger } from '@nestjs/common';
 import { AttractapFirmware } from '../../dtos/firmware.dto';
 
-type FirmwareIdentifier = {
-  name: string;
-  variant: string;
-};
-
 export class WaitForFirmwareUpdateState implements ReaderState {
   private firmwareDefinition: AttractapFirmware;
   private readonly logger = new Logger(WaitForFirmwareUpdateState.name);
-  private static readonly chunks: Map<FirmwareIdentifier, Buffer[]> = new Map();
+  private static readonly chunks: Map<string, Buffer[]> = new Map();
   private firmwareSize = 0;
 
   public constructor(private readonly socket: AuthenticatedWebSocket, private readonly services: GatewayServices) {}
@@ -54,15 +49,19 @@ export class WaitForFirmwareUpdateState implements ReaderState {
 
   private async loadFirmware(): Promise<Buffer[]> {
     if (
-      WaitForFirmwareUpdateState.chunks.has({
-        name: this.firmwareDefinition.name,
-        variant: this.firmwareDefinition.variant,
-      })
+      WaitForFirmwareUpdateState.chunks.has(
+        JSON.stringify({
+          name: this.firmwareDefinition.name,
+          variant: this.firmwareDefinition.variant,
+        })
+      )
     ) {
-      return WaitForFirmwareUpdateState.chunks.get({
-        name: this.firmwareDefinition.name,
-        variant: this.firmwareDefinition.variant,
-      });
+      return WaitForFirmwareUpdateState.chunks.get(
+        JSON.stringify({
+          name: this.firmwareDefinition.name,
+          variant: this.firmwareDefinition.variant,
+        })
+      );
     }
 
     const chunks: Buffer[] = [];
@@ -107,7 +106,10 @@ export class WaitForFirmwareUpdateState implements ReaderState {
     });
 
     WaitForFirmwareUpdateState.chunks.set(
-      { name: this.firmwareDefinition.name, variant: this.firmwareDefinition.variant },
+      JSON.stringify({
+        name: this.firmwareDefinition.name,
+        variant: this.firmwareDefinition.variant,
+      }),
       chunks
     );
 
