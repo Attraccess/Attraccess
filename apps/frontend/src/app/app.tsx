@@ -99,7 +99,7 @@ function AppLayout(props: PropsWithChildren) {
       }
       isPullable={pullToRefreshIsEnabled}
     >
-      <HeroUIProvider navigate={navigate} labelPlacement="inside">
+      <HeroUIProvider navigate={navigate} labelPlacement="inside" locale={navigator.language}>
         <ToastProvider>
           <ReactFlowProvider>
             <Layout noLayout={!isAuthenticated || serverIsNotAvailable}>

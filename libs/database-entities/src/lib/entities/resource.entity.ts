@@ -20,6 +20,7 @@ import { ResourceFlowNode } from './resourceFlowNode';
 import { ResourceFlowEdge } from './resourceFlowEdge';
 import { ResourceFlowLog } from './resourceFlowLog';
 import { Attractap } from './attractap.entity';
+import { ResourceMaintenance } from './resource.maintenance';
 
 @Entity()
 export class Resource {
@@ -127,6 +128,9 @@ export class Resource {
 
   @ManyToMany(() => Attractap, (reader) => reader.resources)
   attractapReaders!: Attractap[];
+
+  @OneToMany(() => ResourceMaintenance, (maintenance) => maintenance.resource)
+  maintenances!: ResourceMaintenance[];
 }
 
 @ViewEntity({

@@ -1,0 +1,11 @@
+{
+  "alert": {
+    "title": "Resource is not available due to maintenance",
+    "description": "From {{start}} to {{end}}",
+    "reason": {
+      "label": "Reason",
+      "noReason": "No reason"
+    },
+    "noDate": "Date not known"
+  }
+}

@@ -1008,6 +1008,84 @@ export type UpdateResourceIntroductionDto = {
     comment?: string;
 };
 
+export type CanManageMaintenanceResponseDto = {
+    /**
+     * Whether the user can manage maintenance for the resource
+     */
+    canManage: boolean;
+    /**
+     * The resource ID that was checked
+     */
+    resourceId: number;
+};
+
+export type CreateMaintenanceDto = {
+    /**
+     * When the maintenance starts (must be in the future)
+     */
+    startTime: string;
+    /**
+     * When the maintenance ends (optional)
+     */
+    endTime?: string;
+    /**
+     * The reason for the maintenance
+     */
+    reason?: string;
+};
+
+export type ResourceMaintenance = {
+    /**
+     * The unique identifier of the maintenance
+     */
+    id: number;
+    /**
+     * When the maintenance was created
+     */
+    createdAt: string;
+    /**
+     * When the maintenance was last updated
+     */
+    updatedAt: string;
+    /**
+     * When the maintenance started
+     */
+    startTime: string;
+    /**
+     * When the maintenance ended (null if not ended yet)
+     */
+    endTime?: string | null;
+    /**
+     * The reason for the maintenance
+     */
+    reason?: string;
+};
+
+export type PaginatedMaintenanceResponse = {
+    total: number;
+    page: number;
+    limit: number;
+    /**
+     * List of maintenances
+     */
+    data: Array<ResourceMaintenance>;
+};
+
+export type UpdateMaintenanceDto = {
+    /**
+     * When the maintenance starts (must be in the future)
+     */
+    startTime?: string;
+    /**
+     * When the maintenance ends (optional)
+     */
+    endTime?: string;
+    /**
+     * The reason for the maintenance
+     */
+    reason?: string;
+};
+
 export type ResourceFlowNodePositionDto = {
     /**
      * The x position of the node
@@ -2015,6 +2093,94 @@ export type ResourceIntroductionsGetHistoryData = {
 };
 
 export type ResourceIntroductionsGetHistoryResponse = Array<ResourceIntroductionHistoryItem>;
+
+export type CanManageMaintenanceData = {
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type CanManageMaintenanceResponse = CanManageMaintenanceResponseDto;
+
+export type CreateMaintenanceData = {
+    requestBody: CreateMaintenanceDto;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type CreateMaintenanceResponse = ResourceMaintenance;
+
+export type FindMaintenancesData = {
+    /**
+     * Include active maintenances (currently ongoing)
+     */
+    includeActive?: boolean;
+    /**
+     * Include past maintenances (already finished)
+     */
+    includePast?: boolean;
+    /**
+     * Include upcoming maintenances (start time in the future)
+     */
+    includeUpcoming?: boolean;
+    /**
+     * Number of items per page
+     */
+    limit?: number;
+    /**
+     * Page number for pagination
+     */
+    page?: number;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type FindMaintenancesResponse = PaginatedMaintenanceResponse;
+
+export type GetMaintenanceData = {
+    /**
+     * The ID of the maintenance
+     */
+    maintenanceId: number;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type GetMaintenanceResponse = ResourceMaintenance;
+
+export type UpdateMaintenanceData = {
+    /**
+     * The ID of the maintenance
+     */
+    maintenanceId: number;
+    requestBody: UpdateMaintenanceDto;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type UpdateMaintenanceResponse = ResourceMaintenance;
+
+export type CancelMaintenanceData = {
+    /**
+     * The ID of the maintenance
+     */
+    maintenanceId: number;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type CancelMaintenanceResponse = void;
 
 export type GetResourceFlowData = {
     /**
@@ -3316,6 +3482,134 @@ export type $OpenApiTs = {
                  * User does not have permission to introduce users to this resource
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenances/can-manage': {
+        get: {
+            req: CanManageMaintenanceData;
+            res: {
+                /**
+                 * Permission check completed successfully
+                 */
+                200: CanManageMaintenanceResponseDto;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenances': {
+        post: {
+            req: CreateMaintenanceData;
+            res: {
+                /**
+                 * Maintenance created successfully
+                 */
+                201: ResourceMaintenance;
+                /**
+                 * Bad request - invalid maintenance data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to manage maintenances for this resource
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+        get: {
+            req: FindMaintenancesData;
+            res: {
+                /**
+                 * Maintenances retrieved successfully
+                 */
+                200: PaginatedMaintenanceResponse;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenances/{maintenanceId}': {
+        get: {
+            req: GetMaintenanceData;
+            res: {
+                /**
+                 * Maintenance retrieved successfully
+                 */
+                200: ResourceMaintenance;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Maintenance not found
+                 */
+                404: unknown;
+            };
+        };
+        put: {
+            req: UpdateMaintenanceData;
+            res: {
+                /**
+                 * Maintenance updated successfully
+                 */
+                200: ResourceMaintenance;
+                /**
+                 * Bad request - invalid maintenance data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to manage maintenances for this resource
+                 */
+                403: unknown;
+                /**
+                 * Maintenance not found
+                 */
+                404: unknown;
+            };
+        };
+        delete: {
+            req: CancelMaintenanceData;
+            res: {
+                /**
+                 * Maintenance cancelled successfully
+                 */
+                204: void;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to manage maintenances for this resource
+                 */
+                403: unknown;
+                /**
+                 * Maintenance not found
+                 */
+                404: unknown;
             };
         };
     };

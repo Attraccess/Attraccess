@@ -6,7 +6,7 @@ import { cn, Image } from '@heroui/react';
 
 interface PageHeaderProps {
   title: string | ReactNode;
-  subtitle?: string;
+  subtitle?: string | ReactNode;
   backTo?: string;
   onBack?: () => void;
   actions?: ReactNode;
@@ -30,7 +30,7 @@ export function PageHeader({
   const navigate = useNavigate();
 
   return (
-    <div className={cn('flex items-center justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
+    <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
       <div className="flex items-center">
         {(backTo || onBack) && (
           <Button

@@ -60,7 +60,12 @@ export function ResetPassword() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </CardBody>
           <CardFooter>
-            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="reset-password-success-go-to-login-button">
+            <Button
+              fullWidth
+              color="primary"
+              onPress={() => navigate('/')}
+              data-cy="reset-password-success-go-to-login-button"
+            >
               {t('success.goToLogin')}
             </Button>
           </CardFooter>
@@ -88,6 +93,7 @@ export function ResetPassword() {
             minLength={8}
             required
             data-cy="reset-password-password-input"
+            autoComplete="new-password"
           />
           <PasswordInput
             label={t('inputs.confirmPassword')}
@@ -101,6 +107,7 @@ export function ResetPassword() {
               return true;
             }}
             data-cy="reset-password-confirm-password-input"
+            autoComplete="new-password"
           />
         </CardBody>
         <CardFooter>

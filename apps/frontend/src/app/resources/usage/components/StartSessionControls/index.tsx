@@ -17,7 +17,11 @@ interface StartSessionControlsProps {
   resourceId: number;
 }
 
-export function StartSessionControls({ resourceId }: Readonly<StartSessionControlsProps>) {
+export function StartSessionControls(
+  props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>
+) {
+  const { resourceId, ...divProps } = props;
+
   const { t } = useTranslations('startSessionControls', { en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
@@ -49,11 +53,22 @@ export function StartSessionControls({ resourceId }: Readonly<StartSessionContro
       });
     },
     onError: (err) => {
+      let errorMessage = err;
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((err as any).body?.error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        errorMessage = (err as any).body.error;
+      }
+
       showError({
         title: t('sessionStartError'),
-        description: t('sessionStartErrorDescription'),
+        description: t('sessionStartErrorDescription') + ' ' + errorMessage,
       });
-      console.error('Failed to start session:', err);
+      console.error('Failed to start session:', JSON.stringify(err));
     },
   });
 
@@ -76,7 +91,7 @@ export function StartSessionControls({ resourceId }: Readonly<StartSessionContro
   };
 
   return (
-    <>
+    <div {...divProps}>
       <div className="space-y-4">
         <p className="text-gray-500 dark:text-gray-400">{t('noActiveSession')}</p>
 
@@ -114,6 +129,6 @@ export function StartSessionControls({ resourceId }: Readonly<StartSessionContro
         mode={SessionModalMode.START}
         isSubmitting={startSession.isPending}
       />
-    </>
+    </div>
   );
 }

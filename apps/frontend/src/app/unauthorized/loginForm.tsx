@@ -84,6 +84,7 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
           required
           isDisabled={isPending}
           data-cy="login-form-password-input"
+          autoComplete="current-password"
         />
         <div className="flex items-center justify-between">
           <Button

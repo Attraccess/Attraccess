@@ -88,6 +88,7 @@ describe('ResourcesService', () => {
       flowEdges: [],
       flowLogs: [],
       attractapReaders: [],
+      maintenances: [],
     });
 
     beforeEach(() => {
@@ -449,6 +450,7 @@ describe('ResourcesService', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);
@@ -501,6 +503,7 @@ describe('ResourcesService', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       resourceRepository.create.mockReturnValue(newResource);
@@ -552,6 +555,7 @@ describe('ResourcesService', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       const updatedResource = {
@@ -561,6 +565,7 @@ describe('ResourcesService', () => {
         documentationType: updateDto.documentationType,
         documentationMarkdown: null,
         documentationUrl: updateDto.documentationUrl,
+        maintenances: [],
       };
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
@@ -608,6 +613,7 @@ describe('ResourcesService', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);

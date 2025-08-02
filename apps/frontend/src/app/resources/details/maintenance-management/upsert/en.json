@@ -1,0 +1,22 @@
+{
+  "title": "Create maintenance period",
+  "inputs": {
+    "startTime": {
+      "label": "Start time"
+    },
+    "endTime": {
+      "label": "End time"
+    },
+    "reason": {
+      "label": "Reason (optional)"
+    }
+  },
+  "actions": {
+    "save": "Save"
+  },
+  "alert": {
+    "error": {
+      "title": "Error adding maintenance period"
+    }
+  }
+}

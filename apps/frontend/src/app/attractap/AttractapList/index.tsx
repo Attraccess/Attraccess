@@ -27,6 +27,7 @@ import { PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
+import { useNow } from '../../../hooks/useNow';
 
 import de from './de.json';
 import en from './en.json';
@@ -62,14 +63,7 @@ export const AttractapList = () => {
 
   const formatDateTime = useDateTimeFormatter();
 
-  const [now, setNow] = useState(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const now = useNow();
 
   const { stale: staleReaders, active: activeReaders } = useMemo(() => {
     const readersSortedByLastConnection = (allReaders ?? []).sort((a, b) => {

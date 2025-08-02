@@ -34,14 +34,14 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
   }, [showDate, showTime, showSeconds, i18n.language]);
 
   return useCallback(
-    (date?: Date | string | number | null) => {
+    (date?: Date | string | number | null, fallback?: string | React.ReactNode) => {
       if (date === null || date === undefined) {
-        return '-';
+        return fallback ?? '-';
       }
 
       const dateAsDate = new Date(date);
       if (isNaN(dateAsDate.getTime())) {
-        return '-';
+        return fallback ?? '-';
       }
 
       return formatter.format(dateAsDate);

@@ -190,6 +190,7 @@ export function AttractapSerialConfiguratorWifi(props: Props) {
         label={t('password.label')}
         value={wifiPassword ?? ''}
         onChange={(e) => setWifiPassword(e.target.value)}
+        autoComplete="off"
       />
       <Button onPress={setWifiCredentials} color="primary">
         {t('setCredentials.label')}

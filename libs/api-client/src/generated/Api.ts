@@ -173,6 +173,14 @@ export interface BulkUpdateUserPermissionsDto {
   updates: UserPermissionsUpdateItem[];
 }
 
+export interface SetUserPasswordDto {
+  /**
+   * The new password for the user
+   * @example "newSecurePassword123"
+   */
+  password: string;
+}
+
 export interface CreateSessionResponse {
   /**
    * The user that has been logged in
@@ -1082,6 +1090,99 @@ export interface UpdateResourceIntroductionDto {
   comment?: string;
 }
 
+export interface CanManageMaintenanceResponseDto {
+  /**
+   * Whether the user can manage maintenance for the resource
+   * @example true
+   */
+  canManage: boolean;
+  /**
+   * The resource ID that was checked
+   * @example 123
+   */
+  resourceId: number;
+}
+
+export interface CreateMaintenanceDto {
+  /**
+   * When the maintenance starts (must be in the future)
+   * @format date-time
+   * @example "2025-01-01T10:00:00.000Z"
+   */
+  startTime: string;
+  /**
+   * When the maintenance ends (optional)
+   * @format date-time
+   * @example "2025-01-01T18:00:00.000Z"
+   */
+  endTime?: string;
+  /**
+   * The reason for the maintenance
+   * @example "Scheduled maintenance for software updates"
+   */
+  reason?: string;
+}
+
+export interface ResourceMaintenance {
+  /**
+   * The unique identifier of the maintenance
+   * @example 1
+   */
+  id: number;
+  /**
+   * When the maintenance was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the maintenance was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /**
+   * When the maintenance started
+   * @format date-time
+   * @example "2025-01-01T00:00:00.000Z"
+   */
+  startTime: string;
+  /**
+   * When the maintenance ended (null if not ended yet)
+   * @format date-time
+   * @example "2025-01-01T00:00:00.000Z"
+   */
+  endTime?: string | null;
+  /** The reason for the maintenance */
+  reason?: string;
+}
+
+export interface PaginatedMaintenanceResponse {
+  total: number;
+  page: number;
+  limit: number;
+  /** List of maintenances */
+  data: ResourceMaintenance[];
+}
+
+export interface UpdateMaintenanceDto {
+  /**
+   * When the maintenance starts (must be in the future)
+   * @format date-time
+   * @example "2025-01-01T10:00:00.000Z"
+   */
+  startTime?: string;
+  /**
+   * When the maintenance ends (optional)
+   * @format date-time
+   * @example "2025-01-01T18:00:00.000Z"
+   */
+  endTime?: string;
+  /**
+   * The reason for the maintenance
+   * @example "Scheduled maintenance for software updates"
+   */
+  reason?: string;
+}
+
 export interface ResourceFlowNodePositionDto {
   /**
    * The x position of the node
@@ -1568,6 +1669,11 @@ export interface GetAllWithPermissionParams {
 
 export type GetAllWithPermissionData = PaginatedUsersResponseDto;
 
+export interface SetUserPasswordData {
+  /** @example "Password updated successfully" */
+  message?: string;
+}
+
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
@@ -1764,6 +1870,53 @@ export type ResourceIntroductionsRevokeData = ResourceIntroductionHistoryItem;
 
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
+
+export type CanManageMaintenanceData = CanManageMaintenanceResponseDto;
+
+export type CreateMaintenanceData = ResourceMaintenance;
+
+export interface FindMaintenancesParams {
+  /**
+   * Page number for pagination
+   * @default 1
+   * @example 1
+   */
+  page?: number;
+  /**
+   * Number of items per page
+   * @default 10
+   * @example 10
+   */
+  limit?: number;
+  /**
+   * Include upcoming maintenances (start time in the future)
+   * @default true
+   * @example true
+   */
+  includeUpcoming?: boolean;
+  /**
+   * Include active maintenances (currently ongoing)
+   * @default true
+   * @example true
+   */
+  includeActive?: boolean;
+  /**
+   * Include past maintenances (already finished)
+   * @default false
+   * @example false
+   */
+  includePast?: boolean;
+  /** The ID of the resource */
+  resourceId: number;
+}
+
+export type FindMaintenancesData = PaginatedMaintenanceResponse;
+
+export type GetMaintenanceData = ResourceMaintenance;
+
+export type UpdateMaintenanceData = ResourceMaintenance;
+
+export type CancelMaintenanceData = any;
 
 export type GetResourceFlowData = ResourceFlowResponseDto;
 
@@ -2079,6 +2232,24 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetAllWithPermissionData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name SetUserPassword
+   * @summary Set a user's password directly
+   * @request POST:/api/users/{id}/set-password
+   * @secure
+   */
+  export namespace SetUserPassword {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SetUserPasswordDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetUserPasswordData;
   }
 }
 
@@ -3184,6 +3355,159 @@ export namespace AccessControl {
   }
 }
 
+export namespace ResourceMaintenances {
+  /**
+   * @description Check if the authenticated user has permission to manage maintenance for the specified resource
+   * @tags Resource Maintenances
+   * @name CanManageMaintenance
+   * @summary Check if user can manage maintenance
+   * @request GET:/api/resources/{resourceId}/maintenances/can-manage
+   * @secure
+   */
+  export namespace CanManageMaintenance {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = CanManageMaintenanceData;
+  }
+
+  /**
+   * @description Create a new maintenance schedule for a specific resource
+   * @tags Resource Maintenances
+   * @name CreateMaintenance
+   * @summary Create a maintenance for a resource
+   * @request POST:/api/resources/{resourceId}/maintenances
+   * @secure
+   */
+  export namespace CreateMaintenance {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateMaintenanceDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateMaintenanceData;
+  }
+
+  /**
+   * @description Retrieve paginated list of maintenances for a specific resource with optional filtering
+   * @tags Resource Maintenances
+   * @name FindMaintenances
+   * @summary Get maintenances for a resource
+   * @request GET:/api/resources/{resourceId}/maintenances
+   * @secure
+   */
+  export namespace FindMaintenances {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * Page number for pagination
+       * @default 1
+       * @example 1
+       */
+      page?: number;
+      /**
+       * Number of items per page
+       * @default 10
+       * @example 10
+       */
+      limit?: number;
+      /**
+       * Include upcoming maintenances (start time in the future)
+       * @default true
+       * @example true
+       */
+      includeUpcoming?: boolean;
+      /**
+       * Include active maintenances (currently ongoing)
+       * @default true
+       * @example true
+       */
+      includeActive?: boolean;
+      /**
+       * Include past maintenances (already finished)
+       * @default false
+       * @example false
+       */
+      includePast?: boolean;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = FindMaintenancesData;
+  }
+
+  /**
+   * @description Retrieve details of a specific maintenance
+   * @tags Resource Maintenances
+   * @name GetMaintenance
+   * @summary Get a specific maintenance by ID
+   * @request GET:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @secure
+   */
+  export namespace GetMaintenance {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+      /** The ID of the maintenance */
+      maintenanceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetMaintenanceData;
+  }
+
+  /**
+   * @description Update a maintenance with new start time, end time, and/or reason
+   * @tags Resource Maintenances
+   * @name UpdateMaintenance
+   * @summary Update a maintenance
+   * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @secure
+   */
+  export namespace UpdateMaintenance {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+      /** The ID of the maintenance */
+      maintenanceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateMaintenanceDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateMaintenanceData;
+  }
+
+  /**
+   * @description Delete a maintenance (cancel it)
+   * @tags Resource Maintenances
+   * @name CancelMaintenance
+   * @summary Cancel a maintenance
+   * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @secure
+   */
+  export namespace CancelMaintenance {
+    export type RequestParams = {
+      /** The ID of the resource */
+      resourceId: number;
+      /** The ID of the maintenance */
+      maintenanceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = CancelMaintenanceData;
+  }
+}
+
 export namespace ResourceFlows {
   /**
    * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
@@ -4031,6 +4355,30 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name SetUserPassword
+     * @summary Set a user's password directly
+     * @request POST:/api/users/{id}/set-password
+     * @secure
+     */
+    setUserPassword: (
+      id: number,
+      data: SetUserPasswordDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetUserPasswordData, void>({
+        path: `/api/users/${id}/set-password`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -5218,6 +5566,139 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  resourceMaintenances = {
+    /**
+     * @description Check if the authenticated user has permission to manage maintenance for the specified resource
+     *
+     * @tags Resource Maintenances
+     * @name CanManageMaintenance
+     * @summary Check if user can manage maintenance
+     * @request GET:/api/resources/{resourceId}/maintenances/can-manage
+     * @secure
+     */
+    canManageMaintenance: (resourceId: number, params: RequestParams = {}) =>
+      this.request<CanManageMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/can-manage`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Create a new maintenance schedule for a specific resource
+     *
+     * @tags Resource Maintenances
+     * @name CreateMaintenance
+     * @summary Create a maintenance for a resource
+     * @request POST:/api/resources/{resourceId}/maintenances
+     * @secure
+     */
+    createMaintenance: (
+      resourceId: number,
+      data: CreateMaintenanceDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve paginated list of maintenances for a specific resource with optional filtering
+     *
+     * @tags Resource Maintenances
+     * @name FindMaintenances
+     * @summary Get maintenances for a resource
+     * @request GET:/api/resources/{resourceId}/maintenances
+     * @secure
+     */
+    findMaintenances: (
+      { resourceId, ...query }: FindMaintenancesParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<FindMaintenancesData, void>({
+        path: `/api/resources/${resourceId}/maintenances`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve details of a specific maintenance
+     *
+     * @tags Resource Maintenances
+     * @name GetMaintenance
+     * @summary Get a specific maintenance by ID
+     * @request GET:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @secure
+     */
+    getMaintenance: (
+      resourceId: number,
+      maintenanceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Update a maintenance with new start time, end time, and/or reason
+     *
+     * @tags Resource Maintenances
+     * @name UpdateMaintenance
+     * @summary Update a maintenance
+     * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @secure
+     */
+    updateMaintenance: (
+      resourceId: number,
+      maintenanceId: number,
+      data: UpdateMaintenanceDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Delete a maintenance (cancel it)
+     *
+     * @tags Resource Maintenances
+     * @name CancelMaintenance
+     * @summary Cancel a maintenance
+     * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @secure
+     */
+    cancelMaintenance: (
+      resourceId: number,
+      maintenanceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<CancelMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

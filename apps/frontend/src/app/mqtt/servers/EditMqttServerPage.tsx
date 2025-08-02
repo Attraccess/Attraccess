@@ -222,6 +222,7 @@ export function EditMqttServerPage() {
                   onChange={handleInputChange}
                   fullWidth
                   data-cy="edit-mqtt-server-form-password-input"
+                  autoComplete="off"
                 />
               </div>
 

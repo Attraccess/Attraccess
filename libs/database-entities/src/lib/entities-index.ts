@@ -33,6 +33,7 @@ import {
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
+import { ResourceMaintenance } from './entities/resource.maintenance';
 
 // Export all entities individually
 export {
@@ -72,6 +73,7 @@ export {
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
   AttractapFirmwareVersion,
+  ResourceMaintenance,
 };
 
 // Export the entities object
@@ -96,4 +98,5 @@ export const entities = {
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowLog,
+  ResourceMaintenance,
 };

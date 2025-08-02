@@ -17,6 +17,7 @@ import {
 import newGithubIssueUrl from 'new-github-issue-url';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
+import { useNow } from '../../hooks/useNow';
 
 export type SidebarItem = {
   path: string;
@@ -106,6 +107,8 @@ export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
 export const useSidebarEndItems = () => {
   const { user } = useAuth();
 
+  const now = useNow();
+
   const reportBugUrl = newGithubIssueUrl({
     user: 'Attraccess',
     repo: 'Attraccess',
@@ -116,7 +119,7 @@ export const useSidebarEndItems = () => {
 
 - **Browser:** ${navigator.userAgent}
 - **Screen Size / Bildschirmgröße:** ${window.innerWidth}x${window.innerHeight}
-- **Time / Zeit:** ${new Date().toISOString()}
+- **Time / Zeit:** ${now.toISOString()}
 - **User ID / Benutzer-ID:** ${user?.id || 'Not logged in / Nicht angemeldet'}
 - **URL:** ${window.location.href}
 
@@ -137,7 +140,7 @@ export const useSidebarEndItems = () => {
 
 - **Browser:** ${navigator.userAgent}
 - **Screen Size / Bildschirmgröße:** ${window.innerWidth}x${window.innerHeight}
-- **Time / Zeit:** ${new Date().toISOString()}
+- **Time / Zeit:** ${now.toISOString()}
 - **User ID / Benutzer-ID:** ${user?.id || 'Not logged in / Nicht angemeldet'}
 - **URL:** ${window.location.href}
 

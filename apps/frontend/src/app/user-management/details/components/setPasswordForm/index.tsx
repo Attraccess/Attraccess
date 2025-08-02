@@ -73,6 +73,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
             data-cy="set-password-form-new-password"
             errorMessage={t('errors.passwordTooShort')}
             isInvalid={passwordTooShort && passwordWasEntered}
+            autoComplete="new-password"
           />
 
           <PasswordInput
@@ -82,6 +83,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps> = ({ user }) => {
             data-cy="set-password-form-confirm-password"
             errorMessage={t('errors.passwordsDoNotMatch')}
             isInvalid={passwordsDontMatch && passwordWasEntered}
+            autoComplete="new-password"
           />
         </div>
       </CardBody>

@@ -12,9 +12,11 @@ import {
   useResourcesServiceResourceUsageGetActiveSession,
   Resource,
   useResourcesServiceResourceUsageCanControl,
+  useResourceMaintenancesServiceFindMaintenances,
 } from '@attraccess/react-query-client';
 import * as en from './translations/en.json';
 import * as de from './translations/de.json';
+import { MaintenanceInProgressDisplay } from './maintenance';
 
 type ResourceUsageSessionProps = {
   resourceId: number;
@@ -60,6 +62,11 @@ export function ResourceUsageSession({ resourceId, resource, ...rest }: Resource
   // Users with canManageResources permission can always start a session
   const canStartSession = canManageResources || access?.canControl || isIntroducer;
 
+  const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
+    resourceId,
+    includeActive: true,
+  });
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -82,6 +89,10 @@ export function ResourceUsageSession({ resourceId, resource, ...rest }: Resource
 
     if (!canStartSession) {
       return <IntroductionRequiredDisplay resourceId={resourceId} />;
+    }
+
+    if (activeMaintenances?.data?.length && activeMaintenances.data.length > 0) {
+      return <MaintenanceInProgressDisplay resourceId={resourceId} />;
     }
 
     return <StartSessionControls resourceId={resourceId} />;

@@ -5,6 +5,7 @@ import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ResourceUsageStartedEvent,
@@ -16,6 +17,7 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 
 @Injectable()
 export class ResourceUsageService {
@@ -31,6 +33,7 @@ export class ResourceUsageService {
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
     private readonly resourceGroupsIntroducersService: ResourceGroupsIntroducersService,
     private readonly resourceGroupsService: ResourceGroupsService,
+    private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2
   ) {}
 
@@ -78,6 +81,22 @@ export class ResourceUsageService {
       throw new ResourceNotFoundException(resourceId);
     }
     this.logger.debug(`Found resource ${resourceId}: ${resource.name}`);
+
+    // Check if there's an active maintenance window
+    const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId);
+    if (hasActiveMaintenance) {
+      // Check if user can manage maintenance (which allows them to use during maintenance)
+      const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(user, resourceId);
+
+      if (!canManageMaintenance) {
+        this.logger.warn(
+          `User ${user.id} attempted to use resource ${resourceId} during maintenance window without permissions`
+        );
+        throw new ResourceUsageImpossibleMaintenanceInProgressException(resourceId);
+      }
+
+      this.logger.debug(`User ${user.id} has maintenance permissions, allowing usage during maintenance window`);
+    }
 
     const canStartSession = await this.canControllResource(resourceId, user);
 
@@ -186,21 +205,12 @@ export class ResourceUsageService {
     // Find active session
     const activeSession = await this.getActiveSession(resourceId);
     if (!activeSession) {
-      this.logger.warn(`No active session found for resource ${resourceId}`);
       throw new BadRequestException('No active session found');
     }
-
-    this.logger.debug(
-      `Found active session ${activeSession.id} for resource ${resourceId} owned by user ${activeSession.user.id}`
-    );
 
     // Check if the user is authorized to end the session
     const canManageResources = user.systemPermissions?.canManageResources || false;
     const isSessionOwner = activeSession.user.id === user.id; // Use loaded user ID
-
-    this.logger.debug(
-      `Authorization check: canManageResources=${canManageResources}, isSessionOwner=${isSessionOwner}`
-    );
 
     if (!isSessionOwner && !canManageResources) {
       this.logger.warn(
@@ -233,36 +243,20 @@ export class ResourceUsageService {
     );
 
     // Fetch the updated record
-    const updatedSession = await this.resourceUsageRepository.findOne({
+    return await this.resourceUsageRepository.findOne({
       where: { id: activeSession.id },
       relations: ['resource', 'user'],
     });
-
-    this.logger.debug(`Retrieved updated session ${activeSession.id} after ending`);
-
-    return updatedSession;
   }
 
   async getActiveSession(resourceId: number): Promise<ResourceUsage | null> {
-    this.logger.debug(`Getting active session for resource ${resourceId}`);
-
-    const activeSession = await this.resourceUsageRepository.findOne({
+    return await this.resourceUsageRepository.findOne({
       where: {
         resourceId,
         endTime: IsNull(),
       },
       relations: ['user', 'resource'],
     });
-
-    if (activeSession) {
-      this.logger.debug(
-        `Found active session ${activeSession.id} for resource ${resourceId} by user ${activeSession.user.id}`
-      );
-    } else {
-      this.logger.debug(`No active session found for resource ${resourceId}`);
-    }
-
-    return activeSession;
   }
 
   async getResourceUsageHistory(
@@ -271,8 +265,6 @@ export class ResourceUsageService {
     limit = 10,
     userId?: number
   ): Promise<{ data: ResourceUsage[]; total: number }> {
-    this.logger.debug(`Getting usage history for resource ${resourceId}`, { page, limit, userId });
-
     const whereClause: FindOneOptions<ResourceUsage>['where'] = { resourceId };
 
     // Add userId filter if provided

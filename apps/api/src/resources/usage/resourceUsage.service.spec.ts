@@ -13,7 +13,9 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceUsageStartedEvent, ResourceUsageEndedEvent } from './events/resource-usage.events';
 
 describe('ResourceUsageService', () => {
@@ -25,6 +27,7 @@ describe('ResourceUsageService', () => {
   let resourceGroupsIntroductionsService: jest.Mocked<ResourceGroupsIntroductionsService>;
   let resourceGroupsIntroducersService: jest.Mocked<ResourceGroupsIntroducersService>;
   let resourceGroupsService: jest.Mocked<ResourceGroupsService>;
+  let resourceMaintenanceService: jest.Mocked<ResourceMaintenanceService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
   const mockRepository = () => ({
@@ -71,6 +74,11 @@ describe('ResourceUsageService', () => {
 
   const mockResourceGroupsService = {
     getGroupsOfResource: jest.fn(),
+  };
+
+  const mockResourceMaintenanceService = {
+    hasActiveMaintenance: jest.fn(),
+    canManageMaintenance: jest.fn(),
   };
 
   type MockQueryBuilder = {
@@ -134,6 +142,10 @@ describe('ResourceUsageService', () => {
           useValue: mockResourceGroupsService,
         },
         {
+          provide: ResourceMaintenanceService,
+          useValue: mockResourceMaintenanceService,
+        },
+        {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
@@ -148,6 +160,7 @@ describe('ResourceUsageService', () => {
     resourceGroupsIntroductionsService = module.get(ResourceGroupsIntroductionsService);
     resourceGroupsIntroducersService = module.get(ResourceGroupsIntroducersService);
     resourceGroupsService = module.get(ResourceGroupsService);
+    resourceMaintenanceService = module.get(ResourceMaintenanceService);
     eventEmitter = module.get(EventEmitter2);
   });
 
@@ -173,6 +186,7 @@ describe('ResourceUsageService', () => {
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
       resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -220,6 +234,7 @@ describe('ResourceUsageService', () => {
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
       resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -235,6 +250,7 @@ describe('ResourceUsageService', () => {
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
       resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -255,6 +271,7 @@ describe('ResourceUsageService', () => {
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: false)
       resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
       resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -275,6 +292,7 @@ describe('ResourceUsageService', () => {
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
       resourceRepository.findOne.mockResolvedValue(mockResourceWithTakeOver);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
       resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -307,6 +325,57 @@ describe('ResourceUsageService', () => {
       expect(mockUpdateQueryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
       expect(mockInsertQueryBuilder.insert).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith('resource.usage.taken_over', expect.any(Object));
+    });
+
+    it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      // Mock resourceRepository.findOne to return the resource
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+
+      // Mock maintenance service to indicate active maintenance
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
+      resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
+
+      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
+        ResourceUsageImpossibleMaintenanceInProgressException
+      );
+      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
+    });
+
+    it('should allow usage when resource is under maintenance but user can manage maintenance', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      // Mock resourceRepository.findOne to return the resource
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+
+      // Mock maintenance service to indicate active maintenance but user can manage
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
+      resourceMaintenanceService.canManageMaintenance.mockResolvedValue(true);
+
+      // Mock other required services
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      // Mock getActiveSession to return null (no active session)
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(null) // For getActiveSession
+        .mockResolvedValueOnce({ id: 1, resourceId: 1, userId: 1 } as ResourceUsage); // For finding new session
+
+      const mockQueryBuilder = createMockQueryBuilder(null);
+      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>
+      );
+
+      const result = await service.startSession(1, mockUser, dto);
+
+      expect(result).toEqual({ id: 1, resourceId: 1, userId: 1 });
+      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
     });
   });
 
