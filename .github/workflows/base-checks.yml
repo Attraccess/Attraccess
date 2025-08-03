@@ -26,8 +26,6 @@ jobs:
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
 
-      - run: pnpm dlx nx-cloud start-ci-run --distribute-on="3 linux-medium-js"
-
       # Cache node_modules
       - uses: actions/setup-node@v4
         with:
