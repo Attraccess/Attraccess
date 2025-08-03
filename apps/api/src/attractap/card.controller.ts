@@ -17,7 +17,7 @@ export class AttractapNfcCardsController {
   ) {}
 
   @Post('keys')
-  @Auth()
+  @Auth('canManageUsers')
   @ApiOperation({ summary: 'Get the app key for a card by UID', operationId: 'getAppKeyByUid' })
   @ApiBody({ type: AppKeyRequestDto })
   @ApiResponse({

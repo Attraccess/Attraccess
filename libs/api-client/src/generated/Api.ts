@@ -173,6 +173,14 @@ export interface BulkUpdateUserPermissionsDto {
   updates: UserPermissionsUpdateItem[];
 }
 
+export interface SetUserPasswordDto {
+  /**
+   * The new password for the user
+   * @example "newSecurePassword123"
+   */
+  password: string;
+}
+
 export interface CreateSessionResponse {
   /**
    * The user that has been logged in
@@ -1568,6 +1576,11 @@ export interface GetAllWithPermissionParams {
 
 export type GetAllWithPermissionData = PaginatedUsersResponseDto;
 
+export interface SetUserPasswordData {
+  /** @example "Password updated successfully" */
+  message?: string;
+}
+
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
@@ -2079,6 +2092,24 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetAllWithPermissionData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name SetUserPassword
+   * @summary Set a user's password directly
+   * @request POST:/api/users/{id}/set-password
+   * @secure
+   */
+  export namespace SetUserPassword {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SetUserPasswordDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetUserPasswordData;
   }
 }
 
@@ -4031,6 +4062,30 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name SetUserPassword
+     * @summary Set a user's password directly
+     * @request POST:/api/users/{id}/set-password
+     * @secure
+     */
+    setUserPassword: (
+      id: number,
+      data: SetUserPasswordDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetUserPasswordData, void>({
+        path: `/api/users/${id}/set-password`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
