@@ -138,6 +138,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           variant="underlined"
           isDisabled={createUser.isPending}
           data-cy="registration-form-password-input"
+          autoComplete="new-password"
         />
 
         <PasswordInput
@@ -148,6 +149,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           variant="underlined"
           isDisabled={createUser.isPending}
           data-cy="registration-form-password-confirmation-input"
+          autoComplete="new-password"
         />
 
         <Button

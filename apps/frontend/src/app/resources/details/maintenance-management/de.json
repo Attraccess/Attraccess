@@ -1,0 +1,19 @@
+{
+  "title": "Wartungsarbeiten",
+  "filters": {
+    "includePast": "Vergangene anzeigen"
+  },
+  "table": {
+    "columns": {
+      "start": "Start",
+      "end": "Ende",
+      "reason": "Grund"
+    }
+  },
+  "actions": {
+    "create": {
+      "title": "Wartungszeitraum anlegen",
+      "label": "Neu"
+    }
+  }
+}

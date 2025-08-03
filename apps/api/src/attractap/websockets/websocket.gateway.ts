@@ -23,6 +23,7 @@ import { ResourceUsageService } from '../../resources/usage/resourceUsage.servic
 import { WaitForResourceSelectionState } from './reader-states/wait-for-resource-selection.state';
 import { WaitForNFCTapState } from './reader-states/wait-for-nfc-tap.state';
 import { AttractapFirmwareService } from '../firmware.service';
+import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 
 export interface GatewayServices {
   websocketService: WebsocketService;
@@ -32,6 +33,7 @@ export interface GatewayServices {
   usersService: UsersService;
   firmwareService: AttractapFirmwareService;
   gateway: AttractapGateway;
+  resourceMaintenanceService: ResourceMaintenanceService;
 }
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
@@ -59,6 +61,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(AttractapFirmwareService)
   private firmwareService: AttractapFirmwareService;
 
+  @Inject(ResourceMaintenanceService)
+  private resourceMaintenanceService: ResourceMaintenanceService;
+
   public async handleConnection(client: AuthenticatedWebSocket) {
     this.logger.log('Client connected via WebSocket');
 
@@ -78,7 +83,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     };
 
     client.sendBinaryData = (data: Buffer) => {
-      this.logger.debug(`Sending binary data: ${data.length} bytes`);
+      this.logger.verbose(`Sending binary data: ${data.length} bytes`);
       (client as unknown as WebSocket).send(data);
     };
 
@@ -94,6 +99,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
         gateway: this,
+        resourceMaintenanceService: this.resourceMaintenanceService,
       })
     );
 
@@ -195,6 +201,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
         gateway: this,
+        resourceMaintenanceService: this.resourceMaintenanceService,
       },
       user
     );
@@ -239,6 +246,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourcesService: this.resourcesService,
         firmwareService: this.firmwareService,
         gateway: this,
+        resourceMaintenanceService: this.resourceMaintenanceService,
       },
       nfcCard.id
     );
@@ -263,6 +271,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           resourcesService: this.resourcesService,
           firmwareService: this.firmwareService,
           gateway: this,
+          resourceMaintenanceService: this.resourceMaintenanceService,
         });
 
         await socket.transitionToState(nextState);
@@ -290,6 +299,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
               resourcesService: this.resourcesService,
               firmwareService: this.firmwareService,
               gateway: this,
+              resourceMaintenanceService: this.resourceMaintenanceService,
             })
           );
         }

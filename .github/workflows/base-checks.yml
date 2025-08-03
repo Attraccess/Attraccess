@@ -23,12 +23,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+
+      - run: pnpm dlx nx-cloud start-ci-run --distribute-on="3 linux-medium-js"
 
       # Cache node_modules
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: v22.18.0
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -46,11 +49,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio esptool
 
-      # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
-      # - run: pnpm exec nx-cloud record -- echo Hello World
-      # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
-
-      # Modified to run lint with max-warnings=0 to fail on warnings
       - name: Run lint, test, build and e2e
         env:
           NODE_ENV: production

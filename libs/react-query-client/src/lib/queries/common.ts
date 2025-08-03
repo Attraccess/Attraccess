@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourceFlowsService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -215,6 +215,30 @@ export const UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn = ({ re
   resourceId: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useAccessControlServiceResourceIntroductionsGetHistoryKey, ...(queryKey ?? [{ resourceId, userId }])];
+export type ResourceMaintenancesServiceCanManageMaintenanceDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenancesService.canManageMaintenance>>;
+export type ResourceMaintenancesServiceCanManageMaintenanceQueryResult<TData = ResourceMaintenancesServiceCanManageMaintenanceDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceMaintenancesServiceCanManageMaintenanceKey = "ResourceMaintenancesServiceCanManageMaintenance";
+export const UseResourceMaintenancesServiceCanManageMaintenanceKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceCanManageMaintenanceKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourceMaintenancesServiceFindMaintenancesDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenancesService.findMaintenances>>;
+export type ResourceMaintenancesServiceFindMaintenancesQueryResult<TData = ResourceMaintenancesServiceFindMaintenancesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceMaintenancesServiceFindMaintenancesKey = "ResourceMaintenancesServiceFindMaintenances";
+export const UseResourceMaintenancesServiceFindMaintenancesKeyFn = ({ includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
+  includeActive?: boolean;
+  includePast?: boolean;
+  includeUpcoming?: boolean;
+  limit?: number;
+  page?: number;
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceFindMaintenancesKey, ...(queryKey ?? [{ includeActive, includePast, includeUpcoming, limit, page, resourceId }])];
+export type ResourceMaintenancesServiceGetMaintenanceDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenancesService.getMaintenance>>;
+export type ResourceMaintenancesServiceGetMaintenanceQueryResult<TData = ResourceMaintenancesServiceGetMaintenanceDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceMaintenancesServiceGetMaintenanceKey = "ResourceMaintenancesServiceGetMaintenance";
+export const UseResourceMaintenancesServiceGetMaintenanceKeyFn = ({ maintenanceId, resourceId }: {
+  maintenanceId: number;
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceGetMaintenanceKey, ...(queryKey ?? [{ maintenanceId, resourceId }])];
 export type ResourceFlowsServiceGetResourceFlowDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getResourceFlow>>;
 export type ResourceFlowsServiceGetResourceFlowQueryResult<TData = ResourceFlowsServiceGetResourceFlowDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceFlowsServiceGetResourceFlowKey = "ResourceFlowsServiceGetResourceFlow";
@@ -301,6 +325,7 @@ export type AccessControlServiceResourceGroupIntroducersGrantMutationResult = Aw
 export type AccessControlServiceResourceGroupIntroducersRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroducersRevoke>>;
 export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersGrant>>;
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
+export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenance>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
@@ -310,6 +335,7 @@ export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
 export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageEndSession>>;
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
+export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
@@ -322,4 +348,5 @@ export type ResourcesServiceResourceGroupsDeleteOneMutationResult = Awaited<Retu
 export type MqttServiceMqttServersDeleteOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersDeleteOne>>;
 export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersRevoke>>;
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
+export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.cancelMaintenance>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;

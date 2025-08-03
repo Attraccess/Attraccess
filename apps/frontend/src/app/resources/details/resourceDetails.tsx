@@ -16,6 +16,7 @@ import {
   useResourcesServiceGetOneResourceById,
   UseResourcesServiceGetAllResourcesKeyFn,
   useAccessControlServiceResourceIntroducersIsIntroducer,
+  useResourceMaintenancesServiceCanManageMaintenance,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ManageResourceGroups } from '../groups';
@@ -28,6 +29,7 @@ import { ResourceIntroductionsManagement } from '../IntroductionsManagement';
 import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
 import { filenameToUrl } from '../../../api';
+import { MaintenanceManagement } from './maintenance-management';
 
 function ResourceDetailsComponent() {
   const { id } = useParams<{ id: string }>();
@@ -70,6 +72,8 @@ function ResourceDetailsComponent() {
   } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const deleteResource = useResourcesServiceDeleteOneResource();
+
+  const { data: maintenancePermissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
 
   const handleDelete = async () => {
     try {
@@ -192,7 +196,11 @@ function ResourceDetailsComponent() {
           className="flex-1 min-w-80"
         />
 
-        <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" />
+        <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
+          <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" className="flex-grow" />
+
+          {maintenancePermissions?.canManage && <MaintenanceManagement resourceId={resourceId} className="flex-grow" />}
+        </div>
       </div>
 
       {/* Add the ManageResourceGroups component */}

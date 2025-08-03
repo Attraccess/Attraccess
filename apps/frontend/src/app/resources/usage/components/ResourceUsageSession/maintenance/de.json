@@ -1,0 +1,11 @@
+{
+  "alert": {
+    "title": "Resource aufgrund von Wartungsarbeiten nicht verfügbar",
+    "description": "Von {{start}} bis {{end}}",
+    "reason": {
+      "label": "Begründung",
+      "noReason": "Keine Begründung"
+    },
+    "noDate": "Datum nicht bekannt"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "title": "Wartungszeitraum anlegen",
+  "inputs": {
+    "startTime": {
+      "label": "Startzeit"
+    },
+    "endTime": {
+      "label": "Endzeit"
+    },
+    "reason": {
+      "label": "Grund (optional)"
+    }
+  },
+  "actions": {
+    "save": "Speichern"
+  },
+  "alert": {
+    "error": {
+      "title": "Fehler beim Hinzufügen des Wartungszeitraums"
+    }
+  }
+}

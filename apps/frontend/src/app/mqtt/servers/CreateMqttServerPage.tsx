@@ -154,6 +154,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
         onChange={handleInputChange}
         fullWidth
         data-cy="create-mqtt-server-form-password-input"
+        autoComplete="off"
       />
 
       <Checkbox

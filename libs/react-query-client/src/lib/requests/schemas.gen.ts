@@ -1495,6 +1495,132 @@ export const $UpdateResourceIntroductionDto = {
     }
 } as const;
 
+export const $CanManageMaintenanceResponseDto = {
+    type: 'object',
+    properties: {
+        canManage: {
+            type: 'boolean',
+            description: 'Whether the user can manage maintenance for the resource',
+            example: true
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The resource ID that was checked',
+            example: 123
+        }
+    },
+    required: ['canManage', 'resourceId']
+} as const;
+
+export const $CreateMaintenanceDto = {
+    type: 'object',
+    properties: {
+        startTime: {
+            type: 'string',
+            description: 'When the maintenance starts (must be in the future)',
+            format: 'date-time',
+            example: '2025-01-01T10:00:00.000Z'
+        },
+        endTime: {
+            type: 'string',
+            description: 'When the maintenance ends (optional)',
+            format: 'date-time',
+            example: '2025-01-01T18:00:00.000Z'
+        },
+        reason: {
+            type: 'string',
+            description: 'The reason for the maintenance',
+            example: 'Scheduled maintenance for software updates'
+        }
+    },
+    required: ['startTime']
+} as const;
+
+export const $ResourceMaintenance = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the maintenance',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the maintenance was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the maintenance was last updated'
+        },
+        startTime: {
+            type: 'string',
+            description: 'When the maintenance started',
+            example: '2025-01-01T00:00:00.000Z',
+            format: 'date-time'
+        },
+        endTime: {
+            type: 'string',
+            description: 'When the maintenance ended (null if not ended yet)',
+            example: '2025-01-01T00:00:00.000Z',
+            nullable: true,
+            format: 'date-time'
+        },
+        reason: {
+            type: 'string',
+            description: 'The reason for the maintenance'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'startTime']
+} as const;
+
+export const $PaginatedMaintenanceResponse = {
+    type: 'object',
+    properties: {
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        },
+        data: {
+            description: 'List of maintenances',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceMaintenance'
+            }
+        }
+    },
+    required: ['total', 'page', 'limit', 'data']
+} as const;
+
+export const $UpdateMaintenanceDto = {
+    type: 'object',
+    properties: {
+        startTime: {
+            type: 'string',
+            description: 'When the maintenance starts (must be in the future)',
+            format: 'date-time',
+            example: '2025-01-01T10:00:00.000Z'
+        },
+        endTime: {
+            type: 'string',
+            description: 'When the maintenance ends (optional)',
+            format: 'date-time',
+            example: '2025-01-01T18:00:00.000Z'
+        },
+        reason: {
+            type: 'string',
+            description: 'The reason for the maintenance',
+            example: 'Scheduled maintenance for software updates'
+        }
+    }
+} as const;
+
 export const $ResourceFlowNodePositionDto = {
     type: 'object',
     properties: {

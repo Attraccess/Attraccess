@@ -22,6 +22,7 @@ import { ResourceImageService } from './resourceImage.service';
 import { ResourceIntroductionsModule } from './introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from './introducers/resourceIntroducers.module';
 import { ResourceFlowsModule } from './flows/resource-flows.module';
+import { ResourceMaintenanceModule } from './maintenances/maintenance.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ResourceFlowsModule } from './flows/resource-flows.module';
     ResourceIntroducersModule,
     ResourceUsageModule,
     ResourceFlowsModule,
+    ResourceMaintenanceModule,
   ],
   controllers: [ResourcesController],
   providers: [ResourcesService, ResourceImageService],

@@ -73,6 +73,7 @@ describe('ResourcesController', () => {
           flowEdges: [],
           flowLogs: [],
           attractapReaders: [],
+          maintenances: [],
         },
       ];
 
@@ -123,6 +124,7 @@ describe('ResourcesController', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
@@ -172,6 +174,7 @@ describe('ResourcesController', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
@@ -212,6 +215,7 @@ describe('ResourcesController', () => {
         flowEdges: [],
         flowLogs: [],
         attractapReaders: [],
+        maintenances: [],
       };
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);

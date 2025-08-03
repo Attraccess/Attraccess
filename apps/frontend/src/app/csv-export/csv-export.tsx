@@ -17,6 +17,7 @@ import en from './en.json';
 import { useCallback, useMemo, useState } from 'react';
 import { getLocalTimeZone } from '@internationalized/date';
 import { ResourceUsageExport } from './resource-usage/resourceUsageExport';
+import { useNow } from '../../hooks/useNow';
 
 export function CsvExport() {
   const { t } = useTranslations('csv-export', {
@@ -44,6 +45,8 @@ export function CsvExport() {
     () => formatDateTime(dateRange?.end?.toDate(getLocalTimeZone())),
     [formatDateTime, dateRange]
   );
+
+  const now = useNow();
 
   return (
     <>
@@ -82,7 +85,13 @@ export function CsvExport() {
         </CardFooter>
       </Card>
 
-      <Modal isOpen={showExport} onClose={() => setShowExport(false)} scrollBehavior="inside" size="5xl" data-cy="csv-export-modal">
+      <Modal
+        isOpen={showExport}
+        onClose={() => setShowExport(false)}
+        scrollBehavior="inside"
+        size="5xl"
+        data-cy="csv-export-modal"
+      >
         <ModalContent>
           <ModalHeader>
             <div>
@@ -96,8 +105,8 @@ export function CsvExport() {
 
           {activeExport === 'resourceUsageHours' && (
             <ResourceUsageExport
-              start={dateRange?.start?.toDate(getLocalTimeZone()) ?? new Date()}
-              end={dateRange?.end?.toDate(getLocalTimeZone()) ?? new Date()}
+              start={dateRange?.start?.toDate(getLocalTimeZone()) ?? now}
+              end={dateRange?.end?.toDate(getLocalTimeZone()) ?? now}
             />
           )}
         </ModalContent>

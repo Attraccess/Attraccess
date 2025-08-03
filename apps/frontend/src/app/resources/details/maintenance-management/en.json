@@ -1,0 +1,19 @@
+{
+  "title": "Maintenance",
+  "filters": {
+    "includePast": "Include past"
+  },
+  "table": {
+    "columns": {
+      "start": "Start",
+      "end": "End",
+      "reason": "Reason"
+    }
+  },
+  "actions": {
+    "create": {
+      "title": "Create maintenance period",
+      "label": "New"
+    }
+  }
+}

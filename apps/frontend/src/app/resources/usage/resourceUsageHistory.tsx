@@ -33,7 +33,7 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
   };
 
   return (
-    <Card {...rest} className={`${rest.className ?? ''} w-full`}>
+    <Card {...rest}>
       <CardHeader className="flex justify-between items-center">
         <HistoryHeader
           title={t('usageHistory')}
