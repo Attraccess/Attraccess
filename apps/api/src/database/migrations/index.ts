@@ -34,3 +34,4 @@ export * from './1752315655063-nfc-card-user-relation';
 export * from './1752412011032-attractap-firmware';
 export * from './1752851939278-create-session-table';
 export * from './1754061071643-resource-maintenance';
+export * from './1754214578982-nfc-card-seed-token';

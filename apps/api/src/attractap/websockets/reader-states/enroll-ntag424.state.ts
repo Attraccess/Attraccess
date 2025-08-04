@@ -110,6 +110,7 @@ export class EnrollNTAG424State implements ReaderState {
     const newKey = await this.services.attractapService.generateNTAG424Key({
       keyNo: this.KEY_ZERO_MASTER,
       cardUID,
+      userId: this.user.id,
     });
     this.enrollment.data.newKeyZeroMaster = this.services.attractapService.uint8ArrayToHexString(newKey);
 

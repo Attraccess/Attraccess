@@ -216,6 +216,7 @@ describe('UsersService', () => {
           authenticationDetails: [],
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
+          nfcKeySeedToken: null,
           sessions: [],
         } as User,
         {
@@ -242,6 +243,7 @@ describe('UsersService', () => {
           authenticationDetails: [],
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
+          nfcKeySeedToken: null,
           sessions: [],
         } as User,
       ];

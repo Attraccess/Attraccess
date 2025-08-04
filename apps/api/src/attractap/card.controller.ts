@@ -17,7 +17,7 @@ export class AttractapNfcCardsController {
   ) {}
 
   @Post('keys')
-  @Auth()
+  @Auth('canManageUsers')
   @ApiOperation({ summary: 'Get the app key for a card by UID', operationId: 'getAppKeyByUid' })
   @ApiBody({ type: AppKeyRequestDto })
   @ApiResponse({
@@ -25,10 +25,11 @@ export class AttractapNfcCardsController {
     description: 'The app key for the card',
     type: AppKeyResponseDto,
   })
-  async getAppKeyByUid(@Body() appKeyRequest: AppKeyRequestDto): Promise<AppKeyResponseDto> {
+  async getAppKeyByUid(@Body() appKeyRequest: AppKeyRequestDto, @Req() req: AuthenticatedRequest): Promise<AppKeyResponseDto> {
     const key = await this.attractapService.generateNTAG424Key({
       keyNo: appKeyRequest.keyNo,
       cardUID: appKeyRequest.cardUID,
+      userId: req.user.id,
     });
 
     return {

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { subtle } from 'crypto';
+import { subtle, pbkdf2Sync } from 'crypto';
 import { NFCCard, Attractap, Resource, User } from '@attraccess/database-entities';
 import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -147,16 +147,56 @@ export class AttractapService {
   }
 
   /**
-   * Generates a new key for the NFC card based on a seed which is based on the current month,
-   * the keyNo and the cardUID.
+   * Generates a new key for the NFC card using PBKDF2 with salt and iterations for enhanced security.
+   * The key derivation is based on:
+   * - A unique random token per user (stored in user.nfcKeySeedToken)
+   * - The key number
+   * - The card UID
+   * - A deterministic salt derived from the card UID and key number
+   * - 100,000 iterations for PBKDF2
    * @param keyNo The key number to generate
    * @param cardUID The UID of the NFC card
+   * @param userId The ID of the user who owns the card
    * @returns 16 bytes Uint8Array
    */
-  public async generateNTAG424Key(data: { keyNo: number; cardUID: string }) {
-    const seed = `${new Date().getMonth()}${data.keyNo}${data.cardUID}`;
-    const seedBytes = new TextEncoder().encode(seed);
-    const key = await subtle.digest('SHA-256', seedBytes);
-    return new Uint8Array(key).slice(0, 16);
+  public async generateNTAG424Key(data: { keyNo: number; cardUID: string; userId: number }) {
+    const user = await this.nfcCardRepository.manager.transaction(async (manager) => {
+      const transactionUserRepository = manager.getRepository(User);
+
+      // Get the user to access their secure token
+      const user = await transactionUserRepository.findOne({
+        where: { id: data.userId },
+        select: ['nfcKeySeedToken'],
+      });
+
+      if (!user) {
+        throw new Error(`User with ID ${data.userId} not found`);
+      }
+
+      // Generate a secure token if it doesn't exist
+      if (!user.nfcKeySeedToken) {
+        user.nfcKeySeedToken = nanoid(32); // 32 characters = ~192 bits of entropy
+        await transactionUserRepository.save(user);
+      }
+
+      return user;
+    });
+
+    // Create a secure seed using the user's unique token, key number, and card UID
+    const seed = `${user.nfcKeySeedToken}:${data.keyNo}:${data.cardUID}`;
+
+    // Create a deterministic salt from card UID and key number
+    // This ensures the same card+key combination always produces the same salt
+    const saltSeed = `${data.cardUID}:${data.keyNo}`;
+    const saltBytes = new TextEncoder().encode(saltSeed);
+    const salt = await subtle.digest('SHA-256', saltBytes);
+
+    // Use PBKDF2 with 100,000 iterations for secure key derivation
+    const iterations = 100000;
+    const keyLength = 16; // 16 bytes = 128 bits
+
+    const derivedKey = pbkdf2Sync(seed, new Uint8Array(salt), iterations, keyLength, 'sha256');
+
+    return new Uint8Array(derivedKey).slice(0, 16);
   }
 }
