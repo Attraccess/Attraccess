@@ -22,6 +22,8 @@ export class AttractapService {
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>
   ) {}
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
@@ -50,7 +52,7 @@ export class AttractapService {
 
   public async createNFCCard(
     user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user'>,
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen'>
   ): Promise<NFCCard> {
     return await this.nfcCardRepository.save({
       ...data,
@@ -60,6 +62,17 @@ export class AttractapService {
 
   public async deleteNFCCard(id: number): Promise<DeleteResult> {
     return await this.nfcCardRepository.delete(id);
+  }
+
+  public async updateNFCCardLastSeen(uid: string): Promise<null | true> {
+    const card = await this.getNFCCardByUID(uid);
+
+    if (!card) {
+      return null;
+    }
+
+    await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
+    return true;
   }
 
   public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
@@ -81,7 +94,7 @@ export class AttractapService {
   public async updateReader(
     id: number,
     updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion },
-    emitEvent = true,
+    emitEvent = true
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 
@@ -160,27 +173,18 @@ export class AttractapService {
    * @returns 16 bytes Uint8Array
    */
   public async generateNTAG424Key(data: { keyNo: number; cardUID: string; userId: number }) {
-    const user = await this.nfcCardRepository.manager.transaction(async (manager) => {
-      const transactionUserRepository = manager.getRepository(User);
+    const user = await this.userRepository.findOne({ where: { id: data.userId } });
 
-      // Get the user to access their secure token
-      const user = await transactionUserRepository.findOne({
-        where: { id: data.userId },
-        select: ['nfcKeySeedToken'],
-      });
+    if (!user) {
+      this.logger.error(`User with ID ${data.userId} not found`);
+      throw new Error(`User with ID ${data.userId} not found`);
+    }
 
-      if (!user) {
-        throw new Error(`User with ID ${data.userId} not found`);
-      }
-
-      // Generate a secure token if it doesn't exist
-      if (!user.nfcKeySeedToken) {
-        user.nfcKeySeedToken = nanoid(32); // 32 characters = ~192 bits of entropy
-        await transactionUserRepository.save(user);
-      }
-
-      return user;
-    });
+    // Generate a secure token if it doesn't exist
+    if (!user.nfcKeySeedToken) {
+      user.nfcKeySeedToken = nanoid(32); // 32 characters = ~192 bits of entropy
+      await this.userRepository.save(user);
+    }
 
     // Create a secure seed using the user's unique token, key number, and card UID
     const seed = `${user.nfcKeySeedToken}:${data.keyNo}:${data.cardUID}`;
@@ -197,6 +201,7 @@ export class AttractapService {
 
     const derivedKey = pbkdf2Sync(seed, new Uint8Array(salt), iterations, keyLength, 'sha256');
 
+    // shrink to 16 bytes
     return new Uint8Array(derivedKey).slice(0, 16);
   }
 }

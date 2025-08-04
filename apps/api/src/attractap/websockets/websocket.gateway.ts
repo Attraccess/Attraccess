@@ -250,6 +250,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     this.logger.debug(`Received event from client ${client.id}: ${JSON.stringify(eventData)}`);
 
+    if (eventData.type === AttractapEventType.NFC_TAP) {
+      this.logger.debug(`Updating last seen for NFC card ${eventData.payload.cardUID}`);
+      await this.attractapService.updateNFCCardLastSeen(eventData.payload.cardUID);
+    }
+
     await client.state.onEvent(eventData);
 
     return undefined;

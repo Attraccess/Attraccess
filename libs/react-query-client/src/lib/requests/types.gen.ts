@@ -1452,6 +1452,10 @@ export type NFCCard = {
      * The date and time the NFC card was last updated
      */
     updatedAt: string;
+    /**
+     * The date and time the NFC card was last seen
+     */
+    lastSeen: string;
 };
 
 export type AttractapFirmware = {

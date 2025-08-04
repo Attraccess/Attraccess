@@ -43,4 +43,11 @@ export class NFCCard {
   @UpdateDateColumn()
   @ApiProperty({ description: 'The date and time the NFC card was last updated' })
   updatedAt!: Date;
+
+  @Column({
+    type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  @ApiProperty({ description: 'The date and time the NFC card was last seen', type: 'string', format: 'date-time' })
+  lastSeen!: Date;
 }

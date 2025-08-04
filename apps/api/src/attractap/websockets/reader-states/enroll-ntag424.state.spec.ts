@@ -266,7 +266,7 @@ describe('EnrollNTAG424State', () => {
         },
       };
 
-      // Call method
+      // First key change failure - should retry
       await enrollState.onResponse({
         type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {
@@ -274,10 +274,38 @@ describe('EnrollNTAG424State', () => {
         },
       });
 
-      // Assert
+      // Assert retry message was sent and enrollment state still exists
+      expect(enrollState['enrollment']).toBeDefined();
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.NFC_CHANGE_KEY,
+            payload: {
+              keyNumber: 0,
+              authKey: mockNewMasterKey,
+              oldKey: mockNewMasterKey,
+              newKey: mockNewMasterKey,
+            },
+          }),
+        })
+      );
+
+      // Clear message mock for second attempt
+      (mockSocket.sendMessage as jest.Mock).mockClear();
+
+      // Second key change failure - should give up
+      await enrollState.onResponse({
+        type: AttractapEventType.NFC_CHANGE_KEY,
+        payload: {
+          successful: false,
+        },
+      });
+
+      // Assert enrollment cleared and transitioned to initial state
       expect(enrollState['enrollment']).toBeUndefined();
       expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
       expect(mockSocket.transitionToState).toHaveBeenCalled();
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
     });
   });
 });
@@ -449,7 +477,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
     // Clear message history before testing key change failure
     (mockSocket.sendMessage as jest.Mock).mockClear();
 
-    // Simulate key change failure
+    // Simulate first key change failure - should retry
     await enrollState.onResponse({
       type: AttractapEventType.NFC_CHANGE_KEY,
       payload: {
@@ -457,7 +485,34 @@ describe('EnrollNTAG424State - Full Flow', () => {
       },
     });
 
-    // Verify no messages sent and transition to initial state
+    // Verify retry message was sent
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
+    expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: AttractapEventType.NFC_CHANGE_KEY,
+          payload: {
+            keyNumber: 0,
+            authKey: mockNewMasterKey,
+            oldKey: mockNewMasterKey,
+            newKey: mockNewMasterKey,
+          },
+        }),
+      })
+    );
+
+    // Clear message history for second attempt
+    (mockSocket.sendMessage as jest.Mock).mockClear();
+
+    // Simulate second key change failure - should give up
+    await enrollState.onResponse({
+      type: AttractapEventType.NFC_CHANGE_KEY,
+      payload: {
+        successful: false,
+      },
+    });
+
+    // Verify no messages sent on second failure and transition to initial state
     expect(mockSocket.sendMessage).not.toHaveBeenCalled();
     expect(mockSocket.transitionToState).toHaveBeenCalledTimes(1);
     expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);

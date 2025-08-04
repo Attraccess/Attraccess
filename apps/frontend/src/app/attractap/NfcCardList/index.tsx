@@ -17,7 +17,7 @@ import {
   Card,
 } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceGetAllCards,
   useAttractapServiceResetNfcCard,
@@ -27,7 +27,6 @@ import {
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../AttractapSelect';
 import { useToastMessage } from '../../../components/toastProvider';
-import { useAuth } from '../../../hooks/useAuth';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
@@ -126,8 +125,12 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     return props.card.id;
   }
 
+  if (props.header === 'lastSeen') {
+    return <DateTimeDisplay date={props.card.lastSeen} />;
+  }
+
   if (props.header === 'createdAt') {
-    return new Date(props.card.createdAt).toLocaleDateString();
+    return <DateTimeDisplay date={props.card.createdAt} />;
   }
 
   if (props.header === 'user') {
@@ -208,8 +211,6 @@ export function NfcCardList() {
 
   const toast = useToastMessage();
 
-  const { user } = useAuth();
-
   useEffect(() => {
     if (cardsError) {
       toast.error({
@@ -219,20 +220,11 @@ export function NfcCardList() {
     }
   }, [cardsError, toast, t]);
 
-  const userCanManage = useMemo(() => {
-    return !!user?.systemPermissions.canManageSystemConfiguration;
-  }, [user]);
-
   const headers = useMemo(() => {
-    const headers: Array<keyof NFCCard | 'actions'> = ['id', 'uid'];
-    if (userCanManage) {
-      headers.push('user');
-    }
-
-    headers.push('createdAt', 'actions');
+    const headers: Array<keyof NFCCard | 'actions'> = ['id', 'createdAt', 'uid', 'lastSeen', 'actions'];
 
     return headers;
-  }, [userCanManage]);
+  }, []);
 
   const [cardToDeleteId, setCardToDeleteId] = useState<number | null>(null);
 

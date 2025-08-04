@@ -6,7 +6,7 @@
     "headers": {
       "id": "ID",
       "uid": "UID",
-      "userId": "Benutzer",
+      "lastSeen": "Zuletzt gesehen",
       "createdAt": "Erstellt am",
       "actions": "Aktionen"
     },

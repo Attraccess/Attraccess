@@ -30,6 +30,8 @@ export class EnrollNTAG424State implements ReaderState {
   public readonly VERIFICATION_TOKEN_FILE_ID = 0x00;
   public readonly ANTI_DUPLICATION_TOKEN_FILE_ID = 0x01;
 
+  private retriedWithNewKey = false;
+
   constructor(
     private readonly socket: AuthenticatedWebSocket,
     private readonly services: GatewayServices,
@@ -127,6 +129,23 @@ export class EnrollNTAG424State implements ReaderState {
 
   private async onKeyChanged(responseData: AttractapResponse<{ successful: boolean }>['data']): Promise<void> {
     const successful = responseData.payload.successful;
+
+    if (!successful && this.retriedWithNewKey !== true && this.enrollment.data.newKeyZeroMaster) {
+      this.retriedWithNewKey = true;
+
+      this.logger.debug('Change key failed, retrying with new key in case it was a fluke', {
+        enrollmentState: this.enrollment,
+      });
+
+      return await this.socket.sendMessage(
+        new AttractapEvent(AttractapEventType.NFC_CHANGE_KEY, {
+          keyNumber: this.KEY_ZERO_MASTER,
+          authKey: this.enrollment.data.newKeyZeroMaster,
+          oldKey: this.enrollment.data.newKeyZeroMaster,
+          newKey: this.enrollment.data.newKeyZeroMaster,
+        })
+      );
+    }
 
     if (!successful) {
       this.logger.error(`Key ${this.KEY_ZERO_MASTER} failed to change`, {

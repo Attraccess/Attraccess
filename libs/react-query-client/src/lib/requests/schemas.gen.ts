@@ -2262,9 +2262,14 @@ export const $NFCCard = {
             format: 'date-time',
             type: 'string',
             description: 'The date and time the NFC card was last updated'
+        },
+        lastSeen: {
+            type: 'string',
+            description: 'The date and time the NFC card was last seen',
+            format: 'date-time'
         }
     },
-    required: ['id', 'uid', 'user', 'createdAt', 'updatedAt']
+    required: ['id', 'uid', 'user', 'createdAt', 'updatedAt', 'lastSeen']
 } as const;
 
 export const $AttractapFirmware = {
