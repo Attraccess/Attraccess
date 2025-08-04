@@ -20,7 +20,7 @@ export class WaitForFirmwareUpdateState implements ReaderState {
 
     const chunks = await this.loadFirmware();
 
-    this.socket.sendMessage(
+    await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
         current: this.socket.reader.firmware,
         available: this.services.firmwareService.getFirmwareDefinition(

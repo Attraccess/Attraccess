@@ -227,6 +227,9 @@ void setup()
   // Initialize I2C for NFC
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
 
+  // Set I2C timeout to prevent hanging operations
+  Wire.setTimeOut(10000); // 5 second timeout
+
   // Initialize LED Service
   Serial.println("0. Initializing LED Service...");
   ledService.begin();
@@ -406,17 +409,6 @@ void loop()
   {
     lastNFCUpdate = millis();
     nfc.loop(); // Update NFC service (now with error handling)
-  }
-
-  // Monitor NFC status and log periodically
-  static uint32_t lastNFCStatusLog = 0;
-  if (millis() - lastNFCStatusLog >= nfcStatusCheckInterval)
-  {
-    lastNFCStatusLog = millis();
-    if (nfc.isNFCDisabled() || nfc.getConsecutiveErrors() > 0)
-    {
-      Serial.printf("[MAIN] NFC Status: %s\n", nfc.getStatusString().c_str());
-    }
   }
 
   attraccessService.update(); // Update Attraccess service

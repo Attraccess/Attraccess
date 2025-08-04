@@ -19,7 +19,7 @@ Display display(&leds);
 Network network(&display);
 Keypad keypad;
 API api(network.getInterface().getClient(), &display, &keypad);
-NFC nfc(&api);
+NFC nfc;
 ConfigWebServer webServer(&network.getInterface());
 
 // Create the Improv manager
@@ -134,8 +134,20 @@ void setup()
 
   keypad.setup();
   network.setup();
-  api.setup(&nfc);
+  api.setup();
   nfc.setup();
+
+  api.setOnDisableNfcCardChecking([]()
+                                  { nfc.disableLoopCardDetection(); });
+  api.setOnEnableNfcCardChecking([]()
+                                 { nfc.enableLoopCardDetection(); });
+  api.setOnNfcAuthenticate([](uint8_t keyNumber, uint8_t *authenticationKey)
+                           { return nfc.authenticate(keyNumber, authenticationKey); });
+  api.setOnNfcChangeKey([](uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey)
+                        { return nfc.changeKey(keyNumber, authKey, oldKey, newKey); });
+
+  nfc.setOnNfcCardDetected([](char *uuid)
+                           { api.sendNFCTapped(uuid, strlen(uuid)); });
 }
 
 void loop()
@@ -144,7 +156,10 @@ void loop()
 
   if (network.isHealthy())
   {
-    api.loop();
-    nfc.loop();
+    api.enableLoop();
+  }
+  else
+  {
+    api.disableLoop();
   }
 }

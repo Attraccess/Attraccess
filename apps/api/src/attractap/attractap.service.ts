@@ -21,11 +21,11 @@ export class AttractapService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>
+    private readonly resourceRepository: Repository<Resource>,
   ) {}
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    return await this.nfcCardRepository.findOne({ where: { id } });
+    return await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
@@ -50,7 +50,7 @@ export class AttractapService {
 
   public async createNFCCard(
     user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user'>
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user'>,
   ): Promise<NFCCard> {
     return await this.nfcCardRepository.save({
       ...data,
@@ -81,7 +81,7 @@ export class AttractapService {
   public async updateReader(
     id: number,
     updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion },
-    emitEvent = true
+    emitEvent = true,
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 

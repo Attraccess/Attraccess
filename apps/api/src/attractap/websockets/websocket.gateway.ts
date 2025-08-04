@@ -12,7 +12,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
 import { InitialReaderState } from './reader-states/initial.state';
 import { EnrollNTAG424State } from './reader-states/enroll-ntag424.state';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage } from './websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { nanoid } from 'nanoid';
 import { ResetNTAG424State } from './reader-states/reset-ntag424.state';
@@ -21,9 +21,10 @@ import { UsersService } from '../../users-and-auth/users/users.service';
 import { ResourcesService } from '../../resources/resources.service';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { WaitForResourceSelectionState } from './reader-states/wait-for-resource-selection.state';
-import { WaitForNFCTapState } from './reader-states/wait-for-nfc-tap.state';
+import { WaitForNFCTapState, WaitForNFCTapStateStep } from './reader-states/wait-for-nfc-tap.state';
 import { AttractapFirmwareService } from '../firmware.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
+import { Mutex } from 'async-mutex';
 
 export interface GatewayServices {
   websocketService: WebsocketService;
@@ -42,6 +43,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   server: Server;
 
   private readonly logger = new Logger(AttractapGateway.name);
+  private readonly clientResponseAwaitersMutex = new Mutex();
 
   @Inject(WebsocketService)
   private websocketService: WebsocketService;
@@ -71,15 +73,60 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     client.transitionToState = async (state: ReaderState) => {
       if (client.state) {
-        await client.state.onStateExit();
+        try {
+          await client.state.onStateExit();
+        } catch (error) {
+          this.logger.error('Error exiting state', error);
+          client.close();
+          this.handleDisconnect(client);
+          const stackTrace = new Error().stack;
+          this.logger.error(stackTrace);
+          throw error;
+        }
       }
       client.state = state;
-      await client.state.onStateEnter();
+      try {
+        await client.state.onStateEnter();
+      } catch (error) {
+        this.logger.error('Error entering state', error);
+        client.close();
+        this.handleDisconnect(client);
+        const stackTrace = new Error().stack;
+        this.logger.error(stackTrace);
+      }
     };
 
-    client.sendMessage = (message: AttractapMessage) => {
-      this.logger.debug(`Sending ${message.event} of type ${message.data.type}`, message.data.payload);
-      (client as unknown as WebSocket).send(JSON.stringify(message));
+    client.sendMessage = async (message: AttractapMessage) => {
+      const RETRY_COUNT = 3;
+
+      let lastError: Error | undefined;
+
+      for (let i = 0; i < RETRY_COUNT; i++) {
+        this.logger.debug(
+          `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
+          message.data.payload
+        );
+        (client as unknown as WebSocket).send(JSON.stringify(message));
+
+        this.logger.debug(
+          `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`
+        );
+        try {
+          await this.waitForClientResponse(client, message.data.type);
+          lastError = undefined;
+          break;
+        } catch (error) {
+          lastError = error as Error;
+          this.logger.debug(`Attempt ${i + 1} failed: ${error.message}`);
+        }
+      }
+
+      if (lastError) {
+        this.logger.error(
+          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`
+        );
+        throw lastError;
+      }
     };
 
     client.sendBinaryData = (data: Buffer) => {
@@ -89,8 +136,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     this.websocketService.sockets.set(client.id, client);
 
+    await this.clientWasActive(client);
+
     this.logger.debug('Transitioning to initial state');
-    client.transitionToState(
+    await client.transitionToState(
       new InitialReaderState(client, {
         websocketService: this.websocketService,
         attractapService: this.attractapService,
@@ -102,12 +151,67 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resourceMaintenanceService: this.resourceMaintenanceService,
       })
     );
-
-    await this.clientWasActive(client);
   }
 
-  public handleDisconnect(client: AuthenticatedWebSocket) {
+  private clientResponseAwaiters: Array<{
+    id: string;
+    clientId: string;
+    type: AttractapEventType;
+    resolve: () => void;
+    timeoutId: NodeJS.Timeout;
+  }> = [];
+
+  private async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
+    const id = nanoid(5);
+
+    const removeAwaiter = async () => {
+      await this.clientResponseAwaitersMutex.runExclusive(async () => {
+        this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.id !== id);
+      });
+    };
+
+    // TODO: refactor wait for response to rely on ACK messages instead of response mesaages
+    return await new Promise<void>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        removeAwaiter();
+        reject(new Error('Timeout waiting for client response'));
+      }, timeoutMs);
+
+      const onResolve = () => {
+        clearTimeout(timeoutId);
+        resolve();
+        removeAwaiter();
+      };
+
+      this.clientResponseAwaiters.push({ id, clientId: client.id, type, resolve: onResolve, timeoutId });
+    });
+  }
+
+  private async resolveClientResponseAwaiters(client: AuthenticatedWebSocket, type: AttractapEventType) {
+    await this.clientResponseAwaitersMutex.runExclusive(async () => {
+      const matchingAwaiters = this.clientResponseAwaiters.filter(
+        (awaiter) => awaiter.clientId === client.id && awaiter.type === type
+      );
+
+      this.logger.debug(
+        `Found ${matchingAwaiters.length} awaiters for client ${client.id} for event ${type} to resolve`
+      );
+
+      matchingAwaiters.forEach((awaiter) => {
+        awaiter.resolve();
+        clearTimeout(awaiter.timeoutId);
+      });
+
+      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
+    });
+  }
+
+  public async handleDisconnect(client: AuthenticatedWebSocket) {
     this.logger.debug(`Client ${client.id} disconnected.`);
+
+    await this.clientResponseAwaitersMutex.runExclusive(async () => {
+      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
+    });
 
     const readerId = client.reader?.id;
     if (readerId) {
@@ -142,9 +246,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    this.logger.debug(`Received event from client ${client.id}: ${JSON.stringify(eventData)}`);
-
     await this.clientWasActive(client);
+
+    this.logger.debug(`Received event from client ${client.id}: ${JSON.stringify(eventData)}`);
 
     await client.state.onEvent(eventData);
 
@@ -161,9 +265,16 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    this.logger.debug(`Received response from client ${client.id}: ${responseData}`);
-
     await this.clientWasActive(client);
+
+    if (responseData.type.startsWith('ACK_')) {
+      this.logger.debug(`Received ACK response from client ${client.id}: ${JSON.stringify(responseData)}`);
+
+      this.resolveClientResponseAwaiters(client, responseData.type.replace('ACK_', '') as AttractapEventType);
+      return;
+    }
+
+    this.logger.debug(`Received response from client ${client.id}: ${JSON.stringify(responseData)}`);
 
     await client.state.onResponse(responseData);
 
@@ -287,7 +398,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(
       sockets.map(async (socket) => {
         if (socket.state instanceof WaitForNFCTapState || socket.state instanceof WaitForResourceSelectionState) {
-          if ((socket.state as WaitForNFCTapState).isInProgress) {
+          if (
+            ![WaitForNFCTapStateStep.IDLE, WaitForNFCTapStateStep.WAIT_FOR_TAP].includes(
+              (socket.state as WaitForNFCTapState).state
+            )
+          ) {
             return;
           }
           await socket.transitionToState(

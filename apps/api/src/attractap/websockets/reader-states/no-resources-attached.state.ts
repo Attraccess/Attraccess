@@ -10,7 +10,7 @@ export class NoResourcesAttachedState implements ReaderState {
   public constructor(private readonly socket: AuthenticatedWebSocket, private readonly services: GatewayServices) {}
 
   public async onStateEnter(): Promise<void> {
-    this.socket.sendMessage(
+    await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
         message: `No Resources`,
       })
@@ -18,7 +18,7 @@ export class NoResourcesAttachedState implements ReaderState {
   }
 
   public async onStateExit(): Promise<void> {
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
   }
 
   public async onEvent(/* data: AttractapEvent['data'] */) {

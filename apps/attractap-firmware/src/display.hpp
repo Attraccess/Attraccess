@@ -23,21 +23,32 @@ public:
     Display(Leds *leds) : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET), leds(leds) {}
 #endif
 
+    enum DisplayState
+    {
+        DISPLAY_STATE_NONE,
+        DISPLAY_STATE_ERROR,
+        DISPLAY_STATE_SUCCESS,
+        DISPLAY_STATE_TEXT,
+        DISPLAY_STATE_CARD_CHECKING
+    };
+
     ~Display() {}
 
     void setup();
     void loop();
 
+    void set_nfc_tap_enabled(bool enabled, String text);
     void set_nfc_tap_enabled(bool enabled);
-    void set_nfc_tap_text(String text);
     void set_network_connected(bool connected);
     void set_api_connected(bool connected);
     void set_ip_address(IPAddress ip);
     void set_device_name(String name);
-    void show_error(String error, unsigned long duration = 0);
-    void show_success(String success, unsigned long duration = 0);
-    void show_text(bool show);
-    void set_text(String lineOne, String lineTwo);
+    void show_error(String error);
+    void clear_error();
+    void show_success(String success);
+    void clear_success();
+    void show_text(String lineOne, String lineTwo);
+    void clear_text();
 
 private:
 #ifdef SCREEN_DRIVER_SH1106
@@ -48,18 +59,16 @@ private:
 
     unsigned long boot_time = 0;
 
+    DisplayState display_state = DISPLAY_STATE_NONE;
+
     Leds *leds;
     bool is_network_connected = false;
     bool is_api_connected = false;
-    bool is_nfc_tap_enabled = false;
     String nfc_tap_text = "-- no text --";
     IPAddress ip_address;
     String device_name = "-";
     String error = "";
     String success = "";
-    unsigned long error_end_at = 0;
-    unsigned long success_end_at = 0;
-    bool is_displaying_text = false;
     String text_line_one = "";
     String text_line_two = "";
 

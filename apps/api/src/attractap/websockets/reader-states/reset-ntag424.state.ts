@@ -30,22 +30,20 @@ export class ResetNTAG424State implements ReaderState {
       throw new Error(`Card not found: ${this.cardId}`);
     }
 
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
-        type: 'reset-nfc-card',
-        card: {
-          id: this.card.id,
-        },
-        user: {
-          id: this.card.user?.id,
-          username: this.card.user?.username,
-        },
-      })
-    );
+    await this.enableCardChecking({
+      type: 'reset-nfc-card',
+      card: {
+        id: this.card.id,
+      },
+      user: {
+        id: this.card.user.id,
+        username: this.card.user.username,
+      },
+    });
   }
 
   public async onStateExit(): Promise<void> {
-    return;
+    await this.disableCardChecking();
   }
 
   public async onEvent(eventData: AttractapEvent['data']): Promise<void> {
@@ -55,18 +53,26 @@ export class ResetNTAG424State implements ReaderState {
 
     if (eventData.type === AttractapEventType.CANCEL) {
       this.logger.log('Reset cancelled by user. Transitioning to initial state.');
-      return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
+      return await this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     this.logger.warn(`Unexpected event type ${eventData.type}`);
   }
 
   public async onResponse(responseData: AttractapResponse['data']): Promise<void> {
-    if (responseData.type === AttractapEventType.NFC_CHANGE_KEYS) {
-      return await this.onKeysChanged(responseData);
+    if (responseData.type === AttractapEventType.NFC_CHANGE_KEY) {
+      return await this.onKeyChanged(responseData);
     }
 
     this.logger.warn(`Unexpected response type ${responseData.type} `);
+  }
+
+  private async enableCardChecking(payload: AttractapEvent['data']['payload']): Promise<void> {
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, payload));
+  }
+
+  private async disableCardChecking(): Promise<void> {
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
   }
 
   private async onGetNfcUID(responseData: AttractapResponse['data']): Promise<void> {
@@ -77,7 +83,7 @@ export class ResetNTAG424State implements ReaderState {
     }
 
     // Only if the card UID matches, disable card checking
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
+    await this.disableCardChecking();
 
     const nfcCard = await this.services.attractapService.getNFCCardByUID(cardUID);
 
@@ -93,42 +99,41 @@ export class ResetNTAG424State implements ReaderState {
 
     this.logger.debug('Sending ChangeKeys event', {
       authenticationKey: masterKey,
-      keys: newKeys,
+      newKeyZeroMaster: newKeys[this.KEY_ZERO_MASTER],
     });
 
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEYS, {
-        authenticationKey: masterKey,
-        keys: newKeys,
+    await this.socket.sendMessage(
+      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEY, {
+        keyNumber: this.KEY_ZERO_MASTER,
+        authKey: masterKey,
+        oldKey: masterKey,
+        newKey: newKeys[this.KEY_ZERO_MASTER],
       })
     );
   }
 
-  private async onKeysChanged(responseData: AttractapResponse['data']): Promise<void> {
-    const failedKeys = responseData.payload.failedKeys as number[];
-    const successfulKeys = responseData.payload.successfulKeys as number[];
+  private async onKeyChanged(responseData: AttractapResponse<{ successful: boolean }>['data']): Promise<void> {
+    const successful = responseData.payload.successful;
 
-    if (successfulKeys?.length !== 1 || failedKeys?.length > 0) {
-      this.logger.error(
-        `Keys ${failedKeys?.join(', ')} failed to change, Keys ${successfulKeys?.join(', ')} changed successfully`
-      );
+    if (!successful) {
+      this.logger.error(`Key ${this.KEY_ZERO_MASTER} failed to change`);
 
       const nextState = new InitialReaderState(this.socket, this.services);
-      return this.socket.transitionToState(nextState);
+      return await this.socket.transitionToState(nextState);
     }
 
     await this.services.attractapService.deleteNFCCard(this.cardId);
 
-    this.socket.sendMessage(
+    await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {
         message: 'Card erased',
       })
     );
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     const initialState = new InitialReaderState(this.socket, this.services);
-    this.socket.transitionToState(initialState);
+    await this.socket.transitionToState(initialState);
   }
 }

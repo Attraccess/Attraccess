@@ -137,12 +137,12 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEY,
             payload: expect.objectContaining({
-              authenticationKey: mockMasterKey,
-              keys: expect.objectContaining({
-                0: mockDefaultMasterKey,
-              }),
+              authKey: mockMasterKey,
+              keyNumber: 0,
+              oldKey: mockMasterKey,
+              newKey: mockDefaultMasterKey,
             }),
           }),
         })
@@ -167,12 +167,12 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEY,
             payload: expect.objectContaining({
-              authenticationKey: mockDefaultMasterKey,
-              keys: expect.objectContaining({
-                0: mockDefaultMasterKey,
-              }),
+              authKey: mockDefaultMasterKey,
+              keyNumber: 0,
+              oldKey: mockDefaultMasterKey,
+              newKey: mockDefaultMasterKey,
             }),
           }),
         })
@@ -193,7 +193,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).not.toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_CHANGE_KEYS,
+            type: AttractapEventType.NFC_CHANGE_KEY,
           }),
         })
       );
@@ -226,10 +226,9 @@ describe('ResetNTAG424State', () => {
 
       // Test
       const responsePromise = resetState.onResponse({
-        type: AttractapEventType.NFC_CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {
-          successfulKeys: [0],
-          failedKeys: [],
+          successful: true,
         },
       });
 
@@ -272,10 +271,9 @@ describe('ResetNTAG424State', () => {
     it('should handle failed key change', async () => {
       // Test
       await resetState.onResponse({
-        type: AttractapEventType.NFC_CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {
-          successfulKeys: [],
-          failedKeys: [0],
+          successful: false,
         },
       });
 
@@ -406,12 +404,12 @@ describe('ResetNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEY,
           payload: expect.objectContaining({
-            authenticationKey: mockMasterKey,
-            keys: expect.objectContaining({
-              0: mockDefaultMasterKey,
-            }),
+            authKey: mockMasterKey,
+            keyNumber: 0,
+            oldKey: mockMasterKey,
+            newKey: mockDefaultMasterKey,
           }),
         }),
       })
@@ -419,10 +417,9 @@ describe('ResetNTAG424State - Full Flow', () => {
 
     // Step 3: Keys changed successfully
     const responsePromise = resetState.onResponse({
-      type: AttractapEventType.NFC_CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEY,
       payload: {
-        successfulKeys: [0],
-        failedKeys: [],
+        successful: true,
       },
     });
 
@@ -522,17 +519,16 @@ describe('ResetNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEY,
         }),
       })
     );
 
     // Keys failed to change
     await resetState.onResponse({
-      type: AttractapEventType.NFC_CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEY,
       payload: {
-        successfulKeys: [],
-        failedKeys: [0],
+        successful: false,
       },
     });
 

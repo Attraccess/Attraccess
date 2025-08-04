@@ -2,7 +2,6 @@ import { Logger } from '@nestjs/common';
 import { ReaderState } from './reader-state.interface';
 import { NoResourcesAttachedState } from './no-resources-attached.state';
 import { WaitForResourceSelectionState } from './wait-for-resource-selection.state';
-import { WaitForNFCTapState } from './wait-for-nfc-tap.state';
 import { GatewayServices } from '../websocket.gateway';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType, AttractapResponse } from '../websocket.types';
 import { verifyToken } from '../websocket.utils';
@@ -30,7 +29,7 @@ export class InitialReaderState implements ReaderState {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     this.logger.debug('InitialReaderState: not yet authenticated');
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_AUTHENTICATE, {}));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_AUTHENTICATE, {}));
 
     /*this.reauthenticateInterval = setInterval(() => {
       if (this.socket.reader || this.socket.CLOSED) {
@@ -42,7 +41,7 @@ export class InitialReaderState implements ReaderState {
         return;
       }
 
-      this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_AUTHENTICATE, {}));
+      await this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_AUTHENTICATE, {}));
     }, 1000 * 10);*/
   }
 
@@ -83,10 +82,10 @@ export class InitialReaderState implements ReaderState {
     const authenticatedResponse = new AttractapResponse(AttractapEventType.READER_AUTHENTICATED, {
       name: this.socket.reader.name,
     });
-    this.socket.sendMessage(authenticatedResponse);
+    await this.socket.sendMessage(authenticatedResponse);
 
     this.waitingForFirmwareInfo = true;
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_FIRMWARE_INFO, {}));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_FIRMWARE_INFO, {}));
   }
 
   private async onFirmwareInfo(responseData: AttractapResponse['data']) {
@@ -101,25 +100,25 @@ export class InitialReaderState implements ReaderState {
     if (!firmwareIsUpToDate) {
       this.logger.debug('Firmware is not up to date, moving reader to WaitForFirmwareUpdateState');
       const nextState = new WaitForFirmwareUpdateState(this.socket, this.services);
-      return this.socket.transitionToState(nextState);
+      return await this.socket.transitionToState(nextState);
     }
 
     if (this.socket.reader.resources.length === 0) {
       this.logger.debug('No resources attached to reader, moving reader to NoResourcesAttachedState');
       const nextState = new NoResourcesAttachedState(this.socket, this.services);
-      return this.socket.transitionToState(nextState);
+      return await this.socket.transitionToState(nextState);
     }
 
-    if (this.socket.reader.resources.length > 1) {
-      this.logger.debug('Resources attached to reader, moving reader to WaitForResourceSelectionState');
+    // if (this.socket.reader.resources.length > 1) {
+    this.logger.debug('Resources attached to reader, moving reader to WaitForResourceSelectionState');
 
-      const nextState = new WaitForResourceSelectionState(this.socket, this.services);
-      return this.socket.transitionToState(nextState);
-    }
+    const nextState = new WaitForResourceSelectionState(this.socket, this.services);
+    return await this.socket.transitionToState(nextState);
+    // }
 
-    this.logger.debug('Reader has only one resource attached, moving reader to WaitForNFCTapState');
-    const nextState = new WaitForNFCTapState(this.socket, this.services, this.socket.reader.resources[0].id);
-    return this.socket.transitionToState(nextState);
+    //this.logger.debug('Reader has only one resource attached, moving reader to WaitForNFCTapState');
+    // const nextState = new WaitForNFCTapState(this.socket, this.services, this.socket.reader.resources[0].id);
+    // return await this.socket.transitionToState(nextState);
   }
 
   public async handleRegisterEvent(data: AttractapEvent['data']): Promise<void> {
@@ -130,7 +129,7 @@ export class InitialReaderState implements ReaderState {
       `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`
     );
 
-    this.socket.sendMessage(
+    await this.socket.sendMessage(
       AttractapResponse.fromEventData(data, {
         id: response.reader.id,
         token: response.token,
@@ -138,7 +137,7 @@ export class InitialReaderState implements ReaderState {
     );
 
     await new Promise((resolve) => setTimeout(resolve, 300));
-    return this.onStateEnter(true);
+    return await this.onStateEnter(true);
   }
 
   public async handleAuthenticateEvent(data: AttractapEvent['data']): Promise<void> {
@@ -152,19 +151,19 @@ export class InitialReaderState implements ReaderState {
     const reader = await this.services.attractapService.findReaderById(data.payload.id);
     if (!reader) {
       this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
-      return this.socket.sendMessage(unauthorizedResponse);
+      return await this.socket.sendMessage(unauthorizedResponse);
     }
 
     this.logger.debug('Checking if token is valid');
     const isValidToken = await verifyToken(data.payload.token, reader.apiTokenHash);
     if (!isValidToken) {
       this.logger.error('Invalid token, sending UNAUTHORIZED response to client');
-      return this.socket.sendMessage(unauthorizedResponse);
+      return await this.socket.sendMessage(unauthorizedResponse);
     }
 
     this.socket.reader = reader;
 
-    return this.onIsAuthenticated();
+    return await this.onIsAuthenticated();
   }
 
   private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {

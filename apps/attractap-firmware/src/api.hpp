@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include "display.hpp"
 #include "keypad.hpp"
-class NFC; // Forward declaration instead of #include "nfc.hpp"
 
 #define API_WS_PATH "/api/attractap/websocket"
 
@@ -16,10 +15,9 @@ public:
     API(Client &client, Display *display, Keypad *keypad) : websocket(client, API_WS_PATH), client(client), display(display), keypad(keypad) {}
     ~API() {}
 
-    void setup(NFC *nfc);
-    void loop();
+    void setup();
 
-    void sendNFCTapped(uint8_t *uid, uint8_t uidLength);
+    void sendNFCTapped(char *uid, uint8_t uidLength);
 
     // Check if the API is connected to the server
     bool isConnected();
@@ -27,10 +25,33 @@ public:
     // Check if API is properly configured
     bool isConfigured();
 
+    void setOnEnableNfcCardChecking(void (*callback)());
+    void setOnDisableNfcCardChecking(void (*callback)());
+    void setOnNfcChangeKey(bool (*callback)(uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey));
+    void setOnNfcAuthenticate(bool (*callback)(uint8_t keyNumber, uint8_t *authenticationKey));
+
+    void enableLoop();
+    void disableLoop();
+    bool isLoopEnabled();
+
 private:
+    TaskHandle_t task_handle;
+    static void task_function(void *pvParameters);
+
+    void loop();
+    bool loop_is_enabled = false;
+
+    // callback to call when card checking shall be enabled
+    void (*onEnableNfcCardChecking)();
+    // callback to call when card checking shall be disabled
+    void (*onDisableNfcCardChecking)();
+    // callback to call when nfc key is changed
+    bool (*onNfcChangeKey)(uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey);
+    // callback to call when nfc is authenticated
+    bool (*onNfcAuthenticate)(uint8_t keyNumber, uint8_t *authenticationKey);
+
     PicoWebsocket::Client websocket;
     Client &client;
-    NFC *nfc;
     Display *display;
     Keypad *keypad;
 
@@ -53,6 +74,8 @@ private:
     bool isRegistered();
     bool isAuthenticated();
 
+    void sendAck(const char *type);
+    void sendMessage(bool is_response, const char *type);
     void sendMessage(bool is_response, const char *type, JsonObject payload);
     void sendHeartbeat();
 
@@ -61,10 +84,13 @@ private:
     void onUnauthorized(JsonObject data);
     void onEnableCardChecking(JsonObject data);
     void onDisableCardChecking(JsonObject data);
-    void onChangeKeys(JsonObject data);
+    void onChangeKey(JsonObject data);
     void onAuthenticate(JsonObject data);
     void onReauthenticate(JsonObject data);
     void onShowText(JsonObject data);
+    void onFirmwareInfo(JsonObject data);
+    void onFirmwareUpdateRequired(JsonObject data);
+    void onFirmwareStreamChunk(JsonObject data);
 
     void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
 };

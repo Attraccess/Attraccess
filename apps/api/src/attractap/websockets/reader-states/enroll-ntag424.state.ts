@@ -9,7 +9,7 @@ export interface EnrollmentState {
   nextExpectedEvent: AttractapEventType;
   cardUID?: string;
   data: {
-    newKeys?: Record<number, string>;
+    newKeyZeroMaster?: string;
     verificationToken?: Uint8Array;
   };
 }
@@ -41,19 +41,19 @@ export class EnrollNTAG424State implements ReaderState {
       nextExpectedEvent: AttractapEventType.NFC_TAP,
       data: {},
     };
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, {
-        type: 'enroll-nfc-card',
-        user: {
-          id: this.user.id,
-          username: this.user.username,
-        },
-      })
-    );
+    await this.enableCardChecking({
+      type: 'enroll-nfc-card',
+      user: {
+        id: this.user.id,
+        username: this.user.username,
+      },
+    });
   }
 
   public async onStateExit(): Promise<void> {
     this.enrollment = undefined;
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
+    await this.disableCardChecking();
   }
 
   public async onEvent(eventData: AttractapEvent['data']): Promise<void> {
@@ -67,7 +67,7 @@ export class EnrollNTAG424State implements ReaderState {
     if (eventData.type === AttractapEventType.CANCEL) {
       this.logger.log('Enrollment cancelled by user. Transitioning to initial state.');
       this.enrollment = undefined;
-      return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
+      return await this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     this.logger.debug(`Unexpected event type ${eventData.type} in state ${this.enrollment?.nextExpectedEvent}`);
@@ -79,19 +79,23 @@ export class EnrollNTAG424State implements ReaderState {
       return;
     }
 
-    if (responseData.type === AttractapEventType.NFC_CHANGE_KEYS) {
-      return this.onKeysChanged(responseData);
-    }
-
-    if (responseData.type === AttractapEventType.NFC_AUTHENTICATE) {
-      return this.onAuthenticate(responseData);
+    if (responseData.type === AttractapEventType.NFC_CHANGE_KEY) {
+      return this.onKeyChanged(responseData);
     }
 
     this.logger.warn(`Unknown response type ${responseData.type} in state ${this.enrollment?.nextExpectedEvent}`);
   }
 
-  private async onGetNfcUID(responseData: AttractapResponse['data']): Promise<void> {
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
+  private async enableCardChecking(payload: AttractapEvent['data']['payload']): Promise<void> {
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, payload));
+  }
+
+  private async disableCardChecking(): Promise<void> {
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
+  }
+
+  private async onGetNfcUID(responseData: AttractapResponse<{ cardUID: string }>['data']): Promise<void> {
+    await this.disableCardChecking();
 
     const cardUID = responseData.payload.cardUID;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -103,71 +107,33 @@ export class EnrollNTAG424State implements ReaderState {
       nfcCard?.keys[this.KEY_ZERO_MASTER] ??
       this.services.attractapService.uint8ArrayToHexString(this.DEFAULT_NTAG424_KEYS[this.KEY_ZERO_MASTER]);
 
-    this.enrollment.data.newKeys = Object.fromEntries(
-      Object.entries({
-        [this.KEY_ZERO_MASTER.toString()]: await this.services.attractapService.generateNTAG424Key({
-          keyNo: this.KEY_ZERO_MASTER,
-          cardUID,
-        }),
-      }).map(([key, value]) => [key, this.services.attractapService.uint8ArrayToHexString(value)])
-    );
-
-    this.logger.debug('Sending ChangeKeys event', {
-      authenticationKey: masterKey,
-      keys: this.enrollment.data.newKeys,
+    const newKey = await this.services.attractapService.generateNTAG424Key({
+      keyNo: this.KEY_ZERO_MASTER,
+      cardUID,
     });
-    this.enrollment.nextExpectedEvent = AttractapEventType.NFC_CHANGE_KEYS;
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEYS, {
-        authenticationKey: masterKey,
-        keys: this.enrollment.data.newKeys,
-      })
-    );
-  }
+    this.enrollment.data.newKeyZeroMaster = this.services.attractapService.uint8ArrayToHexString(newKey);
 
-  private async onKeysChanged(responseData: AttractapResponse['data']): Promise<void> {
-    const failedKeys = responseData.payload.failedKeys as number[];
-    const successfulKeys = responseData.payload.successfulKeys as number[];
-
-    if (successfulKeys?.length !== 1 || failedKeys?.length > 0) {
-      this.logger.error(
-        `Keys ${failedKeys?.join(', ')} failed to change, Keys ${successfulKeys?.join(', ')} changed successfully`,
-        {
-          enrollmentState: this.enrollment,
-        }
-      );
-
-      this.enrollment = undefined;
-      return this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
-    }
-
-    this.enrollment.nextExpectedEvent = AttractapEventType.NFC_AUTHENTICATE;
-    this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.NFC_AUTHENTICATE, {
-        authenticationKey: this.enrollment.data.newKeys[this.KEY_ZERO_MASTER],
+    this.enrollment.nextExpectedEvent = AttractapEventType.NFC_CHANGE_KEY;
+    await this.socket.sendMessage(
+      new AttractapEvent(AttractapEventType.NFC_CHANGE_KEY, {
         keyNumber: this.KEY_ZERO_MASTER,
+        authKey: masterKey,
+        oldKey: masterKey,
+        newKey: this.enrollment.data.newKeyZeroMaster,
       })
     );
   }
 
-  private async onAuthenticate(responseData: AttractapResponse['data']): Promise<void> {
-    const authenticationSuccessful = responseData.payload.authenticationSuccessful as boolean;
+  private async onKeyChanged(responseData: AttractapResponse<{ successful: boolean }>['data']): Promise<void> {
+    const successful = responseData.payload.successful;
 
-    if (!authenticationSuccessful) {
-      this.logger.error('Enrollment failed: Authentication failed', {
+    if (!successful) {
+      this.logger.error(`Key ${this.KEY_ZERO_MASTER} failed to change`, {
         enrollmentState: this.enrollment,
       });
 
-      this.socket.sendMessage(
-        new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
-          message: 'Enrollment failed',
-        })
-      );
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
-
-      const nextState = new InitialReaderState(this.socket, this.services);
-      return this.socket.transitionToState(nextState);
+      this.enrollment = undefined;
+      return await this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     const user = await this.services.usersService.findOne({ id: this.user.id });
@@ -177,29 +143,28 @@ export class EnrollNTAG424State implements ReaderState {
         enrollmentState: this.enrollment,
       });
 
-      this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
-      return;
+      return await this.socket.transitionToState(new InitialReaderState(this.socket, this.services));
     }
 
     const nfcCard = await this.services.attractapService.createNFCCard(user, {
       uid: this.enrollment.cardUID,
       keys: {
-        [this.KEY_ZERO_MASTER]: this.enrollment.data.newKeys[this.KEY_ZERO_MASTER],
+        [this.KEY_ZERO_MASTER]: this.enrollment.data.newKeyZeroMaster,
       },
     });
 
     this.logger.log(`Created NFC card ${nfcCard.id} for user ${this.user.id}`);
 
-    this.socket.sendMessage(
+    await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_SUCCESS, {
         message: 'Enrollment successful',
       })
     );
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
-    this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     const nextState = new InitialReaderState(this.socket, this.services);
-    this.socket.transitionToState(nextState);
+    await this.socket.transitionToState(nextState);
   }
 }

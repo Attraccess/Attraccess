@@ -1,11 +1,27 @@
 #include "api.hpp"
-#include "nfc.hpp"
 
-void API::setup(NFC *nfc)
+void API::task_function(void *pvParameters)
 {
-    this->nfc = nfc;
+    API *api = (API *)pvParameters;
 
+    while (true)
+    {
+        api->loop();
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
+
+void API::setup()
+{
     Serial.println("[API] Setting up...");
+
+    xTaskCreate(
+        task_function,
+        "API",
+        4096,
+        this,
+        10,
+        &task_handle);
 
     Serial.println("[API] Setup complete.");
 }
@@ -217,15 +233,69 @@ void API::onUnauthorized(JsonObject data)
 void API::onEnableCardChecking(JsonObject data)
 {
     Serial.println("[API] ENABLE_CARD_CHECKING");
-    this->nfc->enableCardChecking();
-    this->display->set_nfc_tap_enabled(true);
-    this->display->set_nfc_tap_text(data["payload"]["message"].as<String>());
+    if (this->onEnableNfcCardChecking)
+    {
+        this->onEnableNfcCardChecking();
+    }
+
+    // {"type":"reset-nfc-card","card":{"id":5},"user":{"id":2,"username":"jappy"}}
+    if (data["payload"]["type"].as<String>() == "reset-nfc-card")
+    {
+        JsonObject card = data["payload"]["card"].as<JsonObject>();
+        uint32_t cardId = card["id"].as<uint32_t>();
+        JsonObject user = data["payload"]["user"].as<JsonObject>();
+        String username = user["username"].as<String>();
+
+        String displayText = "Reset NFC card\nUser > " + username + " <\nCard > " + String(cardId) + " <";
+        this->display->set_nfc_tap_enabled(true, displayText);
+    }
+    else if (data["payload"]["type"].as<String>() == "enroll-nfc-card")
+    {
+        JsonObject user = data["payload"]["user"].as<JsonObject>();
+        String username = user["username"].as<String>();
+
+        String displayText = "Enroll NFC card\nUser > " + username + " <";
+        this->display->set_nfc_tap_enabled(true, displayText);
+    }
+    else if (data["payload"]["type"].as<String>() == "toggle-resource-usage")
+    {
+        JsonObject resource = data["payload"]["resource"].as<JsonObject>();
+        String resourceName = resource["name"].as<String>();
+
+        // Check if there's an active usage session
+        bool isActive = data["payload"]["isActive"].as<bool>();
+        if (isActive)
+        {
+            this->display->set_nfc_tap_enabled(true, "Tap card to stop: " + resourceName);
+        }
+        else
+        {
+            // Check for active maintenance
+            bool hasMaintenance = data["payload"]["hasActiveMaintenance"].as<bool>();
+            if (hasMaintenance)
+            {
+                this->display->set_nfc_tap_enabled(true, "Maintenance mode - Tap to start: " + resourceName);
+            }
+            else
+            {
+                this->display->set_nfc_tap_enabled(true, "Tap card to start: " + resourceName);
+            }
+        }
+    }
+    else
+    {
+        this->display->set_nfc_tap_enabled(true, data["payload"]["message"].as<String>());
+    }
 }
 
 void API::onDisableCardChecking(JsonObject data)
 {
     Serial.println("[API] DISABLE_CARD_CHECKING");
-    this->nfc->disableCardChecking();
+    if (this->onDisableNfcCardChecking)
+    {
+        this->onDisableNfcCardChecking();
+    }
+
     this->display->set_nfc_tap_enabled(false);
 }
 
@@ -242,103 +312,44 @@ void API::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t b
     }
 }
 
-void API::onChangeKeys(JsonObject data)
+void API::onChangeKey(JsonObject data)
 {
-    Serial.println("[API] CHANGE_KEYS");
+    Serial.println("[API] CHANGE_KEY");
 
-    // Parse authentication key from hex string
+    if (!this->onNfcChangeKey)
+    {
+        Serial.println("[API] onNfcChangeKey callback is not set");
+        return;
+    }
+
+    uint8_t keyNumber = data["payload"]["keyNumber"].as<uint8_t>();
+    String authKeyHex = data["payload"]["authKey"].as<String>();
+    String oldKeyHex = data["payload"]["oldKey"].as<String>();
+    String newKeyHex = data["payload"]["newKey"].as<String>();
+
+    uint8_t newKey[16];
+    this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
+
+    uint8_t oldKey[16];
+    this->hexStringToBytes(oldKeyHex, oldKey, sizeof(oldKey));
+
     uint8_t authKey[16];
-    String authKeyHex = data["payload"]["authenticationKey"].as<String>();
     this->hexStringToBytes(authKeyHex, authKey, sizeof(authKey));
 
-    JsonObject response = JsonObject();
-    response["failedKeys"] = JsonArray();
-    response["successfulKeys"] = JsonArray();
+    bool success = this->onNfcChangeKey(keyNumber, authKey, oldKey, newKey);
+    if (success)
+    {
+        Serial.println("[API] Key change successful.");
+    }
+    else
+    {
+        Serial.println("[API] Key change failed.");
+    }
 
     StaticJsonDocument<256> doc;
-    JsonObject responsePayload = doc.to<JsonObject>();
-    responsePayload["failedKeys"] = JsonArray();
-    responsePayload["successfulKeys"] = JsonArray();
-
-    // TODO: if change includes key 0, we need to change it first using provided auth key
-    // TODO: if more keys are provided, we need to change them afterwards using new key 0 as auth key
-
-    bool doesChangeKey0 = false;
-    for (JsonPair key : data["payload"]["keys"].as<JsonObject>())
-    {
-        uint8_t keyNumber = key.key().c_str()[0] - '0';
-        if (keyNumber == 0)
-        {
-            doesChangeKey0 = true;
-
-            uint8_t newKey[16];
-            String newKeyHex = key.value().as<String>();
-            this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
-
-            Serial.println("Change KEy Call 1");
-            bool success = this->nfc->changeKey(0, authKey, newKey);
-            if (!success)
-            {
-                responsePayload["failedKeys"].add(0);
-                this->sendMessage(true, "CHANGE_KEYS", responsePayload);
-                return;
-            }
-
-            responsePayload["successfulKeys"].add(0);
-
-            // replace authkey with newkey for further operations
-            for (int i = 0; i < 16; i++)
-            {
-                authKey[i] = newKey[i];
-            }
-
-            break;
-        }
-    }
-
-    // for each key in "keys" object (key = key number as string, value = next key as hex string)
-    for (JsonPair key : data["payload"]["keys"].as<JsonObject>())
-    {
-        uint8_t keyNumber = key.key().c_str()[0] - '0';
-
-        if (keyNumber == 0)
-        {
-            continue;
-        }
-
-        uint8_t newKey[16];
-        String newKeyHex = key.value().as<String>();
-        this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
-
-        Serial.print("[API] executing change key for key number ");
-        Serial.print(keyNumber);
-        Serial.print(" using current key xxxx");
-        for (int i = 10; i < 16; i++)
-        {
-            Serial.print(authKey[i]);
-        }
-        Serial.print(" to new key ");
-        for (int i = 10; i < 16; i++)
-        {
-            Serial.print(newKey[i]);
-        }
-        Serial.println();
-
-        Serial.println("Change key call 3");
-        bool success = this->nfc->changeKey(keyNumber, authKey, newKey);
-        if (success)
-        {
-            responsePayload["successfulKeys"].add(keyNumber);
-        }
-        else
-        {
-            responsePayload["failedKeys"].add(keyNumber);
-            this->sendMessage(true, "CHANGE_KEYS", responsePayload);
-            return;
-        }
-    }
-
-    this->sendMessage(true, "CHANGE_KEYS", responsePayload);
+    JsonObject payload = doc.to<JsonObject>();
+    payload["successful"] = success;
+    this->sendMessage(true, "NFC_CHANGE_KEY", payload);
 }
 
 void API::onAuthenticate(JsonObject data)
@@ -351,7 +362,13 @@ void API::onAuthenticate(JsonObject data)
 
     uint8_t keyNumber = data["payload"]["keyNumber"].as<uint8_t>();
 
-    bool success = this->nfc->authenticate(keyNumber, authenticationKey);
+    if (!this->onNfcAuthenticate)
+    {
+        Serial.println("[API] onNfcAuthenticate callback is not set");
+        return;
+    }
+
+    bool success = this->onNfcAuthenticate(keyNumber, authenticationKey);
     if (success)
     {
         Serial.println("[API] Authentication successful.");
@@ -364,13 +381,12 @@ void API::onAuthenticate(JsonObject data)
     StaticJsonDocument<256> doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["authenticationSuccessful"] = success;
-    this->sendMessage(true, "AUTHENTICATE", payload);
+    this->sendMessage(true, "NFC_AUTHENTICATE", payload);
 }
 
 void API::onReauthenticate(JsonObject data)
 {
     Serial.println("[API] REAUTHENTICATE Api flow");
-    this->display->show_success("Resetting...", 0);
     this->authentication_sent_at = 0;
     this->is_authenticated = false;
 }
@@ -378,8 +394,19 @@ void API::onReauthenticate(JsonObject data)
 void API::onShowText(JsonObject data)
 {
     Serial.println("[API] SHOW_TEXT");
-    this->display->show_text(true);
-    this->display->set_text(data["payload"]["lineOne"].as<String>(), data["payload"]["lineTwo"].as<String>());
+
+    // Handle the payload structure correctly (single message field)
+    if (data["payload"]["message"].is<String>())
+    {
+        this->display->show_text(data["payload"]["message"].as<String>(), "");
+    }
+    else
+    {
+        // Fallback for line-based messages
+        this->display->show_text(
+            data["payload"]["lineOne"].as<String>(),
+            data["payload"]["lineTwo"].as<String>());
+    }
 }
 
 void API::processData()
@@ -397,19 +424,21 @@ void API::processData()
     deserializeJson(doc, buffer, bytes_read);
 
     auto data = doc["data"].as<JsonObject>();
-    auto eventType = data["type"].as<String>();
+    String eventType = data["type"].as<String>();
     auto payload = data["payload"].as<JsonObject>();
 
     String payloadString;
     serializeJson(payload, payloadString);
 
     Serial.println("[API] Received message of type " + eventType + " with payload " + payloadString);
+    Serial.println("[API] Sending ACK for event " + eventType);
+    this->sendAck(eventType.c_str());
 
-    if (eventType == "REGISTER")
+    if (eventType == "READER_REGISTER")
     {
         this->onRegistrationData(data);
     }
-    else if (eventType == "UNAUTHORIZED")
+    else if (eventType == "READER_UNAUTHORIZED")
     {
         this->onUnauthorized(data);
     }
@@ -420,31 +449,42 @@ void API::processData()
         this->display->set_device_name(payload["name"].as<String>());
         Serial.println("[API] Authentication successful.");
     }
-    else if (eventType == "ENABLE_CARD_CHECKING")
+    else if (eventType == "NFC_ENABLE_CARD_CHECKING")
     {
         this->onEnableCardChecking(data);
     }
-    else if (eventType == "DISABLE_CARD_CHECKING")
+    else if (eventType == "NFC_DISABLE_CARD_CHECKING")
     {
         this->onDisableCardChecking(data);
     }
-    else if (eventType == "CHANGE_KEYS")
+    else if (eventType == "NFC_CHANGE_KEY")
     {
-        this->onChangeKeys(data);
+        this->onChangeKey(data);
     }
-    else if (eventType == "AUTHENTICATE")
+    else if (eventType == "NFC_AUTHENTICATE")
     {
         this->onAuthenticate(data);
     }
     else if (eventType == "DISPLAY_SUCCESS")
     {
-        this->display->show_success(data["payload"]["message"].as<String>(), data["payload"]["duration"].as<unsigned long>());
+        String message = data["payload"]["message"].as<String>();
+        this->display->show_success(message);
     }
     else if (eventType == "DISPLAY_ERROR")
     {
-        this->display->show_error(data["payload"]["message"].as<String>(), data["payload"]["duration"].as<unsigned long>());
+        String message = data["payload"]["message"].as<String>();
+
+        this->display->show_error(message);
     }
-    else if (eventType == "REAUTHENTICATE")
+    else if (eventType == "CLEAR_SUCCESS")
+    {
+        this->display->clear_success();
+    }
+    else if (eventType == "CLEAR_ERROR")
+    {
+        this->display->clear_error();
+    }
+    else if (eventType == "READER_AUTHENTICATE")
     {
         this->onReauthenticate(data);
     }
@@ -454,7 +494,57 @@ void API::processData()
     }
     else if (eventType == "HIDE_TEXT")
     {
-        this->display->show_text(false);
+        this->display->clear_text();
+    }
+    else if (eventType == "SELECT_ITEM")
+    {
+        String label = data["payload"]["label"].as<String>();
+        String value = data["payload"]["selectedValue"].as<String>();
+        // options array is array of objects with id and label
+        JsonArray options = data["payload"]["options"].as<JsonArray>();
+
+        uint8_t amountOfOptions = options.size();
+
+        String displayText = label + "\n" + "> " + value + " <";
+        if (amountOfOptions > 1)
+        {
+            for (JsonObject option : options)
+            {
+                String optionLabel = option["label"].as<String>();
+                String optionId = option["id"].as<String>();
+                displayText += optionId + ": " + optionLabel + "\n";
+            }
+        }
+        else
+        {
+            // first option
+            String optionLabel = options[0]["label"].as<String>();
+            displayText = optionLabel + "\n" + "Press '#' to scan card";
+        }
+
+        this->display->show_text(displayText, "");
+    }
+    else if (eventType == "CANCEL")
+    {
+        Serial.println("[API] CANCEL event received");
+        this->display->clear_text();
+        if (this->onDisableNfcCardChecking)
+        {
+            this->onDisableNfcCardChecking();
+        }
+        this->display->set_nfc_tap_enabled(false);
+    }
+    else if (eventType == "READER_FIRMWARE_INFO")
+    {
+        this->onFirmwareInfo(data);
+    }
+    else if (eventType == "READER_FIRMWARE_UPDATE_REQUIRED")
+    {
+        this->onFirmwareUpdateRequired(data);
+    }
+    else if (eventType == "READER_FIRMWARE_STREAM_CHUNK")
+    {
+        this->onFirmwareStreamChunk(data);
     }
     else
     {
@@ -467,6 +557,18 @@ void API::processData()
 bool API::isRegistered()
 {
     return (Persistence::getSettings().Config.api.has_auth);
+}
+
+void API::sendAck(const char *type)
+{
+    this->sendMessage(true, ("ACK_" + String(type)).c_str());
+}
+
+void API::sendMessage(bool is_response, const char *type)
+{
+    StaticJsonDocument<256> doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage(is_response, type, payload);
 }
 
 void API::sendMessage(bool is_response, const char *type, JsonObject payload)
@@ -509,7 +611,7 @@ void API::sendRegistrationRequest()
 
     Serial.println("[API] Registering reader...");
 
-    this->sendMessage(false, "REGISTER", JsonObject());
+    this->sendMessage(false, "READER_REGISTER");
 
     this->registration_sent_at = millis();
 
@@ -537,12 +639,12 @@ void API::sendAuthenticationRequest()
     JsonObject payload = doc.to<JsonObject>();
     payload["id"] = Persistence::getSettings().Config.api.readerId;
     payload["token"] = Persistence::getSettings().Config.api.apiKey;
-    this->sendMessage(false, "AUTHENTICATE", payload);
+    this->sendMessage(false, "READER_AUTHENTICATE", payload);
 
     this->authentication_sent_at = millis();
 }
 
-void API::sendNFCTapped(uint8_t *uid, uint8_t uidLength)
+void API::sendNFCTapped(char *uid, uint8_t uidLength)
 {
     StaticJsonDocument<256> doc;
     JsonObject payload = doc.to<JsonObject>();
@@ -583,6 +685,11 @@ void API::sendHeartbeat()
 
 void API::loop()
 {
+    if (!this->loop_is_enabled)
+    {
+        return;
+    }
+
     // First check if API is configured
     if (!isConfigured())
     {
@@ -613,6 +720,89 @@ void API::loop()
         StaticJsonDocument<256> doc;
         JsonObject payload = doc.to<JsonObject>();
         payload["key"] = String(key);
-        this->sendMessage(false, "KEY_PRESSED", payload);
+
+        if (key == '#')
+        {
+            payload["key"] = String("CONFIRM");
+        }
+
+        if (key == 'D')
+        {
+            payload["key"] = String("DELETE");
+        }
+
+        this->sendMessage(false, "READER_KEY_PRESSED", payload);
     }
+}
+
+void API::onFirmwareInfo(JsonObject data)
+{
+    Serial.println("[API] Requested firmware info");
+
+    JsonObject response = JsonObject();
+    response["name"] = FIRMWARE_NAME;
+    response["variant"] = FIRMWARE_VARIANT;
+    response["version"] = FIRMWARE_VERSION;
+    this->sendMessage(true, "READER_FIRMWARE_INFO", response);
+}
+
+void API::onFirmwareUpdateRequired(JsonObject data)
+{
+    Serial.println("[API] Firmware update required");
+
+    // Show updating message on display
+    this->display->show_text("Firmware Update", "Starting...");
+
+    // Prepare response for firmware chunks
+    StaticJsonDocument<256> doc;
+    JsonObject responsePayload = doc.to<JsonObject>();
+    responsePayload["ready"] = true;
+    responsePayload["bytes_received"] = 0;
+    this->sendMessage(true, "READER_FIRMWARE_UPDATE_REQUIRED", responsePayload);
+}
+
+void API::onFirmwareStreamChunk(JsonObject data)
+{
+    Serial.println("[API] Received firmware stream chunk");
+
+    // Extract chunk information from the payload
+    JsonObject payload = data["payload"].as<JsonObject>();
+
+    // In a full implementation, this would handle the actual firmware chunk data
+    // Since we're receiving binary data through a separate channel, we acknowledge receipt
+}
+
+void API::setOnEnableNfcCardChecking(void (*callback)())
+{
+    this->onEnableNfcCardChecking = callback;
+}
+
+void API::setOnDisableNfcCardChecking(void (*callback)())
+{
+    this->onDisableNfcCardChecking = callback;
+}
+
+void API::setOnNfcChangeKey(bool (*callback)(uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey))
+{
+    this->onNfcChangeKey = callback;
+}
+
+void API::setOnNfcAuthenticate(bool (*callback)(uint8_t keyNumber, uint8_t *authenticationKey))
+{
+    this->onNfcAuthenticate = callback;
+}
+
+void API::enableLoop()
+{
+    this->loop_is_enabled = true;
+}
+
+void API::disableLoop()
+{
+    this->loop_is_enabled = false;
+}
+
+bool API::isLoopEnabled()
+{
+    return this->loop_is_enabled;
 }

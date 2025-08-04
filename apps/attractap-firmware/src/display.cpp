@@ -37,17 +37,7 @@ void Display::loop()
 
     draw_main_elements();
 
-    if (this->error_end_at > millis())
-    {
-        this->leds->setBlinking(CRGB::Red, 1000);
-        this->draw_error_ui();
-    }
-    else if (this->success_end_at > millis())
-    {
-        this->leds->setBlinking(CRGB::Green, 1000);
-        this->draw_success_ui();
-    }
-    else if (!this->is_network_connected)
+    if (!this->is_network_connected)
     {
         this->leds->setBlinking(CRGB::Yellow, 500);
         this->draw_network_connecting_ui();
@@ -57,12 +47,22 @@ void Display::loop()
         this->leds->setBlinking(CRGB::Blue, 500);
         this->draw_api_connecting_ui();
     }
-    else if (this->is_nfc_tap_enabled)
+    else if (this->display_state == DISPLAY_STATE_CARD_CHECKING)
     {
         this->leds->setBreathing(CRGB::White, 500);
         this->draw_nfc_tap_ui();
     }
-    else if (this->is_displaying_text)
+    else if (this->display_state == DISPLAY_STATE_ERROR)
+    {
+        this->leds->setBlinking(CRGB::Red, 1000);
+        this->draw_error_ui();
+    }
+    else if (this->display_state == DISPLAY_STATE_SUCCESS)
+    {
+        this->leds->setBlinking(CRGB::Green, 1000);
+        this->draw_success_ui();
+    }
+    else if (this->display_state == DISPLAY_STATE_TEXT)
     {
         this->leds->setOn(CRGB::Blue);
         this->draw_text_ui();
@@ -71,14 +71,22 @@ void Display::loop()
     display.display();
 }
 
-void Display::set_nfc_tap_enabled(bool enabled)
-{
-    this->is_nfc_tap_enabled = enabled;
-}
-
-void Display::set_nfc_tap_text(String text)
+void Display::set_nfc_tap_enabled(bool enabled, String text)
 {
     this->nfc_tap_text = text;
+    this->set_nfc_tap_enabled(enabled);
+}
+
+void Display::set_nfc_tap_enabled(bool enabled)
+{
+    if (enabled)
+    {
+        this->display_state = DISPLAY_STATE_CARD_CHECKING;
+    }
+    else if (this->display_state == DISPLAY_STATE_CARD_CHECKING)
+    {
+        this->display_state = DISPLAY_STATE_NONE;
+    }
 }
 
 void Display::set_network_connected(bool connected)
@@ -200,29 +208,47 @@ void Display::draw_two_line_message(String line1, String line2)
     display.print(line2);
 }
 
-void Display::show_error(String error, unsigned long duration)
+void Display::show_error(String error)
 {
     this->error = error;
-
-    this->error_end_at = millis() + duration;
+    this->display_state = DISPLAY_STATE_ERROR;
 }
 
-void Display::show_success(String success, unsigned long duration)
+void Display::clear_error()
+{
+    if (this->display_state == DISPLAY_STATE_ERROR)
+    {
+        this->display_state = DISPLAY_STATE_NONE;
+    }
+}
+
+void Display::show_success(String success)
 {
     this->success = success;
-
-    this->success_end_at = millis() + duration;
+    this->display_state = DISPLAY_STATE_SUCCESS;
 }
 
-void Display::show_text(bool show)
+void Display::clear_success()
 {
-    this->is_displaying_text = show;
+    if (this->display_state == DISPLAY_STATE_SUCCESS)
+    {
+        this->display_state = DISPLAY_STATE_NONE;
+    }
 }
 
-void Display::set_text(String lineOne, String lineTwo)
+void Display::show_text(String lineOne, String lineTwo)
 {
+    this->display_state = DISPLAY_STATE_TEXT;
     this->text_line_one = lineOne;
     this->text_line_two = lineTwo;
+}
+
+void Display::clear_text()
+{
+    if (this->display_state == DISPLAY_STATE_TEXT)
+    {
+        this->display_state = DISPLAY_STATE_NONE;
+    }
 }
 
 void Display::draw_text_ui()

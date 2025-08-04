@@ -30,11 +30,6 @@ public:
     void enableCardChecking();
     void disableCardChecking();
 
-    // Status methods
-    bool isNFCDisabled() const { return nfc_disabled; }
-    uint16_t getConsecutiveErrors() const { return consecutive_errors; }
-    String getStatusString() const;
-
     // These operations start the non-blocking operations
     // Returns true if operation was started successfully
     bool startChangeKey(uint8_t keyNumber, uint8_t authKey[16], uint8_t newKey[16]);
@@ -66,15 +61,6 @@ private:
     unsigned long last_state_time = 0;
     unsigned long scan_start_time = 0;
 
-    // Error tracking and recovery
-    uint16_t consecutive_errors = 0;
-    uint32_t last_error_time = 0;
-    bool nfc_disabled = false;
-    static const uint16_t MAX_CONSECUTIVE_ERRORS = 10;
-    static const uint32_t ERROR_BACKOFF_BASE = 1000;    // 1 second base backoff
-    static const uint32_t MAX_ERROR_BACKOFF = 30000;    // 30 seconds max backoff
-    static const uint32_t NFC_DISABLE_DURATION = 60000; // 60 seconds disable after too many errors
-
     // Async operation variables
     uint8_t auth_key_number;
     uint8_t auth_key[16];
@@ -95,13 +81,6 @@ private:
     void handleAuthState();
     void handleWriteState();
     void handleChangeKeyState();
-
-    // Error handling and recovery
-    void recordError();
-    void recordSuccess();
-    bool shouldRetryOperation();
-    uint32_t getBackoffDelay();
-    void checkErrorRecovery();
 
     bool is_card_checking_enabled = false;
 

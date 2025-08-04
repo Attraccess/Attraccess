@@ -1,87 +1,105 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_PN532_NTAG424.h>
+#include "Adafruit_PN532_NTAG424.h"
+#include <esp_task_wdt.h>
 #include <Wire.h>
-#include "configuration.hpp"
 
-// NFC state machine states
-#define NFC_STATE_INIT 0
-#define NFC_STATE_READY 1
-#define NFC_STATE_SCANNING 2
-#define NFC_STATE_AUTH_START 3
-#define NFC_STATE_AUTH_WAIT 4
-#define NFC_STATE_WRITE_START 5
-#define NFC_STATE_WRITE_WAIT 6
-#define NFC_STATE_CHANGE_KEY_START 7
-#define NFC_STATE_CHANGE_KEY_WAIT 8
-
-// Forward declare API instead of including the header
-class API; // Forward declaration instead of #include "api.hpp"
+#define PIN_PN532_IRQ (2)
+#define PIN_PN532_RESET (0)
 
 class NFC
 {
 public:
-    // Using I2C with default IRQ and RESET pins (no pins need to be defined)
-    NFC(API *api) : nfc(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire), api(api) {}
-    ~NFC() {}
+    NFC() : pn532(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire) {}
 
     void setup();
-    void loop();
 
-    void enableCardChecking();
-    void disableCardChecking();
+    /*
+     *  Set the callback to be called when an nfc card is detected
+     *  @param callback : callback to be called when an nfc card is detected
+     */
+    void setOnNfcCardDetected(void (*callback)(char *uuid));
 
-    // These operations start the non-blocking operations
-    // Returns true if operation was started successfully
-    bool startChangeKey(uint8_t keyNumber, uint8_t authKey[16], uint8_t newKey[16]);
-    bool startWriteData(uint8_t authKey[16], uint8_t keyNumber, uint8_t data[], size_t dataLength);
-    bool startAuthenticate(uint8_t keyNumber, uint8_t authKey[16]);
+    /*
+     *  Authenticate with the nfc card
+     *  @param uuid: uuid of the nfc card (can be nullptr to authenticate with any card)
+     *  @param keyNumber: key number to authenticate with
+     *  @param key: key to authenticate with (16 bytes)
+     *  @param waitForRemovalAtEnd: whether to wait for card removal after authentication
+     *  @return true if authentication is successful, false otherwise
+     */
+    bool authenticate(const uint8_t keyNumber, uint8_t *key, bool waitForRemovalAtEnd = true);
 
-    // Legacy blocking API - deprecated but kept for backwards compatibility
-    bool changeKey(uint8_t keyNumber, uint8_t authKey[16], uint8_t newKey[16]);
-    bool writeData(uint8_t authKey[16], uint8_t keyNumber, uint8_t data[], size_t dataLength);
-    bool authenticate(uint8_t keyNumber, uint8_t authKey[16]);
+    /*
+     *  Change a key on the nfc card
+     *  @param uuid: uuid of the nfc card
+     *  @param keyNumber: key number to change
+     *  @param authKey: key to authenticate with (16 bytes)
+     *  @param newKey: new key to use (16 bytes)
+     *  @return true if key change is successful, false otherwise
+     */
+    bool changeKey(const uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey);
 
+    /*
+     *  Waits a given amount of time for the nfc card to be detected
+     *  @param timeout: timeout in milliseconds
+     *  @return true if the nfc card is detected, false otherwise
+     */
+    bool waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeoutMs);
+    bool waitForNfcCard(const uint32_t timeoutMs);
+    bool waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const uint32_t timeoutMs);
+
+    /*
+     *  Waits for the nfc card to be removed
+     */
     void waitForCardRemoval();
 
-    // Callbacks for operation completion
-    void setAuthCompleteCallback(void (*callback)(bool success));
-    void setWriteCompleteCallback(void (*callback)(bool success));
-    void setChangeKeyCompleteCallback(void (*callback)(bool success));
+    /*
+     *  Convert a byte array to a string
+     *  @param uuid: the byte array to convert
+     *  @param length: the length of the byte array
+     *  @return the string representation of the byte array
+     */
+    void uintArrayToCharArray(const uint8_t *uuid, const uint8_t length, char *charArray);
+
+    /*
+     *  Discover the nfc card one time
+     *  @param dicoveredUuid: the discovered uuid
+     *  @param discoveredUuidLength: the length of the discovered uuid
+     *  @param timeoutMs: the timeout in milliseconds
+     *  @return true if the nfc card is discovered, false otherwise
+     */
+    bool discoverNfcCard(char *dicoveredUuid, uint8_t *discoveredUuidLength, const uint32_t timeoutMs = 500);
+
+    void enableLoopCardDetection();
+    void disableLoopCardDetection();
+    bool isLoopCardDetectionEnabled();
 
 private:
-    Adafruit_PN532 nfc;
-    API *api;
+    static const uint8_t AUTH_KEY_NO = 0;
+    static const uint8_t AUTH_CMD = 0x71;
 
-    // State machine variables
-    uint8_t state = NFC_STATE_INIT;
-    unsigned long last_state_time = 0;
-    unsigned long scan_start_time = 0;
+    TaskHandle_t task_handle;
+    static void task_function(void *pvParameters);
 
-    // Async operation variables
-    uint8_t auth_key_number;
-    uint8_t auth_key[16];
-    uint8_t new_key[16];
-    uint8_t write_data[64]; // Buffer for data to write
-    size_t write_data_length;
-    bool operation_success = false;
+    Adafruit_PN532 pn532;
 
-    // Callback functions
-    void (*auth_complete_callback)(bool success) = nullptr;
-    void (*write_complete_callback)(bool success) = nullptr;
-    void (*change_key_complete_callback)(bool success) = nullptr;
+    bool nfc_is_detected = false;
+    bool nfc_is_ready = false;
+    bool loop_card_detection_is_enabled = false;
 
-    // State handlers
-    void handleInitState();
-    void handleReadyState();
-    void handleScanningState();
-    void handleAuthState();
-    void handleWriteState();
-    void handleChangeKeyState();
+    void (*onNfcCardDetected)(char *uuid);
 
-    bool is_card_checking_enabled = false;
+    void loop();
 
-    // Helper constant
-    const uint8_t AUTH_CMD = 0x71;
+    /*
+     *  Detect the nfc module and set the nfc_is_detected flag if it is detected
+     */
+    bool detectNfcModule();
+
+    /*
+     *  Configure the nfc module
+     */
+    bool configureNfcModule();
 };

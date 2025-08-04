@@ -7,8 +7,8 @@
 
 struct ApiConfig
 {
-    char hostname[32];
-    uint16_t port;
+    char hostname[32] = "192.168.178.91";
+    uint16_t port = 3000;
     bool has_auth = false;
 
     // reader id
@@ -20,9 +20,9 @@ struct ApiConfig
 
 struct WiFiConfig
 {
-    char ssid[33] = "";     // Max 32 chars + null terminator
-    char password[65] = ""; // Max 64 chars + null terminator
-    bool configured = false;
+    char ssid[33] = "Darknet";              // Max 32 chars + null terminator
+    char password[65] = "WirWollen16Kekse"; // Max 64 chars + null terminator
+    bool configured = true;
 };
 
 struct WebConfig

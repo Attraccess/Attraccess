@@ -10,12 +10,21 @@ export class WaitForResourceSelectionState implements ReaderState {
 
   public constructor(private readonly socket: AuthenticatedWebSocket, private readonly services: GatewayServices) {}
 
-  public async onStateEnter(): Promise<void> {
-    this.socket.sendMessage(
+  public async onStateEnter(clearValue = true): Promise<void> {
+    if (clearValue) {
+      this.value = '';
+
+      if (this.socket.reader.resources.length === 1) {
+        this.value = '1';
+      }
+    }
+
+    await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.SELECT_ITEM, {
         label: 'Select a resource',
-        options: this.socket.reader.resources.map((resource) => ({
-          id: String(resource.id),
+        selectedValue: this.value,
+        options: this.socket.reader.resources.map((resource, index) => ({
+          id: String(index + 1),
           label: resource.name,
         })),
       })
@@ -31,6 +40,10 @@ export class WaitForResourceSelectionState implements ReaderState {
       return await this.onSelectItem(data.payload);
     }
 
+    if (data.type === AttractapEventType.READER_KEY_PRESSED) {
+      return await this.onKeyPressed(data.payload);
+    }
+
     return undefined;
   }
 
@@ -38,57 +51,77 @@ export class WaitForResourceSelectionState implements ReaderState {
     return undefined;
   }
 
-  private async onSelectItem(data: AttractapEvent['data']['payload']) {
-    const selectedResourceId = Number(data.selectedId);
+  private async onSelectItem(data: AttractapEvent<{ selectedId: string }>['data']['payload']) {
+    const selectedResourceIndex = Number(data.selectedId);
 
-    if (isNaN(selectedResourceId)) {
-      this.logger.error('Selected resource id is not a number, clearing input', {
+    if (isNaN(selectedResourceIndex)) {
+      this.logger.error('Selected resource index is not a number, clearing input', {
         value: this.value,
-        intValue: selectedResourceId,
+        intValue: selectedResourceIndex,
       });
 
-      this.socket.sendMessage(
+      await this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
           message: 'Invalid resource',
         })
       );
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
+      await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
-      return this.onStateEnter();
+      return await this.onStateEnter(true);
     }
 
-    const resource = this.socket.reader.resources.find((resource) => resource.id === selectedResourceId);
+    const resource = this.socket.reader.resources[selectedResourceIndex - 1];
 
     if (!resource) {
       this.logger.error(
         'Resource with id not found',
-        selectedResourceId,
+        selectedResourceIndex,
         this.socket.reader.resources.map((r) => r.id),
-        typeof selectedResourceId
+        typeof selectedResourceIndex
       );
       this.value = '';
 
-      this.socket.sendMessage(
+      await this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
           message: 'Unknown resource',
         })
       );
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
+      await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
-      return await this.onStateEnter();
+      return await this.onStateEnter(true);
     }
 
-    this.logger.debug(`Reader has selected resource with id ${selectedResourceId}, moving to WaitForNFCTapState`);
+    this.logger.debug(`Reader has selected resource with index ${selectedResourceIndex}, moving to WaitForNFCTapState`);
     const nextState = new WaitForNFCTapState(
       this.socket,
       this.services,
-      selectedResourceId,
+      resource.id,
       30000,
       new WaitForResourceSelectionState(this.socket, this.services),
       new WaitForResourceSelectionState(this.socket, this.services)
     );
     return await this.socket.transitionToState(nextState);
+  }
+
+  private async onKeyPressed(data: AttractapEvent<{ key: string }>['data']['payload']) {
+    this.logger.debug('Key pressed', data);
+
+    if (data.key === 'CONFIRM') {
+      await this.onSelectItem({ selectedId: this.value });
+      return;
+    }
+
+    if (data.key === 'CLEAR') {
+      await this.onStateEnter(true);
+      return;
+    }
+
+    if (this.socket.reader.resources.length > 1) {
+      this.value += data.key;
+    }
+
+    await this.onStateEnter(false);
   }
 }

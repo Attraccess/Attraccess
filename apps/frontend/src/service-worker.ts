@@ -9,7 +9,7 @@ self.addEventListener('message', (event) => {
 });
 
 const wb_manifest = self.__WB_MANIFEST;
-setupPrecaching(wb_manifest);
+setupPrecaching([...wb_manifest, '/index.html']);
 
 // Only handle navigation requests that aren't for API routes
 registerRoute(

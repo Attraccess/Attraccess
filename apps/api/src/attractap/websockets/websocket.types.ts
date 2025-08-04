@@ -17,7 +17,7 @@ export enum AttractapEventType {
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   SHOW_TEXT = 'SHOW_TEXT',
   NFC_TAP = 'NFC_TAP',
-  NFC_CHANGE_KEYS = 'NFC_CHANGE_KEYS',
+  NFC_CHANGE_KEY = 'NFC_CHANGE_KEY',
   NFC_ENABLE_CARD_CHECKING = 'NFC_ENABLE_CARD_CHECKING',
   NFC_DISABLE_CARD_CHECKING = 'NFC_DISABLE_CARD_CHECKING',
   DISPLAY_SUCCESS = 'DISPLAY_SUCCESS',
@@ -29,6 +29,7 @@ export enum AttractapEventType {
   READER_FIRMWARE_STREAM_CHUNK = 'READER_FIRMWARE_STREAM_CHUNK',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   SELECT_ITEM = 'SELECT_ITEM',
+  READER_KEY_PRESSED = 'READER_KEY_PRESSED',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,7 +78,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   reader?: Attractap;
   state?: ReaderState;
   transitionToState: (state: ReaderState) => Promise<void>;
-  sendMessage: (message: AttractapMessage) => void;
+  sendMessage: (message: AttractapMessage) => Promise<void>;
   sendBinaryData: (data: Buffer) => void;
 }
 

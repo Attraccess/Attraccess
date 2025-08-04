@@ -33,7 +33,8 @@ describe('EnrollNTAG424State', () => {
     password: 'password',
   } as unknown as User;
   const mockCardUID = 'card-uid-123';
-  const mockNewMasterKey = 'aaaabbbbccccddddeeeeffffgggghhhh';
+  const mockDefaultMasterKey = '00000000000000000000000000000000';
+  const mockNewMasterKey = 'aaaabbbbccccddddeeeefffff0001111';
 
   beforeEach(async () => {
     // Reset mocks
@@ -50,8 +51,19 @@ describe('EnrollNTAG424State', () => {
       attractapService: {
         getNFCCardByUID: jest.fn(),
         createNFCCard: jest.fn().mockResolvedValue({ id: 'nfc-card-1' }),
-        uint8ArrayToHexString: jest.fn().mockReturnValue('aaaabbbbccccddddeeeeffffgggghhhh'),
-        generateNTAG424Key: jest.fn(),
+        uint8ArrayToHexString: jest.fn().mockImplementation((uint8Array: Uint8Array) => {
+          // Convert Uint8Array to hex string
+          return Array.from(uint8Array)
+            .map((b: number) => b.toString(16).padStart(2, '0'))
+            .join('');
+        }),
+        generateNTAG424Key: jest
+          .fn()
+          .mockResolvedValue(
+            new Uint8Array([
+              0xaa, 0xaa, 0xbb, 0xbb, 0xcc, 0xcc, 0xdd, 0xdd, 0xee, 0xee, 0xff, 0xff, 0xf0, 0x00, 0x11, 0x11,
+            ])
+          ),
       },
       usersService: {
         findOne: jest.fn().mockResolvedValue(mockUser),
@@ -134,8 +146,13 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_CHANGE_KEYS,
-            payload: expect.any(Object),
+            type: AttractapEventType.NFC_CHANGE_KEY,
+            payload: {
+              keyNumber: 0,
+              oldKey: mockDefaultMasterKey,
+              newKey: mockNewMasterKey,
+              authKey: mockDefaultMasterKey,
+            },
           }),
         })
       );
@@ -167,7 +184,7 @@ describe('EnrollNTAG424State', () => {
 
       // Send a different response type
       await enrollState.onResponse({
-        type: AttractapEventType.NFC_CHANGE_KEYS,
+        type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {},
       });
 
@@ -182,94 +199,26 @@ describe('EnrollNTAG424State', () => {
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEYS,
-        data: {
-          newKeys: { 0: mockNewMasterKey },
-        },
-      };
-
-      // Call method
-      await enrollState.onResponse({
-        type: AttractapEventType.NFC_CHANGE_KEYS,
-        payload: {
-          successfulKeys: [0],
-          failedKeys: [],
-        },
-      });
-
-      // Assert
-      expect(enrollState['enrollment'].nextExpectedEvent).toBe(AttractapEventType.NFC_AUTHENTICATE);
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.NFC_AUTHENTICATE,
-            payload: expect.objectContaining({
-              authenticationKey: mockNewMasterKey,
-              keyNumber: 0,
-            }),
-          }),
-        })
-      );
-    });
-
-    it('should handle failed key change', async () => {
-      // Setup
-      await enrollState.onStateEnter();
-      (mockSocket.sendMessage as jest.Mock).mockClear();
-
-      // Manually set the enrollment state
-      enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEYS,
-        data: {
-          newKeys: { 0: mockNewMasterKey },
-        },
-      };
-
-      // Call method
-      await enrollState.onResponse({
-        type: AttractapEventType.NFC_CHANGE_KEYS,
-        payload: {
-          successfulKeys: [],
-          failedKeys: [0],
-        },
-      });
-
-      // Assert
-      expect(enrollState['enrollment']).toBeUndefined();
-      expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
-      expect(mockSocket.transitionToState).toHaveBeenCalled();
-    });
-
-    it('should handle successful authentication', async () => {
-      // Setup
-      await enrollState.onStateEnter();
-      (mockSocket.sendMessage as jest.Mock).mockClear();
-
-      // Manually set the enrollment state
-      enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.NFC_AUTHENTICATE,
+        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEY,
         cardUID: mockCardUID,
         data: {
-          newKeys: { 0: mockNewMasterKey },
+          newKeyZeroMaster: mockNewMasterKey,
         },
       };
 
-      // Call method and advance timers
+      // Call method and handle timers
       const responsePromise = enrollState.onResponse({
-        type: AttractapEventType.NFC_AUTHENTICATE,
+        type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {
-          authenticationSuccessful: true,
+          successful: true,
         },
       });
 
-      // Fast-forward through all timers and await the promise
+      // Fast-forward through the 10 second delay
       await jest.runAllTimersAsync();
       await responsePromise;
 
-      // Assert
-      // Don't expect enrollment to be undefined since the implementation doesn't clear it
-
-      // Verify card creation
+      // Assert - should create NFC card and send success message
       expect(mockServices.attractapService.createNFCCard).toHaveBeenCalledWith(mockUser, {
         uid: mockCardUID,
         keys: {
@@ -277,7 +226,6 @@ describe('EnrollNTAG424State', () => {
         },
       });
 
-      // Verify success message
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -289,7 +237,6 @@ describe('EnrollNTAG424State', () => {
         })
       );
 
-      // Verify clear success message was sent
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -299,56 +246,36 @@ describe('EnrollNTAG424State', () => {
         })
       );
 
-      // Verify transition to initial state
-      expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
-      expect(mockSocket.transitionToState).toHaveBeenCalled();
+      expect(mockSocket.transitionToState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          onStateEnter: expect.any(Function),
+        })
+      );
     });
 
-    it('should handle failed authentication', async () => {
+    it('should handle failed key change', async () => {
       // Setup
       await enrollState.onStateEnter();
       (mockSocket.sendMessage as jest.Mock).mockClear();
 
       // Manually set the enrollment state
       enrollState['enrollment'] = {
-        nextExpectedEvent: AttractapEventType.NFC_AUTHENTICATE,
-        cardUID: mockCardUID,
+        nextExpectedEvent: AttractapEventType.NFC_CHANGE_KEY,
         data: {
-          newKeys: { 0: mockNewMasterKey },
+          newKeyZeroMaster: mockNewMasterKey,
         },
       };
 
       // Call method
-      const responsePromise = enrollState.onResponse({
-        type: AttractapEventType.NFC_AUTHENTICATE,
+      await enrollState.onResponse({
+        type: AttractapEventType.NFC_CHANGE_KEY,
         payload: {
-          authenticationSuccessful: false,
+          successful: false,
         },
       });
 
-      // Fast-forward through all timers and await the promise
-      await jest.runAllTimersAsync();
-      await responsePromise;
-
       // Assert
-      // Don't expect enrollment to be undefined since the implementation doesn't clear it
-
-      // No card should be created when authentication fails
-      expect(mockServices.attractapService.createNFCCard).not.toHaveBeenCalled();
-
-      // Verify error message
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.DISPLAY_ERROR,
-            payload: expect.objectContaining({
-              message: 'Enrollment failed',
-            }),
-          }),
-        })
-      );
-
-      // Verify transition to initial state
+      expect(enrollState['enrollment']).toBeUndefined();
       expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
       expect(mockSocket.transitionToState).toHaveBeenCalled();
     });
@@ -369,6 +296,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
     password: 'password',
   } as unknown as User;
   const mockCardUID = 'card-uid-123';
+  const mockNewMasterKey = 'aaaabbbbccccddddeeeefffff0001111';
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -384,8 +312,19 @@ describe('EnrollNTAG424State - Full Flow', () => {
       attractapService: {
         getNFCCardByUID: jest.fn(),
         createNFCCard: jest.fn().mockResolvedValue({ id: 'nfc-card-1' }),
-        uint8ArrayToHexString: jest.fn(),
-        generateNTAG424Key: jest.fn(),
+        uint8ArrayToHexString: jest.fn().mockImplementation((uint8Array: Uint8Array) => {
+          // Convert Uint8Array to hex string
+          return Array.from(uint8Array)
+            .map((b: number) => b.toString(16).padStart(2, '0'))
+            .join('');
+        }),
+        generateNTAG424Key: jest
+          .fn()
+          .mockResolvedValue(
+            new Uint8Array([
+              0xaa, 0xaa, 0xbb, 0xbb, 0xcc, 0xcc, 0xdd, 0xdd, 0xee, 0xee, 0xff, 0xff, 0xf0, 0x00, 0x11, 0x11,
+            ])
+          ),
       },
       usersService: {
         findOne: jest.fn().mockResolvedValue(mockUser),
@@ -450,48 +389,28 @@ describe('EnrollNTAG424State - Full Flow', () => {
       3,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_CHANGE_KEYS,
+          type: AttractapEventType.NFC_CHANGE_KEY,
         }),
       })
     );
 
     // Step 3: Keys changed successfully
-    await enrollState.onResponse({
-      type: AttractapEventType.NFC_CHANGE_KEYS,
+    const keyChangePromise = enrollState.onResponse({
+      type: AttractapEventType.NFC_CHANGE_KEY,
       payload: {
-        successfulKeys: [0],
-        failedKeys: [],
-      },
-    });
-
-    // Verify AUTHENTICATE message
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(4);
-    expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-      4,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: AttractapEventType.NFC_AUTHENTICATE,
-        }),
-      })
-    );
-
-    // Step 4: Authentication successful
-    const authPromise = enrollState.onResponse({
-      type: AttractapEventType.NFC_AUTHENTICATE,
-      payload: {
-        authenticationSuccessful: true,
+        successful: true,
       },
     });
 
     // Fast-forward through the 10 second delay
     await jest.runAllTimersAsync();
-    await authPromise;
+    await keyChangePromise;
 
     // Verify success message and card creation
     expect(mockServices.attractapService.createNFCCard).toHaveBeenCalled();
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(6);
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(5);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-      5,
+      4,
       expect.objectContaining({
         data: expect.objectContaining({
           type: AttractapEventType.DISPLAY_SUCCESS,
@@ -502,7 +421,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
       })
     );
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-      6,
+      5,
       expect.objectContaining({
         data: expect.objectContaining({
           type: AttractapEventType.CLEAR_SUCCESS,
@@ -532,69 +451,14 @@ describe('EnrollNTAG424State - Full Flow', () => {
 
     // Simulate key change failure
     await enrollState.onResponse({
-      type: AttractapEventType.NFC_CHANGE_KEYS,
+      type: AttractapEventType.NFC_CHANGE_KEY,
       payload: {
-        successfulKeys: [],
-        failedKeys: [0],
+        successful: false,
       },
     });
 
     // Verify no messages sent and transition to initial state
     expect(mockSocket.sendMessage).not.toHaveBeenCalled();
-    expect(mockSocket.transitionToState).toHaveBeenCalledTimes(1);
-    expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
-  });
-
-  it('should handle authentication failure and NOT store card data', async () => {
-    // Initialize and tap card
-    await enrollState.onStateEnter();
-    (mockServices.attractapService.getNFCCardByUID as jest.Mock).mockResolvedValue(null);
-
-    await enrollState.onEvent({
-      type: AttractapEventType.NFC_TAP,
-      payload: { cardUID: mockCardUID },
-    });
-
-    // Successfully change keys
-    await enrollState.onResponse({
-      type: AttractapEventType.NFC_CHANGE_KEYS,
-      payload: {
-        successfulKeys: [0],
-        failedKeys: [],
-      },
-    });
-
-    // Clear message history before testing auth failure
-    (mockSocket.sendMessage as jest.Mock).mockClear();
-
-    // Simulate authentication failure
-    const responsePromise = enrollState.onResponse({
-      type: AttractapEventType.NFC_AUTHENTICATE,
-      payload: {
-        authenticationSuccessful: false,
-      },
-    });
-
-    // Fast-forward through all timers and await the promise
-    await jest.runAllTimersAsync();
-    await responsePromise;
-
-    // Verify card was NOT created when authentication fails
-    expect(mockServices.attractapService.createNFCCard).not.toHaveBeenCalled();
-
-    // Verify error message
-    expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: AttractapEventType.DISPLAY_ERROR,
-          payload: expect.objectContaining({
-            message: 'Enrollment failed',
-          }),
-        }),
-      })
-    );
-
-    // Verify transition to initial state
     expect(mockSocket.transitionToState).toHaveBeenCalledTimes(1);
     expect(InitialReaderState).toHaveBeenCalledWith(mockSocket, mockServices);
   });
@@ -621,10 +485,13 @@ describe('EnrollNTAG424State - Full Flow', () => {
     expect(mockSocket.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_CHANGE_KEYS,
-          payload: expect.objectContaining({
-            authenticationKey: 'existingMasterKey',
-          }),
+          type: AttractapEventType.NFC_CHANGE_KEY,
+          payload: {
+            keyNumber: 0,
+            authKey: 'existingMasterKey',
+            oldKey: 'existingMasterKey',
+            newKey: mockNewMasterKey,
+          },
         }),
       })
     );

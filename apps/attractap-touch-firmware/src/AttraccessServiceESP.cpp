@@ -1455,14 +1455,12 @@ void AttraccessServiceESP::onChangeKeysEvent(const JsonObject &data)
     String authKeyHex = data["payload"]["authenticationKey"].as<String>();
     this->hexStringToBytes(authKeyHex, authKey, sizeof(authKey));
 
-    JsonObject response = JsonObject();
-    response["failedKeys"] = JsonArray();
-    response["successfulKeys"] = JsonArray();
-
-    JsonDocument doc;
-    JsonObject responsePayload = doc.to<JsonObject>();
-    responsePayload["failedKeys"] = JsonArray();
-    responsePayload["successfulKeys"] = JsonArray();
+    JsonObject response;
+    response["event"] = "RESPONSE";
+    response["data"]["type"] = "CHANGE_KEYS";
+    response["data"]["payload"]["failedKeys"] = JsonArray();
+    response["data"]["payload"]["successfulKeys"] = JsonArray();
+    response["data"]["payload"]["authenticationKey"] = authKeyHex;
 
     // TODO: if change includes key 0, we need to change it first using provided auth key
     // TODO: if more keys are provided, we need to change them afterwards using new key 0 as auth key
@@ -1479,15 +1477,16 @@ void AttraccessServiceESP::onChangeKeysEvent(const JsonObject &data)
             String newKeyHex = key.value().as<String>();
             this->hexStringToBytes(newKeyHex, newKey, sizeof(newKey));
 
-            Serial.println("Change Key Call 1");
+            Serial.println("Change KEy Call 1");
             bool success = this->nfc->changeKey(0, authKey, newKey);
             if (!success)
             {
-                responsePayload["failedKeys"].add(0);
-                break;
+                response["data"]["payload"]["failedKeys"].add(0);
+                this->sendJSONMessage(response);
+                return;
             }
 
-            responsePayload["successfulKeys"].add(0);
+            response["data"]["payload"]["successfulKeys"].add(0);
 
             // replace authkey with newkey for further operations
             for (int i = 0; i < 16; i++)
@@ -1531,19 +1530,17 @@ void AttraccessServiceESP::onChangeKeysEvent(const JsonObject &data)
         bool success = this->nfc->changeKey(keyNumber, authKey, newKey);
         if (success)
         {
-            responsePayload["successfulKeys"].add(keyNumber);
+            response["data"]["payload"]["successfulKeys"].add(keyNumber);
         }
         else
         {
-            responsePayload["failedKeys"].add(keyNumber);
+            response["data"]["payload"]["failedKeys"].add(keyNumber);
+            this->sendJSONMessage(response);
+            return;
         }
     }
 
-    doc["event"] = "RESPONSE";
-    doc["data"]["type"] = "NFC_CHANGE_KEYS";
-    doc["data"]["payload"] = responsePayload;
-
-    this->sendJSONMessage(doc.as<JsonObject>());
+    this->sendJSONMessage(response);
 }
 
 void AttraccessServiceESP::onAuthenticateNfcEvent(const JsonObject &data)
