@@ -18,7 +18,7 @@ export class NoResourcesAttachedState implements ReaderState {
   }
 
   public async onStateExit(): Promise<void> {
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
+    return;
   }
 
   public async onEvent(/* data: AttractapEvent['data'] */) {

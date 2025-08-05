@@ -17,19 +17,9 @@
         "{projectRoot}/build_firmwares.py",
         "{projectRoot}/src/**/*",
         "{projectRoot}/.pio/**/*",
-        "{projectRoot}/data/**/*",
-        "{workspaceRoot}/dist/apps/attractap-config-ui/**/*"
+        "{projectRoot}/data/**/*"
       ],
-      "cache": true,
-      "dependsOn": ["copy-config-ui"]
-    },
-    "copy-config-ui": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["attractap-config-ui:build"],
-      "options": {
-        "cwd": ".",
-        "command": "rm -rf apps/attractap-firmware/data && mkdir -p apps/attractap-firmware/data && cp -r dist/apps/attractap-config-ui/* apps/attractap-firmware/data"
-      }
+      "cache": true
     }
   }
 }

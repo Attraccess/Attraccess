@@ -22,6 +22,7 @@ interface AttraccessStatusData {
   hostname: string;
   port: number;
   deviceId: string;
+  useSSL: boolean;
 }
 
 interface Props {
@@ -40,7 +41,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
   const [status, setStatus] = useState<AttraccessStatusData | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const apiHostnameAndPort = useMemo(() => {
+  const apiConnectionData = useMemo(() => {
     const baseUrl = getBaseUrl();
     const url = new URL(baseUrl);
 
@@ -53,6 +54,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
     return {
       hostname,
       port: Number(port),
+      useSSL: url.protocol === 'https:',
     };
   }, []);
 
@@ -61,8 +63,12 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       return null;
     }
 
-    return status.hostname === apiHostnameAndPort.hostname && status.port === apiHostnameAndPort.port;
-  }, [status, apiHostnameAndPort]);
+    return (
+      status.hostname === apiConnectionData.hostname &&
+      status.port === apiConnectionData.port &&
+      status.useSSL === apiConnectionData.useSSL
+    );
+  }, [status, apiConnectionData]);
 
   const updateStatus = useCallback(async () => {
     console.debug('Attraccess-Status: fetching status');
@@ -129,8 +135,12 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
   }, [updateStatus]);
 
   const updateAttraccessData = useCallback(
-    async (data?: { hostname: string; port: number }) => {
-      const payload = data ?? { hostname: apiHostnameAndPort.hostname, port: apiHostnameAndPort.port };
+    async (data?: { hostname: string; port: number; useSSL: boolean }) => {
+      const payload = data ?? {
+        hostname: apiConnectionData.hostname,
+        port: apiConnectionData.port,
+        useSSL: apiConnectionData.useSSL,
+      };
 
       console.debug('Attraccess-Status: updating attraccess data', payload);
 
@@ -145,8 +155,9 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
 
       setStatus({
         status: 'connecting_tcp',
-        hostname: apiHostnameAndPort.hostname,
-        port: apiHostnameAndPort.port,
+        hostname: payload.hostname,
+        port: payload.port,
+        useSSL: payload.useSSL,
         deviceId: '',
       });
 
@@ -154,7 +165,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
         updateStatus();
       }, 1000);
     },
-    [updateStatus, apiHostnameAndPort]
+    [updateStatus, apiConnectionData]
   );
 
   const openDeviceSettings = useCallback(() => {
@@ -173,6 +184,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       hostname: status.hostname,
       port: status.port,
       deviceId: status.deviceId,
+      protocolEmoji: status.useSSL ? '🔒' : '🔓',
     });
   }, [status, t]);
 
@@ -185,6 +197,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       hostname: status.hostname,
       port: status.port,
       deviceId: status.deviceId,
+      protocolEmoji: status.useSSL ? '🔒' : '🔓',
     });
   }, [status, t]);
 
@@ -209,7 +222,9 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
       return;
     }
 
-    const payload = { hostname, port: Number(port) };
+    const useSSL = window.confirm('Use SSL?');
+
+    const payload = { hostname, port: Number(port), useSSL };
     console.debug('Attraccess-Status: updating attraccess data manually', payload);
     updateAttraccessData(payload);
   }, [updateAttraccessData]);

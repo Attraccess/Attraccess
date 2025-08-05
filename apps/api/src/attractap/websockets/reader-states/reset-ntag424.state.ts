@@ -131,7 +131,6 @@ export class ResetNTAG424State implements ReaderState {
     );
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     const initialState = new InitialReaderState(this.socket, this.services);
     await this.socket.transitionToState(initialState);

@@ -54,7 +54,6 @@ export class EnrollNTAG424State implements ReaderState {
 
   public async onStateExit(): Promise<void> {
     this.enrollment = undefined;
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
     await this.disableCardChecking();
   }
 
@@ -182,7 +181,6 @@ export class EnrollNTAG424State implements ReaderState {
     );
 
     await new Promise((resolve) => setTimeout(resolve, 10000));
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     const nextState = new InitialReaderState(this.socket, this.services);
     await this.socket.transitionToState(nextState);

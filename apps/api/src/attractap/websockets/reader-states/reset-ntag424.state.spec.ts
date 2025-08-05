@@ -240,8 +240,8 @@ describe('ResetNTAG424State', () => {
       expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledTimes(1);
       expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledWith(mockCardId);
 
-      // Verify success message sent and clear success message sent
-      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(2);
+      // Verify success message sent
+      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
       expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
@@ -250,15 +250,6 @@ describe('ResetNTAG424State', () => {
             payload: expect.objectContaining({
               message: 'Card erased',
             }),
-          }),
-        })
-      );
-      expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.CLEAR_SUCCESS,
-            payload: undefined,
           }),
         })
       );
@@ -431,7 +422,7 @@ describe('ResetNTAG424State - Full Flow', () => {
     expect(mockServices.attractapService.deleteNFCCard).toHaveBeenCalledWith(mockCardId);
 
     // Verify all messages sent in the full flow
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(5);
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(4);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
       4,
       expect.objectContaining({
@@ -440,15 +431,6 @@ describe('ResetNTAG424State - Full Flow', () => {
           payload: expect.objectContaining({
             message: 'Card erased',
           }),
-        }),
-      })
-    );
-    expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-      5,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: AttractapEventType.CLEAR_SUCCESS,
-          payload: undefined,
         }),
       })
     );

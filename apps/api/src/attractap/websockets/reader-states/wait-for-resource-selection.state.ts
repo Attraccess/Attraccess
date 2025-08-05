@@ -6,23 +6,13 @@ import { GatewayServices } from '../websocket.gateway';
 
 export class WaitForResourceSelectionState implements ReaderState {
   private readonly logger = new Logger(WaitForResourceSelectionState.name);
-  private value = '';
 
   public constructor(private readonly socket: AuthenticatedWebSocket, private readonly services: GatewayServices) {}
 
-  public async onStateEnter(clearValue = true): Promise<void> {
-    if (clearValue) {
-      this.value = '';
-
-      if (this.socket.reader.resources.length === 1) {
-        this.value = '1';
-      }
-    }
-
+  public async onStateEnter(): Promise<void> {
     await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.SELECT_ITEM, {
-        label: 'Select a resource',
-        selectedValue: this.value,
+        itemType: 'resource',
         options: this.socket.reader.resources.map((resource, index) => ({
           id: String(index + 1),
           label: resource.name,
@@ -40,10 +30,6 @@ export class WaitForResourceSelectionState implements ReaderState {
       return await this.onSelectItem(data.payload);
     }
 
-    if (data.type === AttractapEventType.READER_KEY_PRESSED) {
-      return await this.onKeyPressed(data.payload);
-    }
-
     return undefined;
   }
 
@@ -51,12 +37,11 @@ export class WaitForResourceSelectionState implements ReaderState {
     return undefined;
   }
 
-  private async onSelectItem(data: AttractapEvent<{ selectedId: string }>['data']['payload']) {
-    const selectedResourceIndex = Number(data.selectedId);
+  private async onSelectItem(data: AttractapEvent<{ value: string }>['data']['payload']) {
+    const selectedResourceIndex = Number(data.value);
 
     if (isNaN(selectedResourceIndex)) {
       this.logger.error('Selected resource index is not a number, clearing input', {
-        value: this.value,
         intValue: selectedResourceIndex,
       });
 
@@ -66,9 +51,8 @@ export class WaitForResourceSelectionState implements ReaderState {
         })
       );
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
-      return await this.onStateEnter(true);
+      return await this.onStateEnter();
     }
 
     const resource = this.socket.reader.resources[selectedResourceIndex - 1];
@@ -80,7 +64,6 @@ export class WaitForResourceSelectionState implements ReaderState {
         this.socket.reader.resources.map((r) => r.id),
         typeof selectedResourceIndex
       );
-      this.value = '';
 
       await this.socket.sendMessage(
         new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
@@ -88,40 +71,16 @@ export class WaitForResourceSelectionState implements ReaderState {
         })
       );
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
-      return await this.onStateEnter(true);
+      return await this.onStateEnter();
     }
 
     this.logger.debug(`Reader has selected resource with index ${selectedResourceIndex}, moving to WaitForNFCTapState`);
-    const nextState = new WaitForNFCTapState(
-      this.socket,
-      this.services,
-      resource.id,
-      30000,
-      new WaitForResourceSelectionState(this.socket, this.services),
-      new WaitForResourceSelectionState(this.socket, this.services)
-    );
+    const nextState = new WaitForNFCTapState(this.socket, this.services, {
+      resourceId: resource.id,
+      timeout_ms: 30000,
+      needsConfirmation: false,
+    });
     return await this.socket.transitionToState(nextState);
-  }
-
-  private async onKeyPressed(data: AttractapEvent<{ key: string }>['data']['payload']) {
-    this.logger.debug('Key pressed', data);
-
-    if (data.key === 'CONFIRM') {
-      await this.onSelectItem({ selectedId: this.value });
-      return;
-    }
-
-    if (data.key === 'CLEAR') {
-      await this.onStateEnter(true);
-      return;
-    }
-
-    if (this.socket.reader.resources.length > 1) {
-      this.value += data.key;
-    }
-
-    await this.onStateEnter(false);
   }
 }

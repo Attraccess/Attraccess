@@ -72,6 +72,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     client.id = nanoid(5);
 
     client.transitionToState = async (state: ReaderState) => {
+      if (!state) {
+        throw new Error('State is undefined');
+      }
+
       if (client.state) {
         try {
           await client.state.onStateExit();
@@ -84,6 +88,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           throw error;
         }
       }
+
       client.state = state;
       try {
         await client.state.onStateEnter();
@@ -174,7 +179,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return await new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         removeAwaiter();
-        reject(new Error('Timeout waiting for client response'));
+        reject(new Error(`Timeout waiting for client response of type ${type}`));
       }, timeoutMs);
 
       const onResolve = () => {

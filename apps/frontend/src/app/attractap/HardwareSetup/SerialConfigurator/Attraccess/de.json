@@ -18,27 +18,27 @@
     },
     "connecting_tcp": {
       "title": "TCP Verbindung wird hergestellt",
-      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}} {{protocolEmoji}}) wird hergestellt..."
     },
     "connecting_websocket": {
       "title": "Websocket Verbindung wird hergestellt",
-      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}}) wird hergestellt..."
+      "description": "Verbindung zu Attraccess Server ({{hostname}}:{{port}} {{protocolEmoji}}) wird hergestellt..."
     },
     "disconnected": {
       "title": "Attraccess nicht verbunden",
-      "description": "Hostname: {{hostname}}, Port: {{port}}"
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
     },
     "error_failed": {
       "title": "Fehler beim Verbinden",
-      "description": "Hostname: {{hostname}}, Port: {{port}}"
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
     },
     "error_timed_out": {
       "title": "Verbindung zu Attraccess Server fehlgeschlagen (Timeout)",
-      "description": "Hostname: {{hostname}}, Port: {{port}}"
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
     },
     "error_invalid_server": {
       "title": "Ungültiger Attraccess Server",
-      "description": "Hostname: {{hostname}}, Port: {{port}}"
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
     }
   },
   "statusNotYetFetched": {

@@ -240,8 +240,8 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.CLEAR_SUCCESS,
-            payload: undefined,
+            type: AttractapEventType.DISPLAY_SUCCESS,
+            payload: expect.objectContaining({ message: 'Enrollment successful' }),
           }),
         })
       );
@@ -436,7 +436,7 @@ describe('EnrollNTAG424State - Full Flow', () => {
 
     // Verify success message and card creation
     expect(mockServices.attractapService.createNFCCard).toHaveBeenCalled();
-    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(5);
+    expect(mockSocket.sendMessage).toHaveBeenCalledTimes(4);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
       4,
       expect.objectContaining({
@@ -445,15 +445,6 @@ describe('EnrollNTAG424State - Full Flow', () => {
           payload: expect.objectContaining({
             message: 'Enrollment successful',
           }),
-        }),
-      })
-    );
-    expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
-      5,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: AttractapEventType.CLEAR_SUCCESS,
-          payload: undefined,
         }),
       })
     );

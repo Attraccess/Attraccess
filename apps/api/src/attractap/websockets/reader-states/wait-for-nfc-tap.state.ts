@@ -7,15 +7,29 @@ import { NFCCard, Resource, User } from '@attraccess/database-entities';
 
 export enum WaitForNFCTapStateStep {
   IDLE = 'idle',
+  WAIT_FOR_CONFIRMATION = 'wait-for-confirmation',
   WAIT_FOR_TAP = 'wait-for-tap',
   PROCESSING_TAP = 'processing-tap',
   WAIT_FOR_AUTHENTICATION = 'wait-for-authentication',
   PROCESSING_AUTHENTICATION = 'processing-authentication',
 }
 
+interface Options {
+  resourceId: number;
+  timeout_ms: number;
+  timout_transition_state?: ReaderState;
+  success_transition_state?: ReaderState;
+  needsConfirmation: boolean;
+}
+
 export class WaitForNFCTapState implements ReaderState {
   public state: WaitForNFCTapStateStep = WaitForNFCTapStateStep.IDLE;
   private readonly logger = new Logger(WaitForNFCTapState.name);
+  private readonly selectedResourceId: number;
+  private readonly timeout_ms: number;
+  private readonly timout_transition_state?: ReaderState;
+  private readonly success_transition_state?: ReaderState;
+  private readonly needsConfirmation: boolean;
 
   private timeout?: NodeJS.Timeout;
 
@@ -24,17 +38,102 @@ export class WaitForNFCTapState implements ReaderState {
   public constructor(
     private readonly socket: AuthenticatedWebSocket,
     private readonly services: GatewayServices,
-    private readonly selectedResourceId: number,
-    private readonly timeout_ms = 0,
-    private readonly timout_transition_state?: ReaderState,
-    private readonly success_transition_state?: ReaderState
-  ) {}
+    options: Options
+  ) {
+    if (options.timeout_ms && !options.timout_transition_state) {
+      throw new Error('Timeout is set but no timeout transition state is provided');
+    }
+
+    this.selectedResourceId = options.resourceId;
+    this.timeout_ms = options.timeout_ms;
+    this.timout_transition_state = options.timout_transition_state;
+    this.success_transition_state = options.success_transition_state;
+    this.needsConfirmation = options.needsConfirmation;
+  }
 
   public async onStateEnter(): Promise<void> {
     this.state = WaitForNFCTapStateStep.WAIT_FOR_TAP;
 
     this.startTimeout();
 
+    if (this.needsConfirmation) {
+      await this.requestConfirmation();
+      return;
+    }
+
+    await this.enableCardChecking();
+  }
+
+  public async onStateExit(): Promise<void> {
+    this.stopTimeout();
+    await this.disableCardChecking();
+  }
+
+  public async restart(): Promise<void> {
+    await this.onStateExit();
+    return await this.onStateEnter();
+  }
+
+  public async onEvent(data: AttractapEvent['data']): Promise<void> {
+    if (data.type === AttractapEventType.NFC_TAP && this.state === WaitForNFCTapStateStep.WAIT_FOR_TAP) {
+      this.stopTimeout();
+
+      return this.onNFCTap(data);
+    }
+
+    return undefined;
+  }
+
+  public async onResponse(data: AttractapResponse['data']): Promise<void> {
+    if (
+      data.type === AttractapEventType.CONFIRM_ACTION &&
+      this.state === WaitForNFCTapStateStep.WAIT_FOR_CONFIRMATION
+    ) {
+      return this.onConfirmAction();
+    }
+
+    if (
+      data.type === AttractapEventType.NFC_AUTHENTICATE &&
+      this.state === WaitForNFCTapStateStep.WAIT_FOR_AUTHENTICATION
+    ) {
+      return await this.onAuthenticate(data);
+    }
+
+    return undefined;
+  }
+
+  private startTimeout(): void {
+    this.stopTimeout();
+
+    if (this.timeout_ms === 0) {
+      return;
+    }
+
+    this.timeout = setTimeout(async () => {
+      this.logger.debug(
+        `Reader has not tapped a card within ${this.timeout_ms}ms, moving to ${this.timout_transition_state?.constructor.name}`
+      );
+
+      console.log({
+        timout_transition_state: this.timout_transition_state,
+        timeout_ms: this.timeout_ms,
+      });
+
+      await this.socket.transitionToState(this.timout_transition_state);
+    }, this.timeout_ms);
+  }
+
+  private stopTimeout(): void {
+    if (!this.timeout_ms) {
+      return;
+    }
+
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+    }
+  }
+
+  private async getTappingPayload() {
     const activeUsageSession = await this.services.resourceUsageService.getActiveSession(this.selectedResourceId);
     const resourceIsInUse = !!activeUsageSession;
 
@@ -74,63 +173,19 @@ export class WaitForNFCTapState implements ReaderState {
       };
     }
 
-    await this.enableCardChecking(payload);
+    return payload;
   }
 
-  public async onStateExit(): Promise<void> {
-    this.stopTimeout();
-    await this.disableCardChecking();
+  private async requestConfirmation(): Promise<void> {
+    this.state = WaitForNFCTapStateStep.WAIT_FOR_CONFIRMATION;
+    const payload = await this.getTappingPayload();
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CONFIRM_ACTION, payload));
   }
 
-  public async restart(): Promise<void> {
-    await this.onStateExit();
-    return await this.onStateEnter();
-  }
+  private async enableCardChecking(): Promise<void> {
+    this.state = WaitForNFCTapStateStep.WAIT_FOR_TAP;
+    const payload = await this.getTappingPayload();
 
-  public async onEvent(data: AttractapEvent['data']): Promise<void> {
-    if (data.type === AttractapEventType.NFC_TAP && this.state === WaitForNFCTapStateStep.WAIT_FOR_TAP) {
-      this.stopTimeout();
-
-      return this.onNFCTap(data);
-    }
-
-    return undefined;
-  }
-
-  public async onResponse(data: AttractapResponse['data']): Promise<void> {
-    if (
-      data.type === AttractapEventType.NFC_AUTHENTICATE &&
-      this.state === WaitForNFCTapStateStep.WAIT_FOR_AUTHENTICATION
-    ) {
-      return await this.onAuthenticate(data);
-    }
-
-    return undefined;
-  }
-
-  private startTimeout(): void {
-    this.stopTimeout();
-
-    this.timeout = setTimeout(async () => {
-      this.logger.debug(
-        `Reader has not tapped a card within ${this.timeout_ms}ms, moving to ${this.timout_transition_state?.constructor.name}`
-      );
-
-      await this.socket.transitionToState(this.timout_transition_state);
-    }, this.timeout_ms);
-  }
-
-  private stopTimeout(): void {
-    if (!this.timeout_ms) {
-      return;
-    }
-
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-    }
-  }
-
-  private async enableCardChecking(payload: AttractapEvent['data']['payload']): Promise<void> {
     await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_ENABLE_CARD_CHECKING, payload));
   }
 
@@ -147,7 +202,6 @@ export class WaitForNFCTapState implements ReaderState {
       })
     );
     await new Promise((resolve) => setTimeout(resolve, 5000));
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_ERROR));
 
     await this.restart();
   }
@@ -156,7 +210,7 @@ export class WaitForNFCTapState implements ReaderState {
     this.state = WaitForNFCTapStateStep.PROCESSING_TAP;
 
     await this.socket.sendMessage(
-      new AttractapEvent(AttractapEventType.SHOW_TEXT, {
+      new AttractapEvent(AttractapEventType.DISPLAY_TEXT, {
         message: 'Do not remove card!',
       })
     );
@@ -229,7 +283,6 @@ export class WaitForNFCTapState implements ReaderState {
     await new Promise((resolve) => setTimeout(resolve, 10000));
     const after = new Date();
     this.logger.debug(`Cleared success message after ${after.getTime() - before.getTime()}ms`);
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.CLEAR_SUCCESS));
 
     if (this.success_transition_state) {
       this.logger.debug(`Transitioning to success state: ${this.success_transition_state.constructor.name}`);
@@ -239,5 +292,9 @@ export class WaitForNFCTapState implements ReaderState {
     this.logger.debug(`Transitioning to restart state: ${this.timout_transition_state.constructor.name}`);
 
     return await this.restart();
+  }
+
+  private async onConfirmAction(): Promise<void> {
+    this.enableCardChecking();
   }
 }

@@ -7,6 +7,7 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType, AttractapRe
 import { verifyToken } from '../websocket.utils';
 import { WaitForFirmwareUpdateState } from './wait-for-firmware-update.state';
 import { AttractapFirmware } from '../../dtos/firmware.dto';
+import { WaitForNFCTapState } from './wait-for-nfc-tap.state';
 
 export class InitialReaderState implements ReaderState {
   private waitingForFirmwareInfo = false;
@@ -29,7 +30,7 @@ export class InitialReaderState implements ReaderState {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     this.logger.debug('InitialReaderState: not yet authenticated');
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_AUTHENTICATE, {}));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
 
     /*this.reauthenticateInterval = setInterval(() => {
       if (this.socket.reader || this.socket.CLOSED) {
@@ -54,12 +55,6 @@ export class InitialReaderState implements ReaderState {
 
   public async onEvent(data: AttractapEvent['data']): Promise<void> {
     switch (data.type) {
-      case AttractapEventType.READER_REGISTER:
-        return await this.handleRegisterEvent(data);
-
-      case AttractapEventType.READER_AUTHENTICATE:
-        return await this.handleAuthenticateEvent(data);
-
       default:
         this.logger.warn(`Received unknown event type: ${data.type}`);
         return undefined;
@@ -72,6 +67,12 @@ export class InitialReaderState implements ReaderState {
     switch (data.type) {
       case AttractapEventType.READER_FIRMWARE_INFO:
         return await this.onFirmwareInfo(data);
+
+      case AttractapEventType.READER_REGISTER:
+        return await this.handleRegisterEvent(data);
+
+      case AttractapEventType.READER_REQUEST_AUTHENTICATION:
+        return await this.handleRequestAuthentication(data);
     }
   }
 
@@ -109,16 +110,20 @@ export class InitialReaderState implements ReaderState {
       return await this.socket.transitionToState(nextState);
     }
 
-    // if (this.socket.reader.resources.length > 1) {
-    this.logger.debug('Resources attached to reader, moving reader to WaitForResourceSelectionState');
+    if (this.socket.reader.resources.length > 1) {
+      this.logger.debug('Resources attached to reader, moving reader to WaitForResourceSelectionState');
 
-    const nextState = new WaitForResourceSelectionState(this.socket, this.services);
+      const nextState = new WaitForResourceSelectionState(this.socket, this.services);
+      return await this.socket.transitionToState(nextState);
+    }
+
+    this.logger.debug('Reader has only one resource attached, moving reader to WaitForNFCTapState');
+    const nextState = new WaitForNFCTapState(this.socket, this.services, {
+      resourceId: this.socket.reader.resources[0].id,
+      timeout_ms: 0,
+      needsConfirmation: true,
+    });
     return await this.socket.transitionToState(nextState);
-    // }
-
-    //this.logger.debug('Reader has only one resource attached, moving reader to WaitForNFCTapState');
-    // const nextState = new WaitForNFCTapState(this.socket, this.services, this.socket.reader.resources[0].id);
-    // return await this.socket.transitionToState(nextState);
   }
 
   public async handleRegisterEvent(data: AttractapEvent['data']): Promise<void> {
@@ -140,7 +145,7 @@ export class InitialReaderState implements ReaderState {
     return await this.onStateEnter(true);
   }
 
-  public async handleAuthenticateEvent(data: AttractapEvent['data']): Promise<void> {
+  public async handleRequestAuthentication(data: AttractapEvent['data']): Promise<void> {
     this.logger.debug('processing READER_AUTHENTICATE event', data);
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
