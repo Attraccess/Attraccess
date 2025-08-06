@@ -28,16 +28,16 @@ void Display::setup()
     uint8_t display_init_cmd = SSD1306_SWITCHCAPVCC;
 #endif
 
-    display.begin(display_init_cmd, 0x3C);
+    this->screen.begin(display_init_cmd, 0x3C);
 
-    display.clearDisplay();
+    this->screen.clearDisplay();
 
     uint8_t boot_logo_width = 110;
     uint8_t boot_logo_height = 48;
-    uint8_t x = (display.width() - boot_logo_width) / 2;
-    uint8_t y = (display.height() - boot_logo_height) / 2;
-    display.drawBitmap(x, y, icon_boot_logo, boot_logo_width, boot_logo_height, WHITE);
-    display.display();
+    uint8_t x = (this->screen.width() - boot_logo_width) / 2;
+    uint8_t y = (this->screen.height() - boot_logo_height) / 2;
+    this->screen.drawBitmap(x, y, icon_boot_logo, boot_logo_width, boot_logo_height, WHITE);
+    this->screen.display();
 
     xTaskCreate(Display::taskFn, "DisplayTask", 4096, this, 1, NULL);
 
@@ -96,7 +96,7 @@ void Display::loop()
         this->draw_confirm_action_ui();
     }
 
-    display.display();
+    this->screen.display();
 }
 
 void Display::set_nfc_tap_enabled(bool enabled, String text)
@@ -127,9 +127,14 @@ void Display::set_api_connected(bool connected)
     this->is_api_connected = connected;
 }
 
-void Display::set_ip_address(IPAddress ip)
+void Display::set_wifi_ip_address(const esp_ip4_addr_t &ip)
 {
-    this->ip_address = ip;
+    this->wifi_ip_address = ip;
+}
+
+void Display::set_ethernet_ip_address(const esp_ip4_addr_t &ip)
+{
+    this->ethernet_ip_address = ip;
 }
 
 void Display::set_device_name(String name)
@@ -146,51 +151,51 @@ void Display::draw_nfc_tap_ui()
     // calculate width and height of text
     int16_t x1, y1;
     uint16_t w, h;
-    display.getTextBounds(this->nfc_tap_text, 0, 0, &x1, &y1, &w, &h);
+    this->screen.getTextBounds(this->nfc_tap_text, 0, 0, &x1, &y1, &w, &h);
 
     uint8_t center_x = SCREEN_WIDTH / 2;
     uint8_t center_y = SCREEN_HEIGHT / 2;
 
     // icon first
-    display.drawBitmap(center_x - (icon_width / 2), center_y - (icon_height / 2) - h, icon_nfc_tap, icon_width, icon_height, WHITE);
+    this->screen.drawBitmap(center_x - (icon_width / 2), center_y - (icon_height / 2) - h, icon_nfc_tap, icon_width, icon_height, WHITE);
 
     // text below the icon
-    display.setCursor(center_x - (w / 2), center_y + (icon_height / 2) - h + 5);
-    display.print(this->nfc_tap_text);
+    this->screen.setCursor(center_x - (w / 2), center_y + (icon_height / 2) - h + 5);
+    this->screen.print(this->nfc_tap_text);
 }
 
 void Display::draw_main_elements()
 {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
+    this->screen.clearDisplay();
+    this->screen.setTextSize(1);
+    this->screen.setTextColor(WHITE);
 
     // network status, top left
     if (this->is_network_connected)
     {
-        display.drawBitmap(1, 0, icon_wifi_on, 16, 16, WHITE);
+        this->screen.drawBitmap(1, 0, icon_wifi_on, 16, 16, WHITE);
     }
     else
     {
-        display.drawBitmap(1, 0, icon_wifi_off, 16, 16, WHITE);
+        this->screen.drawBitmap(1, 0, icon_wifi_off, 16, 16, WHITE);
     }
 
     // api status, next to network status
     if (this->is_api_connected)
     {
-        display.drawBitmap(17, 0, icon_api_connected, 16, 16, WHITE);
+        this->screen.drawBitmap(17, 0, icon_api_connected, 16, 16, WHITE);
     }
     else
     {
-        display.drawBitmap(17, 0, icon_api_disconnected, 16, 16, WHITE);
+        this->screen.drawBitmap(17, 0, icon_api_disconnected, 16, 16, WHITE);
     }
 
     // device name, bottom left
     int16_t x1, y1;
     uint16_t w, h;
-    display.getTextBounds(this->device_name, 0, 0, &x1, &y1, &w, &h);
-    display.setCursor(1, SCREEN_HEIGHT - h - 1);
-    display.print(this->device_name);
+    this->screen.getTextBounds(this->device_name, 0, 0, &x1, &y1, &w, &h);
+    this->screen.setCursor(1, SCREEN_HEIGHT - h - 1);
+    this->screen.print(this->device_name);
 }
 
 void Display::draw_network_connecting_ui()
@@ -200,7 +205,15 @@ void Display::draw_network_connecting_ui()
 
 void Display::draw_api_connecting_ui()
 {
-    this->draw_two_line_message("wait for API...", this->ip_address.toString());
+    // Convert WiFi IP to string
+    char wifi_ip_str[16];
+    snprintf(wifi_ip_str, sizeof(wifi_ip_str), IPSTR, IP2STR(&this->wifi_ip_address));
+
+    // Convert Ethernet IP to string
+    char eth_ip_str[16];
+    snprintf(eth_ip_str, sizeof(eth_ip_str), IPSTR, IP2STR(&this->ethernet_ip_address));
+
+    this->draw_two_line_message("WiFi: " + String(wifi_ip_str), "ETH: " + String(eth_ip_str));
 }
 
 void Display::draw_error_ui()
@@ -215,25 +228,25 @@ void Display::draw_success_ui()
 
 void Display::draw_two_line_message(String line1, String line2)
 {
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
+    this->screen.setTextSize(1);
+    this->screen.setTextColor(WHITE);
 
     int16_t x1, y1;
     uint16_t w1, h1, w2, h2;
 
     // Calculate bounds for the first line
-    display.getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+    this->screen.getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
 
     // Calculate bounds for the second line
-    display.getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
+    this->screen.getTextBounds(line2, 0, 0, &x1, &y1, &w2, &h2);
 
     // Print first line centered
-    display.setCursor(SCREEN_WIDTH / 2 - w1 / 2, SCREEN_HEIGHT / 2 - h1 / 2);
-    display.print(line1);
+    this->screen.setCursor(SCREEN_WIDTH / 2 - w1 / 2, SCREEN_HEIGHT / 2 - h1 / 2);
+    this->screen.print(line1);
 
     // Print second line centered
-    display.setCursor(SCREEN_WIDTH / 2 - w2 / 2, SCREEN_HEIGHT / 2 - h1 / 2 + h1);
-    display.print(line2);
+    this->screen.setCursor(SCREEN_WIDTH / 2 - w2 / 2, SCREEN_HEIGHT / 2 - h1 / 2 + h1);
+    this->screen.print(line2);
 }
 
 void Display::draw_select_item_ui()

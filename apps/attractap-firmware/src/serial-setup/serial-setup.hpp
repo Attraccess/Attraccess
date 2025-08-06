@@ -1,8 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include "esp_netif.h"
+#include "esp_log.h"
 #include "../cli/CLIService.hpp"
-#include "../network/wifi.hpp"
 #include "../api/api.hpp"
 
 class SerialSetup
@@ -15,9 +16,6 @@ private:
     static API *api;
 
     static String handleFirmwareVersion(const String &payload);
-    static String handleWiFiScan(const String &payload);
-    static String handleWiFiSetCredentials(const String &payload);
-    static String handleWiFiStatus(const String &payload);
     static String handleAttraccessStatus(const String &payload);
     static String handleAttraccessConfiguration(const String &payload);
 

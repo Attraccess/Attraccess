@@ -106,36 +106,11 @@ def main():
         if not firmware_variant_friendly_name:
             print(f"Error: FIRMWARE_VARIANT_FRIENDLY_NAME is not defined in build_flags for environment '{env}'")
             sys.exit(1)
-        
-        # Look for CHIP_FAMILY in this environment or inherited ones
-        board_family = None
-        current_section = env_section
-        
-        # Try to find CHIP_FAMILY in the current environment or its ancestors
-        while current_section and not board_family:
-            if 'build_flags' in config[current_section]:
-                board_family = extract_define_value(config[current_section]['build_flags'], 'CHIP_FAMILY')
-            
-            # Move to parent environment if extends is defined
-            if 'extends' in config[current_section]:
-                current_section = config[current_section]['extends']
-            else:
-                current_section = None
-        
-        # If board_family not found in build_flags, check for explicit board_family
-        if not board_family and 'board_family' in config[env_section]:
-            board_family = config[env_section]['board_family'].strip()
-        
-        # Default to ESP32 if still not found
-        if not board_family:
-            print(f"Warning: Could not determine board family for '{env}', defaulting to ESP32")
-            board_family = "ESP32"
             
         print(f"  Firmware name: {firmware_name}")
         print(f"  Firmware variant: {firmware_variant}")
         print(f"  Firmware variant friendly name: {firmware_variant_friendly_name}")
         print(f"  Firmware version: {firmware_version}")
-        print(f"  Board family: {board_family}")
         
         # Build firmware
         try:

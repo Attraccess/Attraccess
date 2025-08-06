@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <I2CKeyPad.h>
-#include "configuration.hpp"
 
 class Keypad
 {

@@ -145,19 +145,19 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         {
             this->_certManager.markSuccess();
         }
-        Serial.println("AttraccessServiceESP: WebSocket connected");
+        Serial.println("Websocket: WebSocket connected");
         setState(CONNECTED);
         break;
 
     case WEBSOCKET_EVENT_CLOSED:
-        Serial.println("AttraccessServiceESP: WebSocket closed");
+        Serial.println("Websocket: WebSocket closed");
         vTaskDelay(RECONNECT_INTERVAL_MS / portTICK_PERIOD_MS);
         setState(INIT);
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
-        Serial.println("AttraccessServiceESP: WebSocket disconnected");
+        Serial.println("Websocket: WebSocket disconnected");
         if (apiConfig.useSSL)
         {
             this->_certManager.markFailure();
@@ -171,24 +171,32 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         if (data->op_code == 0x01)
         { // Text frame
             String message = String((char *)data->data_ptr, data->data_len);
-            Serial.printf("AttraccessServiceESP: Received: %s\n", message.c_str());
+            Serial.printf("Websocket: Received: %s\n", message.c_str());
             if (_messageHandler)
             {
                 _messageHandler(message);
             }
+            else
+            {
+                Serial.println("Websocket: No message handler");
+            }
         }
         else if (data->op_code == 0x02)
         { // Binary frame
-            Serial.printf("AttraccessServiceESP: Received binary data: %zu bytes\n", data->data_len);
+            Serial.printf("Websocket: Received binary data: %zu bytes\n", data->data_len);
             if (_binaryDataHandler)
             {
                 _binaryDataHandler((const uint8_t *)data->data_ptr, data->data_len);
+            }
+            else
+            {
+                Serial.println("Websocket: No binary data handler");
             }
         }
         break;
 
     case WEBSOCKET_EVENT_ERROR:
-        Serial.println("AttraccessServiceESP: WebSocket error");
+        Serial.println("Websocket: WebSocket error");
         setState(INIT);
         break;
 

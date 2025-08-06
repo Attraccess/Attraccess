@@ -5,7 +5,7 @@
 #ifdef SCREEN_DRIVER_SH1106
 #include <Adafruit_SH1106.h>
 #include "icons.hpp"
-#include "../leds/leds.hpp"
+#include "../../leds/leds.hpp"
 #include <ArduinoJson.h>
 
 #elif SCREEN_DRIVER_SSD1306
@@ -13,13 +13,14 @@
 #elif
 #error "No display driver defined"
 #endif
-#include "configuration.hpp"
+#include "esp_netif.h"
+#include "esp_log.h"
 
 class Display
 {
 public:
 #ifdef SCREEN_DRIVER_SH1106
-    Display(Leds *leds) : display(SCREEN_RESET), leds(leds) {}
+    Display(Leds *leds) : screen(SCREEN_RESET), leds(leds) {}
 #elif SCREEN_DRIVER_SSD1306
     Display(Leds *leds) : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET), leds(leds) {}
 #endif
@@ -43,7 +44,8 @@ public:
     void set_nfc_tap_enabled(bool enabled);
     void set_network_connected(bool connected);
     void set_api_connected(bool connected);
-    void set_ip_address(IPAddress ip);
+    void set_wifi_ip_address(const esp_ip4_addr_t &ip);
+    void set_ethernet_ip_address(const esp_ip4_addr_t &ip);
     void set_device_name(String name);
     void show_error(String error);
     void show_success(String success);
@@ -56,9 +58,9 @@ private:
     static void taskFn(void *parameter);
 
 #ifdef SCREEN_DRIVER_SH1106
-    Adafruit_SH1106 display;
+    Adafruit_SH1106 screen;
 #elif SCREEN_DRIVER_SSD1306
-    Adafruit_SSD1306 display;
+    Adafruit_SSD1306 screen;
 #endif
 
     unsigned long boot_time = 0;
@@ -69,7 +71,8 @@ private:
     bool is_network_connected = false;
     bool is_api_connected = false;
     String nfc_tap_text = "-- no text --";
-    IPAddress ip_address;
+    esp_ip4_addr_t wifi_ip_address;
+    esp_ip4_addr_t ethernet_ip_address;
     String device_name = "-";
     String error = "";
     String success = "";

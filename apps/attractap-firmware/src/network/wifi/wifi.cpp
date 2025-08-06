@@ -7,7 +7,7 @@ uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
 const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
 const uint32_t Wifi::MAX_RECONNECT_ATTEMPTS = 10;
 esp_netif_t *Wifi::wifi_interface = NULL;
-void (*Wifi::onStateChangedCallback)(WifiState state, const String &ssid) = NULL;
+void (*Wifi::onStateChangedCallback)(WifiState state, const esp_ip4_addr_t &ip) = NULL;
 void (*Wifi::onScanComplete)(WifiNetwork *networks, uint8_t count) = NULL;
 Wifi::WifiState Wifi::_state = WIFI_STATE_INIT;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
@@ -29,8 +29,21 @@ void Wifi::setup()
         return;
     }
 
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    // Initialize TCP/IP network interface (should be called only once in application)
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        Serial.printf("[ERROR][WiFi] Failed to initialize netif: %s\n", esp_err_to_name(ret));
+        return;
+    }
+
+    // Create default event loop
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        Serial.printf("[ERROR][WiFi] Failed to create event loop: %s\n", esp_err_to_name(ret));
+        return;
+    }
 
     wifi_interface = esp_netif_create_default_wifi_sta();
 
@@ -111,7 +124,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     }
 }
 
-void Wifi::setStateChangedCallback(void (*callback)(WifiState state, const String &ssid))
+void Wifi::setStateChangedCallback(void (*callback)(WifiState state, const esp_ip4_addr_t &ip))
 {
     onStateChangedCallback = callback;
 }
@@ -137,7 +150,7 @@ void Wifi::setState(WifiState state)
 
     if (onStateChangedCallback)
     {
-        onStateChangedCallback(state, Settings::getNetworkConfig().ssid);
+        onStateChangedCallback(state, getIPAddress());
     }
 }
 
@@ -281,11 +294,11 @@ Wifi::WifiState Wifi::getState()
     return _state;
 }
 
-IPAddress Wifi::getIPAddress()
+esp_ip4_addr_t Wifi::getIPAddress()
 {
     esp_netif_ip_info_t ip_info;
     esp_netif_get_ip_info(wifi_interface, &ip_info);
-    return IPAddress(ip_info.ip.addr);
+    return ip_info.ip;
 }
 
 void Wifi::startScan()

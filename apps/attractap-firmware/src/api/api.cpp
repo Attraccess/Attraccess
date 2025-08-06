@@ -438,6 +438,7 @@ void API::onRequestAuthentication(JsonObject data)
         return;
     }
 
+    Serial.println("[API] Sending authentication request");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["id"] = Settings::getAttraccessAuthConfig().readerId;

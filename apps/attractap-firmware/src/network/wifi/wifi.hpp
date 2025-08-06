@@ -4,7 +4,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
-#include "../settings/settings.hpp"
+#include "../../settings/settings.hpp"
 
 class Wifi
 {
@@ -39,11 +39,11 @@ public:
     };
 
     static void setup();
-    static void setStateChangedCallback(void (*callback)(WifiState state, const String &ssid));
+    static void setStateChangedCallback(void (*callback)(WifiState state, const esp_ip4_addr_t &ip));
     static void setScanCompleteCallback(void (*callback)(WifiNetwork *networks, uint8_t count));
     static void connectToNetwork(const String &ssid, const String &password);
     static WifiState getState();
-    static IPAddress getIPAddress();
+    static esp_ip4_addr_t getIPAddress();
     static void startScan();
     static bool isScanning();
     static WifiScanResult getKnownWifiNetworks();
@@ -54,7 +54,7 @@ private:
     static void loop();
 
     static WifiState _state;
-    static void (*onStateChangedCallback)(WifiState state, const String &ssid);
+    static void (*onStateChangedCallback)(WifiState state, const esp_ip4_addr_t &ip);
     static void (*onScanComplete)(WifiNetwork *networks, uint8_t count);
     static bool is_setup;
     static bool is_scanning;

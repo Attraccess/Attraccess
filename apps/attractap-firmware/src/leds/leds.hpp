@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
-#include "configs/attractap.h"
-
 enum LED_STATE
 {
     LED_STATE_OFF,

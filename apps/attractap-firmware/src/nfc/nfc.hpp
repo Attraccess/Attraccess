@@ -4,7 +4,6 @@
 #include "Adafruit_PN532_NTAG424.h"
 #include <esp_task_wdt.h>
 #include <Wire.h>
-#include "configuration.hpp"
 
 class NFC
 {
