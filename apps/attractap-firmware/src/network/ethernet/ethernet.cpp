@@ -4,7 +4,6 @@
 
 // Static member definitions
 Ethernet::EthernetState Ethernet::_state = ETHERNET_STATE_INIT;
-State Ethernet::appState;
 Logger Ethernet::logger("Ethernet");
 esp_netif_t *Ethernet::eth_netif = nullptr;
 esp_eth_handle_t Ethernet::eth_handle = nullptr;
@@ -63,6 +62,8 @@ esp_err_t Ethernet::initializeNetwork()
         logger.error("Failed to create netif");
         return ESP_FAIL;
     }
+
+    esp_netif_set_hostname(eth_netif, String(Settings::getHostname() + "-eth").c_str());
 
     eth_netif_glue = esp_eth_new_netif_glue(eth_handle);
     // Attach Ethernet driver to TCP/IP stack
@@ -177,7 +178,12 @@ esp_err_t Ethernet::initSPI()
         .max_transfer_sz = 0,
     };
 
+#ifdef DISPLAY_TOUCHSCREEN_LVGL
+    // Use VSPI (SPI3_HOST) for Ethernet to avoid conflicts with TFT/Touch (HSPI)
+    ret = spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
+#else
     ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+#endif
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         logger.error((String("Failed to initialize SPI bus: ") + esp_err_to_name(ret)).c_str());
@@ -210,7 +216,11 @@ esp_err_t Ethernet::initSPI()
         .post_cb = nullptr,
     };
 
+#ifdef DISPLAY_TOUCHSCREEN_LVGL
+    ret = spi_bus_add_device(SPI3_HOST, &devcfg, &spi_handle);
+#else
     ret = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle);
+#endif
     if (ret != ESP_OK)
     {
         logger.error((String("Failed to add SPI device: ") + esp_err_to_name(ret)).c_str());
@@ -357,7 +367,7 @@ void Ethernet::setState(EthernetState state)
         _state = state;
         logger.infof("State changed to: %d", state);
 
-        appState.setEthernetState(state == ETHERNET_STATE_CONNECTED, getIPAddress());
+        State::setEthernetState(state == ETHERNET_STATE_CONNECTED, getIPAddress());
     }
 }
 

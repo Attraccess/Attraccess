@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <I2CKeyPad.h>
 #include "../logger/logger.hpp"
+#include "../state/state.hpp"
 
 class Keypad
 {
@@ -18,6 +19,8 @@ private:
 
     I2CKeyPad keyPad;
     char keymap[17] = "DCBA#9630852*741";
-    char released_key_num = 16;
+    char last_pressed_key_num = 16;
     Logger logger;
+
+    String value;
 };

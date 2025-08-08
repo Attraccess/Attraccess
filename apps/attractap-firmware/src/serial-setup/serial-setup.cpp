@@ -12,45 +12,45 @@ void SerialSetup::setup(CLIService *cliService, API *api, Websocket *websocket)
     SerialSetup::websocket = websocket;
 
     // Register firmware version handler
-    cliService->registerCommandHandler("firmware.version", [](const String &payload) -> String
-                                       { return handleFirmwareVersion(payload); });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "firmware.version", [](const String &payload)
+                                       { handleFirmwareVersion(payload); });
 
     // Register Attraccess status handler
-    cliService->registerCommandHandler("attraccess.status", [](const String &payload) -> String
-                                       { return handleAttraccessStatus(payload); });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "attraccess.status", [](const String &payload)
+                                       { handleAttraccessStatus(payload); });
 
     // Register Attraccess configuration handler
-    cliService->registerCommandHandler("attraccess.configuration", [](const String &payload) -> String
-                                       { return handleAttraccessConfiguration(payload); });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", [](const String &payload)
+                                       { handleAttraccessConfiguration(payload); });
 
     // Register WiFi scan handler
-    cliService->registerCommandHandler("network.wifi.scan", [](const String &payload) -> String
-                                       { return handleWiFiScan(payload); });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", [](const String &payload)
+                                       { handleWiFiScan(payload); });
 
     // Register WiFi connect handler
-    cliService->registerCommandHandler("network.wifi.credentials", [](const String &payload) -> String
-                                       { return handleWiFiConnect(payload); });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", [](const String &payload)
+                                       { handleWiFiConnect(payload); });
 
     // register reboot handler
-    cliService->registerCommandHandler("system.reboot", [](const String &payload) -> String
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "system.reboot", [](const String &payload)
                                        {
                                            ESP.restart();
-                                           return "rebooting"; // This will likely not be sent since ESP.restart() is immediate
-                                       });
+                                           SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "system.reboot", "rebooting"); });
 
     // set log level
-    cliService->registerCommandHandler("log.level", [](const String &payload) -> String
-                                       { 
-                                           Logger::setLogLevel(payload); 
-                                           return "success"; });
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "log.level", [](const String &payload)
+                                       {
+                                           Logger::setLogLevel(payload);
+                                           SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "log.level", "success"); });
 }
 
-String SerialSetup::handleFirmwareVersion(const String &payload)
+void SerialSetup::handleFirmwareVersion(const String &payload)
 {
     // Firmware version GET command should not have a payload
     if (payload.length() > 0)
     {
-        return "error unexpected_payload";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "firmware.version", "error unexpected_payload");
+        return;
     }
 
     try
@@ -68,15 +68,16 @@ String SerialSetup::handleFirmwareVersion(const String &payload)
             char c = version.charAt(i);
             if (c < 32 || c > 126)
             {
-                return "error invalid_version_format";
+                cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "firmware.version", "error invalid_version_format");
+                return;
             }
         }
 
-        return version;
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "firmware.version", version);
     }
     catch (...)
     {
-        return "error version_retrieval_failed";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "firmware.version", "error version_retrieval_failed");
     }
 }
 
@@ -107,12 +108,13 @@ String SerialSetup::wifiGetEncryptionTypeString(wifi_auth_mode_t encType)
     }
 }
 
-String SerialSetup::handleAttraccessStatus(const String &payload)
+void SerialSetup::handleAttraccessStatus(const String &payload)
 {
     // GET command should not have a payload
     if (payload.length() > 0)
     {
-        return "error unexpected_payload";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "attraccess.status", "error unexpected_payload");
+        return;
     }
 
     try
@@ -135,21 +137,21 @@ String SerialSetup::handleAttraccessStatus(const String &payload)
         // Serialize to string
         String result;
         serializeJson(doc, result);
-
-        return result;
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "attraccess.status", result);
     }
     catch (...)
     {
-        return "error status_retrieval_failed";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "attraccess.status", "error status_retrieval_failed");
     }
 }
 
-String SerialSetup::handleAttraccessConfiguration(const String &payload)
+void SerialSetup::handleAttraccessConfiguration(const String &payload)
 {
     // SET command requires a payload
     if (payload.length() == 0)
     {
-        return "error missing_payload";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "error missing_payload");
+        return;
     }
 
     try
@@ -160,19 +162,22 @@ String SerialSetup::handleAttraccessConfiguration(const String &payload)
 
         if (error)
         {
-            return "error invalid_json_format";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "error invalid_json_format");
+            return;
         }
 
         if (!doc["hostname"].is<String>())
         {
-            return "error missing_hostname_field";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "error missing_hostname_field");
+            return;
         }
 
         String hostname = doc["hostname"].as<String>();
 
         if (!doc["port"].is<uint16_t>())
         {
-            return "error missing_port_field";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "error missing_port_field");
+            return;
         }
 
         uint16_t port = doc["port"].as<uint16_t>();
@@ -187,31 +192,31 @@ String SerialSetup::handleAttraccessConfiguration(const String &payload)
 
         websocket->connectWebSocket();
 
-        return "success";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "success");
     }
     catch (...)
     {
-        return "error connection_failed";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", "error connection_failed");
     }
 }
 
-String SerialSetup::handleWiFiScan(const String &payload)
+void SerialSetup::handleWiFiScan(const String &payload)
 {
     // Validate that WiFi service is available
     if (!onWifiScanStart)
     {
-        return "error wifi_service_unavailable";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", "error wifi_service_unavailable");
+        return;
     }
 
     // GET command should not have a payload
     if (payload.length() > 0)
     {
-        return "error unexpected_payload";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", "error unexpected_payload");
+        return;
     }
 
     onWifiScanStart();
-
-    return "__DO_NOT_SEND_RESPONSE__";
 }
 
 String SerialSetup::getEncryptionTypeString(wifi_auth_mode_t encType)
@@ -261,15 +266,16 @@ void SerialSetup::onWifiScanDone(WifiNetwork *networks, uint8_t count)
     String result;
     serializeJson(doc, result);
 
-    cliService->sendResponse("network.wifi.scan", result);
+    cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", result);
 }
 
-String SerialSetup::handleWiFiConnect(const String &payload)
+void SerialSetup::handleWiFiConnect(const String &payload)
 {
     // SET command requires a payload
     if (payload.length() == 0)
     {
-        return "error missing_payload";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "error missing_payload");
+        return;
     }
 
     try
@@ -280,13 +286,15 @@ String SerialSetup::handleWiFiConnect(const String &payload)
 
         if (error)
         {
-            return "error invalid_json_format";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "error invalid_json_format");
+            return;
         }
 
         // Extract SSID (required)
         if (!doc["ssid"].is<String>())
         {
-            return "error missing_ssid_field";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "error missing_ssid_field");
+            return;
         }
 
         String ssid = doc["ssid"].as<String>();
@@ -301,16 +309,17 @@ String SerialSetup::handleWiFiConnect(const String &payload)
         // Validate SSID
         if (ssid.length() == 0)
         {
-            return "error empty_ssid";
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "error empty_ssid");
+            return;
         }
 
         Settings::saveNetworkConfig(ssid, password);
 
-        return "success";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "success");
     }
     catch (...)
     {
-        return "error connection_failed";
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", "error connection_failed");
     }
 }
 

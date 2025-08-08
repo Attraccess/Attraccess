@@ -92,7 +92,7 @@ export class EnrollNTAG424State implements ReaderState {
   }
 
   private async disableCardChecking(): Promise<void> {
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.WAIT_FOR_PROCESSING));
   }
 
   private async onGetNfcUID(responseData: AttractapResponse<{ cardUID: string }>['data']): Promise<void> {

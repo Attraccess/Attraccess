@@ -8,6 +8,7 @@
 #include "esp_netif.h"
 #include "esp_log.h"
 #include "../../logger/logger.hpp"
+#include "../../display/IDisplay.hpp"
 
 #ifdef SCREEN_DRIVER_SH1106
 #include <Adafruit_SH1106.h>
@@ -17,7 +18,7 @@
 #error "No display driver defined"
 #endif
 
-class OLED
+class OLED : public IDisplay
 {
 public:
 #ifdef SCREEN_DRIVER_SH1106
@@ -26,35 +27,20 @@ public:
     OLED() : logger("OLED"), screen(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET) {}
 #endif
 
-    enum OLEDState
-    {
-        OLED_STATE_NONE,
-        OLED_STATE_ERROR,
-        OLED_STATE_SUCCESS,
-        OLED_STATE_TEXT,
-        OLED_STATE_SELECT_ITEM,
-        OLED_STATE_CONFIRM_ACTION,
-        OLED_STATE_CARD_CHECKING
-    };
-
-    void setup();
-
-    void set_nfc_tap_enabled(bool enabled, String text);
-    void set_nfc_tap_enabled(bool enabled);
-    void set_network_connected(bool connected);
-    void set_api_connected(bool connected);
-    void set_wifi_ip_address(const esp_ip4_addr_t &ip);
-    void set_ethernet_ip_address(const esp_ip4_addr_t &ip);
-    void set_device_name(String name);
-    void show_error(String error);
-    void show_success(String success);
-    void show_text(String lineOne, String lineTwo);
-    void show_select_item(String type, JsonArray options, String value);
-    void show_confirm_action(String title, String message);
+    void setup() override;
+    void transitionTo(DisplayState state) override;
+    void onAppStateChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState) override;
+    void onApiEvent(State::ApiEventData apiEventData) override;
 
 private:
     void loop();
     static void taskFn(void *parameter);
+
+    DisplayState _state;
+    State::NetworkState networkState;
+    State::WebsocketState webSocketState;
+    State::ApiState apiState;
+    State::ApiEventData apiEventData;
 
 #ifdef SCREEN_DRIVER_SH1106
     Adafruit_SH1106 screen;
@@ -62,37 +48,22 @@ private:
     Adafruit_SSD1306 screen;
 #endif
 
-    unsigned long boot_time = 0;
-
-    OLEDState _state = OLED_STATE_NONE;
-
-    bool is_network_connected = false;
-    bool is_api_connected = false;
-    String nfc_tap_text = "-- no text --";
-    esp_ip4_addr_t wifi_ip_address;
-    esp_ip4_addr_t ethernet_ip_address;
-    String device_name = "-";
-    String error = "";
-    String success = "";
-    String text_line_one = "";
-    String text_line_two = "";
-    String select_item_type = "";
-    String select_item_value = "";
-    JsonArray select_item_options;
-
-    String confirm_action_title = "";
-    String confirm_action_message = "";
+    void updateScreen();
 
     void draw_main_elements();
+    void draw_booting_ui();
     void draw_nfc_tap_ui();
     void draw_network_connecting_ui();
-    void draw_api_connecting_ui();
+    void draw_websocket_connecting_ui();
+    void draw_authentication_ui();
     void draw_error_ui();
     void draw_success_ui();
     void draw_text_ui();
-    void draw_select_item_ui();
+    void draw_resource_selection_ui();
     void draw_two_line_message(String line1, String line2);
     void draw_confirm_action_ui();
+    void draw_firmware_update_ui();
+    void draw_wait_for_processing_ui();
 
     Logger logger;
 };

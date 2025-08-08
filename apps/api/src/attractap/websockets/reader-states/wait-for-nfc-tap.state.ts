@@ -190,7 +190,7 @@ export class WaitForNFCTapState implements ReaderState {
   }
 
   private async disableCardChecking(): Promise<void> {
-    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.NFC_DISABLE_CARD_CHECKING));
+    await this.socket.sendMessage(new AttractapEvent(AttractapEventType.WAIT_FOR_PROCESSING));
   }
 
   private async onInvalidCard(): Promise<void> {
@@ -234,7 +234,7 @@ export class WaitForNFCTapState implements ReaderState {
     );
   }
 
-  private async onAuthenticate(data: AttractapEvent<{ authenticationSuccessful: boolean }>['data']): Promise<void> {
+  private async onAuthenticate(data: AttractapEvent<{ successful: boolean }>['data']): Promise<void> {
     this.state = WaitForNFCTapStateStep.PROCESSING_AUTHENTICATION;
 
     if (!this.card) {
@@ -242,7 +242,7 @@ export class WaitForNFCTapState implements ReaderState {
       return;
     }
 
-    if (!data.payload.authenticationSuccessful) {
+    if (!data.payload.successful) {
       return this.onInvalidCard();
     }
 

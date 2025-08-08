@@ -1,6 +1,5 @@
 #include "wifi.hpp"
 
-State Wifi::appState;
 bool Wifi::is_setup = false;
 esp_netif_t *Wifi::wifi_interface = NULL;
 Logger Wifi::logger("WiFi");
@@ -11,15 +10,107 @@ String Wifi::_lastSSID;
 uint8_t Wifi::current_reconnect_attempts_count = 0;
 uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
 const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
-const uint32_t Wifi::MAX_RECONNECT_ATTEMPTS = 10;
 
 bool Wifi::is_scanning = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
 
+static String formatMac(const uint8_t *mac)
+{
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return String(buf);
+}
+
+const char *Wifi::getStateName(WifiState state)
+{
+    switch (state)
+    {
+    case WIFI_STATE_INIT:
+        return "INIT";
+    case WIFI_STATE_CONNECTING:
+        return "CONNECTING";
+    case WIFI_STATE_CONNECTED_WAITING_FOR_IP:
+        return "CONNECTED_WAITING_FOR_IP";
+    case WIFI_STATE_CONNECTED:
+        return "CONNECTED";
+    case WIFI_STATE_DISCONNECTED:
+        return "DISCONNECTED";
+    case WIFI_STATE_CONNECT_FAILED:
+        return "CONNECT_FAILED";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+const char *Wifi::getDisconnectReasonName(uint8_t reasonCode)
+{
+    switch (reasonCode)
+    {
+    case WIFI_REASON_UNSPECIFIED:
+        return "UNSPECIFIED";
+    case WIFI_REASON_AUTH_EXPIRE:
+        return "AUTH_EXPIRE";
+    case WIFI_REASON_AUTH_LEAVE:
+        return "AUTH_LEAVE";
+    case WIFI_REASON_ASSOC_EXPIRE:
+        return "ASSOC_EXPIRE";
+    case WIFI_REASON_ASSOC_TOOMANY:
+        return "ASSOC_TOOMANY";
+    case WIFI_REASON_NOT_AUTHED:
+        return "NOT_AUTHED";
+    case WIFI_REASON_NOT_ASSOCED:
+        return "NOT_ASSOCED";
+    case WIFI_REASON_ASSOC_LEAVE:
+        return "ASSOC_LEAVE";
+    case WIFI_REASON_ASSOC_NOT_AUTHED:
+        return "ASSOC_NOT_AUTHED";
+    case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+        return "DISASSOC_PWRCAP_BAD";
+    case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+        return "DISASSOC_SUPCHAN_BAD";
+    case WIFI_REASON_IE_INVALID:
+        return "IE_INVALID";
+    case WIFI_REASON_MIC_FAILURE:
+        return "MIC_FAILURE";
+    case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        return "4WAY_HANDSHAKE_TIMEOUT";
+    case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+        return "GROUP_KEY_UPDATE_TIMEOUT";
+    case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+        return "IE_IN_4WAY_DIFFERS";
+    case WIFI_REASON_GROUP_CIPHER_INVALID:
+        return "GROUP_CIPHER_INVALID";
+    case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+        return "PAIRWISE_CIPHER_INVALID";
+    case WIFI_REASON_AKMP_INVALID:
+        return "AKMP_INVALID";
+    case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+        return "UNSUPP_RSN_IE_VERSION";
+    case WIFI_REASON_INVALID_RSN_IE_CAP:
+        return "INVALID_RSN_IE_CAP";
+    case WIFI_REASON_802_1X_AUTH_FAILED:
+        return "802_1X_AUTH_FAILED";
+    case WIFI_REASON_CIPHER_SUITE_REJECTED:
+        return "CIPHER_SUITE_REJECTED";
+    case WIFI_REASON_BEACON_TIMEOUT:
+        return "BEACON_TIMEOUT";
+    case WIFI_REASON_NO_AP_FOUND:
+        return "NO_AP_FOUND";
+    case WIFI_REASON_AUTH_FAIL:
+        return "AUTH_FAIL";
+    case WIFI_REASON_ASSOC_FAIL:
+        return "ASSOC_FAIL";
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        return "HANDSHAKE_TIMEOUT";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 void Wifi::setup()
 {
-    logger.info("initializing");
+    logger.info("Initializing WiFi");
 
     if (is_setup)
     {
@@ -27,14 +118,16 @@ void Wifi::setup()
         return;
     }
 
-    logger.info("creating default wifi station interface");
-
     wifi_interface = esp_netif_create_default_wifi_sta();
     if (wifi_interface == NULL)
     {
         logger.error("Failed to create WiFi station interface");
         return;
     }
+
+    String hostname = Settings::getHostname() + "-wifi";
+    esp_netif_set_hostname(wifi_interface, hostname.c_str());
+    logger.infof("Hostname set to %s", hostname.c_str());
 
     // Configure WiFi memory settings for lower RAM usage
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -88,7 +181,7 @@ void Wifi::setup()
     BaseType_t taskResult = xTaskCreate(
         taskFn,
         "Wifi",
-        8192, // Increased stack size to 8192 to prevent stack overflow
+        8192,
         NULL,
         TASK_PRIORITY_WIFI,
         NULL);
@@ -99,7 +192,7 @@ void Wifi::setup()
         return;
     }
 
-    logger.info("WiFi task created successfully");
+    logger.debug("WiFi task created successfully");
     is_setup = true;
 }
 
@@ -108,11 +201,14 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     switch (event_id)
     {
     case WIFI_EVENT_STA_START:
-        logger.info("WiFi station started");
+        logger.debug("STA start");
         break;
 
     case WIFI_EVENT_STA_CONNECTED:
-        logger.info("Connected to AP");
+    {
+        auto *ev = (wifi_event_sta_connected_t *)event_data;
+        String ssid = String(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
+        logger.infof("Associated with SSID '%s' BSSID %s on channel %d", ssid.c_str(), formatMac(ev->bssid).c_str(), ev->channel);
 
         if (_state != WIFI_STATE_CONNECTED)
         {
@@ -121,19 +217,13 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
         // Reset reconnection attempts on successful connection
         current_reconnect_attempts_count = 0;
         break;
+    }
 
     case WIFI_EVENT_STA_DISCONNECTED:
     {
-        logger.info("Disconnected from AP");
+        auto *ev = (wifi_event_sta_disconnected_t *)event_data;
+        logger.infof("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
         setState(WIFI_STATE_DISCONNECTED);
-
-        // If we were previously connected (not a connection failure), reset reconnect attempts
-        // to allow immediate reconnection attempts
-        if (current_reconnect_attempts_count == 0)
-        {
-            logger.info("Unexpected disconnection, enabling auto-reconnect");
-            current_reconnect_attempts_count = 0; // Allow immediate reconnect attempt
-        }
         break;
     }
 
@@ -151,9 +241,11 @@ void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
 
-    char wifi_ip_str[16];
-    snprintf(wifi_ip_str, sizeof(wifi_ip_str), IPSTR, IP2STR(&event->ip_info.ip));
-    logger.info(("Got IP: " + String(wifi_ip_str)).c_str());
+    char ip[16], mask[16], gw[16];
+    snprintf(ip, sizeof(ip), IPSTR, IP2STR(&event->ip_info.ip));
+    snprintf(mask, sizeof(mask), IPSTR, IP2STR(&event->ip_info.netmask));
+    snprintf(gw, sizeof(gw), IPSTR, IP2STR(&event->ip_info.gw));
+    logger.infof("Got IP %s, mask %s, gw %s", ip, mask, gw);
 
     setState(WIFI_STATE_CONNECTED);
     // Reset reconnection attempts on successful IP acquisition
@@ -162,15 +254,18 @@ void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 
 void Wifi::setState(WifiState state)
 {
+    WifiState previous = _state;
     _state = state;
-    appState.setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
-
-    logger.debug(("setState called with state: " + String(state)).c_str());
+    State::setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
+    if (previous != state)
+    {
+        logger.infof("State: %s -> %s", getStateName(previous), getStateName(state));
+    }
 }
 
 void Wifi::taskFn(void *parameter)
 {
-    logger.info("WiFi task started and running");
+    logger.debug("WiFi task started");
 
     while (true)
     {
@@ -180,15 +275,6 @@ void Wifi::taskFn(void *parameter)
 }
 void Wifi::loop()
 {
-    // Add periodic debug logging
-    static uint32_t lastLoopLog = 0;
-    uint32_t currentTime = millis();
-    if (currentTime - lastLoopLog > 10000) // Every 10 seconds
-    {
-        lastLoopLog = currentTime;
-        logger.debug(("Loop - current state: " + String(_state)).c_str());
-    }
-
     // Yield to other tasks at the start of each loop iteration
     vTaskDelay(1);
 
@@ -218,7 +304,7 @@ void Wifi::loop()
         break;
 
     default:
-        logger.error(("Unknown state: " + String(_state)).c_str());
+        logger.error("Unknown WiFi state");
         break;
     }
 }
@@ -227,18 +313,17 @@ void Wifi::ensureConnection()
 {
     if (isConnected())
     {
-        logger.info("Already connected");
         return;
     }
 
     uint32_t currentTime = millis();
     if (!hasSavedCredentials())
     {
-        static uint32_t lastNoSavedCredentialsLog = 0;
-        if (currentTime - lastNoSavedCredentialsLog > 10000) // 10 seconds
+        static bool warned = false;
+        if (!warned)
         {
-            lastNoSavedCredentialsLog = currentTime;
-            logger.info("No saved credentials found, cannot auto-connect");
+            logger.info("No saved WiFi credentials");
+            warned = true;
         }
         return;
     }
@@ -251,18 +336,6 @@ void Wifi::ensureConnection()
         return;
     }
 
-    if (current_reconnect_attempts_count >= MAX_RECONNECT_ATTEMPTS)
-    {
-        // Only log this once every 5 minutes to avoid spam
-        static uint32_t lastMaxAttemptsLog = 0;
-        if (currentTime - lastMaxAttemptsLog > 10000) // 10 seconds
-        {
-            lastMaxAttemptsLog = currentTime;
-            logger.info(("Max reconnect attempts (" + String(MAX_RECONNECT_ATTEMPTS) + ") reached. Will retry after successful manual connection.").c_str());
-        }
-        return;
-    }
-
     last_reconnect_attempt_time_ms = currentTime;
     current_reconnect_attempts_count++;
 
@@ -271,18 +344,15 @@ void Wifi::ensureConnection()
 
 void Wifi::tryAutoConnect()
 {
-    logger.info(("Auto-reconnect attempt " + String(current_reconnect_attempts_count) + "/" + String(MAX_RECONNECT_ATTEMPTS)).c_str());
-
     if (!hasSavedCredentials())
     {
-        logger.info("No saved credentials found, cannot auto-connect");
         return;
     }
 
     String savedSSID = Settings::getNetworkConfig().ssid;
     String savedPassword = Settings::getNetworkConfig().password;
 
-    logger.info(("Attempting auto-connect to: " + savedSSID).c_str());
+    logger.infof("Reconnect attempt #%u to '%s'", current_reconnect_attempts_count, savedSSID.c_str());
     connectToNetwork(savedSSID, savedPassword);
 }
 
@@ -293,40 +363,30 @@ bool Wifi::hasSavedCredentials()
 
 void Wifi::connectToNetwork(const String &ssid, const String &password)
 {
-    logger.info(("connectToNetwork called for SSID: " + ssid).c_str());
+    logger.infof("Connecting to SSID '%s'", ssid.c_str());
 
     _lastSSID = ssid;
 
-    logger.debug("Step 1: Checking if already connected");
     // Disconnect from any existing connection first
     if (isConnected())
     {
-        logger.info("Disconnecting from existing connection");
+        logger.debug("Disconnecting from current AP");
         esp_wifi_disconnect();
     }
 
-    logger.debug("Step 2: Setting state to connecting");
     setState(WIFI_STATE_CONNECTING);
-
-    logger.debug("Step 3: Creating WiFi configuration");
 
     // Create WiFi configuration
     wifi_config_t wifi_config = {};
-
-    logger.debug("Step 4: Copying SSID");
     // Copy SSID
     strncpy((char *)wifi_config.sta.ssid, ssid.c_str(), sizeof(wifi_config.sta.ssid) - 1);
     vTaskDelay(1); // Yield to prevent watchdog
-
-    logger.debug("Step 5: Copying password");
     // Copy password if provided
     if (password.length() > 0)
     {
         strncpy((char *)wifi_config.sta.password, password.c_str(), sizeof(wifi_config.sta.password) - 1);
     }
     vTaskDelay(1); // Yield to prevent watchdog
-
-    logger.debug("Step 6: Setting WiFi configuration options");
 
     // Set threshold for weakest authmode to accept (more permissive)
     wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
@@ -339,8 +399,6 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
     wifi_config.sta.failure_retry_cnt = 3;
     vTaskDelay(1); // Yield to prevent watchdog
 
-    logger.debug("Step 7: Setting WiFi config and initiating connection");
-
     esp_err_t wifi_set_config_result = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (wifi_set_config_result != ESP_OK)
     {
@@ -349,19 +407,10 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
         return;
     }
 
-    logger.info("WiFi config set successfully");
-
     // Give WiFi stack time to process the config before connecting
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    logger.debug("calling esp_wifi_connect");
-
-    // Make the WiFi connect call
-    logger.debug("About to call esp_wifi_connect...");
-
     esp_err_t wifi_connect_result = esp_wifi_connect();
-
-    logger.debug((String("esp_wifi_connect returned: ") + esp_err_to_name(wifi_connect_result)).c_str());
 
     if (wifi_connect_result != ESP_OK)
     {
@@ -372,7 +421,6 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
 
     // Don't reset the attempt counter here - it should only be reset on successful connection
     last_reconnect_attempt_time_ms = millis();
-    logger.debug(("Connection attempt started at " + String(last_reconnect_attempt_time_ms) + " ms").c_str());
 }
 
 bool Wifi::isConnected()
@@ -400,7 +448,7 @@ void Wifi::startScan()
         return;
     }
 
-    logger.info("starting wifi scan");
+    logger.info("Starting WiFi scan");
     Wifi::is_scanning = true;
 
     wifi_scan_config_t scan_config = {};
@@ -418,7 +466,7 @@ void Wifi::startScan()
         logger.error((String("Failed to start scan: ") + esp_err_to_name(err)).c_str());
         Wifi::is_scanning = false;
     }
-    logger.info("wifi scan started");
+    logger.debug("WiFi scan started");
 }
 
 bool Wifi::isScanning()
@@ -428,7 +476,7 @@ bool Wifi::isScanning()
 
 void Wifi::handleScanComplete()
 {
-    logger.info("handling scan complete");
+    logger.debug("Scan complete event");
     uint16_t scan_count = 0;
     esp_err_t err = esp_wifi_scan_get_ap_num(&scan_count);
 
@@ -442,14 +490,14 @@ void Wifi::handleScanComplete()
 
     if (scan_count == 0)
     {
-        logger.info("No networks found");
+        logger.info("Scan complete: no networks found");
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
         return;
     }
 
     knownWifiNetworksCount = min((int)scan_count, (int)MAX_KNOWN_WIFI_NETWORKS);
-    logger.info(("Found " + String(knownWifiNetworksCount) + " networks").c_str());
+    logger.infof("Scan complete: %u networks", knownWifiNetworksCount);
 
     wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(scan_count * sizeof(wifi_ap_record_t));
 
@@ -461,7 +509,7 @@ void Wifi::handleScanComplete()
         return;
     }
 
-    logger.debug("calling esp_wifi_scan_get_ap_records");
+    logger.debug("Fetching AP records");
     err = esp_wifi_scan_get_ap_records(&scan_count, ap_records);
     if (err != ESP_OK)
     {
@@ -473,13 +521,11 @@ void Wifi::handleScanComplete()
     }
 
     // Copy scan results to our network array with safety checks
-    logger.debug("copying scan results to our network array");
     for (uint8_t i = 0; i < knownWifiNetworksCount && i < MAX_KNOWN_WIFI_NETWORKS; i++)
     {
         // Skip empty SSIDs
         if (ap_records[i].ssid[0] == 0)
         {
-            logger.debug(("Skipping network " + String(i) + " with empty SSID").c_str());
             continue;
         }
 
@@ -497,15 +543,13 @@ void Wifi::handleScanComplete()
             knownWifiNetworks[i].encryptionType = ap_records[i].authmode;
             knownWifiNetworks[i].isOpen = (ap_records[i].authmode == WIFI_AUTH_OPEN);
             knownWifiNetworks[i].channel = ap_records[i].primary;
-
-            logger.debug(("Network " + String(i) + ": " + String(ssid_str) + " (RSSI: " + String(ap_records[i].rssi) + ")").c_str());
         }
     }
 
     free(ap_records);
     Wifi::is_scanning = false;
 
-    logger.info("wifi scan complete and done");
+    logger.debug("WiFi scan results stored");
 }
 
 void Wifi::handleTimeout()
@@ -517,14 +561,6 @@ void Wifi::handleTimeout()
 
     uint32_t currentTime = millis();
     uint32_t elapsed = currentTime - last_reconnect_attempt_time_ms;
-
-    // Add debug logging every 5 seconds
-    static uint32_t lastTimeoutLog = 0;
-    if (currentTime - lastTimeoutLog > 5000)
-    {
-        lastTimeoutLog = currentTime;
-        logger.debug(("Connection timeout check - elapsed: " + String(elapsed) + " ms (max: 15000 ms), state: " + String(_state)).c_str());
-    }
 
     if (elapsed > 15000)
     { // 15 second timeout

@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include "task_priorities.h"
 #include "../logger/logger.hpp"
+#include "../state/state.hpp"
 
 class NFC
 {
@@ -12,12 +13,6 @@ public:
     NFC() : pn532(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire), logger("NFC") {}
 
     void setup();
-
-    /*
-     *  Set the callback to be called when an nfc card is detected
-     *  @param callback : callback to be called when an nfc card is detected
-     */
-    void setOnNfcCardDetected(void (*callback)(char *uuid));
 
     /*
      *  Authenticate with the nfc card
@@ -70,15 +65,13 @@ public:
      */
     bool discoverNfcCard(char *dicoveredUuid, uint8_t *discoveredUuidLength, const uint32_t timeoutMs = 500);
 
-    void enableLoopCardDetection();
-    void disableLoopCardDetection();
-    bool isLoopCardDetectionEnabled();
-
 private:
     static const uint8_t AUTH_KEY_NO = 0;
     static const uint8_t AUTH_CMD = 0x71;
 
     static void task_function(void *pvParameters);
+    void updateStateFromAppState();
+    uint32_t lastKnownAppStateChangeTime = 0;
 
     Adafruit_PN532 pn532;
 
@@ -86,9 +79,11 @@ private:
     bool nfc_is_ready = false;
     bool loop_card_detection_is_enabled = false;
 
-    void (*onNfcCardDetected)(char *uuid);
-
     void loop();
+
+    void processNfcCommands();
+
+    void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
 
     /*
      *  Detect the nfc module and set the nfc_is_detected flag if it is detected

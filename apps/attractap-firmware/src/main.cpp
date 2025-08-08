@@ -2,47 +2,53 @@
 #include "esp_err.h"
 #include "api/api.hpp"
 #include "nfc/nfc.hpp"
-#ifdef DISPLAY_OLED
-#include "display/oled/oled.hpp"
-#endif
-#ifdef HAS_I2C_KEYPAD
-#include "keypad/keypad.hpp"
-#endif
-#ifdef PIN_NEOPIXEL_LED
-#include "leds/neopixel/neopixel.hpp"
-#endif
 #include "settings/settings.hpp"
 #include "cli/CLIService.hpp"
 #include "serial-setup/serial-setup.hpp"
 #include "firmwareUpdate/firmwareUpdate.hpp"
 #include "websocket/websocket.hpp"
 #include "network/network.hpp"
-#ifdef DISPLAY_TOUCHSCREEN_LVGL
-#include "display/touchscreen/touchscreen.hpp"
-#endif
 #include "logger/logger.hpp"
-
 #include <Wire.h>
+#include "display/displayManager.hpp"
 
-Logger mainLogger("Main");
+#ifdef HAS_I2C_KEYPAD
+#include "keypad/keypad.hpp"
+#endif
 
 #ifdef PIN_NEOPIXEL_LED
-Neopixel leds;
+#include "leds/neopixel/neopixel.hpp"
 #endif
+
 #ifdef DISPLAY_OLED
-OLED oled;
+#include "display/oled/oled.hpp"
+#elif defined(DISPLAY_TOUCHSCREEN_LVGL)
+#include "display/touchscreen/touchscreen.hpp"
 #endif
-#ifdef DISPLAY_TOUCHSCREEN_LVGL
-Touchscreen touchscreen;
-#endif
-#ifdef HAS_I2C_KEYPAD
-Keypad keypad;
-#endif
+
+Logger mainLogger("Main");
 API api;
 NFC nfc;
 CLIService cliService;
 FirmwareUpdate firmwareUpdate;
 Websocket websocket;
+
+#ifdef PIN_NEOPIXEL_LED
+Neopixel leds;
+#endif
+
+#ifdef HAS_I2C_KEYPAD
+Keypad keypad;
+#endif
+
+#ifdef DISPLAY_OLED
+OLED oled;
+DisplayManager displayManager(&oled);
+#endif
+#ifdef DISPLAY_TOUCHSCREEN_LVGL
+Touchscreen touchscreen;
+DisplayManager displayManager(&touchscreen);
+#endif
 
 void setup()
 {
@@ -55,20 +61,16 @@ void setup()
 
     // Initialize I2C for NFC
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
-#ifdef DISPLAY_TOUCHSCREEN_LVGL
-    touchscreen.setup();
-    delay(100);
-#endif
 
+    displayManager.setup();
     Network::setup();
     websocket.setup();
+    nfc.setup();
+    api.setup();
+    cliService.setup();
+    firmwareUpdate.setup();
+    SerialSetup::setup(&cliService, &api, &websocket);
 
-#ifdef DISPLAY_OLED
-    oled.setup();
-#endif
-#ifdef DISPLAY_TOUCHSCREEN_LVGL
-
-#endif
 #ifdef PIN_NEOPIXEL_LED
     leds.setup();
 #endif
@@ -76,13 +78,6 @@ void setup()
 #ifdef HAS_I2C_KEYPAD
     keypad.setup();
 #endif
-
-    nfc.setup();
-    api.setup();
-    cliService.setup();
-    firmwareUpdate.setup();
-
-    SerialSetup::setup(&cliService, &api, &websocket);
 }
 
 void loop()

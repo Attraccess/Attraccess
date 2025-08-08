@@ -2,14 +2,13 @@
 
 #include <esp_netif.h>
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 class State
 {
 public:
-    State();
-
-    void setWifiState(bool connected, esp_ip4_addr_t ip, String ssid);
-    void setEthernetState(bool connected, esp_ip4_addr_t ip);
+    static void setWifiState(bool connected, esp_ip4_addr_t ip, String ssid);
+    static void setEthernetState(bool connected, esp_ip4_addr_t ip);
     struct NetworkState
     {
         bool wifi_connected;
@@ -18,9 +17,9 @@ public:
         bool ethernet_connected;
         esp_ip4_addr_t ethernet_ip;
     };
-    NetworkState getNetworkState();
+    static NetworkState getNetworkState();
 
-    void setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL);
+    static void setWebsocketState(bool connected, String hostname, uint16_t port, bool useSSL);
     struct WebsocketState
     {
         bool connected;
@@ -28,17 +27,17 @@ public:
         uint16_t port;
         bool useSSL;
     };
-    WebsocketState getWebsocketState();
+    static WebsocketState getWebsocketState();
 
-    void setApiState(bool authenticated, String deviceName);
+    static void setApiState(bool authenticated, String deviceName);
     struct ApiState
     {
         bool authenticated;
         String deviceName;
     };
-    ApiState getApiState();
+    static ApiState getApiState();
 
-    uint32_t getLastStateChangeTime();
+    static uint32_t getLastStateChangeTime();
 
     static void pushIncomingWebsocketMessageToQueue(const String &message);
     static bool getNextIncomingWebsocketMessage(String &message);
@@ -46,11 +45,72 @@ public:
     static void pushOutgoingWebsocketMessageToQueue(const String &message);
     static bool getNextOutgoingWebsocketMessage(String &message);
 
+    enum ApiInputEventType
+    {
+        API_INPUT_EVENT_KEYPAD_CONFIRM_PRESSED,
+        API_INPUT_EVENT_KEYPAD_CANCEL_PRESSED,
+        API_INPUT_EVENT_NFC_CARD_DETECTED,
+        API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_SUCCESS,
+        API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_FAILED,
+        API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_SUCCESS,
+        API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_FAILED,
+    };
+    struct ApiInputEvent
+    {
+        ApiInputEventType type;
+        // Fixed-size buffer to avoid placing Arduino String in FreeRTOS queue
+        char payload[64];
+    };
+    static void pushEventToApi(ApiInputEventType type);
+    static void pushEventToApi(ApiInputEventType type, const String &payload);
+    static bool getNextApiInputEvent(ApiInputEvent &event);
+
+    enum ApiEventState
+    {
+        API_EVENT_STATE_DISPLAY_ERROR,
+        API_EVENT_STATE_DISPLAY_SUCCESS,
+        API_EVENT_STATE_DISPLAY_TEXT,
+        API_EVENT_STATE_CONFIRM_ACTION,
+        API_EVENT_STATE_RESOURCE_SELECTION,
+        API_EVENT_STATE_WAIT_FOR_PROCESSING,
+        API_EVENT_STATE_WAIT_FOR_NFC_TAP,
+        API_EVENT_STATE_FIRMWARE_UPDATE
+    };
+    struct ApiEventData
+    {
+        ApiEventState state;
+        ArduinoJson::JsonObject payload;
+    };
+    static void setApiEventData(ApiEventState state, ArduinoJson::JsonObject payload);
+    static ApiEventData getApiEventData();
+    static uint32_t getLastApiEventTime();
+
+    static void setKeypadValue(String value);
+    static String getKeypadValue();
+
+    // queue methods to send nfc commands to nfc class
+    enum NfcCommandType
+    {
+        NFC_COMMAND_TYPE_AUTHENTICATE,
+        NFC_COMMAND_TYPE_CHANGE_KEY,
+    };
+    struct NfcCommand
+    {
+        NfcCommandType type;
+        // Fixed-size buffer to avoid placing Arduino String in FreeRTOS queue
+        char payload[1024];
+    };
+    static void pushNfcCommandToQueue(NfcCommandType type, const String &payload);
+    static bool getNextNfcCommand(NfcCommand &command);
+
 private:
-    void onStateChanged();
+    State() = delete;
+
+    static void onStateChanged();
     static uint32_t _lastStateChangeTime;
 
     static portMUX_TYPE stateMutex;
+    static portMUX_TYPE apiEventMutex;
 
     static esp_ip4_addr_t wifi_ip;
     static bool wifi_connected;
@@ -66,10 +126,23 @@ private:
     static QueueHandle_t incoming_websocket_messages_queue;
     static QueueHandle_t outgoing_websocket_messages_queue;
 
+    static QueueHandle_t nfc_commands_queue;
+
+    static QueueHandle_t api_input_events_queue;
+
     static void initializeQueuesIfNeeded();
 
     static bool _queuesInitialized;
 
     static bool api_authenticated;
     static String api_device_name;
+
+    static ApiEventData api_event_data;
+    static uint32_t api_event_time;
+
+    // Backing store for api_event_data.payload so it remains valid
+    // after the source JsonDocument in the caller goes out of scope.
+    static DynamicJsonDocument api_event_doc;
+
+    static String keypad_value;
 };

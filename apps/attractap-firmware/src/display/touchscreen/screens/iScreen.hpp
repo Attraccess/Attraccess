@@ -5,6 +5,8 @@
 class IScreen
 {
 public:
+    IScreen() {}
+
     virtual void onScreenEnter() = 0;
     virtual void onScreenExit() = 0;
     virtual void loop() = 0;

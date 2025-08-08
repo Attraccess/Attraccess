@@ -6,6 +6,7 @@ Logger Settings::logger("Settings");
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
 AttraccessAuthConfig Settings::_attraccessAuthConfig;
+String Settings::_hostname;
 
 void Settings::setup()
 {
@@ -22,6 +23,8 @@ void Settings::setup()
 
     _attraccessAuthConfig.apiKey = preferences.getString("api.key", "");
     _attraccessAuthConfig.readerId = preferences.getUInt("api.readerId", 0);
+
+    _hostname = preferences.getString("hostname", "");
 
     preferences.end();
 
@@ -100,4 +103,18 @@ void Settings::clearAttraccessAuthConfig()
     _attraccessAuthConfig.readerId = 0;
 
     preferences.end();
+}
+
+String Settings::getHostname()
+{
+    if (_hostname.isEmpty())
+    {
+        String randomSuffix = String(random(1000, 9999));
+        _hostname = String(FIRMWARE_FRIENDLY_NAME) + "-" + String(FIRMWARE_VARIANT_FRIENDLY_NAME) + "-" + randomSuffix;
+        preferences.begin("settings", false);
+        preferences.putString("hostname", _hostname);
+        preferences.end();
+    }
+
+    return _hostname;
 }

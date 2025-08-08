@@ -38,6 +38,8 @@ public:
     static void saveAttraccessAuthConfig(String apiKey, uint32_t readerId);
     static void clearAttraccessAuthConfig();
 
+    static String getHostname();
+
 private:
     static Preferences preferences;
     static Logger logger;
@@ -45,4 +47,6 @@ private:
     static NetworkConfig _networkConfig;
     static AttraccessApiConfig _attraccessApiConfig;
     static AttraccessAuthConfig _attraccessAuthConfig;
+
+    static String _hostname;
 };

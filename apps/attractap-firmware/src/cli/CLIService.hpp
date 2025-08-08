@@ -2,83 +2,61 @@
 
 #include <Arduino.h>
 #include <functional>
-#include <map>
-#include "CommandParser.hpp"
-#include "CommandExecutor.hpp"
-#include <Preferences.h>
-#include "task_priorities.h"
+#include <vector>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-/**
- * Function type for command handlers
- * Takes payload as input and returns response string
- */
-typedef std::function<String(const String &payload)> CommandHandler;
+// Simple minimal CLI service for line-based serial commands.
+// Format per line: "<TYPE> <command> [payload...]"
+// Examples:
+//   GET firmware.version
+//   SET attraccess.configuration {"hostname":"example.com","port":443}
 
-/**
- * Response formatter class responsible for formatting and sending responses
- */
-class ResponseFormatter
+namespace CLI_SERVICE
 {
-public:
-    /**
-     * Format and send a successful response
-     * @param action The action that was executed
-     * @param answer The response data
-     */
-    static void formatResponse(const String &action, const String &answer);
+    enum CommandType
+    {
+        CLI_COMMAND_GET = 0,
+        CLI_COMMAND_SET = 1
+    };
+}
 
-    /**
-     * Format and send an error response
-     * @param errorType The type of error that occurred
-     * @param message Optional error message
-     */
-    static void formatError(const String &errorType, const String &message = "");
-
-    static void sendLine(const String &line);
-};
-
-/**
- * Main CLI service class that coordinates command processing
- */
 class CLIService
 {
 public:
-    CLIService();
-    ~CLIService();
+    using CommandHandler = std::function<void(const String &payload)>;
 
-    /**
-     * Initialize the CLI service
-     */
+    CLIService();
+    ~CLIService() = default;
+
+    // Initialize the service (starts the background serial read task once)
     void setup();
 
-    /**
-     * Register a command handler for extensibility
-     * @param action The action string (e.g., "firmware.version")
-     * @param handler The function to handle this command
-     */
-    void registerCommandHandler(const String &action, CommandHandler handler);
-    void sendResponse(const String &action, const String &response);
+    // Register handler by enum command type (GET/SET) and arbitrary command string
+    void registerCommandHandler(CLI_SERVICE::CommandType type,
+                                const String &command,
+                                CommandHandler handler);
+
+    // Send response back over serial using the required framing.
+    void sendResponse(CLI_SERVICE::CommandType type, const String &command, const String &payload);
 
 private:
-    static void taskFunction(void *param);
-    void loop();
+    struct HandlerEntry
+    {
+        CLI_SERVICE::CommandType type;
+        String command;
+        CommandHandler handler;
+    };
 
-    CommandParser parser;
-    CommandExecutor executor;
-    String inputBuffer;
+    static void serialTaskThunk(void *param);
+    void serialTaskLoop();
+    void processLine(const String &line);
+    bool findHandler(CLI_SERVICE::CommandType type, const String &command, CommandHandler &outHandler);
+    String typeToStringLower(CLI_SERVICE::CommandType type);
 
-    // Error recovery state
-    bool serialErrorRecovery;
-    unsigned long lastSerialActivity;
-    static const unsigned long SERIAL_TIMEOUT_MS = 5000;
+    // Storage for registered handlers
+    std::vector<HandlerEntry> handlers;
 
-    void processSerialInput();
-    void handleCommand(const ParsedCommand &command);
-    void sendError(const String &errorType, const String &message = "");
-
-    // Error handling and recovery
-    void handleSerialError();
-    void recoverFromSerialError();
-    bool isSerialHealthy();
-    void clearInputBuffer();
+    // FreeRTOS task handle (optional)
+    TaskHandle_t taskHandle = nullptr;
 };

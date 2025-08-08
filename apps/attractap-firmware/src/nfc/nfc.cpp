@@ -40,6 +40,9 @@ void NFC::loop()
         return;
     }
 
+    this->updateStateFromAppState();
+    this->processNfcCommands();
+
     if (!this->loop_card_detection_is_enabled)
     {
         return;
@@ -54,14 +57,117 @@ void NFC::loop()
 
     if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
     {
-        logger.info("loop Detected card with UID:");
-        logger.info(String(dicoveredUuid).c_str());
-
-        if (this->onNfcCardDetected)
+        String uidHex = "";
+        for (uint8_t i = 0; i < discoveredUuidLength; i++)
         {
-            this->onNfcCardDetected(dicoveredUuid);
+            if (dicoveredUuid[i] < 0x10)
+            {
+                uidHex += "0";
+            }
+            uidHex += String(dicoveredUuid[i], HEX);
         }
+        logger.infof("loop Detected card with UID: %s", uidHex.c_str());
+
+        State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_DETECTED, uidHex);
     }
+}
+
+void NFC::processNfcCommands()
+{
+    State::NfcCommand command;
+    if (!State::getNextNfcCommand(command))
+    {
+        return;
+    }
+
+    switch (command.type)
+    {
+    case State::NfcCommandType::NFC_COMMAND_TYPE_CHANGE_KEY:
+    {
+        String payload(command.payload);
+
+        // Parse space-delimited values more efficiently
+        int firstSpace = payload.indexOf(' ');
+        int secondSpace = payload.indexOf(' ', firstSpace + 1);
+        int thirdSpace = payload.indexOf(' ', secondSpace + 1);
+
+        String keyNumberStr = payload.substring(0, firstSpace);
+        String authKeyHex = payload.substring(firstSpace + 1, secondSpace);
+        String oldKeyHex = payload.substring(secondSpace + 1, thirdSpace);
+        String newKeyHex = payload.substring(thirdSpace + 1);
+
+        uint8_t keyNumber = keyNumberStr.toInt();
+        uint8_t authKey[16];
+        uint8_t oldKey[16];
+        uint8_t newKey[16];
+
+        this->hexStringToBytes(authKeyHex, authKey, 16);
+        this->hexStringToBytes(oldKeyHex, oldKey, 16);
+        this->hexStringToBytes(newKeyHex, newKey, 16);
+
+        bool success = this->changeKey(keyNumber, authKey, oldKey, newKey);
+        if (success)
+        {
+            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_SUCCESS, command.payload);
+        }
+        else
+        {
+            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_FAILED, command.payload);
+        }
+        break;
+    }
+
+    case State::NfcCommandType::NFC_COMMAND_TYPE_AUTHENTICATE:
+    {
+        String payload(command.payload);
+
+        // Parse space-delimited values more efficiently
+        int firstSpace = payload.indexOf(' ');
+        String keyNumberStr = payload.substring(0, firstSpace);
+        String authKeyHex = payload.substring(firstSpace + 1);
+
+        uint8_t keyNumber = keyNumberStr.toInt();
+        uint8_t authKey[16];
+
+        this->hexStringToBytes(authKeyHex, authKey, 16);
+
+        bool success = this->authenticate(keyNumber, authKey, true);
+        if (success)
+        {
+            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_SUCCESS, command.payload);
+        }
+        else
+        {
+            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_FAILED, command.payload);
+        }
+
+        break;
+    }
+    }
+}
+
+void NFC::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength)
+{
+    // Initialize array with zeros
+    memset(byteArray, 0, byteArrayLength);
+
+    // Process the hex string - 2 characters per byte
+    for (size_t i = 0; i < byteArrayLength && i * 2 + 1 < hexString.length(); i++)
+    {
+        String byteHex = hexString.substring(i * 2, i * 2 + 2);
+        byteArray[i] = strtol(byteHex.c_str(), NULL, 16);
+    }
+}
+
+void NFC::updateStateFromAppState()
+{
+    uint32_t lastAppStateChangeTime = State::getLastStateChangeTime();
+    if (this->lastKnownAppStateChangeTime >= lastAppStateChangeTime)
+    {
+        return;
+    }
+
+    this->loop_card_detection_is_enabled = State::getApiEventData().state == State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP;
 }
 
 bool NFC::detectNfcModule()
@@ -326,24 +432,4 @@ void NFC::uintArrayToCharArray(const uint8_t *uuid, const uint8_t length, char *
     }
     // Null terminate the string
     charArray[length] = '\0';
-}
-
-void NFC::setOnNfcCardDetected(void (*callback)(char *uuid))
-{
-    this->onNfcCardDetected = callback;
-}
-
-void NFC::enableLoopCardDetection()
-{
-    this->loop_card_detection_is_enabled = true;
-}
-
-void NFC::disableLoopCardDetection()
-{
-    this->loop_card_detection_is_enabled = false;
-}
-
-bool NFC::isLoopCardDetectionEnabled()
-{
-    return this->loop_card_detection_is_enabled;
 }

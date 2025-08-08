@@ -29,15 +29,15 @@ private:
     static API *api;
     static Websocket *websocket;
 
-    static String handleFirmwareVersion(const String &payload);
-    static String handleAttraccessStatus(const String &payload);
-    static String handleAttraccessConfiguration(const String &payload);
+    static void handleFirmwareVersion(const String &payload);
+    static void handleAttraccessStatus(const String &payload);
+    static void handleAttraccessConfiguration(const String &payload);
 
     static String wifiGetEncryptionTypeString(wifi_auth_mode_t encType);
 
     static void (*onWifiScanStart)();
 
     static String getEncryptionTypeString(wifi_auth_mode_t encType);
-    static String handleWiFiScan(const String &payload);
-    static String handleWiFiConnect(const String &payload);
+    static void handleWiFiScan(const String &payload);
+    static void handleWiFiConnect(const String &payload);
 };

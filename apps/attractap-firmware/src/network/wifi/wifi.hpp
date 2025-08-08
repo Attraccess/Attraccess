@@ -54,15 +54,12 @@ private:
     static void taskFn(void *parameter);
     static void loop();
 
-    static State appState;
-
     static WifiState _state;
     static bool is_setup;
     static bool is_scanning;
     static uint8_t current_reconnect_attempts_count;
     static uint32_t last_reconnect_attempt_time_ms;
     static const uint32_t RECONNECT_INTERVAL_MS;
-    static const uint32_t MAX_RECONNECT_ATTEMPTS;
     static void tryAutoConnect();
     static bool hasSavedCredentials();
     static WifiNetwork knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
@@ -77,6 +74,10 @@ private:
 
     static void wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+
+    // Helpers for readable logging
+    static const char *getStateName(WifiState state);
+    static const char *getDisconnectReasonName(uint8_t reasonCode);
 
     static esp_netif_t *wifi_interface;
     static Logger logger;

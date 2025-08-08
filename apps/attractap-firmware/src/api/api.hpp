@@ -17,10 +17,10 @@ private:
     static void taskFn(void *parameter);
     void loop();
     void processAvailableMessages();
+    void processInputEvents();
 
     Logger logger;
 
-    State appState;
     void updateSateInfo();
     uint32_t lastKnownAppStateChangeTime;
 
@@ -40,22 +40,16 @@ private:
     void sendHeartbeat();
 
     void onRegistrationData(JsonObject data);
-    void onDisplayText(JsonObject data);
     void onUnauthorized(JsonObject data);
-    void onEnableCardChecking(JsonObject data);
-    void onDisableCardChecking(JsonObject data);
-    void onChangeKey(JsonObject data);
     void onRequestAuthentication(JsonObject data);
     void onReaderAuthenticated(JsonObject data);
-    void onNfcAuthenticate(JsonObject data);
-    void onShowText(JsonObject data);
     void onFirmwareInfo(JsonObject data);
-    void onFirmwareUpdateRequired(JsonObject data);
-    void onFirmwareStreamChunk(JsonObject data);
-    void onConfirmAction(JsonObject data);
-    void onDisplaySuccess(JsonObject data);
-    void onDisplayError(JsonObject data);
-    void onSelectItem(JsonObject data);
 
-    void hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength);
+    void onKeyPadConfirmPressed(String value);
+    void onKeyPadCancelPressed();
+    void onNfcCardDetected(String cardUid);
+    void onNfcCardChangeKeySuccess(String payload);
+    void onNfcCardChangeKeyFailed(String payload);
+    void onNfcCardAuthenticateSuccess(String payload);
+    void onNfcCardAuthenticateFailed(String payload);
 };

@@ -58,7 +58,7 @@ void Websocket::loop()
 
 void Websocket::updateInfoFromAppState()
 {
-    uint32_t lastStateChangeTime = appState.getLastStateChangeTime();
+    uint32_t lastStateChangeTime = State::getLastStateChangeTime();
     if (lastKnownAppStateChangeTime >= lastStateChangeTime)
     {
         return;
@@ -66,7 +66,7 @@ void Websocket::updateInfoFromAppState()
 
     lastKnownAppStateChangeTime = lastStateChangeTime;
 
-    auto networkState = appState.getNetworkState();
+    auto networkState = State::getNetworkState();
     this->network_is_connected = networkState.wifi_connected || networkState.ethernet_connected;
 }
 
@@ -244,5 +244,5 @@ void Websocket::setState(ConnectionState state)
 {
     _state = state;
 
-    appState.setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
+    State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
 }

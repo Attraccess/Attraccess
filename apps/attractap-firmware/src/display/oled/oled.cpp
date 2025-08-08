@@ -18,8 +18,6 @@ void OLED::taskFn(void *parameter)
 
 void OLED::setup()
 {
-    this->boot_time = millis();
-
     this->logger.info("Setup");
 
 #ifdef SCREEN_DRIVER_SH1106
@@ -44,98 +42,142 @@ void OLED::setup()
     this->logger.info("SSD1306 initialized");
 }
 
-void OLED::loop()
+void OLED::transitionTo(DisplayState state)
 {
-    unsigned long boot_end_time = this->boot_time + 2000;
+    this->_state = state;
+    this->updateScreen();
+}
 
-    if (millis() < boot_end_time)
-    {
-        return;
-    }
+void OLED::onAppStateChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState)
+{
+    this->networkState = networkState;
+    this->webSocketState = webSocketState;
+    this->apiState = apiState;
 
+    this->updateScreen();
+}
+
+void OLED::onApiEvent(State::ApiEventData apiEventData)
+{
+    this->apiEventData = apiEventData;
+    this->updateScreen();
+}
+
+void OLED::updateScreen()
+{
     draw_main_elements();
 
-    if (!this->is_network_connected)
+    switch (this->_state)
     {
+    case DISPLAY_STATE_BOOTING:
+        this->draw_booting_ui();
+        break;
+    case DISPLAY_STATE_WAITING_FOR_NETWORK:
         this->draw_network_connecting_ui();
-    }
-    else if (!this->is_api_connected)
-    {
-        this->draw_api_connecting_ui();
-    }
-    else if (this->_state == OLED_STATE_CARD_CHECKING)
-    {
-        this->draw_nfc_tap_ui();
-    }
-    else if (this->_state == OLED_STATE_ERROR)
-    {
-        this->draw_error_ui();
-    }
-    else if (this->_state == OLED_STATE_SUCCESS)
-    {
-        this->draw_success_ui();
-    }
-    else if (this->_state == OLED_STATE_TEXT)
-    {
-        this->draw_text_ui();
-    }
-    else if (this->_state == OLED_STATE_SELECT_ITEM)
-    {
-        this->draw_select_item_ui();
-    }
-    else if (this->_state == OLED_STATE_CONFIRM_ACTION)
-    {
+        break;
+    case DISPLAY_STATE_WAITING_FOR_WEBSOCKET:
+        this->draw_websocket_connecting_ui();
+        break;
+    case DISPLAY_STATE_WAITING_FOR_AUTHENTICATION:
+        this->draw_authentication_ui();
+        break;
+    case DISPLAY_STATE_RESOURCE_SELECTION:
+        this->draw_resource_selection_ui();
+        break;
+    case DISPLAY_STATE_CONFIRM_ACTION:
         this->draw_confirm_action_ui();
+        break;
+    case DISPLAY_STATE_WAIT_FOR_NFC_TAP:
+        this->draw_nfc_tap_ui();
+        break;
+    case DISPLAY_STATE_SUCCESS:
+        this->draw_success_ui();
+        break;
+    case DISPLAY_STATE_ERROR:
+        this->draw_error_ui();
+        break;
+    case DISPLAY_STATE_TEXT:
+        this->draw_text_ui();
+        break;
+    case DISPLAY_STATE_FIRMWARE_UPDATE:
+        this->draw_firmware_update_ui();
+        break;
+    case DISPLAY_STATE_WAIT_FOR_PROCESSING:
+        this->draw_wait_for_processing_ui();
+        break;
     }
 
     this->screen.display();
 }
 
-void OLED::set_nfc_tap_enabled(bool enabled, String text)
+void OLED::draw_booting_ui()
 {
-    this->nfc_tap_text = text;
-    this->set_nfc_tap_enabled(enabled);
-}
-
-void OLED::set_nfc_tap_enabled(bool enabled)
-{
-    if (enabled)
-    {
-        this->_state = OLED_STATE_CARD_CHECKING;
-    }
-    else if (this->_state == OLED_STATE_CARD_CHECKING)
-    {
-        this->_state = OLED_STATE_NONE;
-    }
-}
-
-void OLED::set_network_connected(bool connected)
-{
-    this->is_network_connected = connected;
-}
-
-void OLED::set_api_connected(bool connected)
-{
-    this->is_api_connected = connected;
-}
-
-void OLED::set_wifi_ip_address(const esp_ip4_addr_t &ip)
-{
-    this->wifi_ip_address = ip;
-}
-
-void OLED::set_ethernet_ip_address(const esp_ip4_addr_t &ip)
-{
-    this->ethernet_ip_address = ip;
-}
-
-void OLED::set_device_name(String name)
-{
-    this->device_name = name;
+    this->logger.debug("draw_booting_ui");
+    // draw the boot logo
+    uint8_t boot_logo_width = 110;
+    uint8_t boot_logo_height = 48;
+    uint8_t x = (this->screen.width() - boot_logo_width) / 2;
+    uint8_t y = (this->screen.height() - boot_logo_height) / 2;
+    this->screen.drawBitmap(x, y, icon_boot_logo, boot_logo_width, boot_logo_height, WHITE);
 }
 
 void OLED::draw_nfc_tap_ui()
 {
+    this->logger.debug("draw_nfc_tap_ui");
+    String lineOne = "Please tap card";
+    String lineTwo = "";
+    auto payload = this->apiEventData.payload;
+
+    if (payload["type"].as<String>() == "reset-nfc-card")
+    {
+        JsonObject card = payload["card"].as<JsonObject>();
+        uint32_t cardId = card["id"].as<uint32_t>();
+        JsonObject user = payload["user"].as<JsonObject>();
+        String username = user["username"].as<String>();
+
+        lineOne = "Reset NFC card";
+        lineTwo = username + " (Card: " + String(cardId) + ")";
+    }
+    else if (payload["type"].as<String>() == "enroll-nfc-card")
+    {
+        JsonObject user = payload["user"].as<JsonObject>();
+        String username = user["username"].as<String>();
+
+        lineOne = "Enroll NFC card";
+        lineTwo = username;
+    }
+    else if (payload["type"].as<String>() == "toggle-resource-usage")
+    {
+        JsonObject resource = payload["resource"].as<JsonObject>();
+        String resourceName = resource["name"].as<String>();
+
+        // Check if there's an active usage session
+        bool isActive = payload["isActive"].as<bool>();
+        if (isActive)
+        {
+            lineOne = "Tap to stop";
+            lineTwo = resourceName;
+        }
+        else
+        {
+            // Check for active maintenance
+            bool hasMaintenance = payload["hasActiveMaintenance"].as<bool>();
+            if (hasMaintenance)
+            {
+                lineOne = "Start (Maintenance)";
+                lineTwo = resourceName;
+            }
+            else
+            {
+                lineOne = "Tap to start";
+                lineTwo = resourceName;
+            }
+        }
+    }
+    else
+    {
+        logger.error("Unknown NFC tap type");
+    }
 
     uint8_t icon_width = 64;
     uint8_t icon_height = 26;
@@ -143,7 +185,7 @@ void OLED::draw_nfc_tap_ui()
     // calculate width and height of text
     int16_t x1, y1;
     uint16_t w, h;
-    this->screen.getTextBounds(this->nfc_tap_text, 0, 0, &x1, &y1, &w, &h);
+    this->screen.getTextBounds(lineOne, 0, 0, &x1, &y1, &w, &h);
 
     uint8_t center_x = SCREEN_WIDTH / 2;
     uint8_t center_y = SCREEN_HEIGHT / 2;
@@ -153,73 +195,104 @@ void OLED::draw_nfc_tap_ui()
 
     // text below the icon
     this->screen.setCursor(center_x - (w / 2), center_y + (icon_height / 2) - h + 5);
-    this->screen.print(this->nfc_tap_text);
+    this->screen.print(lineOne);
+
+    this->screen.getTextBounds(lineTwo, 0, 0, &x1, &y1, &w, &h);
+    this->screen.setCursor(center_x - (w / 2), center_y + (icon_height / 2) - h + 5 + h);
+    this->screen.print(lineTwo);
 }
 
 void OLED::draw_main_elements()
 {
+    this->logger.debug("draw_main_elements");
     this->screen.clearDisplay();
     this->screen.setTextSize(1);
     this->screen.setTextColor(WHITE);
 
-    // network status, top left
-    if (this->is_network_connected)
+    uint8_t current_x_offset = 1;
+
+    // wifi status
+    if (this->networkState.wifi_connected)
     {
-        this->screen.drawBitmap(1, 0, icon_wifi_on, 16, 16, WHITE);
+        this->screen.drawBitmap(current_x_offset, 0, icon_wifi_on, 16, 16, WHITE);
+        current_x_offset += 16;
     }
     else
     {
-        this->screen.drawBitmap(1, 0, icon_wifi_off, 16, 16, WHITE);
+        this->screen.drawBitmap(current_x_offset, 0, icon_wifi_off, 16, 16, WHITE);
+        current_x_offset += 16;
+    }
+
+    // ethernet status
+    if (this->networkState.ethernet_connected)
+    {
+        this->screen.drawBitmap(current_x_offset, 0, icon_ethernet, 16, 16, WHITE);
+        current_x_offset += 16;
     }
 
     // api status, next to network status
-    if (this->is_api_connected)
+    if (this->webSocketState.connected && this->apiState.authenticated)
     {
-        this->screen.drawBitmap(17, 0, icon_api_connected, 16, 16, WHITE);
+        this->screen.drawBitmap(current_x_offset, 0, icon_api_connected, 16, 16, WHITE);
+        current_x_offset += 16;
     }
     else
     {
-        this->screen.drawBitmap(17, 0, icon_api_disconnected, 16, 16, WHITE);
+        this->screen.drawBitmap(current_x_offset, 0, icon_api_disconnected, 16, 16, WHITE);
+        current_x_offset += 16;
     }
 
-    // device name, bottom left
+    // device name, top right
     int16_t x1, y1;
     uint16_t w, h;
-    this->screen.getTextBounds(this->device_name, 0, 0, &x1, &y1, &w, &h);
-    this->screen.setCursor(1, SCREEN_HEIGHT - h - 1);
-    this->screen.print(this->device_name);
+    this->screen.getTextBounds(this->apiState.deviceName, 0, 0, &x1, &y1, &w, &h);
+    this->screen.setCursor(SCREEN_WIDTH - w - 1, 1);
+    this->screen.print(this->apiState.deviceName);
 }
 
 void OLED::draw_network_connecting_ui()
 {
+    this->logger.debug("draw_network_connecting_ui");
     this->draw_two_line_message("Network", "Connecting...");
 }
 
-void OLED::draw_api_connecting_ui()
+void OLED::draw_websocket_connecting_ui()
 {
-    // Convert WiFi IP to string
-    char wifi_ip_str[16];
-    snprintf(wifi_ip_str, sizeof(wifi_ip_str), IPSTR, IP2STR(&this->wifi_ip_address));
+    this->logger.debug("draw_websocket_connecting_ui");
+    if (this->webSocketState.hostname.length() == 0 || this->webSocketState.port == 0)
+    {
+        this->draw_two_line_message("Please configure API", "hostname/port not set");
+        return;
+    }
 
-    // Convert Ethernet IP to string
-    char eth_ip_str[16];
-    snprintf(eth_ip_str, sizeof(eth_ip_str), IPSTR, IP2STR(&this->ethernet_ip_address));
+    this->draw_two_line_message("Connecting", this->webSocketState.hostname + ":" + String(this->webSocketState.port));
+}
 
-    this->draw_two_line_message("WiFi: " + String(wifi_ip_str), "ETH: " + String(eth_ip_str));
+void OLED::draw_authentication_ui()
+{
+    this->logger.debug("draw_authentication_ui");
+    this->draw_two_line_message("Authenticating", this->webSocketState.hostname + ":" + String(this->webSocketState.port));
 }
 
 void OLED::draw_error_ui()
 {
-    this->draw_two_line_message("Error", this->error);
+    this->logger.debug("draw_error_ui");
+    JsonObject payload = this->apiEventData.payload;
+    String error = payload["message"].as<String>();
+    this->draw_two_line_message("Error", error);
 }
 
 void OLED::draw_success_ui()
 {
-    this->draw_two_line_message("Success", this->success);
+    this->logger.debug("draw_success_ui");
+    JsonObject payload = this->apiEventData.payload;
+    String success = payload["message"].as<String>();
+    this->draw_two_line_message("Success", success);
 }
 
 void OLED::draw_two_line_message(String line1, String line2)
 {
+    this->logger.debug("draw_two_line_message");
     this->screen.setTextSize(1);
     this->screen.setTextColor(WHITE);
 
@@ -241,51 +314,75 @@ void OLED::draw_two_line_message(String line1, String line2)
     this->screen.print(line2);
 }
 
-void OLED::draw_select_item_ui()
+void OLED::draw_resource_selection_ui()
 {
-    this->draw_two_line_message("Select " + this->select_item_type, "> " + this->select_item_value + " <");
-}
+    this->logger.debug("draw_resource_selection_ui");
+    JsonObject payload = this->apiEventData.payload;
+    String select_item_type = payload["itemType"].as<String>();
 
-void OLED::show_error(String error)
-{
-    this->error = error;
-    this->_state = OLED_STATE_ERROR;
-}
-
-void OLED::show_success(String success)
-{
-    this->success = success;
-    this->_state = OLED_STATE_SUCCESS;
-}
-
-void OLED::show_text(String lineOne, String lineTwo)
-{
-    this->_state = OLED_STATE_TEXT;
-    this->text_line_one = lineOne;
-    this->text_line_two = lineTwo;
-}
-
-void OLED::show_select_item(String type, JsonArray options, String value)
-{
-    this->_state = OLED_STATE_SELECT_ITEM;
-    this->select_item_type = type;
-    this->select_item_value = value;
-    this->select_item_options = options;
+    // TODO: get current value keypad
+    String currentValue = "NOT IMPLEMENTED";
+    this->draw_two_line_message("Select " + select_item_type, "> " + currentValue + " <");
 }
 
 void OLED::draw_text_ui()
 {
-    this->draw_two_line_message(this->text_line_one, this->text_line_two);
-}
+    this->logger.debug("draw_text_ui");
+    JsonObject payload = this->apiEventData.payload;
+    String message = payload["message"].as<String>();
 
-void OLED::show_confirm_action(String title, String message)
-{
-    this->_state = OLED_STATE_CONFIRM_ACTION;
-    this->confirm_action_title = title;
-    this->confirm_action_message = message;
+    // split by newlines, merge 2nd and all following lines
+    String text_line_one = message.substring(0, message.indexOf('\n'));
+    String text_line_two = message.substring(message.indexOf('\n') + 1);
+
+    this->draw_two_line_message(text_line_one, text_line_two);
 }
 
 void OLED::draw_confirm_action_ui()
 {
-    this->draw_two_line_message(this->confirm_action_title, this->confirm_action_message);
+    this->logger.debug("draw_confirm_action_ui");
+    String title = "Confirm";
+    String message = "> not sure what... <";
+
+    JsonObject payload = this->apiEventData.payload;
+
+    if (payload["type"].as<String>() == "toggle-resource-usage")
+    {
+        String resourceName = payload["resource"]["name"].as<String>();
+        bool isActive = payload["isActive"].as<bool>();
+
+        if (isActive)
+        {
+            title = "Stop " + resourceName;
+            message = "Confirm with \"#\"";
+        }
+        else
+        {
+            title = "Start " + resourceName;
+            message = "Confirm with \"#\"";
+        }
+    }
+    else
+    {
+        logger.error("UNSUPPORTED CONFIRM ACTION");
+    }
+
+    this->draw_two_line_message(title, message);
+}
+
+void OLED::draw_firmware_update_ui()
+{
+    this->logger.debug("draw_firmware_update_ui");
+    this->draw_two_line_message("Updating Firmware", "Please wait...");
+}
+
+void OLED::draw_wait_for_processing_ui()
+{
+    this->logger.debug("draw_wait_for_processing_ui");
+    this->draw_two_line_message("Processing", "Please wait...");
+}
+
+void OLED::loop()
+{
+    // nothing to do here
 }

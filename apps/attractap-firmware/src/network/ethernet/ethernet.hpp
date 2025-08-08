@@ -10,6 +10,7 @@
 #include "task_priorities.h"
 #include "state/state.hpp"
 #include "../../logger/logger.hpp"
+#include "../../settings/settings.hpp"
 
 class Ethernet
 {
@@ -32,8 +33,6 @@ public:
 private:
     static void taskFn(void *parameter);
     static void loop();
-
-    static State appState;
 
     static esp_ip4_addr_t getIPAddress();
 

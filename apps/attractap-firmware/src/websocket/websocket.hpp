@@ -28,7 +28,6 @@ private:
     static void taskFn(void *parameter);
     void loop();
 
-    State appState;
     void updateInfoFromAppState();
     uint32_t lastKnownAppStateChangeTime;
 

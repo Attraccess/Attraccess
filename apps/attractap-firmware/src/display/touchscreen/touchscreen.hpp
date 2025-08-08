@@ -29,7 +29,7 @@ public:
         DISPLAY_STATE_CONFIRM_ACTION,
     };
 
-    Touchscreen() : xptSPI(VSPI), xpt(XPT2046_CS, XPT2046_IRQ), tft(), draw_buf(), indev(), lastMillis(0), appState(), lastKnownAppStateChangeTime(0), waitForConnectionScreen(), nfcTapScreen(), messageScreen(), unknownStateScreen(), isConnectedToWifi(false), isConnectedToEthernet(false), isConnectedToWebsocket(false), isConnectedToApi(false), nfcTapEnabled(false), currentScreen(nullptr), state(DISPLAY_STATE_NONE), logger("Touchscreen") {}
+    Touchscreen() : xptSPI(VSPI), xpt(XPT2046_CS, XPT2046_IRQ), tft(), draw_buf(), indev(), lastMillis(0), lastKnownAppStateChangeTime(0), waitForConnectionScreen(), nfcTapScreen(), messageScreen(), unknownStateScreen(), isConnectedToWifi(false), isConnectedToEthernet(false), isConnectedToWebsocket(false), isConnectedToApi(false), nfcTapEnabled(false), currentScreen(nullptr), state(DISPLAY_STATE_NONE), logger("Touchscreen") {}
 
     void setup();
 
@@ -44,7 +44,6 @@ private:
     static uint8_t UPDATE_FREQ_HZ;
     static uint32_t UPDATE_INTERVAL_MS;
 
-    State appState;
     uint32_t lastKnownAppStateChangeTime;
     void getUpdatesFromAppState();
 

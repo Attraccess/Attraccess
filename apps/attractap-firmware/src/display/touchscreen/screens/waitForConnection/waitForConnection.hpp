@@ -18,7 +18,6 @@ public:
 
 private:
     lv_obj_t *screen;
-    State appState;
     uint32_t lastKnownAppStateChangeTime;
 
     lv_obj_t *currentStatusLabel;
