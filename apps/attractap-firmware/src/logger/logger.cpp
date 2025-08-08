@@ -137,8 +137,13 @@ void Logger::log(const char *message, LogLevel level)
     {
         return;
     }
-
-    this->logf(message, level, NULL);
+    // Use a safe, non-variadic path to avoid undefined behavior from a NULL va_list
+    Serial.print("[");
+    Serial.print(name);
+    Serial.print("] ");
+    Serial.print(getLogLevelString(level));
+    Serial.print(": ");
+    Serial.println(message);
 }
 
 void Logger::logf(const char *message, LogLevel level, va_list args)

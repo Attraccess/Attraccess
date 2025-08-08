@@ -4,14 +4,6 @@ void NFC::task_function(void *pvParameters)
 {
     NFC *nfc = (NFC *)pvParameters;
 
-    if (!nfc)
-    {
-        nfc->logger.error("task_function Error: Invalid NFC instance");
-        vTaskDelete(NULL);
-        ESP.restart();
-        return;
-    }
-
     const int LOOP_DELAY_MS = 50; // 50ms delay for NFC operations
 
     while (true)
@@ -166,6 +158,8 @@ void NFC::updateStateFromAppState()
     {
         return;
     }
+
+    this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
 
     this->loop_card_detection_is_enabled = State::getApiEventData().state == State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP;
 }

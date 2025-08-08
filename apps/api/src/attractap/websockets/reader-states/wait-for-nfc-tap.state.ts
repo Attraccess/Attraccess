@@ -289,8 +289,6 @@ export class WaitForNFCTapState implements ReaderState {
       return await this.socket.transitionToState(this.success_transition_state);
     }
 
-    this.logger.debug(`Transitioning to restart state: ${this.timout_transition_state.constructor.name}`);
-
     return await this.restart();
   }
 
