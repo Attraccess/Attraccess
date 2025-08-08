@@ -2,6 +2,14 @@
 """
 Individual Root CA Certificate Extractor for ESP32 Adaptive SSL
 Fetches Mozilla's root CA list and extracts individual certificates.
+
+Features:
+- Downloads Mozilla's CA certificate bundle
+- Extracts individual PEM certificates 
+- Prioritizes common CAs (Let's Encrypt, DigiCert, etc.)
+- Generates C++ headers and data files for ESP32
+- Caches downloads for 7 days to avoid unnecessary network requests
+- Use --force to download fresh certificates regardless of age
 """
 
 import os
@@ -10,12 +18,17 @@ import requests
 import re
 import hashlib
 import shutil
+import time
+import argparse
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # Configuration
 MOZILLA_CA_URL = "https://curl.se/ca/cacert.pem"
 OUTPUT_DIR = Path("src/certs")
 INDEX_FILE = OUTPUT_DIR / "ca_index.hpp"
+TIMESTAMP_FILE = OUTPUT_DIR / ".last_download"
+MAX_CERT_AGE_DAYS = 7
 
 # Most common Certificate Authorities in order of popularity
 # Based on SSL certificate market share and usage statistics
@@ -109,6 +122,50 @@ PRIORITY_CAS = [
     "Certum Trusted Network CA",
     "Certum Trusted Network CA 2",
 ]
+
+def check_certificates_age():
+    """Check if existing certificates are recent enough (less than MAX_CERT_AGE_DAYS old)."""
+    if not OUTPUT_DIR.exists():
+        print(f"Output directory {OUTPUT_DIR} doesn't exist - need to download certificates")
+        return False
+    
+    if not TIMESTAMP_FILE.exists():
+        print(f"Timestamp file {TIMESTAMP_FILE} doesn't exist - need to download certificates")
+        return False
+    
+    if not INDEX_FILE.exists():
+        print(f"Index file {INDEX_FILE} doesn't exist - need to download certificates")
+        return False
+    
+    try:
+        # Read the timestamp of last download
+        with open(TIMESTAMP_FILE, 'r') as f:
+            timestamp_str = f.read().strip()
+        
+        last_download = datetime.fromisoformat(timestamp_str)
+        now = datetime.now()
+        age = now - last_download
+        
+        if age <= timedelta(days=MAX_CERT_AGE_DAYS):
+            print(f"✅ Certificates are recent (downloaded {age.days} days ago)")
+            print(f"✅ Skipping download - certificates are less than {MAX_CERT_AGE_DAYS} days old")
+            return True
+        else:
+            print(f"⏰ Certificates are {age.days} days old (older than {MAX_CERT_AGE_DAYS} days)")
+            print(f"📥 Need to download fresh certificates")
+            return False
+            
+    except (ValueError, FileNotFoundError) as e:
+        print(f"❌ Error reading timestamp file: {e}")
+        print(f"📥 Will download fresh certificates")
+        return False
+
+def save_download_timestamp():
+    """Save the current timestamp to indicate when certificates were last downloaded."""
+    timestamp = datetime.now().isoformat()
+    with open(TIMESTAMP_FILE, 'w') as f:
+        f.write(timestamp)
+    print(f"💾 Saved download timestamp: {timestamp}")
 
 def prioritize_certificates(certificates):
     """Reorder certificates to put most common CAs first."""
@@ -273,12 +330,27 @@ def create_ca_data_file(cert_files, certificates_map):
     return '\n'.join(cpp_content)
 
 def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Download and process Mozilla CA certificates')
+    parser.add_argument('--force', '-f', action='store_true', 
+                       help='Force download even if certificates are recent')
+    args = parser.parse_args()
+    
+    if args.force:
+        print("🔄 Forcing certificate download (--force flag used)")
+    else:
+        print("🔍 Checking certificate age...")
+        
+        # Check if we have recent certificates (unless forced)
+        if check_certificates_age():
+            return  # Exit early if certificates are recent enough
+    
     # Clean and create output directory
     if OUTPUT_DIR.exists():
-        print(f"Cleaning existing output directory: {OUTPUT_DIR}")
+        print(f"🧹 Cleaning existing output directory: {OUTPUT_DIR}")
         shutil.rmtree(OUTPUT_DIR)
     
-    print(f"Creating output directory: {OUTPUT_DIR}")
+    print(f"📁 Creating output directory: {OUTPUT_DIR}")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     # Download and parse certificates
@@ -330,10 +402,13 @@ def main():
     with open(cpp_file, 'w') as f:
         f.write(cpp_content)
     
+    # Save timestamp to indicate successful download
+    save_download_timestamp()
+    
     print(f"\n✅ Generated {len(cert_files)} certificate files")
     print(f"✅ Created index: {INDEX_FILE}")
     print(f"✅ Created data: {cpp_file}")
-    print(f"Total size: ~{sum(len(cert['data']) for cert in prioritized_certs) // 1024}KB")
+    print(f"📊 Total size: ~{sum(len(cert['data']) for cert in prioritized_certs) // 1024}KB")
 
 if __name__ == "__main__":
     main() 

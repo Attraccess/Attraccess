@@ -10,13 +10,13 @@ void FirmwareUpdate::loop()
 
 void FirmwareUpdate::start()
 {
-    Serial.println("[FirmwareUpdate] Starting firmware update");
+    logger.info("Starting firmware update");
 
     // TODO: implement
 }
 
 void FirmwareUpdate::processChunk()
 {
-    Serial.println("[FirmwareUpdate] Processing firmware chunk");
+    logger.info("Processing firmware chunk");
     // TODO: implement
 }

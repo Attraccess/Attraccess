@@ -6,7 +6,7 @@ void NFC::task_function(void *pvParameters)
 
     if (!nfc)
     {
-        Serial.println("[NFC][task_function] Error: Invalid NFC instance");
+        nfc->logger.error("task_function Error: Invalid NFC instance");
         vTaskDelete(NULL);
         ESP.restart();
         return;
@@ -25,7 +25,7 @@ void NFC::setup()
 {
     this->pn532.begin();
 
-    xTaskCreate(NFC::task_function, "NFC", 8192, this, 10, NULL);
+    xTaskCreate(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL);
 }
 
 void NFC::loop()
@@ -54,15 +54,13 @@ void NFC::loop()
 
     if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
     {
-        Serial.println("[NFC][loop] Detected card with UID: ");
-        Serial.println(dicoveredUuid);
+        logger.info("loop Detected card with UID:");
+        logger.info(String(dicoveredUuid).c_str());
 
         if (this->onNfcCardDetected)
         {
             this->onNfcCardDetected(dicoveredUuid);
         }
-
-        Serial.println();
     }
 }
 
@@ -73,19 +71,15 @@ bool NFC::detectNfcModule()
     if (!versiondata)
     {
         this->nfc_is_detected = false;
-        Serial.println("[NFC][detectNfcModule] Error: Didn't find PN53x board. Check wiring.");
+        logger.error("detectNfcModule Error: Didn't find PN53x board. Check wiring.");
         return false;
     }
 
     this->nfc_is_detected = true;
 
     // Print board info
-    Serial.print("[NFC][detectNfcModule] Found PN53x board version: ");
-    Serial.print((versiondata >> 24) & 0xFF, HEX);
-    Serial.print('.');
-    Serial.print((versiondata >> 16) & 0xFF, DEC);
-    Serial.print('.');
-    Serial.println((versiondata >> 8) & 0xFF, DEC);
+    String versionStr = "detectNfcModule Found PN53x board version: " + String((versiondata >> 24) & 0xFF, HEX) + "." + String((versiondata >> 16) & 0xFF, DEC) + "." + String((versiondata >> 8) & 0xFF, DEC);
+    logger.info(versionStr.c_str());
 
     return true;
 }
@@ -96,12 +90,12 @@ bool NFC::configureNfcModule()
 
     if (!success)
     {
-        Serial.println("[NFC][configureNfcModule] Error: Failed to configure NFC module");
+        logger.error("configureNfcModule Error: Failed to configure NFC module");
         this->nfc_is_ready = false;
         return false;
     }
 
-    Serial.println("[NFC][configureNfcModule] NFC module configured successfully");
+    logger.info("configureNfcModule NFC module configured successfully");
     this->nfc_is_ready = true;
 
     return true;
@@ -109,7 +103,7 @@ bool NFC::configureNfcModule()
 
 bool NFC::waitForNfcCard(const uint32_t timeoutMs)
 {
-    Serial.println("[NFC][waitForNfcCard] version without expectedUuid");
+    logger.debug("waitForNfcCard version without expectedUuid");
 
     char uid[16];      // Buffer for UID
     uint8_t uidLength; // Length of UID
@@ -123,12 +117,12 @@ bool NFC::waitForNfcCard(const uint32_t timeoutMs)
 
 bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const uint32_t timeoutMs)
 {
-    Serial.println("[NFC][waitForNfcCard] version with detectedUid and detectedUidLength");
+    logger.debug("waitForNfcCard version with detectedUid and detectedUidLength");
 
     // Add parameter validation
     if (!detectedUid || !detectedUidLength)
     {
-        Serial.println("[NFC][waitForNfcCard] Error: Invalid parameters");
+        logger.error("waitForNfcCard Error: Invalid parameters");
         return false;
     }
 
@@ -141,8 +135,7 @@ bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const ui
 
     uint32_t startTime = millis();
 
-    Serial.println(); // Start with a newline
-    Serial.println("[NFC][waitForNfcCard] Waiting for NTAG424 card");
+    logger.info("waitForNfcCard Waiting for NTAG424 card");
 
     while (millis() - startTime < timeoutMs)
     {
@@ -151,8 +144,8 @@ bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const ui
         // It will populate uid and uidLength
         if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
         {
-            Serial.println();
-            Serial.println("[NFC][waitForNfcCard] Card is NTAG424.");
+
+            logger.info("waitForNfcCard Card is NTAG424.");
 
             // Safely copy the discovered UID to the output parameters
             if (discoveredUuidLength <= 16)
@@ -162,25 +155,24 @@ bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const ui
             }
             else
             {
-                Serial.println("[NFC][waitForNfcCard] Error: UID too long");
+                logger.error("waitForNfcCard Error: UID too long");
                 return false;
             }
 
             return true;
         }
 
-        Serial.print(".");
+        // Wait indicator removed for logger
         delay(100); // Small delay before next check
     }
 
-    Serial.println();
-    Serial.println("[NFC][waitForNfcCard] Timeout waiting for NFC card");
+    logger.info("waitForNfcCard Timeout waiting for NFC card");
     return false;
 }
 
 bool NFC::waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeoutMs)
 {
-    Serial.println("[NFC][waitForNfcCard] version with expectedUuid");
+    logger.debug("waitForNfcCard version with expectedUuid");
 
     uint32_t startTime = millis();
 
@@ -202,7 +194,7 @@ bool NFC::waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeout
 
         if (expectedUuid == nullptr)
         {
-            Serial.println("[NFC][waitForNfcCard] NTAG424 card detected. SUCCESS!");
+            logger.info("waitForNfcCard NTAG424 card detected. SUCCESS!");
             return true;
         }
 
@@ -217,12 +209,12 @@ bool NFC::waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeout
 
         if (discovoredUUIDString.equalsIgnoreCase(String(expectedUuid)))
         {
-            Serial.println("[NFC][waitForNfcCard] UUID matches. SUCCESS!");
+            logger.info("waitForNfcCard UUID matches. SUCCESS!");
             return true;
         }
     }
 
-    Serial.println("[NFC][waitForNfcCard] Timeout waiting for NFC card");
+    logger.info("waitForNfcCard Timeout waiting for NFC card");
     return false;
 }
 
@@ -239,13 +231,13 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key, bool waitForRemovalAtEnd
             break;
         }
 
-        Serial.println("[NFC][authenticate] Failed to authenticate with NFC card, retrying in .5sec");
+        logger.debug("authenticate Failed to authenticate with NFC card, retrying in .5sec");
         delay(500);
     }
 
     if (!success)
     {
-        Serial.println("[NFC][authenticate] Failed to authenticate with NFC card");
+        logger.error("authenticate Failed to authenticate with NFC card");
         return false;
     }
 
@@ -262,32 +254,32 @@ bool NFC::changeKey(const uint8_t keyNumber, uint8_t authKey[16], uint8_t *oldKe
     // Add memory protection and error handling
     if (!authKey || !oldKey || !newKey)
     {
-        Serial.println("[NFC][changeKey] Error: Invalid parameters");
+        logger.error("changeKey Error: Invalid parameters");
         return false;
     }
 
     // 1. Authenticate with master key (0)
     if (!this->authenticate(NFC::AUTH_KEY_NO, authKey, false))
     {
-        Serial.println("[NFC][changeKey] Failed to authenticate with NFC card");
+        logger.error("changeKey Failed to authenticate with NFC card");
         return false;
     }
 
     // 2. Change key
     if (!this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber))
     {
-        Serial.println("[NFC][changeKey] Failed to change key");
+        logger.error("changeKey Failed to change key");
         return false;
     }
 
-    Serial.println("[NFC][changeKey] Validating new key...");
+    logger.debug("changeKey Validating new key...");
     if (!this->authenticate(keyNumber, newKey, true))
     {
-        Serial.println("[NFC][changeKey] Failed to authenticate with NFC card after changing key");
+        logger.error("changeKey Failed to authenticate with NFC card after changing key");
         return false;
     }
 
-    Serial.println("[NFC][changeKey] Key change operation completed successfully");
+    logger.info("changeKey Key change operation completed successfully");
     return true;
 }
 
@@ -296,13 +288,13 @@ void NFC::waitForCardRemoval()
     uint8_t uid[7];
     uint8_t uidLength;
 
-    Serial.println("[NFC][waitForCardRemoval] Please remove the card.");
+    logger.info("waitForCardRemoval Please remove the card.");
     while (this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 50))
     {
-        Serial.print(".");
+        // Wait indicator removed for logger
     }
-    Serial.println();
-    Serial.println("[NFC] Card removed.");
+
+    logger.info("Card removed.");
 }
 
 bool NFC::discoverNfcCard(char *dicoveredUuid, uint8_t *discoveredUuidLength, const uint32_t timeoutMs)

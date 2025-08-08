@@ -4,7 +4,8 @@
 
 // Static member definitions
 Ethernet::EthernetState Ethernet::_state = ETHERNET_STATE_INIT;
-void (*Ethernet::onStateChangedCallback)(EthernetState state, const esp_ip4_addr_t &ip) = nullptr;
+State Ethernet::appState;
+Logger Ethernet::logger("Ethernet");
 esp_netif_t *Ethernet::eth_netif = nullptr;
 esp_eth_handle_t Ethernet::eth_handle = nullptr;
 esp_eth_netif_glue_handle_t Ethernet::eth_netif_glue = nullptr;
@@ -19,20 +20,26 @@ const uint32_t Ethernet::DHCP_TIMEOUT_MS = 30000; // 30 second DHCP timeout
 
 void Ethernet::setup()
 {
-    Serial.println("[INFO][Ethernet] Starting Ethernet");
+    if (PIN_ETH_SPI_CS < 0)
+    {
+        logger.info("Ethernet SPI CS pin not configured, skipping Ethernet setup");
+        return;
+    }
 
-    xTaskCreate(taskFn, "EthernetTask", 4096, nullptr, 9, nullptr);
+    logger.info("Starting");
+
+    xTaskCreate(taskFn, "EthernetTask", 4096, nullptr, TASK_PRIORITY_ETHERNET, nullptr);
 }
 
 esp_err_t Ethernet::initializeNetwork()
 {
-    Serial.println("[INFO][Ethernet] Initializing Ethernet network stack");
+    logger.info("Initializing Ethernet network stack");
 
     // Initialize SPI first
     esp_err_t ret = initSPI();
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to initialize SPI: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to initialize SPI: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -41,32 +48,19 @@ esp_err_t Ethernet::initializeNetwork()
     ret = ethernet_init(&eth_handle, &eth_port_cnt);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to initialize Ethernet driver: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to initialize Ethernet driver: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
-    // Initialize TCP/IP network interface (should be called only once in application)
-    ret = esp_netif_init();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
-    {
-        Serial.printf("[ERROR][Ethernet] Failed to initialize netif: %s\n", esp_err_to_name(ret));
-        return ret;
-    }
-
-    // Create default event loop
-    ret = esp_event_loop_create_default();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
-    {
-        Serial.printf("[ERROR][Ethernet] Failed to create event loop: %s\n", esp_err_to_name(ret));
-        return ret;
-    }
+    // Note: esp_netif_init() and esp_event_loop_create_default() are handled by Network::initSharedComponents()
+    // These should not be called here to avoid double initialization
 
     // Create instance of esp-netif for Ethernet
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
     eth_netif = esp_netif_new(&cfg);
     if (eth_netif == nullptr)
     {
-        Serial.println("[ERROR][Ethernet] Failed to create netif");
+        logger.error("Failed to create netif");
         return ESP_FAIL;
     }
 
@@ -75,7 +69,7 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_netif_attach(eth_netif, eth_netif_glue);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to attach netif: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to attach netif: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -83,14 +77,14 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, nullptr);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to register ETH event handler: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to register ETH event handler: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
     ret = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, nullptr);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to register IP event handler: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to register IP event handler: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
@@ -98,33 +92,33 @@ esp_err_t Ethernet::initializeNetwork()
     ret = esp_netif_dhcpc_start(eth_netif);
     if (ret != ESP_OK && ret != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to start DHCP client: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to start DHCP client: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
-    Serial.println("[INFO][Ethernet] DHCP client started");
+    logger.info("DHCP client started");
 
     // Start Ethernet driver state machine
     ret = esp_eth_start(eth_handle);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to start Ethernet: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to start Ethernet: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
     setState(ETHERNET_STATE_CONNECTING);
-    Serial.println("[INFO][Ethernet] Ethernet network initialization completed");
+    logger.info("Ethernet network initialization completed");
 
     return ESP_OK;
 }
 
 esp_err_t Ethernet::initSPI()
 {
-    Serial.println("[INFO][Ethernet] Initializing SPI for W5500");
+    logger.info("Initializing SPI for W5500");
 
     // If SPI device is already initialized, we're done
     if (spi_handle != nullptr)
     {
-        Serial.println("[INFO][Ethernet] SPI device already initialized");
+        logger.info("SPI device already initialized");
         return ESP_OK;
     }
 
@@ -135,18 +129,19 @@ esp_err_t Ethernet::initSPI()
         ret = gpio_install_isr_service(0);
         if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
         {
-            Serial.printf("[ERROR][Ethernet] Failed to install GPIO ISR service: %s\n", esp_err_to_name(ret));
+            logger.error((String("Failed to install GPIO ISR service: ") + esp_err_to_name(ret)).c_str());
             return ret;
         }
-        Serial.println("[INFO][Ethernet] GPIO ISR service installed for interrupt mode");
+        logger.info("GPIO ISR service installed for interrupt mode");
     }
 
     // Configure W5500 reset pin (if available)
     if (PIN_W5500_RESET >= 0)
     {
-        Serial.printf("[INFO][Ethernet] Configuring reset pin GPIO%d\n", PIN_W5500_RESET);
+        logger.info(("Configuring reset pin GPIO" + String(PIN_W5500_RESET)).c_str());
+        uint64_t pin_mask = (1ULL << PIN_W5500_RESET);
         gpio_config_t reset_gpio_config = {
-            .pin_bit_mask = (1ULL << PIN_W5500_RESET),
+            .pin_bit_mask = pin_mask,
             .mode = GPIO_MODE_OUTPUT,
             .pull_up_en = GPIO_PULLUP_DISABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -155,7 +150,7 @@ esp_err_t Ethernet::initSPI()
         ret = gpio_config(&reset_gpio_config);
         if (ret != ESP_OK)
         {
-            Serial.printf("[ERROR][Ethernet] Failed to configure reset GPIO: %s\n", esp_err_to_name(ret));
+            logger.error((String("Failed to configure reset GPIO: ") + esp_err_to_name(ret)).c_str());
             return ret;
         }
 
@@ -164,11 +159,11 @@ esp_err_t Ethernet::initSPI()
         vTaskDelay(pdMS_TO_TICKS(10)); // Hold reset for 10ms
         gpio_set_level((gpio_num_t)PIN_W5500_RESET, 1);
         vTaskDelay(pdMS_TO_TICKS(10)); // Wait for chip to come out of reset
-        Serial.println("[INFO][Ethernet] W5500 hardware reset completed");
+        logger.info("W5500 hardware reset completed");
     }
     else
     {
-        Serial.println("[INFO][Ethernet] No reset pin configured - relying on power-on reset");
+        logger.info("No reset pin configured - relying on power-on reset");
         vTaskDelay(pdMS_TO_TICKS(100)); // Give some time for power-on reset to complete
     }
 
@@ -185,16 +180,16 @@ esp_err_t Ethernet::initSPI()
     ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to initialize SPI bus: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to initialize SPI bus: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
     else if (ret == ESP_ERR_INVALID_STATE)
     {
-        Serial.println("[INFO][Ethernet] SPI bus already initialized, continuing with device setup");
+        logger.info("SPI bus already initialized, continuing with device setup");
     }
     else
     {
-        Serial.println("[INFO][Ethernet] SPI bus initialized successfully");
+        logger.info("SPI bus initialized successfully");
     }
 
     // Initialize SPI device
@@ -218,22 +213,22 @@ esp_err_t Ethernet::initSPI()
     ret = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to add SPI device: %s\n", esp_err_to_name(ret));
+        logger.error((String("Failed to add SPI device: ") + esp_err_to_name(ret)).c_str());
         return ret;
     }
 
-    Serial.println("[INFO][Ethernet] SPI initialization completed");
+    logger.info("SPI initialization completed");
     return ESP_OK;
 }
 
 esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_port_cnt)
 {
-    Serial.println("[INFO][Ethernet] Initializing W5500 Ethernet driver");
+    logger.info("Initializing W5500 Ethernet driver");
 
     // SPI should already be initialized
     if (spi_handle == nullptr)
     {
-        Serial.println("[ERROR][Ethernet] SPI not initialized");
+        logger.error("SPI not initialized");
         return ESP_FAIL;
     }
 
@@ -243,12 +238,12 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     // Configure interrupt pin (if available)
     if (PIN_W5500_INT >= 0)
     {
-        Serial.printf("[INFO][Ethernet] Configuring interrupt pin GPIO%d\n", PIN_W5500_INT);
+        logger.info(("Configuring interrupt pin GPIO" + String(PIN_W5500_INT)).c_str());
         w5500_config.int_gpio_num = PIN_W5500_INT;
     }
     else
     {
-        Serial.println("[INFO][Ethernet] No interrupt pin configured - using polling mode");
+        logger.info("No interrupt pin configured - using polling mode");
         w5500_config.int_gpio_num = -1; // Disable interrupt, use polling
     }
 
@@ -257,7 +252,7 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     esp_eth_mac_t *mac = esp_eth_mac_new_w5500(&w5500_config, &mac_config);
     if (mac == nullptr)
     {
-        Serial.println("[ERROR][Ethernet] Failed to create MAC");
+        logger.error("Failed to create MAC");
         return ESP_FAIL;
     }
 
@@ -268,7 +263,7 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     esp_eth_phy_t *phy = esp_eth_phy_new_w5500(&phy_config);
     if (phy == nullptr)
     {
-        Serial.println("[ERROR][Ethernet] Failed to create PHY");
+        logger.error("Failed to create PHY");
         return ESP_FAIL;
     }
 
@@ -277,7 +272,7 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     esp_err_t ret = esp_eth_driver_install(&eth_config, eth_handles);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to install Ethernet driver: %s\n", esp_err_to_name(ret));
+        logger.errorf("Failed to install Ethernet driver: %s", esp_err_to_name(ret));
         return ret;
     }
 
@@ -291,15 +286,15 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     ret = esp_eth_ioctl(*eth_handles, ETH_CMD_S_MAC_ADDR, mac_addr);
     if (ret != ESP_OK)
     {
-        Serial.printf("[ERROR][Ethernet] Failed to set MAC address: %s\n", esp_err_to_name(ret));
+        logger.errorf("Failed to set MAC address: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    Serial.printf("[INFO][Ethernet] MAC address set to: %02x:%02x:%02x:%02x:%02x:%02x\n",
-                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+    logger.infof("MAC address set to: %02x:%02x:%02x:%02x:%02x:%02x",
+                 mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 
     *eth_port_cnt = 1;
-    Serial.println("[INFO][Ethernet] W5500 Ethernet driver initialized successfully");
+    logger.info("W5500 Ethernet driver initialized successfully");
     return ESP_OK;
 }
 
@@ -313,24 +308,24 @@ void Ethernet::eth_event_handler(void *arg, esp_event_base_t event_base, int32_t
     {
     case ETHERNET_EVENT_CONNECTED:
         esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-        Serial.println("[INFO][Ethernet] Ethernet Link Up");
-        Serial.printf("[INFO][Ethernet] Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x\n",
-                      mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+        logger.info("Ethernet Link Up");
+        logger.infof("Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
+                     mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
         initialization_in_progress = false; // Clear flag on successful connection
         dhcp_start_time = millis();         // Record when we start waiting for DHCP
-        Serial.println("[INFO][Ethernet] Waiting for DHCP IP address...");
+        logger.info("Waiting for DHCP IP address...");
         setState(ETHERNET_STATE_CONNECTED_WAITING_FOR_IP);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
-        Serial.println("[INFO][Ethernet] Ethernet Link Down");
+        logger.info("Ethernet Link Down");
         initialization_in_progress = false; // Clear flag on disconnection
         setState(ETHERNET_STATE_DISCONNECTED);
         break;
     case ETHERNET_EVENT_START:
-        Serial.println("[INFO][Ethernet] Ethernet Started");
+        logger.info("Ethernet Started");
         break;
     case ETHERNET_EVENT_STOP:
-        Serial.println("[INFO][Ethernet] Ethernet Stopped");
+        logger.info("Ethernet Stopped");
         initialization_in_progress = false; // Clear flag when stopped
         setState(ETHERNET_STATE_DISCONNECTED);
         break;
@@ -344,12 +339,12 @@ void Ethernet::got_ip_event_handler(void *arg, esp_event_base_t event_base, int3
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     const esp_netif_ip_info_t *ip_info = &event->ip_info;
 
-    Serial.println("[INFO][Ethernet] Ethernet Got IP Address");
-    Serial.println("[INFO][Ethernet] ~~~~~~~~~~~");
-    Serial.printf("[INFO][Ethernet] ETHIP:" IPSTR "\n", IP2STR(&ip_info->ip));
-    Serial.printf("[INFO][Ethernet] ETHMASK:" IPSTR "\n", IP2STR(&ip_info->netmask));
-    Serial.printf("[INFO][Ethernet] ETHGW:" IPSTR "\n", IP2STR(&ip_info->gw));
-    Serial.println("[INFO][Ethernet] ~~~~~~~~~~~");
+    logger.info("Ethernet Got IP Address");
+    logger.info("~~~~~~~~~~~");
+    logger.infof("ETHIP:" IPSTR, IP2STR(&ip_info->ip));
+    logger.infof("ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
+    logger.infof("ETHGW:" IPSTR, IP2STR(&ip_info->gw));
+    logger.info("~~~~~~~~~~~");
 
     initialization_in_progress = false; // Clear flag when fully connected
     setState(ETHERNET_STATE_CONNECTED);
@@ -360,24 +355,10 @@ void Ethernet::setState(EthernetState state)
     if (_state != state)
     {
         _state = state;
-        Serial.printf("[INFO][Ethernet] State changed to: %d\n", state);
+        logger.infof("State changed to: %d", state);
 
-        if (onStateChangedCallback)
-        {
-            esp_ip4_addr_t ip = getIPAddress();
-            onStateChangedCallback(state, ip);
-        }
+        appState.setEthernetState(state == ETHERNET_STATE_CONNECTED, getIPAddress());
     }
-}
-
-void Ethernet::setStateChangedCallback(void (*callback)(EthernetState state, const esp_ip4_addr_t &ip))
-{
-    onStateChangedCallback = callback;
-}
-
-Ethernet::EthernetState Ethernet::getState()
-{
-    return _state;
 }
 
 esp_ip4_addr_t Ethernet::getIPAddress()
@@ -398,7 +379,7 @@ esp_ip4_addr_t Ethernet::getIPAddress()
 
 void Ethernet::deinit()
 {
-    Serial.println("[INFO][Ethernet] Deinitializing Ethernet");
+    logger.info("Deinitializing Ethernet");
 
     // Clean up everything
     cleanupPartialInit();
@@ -449,7 +430,7 @@ esp_err_t Ethernet::w5500_read_version_register(spi_device_handle_t spi_device, 
 
 void Ethernet::cleanupPartialInit()
 {
-    Serial.println("[INFO][Ethernet] Cleaning up partial initialization");
+    logger.info("Cleaning up partial initialization");
 
     // Unregister event handlers (ignore errors if not registered)
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, got_ip_event_handler);
@@ -506,7 +487,7 @@ void Ethernet::loop()
         // Check if we've exceeded maximum retry count
         if (retry_count >= MAX_RETRY_COUNT)
         {
-            Serial.printf("[ERROR][Ethernet] Maximum retry count (%u) reached. Giving up.\n", MAX_RETRY_COUNT);
+            logger.errorf("Maximum retry count (%u) reached. Giving up.", MAX_RETRY_COUNT);
             initialization_in_progress = false;
             setState(ETHERNET_STATE_CONNECT_FAILED);
             break;
@@ -528,7 +509,7 @@ void Ethernet::loop()
             break;
         }
 
-        Serial.printf("[INFO][Ethernet] Connection attempt %u/%u\n", retry_count + 1, MAX_RETRY_COUNT);
+        logger.infof("Connection attempt %u/%u", retry_count + 1, MAX_RETRY_COUNT);
 
         // Clean up any previous failed attempt
         cleanupPartialInit();
@@ -539,7 +520,7 @@ void Ethernet::loop()
         // Try to initialize network
         if (initializeNetwork() != ESP_OK)
         {
-            Serial.printf("[ERROR][Ethernet] Network initialization failed (attempt %u/%u)\n", retry_count + 1, MAX_RETRY_COUNT);
+            logger.errorf("Network initialization failed (attempt %u/%u)", retry_count + 1, MAX_RETRY_COUNT);
             initialization_in_progress = false;
             retry_count++;
             last_retry_time = current_time;
@@ -548,7 +529,7 @@ void Ethernet::loop()
 
         // Success! Reset retry count for next time (but keep initialization_in_progress = true)
         retry_count = 0;
-        Serial.println("[INFO][Ethernet] Connection attempt successful - waiting for events");
+        logger.info("Connection attempt successful - waiting for events");
         break;
     }
     case ETHERNET_STATE_CONNECTED_WAITING_FOR_IP:
@@ -557,8 +538,8 @@ void Ethernet::loop()
         uint32_t current_time = millis();
         if (dhcp_start_time > 0 && (current_time - dhcp_start_time) > DHCP_TIMEOUT_MS)
         {
-            Serial.printf("[ERROR][Ethernet] DHCP timeout after %u ms\n", DHCP_TIMEOUT_MS);
-            Serial.println("[INFO][Ethernet] Retrying network initialization...");
+            logger.errorf("DHCP timeout after %u ms", DHCP_TIMEOUT_MS);
+            logger.info("Retrying network initialization...");
             dhcp_start_time = 0;
             setState(ETHERNET_STATE_DISCONNECTED); // This will trigger a reconnection attempt
         }
@@ -567,7 +548,7 @@ void Ethernet::loop()
     case ETHERNET_STATE_DISCONNECTED:
     {
         // Auto-retry connection if we get disconnected
-        Serial.println("[INFO][Ethernet] Ethernet disconnected, attempting to reconnect");
+        logger.info("Ethernet disconnected, attempting to reconnect");
         setState(ETHERNET_STATE_CONNECTING);
         break;
     }
@@ -577,7 +558,7 @@ void Ethernet::loop()
         uint32_t current_time = millis();
         if (retry_count == 0 || (current_time - last_retry_time) > (BASE_RETRY_DELAY_MS * 10))
         {
-            Serial.println("[INFO][Ethernet] Resetting after connection failure, will retry");
+            logger.info("Resetting after connection failure, will retry");
             retry_count = 0;
             dhcp_start_time = 0;
             initialization_in_progress = false;

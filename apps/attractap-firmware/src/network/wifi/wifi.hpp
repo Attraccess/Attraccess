@@ -5,6 +5,9 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "../../settings/settings.hpp"
+#include "task_priorities.h"
+#include "../../state/state.hpp"
+#include "../../logger/logger.hpp"
 
 class Wifi
 {
@@ -39,8 +42,6 @@ public:
     };
 
     static void setup();
-    static void setStateChangedCallback(void (*callback)(WifiState state, const esp_ip4_addr_t &ip));
-    static void setScanCompleteCallback(void (*callback)(WifiNetwork *networks, uint8_t count));
     static void connectToNetwork(const String &ssid, const String &password);
     static WifiState getState();
     static esp_ip4_addr_t getIPAddress();
@@ -53,9 +54,9 @@ private:
     static void taskFn(void *parameter);
     static void loop();
 
+    static State appState;
+
     static WifiState _state;
-    static void (*onStateChangedCallback)(WifiState state, const esp_ip4_addr_t &ip);
-    static void (*onScanComplete)(WifiNetwork *networks, uint8_t count);
     static bool is_setup;
     static bool is_scanning;
     static uint8_t current_reconnect_attempts_count;
@@ -68,6 +69,8 @@ private:
     static uint8_t knownWifiNetworksCount;
     static void handleScanComplete();
 
+    static String _lastSSID;
+
     static void setState(WifiState state);
     static void handleTimeout();
     static void ensureConnection();
@@ -76,4 +79,5 @@ private:
     static void ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 
     static esp_netif_t *wifi_interface;
+    static Logger logger;
 };

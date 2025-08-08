@@ -50,12 +50,6 @@ String CommandExecutor::handleGetCommand(const String &action, const String &pay
                 return "error empty_response";
             }
 
-            // Check if handler returned an error
-            if (result.startsWith("error "))
-            {
-                return result; // Pass through error from handler
-            }
-
             return result;
         }
         catch (const std::exception &e)

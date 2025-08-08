@@ -2,10 +2,15 @@
 
 #include <ArduinoJson.h>
 #include "../settings/settings.hpp"
+#include "task_priorities.h"
+#include "state/state.hpp"
+#include "../logger/logger.hpp"
 
 class API
 {
 public:
+    API() : logger("API") {}
+
     void setup();
 
     void onNFCTapped(char *uid, uint8_t uidLength);
@@ -30,18 +35,23 @@ public:
     void setOnFirmwareUpdateRequiredHandler(void (*callback)());
     void setOnFirmwareStreamChunkHandler(void (*callback)(JsonObject data));
 
-    void setLoopIsEnabled(bool enabled);
-
     void onKeyPressed(char key);
     bool isRegistered();
     bool isAuthenticated();
 
 private:
-    static void task_function(void *pvParameters);
+    static void taskFn(void *parameter);
     void loop();
 
+    Logger logger;
+
+    State appState;
+    void updateSateInfo();
+    uint32_t lastKnownAppStateChangeTime;
+
+    bool loopIsEnabled = false;
+
     unsigned long heartbeat_sent_at = 0;
-    bool loop_is_enabled = false;
 
     String select_item_current_value = "";
     bool is_in_select_item_mode = false;

@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <esp_websocket_client.h>
 #include "../../certs/ca_index.hpp"
+#include "../../logger/logger.hpp"
 
 class AdaptiveCertManager
 {
@@ -37,6 +38,7 @@ private:
     int successfulCertIndex;
     bool initialized;
     int rememberedCertFailureCount;
+    mutable Logger logger;
 
     // Preference keys
     static const char *PREF_NAMESPACE;

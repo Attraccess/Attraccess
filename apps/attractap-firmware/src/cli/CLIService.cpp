@@ -113,25 +113,26 @@ void CLIService::setup()
     lastSerialActivity = millis();
 
     xTaskCreate(
-        CLIService::taskFn,
-        "CLIService",
+        taskFunction,
+        "CLI Service",
         4096,
         this,
-        1,
+        TASK_PRIORITY_CLI,
         NULL);
 }
 
-void CLIService::taskFn(void *parameter)
+void CLIService::taskFunction(void *param)
 {
-    CLIService *cliService = (CLIService *)parameter;
+    CLIService *service = (CLIService *)param;
+
     while (true)
     {
-        cliService->update();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        service->loop();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
-void CLIService::update()
+void CLIService::loop()
 {
     // Check for serial communication health
     if (!isSerialHealthy())
@@ -236,6 +237,11 @@ void CLIService::handleCommand(const ParsedCommand &command)
         if (response.length() == 0)
         {
             ResponseFormatter::formatError("empty_response", "executor_returned_empty");
+            return;
+        }
+
+        if (response == "__DO_NOT_SEND_RESPONSE__")
+        {
             return;
         }
 
@@ -354,4 +360,9 @@ void CLIService::clearInputBuffer()
     {
         Serial.read();
     }
+}
+
+void CLIService::sendResponse(const String &action, const String &response)
+{
+    ResponseFormatter::formatResponse(action, response);
 }

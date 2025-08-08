@@ -2,24 +2,22 @@
 
 #include <Arduino.h>
 #include <I2CKeyPad.h>
+#include "../logger/logger.hpp"
 
 class Keypad
 {
 public:
-    Keypad() : keyPad(I2C_KEYPAD_ADDRESS) {}
+    Keypad() : keyPad(I2C_KEYPAD_ADDRESS), logger("Keypad") {}
 
     void setup();
-    char readKey();
-
-    void setOnKeyPressed(void (*callback)(char key));
 
 private:
-    static void task_function(void *pvParameters);
+    static void taskFn(void *parameter);
     void loop();
+    char readKey();
 
     I2CKeyPad keyPad;
     char keymap[17] = "DCBA#9630852*741";
     char released_key_num = 16;
-
-    void (*keyPressedHandler)(char key);
+    Logger logger;
 };

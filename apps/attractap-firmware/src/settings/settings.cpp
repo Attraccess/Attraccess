@@ -1,6 +1,7 @@
 #include "settings.hpp"
 
 Preferences Settings::preferences;
+Logger Settings::logger("Settings");
 
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
@@ -8,7 +9,7 @@ AttraccessAuthConfig Settings::_attraccessAuthConfig;
 
 void Settings::setup()
 {
-    Serial.println("[Settings] Setting up...");
+    logger.info("Setting up...");
 
     // load settings from preferences
     preferences.begin("settings", true);
@@ -24,7 +25,7 @@ void Settings::setup()
 
     preferences.end();
 
-    Serial.println("[Settings] Setup complete.");
+    logger.info("Setup complete.");
 }
 
 NetworkConfig Settings::getNetworkConfig()
@@ -34,7 +35,7 @@ NetworkConfig Settings::getNetworkConfig()
 
 void Settings::saveNetworkConfig(String ssid, String password)
 {
-    Serial.println("[Settings] Saving network config...");
+    logger.info("Saving network config...");
     preferences.begin("settings", false);
 
     preferences.putString("wifi.ssid", ssid);
@@ -53,7 +54,7 @@ AttraccessApiConfig Settings::getAttraccessApiConfig()
 
 void Settings::saveAttraccessApiConfig(String hostname, uint16_t port, bool useSSL)
 {
-    Serial.println("[Settings] Saving attraccess api config...");
+    logger.info("Saving attraccess api config...");
     preferences.begin("settings", false);
 
     preferences.putString("api.host", hostname);
@@ -75,7 +76,7 @@ AttraccessAuthConfig Settings::getAttraccessAuthConfig()
 
 void Settings::saveAttraccessAuthConfig(String apiKey, uint32_t readerId)
 {
-    Serial.println("[Settings] Saving attraccess auth config...");
+    logger.info("Saving attraccess auth config...");
     preferences.begin("settings", false);
 
     preferences.putString("api.key", apiKey);
@@ -89,7 +90,7 @@ void Settings::saveAttraccessAuthConfig(String apiKey, uint32_t readerId)
 
 void Settings::clearAttraccessAuthConfig()
 {
-    Serial.println("[Settings] Clearing attraccess auth config...");
+    logger.info("Clearing attraccess auth config...");
     preferences.begin("settings", false);
 
     preferences.remove("api.key");

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include "../logger/logger.hpp"
 
 struct NetworkConfig
 {
@@ -39,6 +40,7 @@ public:
 
 private:
     static Preferences preferences;
+    static Logger logger;
 
     static NetworkConfig _networkConfig;
     static AttraccessApiConfig _attraccessApiConfig;

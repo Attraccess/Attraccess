@@ -1,51 +1,40 @@
 #include "wifi.hpp"
 
+State Wifi::appState;
 bool Wifi::is_setup = false;
-bool Wifi::is_scanning = false;
+esp_netif_t *Wifi::wifi_interface = NULL;
+Logger Wifi::logger("WiFi");
+
+Wifi::WifiState Wifi::_state = WIFI_STATE_INIT;
+String Wifi::_lastSSID;
+
 uint8_t Wifi::current_reconnect_attempts_count = 0;
 uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
 const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
 const uint32_t Wifi::MAX_RECONNECT_ATTEMPTS = 10;
-esp_netif_t *Wifi::wifi_interface = NULL;
-void (*Wifi::onStateChangedCallback)(WifiState state, const esp_ip4_addr_t &ip) = NULL;
-void (*Wifi::onScanComplete)(WifiNetwork *networks, uint8_t count) = NULL;
-Wifi::WifiState Wifi::_state = WIFI_STATE_INIT;
+
+bool Wifi::is_scanning = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
 
-void Wifi::taskFn(void *parameter)
-{
-    while (true)
-    {
-        Wifi::loop();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-    }
-}
-
 void Wifi::setup()
 {
+    logger.info("initializing");
+
     if (is_setup)
     {
+        logger.info("Already initialized");
         return;
     }
 
-    // Initialize TCP/IP network interface (should be called only once in application)
-    esp_err_t ret = esp_netif_init();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
-    {
-        Serial.printf("[ERROR][WiFi] Failed to initialize netif: %s\n", esp_err_to_name(ret));
-        return;
-    }
-
-    // Create default event loop
-    ret = esp_event_loop_create_default();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
-    {
-        Serial.printf("[ERROR][WiFi] Failed to create event loop: %s\n", esp_err_to_name(ret));
-        return;
-    }
+    logger.info("creating default wifi station interface");
 
     wifi_interface = esp_netif_create_default_wifi_sta();
+    if (wifi_interface == NULL)
+    {
+        logger.error("Failed to create WiFi station interface");
+        return;
+    }
 
     // Configure WiFi memory settings for lower RAM usage
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -59,24 +48,58 @@ void Wifi::setup()
     cfg.ampdu_rx_enable = 0;    // Disable AMPDU RX
     cfg.ampdu_tx_enable = 0;    // Disable AMPDU TX
 
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_err_t wifi_init_result = esp_wifi_init(&cfg);
+    if (wifi_init_result != ESP_OK)
+    {
+        logger.error((String("Failed to initialize WiFi: ") + esp_err_to_name(wifi_init_result)).c_str());
+        return;
+    }
 
     // Register event handlers
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifiEventHandler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ipEventHandler, NULL));
+    esp_err_t wifi_event_handler_result = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifiEventHandler, NULL);
+    if (wifi_event_handler_result != ESP_OK)
+    {
+        logger.error((String("Failed to register WiFi event handler: ") + esp_err_to_name(wifi_event_handler_result)).c_str());
+        return;
+    }
+
+    esp_err_t ip_event_handler_result = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ipEventHandler, NULL);
+    if (ip_event_handler_result != ESP_OK)
+    {
+        logger.error((String("Failed to register IP event handler: ") + esp_err_to_name(ip_event_handler_result)).c_str());
+        return;
+    }
 
     // Set WiFi mode to station
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_err_t wifi_set_mode_result = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (wifi_set_mode_result != ESP_OK)
+    {
+        logger.error((String("Failed to set WiFi mode: ") + esp_err_to_name(wifi_set_mode_result)).c_str());
+        return;
+    }
 
-    xTaskCreate(
+    esp_err_t wifi_start_result = esp_wifi_start();
+    if (wifi_start_result != ESP_OK)
+    {
+        logger.error((String("Failed to start WiFi: ") + esp_err_to_name(wifi_start_result)).c_str());
+        return;
+    }
+
+    BaseType_t taskResult = xTaskCreate(
         taskFn,
         "Wifi",
-        10000,
+        8192, // Increased stack size to 8192 to prevent stack overflow
         NULL,
-        10,
+        TASK_PRIORITY_WIFI,
         NULL);
 
+    if (taskResult != pdPASS)
+    {
+        logger.error(("Failed to create WiFi task: " + String(taskResult)).c_str());
+        return;
+    }
+
+    logger.info("WiFi task created successfully");
     is_setup = true;
 }
 
@@ -85,11 +108,11 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     switch (event_id)
     {
     case WIFI_EVENT_STA_START:
-        Serial.println("WiFiServiceESP: WiFi station started");
+        logger.info("WiFi station started");
         break;
 
     case WIFI_EVENT_STA_CONNECTED:
-        Serial.println("WiFiServiceESP: Connected to AP");
+        logger.info("Connected to AP");
 
         if (_state != WIFI_STATE_CONNECTED)
         {
@@ -101,21 +124,21 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
 
     case WIFI_EVENT_STA_DISCONNECTED:
     {
-        Serial.println("WiFiServiceESP: Disconnected from AP");
+        logger.info("Disconnected from AP");
         setState(WIFI_STATE_DISCONNECTED);
 
         // If we were previously connected (not a connection failure), reset reconnect attempts
         // to allow immediate reconnection attempts
         if (current_reconnect_attempts_count == 0)
         {
-            Serial.println("WiFiServiceESP: Unexpected disconnection, enabling auto-reconnect");
+            logger.info("Unexpected disconnection, enabling auto-reconnect");
             current_reconnect_attempts_count = 0; // Allow immediate reconnect attempt
         }
         break;
     }
 
     case WIFI_EVENT_SCAN_DONE:
-        Serial.println("WiFiServiceESP: Scan completed");
+        logger.info("Scan completed");
         handleScanComplete();
         break;
 
@@ -124,20 +147,13 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     }
 }
 
-void Wifi::setStateChangedCallback(void (*callback)(WifiState state, const esp_ip4_addr_t &ip))
-{
-    onStateChangedCallback = callback;
-}
-
-void Wifi::setScanCompleteCallback(void (*callback)(WifiNetwork *networks, uint8_t count))
-{
-    onScanComplete = callback;
-}
-
 void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    Serial.printf("Network: Got IP: " IPSTR "\n", IP2STR(&event->ip_info.ip));
+
+    char wifi_ip_str[16];
+    snprintf(wifi_ip_str, sizeof(wifi_ip_str), IPSTR, IP2STR(&event->ip_info.ip));
+    logger.info(("Got IP: " + String(wifi_ip_str)).c_str());
 
     setState(WIFI_STATE_CONNECTED);
     // Reset reconnection attempts on successful IP acquisition
@@ -147,15 +163,35 @@ void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_
 void Wifi::setState(WifiState state)
 {
     _state = state;
+    appState.setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
 
-    if (onStateChangedCallback)
-    {
-        onStateChangedCallback(state, getIPAddress());
-    }
+    logger.debug(("setState called with state: " + String(state)).c_str());
 }
 
+void Wifi::taskFn(void *parameter)
+{
+    logger.info("WiFi task started and running");
+
+    while (true)
+    {
+        Wifi::loop();
+        vTaskDelay(pdMS_TO_TICKS(100)); // Use FreeRTOS delay instead of Arduino delay
+    }
+}
 void Wifi::loop()
 {
+    // Add periodic debug logging
+    static uint32_t lastLoopLog = 0;
+    uint32_t currentTime = millis();
+    if (currentTime - lastLoopLog > 10000) // Every 10 seconds
+    {
+        lastLoopLog = currentTime;
+        logger.debug(("Loop - current state: " + String(_state)).c_str());
+    }
+
+    // Yield to other tasks at the start of each loop iteration
+    vTaskDelay(1);
+
     switch (_state)
     {
     case WIFI_STATE_INIT:
@@ -180,6 +216,10 @@ void Wifi::loop()
     case WIFI_STATE_CONNECT_FAILED:
         ensureConnection();
         break;
+
+    default:
+        logger.error(("Unknown state: " + String(_state)).c_str());
+        break;
     }
 }
 
@@ -187,17 +227,21 @@ void Wifi::ensureConnection()
 {
     if (isConnected())
     {
-        Serial.println("WiFiServiceESP: Already connected");
-        return;
-    }
-
-    if (!hasSavedCredentials())
-    {
-        Serial.println("WiFiServiceESP: No saved credentials found, cannot auto-connect");
+        logger.info("Already connected");
         return;
     }
 
     uint32_t currentTime = millis();
+    if (!hasSavedCredentials())
+    {
+        static uint32_t lastNoSavedCredentialsLog = 0;
+        if (currentTime - lastNoSavedCredentialsLog > 10000) // 10 seconds
+        {
+            lastNoSavedCredentialsLog = currentTime;
+            logger.info("No saved credentials found, cannot auto-connect");
+        }
+        return;
+    }
 
     // Check if it's time to attempt reconnection
     bool shouldAttemptReconnect = currentTime - last_reconnect_attempt_time_ms >= RECONNECT_INTERVAL_MS;
@@ -214,8 +258,7 @@ void Wifi::ensureConnection()
         if (currentTime - lastMaxAttemptsLog > 10000) // 10 seconds
         {
             lastMaxAttemptsLog = currentTime;
-            Serial.printf("WiFiServiceESP: Max reconnect attempts (%d) reached. Will retry after successful manual connection.\n",
-                          MAX_RECONNECT_ATTEMPTS);
+            logger.info(("Max reconnect attempts (" + String(MAX_RECONNECT_ATTEMPTS) + ") reached. Will retry after successful manual connection.").c_str());
         }
         return;
     }
@@ -228,19 +271,18 @@ void Wifi::ensureConnection()
 
 void Wifi::tryAutoConnect()
 {
-    Serial.printf("WiFiServiceESP: Auto-reconnect attempt %d/%d\n",
-                  current_reconnect_attempts_count + 1, MAX_RECONNECT_ATTEMPTS);
+    logger.info(("Auto-reconnect attempt " + String(current_reconnect_attempts_count) + "/" + String(MAX_RECONNECT_ATTEMPTS)).c_str());
 
     if (!hasSavedCredentials())
     {
-        Serial.println("WiFiServiceESP: No saved credentials found, cannot auto-connect");
+        logger.info("No saved credentials found, cannot auto-connect");
         return;
     }
 
     String savedSSID = Settings::getNetworkConfig().ssid;
     String savedPassword = Settings::getNetworkConfig().password;
 
-    Serial.println("WiFiServiceESP: Attempting auto-connect to: " + savedSSID);
+    logger.info(("Attempting auto-connect to: " + savedSSID).c_str());
     connectToNetwork(savedSSID, savedPassword);
 }
 
@@ -251,36 +293,86 @@ bool Wifi::hasSavedCredentials()
 
 void Wifi::connectToNetwork(const String &ssid, const String &password)
 {
+    logger.info(("connectToNetwork called for SSID: " + ssid).c_str());
+
+    _lastSSID = ssid;
+
+    logger.debug("Step 1: Checking if already connected");
     // Disconnect from any existing connection first
     if (isConnected())
     {
+        logger.info("Disconnecting from existing connection");
         esp_wifi_disconnect();
     }
 
+    logger.debug("Step 2: Setting state to connecting");
     setState(WIFI_STATE_CONNECTING);
+
+    logger.debug("Step 3: Creating WiFi configuration");
 
     // Create WiFi configuration
     wifi_config_t wifi_config = {};
 
+    logger.debug("Step 4: Copying SSID");
     // Copy SSID
     strncpy((char *)wifi_config.sta.ssid, ssid.c_str(), sizeof(wifi_config.sta.ssid) - 1);
+    vTaskDelay(1); // Yield to prevent watchdog
 
+    logger.debug("Step 5: Copying password");
     // Copy password if provided
     if (password.length() > 0)
     {
         strncpy((char *)wifi_config.sta.password, password.c_str(), sizeof(wifi_config.sta.password) - 1);
     }
+    vTaskDelay(1); // Yield to prevent watchdog
 
-    // Set threshold for weakest authmode to accept
-    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    logger.debug("Step 6: Setting WiFi configuration options");
+
+    // Set threshold for weakest authmode to accept (more permissive)
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_connect());
+    // Set scan method to be more reliable
+    wifi_config.sta.scan_method = WIFI_FAST_SCAN;
+    wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    wifi_config.sta.failure_retry_cnt = 3;
+    vTaskDelay(1); // Yield to prevent watchdog
 
-    current_reconnect_attempts_count = 0;
+    logger.debug("Step 7: Setting WiFi config and initiating connection");
+
+    esp_err_t wifi_set_config_result = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (wifi_set_config_result != ESP_OK)
+    {
+        logger.error((String("Failed to set WiFi config: ") + esp_err_to_name(wifi_set_config_result)).c_str());
+        setState(WIFI_STATE_CONNECT_FAILED);
+        return;
+    }
+
+    logger.info("WiFi config set successfully");
+
+    // Give WiFi stack time to process the config before connecting
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    logger.debug("calling esp_wifi_connect");
+
+    // Make the WiFi connect call
+    logger.debug("About to call esp_wifi_connect...");
+
+    esp_err_t wifi_connect_result = esp_wifi_connect();
+
+    logger.debug((String("esp_wifi_connect returned: ") + esp_err_to_name(wifi_connect_result)).c_str());
+
+    if (wifi_connect_result != ESP_OK)
+    {
+        logger.error((String("Failed to start WiFi connection: ") + esp_err_to_name(wifi_connect_result)).c_str());
+        setState(WIFI_STATE_CONNECT_FAILED);
+        return;
+    }
+
+    // Don't reset the attempt counter here - it should only be reset on successful connection
     last_reconnect_attempt_time_ms = millis();
+    logger.debug(("Connection attempt started at " + String(last_reconnect_attempt_time_ms) + " ms").c_str());
 }
 
 bool Wifi::isConnected()
@@ -308,6 +400,7 @@ void Wifi::startScan()
         return;
     }
 
+    logger.info("starting wifi scan");
     Wifi::is_scanning = true;
 
     wifi_scan_config_t scan_config = {};
@@ -322,9 +415,10 @@ void Wifi::startScan()
     esp_err_t err = esp_wifi_scan_start(&scan_config, false);
     if (err != ESP_OK)
     {
-        Serial.printf("WiFiServiceESP: Failed to start scan: %s\n", esp_err_to_name(err));
+        logger.error((String("Failed to start scan: ") + esp_err_to_name(err)).c_str());
         Wifi::is_scanning = false;
     }
+    logger.info("wifi scan started");
 }
 
 bool Wifi::isScanning()
@@ -334,12 +428,13 @@ bool Wifi::isScanning()
 
 void Wifi::handleScanComplete()
 {
+    logger.info("handling scan complete");
     uint16_t scan_count = 0;
     esp_err_t err = esp_wifi_scan_get_ap_num(&scan_count);
 
     if (err != ESP_OK)
     {
-        Serial.printf("WiFiServiceESP: Error getting scan count: %s\n", esp_err_to_name(err));
+        logger.error((String("Error getting scan count: ") + esp_err_to_name(err)).c_str());
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
         return;
@@ -347,29 +442,30 @@ void Wifi::handleScanComplete()
 
     if (scan_count == 0)
     {
-        Serial.println("WiFiServiceESP: No networks found");
+        logger.info("No networks found");
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
         return;
     }
 
     knownWifiNetworksCount = min((int)scan_count, (int)MAX_KNOWN_WIFI_NETWORKS);
-    Serial.printf("WiFiServiceESP: Found %d networks\n", knownWifiNetworksCount);
+    logger.info(("Found " + String(knownWifiNetworksCount) + " networks").c_str());
 
     wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(scan_count * sizeof(wifi_ap_record_t));
 
     if (!ap_records)
     {
-        Serial.println("WiFiServiceESP: Failed to allocate memory for scan results");
+        logger.error("Failed to allocate memory for scan results");
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
         return;
     }
 
+    logger.debug("calling esp_wifi_scan_get_ap_records");
     err = esp_wifi_scan_get_ap_records(&scan_count, ap_records);
     if (err != ESP_OK)
     {
-        Serial.printf("WiFiServiceESP: Error getting scan records: %s\n", esp_err_to_name(err));
+        logger.error((String("Error getting scan records: ") + esp_err_to_name(err)).c_str());
         free(ap_records);
         knownWifiNetworksCount = 0;
         Wifi::is_scanning = false;
@@ -377,12 +473,13 @@ void Wifi::handleScanComplete()
     }
 
     // Copy scan results to our network array with safety checks
+    logger.debug("copying scan results to our network array");
     for (uint8_t i = 0; i < knownWifiNetworksCount && i < MAX_KNOWN_WIFI_NETWORKS; i++)
     {
         // Skip empty SSIDs
         if (ap_records[i].ssid[0] == 0)
         {
-            Serial.printf("WiFiServiceESP: Skipping network %d with empty SSID\n", i);
+            logger.debug(("Skipping network " + String(i) + " with empty SSID").c_str());
             continue;
         }
 
@@ -401,17 +498,14 @@ void Wifi::handleScanComplete()
             knownWifiNetworks[i].isOpen = (ap_records[i].authmode == WIFI_AUTH_OPEN);
             knownWifiNetworks[i].channel = ap_records[i].primary;
 
-            Serial.printf("WiFiServiceESP: Network %d: %s (RSSI: %d)\n", i, ssid_str, ap_records[i].rssi);
+            logger.debug(("Network " + String(i) + ": " + String(ssid_str) + " (RSSI: " + String(ap_records[i].rssi) + ")").c_str());
         }
     }
 
     free(ap_records);
     Wifi::is_scanning = false;
 
-    if (onScanComplete)
-    {
-        onScanComplete(knownWifiNetworks, knownWifiNetworksCount);
-    }
+    logger.info("wifi scan complete and done");
 }
 
 void Wifi::handleTimeout()
@@ -422,25 +516,22 @@ void Wifi::handleTimeout()
     }
 
     uint32_t currentTime = millis();
-    if (currentTime - last_reconnect_attempt_time_ms > 15000)
-    { // 15 second timeout
-        Serial.println("WiFiServiceESP: Connection timeout - stopping connection attempt");
-        esp_wifi_disconnect();
-        setState(WIFI_STATE_DISCONNECTED);
-        return;
+    uint32_t elapsed = currentTime - last_reconnect_attempt_time_ms;
+
+    // Add debug logging every 5 seconds
+    static uint32_t lastTimeoutLog = 0;
+    if (currentTime - lastTimeoutLog > 5000)
+    {
+        lastTimeoutLog = currentTime;
+        logger.debug(("Connection timeout check - elapsed: " + String(elapsed) + " ms (max: 15000 ms), state: " + String(_state)).c_str());
     }
 
-    // Update connecting status with animation
-    uint32_t elapsed = (currentTime - last_reconnect_attempt_time_ms) / 1000;
-    if (elapsed != last_reconnect_attempt_time_ms)
-    {
-        last_reconnect_attempt_time_ms = elapsed;
-        String dots = "";
-        for (int i = 0; i < (elapsed % 4); i++)
-        {
-            dots += ".";
-        }
-        Serial.println("Connecting" + dots);
+    if (elapsed > 15000)
+    { // 15 second timeout
+        logger.info("Connection timeout - stopping connection attempt");
+        esp_wifi_disconnect();
+        setState(WIFI_STATE_CONNECT_FAILED);
+        return;
     }
 }
 

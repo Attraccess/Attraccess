@@ -2,13 +2,14 @@
 
 #include <Arduino.h>
 #include "Adafruit_PN532_NTAG424.h"
-#include <esp_task_wdt.h>
 #include <Wire.h>
+#include "task_priorities.h"
+#include "../logger/logger.hpp"
 
 class NFC
 {
 public:
-    NFC() : pn532(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire) {}
+    NFC() : pn532(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire), logger("NFC") {}
 
     void setup();
 
@@ -98,4 +99,6 @@ private:
      *  Configure the nfc module
      */
     bool configureNfcModule();
+
+    Logger logger;
 };

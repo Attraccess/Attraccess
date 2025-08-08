@@ -1,28 +1,33 @@
 #include "keypad.hpp"
 
-void Keypad::task_function(void *pvParameters)
+void Keypad::setup()
 {
-    Keypad *keypad = (Keypad *)pvParameters;
+    this->keyPad.begin();
+
+    xTaskCreate(Keypad::taskFn, "Keypad", 2048, this, 1, NULL);
+}
+
+void Keypad::taskFn(void *parameter)
+{
+    Keypad *instance = (Keypad *)parameter;
 
     while (true)
     {
-
-        keypad->loop();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        instance->loop();
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
-}
-
-void Keypad::setup()
-{
-    xTaskCreate(Keypad::task_function, "Keypad", 10000, this, 1, NULL);
 }
 
 void Keypad::loop()
 {
     if (this->keyPad.begin() == false)
     {
-        Serial.println("\nERROR: cannot communicate to keypad.\n");
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        static unsigned long lastKeyPadSetupErrorLog = 0;
+        if (millis() - lastKeyPadSetupErrorLog > 10000)
+        {
+            logger.error("cannot communicate to keypad");
+            lastKeyPadSetupErrorLog = millis();
+        }
         return;
     }
 
@@ -31,11 +36,6 @@ void Keypad::loop()
     if (key == '\0')
     {
         return;
-    }
-
-    if (this->keyPressedHandler)
-    {
-        this->keyPressedHandler(key);
     }
 }
 
@@ -50,20 +50,16 @@ char Keypad::readKey()
 
     char key = this->keymap[pressedKeyNum];
 
-    Serial.println("Pressed key number: " + String(pressedKeyNum));
-    Serial.println("Key pressed (" + String(key) + ")");
+    logger.debug(("Pressed key number: " + String(pressedKeyNum)).c_str());
+    logger.debug(("Key pressed (" + String(key) + ")").c_str());
 
+    // TODO: refactor so its non-blocking
     while (this->keyPad.getKey() != this->released_key_num)
     {
         delay(10);
     }
 
-    Serial.println("Key released (" + String(key) + ")");
+    logger.debug(("Key released (" + String(key) + ")").c_str());
 
     return key;
-}
-
-void Keypad::setOnKeyPressed(void (*callback)(char key))
-{
-    this->keyPressedHandler = callback;
 }

@@ -1,11 +1,11 @@
 #pragma once
 
 #include <Arduino.h>
+#include "task_priorities.h"
 #include <Adafruit_GFX.h>
 #ifdef SCREEN_DRIVER_SH1106
 #include <Adafruit_SH1106.h>
 #include "icons.hpp"
-#include "../../leds/leds.hpp"
 #include <ArduinoJson.h>
 
 #elif SCREEN_DRIVER_SSD1306
@@ -15,28 +15,29 @@
 #endif
 #include "esp_netif.h"
 #include "esp_log.h"
+#include "../logger/logger.hpp"
 
-class Display
+class OLED
 {
 public:
 #ifdef SCREEN_DRIVER_SH1106
-    Display(Leds *leds) : screen(SCREEN_RESET), leds(leds) {}
+    OLED() : screen(SCREEN_RESET) {}
 #elif SCREEN_DRIVER_SSD1306
-    Display(Leds *leds) : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET), leds(leds) {}
+    OLED() : screen(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET) {}
 #endif
 
-    enum DisplayState
+    enum OLEDState
     {
-        DISPLAY_STATE_NONE,
-        DISPLAY_STATE_ERROR,
-        DISPLAY_STATE_SUCCESS,
-        DISPLAY_STATE_TEXT,
-        DISPLAY_STATE_SELECT_ITEM,
-        DISPLAY_STATE_CONFIRM_ACTION,
-        DISPLAY_STATE_CARD_CHECKING
+        OLED_STATE_NONE,
+        OLED_STATE_ERROR,
+        OLED_STATE_SUCCESS,
+        OLED_STATE_TEXT,
+        OLED_STATE_SELECT_ITEM,
+        OLED_STATE_CONFIRM_ACTION,
+        OLED_STATE_CARD_CHECKING
     };
 
-    ~Display() {}
+    OLED() : logger("OLED") {}
 
     void setup();
 
@@ -65,9 +66,8 @@ private:
 
     unsigned long boot_time = 0;
 
-    DisplayState display_state = DISPLAY_STATE_NONE;
+    OLEDState _state = OLED_STATE_NONE;
 
-    Leds *leds;
     bool is_network_connected = false;
     bool is_api_connected = false;
     String nfc_tap_text = "-- no text --";
@@ -95,4 +95,6 @@ private:
     void draw_select_item_ui();
     void draw_two_line_message(String line1, String line2);
     void draw_confirm_action_ui();
+
+    Logger logger;
 };

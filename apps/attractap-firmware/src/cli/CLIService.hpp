@@ -6,6 +6,7 @@
 #include "CommandParser.hpp"
 #include "CommandExecutor.hpp"
 #include <Preferences.h>
+#include "task_priorities.h"
 
 /**
  * Function type for command handlers
@@ -33,7 +34,6 @@ public:
      */
     static void formatError(const String &errorType, const String &message = "");
 
-private:
     static void sendLine(const String &line);
 };
 
@@ -57,14 +57,11 @@ public:
      * @param handler The function to handle this command
      */
     void registerCommandHandler(const String &action, CommandHandler handler);
+    void sendResponse(const String &action, const String &response);
 
 private:
-    static void taskFn(void *parameter);
-
-    /**
-     * Update the CLI service - call this in the main loop
-     */
-    void update();
+    static void taskFunction(void *param);
+    void loop();
 
     CommandParser parser;
     CommandExecutor executor;
@@ -77,7 +74,6 @@ private:
 
     void processSerialInput();
     void handleCommand(const ParsedCommand &command);
-    void sendResponse(const String &action, const String &response);
     void sendError(const String &errorType, const String &message = "");
 
     // Error handling and recovery

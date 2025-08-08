@@ -7,6 +7,9 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "task_priorities.h"
+#include "state/state.hpp"
+#include "../../logger/logger.hpp"
 
 class Ethernet
 {
@@ -23,14 +26,16 @@ public:
 
     static void setup();
     static esp_err_t initializeNetwork();
-    static void setStateChangedCallback(void (*callback)(EthernetState state, const esp_ip4_addr_t &ip));
-    static EthernetState getState();
-    static esp_ip4_addr_t getIPAddress();
+
     static void deinit();
 
 private:
     static void taskFn(void *parameter);
     static void loop();
+
+    static State appState;
+
+    static esp_ip4_addr_t getIPAddress();
 
     static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static void got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -42,7 +47,6 @@ private:
     static EthernetState _state;
     static void setState(EthernetState state);
 
-    static void (*onStateChangedCallback)(EthernetState state, const esp_ip4_addr_t &ip);
     static esp_netif_t *eth_netif;
     static esp_eth_handle_t eth_handle;
     static esp_eth_netif_glue_handle_t eth_netif_glue;
@@ -54,4 +58,5 @@ private:
     static const uint32_t MAX_RETRY_COUNT;
     static const uint32_t BASE_RETRY_DELAY_MS;
     static const uint32_t DHCP_TIMEOUT_MS;
+    static Logger logger;
 };

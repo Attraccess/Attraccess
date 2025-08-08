@@ -1,36 +1,50 @@
 #include "api.hpp"
 
-void API::task_function(void *pvParameters)
+void API::setup()
 {
-    API *api = (API *)pvParameters;
+    xTaskCreate(taskFn, "API", 4096, this, TASK_PRIORITY_API, NULL);
+}
 
-    const int LOOP_DELAY_MS = 10; // 10ms delay = ~100Hz update rate
-
+void API::taskFn(void *parameter)
+{
+    API *api = (API *)parameter;
     while (true)
     {
         api->loop();
-        vTaskDelay(LOOP_DELAY_MS / portTICK_PERIOD_MS);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
-void API::setup()
+void API::updateSateInfo()
 {
-    Serial.println("[API] Setting up...");
+    uint32_t lastStateChangeTime = this->appState.getLastStateChangeTime();
+    if (this->lastKnownAppStateChangeTime <= lastStateChangeTime)
+    {
+        return;
+    }
 
-    xTaskCreate(
-        API::task_function,
-        "API",
-        4096,
-        this,
-        7,
-        NULL);
+    this->lastKnownAppStateChangeTime = lastStateChangeTime;
 
-    Serial.println("[API] Setup complete.");
+    auto websocketState = this->appState.getWebsocketState();
+    auto networkState = this->appState.getNetworkState();
+
+    this->loopIsEnabled = websocketState.connected && (networkState.wifi_connected || networkState.ethernet_connected);
+}
+
+void API::loop()
+{
+    this->updateSateInfo();
+    if (!this->loopIsEnabled)
+    {
+        return;
+    }
+
+    this->sendHeartbeat();
 }
 
 void API::onRegistrationData(JsonObject data)
 {
-    Serial.println("[API] Received registration response.");
+    this->logger.info("Received registration response.");
 
     if (data["payload"].is<JsonObject>())
     {
@@ -42,10 +56,7 @@ void API::onRegistrationData(JsonObject data)
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
 
-            Serial.print("[API] Reader registered with ID: ");
-            Serial.print(readerId);
-            Serial.print(" and token: ");
-            Serial.println(apiKey);
+            this->logger.infof("Reader registered with ID: %d and token: %s", readerId, apiKey.c_str());
         }
     }
 }
@@ -62,7 +73,7 @@ void API::onUnauthorized(JsonObject data)
         }
     }
 
-    Serial.println("[API] UNAUTHORIZED: " + message);
+    logger.error(("UNAUTHORIZED: " + message).c_str());
     Settings::clearAttraccessAuthConfig();
 
     if (this->apiConnectionStatusChangedHandler)
@@ -73,7 +84,7 @@ void API::onUnauthorized(JsonObject data)
 
 void API::onEnableCardChecking(JsonObject data)
 {
-    Serial.println("[API] ENABLE_CARD_CHECKING");
+    logger.info("ENABLE_CARD_CHECKING");
     if (this->enableNfcCardCheckingHandler)
     {
         this->enableNfcCardCheckingHandler();
@@ -149,7 +160,7 @@ void API::onEnableCardChecking(JsonObject data)
 
 void API::onDisableCardChecking(JsonObject data)
 {
-    Serial.println("[API] DISABLE_CARD_CHECKING");
+    logger.info("DISABLE_CARD_CHECKING");
     if (this->disableNfcCardCheckingHandler)
     {
         this->disableNfcCardCheckingHandler();
@@ -176,11 +187,11 @@ void API::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t b
 
 void API::onChangeKey(JsonObject data)
 {
-    Serial.println("[API] CHANGE_KEY");
+    logger.info("CHANGE_KEY");
 
     if (!this->nfcChangeKeyHandler)
     {
-        Serial.println("[API] onNfcChangeKey callback is not set");
+        logger.error("onNfcChangeKey callback is not set");
         return;
     }
 
@@ -201,14 +212,14 @@ void API::onChangeKey(JsonObject data)
     bool success = this->nfcChangeKeyHandler(keyNumber, authKey, oldKey, newKey);
     if (success)
     {
-        Serial.println("[API] Key change successful.");
+        logger.info("Key change successful.");
     }
     else
     {
-        Serial.println("[API] Key change failed.");
+        logger.error("Key change failed.");
     }
 
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["successful"] = success;
     this->sendMessage(true, "NFC_CHANGE_KEY", payload);
@@ -216,7 +227,7 @@ void API::onChangeKey(JsonObject data)
 
 void API::onNfcAuthenticate(JsonObject data)
 {
-    Serial.println("[API] AUTHENTICATE");
+    logger.info("NFC AUTHENTICATE");
 
     uint8_t authenticationKey[16];
     String authKeyHex = data["payload"]["authenticationKey"].as<String>();
@@ -226,21 +237,21 @@ void API::onNfcAuthenticate(JsonObject data)
 
     if (!this->nfcAuthenticateHandler)
     {
-        Serial.println("[API] onNfcAuthenticate callback is not set");
+        logger.error("onNfcAuthenticate callback is not set");
         return;
     }
 
     bool success = this->nfcAuthenticateHandler(keyNumber, authenticationKey);
     if (success)
     {
-        Serial.println("[API] Authentication successful.");
+        logger.info("NFC Authentication successful.");
     }
     else
     {
-        Serial.println("[API] Authentication failed.");
+        logger.error("NFC Authentication failed.");
     }
 
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["authenticationSuccessful"] = success;
     this->sendMessage(true, "NFC_AUTHENTICATE", payload);
@@ -248,7 +259,7 @@ void API::onNfcAuthenticate(JsonObject data)
 
 void API::onShowText(JsonObject data)
 {
-    Serial.println("[API] SHOW_TEXT");
+    logger.info("SHOW_TEXT");
 
     // Handle the payload structure correctly (single message field)
     if (data["payload"]["message"].is<String>())
@@ -282,8 +293,8 @@ void API::processMessage(String message)
     String payloadString;
     serializeJson(payload, payloadString);
 
-    Serial.println("[API] Received message of type " + eventType + " with payload " + payloadString);
-    Serial.println("[API] Sending ACK for event " + eventType);
+    logger.info(("Received message of type " + eventType + " with payload " + payloadString).c_str());
+    logger.info(("Sending ACK for event " + eventType).c_str());
     this->sendAck(eventType.c_str());
 
     if (eventType == "READER_REGISTER")
@@ -375,8 +386,8 @@ void API::processMessage(String message)
     }
     else
     {
-        Serial.println("[API] Unknown event type: " + eventType);
-        Serial.println(payloadString);
+        logger.error(("Unknown event type: " + eventType).c_str());
+        logger.error(payloadString.c_str());
     }
 }
 
@@ -392,7 +403,7 @@ void API::sendAck(const char *type)
 
 void API::sendMessage(bool is_response, const char *type)
 {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     this->sendMessage(is_response, type, payload);
 }
@@ -419,7 +430,7 @@ void API::sendMessage(bool is_response, const char *type, JsonObject payload)
 
     String payloadString = event["data"]["payload"].as<String>();
 
-    Serial.println("[API] Sending " + String(is_response ? "response" : "event") + " of type " + String(type) + " with payload " + payloadString);
+    logger.debug(("Sending " + String(is_response ? "response" : "event") + " of type " + String(type) + " with payload " + payloadString).c_str());
 
     String json;
     serializeJson(event, json);
@@ -433,12 +444,12 @@ void API::onRequestAuthentication(JsonObject data)
 {
     if (!this->isRegistered())
     {
-        Serial.println("[API] Not registered, sending registration request");
+        logger.info("Not registered, sending registration request");
         this->sendMessage(true, "READER_REGISTER");
         return;
     }
 
-    Serial.println("[API] Sending authentication request");
+    logger.info("Sending authentication request");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["id"] = Settings::getAttraccessAuthConfig().readerId;
@@ -448,7 +459,7 @@ void API::onRequestAuthentication(JsonObject data)
 
 void API::onNFCTapped(char *uid, uint8_t uidLength)
 {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
 
     // Convert UID to hex string
@@ -487,21 +498,12 @@ void API::sendHeartbeat()
     this->heartbeat_sent_at = millis();
 }
 
-void API::loop()
-{
-    if (!this->loop_is_enabled)
-    {
-        return;
-    }
-
-    this->sendHeartbeat();
-}
-
 void API::onFirmwareInfo(JsonObject data)
 {
-    Serial.println("[API] Requested firmware info");
+    logger.info("Requested firmware info");
 
-    JsonObject response = JsonObject();
+    JsonDocument doc;
+    JsonObject response = doc.to<JsonObject>();
     response["name"] = FIRMWARE_NAME;
     response["variant"] = FIRMWARE_VARIANT;
     response["version"] = FIRMWARE_VERSION;
@@ -510,7 +512,7 @@ void API::onFirmwareInfo(JsonObject data)
 
 void API::onFirmwareUpdateRequired(JsonObject data)
 {
-    Serial.println("[API] Firmware update required");
+    logger.info("Firmware update required");
 
     if (this->firmwareUpdateRequiredHandler)
     {
@@ -520,7 +522,7 @@ void API::onFirmwareUpdateRequired(JsonObject data)
 
 void API::onFirmwareStreamChunk(JsonObject data)
 {
-    Serial.println("[API] Received firmware stream chunk");
+    logger.info("Received firmware stream chunk");
 
     if (this->firmwareStreamChunkHandler)
     {
@@ -546,16 +548,6 @@ void API::setOnNfcChangeKey(bool (*callback)(uint8_t keyNumber, uint8_t *authKey
 void API::setOnNfcAuthenticate(bool (*callback)(uint8_t keyNumber, uint8_t *authenticationKey))
 {
     this->nfcAuthenticateHandler = callback;
-}
-
-void API::setLoopIsEnabled(bool enabled)
-{
-    this->heartbeat_sent_at = 0;
-    this->is_in_select_item_mode = false;
-    this->select_item_current_value = "";
-    this->select_item_type = "";
-    this->select_item_options = JsonArray();
-    this->loop_is_enabled = enabled;
 }
 
 void API::setOnApiConnectionStatusChanged(void (*callback)(bool isAuthenticated))
@@ -622,7 +614,8 @@ void API::onKeyPressed(char key)
 
     if (key == '#')
     {
-        JsonObject payload = JsonObject();
+        JsonDocument doc;
+        JsonObject payload = doc.to<JsonObject>();
         payload["value"] = this->select_item_current_value;
         this->sendMessage(false, "SELECT_ITEM", payload);
         this->is_in_select_item_mode = false;
@@ -645,7 +638,7 @@ void API::onKeyPressed(char key)
 
 void API::onConfirmAction(JsonObject data)
 {
-    Serial.println("[API] CONFIRM_ACTION");
+    logger.info("CONFIRM_ACTION");
 
     String title = "Confirm";
     String message = "> not sure what... <";
@@ -668,7 +661,7 @@ void API::onConfirmAction(JsonObject data)
     }
     else
     {
-        Serial.println("UNSUPPORTED CONFIRM ACTION");
+        logger.error("UNSUPPORTED CONFIRM ACTION");
     }
 
     if (this->confirmActionHandler)
@@ -684,7 +677,7 @@ void API::setDisplayConfirmActionHandler(void (*callback)(String title, String m
 
 void API::onReaderAuthenticated(JsonObject data)
 {
-    Serial.println("[API] READER_AUTHENTICATED");
+    logger.info("READER_AUTHENTICATED");
 
     String deviceName = data["payload"]["name"].as<String>();
 
@@ -698,5 +691,5 @@ void API::onReaderAuthenticated(JsonObject data)
         this->deviceNameChangedHandler(deviceName);
     }
 
-    Serial.println("[API] Authentication successful.");
+    logger.info("Reader Authentication successful.");
 }
