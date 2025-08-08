@@ -18,7 +18,7 @@ void API::taskFn(void *parameter)
 void API::updateSateInfo()
 {
     uint32_t lastStateChangeTime = this->appState.getLastStateChangeTime();
-    if (this->lastKnownAppStateChangeTime <= lastStateChangeTime)
+    if (this->lastKnownAppStateChangeTime >= lastStateChangeTime)
     {
         return;
     }
@@ -34,12 +34,14 @@ void API::updateSateInfo()
 void API::loop()
 {
     this->updateSateInfo();
-    if (!this->loopIsEnabled)
-    {
-        return;
-    }
+    // Always try to drain/process any available incoming messages
+    this->processAvailableMessages();
 
-    this->sendHeartbeat();
+    // Only send heartbeat when connection is usable
+    if (this->loopIsEnabled)
+    {
+        this->sendHeartbeat();
+    }
 }
 
 void API::onRegistrationData(JsonObject data)
@@ -76,19 +78,14 @@ void API::onUnauthorized(JsonObject data)
     logger.error(("UNAUTHORIZED: " + message).c_str());
     Settings::clearAttraccessAuthConfig();
 
-    if (this->apiConnectionStatusChangedHandler)
-    {
-        this->apiConnectionStatusChangedHandler(false);
-    }
+    this->appState.setApiState(false, "");
 }
 
 void API::onEnableCardChecking(JsonObject data)
 {
     logger.info("ENABLE_CARD_CHECKING");
-    if (this->enableNfcCardCheckingHandler)
-    {
-        this->enableNfcCardCheckingHandler();
-    }
+
+    // TODO: trigger nfc card checking
 
     // {"type":"reset-nfc-card","card":{"id":5},"user":{"id":2,"username":"jappy"}}
     if (data["payload"]["type"].as<String>() == "reset-nfc-card")
@@ -99,10 +96,8 @@ void API::onEnableCardChecking(JsonObject data)
         String username = user["username"].as<String>();
 
         String displayText = "Reset NFC card\nUser > " + username + " <\nCard > " + String(cardId) + " <";
-        if (this->displayNfcTapEnabledHandler)
-        {
-            this->displayNfcTapEnabledHandler(true, displayText);
-        }
+        logger.error("Reset NFC card not implemented");
+        // TODO: trigger displaying of reset nfc card screen
     }
     else if (data["payload"]["type"].as<String>() == "enroll-nfc-card")
     {
@@ -110,10 +105,8 @@ void API::onEnableCardChecking(JsonObject data)
         String username = user["username"].as<String>();
 
         String displayText = "Enroll NFC card\nUser > " + username + " <";
-        if (this->displayNfcTapEnabledHandler)
-        {
-            this->displayNfcTapEnabledHandler(true, displayText);
-        }
+        logger.error("Enroll NFC card not implemented");
+        // TODO: trigger displaying of enroll nfc card screen
     }
     else if (data["payload"]["type"].as<String>() == "toggle-resource-usage")
     {
@@ -124,10 +117,8 @@ void API::onEnableCardChecking(JsonObject data)
         bool isActive = data["payload"]["isActive"].as<bool>();
         if (isActive)
         {
-            if (this->displayNfcTapEnabledHandler)
-            {
-                this->displayNfcTapEnabledHandler(true, "Tap card to stop: " + resourceName);
-            }
+            logger.error("Toggle resource usage not implemented");
+            // TODO: trigger displaying of toggle resource usage screen
         }
         else
         {
@@ -135,41 +126,28 @@ void API::onEnableCardChecking(JsonObject data)
             bool hasMaintenance = data["payload"]["hasActiveMaintenance"].as<bool>();
             if (hasMaintenance)
             {
-                if (this->displayNfcTapEnabledHandler)
-                {
-                    this->displayNfcTapEnabledHandler(true, "Maintenance mode - Tap to start: " + resourceName);
-                }
+                logger.error("Toggle resource usage not implemented");
+                // TODO: trigger displaying of toggle resource usage screen
             }
             else
             {
-                if (this->displayNfcTapEnabledHandler)
-                {
-                    this->displayNfcTapEnabledHandler(true, "Tap card to start: " + resourceName);
-                }
+                logger.error("Toggle resource usage not implemented");
+                // TODO: trigger displaying of toggle resource usage screen
             }
         }
     }
     else
     {
-        if (this->displayNfcTapEnabledHandler)
-        {
-            this->displayNfcTapEnabledHandler(true, data["payload"]["message"].as<String>());
-        }
+        logger.error("Toggle resource usage not implemented");
+        // TODO: trigger displaying of toggle resource usage screen
     }
 }
 
 void API::onDisableCardChecking(JsonObject data)
 {
     logger.info("DISABLE_CARD_CHECKING");
-    if (this->disableNfcCardCheckingHandler)
-    {
-        this->disableNfcCardCheckingHandler();
-    }
-
-    if (this->displayNfcTapEnabledHandler)
-    {
-        this->displayNfcTapEnabledHandler(false, "");
-    }
+    logger.error("Disable card checking not implemented");
+    // TODO: trigger displaying of disable card checking screen and disable card checking
 }
 
 void API::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength)
@@ -189,11 +167,11 @@ void API::onChangeKey(JsonObject data)
 {
     logger.info("CHANGE_KEY");
 
-    if (!this->nfcChangeKeyHandler)
-    {
-        logger.error("onNfcChangeKey callback is not set");
-        return;
-    }
+    return;
+
+    /*
+
+    // TODO: implement change key
 
     uint8_t keyNumber = data["payload"]["keyNumber"].as<uint8_t>();
     String authKeyHex = data["payload"]["authKey"].as<String>();
@@ -223,11 +201,17 @@ void API::onChangeKey(JsonObject data)
     JsonObject payload = doc.to<JsonObject>();
     payload["successful"] = success;
     this->sendMessage(true, "NFC_CHANGE_KEY", payload);
+    */
 }
 
 void API::onNfcAuthenticate(JsonObject data)
 {
     logger.info("NFC AUTHENTICATE");
+
+    return;
+
+    /*
+    // TODO: implement nfc authenticate
 
     uint8_t authenticationKey[16];
     String authKeyHex = data["payload"]["authenticationKey"].as<String>();
@@ -255,6 +239,7 @@ void API::onNfcAuthenticate(JsonObject data)
     JsonObject payload = doc.to<JsonObject>();
     payload["authenticationSuccessful"] = success;
     this->sendMessage(true, "NFC_AUTHENTICATE", payload);
+    */
 }
 
 void API::onShowText(JsonObject data)
@@ -264,25 +249,26 @@ void API::onShowText(JsonObject data)
     // Handle the payload structure correctly (single message field)
     if (data["payload"]["message"].is<String>())
     {
-        if (this->showTextHandler)
-        {
-            this->showTextHandler(data["payload"]["message"].as<String>(), "");
-        }
+        logger.error("Show text not implemented");
+        // TODO: trigger displaying of show text screen
     }
     else
     {
         // Fallback for line-based messages
-        if (this->showTextHandler)
-        {
-            this->showTextHandler(
-                data["payload"]["lineOne"].as<String>(),
-                data["payload"]["lineTwo"].as<String>());
-        }
+        logger.error("Show text not implemented");
+        // TODO: trigger displaying of show text screen
     }
 }
 
-void API::processMessage(String message)
+void API::processAvailableMessages()
 {
+    String message;
+
+    if (!State::getNextIncomingWebsocketMessage(message))
+    {
+        return;
+    }
+
     JsonDocument doc;
     deserializeJson(doc, message);
 
@@ -346,20 +332,11 @@ void API::processMessage(String message)
 
     else if (eventType == "DISPLAY_SUCCESS")
     {
-        String message = data["payload"]["message"].as<String>();
-        if (this->displaySuccessHandler)
-        {
-            this->displaySuccessHandler(message);
-        }
+        this->onDisplaySuccess(data);
     }
     else if (eventType == "DISPLAY_ERROR")
     {
-        String message = data["payload"]["message"].as<String>();
-
-        if (this->displayErrorHandler)
-        {
-            this->displayErrorHandler(message);
-        }
+        this->onDisplayError(data);
     }
     else if (eventType == "DISPLAY_TEXT")
     {
@@ -368,17 +345,7 @@ void API::processMessage(String message)
 
     else if (eventType == "SELECT_ITEM")
     {
-        this->is_in_select_item_mode = true;
-        this->select_item_current_value = "";
-
-        this->select_item_type = data["payload"]["itemType"].as<String>();
-        // options array is array of objects with id and label
-        this->select_item_options = data["payload"]["options"].as<JsonArray>();
-
-        if (this->displaySelectItemHandler)
-        {
-            this->displaySelectItemHandler(this->select_item_type, this->select_item_options, this->select_item_current_value);
-        }
+        this->onSelectItem(data);
     }
     else if (eventType == "CONFIRM_ACTION")
     {
@@ -434,10 +401,9 @@ void API::sendMessage(bool is_response, const char *type, JsonObject payload)
 
     String json;
     serializeJson(event, json);
-    if (this->sendMessageHandler)
-    {
-        this->sendMessageHandler(json);
-    }
+
+    this->logger.info(("pushing message to queue: " + json).c_str());
+    this->appState.pushOutgoingWebsocketMessageToQueue(json);
 }
 
 void API::onRequestAuthentication(JsonObject data)
@@ -457,26 +423,6 @@ void API::onRequestAuthentication(JsonObject data)
     this->sendMessage(true, "READER_REQUEST_AUTHENTICATION", payload);
 }
 
-void API::onNFCTapped(char *uid, uint8_t uidLength)
-{
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-
-    // Convert UID to hex string
-    String uidHex = "";
-    for (uint8_t i = 0; i < uidLength; i++)
-    {
-        if (uid[i] < 0x10)
-        {
-            uidHex += "0";
-        }
-        uidHex += String(uid[i], HEX);
-    }
-
-    payload["cardUID"] = uidHex;
-    this->sendMessage(false, "NFC_TAP", payload);
-}
-
 void API::sendHeartbeat()
 {
     // send every 5 seconds
@@ -485,15 +431,14 @@ void API::sendHeartbeat()
         return;
     }
 
-    StaticJsonDocument<512> event;
+    JsonDocument event;
     event["event"] = "HEARTBEAT";
 
     String json;
     serializeJson(event, json);
-    if (this->sendMessageHandler)
-    {
-        this->sendMessageHandler(json);
-    }
+
+    this->logger.info(("pushing heartbeat to websocket queue: " + json).c_str());
+    this->appState.pushOutgoingWebsocketMessageToQueue(json);
 
     this->heartbeat_sent_at = millis();
 }
@@ -514,126 +459,14 @@ void API::onFirmwareUpdateRequired(JsonObject data)
 {
     logger.info("Firmware update required");
 
-    if (this->firmwareUpdateRequiredHandler)
-    {
-        this->firmwareUpdateRequiredHandler();
-    }
+    logger.error("Firmware update required not implemented");
 }
 
 void API::onFirmwareStreamChunk(JsonObject data)
 {
     logger.info("Received firmware stream chunk");
 
-    if (this->firmwareStreamChunkHandler)
-    {
-        this->firmwareStreamChunkHandler(data);
-    }
-}
-
-void API::setOnEnableNfcCardChecking(void (*callback)())
-{
-    this->enableNfcCardCheckingHandler = callback;
-}
-
-void API::setOnDisableNfcCardChecking(void (*callback)())
-{
-    this->disableNfcCardCheckingHandler = callback;
-}
-
-void API::setOnNfcChangeKey(bool (*callback)(uint8_t keyNumber, uint8_t *authKey, uint8_t *oldKey, uint8_t *newKey))
-{
-    this->nfcChangeKeyHandler = callback;
-}
-
-void API::setOnNfcAuthenticate(bool (*callback)(uint8_t keyNumber, uint8_t *authenticationKey))
-{
-    this->nfcAuthenticateHandler = callback;
-}
-
-void API::setOnApiConnectionStatusChanged(void (*callback)(bool isAuthenticated))
-{
-    this->apiConnectionStatusChangedHandler = callback;
-}
-
-void API::setDisplayNfcTapEnabledHandler(void (*callback)(bool enabled, String text))
-{
-    this->displayNfcTapEnabledHandler = callback;
-}
-
-void API::setShowTextHandler(void (*callback)(String lineOne, String lineTwo))
-{
-    this->showTextHandler = callback;
-}
-
-void API::setDeviceNameChangedHandler(void (*callback)(String deviceName))
-{
-    this->deviceNameChangedHandler = callback;
-}
-
-void API::setDisplaySuccessHandler(void (*callback)(String message))
-{
-    this->displaySuccessHandler = callback;
-}
-
-void API::setDisplayErrorHandler(void (*callback)(String message))
-{
-    this->displayErrorHandler = callback;
-}
-
-void API::setDisplaySelectItemHandler(void (*callback)(String type, JsonArray options, String value))
-{
-    this->displaySelectItemHandler = callback;
-}
-
-void API::setOnFirmwareUpdateRequiredHandler(void (*callback)())
-{
-    this->firmwareUpdateRequiredHandler = callback;
-}
-
-void API::setOnFirmwareStreamChunkHandler(void (*callback)(JsonObject data))
-{
-    this->firmwareStreamChunkHandler = callback;
-}
-
-void API::setSendMessageHandler(void (*callback)(String message))
-{
-    this->sendMessageHandler = callback;
-}
-
-void API::onKeyPressed(char key)
-{
-    if (key == '\0')
-    {
-        return;
-    }
-
-    if (!this->is_in_select_item_mode)
-    {
-        return;
-    }
-
-    if (key == '#')
-    {
-        JsonDocument doc;
-        JsonObject payload = doc.to<JsonObject>();
-        payload["value"] = this->select_item_current_value;
-        this->sendMessage(false, "SELECT_ITEM", payload);
-        this->is_in_select_item_mode = false;
-        return;
-    }
-    else if (key == 'D')
-    {
-        this->select_item_current_value = "";
-    }
-    else
-    {
-        this->select_item_current_value += key;
-    }
-
-    if (this->displaySelectItemHandler)
-    {
-        this->displaySelectItemHandler(this->select_item_type, this->select_item_options, this->select_item_current_value);
-    }
+    logger.error("Firmware stream chunk not implemented");
 }
 
 void API::onConfirmAction(JsonObject data)
@@ -664,15 +497,39 @@ void API::onConfirmAction(JsonObject data)
         logger.error("UNSUPPORTED CONFIRM ACTION");
     }
 
-    if (this->confirmActionHandler)
-    {
-        this->confirmActionHandler(title, message);
-    }
+    logger.error("Confirm action not implemented");
 }
 
-void API::setDisplayConfirmActionHandler(void (*callback)(String title, String message))
+void API::onDisplaySuccess(JsonObject data)
 {
-    this->confirmActionHandler = callback;
+    String message = "";
+    if (data["payload"].is<JsonObject>() && data["payload"]["message"].is<String>())
+    {
+        message = data["payload"]["message"].as<String>();
+    }
+    logger.error("Display success not implemented");
+}
+
+void API::onDisplayError(JsonObject data)
+{
+    String message = "";
+    if (data["payload"].is<JsonObject>() && data["payload"]["message"].is<String>())
+    {
+        message = data["payload"]["message"].as<String>();
+    }
+    logger.error("Display error not implemented");
+}
+
+void API::onSelectItem(JsonObject data)
+{
+    this->is_in_select_item_mode = true;
+    this->select_item_current_value = "";
+
+    this->select_item_type = data["payload"]["itemType"].as<String>();
+    // options array is array of objects with id and label
+    this->select_item_options = data["payload"]["options"].as<JsonArray>();
+
+    logger.error("Select item not implemented");
 }
 
 void API::onReaderAuthenticated(JsonObject data)
@@ -681,15 +538,7 @@ void API::onReaderAuthenticated(JsonObject data)
 
     String deviceName = data["payload"]["name"].as<String>();
 
-    if (this->apiConnectionStatusChangedHandler)
-    {
-        this->apiConnectionStatusChangedHandler(true);
-    }
-
-    if (this->deviceNameChangedHandler)
-    {
-        this->deviceNameChangedHandler(deviceName);
-    }
+    this->appState.setApiState(true, deviceName);
 
     logger.info("Reader Authentication successful.");
 }

@@ -40,6 +40,12 @@ public:
 
     uint32_t getLastStateChangeTime();
 
+    static void pushIncomingWebsocketMessageToQueue(const String &message);
+    static bool getNextIncomingWebsocketMessage(String &message);
+
+    static void pushOutgoingWebsocketMessageToQueue(const String &message);
+    static bool getNextOutgoingWebsocketMessage(String &message);
+
 private:
     void onStateChanged();
     static uint32_t _lastStateChangeTime;
@@ -57,6 +63,12 @@ private:
     static uint16_t websocket_port;
     static bool websocket_use_ssl;
     static bool websocket_connected;
+    static QueueHandle_t incoming_websocket_messages_queue;
+    static QueueHandle_t outgoing_websocket_messages_queue;
+
+    static void initializeQueuesIfNeeded();
+
+    static bool _queuesInitialized;
 
     static bool api_authenticated;
     static String api_device_name;

@@ -27,6 +27,8 @@ void Websocket::taskFn(void *parameter)
 
 void Websocket::loop()
 {
+    this->updateInfoFromAppState();
+
     if (!network_is_connected)
     {
         return;
@@ -48,8 +50,24 @@ void Websocket::loop()
     case CONNECTING:
         break;
     case CONNECTED:
+        // Try to send any pending outgoing messages
+        this->processOutgoingMessages();
         break;
     }
+}
+
+void Websocket::updateInfoFromAppState()
+{
+    uint32_t lastStateChangeTime = appState.getLastStateChangeTime();
+    if (lastKnownAppStateChangeTime >= lastStateChangeTime)
+    {
+        return;
+    }
+
+    lastKnownAppStateChangeTime = lastStateChangeTime;
+
+    auto networkState = appState.getNetworkState();
+    this->network_is_connected = networkState.wifi_connected || networkState.ethernet_connected;
 }
 
 void Websocket::connectWebSocket()
@@ -182,27 +200,15 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         if (data->op_code == 0x01)
         { // Text frame
             String message = String((char *)data->data_ptr, data->data_len);
-            logger.debug(("Received: " + message).c_str());
-            if (_messageHandler)
-            {
-                _messageHandler(message);
-            }
-            else
-            {
-                logger.error("No message handler");
-            }
+            logger.debug(("Pushing incoming message to queue: " + message).c_str());
+
+            State::pushIncomingWebsocketMessageToQueue(message);
         }
         else if (data->op_code == 0x02)
         { // Binary frame
             logger.debug(("Received binary data: " + String(data->data_len) + " bytes").c_str());
-            if (_binaryDataHandler)
-            {
-                _binaryDataHandler((const uint8_t *)data->data_ptr, data->data_len);
-            }
-            else
-            {
-                logger.error("No binary data handler");
-            }
+
+            logger.error("No binary data handler");
         }
         break;
 
@@ -217,8 +223,14 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 }
 
-void Websocket::sendMessage(const String &message)
+void Websocket::processOutgoingMessages()
 {
+    String message;
+    if (!State::getNextOutgoingWebsocketMessage(message))
+    {
+        return;
+    }
+
     logger.debug(("sendMessage: " + message).c_str());
     int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
 
@@ -226,21 +238,6 @@ void Websocket::sendMessage(const String &message)
     {
         logger.error("sendMessage: failed");
     }
-}
-
-void Websocket::setNetworkIsConnected(bool isConnected)
-{
-    network_is_connected = isConnected;
-}
-
-void Websocket::setBinaryDataHandler(std::function<void(const uint8_t *data, size_t length)> binaryDataHandler)
-{
-    _binaryDataHandler = binaryDataHandler;
-}
-
-void Websocket::setMessageHandler(std::function<void(const String &message)> messageHandler)
-{
-    _messageHandler = messageHandler;
 }
 
 void Websocket::setState(ConnectionState state)

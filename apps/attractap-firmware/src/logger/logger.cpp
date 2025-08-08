@@ -4,9 +4,29 @@ LogLevel Logger::level = LOG_LEVEL_INFO;
 
 Logger::Logger(const char *name) : name(name)
 {
+    Preferences preferences;
+    preferences.begin("logging", true);
+    bool hasLogLevel = preferences.isKey("log.level");
+
+    if (hasLogLevel)
+    {
+        Serial.println("Logger: has persisted log level, restoring");
+        LogLevel storedLogLevel = (LogLevel)preferences.getUChar("log.level", 0);
+        Logger::setLevel(storedLogLevel, false);
+    }
+    else
+    {
+        Serial.println("Logger: no persisted log level, using LOG_LEVEL if exists");
 #ifdef LOG_LEVEL
-    Logger::setLevel(getLogLevelFromString(LOG_LEVEL));
+        Serial.println("Logger: LOG_LEVEL is defined, using it");
+        Logger::setLevel(getLogLevelFromString(LOG_LEVEL));
+#else
+
+        Serial.println("Logger: no persisted log level, no LOG_LEVEL, using LOG_LEVEL_INFO");
+        Logger::setLevel(LOG_LEVEL_INFO, false);
 #endif
+    }
+    preferences.end();
 }
 
 void Logger::log(const char *message)
@@ -61,9 +81,22 @@ void Logger::debugf(const char *message, ...)
     va_end(args);
 }
 
-void Logger::setLevel(LogLevel level)
+void Logger::setLogLevel(String level, bool saveToPreferences)
+{
+    Logger::setLevel(getLogLevelFromString(level.c_str()), saveToPreferences);
+}
+
+void Logger::setLevel(LogLevel level, bool saveToPreferences)
 {
     Logger::level = level;
+
+    if (saveToPreferences)
+    {
+        Preferences preferences;
+        preferences.begin("logging", false);
+        preferences.putUChar("log.level", level);
+        preferences.end();
+    }
 }
 
 String Logger::getLogLevelString(LogLevel level)

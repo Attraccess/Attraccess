@@ -30,6 +30,19 @@ void SerialSetup::setup(CLIService *cliService, API *api, Websocket *websocket)
     // Register WiFi connect handler
     cliService->registerCommandHandler("network.wifi.credentials", [](const String &payload) -> String
                                        { return handleWiFiConnect(payload); });
+
+    // register reboot handler
+    cliService->registerCommandHandler("system.reboot", [](const String &payload) -> String
+                                       {
+                                           ESP.restart();
+                                           return "rebooting"; // This will likely not be sent since ESP.restart() is immediate
+                                       });
+
+    // set log level
+    cliService->registerCommandHandler("log.level", [](const String &payload) -> String
+                                       { 
+                                           Logger::setLogLevel(payload); 
+                                           return "success"; });
 }
 
 String SerialSetup::handleFirmwareVersion(const String &payload)

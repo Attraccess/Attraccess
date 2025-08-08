@@ -44,10 +44,6 @@ CLIService cliService;
 FirmwareUpdate firmwareUpdate;
 Websocket websocket;
 
-// Global variables to track connection status
-static bool apiIsAuthenticated = false;
-static bool websocketIsConnected = false;
-
 void setup()
 {
     Serial.begin(115200);

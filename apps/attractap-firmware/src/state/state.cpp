@@ -1,5 +1,24 @@
 #include "state.hpp"
 
+// Fixed-size buffer per queued message to avoid heap and keep stack small
+static constexpr size_t WEBSOCKET_MESSAGE_MAX_LEN = 1024; // bytes, including null terminator
+struct StateQueueMessage
+{
+    char data[WEBSOCKET_MESSAGE_MAX_LEN];
+};
+
+void State::initializeQueuesIfNeeded()
+{
+    if (State::incoming_websocket_messages_queue == nullptr)
+    {
+        State::incoming_websocket_messages_queue = xQueueCreate(15, sizeof(StateQueueMessage));
+    }
+    if (State::outgoing_websocket_messages_queue == nullptr)
+    {
+        State::outgoing_websocket_messages_queue = xQueueCreate(15, sizeof(StateQueueMessage));
+    }
+}
+
 portMUX_TYPE State::stateMutex = portMUX_INITIALIZER_UNLOCKED;
 uint32_t State::_lastStateChangeTime;
 
@@ -14,6 +33,8 @@ String State::websocket_hostname;
 uint16_t State::websocket_port;
 bool State::websocket_use_ssl;
 bool State::websocket_connected;
+QueueHandle_t State::incoming_websocket_messages_queue = nullptr;
+QueueHandle_t State::outgoing_websocket_messages_queue = nullptr;
 
 bool State::api_authenticated;
 String State::api_device_name;
@@ -112,4 +133,60 @@ State::ApiState State::getApiState()
     taskEXIT_CRITICAL(&State::stateMutex);
 
     return state;
+}
+
+void State::pushIncomingWebsocketMessageToQueue(const String &message)
+{
+    initializeQueuesIfNeeded();
+    static const uint32_t incoming_queue_max_wait_ms = 2000;
+    StateQueueMessage qmsg;
+    size_t copyLen = message.length();
+    if (copyLen >= WEBSOCKET_MESSAGE_MAX_LEN)
+    {
+        copyLen = WEBSOCKET_MESSAGE_MAX_LEN - 1; // leave space for null terminator
+    }
+    memcpy(qmsg.data, message.c_str(), copyLen);
+    qmsg.data[copyLen] = '\0';
+
+    xQueueSend(incoming_websocket_messages_queue, &qmsg, pdMS_TO_TICKS(incoming_queue_max_wait_ms));
+}
+
+bool State::getNextIncomingWebsocketMessage(String &message)
+{
+    initializeQueuesIfNeeded();
+    StateQueueMessage qmsg;
+    if (xQueueReceive(incoming_websocket_messages_queue, &qmsg, 0) == pdPASS)
+    {
+        message = String(qmsg.data);
+        return true;
+    }
+    return false;
+}
+
+void State::pushOutgoingWebsocketMessageToQueue(const String &message)
+{
+    initializeQueuesIfNeeded();
+    static const uint32_t outgoing_queue_max_wait_ms = 2000;
+    StateQueueMessage qmsg;
+    size_t copyLen = message.length();
+    if (copyLen >= WEBSOCKET_MESSAGE_MAX_LEN)
+    {
+        copyLen = WEBSOCKET_MESSAGE_MAX_LEN - 1;
+    }
+    memcpy(qmsg.data, message.c_str(), copyLen);
+    qmsg.data[copyLen] = '\0';
+
+    xQueueSend(outgoing_websocket_messages_queue, &qmsg, pdMS_TO_TICKS(outgoing_queue_max_wait_ms));
+}
+
+bool State::getNextOutgoingWebsocketMessage(String &message)
+{
+    initializeQueuesIfNeeded();
+    StateQueueMessage qmsg;
+    if (xQueueReceive(outgoing_websocket_messages_queue, &qmsg, 0) == pdPASS)
+    {
+        message = String(qmsg.data);
+        return true;
+    }
+    return false;
 }

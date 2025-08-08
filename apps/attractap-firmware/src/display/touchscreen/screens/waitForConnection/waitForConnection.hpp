@@ -26,6 +26,17 @@ private:
 
     bool initialized;
 
+    // dot animation state (single synchronized animation)
+    static const int DOT_COUNT = 5;
+    lv_obj_t *dots[DOT_COUNT];
+    int16_t dotXOffsets[DOT_COUNT];
+    int16_t dotsBaseYOffset;
+    int16_t dotsAmplitude;
+    int32_t dotsAnimDurationMs;
+
+    static void dotsAnimExecCb(void *var, int32_t v);
+    void startDotsAnimation();
+
     void initialize();
     void updateStatus();
     Logger logger;

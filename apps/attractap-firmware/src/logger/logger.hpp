@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <cstdarg>
+#include <Preferences.h>
 
 enum LogLevel
 {
@@ -23,14 +24,15 @@ public:
     void debug(const char *message);
     void debugf(const char *message, ...);
 
-    static void setLevel(LogLevel level);
+    static void setLogLevel(String level, bool saveToPreferences = true);
+    static void setLevel(LogLevel level, bool saveToPreferences = true);
 
 private:
     const char *name;
     static LogLevel level;
 
-    String getLogLevelString(LogLevel level);
-    LogLevel getLogLevelFromString(const char *level);
+    static String getLogLevelString(LogLevel level);
+    static LogLevel getLogLevelFromString(const char *level);
 
     void log(const char *message, LogLevel level);
     void logf(const char *message, LogLevel level, va_list args);

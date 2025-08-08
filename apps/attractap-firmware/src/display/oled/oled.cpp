@@ -20,7 +20,7 @@ void OLED::setup()
 {
     this->boot_time = millis();
 
-    instance->logger.info("Setup");
+    this->logger.info("Setup");
 
 #ifdef SCREEN_DRIVER_SH1106
     uint8_t screen_init_cmd = SH1106_SWITCHCAPVCC;
@@ -63,27 +63,27 @@ void OLED::loop()
     {
         this->draw_api_connecting_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_CARD_CHECKING)
+    else if (this->_state == OLED_STATE_CARD_CHECKING)
     {
         this->draw_nfc_tap_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_ERROR)
+    else if (this->_state == OLED_STATE_ERROR)
     {
         this->draw_error_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_SUCCESS)
+    else if (this->_state == OLED_STATE_SUCCESS)
     {
         this->draw_success_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_TEXT)
+    else if (this->_state == OLED_STATE_TEXT)
     {
         this->draw_text_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_SELECT_ITEM)
+    else if (this->_state == OLED_STATE_SELECT_ITEM)
     {
         this->draw_select_item_ui();
     }
-    else if (this->display_state == DISPLAY_STATE_CONFIRM_ACTION)
+    else if (this->_state == OLED_STATE_CONFIRM_ACTION)
     {
         this->draw_confirm_action_ui();
     }

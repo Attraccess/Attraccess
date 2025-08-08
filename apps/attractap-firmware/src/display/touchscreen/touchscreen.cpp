@@ -228,46 +228,47 @@ void Touchscreen::updateScreen()
     bool isConnectedToNetwork = isConnectedToWifi || isConnectedToEthernet;
 
     IScreen *oldScreen = currentScreen;
+    IScreen *newScreen = NULL;
 
     if (!isConnectedToNetwork || !isConnectedToWebsocket || !isConnectedToApi)
     {
-        currentScreen = &waitForConnectionScreen;
+        newScreen = &waitForConnectionScreen;
     }
     else if (this->nfcTapEnabled)
     {
-        this->currentScreen = &nfcTapScreen;
+        newScreen = &nfcTapScreen;
     }
     else if (this->state == DISPLAY_STATE_ERROR)
     {
-        this->currentScreen = &messageScreen;
+        newScreen = &messageScreen;
     }
     else if (this->state == DISPLAY_STATE_SUCCESS)
     {
-        this->currentScreen = &messageScreen;
+        newScreen = &messageScreen;
     }
     else if (this->state == DISPLAY_STATE_TEXT)
     {
-        this->currentScreen = &messageScreen;
+        newScreen = &messageScreen;
     }
     else if (this->state == DISPLAY_STATE_SELECT_ITEM)
     {
-        this->currentScreen = &messageScreen;
+        newScreen = &messageScreen;
     }
     else if (this->state == DISPLAY_STATE_CONFIRM_ACTION)
     {
-        this->currentScreen = &messageScreen;
+        newScreen = &messageScreen;
     }
     else
     {
-        this->currentScreen = &unknownStateScreen;
+        newScreen = &unknownStateScreen;
     }
 
-    if (currentScreen == NULL)
+    if (newScreen == NULL)
     {
         return;
     }
 
-    if (oldScreen != currentScreen)
+    if (oldScreen != newScreen)
     {
         if (oldScreen != NULL)
         {
@@ -276,14 +277,16 @@ void Touchscreen::updateScreen()
         }
 
         logger.debug("currentScreen onScreenEnter");
-        currentScreen->onScreenEnter();
+        newScreen->onScreenEnter();
 
         logger.debug("Loading next screen, currentScreen->getScreen()");
         lv_screen_load(currentScreen->getScreen());
-        // lv_screen_load_anim(currentScreen->getScreen(), LV_SCR_LOAD_ANIM_FADE_IN, 500, 0, false);
+        // lv_screen_load_anim(newScreen->getScreen(), LV_SCR_LOAD_ANIM_FADE_IN, 100, 0, false);
+
+        currentScreen = newScreen;
     }
 
-    currentScreen->loop();
+    // currentScreen->loop();
 }
 
 void Touchscreen::getUpdatesFromAppState()

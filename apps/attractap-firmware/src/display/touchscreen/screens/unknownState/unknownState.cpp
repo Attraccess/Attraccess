@@ -1,6 +1,6 @@
 #include "unknownState.hpp"
 
-UnknownStateScreen::UnknownStateScreen() : screen(nullptr), initialized(false), logger("UnknownStateScreen")
+UnknownStateScreen::UnknownStateScreen() : screen(nullptr), initialized(false), logger("Touchscreen:UnknownState")
 {
     // Don't create LVGL objects here - they need to be created after lv_init()
 }

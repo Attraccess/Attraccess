@@ -12,7 +12,7 @@
 class Websocket
 {
 public:
-    Websocket() : logger("Websocket") {}
+    Websocket() : logger("Websocket"), lastKnownAppStateChangeTime(0) {}
 
     enum ConnectionState
     {
@@ -21,12 +21,7 @@ public:
         CONNECTED,
     };
     void setup();
-    void setNetworkIsConnected(bool isConnected);
 
-    void setMessageHandler(std::function<void(const String &message)> messageHandler);
-    void setBinaryDataHandler(std::function<void(const uint8_t *data, size_t length)> binaryDataHandler);
-
-    void sendMessage(const String &message);
     void connectWebSocket();
 
 private:
@@ -34,6 +29,10 @@ private:
     void loop();
 
     State appState;
+    void updateInfoFromAppState();
+    uint32_t lastKnownAppStateChangeTime;
+
+    void processOutgoingMessages();
 
     AdaptiveCertManager _certManager;
 
@@ -41,9 +40,6 @@ private:
     const uint32_t RECONNECT_INTERVAL_MS = 10000;
 
     AttraccessApiConfig _lastApiConfig;
-
-    std::function<void(const String &message)> _messageHandler;
-    std::function<void(const uint8_t *data, size_t length)> _binaryDataHandler;
 
     ConnectionState _state = INIT;
     void setState(ConnectionState state);

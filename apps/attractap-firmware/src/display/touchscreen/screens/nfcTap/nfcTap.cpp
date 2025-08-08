@@ -1,6 +1,6 @@
 #include "nfcTap.hpp"
 
-NfcTapScreen::NfcTapScreen() : screen(nullptr), label(nullptr), initialized(false), logger("NfcTapScreen")
+NfcTapScreen::NfcTapScreen() : screen(nullptr), label(nullptr), initialized(false), logger("Touchscreen:NfcTap")
 {
     // Don't create LVGL objects here - they need to be created after lv_init()
 }

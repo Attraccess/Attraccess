@@ -1,6 +1,6 @@
 #include "message.hpp"
 
-MessageScreen::MessageScreen() : screen(nullptr), lineOneLabel(nullptr), lineTwoLabel(nullptr), initialized(false), logger("MessageScreen")
+MessageScreen::MessageScreen() : screen(nullptr), lineOneLabel(nullptr), lineTwoLabel(nullptr), initialized(false), logger("Touchscreen:Message")
 {
     // Don't create LVGL objects here - they need to be created after lv_init()
 }

@@ -2,28 +2,28 @@
 
 #include <Arduino.h>
 #include "task_priorities.h"
-#include <Adafruit_GFX.h>
-#ifdef SCREEN_DRIVER_SH1106
-#include <Adafruit_SH1106.h>
 #include "icons.hpp"
 #include <ArduinoJson.h>
-
-#elif SCREEN_DRIVER_SSD1306
-#include <Adafruit_SSD1306.h>
-#elif
-#error "No display driver defined"
-#endif
+#include <Adafruit_GFX.h>
 #include "esp_netif.h"
 #include "esp_log.h"
-#include "../logger/logger.hpp"
+#include "../../logger/logger.hpp"
+
+#ifdef SCREEN_DRIVER_SH1106
+#include <Adafruit_SH1106.h>
+#elif defined(SCREEN_DRIVER_SSD1306)
+#include <Adafruit_SSD1306.h>
+#else
+#error "No display driver defined"
+#endif
 
 class OLED
 {
 public:
 #ifdef SCREEN_DRIVER_SH1106
-    OLED() : screen(SCREEN_RESET) {}
-#elif SCREEN_DRIVER_SSD1306
-    OLED() : screen(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET) {}
+    OLED() : logger("OLED"), screen(SCREEN_RESET) {}
+#elif defined(SCREEN_DRIVER_SSD1306)
+    OLED() : logger("OLED"), screen(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, SCREEN_RESET) {}
 #endif
 
     enum OLEDState
@@ -36,8 +36,6 @@ public:
         OLED_STATE_CONFIRM_ACTION,
         OLED_STATE_CARD_CHECKING
     };
-
-    OLED() : logger("OLED") {}
 
     void setup();
 
