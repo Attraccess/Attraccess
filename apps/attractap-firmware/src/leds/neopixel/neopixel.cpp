@@ -1,5 +1,74 @@
 #include "neopixel.hpp"
 
+namespace
+{
+    // Utility: wrap an index on the 8-LED ring
+    inline int wrapIndex(int index, int count)
+    {
+        int m = index % count;
+        return m < 0 ? m + count : m;
+    }
+
+    // Utility: scaled copy of a color (video safe)
+    inline CRGB scaledColor(const CRGB &c, uint8_t scale)
+    {
+        CRGB out = c;
+        out.nscale8_video(scale);
+        return out;
+    }
+
+    // Utility: set LED with wrap
+    inline void setLedWrapped(CRGB *leds, int count, int index, const CRGB &color)
+    {
+        leds[wrapIndex(index, count)] = color;
+    }
+
+    // Utility: add LED with wrap (for tails/overlays)
+    inline void addLedWrapped(CRGB *leds, int count, int index, const CRGB &color)
+    {
+        leds[wrapIndex(index, count)] += color;
+    }
+
+    // Colors (sRGB)
+    const CRGB COLOR_BLUE_NET = CRGB(0x00, 0x7B, 0xFF); // #007BFF
+    const CRGB COLOR_CYAN_WS = CRGB(0x00, 0xE5, 0xFF);  // #00E5FF
+    const CRGB COLOR_AMBER = CRGB(0xFF, 0xC1, 0x07);    // #FFC107
+    const CRGB COLOR_RED_ERR = CRGB(0xFF, 0x00, 0x00);  // Pure red #FF0000
+    const CRGB COLOR_GREEN_OK = CRGB(0x00, 0xFF, 0x00); // Pure green #00FF00
+    const CRGB COLOR_WHITE = CRGB(0xFF, 0xFF, 0xFF);    // #FFFFFF
+    const CRGB COLOR_BLUE_ACT = CRGB(0x29, 0x79, 0xFF); // #2979FF
+    const CRGB COLOR_PURPLE = CRGB(0x9C, 0x27, 0xB0);   // #9C27B0
+    const CRGB COLOR_ORANGE = CRGB(0xFF, 0x91, 0x00);   // #FF9100
+    const CRGB COLOR_MAGENTA = CRGB(0xD5, 0x00, 0xF9);  // #D500F9
+
+    // Timing helpers
+    inline uint8_t breathe8(uint8_t bpm, uint8_t minV = 5, uint8_t maxV = 255)
+    {
+        return beatsin8(bpm, minV, maxV);
+    }
+
+    inline int stepFromPeriod(uint32_t nowMs, uint16_t periodMs, int steps)
+    {
+        if (periodMs == 0 || steps <= 0)
+            return 0;
+        uint32_t phase = nowMs % periodMs;
+        return (int)((uint64_t)phase * (uint32_t)steps / (uint32_t)periodMs);
+    }
+}
+
+void Neopixel::setup()
+{
+    logger.info("Setup");
+    FastLED.addLeds<WS2812, PIN_NEOPIXEL_LED, GRB>(leds, LED_COUNT);
+
+    xTaskCreate(
+        Neopixel::taskFn,
+        "leds",
+        4096,
+        this,
+        TASK_PRIORITY_LED,
+        NULL);
+}
 void Neopixel::taskFn(void *parameter)
 {
     const int REFRESH_RATE_HZ = 60;
@@ -15,190 +84,512 @@ void Neopixel::taskFn(void *parameter)
     }
 }
 
-void Neopixel::setup()
-{
-    logger.info("Setup");
-    FastLED.addLeds<WS2812, PIN_NEOPIXEL_LED, GRB>(leds, LED_COUNT);
-
-    FastLED.setBrightness(LED_MAX_BRIGHTNESS);
-
-    xTaskCreate(
-        Neopixel::taskFn,
-        "leds",
-        4096,
-        this,
-        TASK_PRIORITY_LED,
-        NULL);
-}
-
 void Neopixel::loop()
 {
-    // Update LED state based on system state
-    updateStateBasedLeds();
+    this->updateAppStateData();
+    this->updateApiEventData();
 
-    switch (this->currentState)
-    {
-    case NEOPIXEL_STATE_OFF:
-        this->updateAnimationOff();
-        break;
-    case NEOPIXEL_STATE_ON:
-        this->updateAnimationOn();
-        break;
-    case NEOPIXEL_STATE_BLINKING:
-        this->updateAnimationBlinking();
-        break;
-    case NEOPIXEL_STATE_BREATHING:
-        this->updateAnimationBreathing();
-        break;
-    }
-    FastLED.show();
+    this->runAnimation();
 }
 
-void Neopixel::setOff()
+void Neopixel::updateAppStateData()
 {
-    for (int i = 0; i < LED_COUNT; i++)
-    {
-        leds[i] = CRGB::Black;
-    }
-    this->currentState = NEOPIXEL_STATE_OFF;
-
-    FastLED.setBrightness(LED_MAX_BRIGHTNESS);
-}
-
-void Neopixel::updateAnimationOff()
-{
-    return;
-}
-
-void Neopixel::setOn(CRGB color)
-{
-    for (int i = 0; i < LED_COUNT; i++)
-    {
-        leds[i] = color;
-    }
-    this->currentState = NEOPIXEL_STATE_ON;
-
-    FastLED.setBrightness(LED_MAX_BRIGHTNESS);
-}
-
-void Neopixel::updateAnimationOn()
-{
-    return;
-}
-
-void Neopixel::setBlinking(CRGB color, int interval)
-{
-    this->currentColor = color;
-    this->currentInterval = interval;
-    this->currentState = NEOPIXEL_STATE_BLINKING;
-
-    FastLED.setBrightness(LED_MAX_BRIGHTNESS);
-}
-
-void Neopixel::updateAnimationBlinking()
-{
-    unsigned long currentTime = millis();
-
-    // if interval not reached, return
-    if (currentTime - this->lastUpdate < this->currentInterval)
+    uint32_t lastStateChangeTime = State::getLastStateChangeTime();
+    if (lastStateChangeTime <= this->lastKnownStateChangeTime)
     {
         return;
     }
 
-    // update last update time
-    this->lastUpdate = currentTime;
+    this->lastKnownStateChangeTime = lastStateChangeTime;
 
-    // toggle led state
-    this->ledsAreOn = !this->ledsAreOn;
+    this->networkState = State::getNetworkState();
+    this->websocketState = State::getWebsocketState();
+    this->apiState = State::getApiState();
+}
 
-    // set led state
-    for (int i = 0; i < LED_COUNT; i++)
+void Neopixel::updateApiEventData()
+{
+    uint32_t lastApiEventTime = State::getLastApiEventTime();
+    if (lastApiEventTime <= this->lastApiEventTime)
     {
-        leds[i] = this->ledsAreOn ? this->currentColor : CRGB::Black;
+        return;
+    }
+
+    this->lastApiEventTime = lastApiEventTime;
+    this->apiEventData = State::getApiEventData();
+}
+
+void Neopixel::runAnimation()
+{
+    bool isNetworkConnected = this->networkState.wifi_connected || this->networkState.ethernet_connected;
+
+    if (!isNetworkConnected)
+    {
+        return this->runWaitingForNetworkAnimation();
+    }
+
+    if (!this->websocketState.connected)
+    {
+        return this->runWaitingForWebsocketConnectionAnimation();
+    }
+
+    if (!this->apiState.authenticated)
+    {
+        return this->runWaitingForApiAuthenticationAnimation();
+    }
+
+    switch (this->apiEventData.state)
+    {
+    case State::API_EVENT_STATE_DISPLAY_ERROR:
+        this->runDisplayErrorAnimation();
+        break;
+    case State::API_EVENT_STATE_DISPLAY_SUCCESS:
+        this->runDisplaySuccessAnimation();
+        break;
+    case State::API_EVENT_STATE_DISPLAY_TEXT:
+        this->runDisplayTextAnimation();
+        break;
+    case State::API_EVENT_STATE_CONFIRM_ACTION:
+        this->runConfirmActionAnimation();
+        break;
+    case State::API_EVENT_STATE_RESOURCE_SELECTION:
+        this->runResourceSelectionAnimation();
+        break;
+    case State::API_EVENT_STATE_WAIT_FOR_PROCESSING:
+        this->runWaitForProcessingAnimation();
+        break;
+    case State::API_EVENT_STATE_WAIT_FOR_NFC_TAP:
+        this->runWaitForNfcTapAnimation();
+        break;
+    case State::API_EVENT_STATE_FIRMWARE_UPDATE:
+        this->runFirmwareUpdateAnimation();
+        break;
     }
 }
 
-void Neopixel::setBreathing(CRGB color, int interval)
+/**
+ * We are waiting for the network to be connected
+ * Animation:
+ * - Color: Deep network blue (#007BFF)
+ * - Pattern: Single "comet" rotates clockwise with a soft fading tail
+ *   - Head brightness ~60%, tail on the 2 following LEDs at ~30% and ~10%
+ *   - One full revolution every ~2.0s (calm pace)
+ * - Background: Optional very soft global white breathe at ~5% to indicate power
+ * - User guidance: No action required; device is trying to connect to Wi‑Fi/Ethernet
+ */
+void Neopixel::runWaitingForNetworkAnimation()
 {
-    this->currentColor = color;
-    this->currentInterval = interval;
-    this->currentState = NEOPIXEL_STATE_BREATHING;
+    const uint16_t revolutionMs = 2000; // ~2.0s per revolution
+    const uint8_t headBrightness = 160; // ~60%
+    const uint8_t tail1 = 96;           // ~38%
+    const uint8_t tail2 = 40;           // ~16%
 
-    FastLED.setBrightness(0);
+    uint32_t now = millis();
+    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
 
-    for (int i = 0; i < LED_COUNT; i++)
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // Optional subtle background breathe (~5% base white)
+    uint8_t bg = breathe8(12, 3, 10); // slow, very dim
+    for (int i = 0; i < LED_COUNT; ++i)
     {
-        leds[i] = CRGB(this->currentColor);
+        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, bg));
     }
+
+    // Comet with 2-LED tail
+    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_BLUE_NET, headBrightness));
+    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_NET, tail1));
+    addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_NET, tail2));
+
+    FastLED.show();
 }
 
-void Neopixel::updateAnimationBreathing()
+/**
+ * We are waiting for the websocket connection to be established
+ * Animation:
+ * - Color: Teal/Cyan (#00E5FF)
+ * - Pattern: Two comets rotate clockwise 180° apart with short tails
+ *   - Head brightness ~55%, short tail on 1 following LED at ~25%
+ *   - One full revolution every ~1.5s (slightly more active than network)
+ * - Sync cue: Brief 80ms micro‑flash of all LEDs at ~10% every ~3s to imply handshaking
+ * - User guidance: No action required; establishing realtime connection
+ */
+void Neopixel::runWaitingForWebsocketConnectionAnimation()
 {
-    // breath the color from black to the current color and back, calculate the change amount by time and interval
-    unsigned long currentTime = millis();
-    int percentagePassed = (currentTime - this->lastUpdate) / this->currentInterval;
-    int brightness = map(percentagePassed, 0, 100, 0, LED_MAX_BRIGHTNESS);
+    const uint16_t revolutionMs = 1500; // ~1.5s per revolution
+    const uint8_t headBrightness = 140; // ~55%
+    const uint8_t tail = 64;            // ~25%
 
-    FastLED.setBrightness(brightness);
-}
+    uint32_t now = millis();
+    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
+    int head2 = head + LED_COUNT / 2; // 180° apart
 
-// State update methods
-void Neopixel::setNetworkConnected(bool connected)
-{
-    this->is_network_connected = connected;
-}
+    fill_solid(leds, LED_COUNT, CRGB::Black);
 
-void Neopixel::setApiConnected(bool connected)
-{
-    this->is_api_connected = connected;
-}
+    // Two comets
+    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_CYAN_WS, headBrightness));
+    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_CYAN_WS, tail));
+    setLedWrapped(leds, LED_COUNT, head2, scaledColor(COLOR_CYAN_WS, headBrightness));
+    addLedWrapped(leds, LED_COUNT, head2 - 1, scaledColor(COLOR_CYAN_WS, tail));
 
-void Neopixel::setDisplayState(DISPLAY_STATE state)
-{
-    this->current_display_state = state;
-}
-
-// Autonomous LED state management based on system state
-void Neopixel::updateStateBasedLeds()
-{
-    if (!this->is_network_connected)
+    // Handshake micro‑flash every ~3s
+    if ((now % 3000) < 80)
     {
-        // Network disconnected - yellow blinking
-        setBlinking(CRGB::Yellow, 500);
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 28)); // ~11%
+        }
     }
-    else if (!this->is_api_connected)
+
+    FastLED.show();
+}
+
+/**
+ * We are waiting for the API authentication to be established
+ * Animation:
+ * - Color: Amber/Yellow (#FFC107)
+ * - Pattern: Gentle global breathe between ~5% and ~40% brightness at ~0.6 Hz
+ * - Activity tick: After every 2 breaths, a quick 250ms clockwise pulse runs around the ring
+ * - User guidance: No action required; logging in/authenticating
+ */
+void Neopixel::runWaitingForApiAuthenticationAnimation()
+{
+    // Smooth, calm: base amber breathe + continuous subtle running highlight (no blinks)
+    // Breathe at ~0.6 Hz → 36 BPM
+    uint8_t base = breathe8(36, 13, 64); // ~5% to ~25%
+
+    uint32_t now = millis();
+    fill_solid(leds, LED_COUNT, scaledColor(COLOR_AMBER, base));
+
+    // Continuous running dot with short tail, slow pace (~2.4s per revolution)
+    int head = stepFromPeriod(now, 2400, LED_COUNT);
+    addLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_AMBER, 160));    // head ~60%
+    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_AMBER, 64)); // tail ~25%
+
+    FastLED.show();
+}
+
+/**
+ * We are displaying an error message
+ * Animation:
+ * - Color: Alert Red (#FF1744)
+ * - Pattern: Attention sequence followed by idle alert
+ *   1) Attention: 3 double‑flashes (200ms on, 200ms off, repeat twice per flash),
+ *      with even and odd LEDs alternating per flash to create a zig‑zag effect
+ *   2) Idle alert: Slow heartbeat at ~1 Hz (on ~150ms at ~30%, off ~850ms)
+ * - User guidance: Something went wrong; check the screen for details
+ */
+void Neopixel::runDisplayErrorAnimation()
+{
+    uint32_t now = millis();
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // Intro: 3 double‑flashes with even/odd alternation (~2.4s total)
+    uint32_t sinceEvent = now - this->lastApiEventTime;
+    if (sinceEvent < 2400)
     {
-        // API disconnected - blue blinking
-        setBlinking(CRGB::Blue, 500);
+        // Each double flash window: 800ms (on 200, off 200, on 200, off 200)
+        uint32_t inDouble = sinceEvent % 800;
+        bool onPhase = (inDouble < 200) || (inDouble >= 400 && inDouble < 600);
+        bool even = ((sinceEvent / 800) % 2) == 0; // alternate even/odd per double flash
+        uint8_t level = onPhase ? 180 : 0;         // ~70%
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            bool isEven = (i % 2) == 0;
+            if ((even && isEven) || (!even && !isEven))
+            {
+                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_RED_ERR, level));
+            }
+        }
+        FastLED.show();
+        return;
+    }
+
+    // Idle heartbeat at ~1 Hz
+    uint8_t beat = ((now % 1000) < 150) ? 96 : 0; // 150ms pulse, pure red
+    for (int i = 0; i < LED_COUNT; ++i)
+    {
+        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_RED_ERR, beat));
+    }
+
+    FastLED.show();
+}
+
+/**
+ * We are displaying a success message
+ * Animation:
+ * - Color: Success Green (#00E676)
+ * - Pattern:
+ *   1) Celebration wipe: Clockwise progressive fill of the ring over ~600ms
+ *   2) Hold: Solid green at ~20% for ~2s
+ *   3) Idle: Gentle breathe between ~10% and ~25% at ~0.4 Hz
+ * - User guidance: Action completed successfully
+ */
+void Neopixel::runDisplaySuccessAnimation()
+{
+    uint32_t now = millis();
+    uint32_t sinceEvent = now - this->lastApiEventTime;
+
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    if (sinceEvent < 800)
+    {
+        // Celebration: fast radial sparkle + progressive fill over ~800ms
+        int lit = (int)((sinceEvent * LED_COUNT) / 800);
+        for (int i = 0; i <= lit && i < LED_COUNT; ++i)
+        {
+            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, 200));
+        }
+        // subtle white sparkles on remaining LEDs (excitement)
+        for (int i = lit + 1; i < LED_COUNT; ++i)
+        {
+            if (((now + i * 73) % 120) < 20)
+            {
+                addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 64));
+            }
+        }
+    }
+    else if (sinceEvent < 2800)
+    {
+        // Hold vivid green ~2s with gentle shimmer to read as celebratory
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            uint8_t jitter = ((now + i * 41) % 250) < 12 ? 30 : 0; // brief local lift
+            leds[i] = scaledColor(COLOR_GREEN_OK, 120 + jitter);   // base ~47%
+        }
     }
     else
     {
-        // Network and API connected - respond to display state
-        switch (this->current_display_state)
+        // Idle upbeat breathe 0.5 Hz → 30 BPM, a bit brighter
+        uint8_t level = breathe8(30, 38, 96); // ~15% to ~38%
+        fill_solid(leds, LED_COUNT, scaledColor(COLOR_GREEN_OK, level));
+    }
+
+    FastLED.show();
+}
+
+/**
+ * We are displaying a text message
+ * Animation:
+ * - Color: Soft neutral white (#FFFFFF)
+ * - Pattern: Static ring at low brightness (~8–12%) with very subtle drift (±3%) at ~0.2 Hz
+ * - Intent: Non‑distracting ambient light while the user reads text on the display
+ * - User guidance: Read the message; no immediate action required
+ */
+void Neopixel::runDisplayTextAnimation()
+{
+    // Soft neutral white, subtle drift at ~0.2 Hz (12 BPM)
+    uint8_t level = breathe8(12, 20, 31); // ~8–12%
+    fill_solid(leds, LED_COUNT, scaledColor(COLOR_WHITE, level));
+    FastLED.show();
+}
+
+/**
+ * We are confirming an action
+ * Animation:
+ * - Colors: Confirm Green (#00E676) and Cancel Blue (#2979FF)
+ * - Pattern: The ring is split into two halves (4+4 LEDs)
+ *   - One half breathes green while the opposite half breathes blue, 180° out of phase (~0.8 Hz)
+ *   - Every 1.5s, a quick bidirectional sweep (green clockwise, blue counter‑clockwise) signals input needed
+ * - User guidance: Choose/confirm on the screen; LEDs indicate that a decision is required
+ */
+void Neopixel::runConfirmActionAnimation()
+{
+    uint32_t now = millis();
+    // Two halves out of phase breathe (~0.8 Hz → 48 BPM)
+    uint8_t levelA = breathe8(48, 26, 102); // green half
+    uint8_t levelB = 128 - (levelA / 2);    // simple phase contrast
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    for (int i = 0; i < LED_COUNT; ++i)
+    {
+        bool firstHalf = (i < (LED_COUNT / 2));
+        if (firstHalf)
         {
-        case DISPLAY_STATE_CARD_CHECKING:
-            setBreathing(CRGB::White, 500);
-            break;
-        case DISPLAY_STATE_ERROR:
-            setBlinking(CRGB::Red, 1000);
-            break;
-        case DISPLAY_STATE_SUCCESS:
-            setBlinking(CRGB::Green, 1000);
-            break;
-        case DISPLAY_STATE_TEXT:
-            setOn(CRGB::Blue);
-            break;
-        case DISPLAY_STATE_SELECT_ITEM:
-            setBreathing(CRGB::White, 500);
-            break;
-        case DISPLAY_STATE_CONFIRM_ACTION:
-            setBlinking(CRGB::White, 500);
-            break;
-        case DISPLAY_STATE_NONE:
-        default:
-            // Default state when everything is connected but no special display state
-            setOff();
-            break;
+            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, levelA));
+        }
+        else
+        {
+            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, levelB));
         }
     }
+
+    // Bidirectional sweep every ~1.5s for ~150ms
+    uint32_t phase = now % 1500;
+    if (phase < 150)
+    {
+        int pos = stepFromPeriod(phase, 150, LED_COUNT);
+        // Green clockwise
+        addLedWrapped(leds, LED_COUNT, pos, scaledColor(COLOR_GREEN_OK, 170));
+        // Blue counter‑clockwise
+        addLedWrapped(leds, LED_COUNT, (LED_COUNT - pos), scaledColor(COLOR_BLUE_ACT, 170));
+    }
+
+    FastLED.show();
+}
+
+/**
+ * We are selecting a resource
+ * Animation:
+ * - Color: White cursor with a purple tail (Cursor: #FFFFFF at ~60%, Tail: #9C27B0 at ~20%)
+ * - Pattern: Single "selector" LED steps clockwise around the ring every ~250ms
+ *   - One trailing LED provides a subtle motion tail
+ * - User guidance: Navigate/select on the screen; the ring hints at a scrollable/list selection context
+ */
+void Neopixel::runResourceSelectionAnimation()
+{
+    const uint16_t stepMs = 250;
+    uint32_t now = millis();
+    int head = stepFromPeriod(now, stepMs * LED_COUNT, LED_COUNT);
+
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // Cursor and 1-LED tail (both white to read as a single moving unit)
+    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_WHITE, 180));    // brighter head
+    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_WHITE, 60)); // softer tail
+
+    FastLED.show();
+}
+
+/**
+ * We are waiting for processing
+ * Animation:
+ * - Color: Processing Orange (#FF9100)
+ * - Pattern: Spinner with 2 bright adjacent LEDs (~50%) and a 2‑LED fading tail (25%/10%)
+ *   - Rotates clockwise at ~0.75 rev/s; subtle global breathe (±5%) overlays to indicate ongoing work
+ * - User guidance: Please wait; operation in progress
+ */
+void Neopixel::runWaitForProcessingAnimation()
+{
+    const uint16_t revolutionMs = 1333; // ~0.75 rev/s
+    uint32_t now = millis();
+    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
+
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // 2 bright adjacent + 2 fading tail
+    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_ORANGE, 128));
+    setLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_ORANGE, 128));
+    addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_ORANGE, 64));
+    addLedWrapped(leds, LED_COUNT, head - 3, scaledColor(COLOR_ORANGE, 32));
+
+    // Subtle global overlay breathe (±5%)
+    uint8_t overlay = breathe8(30, 5, 13);
+    for (int i = 0; i < LED_COUNT; ++i)
+    {
+        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_ORANGE, overlay));
+    }
+
+    FastLED.show();
+}
+
+/**
+ * We are waiting for an NFC tap
+ * Animation:
+ * - Colors: Magenta/Purple (#D500F9) with crisp white accents (#FFFFFF)
+ * - Pattern: Symmetric "attract" pulses
+ *   - Pairs of opposite LEDs light up in magenta and move inward toward their neighbors, fading as they converge
+ *   - Cycle repeats at ~1.5 Hz; every second pulse ends with a brief 80ms white sparkle to invite a tap
+ * - User guidance: Hold a compatible NFC card/tag near the reader to proceed
+ */
+void Neopixel::runWaitForNfcTapAnimation()
+{
+    // Attract pulses ~1.5 Hz → 90 BPM; animate opposing pairs moving inward
+    uint32_t now = millis();
+    uint32_t cycleMs = 1500;
+    uint32_t phase = now % cycleMs;
+    // 4 steps across the ring, each ~375ms
+    int step = (phase * 4) / cycleMs; // 0..3
+
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // Base magenta pairs, moving inward
+    // Define pair starts: (0,4)->(1,5)->(2,6)->(3,7)
+    int a = step;
+    int b = step + 4;
+    setLedWrapped(leds, LED_COUNT, a, scaledColor(COLOR_MAGENTA, 128));
+    setLedWrapped(leds, LED_COUNT, b, scaledColor(COLOR_MAGENTA, 128));
+    // Neighbor fade
+    addLedWrapped(leds, LED_COUNT, a + 1, scaledColor(COLOR_MAGENTA, 64));
+    addLedWrapped(leds, LED_COUNT, b - 1, scaledColor(COLOR_MAGENTA, 64));
+
+    // White sparkle invite every second pulse end (~80ms at phase wrap)
+    if (phase > cycleMs - 120)
+    {
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 48));
+        }
+    }
+
+    FastLED.show();
+}
+
+/**
+ * We are updating the firmware
+ * Animation:
+ * - Primary color: Update Blue (#2979FF)
+ * - If progress percentage is available: Map 0–100% to 0–8 LEDs filled clockwise
+ *   - Filled LEDs solid blue at ~35%; the next LED shows a breathing blue to indicate movement
+ * - If progress is not available: Continuous clockwise progress spinner (3‑LED wedge) at ~0.8 rev/s
+ * - Status cues: Brief white tick every ~2s to indicate activity; any error would transition to the error animation
+ * - User guidance: Do not power off; updating firmware
+ */
+void Neopixel::runFirmwareUpdateAnimation()
+{
+    uint32_t now = millis();
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    // If progress present, map 0..100 to 0..8 LEDs
+    bool hasProgress = false;
+    int progress = 0;
+    if (!this->apiEventData.payload.isNull())
+    {
+        if (this->apiEventData.payload.containsKey("progress"))
+        {
+            progress = (int)this->apiEventData.payload["progress"].as<int>();
+            if (progress < 0)
+                progress = 0;
+            if (progress > 100)
+                progress = 100;
+            hasProgress = true;
+        }
+    }
+
+    if (hasProgress)
+    {
+        int lit = (progress * LED_COUNT) / 100;
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            if (i < lit)
+            {
+                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, 90)); // ~35%
+            }
+            else if (i == lit)
+            {
+                // breathing next LED to show activity
+                uint8_t level = breathe8(32, 26, 90);
+                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, level));
+            }
+        }
+    }
+    else
+    {
+        // Spinner wedge (3 LEDs) at ~0.8 rev/s → 1250ms per rev
+        int head = stepFromPeriod(now, 1250, LED_COUNT);
+        setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_BLUE_ACT, 120));
+        addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_ACT, 64));
+        addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_ACT, 32));
+    }
+
+    // Activity tick every ~2s (~80ms)
+    if ((now % 2000) < 80)
+    {
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 28));
+        }
+    }
+
+    FastLED.show();
 }

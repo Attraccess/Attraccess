@@ -263,8 +263,11 @@ bool State::getNextApiInputEvent(ApiInputEvent &event)
 void State::setKeypadValue(String value)
 {
     taskENTER_CRITICAL(&stateMutex);
-    keypad_value = value;
-    onStateChanged();
+    if (keypad_value != value)
+    {
+        keypad_value = value;
+        onStateChanged();
+    }
     taskEXIT_CRITICAL(&stateMutex);
 }
 

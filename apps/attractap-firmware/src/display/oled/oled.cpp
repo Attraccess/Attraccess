@@ -11,6 +11,7 @@ void OLED::taskFn(void *parameter)
 
     while (true)
     {
+        instance->logger.debug("OLED task loop");
         instance->loop();
         vTaskDelay(LOOP_DELAY_MS);
     }
@@ -44,6 +45,7 @@ void OLED::setup()
 
 void OLED::transitionTo(DisplayState state)
 {
+    this->logger.infof("Transition to display state: %d", state);
     this->_state = state;
     this->updateScreen();
 }
@@ -54,17 +56,25 @@ void OLED::onAppStateChange(State::NetworkState networkState, State::WebsocketSt
     this->webSocketState = webSocketState;
     this->apiState = apiState;
 
+    this->logger.debugf("onAppStateChange wifi=%d eth=%d ws=%d apiAuth=%d",
+                        networkState.wifi_connected,
+                        networkState.ethernet_connected,
+                        webSocketState.connected,
+                        apiState.authenticated);
     this->updateScreen();
 }
 
 void OLED::onApiEvent(State::ApiEventData apiEventData)
 {
     this->apiEventData = apiEventData;
+    const char *typeStr = this->apiEventData.payload["type"].is<const char *>() ? this->apiEventData.payload["type"].as<const char *>() : "";
+    this->logger.infof("onApiEvent state=%d type=%s", this->apiEventData.state, typeStr);
     this->updateScreen();
 }
 
 void OLED::updateScreen()
 {
+    this->logger.debug("updateScreen");
     draw_main_elements();
 
     switch (this->_state)
@@ -176,7 +186,9 @@ void OLED::draw_nfc_tap_ui()
     }
     else
     {
-        logger.error("Unknown NFC tap type");
+        // Avoid heavy String concatenations on OLED task stack; log minimal info
+        const char *typeStr = payload["type"].is<const char *>() ? payload["type"].as<const char *>() : "<null>";
+        this->logger.errorf("Unknown NFC tap type: %s", typeStr);
     }
 
     uint8_t icon_width = 64;
@@ -320,8 +332,7 @@ void OLED::draw_resource_selection_ui()
     JsonObject payload = this->apiEventData.payload;
     String select_item_type = payload["itemType"].as<String>();
 
-    // TODO: get current value keypad
-    String currentValue = "NOT IMPLEMENTED";
+    String currentValue = State::getKeypadValue();
     this->draw_two_line_message("Select " + select_item_type, "> " + currentValue + " <");
 }
 

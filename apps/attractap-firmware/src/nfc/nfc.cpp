@@ -17,18 +17,22 @@ void NFC::setup()
 {
     this->pn532.begin();
 
+    this->logger.info("Creating NFC task");
     xTaskCreate(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL);
 }
 
 void NFC::loop()
 {
+    this->logger.debugf("loop: detected=%d ready=%d enableDetect=%d", this->nfc_is_detected, this->nfc_is_ready, this->loop_card_detection_is_enabled);
     if (!this->nfc_is_detected && !this->detectNfcModule())
     {
+        this->logger.debug("loop: detectNfcModule returned false");
         return;
     }
 
     if (!this->nfc_is_ready && !this->configureNfcModule())
     {
+        this->logger.debug("loop: configureNfcModule returned false");
         return;
     }
 
@@ -37,6 +41,7 @@ void NFC::loop()
 
     if (!this->loop_card_detection_is_enabled)
     {
+        this->logger.debug("loop: card detection disabled");
         return;
     }
 
@@ -47,6 +52,7 @@ void NFC::loop()
     memset(dicoveredUuid, 0, sizeof(dicoveredUuid));
     discoveredUuidLength = 0;
 
+    this->logger.debug("loop: waiting for card (discoverNfcCard)...");
     if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
     {
         String uidHex = "";
@@ -58,9 +64,13 @@ void NFC::loop()
             }
             uidHex += String(dicoveredUuid[i], HEX);
         }
-        logger.infof("loop Detected card with UID: %s", uidHex.c_str());
+        logger.infof("loop: Detected card UID=%s", uidHex.c_str());
 
         State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_DETECTED, uidHex);
+    }
+    else
+    {
+        this->logger.debug("loop: no card detected");
     }
 }
 
@@ -153,15 +163,30 @@ void NFC::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t b
 
 void NFC::updateStateFromAppState()
 {
+    bool stateChanged = false;
     uint32_t lastAppStateChangeTime = State::getLastStateChangeTime();
-    if (this->lastKnownAppStateChangeTime >= lastAppStateChangeTime)
+    if (this->lastKnownAppStateChangeTime < lastAppStateChangeTime)
+    {
+        stateChanged = true;
+        this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
+        State::NetworkState networkState = State::getNetworkState();
+        this->network_connected = networkState.wifi_connected || networkState.ethernet_connected;
+    }
+
+    uint32_t lastApiEventTime = State::getLastApiEventTime();
+    if (this->lastKnownApiEventTime < lastApiEventTime)
+    {
+        stateChanged = true;
+        this->lastKnownApiEventTime = lastApiEventTime;
+        this->nfc_detection_enabled_from_state = State::getApiEventData().state == State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP;
+    }
+
+    if (!stateChanged)
     {
         return;
     }
 
-    this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
-
-    this->loop_card_detection_is_enabled = State::getApiEventData().state == State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP;
+    this->loop_card_detection_is_enabled = this->network_connected && this->nfc_detection_enabled_from_state;
 }
 
 bool NFC::detectNfcModule()

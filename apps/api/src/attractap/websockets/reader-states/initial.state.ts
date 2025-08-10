@@ -121,7 +121,7 @@ export class InitialReaderState implements ReaderState {
     const nextState = new WaitForNFCTapState(this.socket, this.services, {
       resourceId: this.socket.reader.resources[0].id,
       timeout_ms: 0,
-      needsConfirmation: true,
+      needsConfirmation: false,
     });
     return await this.socket.transitionToState(nextState);
   }

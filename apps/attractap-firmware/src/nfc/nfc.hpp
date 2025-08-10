@@ -72,6 +72,9 @@ private:
     static void task_function(void *pvParameters);
     void updateStateFromAppState();
     uint32_t lastKnownAppStateChangeTime = 0;
+    uint32_t lastKnownApiEventTime = 0;
+    bool network_connected = false;
+    bool nfc_detection_enabled_from_state = false;
 
     Adafruit_PN532 pn532;
 

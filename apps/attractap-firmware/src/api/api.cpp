@@ -104,7 +104,6 @@ void API::processAvailableMessages()
     }
     else if (eventType == "NFC_CHANGE_KEY")
     {
-        // TODO: trigger nfc classes change key method
         State::setApiEventData(State::ApiEventState::API_EVENT_STATE_WAIT_FOR_PROCESSING, payload);
 
         uint8_t keyNumber = data["payload"]["keyNumber"].as<uint8_t>();

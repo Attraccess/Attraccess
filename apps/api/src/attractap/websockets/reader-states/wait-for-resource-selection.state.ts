@@ -1,8 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType, AttractapResponse } from '../websocket.types';
 import { ReaderState } from './reader-state.interface';
 import { WaitForNFCTapState } from './wait-for-nfc-tap.state';
 import { GatewayServices } from '../websocket.gateway';
+import { InitialReaderState } from './initial.state';
 
 export class WaitForResourceSelectionState implements ReaderState {
   private readonly logger = new Logger(WaitForResourceSelectionState.name);
@@ -26,14 +27,14 @@ export class WaitForResourceSelectionState implements ReaderState {
   }
 
   public async onEvent(data: AttractapEvent['data']) {
+    return undefined;
+  }
+
+  public async onResponse(data: AttractapResponse['data']) {
     if (data.type === AttractapEventType.SELECT_ITEM) {
       return await this.onSelectItem(data.payload);
     }
 
-    return undefined;
-  }
-
-  public async onResponse(/* data: AttractapResponse<{ selection: number }>['data'] */) {
     return undefined;
   }
 
@@ -79,6 +80,7 @@ export class WaitForResourceSelectionState implements ReaderState {
     const nextState = new WaitForNFCTapState(this.socket, this.services, {
       resourceId: resource.id,
       timeout_ms: 30000,
+      timout_transition_state: new InitialReaderState(this.socket, this.services),
       needsConfirmation: false,
     });
     return await this.socket.transitionToState(nextState);

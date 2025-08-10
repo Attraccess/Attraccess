@@ -15,11 +15,10 @@ public:
 private:
     static void taskFn(void *parameter);
     void loop();
-    char readKey();
 
     I2CKeyPad keyPad;
     char keymap[17] = "DCBA#9630852*741";
-    char last_pressed_key_num = 16;
+    uint8_t last_pressed_key_num = I2C_KEYPAD_NOKEY;
     Logger logger;
 
     String value;

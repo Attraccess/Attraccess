@@ -8,7 +8,16 @@
 class DisplayManager
 {
 public:
-    DisplayManager(IDisplay *display) : display(display), logger("DisplayManager"), _bootTime(millis()), _state(IDisplay::DisplayState::DISPLAY_STATE_BOOTING), _nextState(IDisplay::DisplayState::DISPLAY_STATE_BOOTING) {}
+    DisplayManager(IDisplay *display)
+        : display(display),
+          logger("DisplayManager"),
+          _bootTime(millis()),
+          _state(IDisplay::DisplayState::DISPLAY_STATE_BOOTING),
+          _nextState(IDisplay::DisplayState::DISPLAY_STATE_BOOTING),
+          lastKnownAppStateChangeTime(0),
+          lastKnownApiEventTime(0)
+    {
+    }
 
     void setup();
 

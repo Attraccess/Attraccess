@@ -122,7 +122,6 @@ void SerialSetup::handleAttraccessStatus(const String &payload)
         // Create JSON response using ArduinoJson
         JsonDocument doc;
 
-        // TODO: implement
         String status = "disconnected";
 
         AttraccessApiConfig config = Settings::getAttraccessApiConfig();
@@ -248,8 +247,6 @@ String SerialSetup::getEncryptionTypeString(wifi_auth_mode_t encType)
 
 void SerialSetup::onWifiScanDone(WifiNetwork *networks, uint8_t count)
 {
-    // TODO: implement
-
     JsonDocument doc;
     JsonArray networksArray = doc.to<JsonArray>();
 
