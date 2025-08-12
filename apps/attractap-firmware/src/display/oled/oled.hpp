@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include "task_priorities.h"
 #include "icons.hpp"
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
@@ -28,14 +27,11 @@ public:
 #endif
 
     void setup() override;
+    void loop() override;
     void transitionTo(DisplayState state) override;
-    void onAppStateChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState) override;
-    void onApiEvent(State::ApiEventData apiEventData) override;
+    void onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData) override;
 
 private:
-    void loop();
-    static void taskFn(void *parameter);
-
     DisplayState _state;
     State::NetworkState networkState;
     State::WebsocketState webSocketState;
@@ -49,6 +45,8 @@ private:
 #endif
 
     void updateScreen();
+    IDisplay::DisplayState computeDesiredState() const;
+    bool needsUpdate = true;
 
     void draw_main_elements();
     void draw_booting_ui();
@@ -56,6 +54,7 @@ private:
     void draw_network_connecting_ui();
     void draw_websocket_connecting_ui();
     void draw_authentication_ui();
+    void draw_waiting_for_commands_ui();
     void draw_error_ui();
     void draw_success_ui();
     void draw_text_ui();
@@ -66,4 +65,8 @@ private:
     void draw_wait_for_processing_ui();
 
     Logger logger;
+
+    // Boot gating to keep logo visible briefly
+    uint32_t bootMillis = 0;
+    static constexpr uint32_t BOOT_DURATION_MS = 2000;
 };

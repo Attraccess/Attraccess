@@ -7,5 +7,10 @@
     "progress": {
       "label": "Connecting..."
     }
+  },
+  "tabs": {
+    "main": "Main",
+    "keypad": "Keypad",
+    "checkingKeypad": "Checking for keypad..."
   }
 }

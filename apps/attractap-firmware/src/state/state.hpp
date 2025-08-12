@@ -67,6 +67,7 @@ public:
 
     enum ApiEventState
     {
+        API_EVENT_STATE_NONE,
         API_EVENT_STATE_DISPLAY_ERROR,
         API_EVENT_STATE_DISPLAY_SUCCESS,
         API_EVENT_STATE_DISPLAY_TEXT,
@@ -87,6 +88,18 @@ public:
 
     static void setKeypadValue(String value);
     static String getKeypadValue();
+
+    // WiFi events queue to notify other components (e.g., CLI) about WiFi-related events
+    enum WifiEventType
+    {
+        WIFI_EVENT_SCAN_DONE
+    };
+    struct WifiEvent
+    {
+        WifiEventType type;
+    };
+    static void pushWifiEventToQueue(WifiEventType type);
+    static bool getNextWifiEvent(WifiEvent &event);
 
     // queue methods to send nfc commands to nfc class
     enum NfcCommandType
@@ -127,6 +140,7 @@ private:
     static QueueHandle_t outgoing_websocket_messages_queue;
 
     static QueueHandle_t nfc_commands_queue;
+    static QueueHandle_t wifi_events_queue;
 
     static QueueHandle_t api_input_events_queue;
 

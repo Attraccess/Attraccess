@@ -16,7 +16,7 @@ void CLIService::setup()
         "cli_serial_task",
         4096,
         this,
-        1,
+        TASK_PRIORITY_CLI_SERIAL,
         &taskHandle);
 }
 
@@ -95,33 +95,51 @@ void CLIService::serialTaskLoop()
 
 void CLIService::processLine(const String &line)
 {
-    // Expected minimal format: "<TYPE> <command> [payload...]"
-    int firstSpace = line.indexOf(' ');
+    // Make a working copy and try to align to the CMND framing token.
+    // In the field we sometimes see stray/non-printable bytes before CMND
+    // (e.g. from serial line noise or control characters). To be robust,
+    // we skip everything before the first occurrence of "CMND ".
+    const String originalLine = line;
+    String work = line;
+
+    int cmndPos = work.indexOf("CMND ");
+    if (cmndPos > 0)
+    {
+        work = work.substring(cmndPos);
+    }
+    else if (cmndPos < 0)
+    {
+        Serial.println("error malformed_request, no CMND: " + originalLine);
+        return;
+    }
+
+    // Expected minimal format (from here): "CMND <GET|SET> <command> [payload...]"
+    int firstSpace = work.indexOf(' ');
     if (firstSpace < 0)
     {
         // no space -> malformed
-        Serial.println("error malformed_request");
+        Serial.println("error malformed_request, no space: " + originalLine);
         return;
     }
-    String typeToken = line.substring(0, firstSpace);
+    String typeToken = work.substring(0, firstSpace);
     typeToken.trim();
     typeToken.toUpperCase();
     // Require framing token "CMND"
     if (typeToken != "CMND")
     {
-        Serial.println("error malformed_request");
+        Serial.println("error malformed_request, no CMND: " + originalLine);
         return;
     }
 
     // Expect GET/SET as next token
-    int secondSpace = line.indexOf(' ', firstSpace + 1);
+    int secondSpace = work.indexOf(' ', firstSpace + 1);
     if (secondSpace < 0)
     {
-        Serial.println("error missing_type");
+        Serial.println("error missing_type: " + originalLine);
         return;
     }
 
-    String methodToken = line.substring(firstSpace + 1, secondSpace);
+    String methodToken = work.substring(firstSpace + 1, secondSpace);
     methodToken.trim();
     methodToken.toUpperCase();
 
@@ -136,26 +154,26 @@ void CLIService::processLine(const String &line)
     }
     else
     {
-        Serial.println("error unknown_type");
+        Serial.println("error unknown_type: " + originalLine);
         return;
     }
 
     String command;
     String payload = "";
-    int thirdSpace = line.indexOf(' ', secondSpace + 1);
+    int thirdSpace = work.indexOf(' ', secondSpace + 1);
     if (thirdSpace < 0)
     {
         // No payload provided; everything after the method token is the command
-        command = line.substring(secondSpace + 1);
+        command = work.substring(secondSpace + 1);
         command.trim();
     }
     else
     {
-        command = line.substring(secondSpace + 1, thirdSpace);
+        command = work.substring(secondSpace + 1, thirdSpace);
         command.trim();
-        if (thirdSpace + 1 < static_cast<int>(line.length()))
+        if (thirdSpace + 1 < static_cast<int>(work.length()))
         {
-            payload = line.substring(thirdSpace + 1);
+            payload = work.substring(thirdSpace + 1);
             payload.trim();
         }
     }
@@ -163,18 +181,18 @@ void CLIService::processLine(const String &line)
     CommandHandler handler;
     if (!findHandler(typeEnum, command, handler))
     {
-        Serial.println("error unknown_command");
+        Serial.println("error unknown_command: " + originalLine);
         return;
     }
 
-    try
-    {
-        handler(payload);
-    }
-    catch (...)
-    {
-        sendResponse(typeEnum, command, "error handler_exception");
-    }
+    // try
+    // {
+    handler(payload);
+    // }
+    // catch (...)
+    // {
+    //     sendResponse(typeEnum, command, "error handler_exception");
+    // }
 }
 
 bool CLIService::findHandler(CLI_SERVICE::CommandType type, const String &command, CommandHandler &outHandler)

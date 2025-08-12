@@ -13,6 +13,7 @@ public:
     NFC() : pn532(PIN_PN532_IRQ, PIN_PN532_RESET, &Wire), logger("NFC") {}
 
     void setup();
+    void loop();
 
     /*
      *  Authenticate with the nfc card
@@ -39,8 +40,6 @@ public:
      *  @param timeout: timeout in milliseconds
      *  @return true if the nfc card is detected, false otherwise
      */
-    bool waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeoutMs);
-    bool waitForNfcCard(const uint32_t timeoutMs);
     bool waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const uint32_t timeoutMs);
 
     /*
@@ -81,8 +80,6 @@ private:
     bool nfc_is_detected = false;
     bool nfc_is_ready = false;
     bool loop_card_detection_is_enabled = false;
-
-    void loop();
 
     void processNfcCommands();
 

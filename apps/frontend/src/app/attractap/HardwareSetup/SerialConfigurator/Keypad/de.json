@@ -1,0 +1,42 @@
+{
+  "title": "Tastatur-Kalibrierung (MPR121)",
+  "unsupported": {
+    "title": "Tastatur nicht erkannt oder nicht unterstützt",
+    "description": "Verbinden Sie ein Gerät mit MPR121-Tastatur, um den Kalibrierungsassistenten zu verwenden."
+  },
+  "actions": {
+    "detect": "Tastatur erkennen",
+    "detecting": "Erkennung läuft..."
+  },
+  "baseline": {
+    "title": "Schritt 1: Baseline-Messung",
+    "description": "Bitte die Tastatur nicht berühren. Es werden kurz Geräuschproben gesammelt.",
+    "start": "Baseline-Messung starten",
+    "noiseMax": "Geschätztes maximales Rauschen: {{value}}"
+  },
+  "pressed": {
+    "title": "Schritt 2: Tastendruck (schnell)",
+    "description": "Beliebige Taste drücken und halten, während die Messung für eine Sekunde läuft.",
+    "quickStart": "Schnelle Messung starten",
+    "measured": "Gemessene minimale Druck-Differenz: {{value}}"
+  },
+  "compute": {
+    "title": "Schritt 3: Schwellwerte berechnen",
+    "description": "Wir schlagen Schwellwerte auf Basis von Rauschen und Tastendruck vor. Passen Sie diese bei Bedarf an.",
+    "computeButton": "Berechnen",
+    "touch": "Touch-Schwellwert",
+    "release": "Loslass-Schwellwert"
+  },
+  "apply": {
+    "applyButton": "Schwellwerte anwenden"
+  },
+  "validate": {
+    "title": "Schritt 4: Validieren",
+    "description": "Tasten tippen und prüfen, dass die Deltas den Touch-Schwellwert überschreiten und im Idle darunter bleiben.",
+    "refresh": "Aktualisieren"
+  },
+  "keys": {
+    "confirm": "Bestätigen",
+    "cancel": "Abbrechen"
+  }
+}

@@ -15,17 +15,21 @@ public:
           _state(IDisplay::DisplayState::DISPLAY_STATE_BOOTING),
           _nextState(IDisplay::DisplayState::DISPLAY_STATE_BOOTING),
           lastKnownAppStateChangeTime(0),
-          lastKnownApiEventTime(0)
+          lastKnownApiEventTime(0),
+          needsUpdate(true),
+          cachedNetworkState({}),
+          cachedWebsocketState({}),
+          cachedApiState({})
     {
     }
 
     void setup();
+    void loop();
 
 private:
     Logger logger;
 
     static void taskFn(void *parameter);
-    void loop();
 
     uint32_t _bootTime;
     const uint32_t BOOT_DURATION_MS = 2000;
@@ -40,4 +44,9 @@ private:
     State::ApiEventData apiEventData;
     uint32_t lastKnownApiEventTime;
     void checkForApiEvent();
+
+    bool needsUpdate;
+    State::NetworkState cachedNetworkState;
+    State::WebsocketState cachedWebsocketState;
+    State::ApiState cachedApiState;
 };

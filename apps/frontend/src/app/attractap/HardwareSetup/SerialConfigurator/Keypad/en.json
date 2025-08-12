@@ -1,0 +1,42 @@
+{
+  "title": "Keypad Calibration (MPR121)",
+  "unsupported": {
+    "title": "Keypad not detected or unsupported",
+    "description": "Connect a device with an MPR121 keypad to use the calibration wizard."
+  },
+  "actions": {
+    "detect": "Detect keypad",
+    "detecting": "Detecting..."
+  },
+  "baseline": {
+    "title": "Step 1: Baseline sampling",
+    "description": "Don’t touch the keypad. We will collect short noise samples to estimate baseline noise.",
+    "start": "Start baseline sampling",
+    "noiseMax": "Estimated max noise: {{value}}"
+  },
+  "pressed": {
+    "title": "Step 2: Press sampling (quick)",
+    "description": "Press any key and hold while sampling runs for a second.",
+    "quickStart": "Start quick press sampling",
+    "measured": "Measured minimum press delta: {{value}}"
+  },
+  "compute": {
+    "title": "Step 3: Compute thresholds",
+    "description": "We suggest thresholds using noise and press samples. Adjust if needed.",
+    "computeButton": "Compute",
+    "touch": "Touch threshold",
+    "release": "Release threshold"
+  },
+  "apply": {
+    "applyButton": "Apply thresholds"
+  },
+  "validate": {
+    "title": "Step 4: Validate",
+    "description": "Tap keys and verify deltas exceeding touch threshold while idle remains below release.",
+    "refresh": "Refresh"
+  },
+  "keys": {
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  }
+}

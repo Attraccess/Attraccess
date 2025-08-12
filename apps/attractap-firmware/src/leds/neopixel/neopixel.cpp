@@ -1,7 +1,11 @@
+// Restored NeoPixelBus-based implementation (packed 0xRRGGBB framebuffer)
 #include "neopixel.hpp"
+#include <math.h>
 
 namespace
 {
+    using crgb_t = uint32_t; // 0xRRGGBB packed color for local helpers
+
     // Utility: wrap an index on the 8-LED ring
     inline int wrapIndex(int index, int count)
     {
@@ -9,42 +13,100 @@ namespace
         return m < 0 ? m + count : m;
     }
 
-    // Utility: scaled copy of a color (video safe)
-    inline CRGB scaledColor(const CRGB &c, uint8_t scale)
+    inline uint8_t scale8(uint8_t value, uint8_t scale)
     {
-        CRGB out = c;
-        out.nscale8_video(scale);
-        return out;
+        return (uint16_t(value) * uint16_t(scale) + 127) / 255; // rounded
+    }
+
+    inline uint8_t chanR(crgb_t c) { return (c >> 16) & 0xFF; }
+    inline uint8_t chanG(crgb_t c) { return (c >> 8) & 0xFF; }
+    inline uint8_t chanB(crgb_t c) { return (c >> 0) & 0xFF; }
+    inline crgb_t makeColor(uint8_t r, uint8_t g, uint8_t b)
+    {
+        return (crgb_t)(((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b);
+    }
+
+    // Utility: scaled copy of a color (approx. "video" safe)
+    inline crgb_t scaledColor(crgb_t c, uint8_t scale)
+    {
+        uint8_t r = scale8(chanR(c), scale);
+        uint8_t g = scale8(chanG(c), scale);
+        uint8_t b = scale8(chanB(c), scale);
+        return makeColor(r, g, b);
+    }
+
+    inline uint8_t addSaturate(uint8_t a, uint8_t b)
+    {
+        uint16_t s = uint16_t(a) + uint16_t(b);
+        return s > 255 ? 255 : uint8_t(s);
+    }
+
+    inline crgb_t addColor(crgb_t base, crgb_t overlay)
+    {
+        uint8_t r = addSaturate(chanR(base), chanR(overlay));
+        uint8_t g = addSaturate(chanG(base), chanG(overlay));
+        uint8_t b = addSaturate(chanB(base), chanB(overlay));
+        return makeColor(r, g, b);
     }
 
     // Utility: set LED with wrap
-    inline void setLedWrapped(CRGB *leds, int count, int index, const CRGB &color)
+    inline void setLedWrapped(crgb_t *buffer, int count, int index, crgb_t color)
     {
-        leds[wrapIndex(index, count)] = color;
+        buffer[wrapIndex(index, count)] = color;
     }
 
     // Utility: add LED with wrap (for tails/overlays)
-    inline void addLedWrapped(CRGB *leds, int count, int index, const CRGB &color)
+    inline void addLedWrapped(crgb_t *buffer, int count, int index, crgb_t color)
     {
-        leds[wrapIndex(index, count)] += color;
+        int idx = wrapIndex(index, count);
+        buffer[idx] = addColor(buffer[idx], color);
+    }
+
+    inline void fillSolid(crgb_t *buffer, int count, crgb_t color)
+    {
+        for (int i = 0; i < count; ++i)
+        {
+            buffer[i] = color;
+        }
+    }
+
+    using LedDriver = NeoPixelBus<NeoGrbFeature, NeoEsp32Rmt0Ws2812xMethod>;
+
+    inline void flushFrame(LedDriver &driver, crgb_t *buffer, int count)
+    {
+        if (count <= 0)
+            return;
+        for (int i = 0; i < count; ++i)
+        {
+            const uint8_t r = chanR(buffer[i]);
+            const uint8_t g = chanG(buffer[i]);
+            const uint8_t b = chanB(buffer[i]);
+            driver.SetPixelColor(i, RgbColor(r, g, b));
+        }
+        driver.Show();
     }
 
     // Colors (sRGB)
-    const CRGB COLOR_BLUE_NET = CRGB(0x00, 0x7B, 0xFF); // #007BFF
-    const CRGB COLOR_CYAN_WS = CRGB(0x00, 0xE5, 0xFF);  // #00E5FF
-    const CRGB COLOR_AMBER = CRGB(0xFF, 0xC1, 0x07);    // #FFC107
-    const CRGB COLOR_RED_ERR = CRGB(0xFF, 0x00, 0x00);  // Pure red #FF0000
-    const CRGB COLOR_GREEN_OK = CRGB(0x00, 0xFF, 0x00); // Pure green #00FF00
-    const CRGB COLOR_WHITE = CRGB(0xFF, 0xFF, 0xFF);    // #FFFFFF
-    const CRGB COLOR_BLUE_ACT = CRGB(0x29, 0x79, 0xFF); // #2979FF
-    const CRGB COLOR_PURPLE = CRGB(0x9C, 0x27, 0xB0);   // #9C27B0
-    const CRGB COLOR_ORANGE = CRGB(0xFF, 0x91, 0x00);   // #FF9100
-    const CRGB COLOR_MAGENTA = CRGB(0xD5, 0x00, 0xF9);  // #D500F9
+    const crgb_t COLOR_BLUE_NET = 0x007BFF; // #007BFF
+    const crgb_t COLOR_CYAN_WS = 0x00E5FF;  // #00E5FF
+    const crgb_t COLOR_AMBER = 0xFFC107;    // #FFC107
+    const crgb_t COLOR_RED_ERR = 0xFF0000;  // Pure red #FF0000
+    const crgb_t COLOR_GREEN_OK = 0x00FF00; // Pure green #00FF00
+    const crgb_t COLOR_WHITE = 0xFFFFFF;    // #FFFFFF
+    const crgb_t COLOR_BLUE_ACT = 0x2979FF; // #2979FF
+    const crgb_t COLOR_PURPLE = 0x9C27B0;   // #9C27B0
+    const crgb_t COLOR_ORANGE = 0xFF9100;   // #FF9100
+    const crgb_t COLOR_MAGENTA = 0xD500F9;  // #D500F9
 
     // Timing helpers
     inline uint8_t breathe8(uint8_t bpm, uint8_t minV = 5, uint8_t maxV = 255)
     {
-        return beatsin8(bpm, minV, maxV);
+        // Sine wave between minV..maxV at bpm
+        float t = millis() / 1000.0f;
+        float freq = (float)bpm / 60.0f;
+        float phase = sinf(2.0f * 3.14159265f * freq * t) * 0.5f + 0.5f;
+        uint8_t range = (uint8_t)(maxV - minV);
+        return (uint8_t)(minV + phase * range);
     }
 
     inline int stepFromPeriod(uint32_t nowMs, uint16_t periodMs, int steps)
@@ -59,8 +121,11 @@ namespace
 void Neopixel::setup()
 {
     logger.info("Setup");
-    FastLED.addLeds<WS2812, PIN_NEOPIXEL_LED, GRB>(leds, LED_COUNT);
+    leds.Begin();
+    fillSolid(frame, LED_COUNT, 0x000000);
+    flushFrame(leds, frame, LED_COUNT);
 
+    /*
     xTaskCreate(
         Neopixel::taskFn,
         "leds",
@@ -68,6 +133,7 @@ void Neopixel::setup()
         this,
         TASK_PRIORITY_LED,
         NULL);
+    */
 }
 void Neopixel::taskFn(void *parameter)
 {
@@ -187,21 +253,21 @@ void Neopixel::runWaitingForNetworkAnimation()
     uint32_t now = millis();
     int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // Optional subtle background breathe (~5% base white)
     uint8_t bg = breathe8(12, 3, 10); // slow, very dim
     for (int i = 0; i < LED_COUNT; ++i)
     {
-        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, bg));
+        addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_WHITE, bg));
     }
 
     // Comet with 2-LED tail
-    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_BLUE_NET, headBrightness));
-    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_NET, tail1));
-    addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_NET, tail2));
+    setLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_BLUE_NET, headBrightness));
+    addLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_NET, tail1));
+    addLedWrapped(frame, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_NET, tail2));
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -224,24 +290,24 @@ void Neopixel::runWaitingForWebsocketConnectionAnimation()
     int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
     int head2 = head + LED_COUNT / 2; // 180° apart
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // Two comets
-    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_CYAN_WS, headBrightness));
-    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_CYAN_WS, tail));
-    setLedWrapped(leds, LED_COUNT, head2, scaledColor(COLOR_CYAN_WS, headBrightness));
-    addLedWrapped(leds, LED_COUNT, head2 - 1, scaledColor(COLOR_CYAN_WS, tail));
+    setLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_CYAN_WS, headBrightness));
+    addLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_CYAN_WS, tail));
+    setLedWrapped(frame, LED_COUNT, head2, scaledColor(COLOR_CYAN_WS, headBrightness));
+    addLedWrapped(frame, LED_COUNT, head2 - 1, scaledColor(COLOR_CYAN_WS, tail));
 
     // Handshake micro‑flash every ~3s
     if ((now % 3000) < 80)
     {
         for (int i = 0; i < LED_COUNT; ++i)
         {
-            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 28)); // ~11%
+            addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_WHITE, 28)); // ~11%
         }
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -259,14 +325,14 @@ void Neopixel::runWaitingForApiAuthenticationAnimation()
     uint8_t base = breathe8(36, 13, 64); // ~5% to ~25%
 
     uint32_t now = millis();
-    fill_solid(leds, LED_COUNT, scaledColor(COLOR_AMBER, base));
+    fillSolid(frame, LED_COUNT, scaledColor(COLOR_AMBER, base));
 
     // Continuous running dot with short tail, slow pace (~2.4s per revolution)
     int head = stepFromPeriod(now, 2400, LED_COUNT);
-    addLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_AMBER, 160));    // head ~60%
-    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_AMBER, 64)); // tail ~25%
+    addLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_AMBER, 160));    // head ~60%
+    addLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_AMBER, 64)); // tail ~25%
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -282,7 +348,7 @@ void Neopixel::runWaitingForApiAuthenticationAnimation()
 void Neopixel::runDisplayErrorAnimation()
 {
     uint32_t now = millis();
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // Intro: 3 double‑flashes with even/odd alternation (~2.4s total)
     uint32_t sinceEvent = now - this->lastApiEventTime;
@@ -298,10 +364,10 @@ void Neopixel::runDisplayErrorAnimation()
             bool isEven = (i % 2) == 0;
             if ((even && isEven) || (!even && !isEven))
             {
-                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_RED_ERR, level));
+                setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_RED_ERR, level));
             }
         }
-        FastLED.show();
+        flushFrame(leds, frame, LED_COUNT);
         return;
     }
 
@@ -309,10 +375,10 @@ void Neopixel::runDisplayErrorAnimation()
     uint8_t beat = ((now % 1000) < 150) ? 96 : 0; // 150ms pulse, pure red
     for (int i = 0; i < LED_COUNT; ++i)
     {
-        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_RED_ERR, beat));
+        addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_RED_ERR, beat));
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -330,7 +396,7 @@ void Neopixel::runDisplaySuccessAnimation()
     uint32_t now = millis();
     uint32_t sinceEvent = now - this->lastApiEventTime;
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     if (sinceEvent < 800)
     {
@@ -338,14 +404,14 @@ void Neopixel::runDisplaySuccessAnimation()
         int lit = (int)((sinceEvent * LED_COUNT) / 800);
         for (int i = 0; i <= lit && i < LED_COUNT; ++i)
         {
-            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, 200));
+            setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, 200));
         }
         // subtle white sparkles on remaining LEDs (excitement)
         for (int i = lit + 1; i < LED_COUNT; ++i)
         {
             if (((now + i * 73) % 120) < 20)
             {
-                addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 64));
+                addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_WHITE, 64));
             }
         }
     }
@@ -355,17 +421,17 @@ void Neopixel::runDisplaySuccessAnimation()
         for (int i = 0; i < LED_COUNT; ++i)
         {
             uint8_t jitter = ((now + i * 41) % 250) < 12 ? 30 : 0; // brief local lift
-            leds[i] = scaledColor(COLOR_GREEN_OK, 120 + jitter);   // base ~47%
+            frame[i] = scaledColor(COLOR_GREEN_OK, 120 + jitter);  // base ~47%
         }
     }
     else
     {
         // Idle upbeat breathe 0.5 Hz → 30 BPM, a bit brighter
         uint8_t level = breathe8(30, 38, 96); // ~15% to ~38%
-        fill_solid(leds, LED_COUNT, scaledColor(COLOR_GREEN_OK, level));
+        fillSolid(frame, LED_COUNT, scaledColor(COLOR_GREEN_OK, level));
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -380,8 +446,8 @@ void Neopixel::runDisplayTextAnimation()
 {
     // Soft neutral white, subtle drift at ~0.2 Hz (12 BPM)
     uint8_t level = breathe8(12, 20, 31); // ~8–12%
-    fill_solid(leds, LED_COUNT, scaledColor(COLOR_WHITE, level));
-    FastLED.show();
+    fillSolid(frame, LED_COUNT, scaledColor(COLOR_WHITE, level));
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -399,18 +465,18 @@ void Neopixel::runConfirmActionAnimation()
     // Two halves out of phase breathe (~0.8 Hz → 48 BPM)
     uint8_t levelA = breathe8(48, 26, 102); // green half
     uint8_t levelB = 128 - (levelA / 2);    // simple phase contrast
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     for (int i = 0; i < LED_COUNT; ++i)
     {
         bool firstHalf = (i < (LED_COUNT / 2));
         if (firstHalf)
         {
-            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, levelA));
+            setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_GREEN_OK, levelA));
         }
         else
         {
-            setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, levelB));
+            setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, levelB));
         }
     }
 
@@ -420,12 +486,12 @@ void Neopixel::runConfirmActionAnimation()
     {
         int pos = stepFromPeriod(phase, 150, LED_COUNT);
         // Green clockwise
-        addLedWrapped(leds, LED_COUNT, pos, scaledColor(COLOR_GREEN_OK, 170));
+        addLedWrapped(frame, LED_COUNT, pos, scaledColor(COLOR_GREEN_OK, 170));
         // Blue counter‑clockwise
-        addLedWrapped(leds, LED_COUNT, (LED_COUNT - pos), scaledColor(COLOR_BLUE_ACT, 170));
+        addLedWrapped(frame, LED_COUNT, (LED_COUNT - pos), scaledColor(COLOR_BLUE_ACT, 170));
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -442,13 +508,13 @@ void Neopixel::runResourceSelectionAnimation()
     uint32_t now = millis();
     int head = stepFromPeriod(now, stepMs * LED_COUNT, LED_COUNT);
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // Cursor and 1-LED tail (both white to read as a single moving unit)
-    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_WHITE, 180));    // brighter head
-    addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_WHITE, 60)); // softer tail
+    setLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_WHITE, 180));    // brighter head
+    addLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_WHITE, 60)); // softer tail
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -465,22 +531,22 @@ void Neopixel::runWaitForProcessingAnimation()
     uint32_t now = millis();
     int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // 2 bright adjacent + 2 fading tail
-    setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_ORANGE, 128));
-    setLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_ORANGE, 128));
-    addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_ORANGE, 64));
-    addLedWrapped(leds, LED_COUNT, head - 3, scaledColor(COLOR_ORANGE, 32));
+    setLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_ORANGE, 128));
+    setLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_ORANGE, 128));
+    addLedWrapped(frame, LED_COUNT, head - 2, scaledColor(COLOR_ORANGE, 64));
+    addLedWrapped(frame, LED_COUNT, head - 3, scaledColor(COLOR_ORANGE, 32));
 
     // Subtle global overlay breathe (±5%)
     uint8_t overlay = breathe8(30, 5, 13);
     for (int i = 0; i < LED_COUNT; ++i)
     {
-        addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_ORANGE, overlay));
+        addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_ORANGE, overlay));
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -501,28 +567,28 @@ void Neopixel::runWaitForNfcTapAnimation()
     // 4 steps across the ring, each ~375ms
     int step = (phase * 4) / cycleMs; // 0..3
 
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // Base magenta pairs, moving inward
     // Define pair starts: (0,4)->(1,5)->(2,6)->(3,7)
     int a = step;
     int b = step + 4;
-    setLedWrapped(leds, LED_COUNT, a, scaledColor(COLOR_MAGENTA, 128));
-    setLedWrapped(leds, LED_COUNT, b, scaledColor(COLOR_MAGENTA, 128));
+    setLedWrapped(frame, LED_COUNT, a, scaledColor(COLOR_MAGENTA, 128));
+    setLedWrapped(frame, LED_COUNT, b, scaledColor(COLOR_MAGENTA, 128));
     // Neighbor fade
-    addLedWrapped(leds, LED_COUNT, a + 1, scaledColor(COLOR_MAGENTA, 64));
-    addLedWrapped(leds, LED_COUNT, b - 1, scaledColor(COLOR_MAGENTA, 64));
+    addLedWrapped(frame, LED_COUNT, a + 1, scaledColor(COLOR_MAGENTA, 64));
+    addLedWrapped(frame, LED_COUNT, b - 1, scaledColor(COLOR_MAGENTA, 64));
 
     // White sparkle invite every second pulse end (~80ms at phase wrap)
     if (phase > cycleMs - 120)
     {
         for (int i = 0; i < LED_COUNT; ++i)
         {
-            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 48));
+            addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_WHITE, 48));
         }
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }
 
 /**
@@ -538,14 +604,14 @@ void Neopixel::runWaitForNfcTapAnimation()
 void Neopixel::runFirmwareUpdateAnimation()
 {
     uint32_t now = millis();
-    fill_solid(leds, LED_COUNT, CRGB::Black);
+    fillSolid(frame, LED_COUNT, 0x000000);
 
     // If progress present, map 0..100 to 0..8 LEDs
     bool hasProgress = false;
     int progress = 0;
     if (!this->apiEventData.payload.isNull())
     {
-        if (this->apiEventData.payload.containsKey("progress"))
+        if (this->apiEventData.payload["progress"].is<int>())
         {
             progress = (int)this->apiEventData.payload["progress"].as<int>();
             if (progress < 0)
@@ -563,13 +629,13 @@ void Neopixel::runFirmwareUpdateAnimation()
         {
             if (i < lit)
             {
-                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, 90)); // ~35%
+                setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, 90)); // ~35%
             }
             else if (i == lit)
             {
                 // breathing next LED to show activity
                 uint8_t level = breathe8(32, 26, 90);
-                setLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, level));
+                setLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_BLUE_ACT, level));
             }
         }
     }
@@ -577,9 +643,9 @@ void Neopixel::runFirmwareUpdateAnimation()
     {
         // Spinner wedge (3 LEDs) at ~0.8 rev/s → 1250ms per rev
         int head = stepFromPeriod(now, 1250, LED_COUNT);
-        setLedWrapped(leds, LED_COUNT, head, scaledColor(COLOR_BLUE_ACT, 120));
-        addLedWrapped(leds, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_ACT, 64));
-        addLedWrapped(leds, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_ACT, 32));
+        setLedWrapped(frame, LED_COUNT, head, scaledColor(COLOR_BLUE_ACT, 120));
+        addLedWrapped(frame, LED_COUNT, head - 1, scaledColor(COLOR_BLUE_ACT, 64));
+        addLedWrapped(frame, LED_COUNT, head - 2, scaledColor(COLOR_BLUE_ACT, 32));
     }
 
     // Activity tick every ~2s (~80ms)
@@ -587,9 +653,9 @@ void Neopixel::runFirmwareUpdateAnimation()
     {
         for (int i = 0; i < LED_COUNT; ++i)
         {
-            addLedWrapped(leds, LED_COUNT, i, scaledColor(COLOR_WHITE, 28));
+            addLedWrapped(frame, LED_COUNT, i, scaledColor(COLOR_WHITE, 28));
         }
     }
 
-    FastLED.show();
+    flushFrame(leds, frame, LED_COUNT);
 }

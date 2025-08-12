@@ -40,7 +40,7 @@ void DisplayManager::setup()
     this->display->setup();
 
     this->logger.infof("Creating DisplayManager task with stack %u bytes", 4096u);
-    xTaskCreate(DisplayManager::taskFn, "DisplayManager", 4096, this, TASK_PRIORITY_DISPLAY_MANAGER, NULL);
+    // xTaskCreate(DisplayManager::taskFn, "DisplayManager", 4096, this, TASK_PRIORITY_DISPLAY_MANAGER, NULL);
 }
 
 void DisplayManager::taskFn(void *parameter)
@@ -52,7 +52,6 @@ void DisplayManager::taskFn(void *parameter)
 
     displayManager->_bootTime = millis();
 
-    displayManager->display->transitionTo(IDisplay::DisplayState::DISPLAY_STATE_BOOTING);
     displayManager->logger.info("DisplayManager task started");
     displayManager->logger.debugf("Initial state=%s", displayStateToString(IDisplay::DisplayState::DISPLAY_STATE_BOOTING));
 
@@ -68,11 +67,11 @@ void DisplayManager::loop()
     this->checkForAppStateChange();
     this->checkForApiEvent();
 
-    if (this->_nextState != this->_state)
+    // Only notify display when something actually changed
+    if (this->needsUpdate)
     {
-        this->logger.infof("Transition: %s -> %s", displayStateToString(this->_state), displayStateToString(this->_nextState));
-        this->display->transitionTo(this->_nextState);
-        this->_state = this->_nextState;
+        this->display->onDataChange(this->cachedNetworkState, this->cachedWebsocketState, this->cachedApiState, this->apiEventData);
+        this->needsUpdate = false;
     }
 
     this->display->loop();
@@ -81,55 +80,50 @@ void DisplayManager::loop()
 void DisplayManager::checkForAppStateChange()
 {
     uint32_t lastAppStateChangeTime = State::getLastStateChangeTime();
-    if (this->lastKnownAppStateChangeTime >= lastAppStateChangeTime)
-    {
-        return;
-    }
 
-    this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
-
+    // Pull latest global states
     State::NetworkState networkState = State::getNetworkState();
     State::WebsocketState webSocketState = State::getWebsocketState();
     State::ApiState apiState = State::getApiState();
 
-    this->logger.debugf("App state changed: wifi=%d eth=%d ws=%d apiAuth=%d",
-                        networkState.wifi_connected,
-                        networkState.ethernet_connected,
-                        webSocketState.connected,
-                        apiState.authenticated);
+    if (this->lastKnownAppStateChangeTime < lastAppStateChangeTime)
+    {
+        this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
+        this->cachedNetworkState = networkState;
+        this->cachedWebsocketState = webSocketState;
+        this->cachedApiState = apiState;
 
-    this->display->onAppStateChange(networkState, webSocketState, apiState);
+        this->logger.debugf("App state changed: wifi=%d eth=%d ws=%d apiAuth=%d",
+                            networkState.wifi_connected,
+                            networkState.ethernet_connected,
+                            webSocketState.connected,
+                            apiState.authenticated);
 
+        this->needsUpdate = true;
+    }
+
+    // Manager no longer decides instant redraw or transitions; display computes state
+    // We still keep a computed state for potential future usage/logging
     if (millis() < this->_bootTime + this->BOOT_DURATION_MS)
     {
         this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_BOOTING;
-        this->logger.debug("Next display state: BOOTING (within boot duration)");
-        return;
     }
-
-    if (!networkState.wifi_connected && !networkState.ethernet_connected)
+    else if (!networkState.wifi_connected && !networkState.ethernet_connected)
     {
         this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_NETWORK;
-        this->logger.debug("Next display state: WAITING_FOR_NETWORK (no network connected)");
-        return;
     }
-
-    if (!webSocketState.connected)
+    else if (!webSocketState.connected)
     {
         this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_WEBSOCKET;
-        this->logger.debug("Next display state: WAITING_FOR_WEBSOCKET (ws disconnected)");
-        return;
     }
-
-    if (!apiState.authenticated)
+    else if (!apiState.authenticated)
     {
         this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_AUTHENTICATION;
-        this->logger.debug("Next display state: WAITING_FOR_AUTHENTICATION (API not authenticated)");
-        return;
     }
-
-    this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_CONNECTED_WAITING_FOR_API_EVENT;
-    this->logger.debug("Next display state: CONNECTED_WAITING_FOR_API_EVENT");
+    else
+    {
+        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_CONNECTED_WAITING_FOR_API_EVENT;
+    }
 }
 
 void DisplayManager::checkForApiEvent()
@@ -150,53 +144,8 @@ void DisplayManager::checkForApiEvent()
         this->apiEventData = State::getApiEventData();
         const char *typeStr = this->apiEventData.payload["type"].is<const char *>() ? this->apiEventData.payload["type"].as<const char *>() : "";
         this->logger.infof("New API event: state=%d type=%s", this->apiEventData.state, typeStr);
-        this->display->onApiEvent(this->apiEventData);
-    }
+        this->needsUpdate = true;
 
-    switch (this->apiEventData.state)
-    {
-    case State::ApiEventState::API_EVENT_STATE_DISPLAY_ERROR:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_ERROR;
-        this->logger.debug("API event -> display: ERROR");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_DISPLAY_SUCCESS:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_SUCCESS;
-        this->logger.debug("API event -> display: SUCCESS");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_DISPLAY_TEXT:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_TEXT;
-        this->logger.debug("API event -> display: TEXT");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_CONFIRM_ACTION:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_CONFIRM_ACTION;
-        this->logger.debug("API event -> display: CONFIRM_ACTION");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_RESOURCE_SELECTION:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_RESOURCE_SELECTION;
-        this->logger.debug("API event -> display: RESOURCE_SELECTION");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_WAIT_FOR_PROCESSING:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_WAIT_FOR_PROCESSING;
-        this->logger.debug("API event -> display: WAIT_FOR_PROCESSING");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_WAIT_FOR_NFC_TAP;
-        this->logger.debug("API event -> display: WAIT_FOR_NFC_TAP");
-        break;
-
-    case State::ApiEventState::API_EVENT_STATE_FIRMWARE_UPDATE:
-        this->_nextState = IDisplay::DisplayState::DISPLAY_STATE_FIRMWARE_UPDATE;
-        this->logger.debug("API event -> display: FIRMWARE_UPDATE");
-        break;
-
-    default:
-        this->logger.errorf("Unknown API event state: %d", this->apiEventData.state);
-        break;
+        // Display will decide what to draw based on the event; manager does not transition screens here
     }
 }

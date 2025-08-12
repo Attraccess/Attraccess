@@ -85,7 +85,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           this.handleDisconnect(client);
           const stackTrace = new Error().stack;
           this.logger.error(stackTrace);
-          throw error;
+          return;
         }
       }
 
@@ -98,6 +98,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         this.handleDisconnect(client);
         const stackTrace = new Error().stack;
         this.logger.error(stackTrace);
+        return;
       }
     };
 

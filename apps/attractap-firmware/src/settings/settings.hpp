@@ -40,6 +40,10 @@ public:
 
     static String getHostname();
 
+    // Keypad (MPR121) thresholds
+    static bool getMpr121Thresholds(uint8_t &touch, uint8_t &release);
+    static void saveMpr121Thresholds(uint8_t touch, uint8_t release);
+
 private:
     static Preferences preferences;
     static Logger logger;

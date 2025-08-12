@@ -1,0 +1,34 @@
+{
+  "title": "Network",
+  "ssidSelect": {
+    "label": "Select SSID"
+  },
+  "password": {
+    "label": "Password"
+  },
+  "wifi": {
+    "connected": {
+      "title": "WiFi connected",
+      "description": "SSID: {{ssid}}, IP: {{ip}}"
+    },
+    "connecting": {
+      "label": "Connecting to {{ssid}}..."
+    },
+    "disconnected": {
+      "title": "WiFi disconnected",
+      "description": "SSID: {{ssid}}"
+    }
+  },
+  "ethernet": {
+    "connected": {
+      "title": "Ethernet connected",
+      "description": "IP: {{ip}}"
+    },
+    "disconnected": {
+      "title": "Ethernet not connected"
+    }
+  },
+  "setCredentials": {
+    "label": "Set SSID and password"
+  }
+}

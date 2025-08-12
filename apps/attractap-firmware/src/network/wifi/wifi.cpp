@@ -550,6 +550,8 @@ void Wifi::handleScanComplete()
     Wifi::is_scanning = false;
 
     logger.debug("WiFi scan results stored");
+
+    State::pushWifiEventToQueue(State::WIFI_EVENT_SCAN_DONE);
 }
 
 void Wifi::handleTimeout()

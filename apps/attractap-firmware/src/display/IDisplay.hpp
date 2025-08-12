@@ -25,6 +25,6 @@ public:
     virtual void setup() = 0;
     virtual void loop() = 0;
     virtual void transitionTo(DisplayState state) = 0;
-    virtual void onAppStateChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState) = 0;
-    virtual void onApiEvent(State::ApiEventData apiEventData) = 0;
+    // Notifies the display that input data changed. Implementations decide if/when to redraw.
+    virtual void onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData) = 0;
 };

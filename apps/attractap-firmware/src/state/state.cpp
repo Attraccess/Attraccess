@@ -24,10 +24,11 @@ QueueHandle_t State::incoming_websocket_messages_queue = nullptr;
 QueueHandle_t State::outgoing_websocket_messages_queue = nullptr;
 QueueHandle_t State::api_input_events_queue = nullptr;
 QueueHandle_t State::nfc_commands_queue = nullptr;
+QueueHandle_t State::wifi_events_queue = nullptr;
 bool State::_queuesInitialized = false;
 bool State::api_authenticated = false;
 String State::api_device_name = "";
-State::ApiEventData State::api_event_data = {};
+State::ApiEventData State::api_event_data = {State::ApiEventState::API_EVENT_STATE_NONE, JsonObject()};
 uint32_t State::api_event_time = 0;
 DynamicJsonDocument State::api_event_doc(1024);
 String State::keypad_value = "";
@@ -49,6 +50,10 @@ void State::initializeQueuesIfNeeded()
     if (State::nfc_commands_queue == nullptr)
     {
         State::nfc_commands_queue = xQueueCreate(15, sizeof(NfcCommand));
+    }
+    if (State::wifi_events_queue == nullptr)
+    {
+        State::wifi_events_queue = xQueueCreate(10, sizeof(WifiEvent));
     }
 }
 
@@ -277,6 +282,20 @@ String State::getKeypadValue()
     String value = keypad_value;
     taskEXIT_CRITICAL(&stateMutex);
     return value;
+}
+
+void State::pushWifiEventToQueue(WifiEventType type)
+{
+    initializeQueuesIfNeeded();
+    WifiEvent event;
+    event.type = type;
+    xQueueSend(wifi_events_queue, &event, pdMS_TO_TICKS(1000));
+}
+
+bool State::getNextWifiEvent(WifiEvent &event)
+{
+    initializeQueuesIfNeeded();
+    return xQueueReceive(wifi_events_queue, &event, 0) == pdPASS;
 }
 
 void State::pushNfcCommandToQueue(NfcCommandType type, const String &payload)

@@ -118,3 +118,24 @@ String Settings::getHostname()
 
     return _hostname;
 }
+
+bool Settings::getMpr121Thresholds(uint8_t &touch, uint8_t &release)
+{
+    preferences.begin("settings", true);
+    bool has = preferences.isKey("mpr121.touch") && preferences.isKey("mpr121.release");
+    if (has)
+    {
+        touch = preferences.getUChar("mpr121.touch", 0);
+        release = preferences.getUChar("mpr121.release", 0);
+    }
+    preferences.end();
+    return has;
+}
+
+void Settings::saveMpr121Thresholds(uint8_t touch, uint8_t release)
+{
+    preferences.begin("settings", false);
+    preferences.putUChar("mpr121.touch", touch);
+    preferences.putUChar("mpr121.release", release);
+    preferences.end();
+}

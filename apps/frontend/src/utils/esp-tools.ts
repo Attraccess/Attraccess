@@ -444,8 +444,6 @@ export class ESPTools {
           return null;
         }
 
-        // release();
-
         let continueReading = true;
         let buffer = '';
 
@@ -465,20 +463,42 @@ export class ESPTools {
           buffer += chunk;
 
           // Process complete lines
+          const bufferEndsWithNewLine = buffer.endsWith('\n');
           const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          if (!bufferEndsWithNewLine) {
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          } else {
+            buffer = '';
+          }
 
           for (const line of lines) {
             const trimmedLine = line.trim();
             if (!trimmedLine) continue;
 
-            // Check if line matches expected RESP format: RESP <topic> <payload>
-            const respMatch = trimmedLine.match(/^RESP\s+(\S+)\s+(.+)$/);
+            // Strip any non-printable / BOM-like bytes that sometimes precede
+            // real text on serial lines.
+            const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
+
+            // Check if line matches expected RESP format: RESP <type?> <topic> <payload>
+            // New firmware emits: RESP <get|set> <topic> <payload>
+            // Old firmware emitted: RESP <topic> <payload>
+            let respMatch = cleaned.match(/^RESP\s+(get|set)\s+(\S+)\s+(.+)$/i);
+            let responseTopic: string | undefined;
+            let payload: string | undefined;
+            if (respMatch) {
+              responseTopic = respMatch[2];
+              payload = respMatch[3];
+            } else {
+              // Try legacy format
+              respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
+              if (respMatch) {
+                responseTopic = respMatch[1];
+                payload = respMatch[2];
+              }
+            }
             if (!respMatch) {
               continue;
             }
-
-            const [, responseTopic, payload] = respMatch;
 
             // Check if the response topic matches our command topic
             if (responseTopic !== command.topic) {
@@ -487,7 +507,7 @@ export class ESPTools {
 
             clearTimeout(timeoutId);
             continueReading = false;
-            return payload;
+            return payload ?? null;
           }
         }
 

@@ -1,9 +1,26 @@
 #include "serial-setup.hpp"
+#include "../keypad/keypad.hpp"
+#include "../keypad/keypad_config.hpp"
+#include "../state/state.hpp"
+#include "../network/wifi/wifi.hpp"
+#if KEYPAD == KEYPAD_I2C_MPR121
+#include "../keypad/variations/mpr121/mpr121.hpp"
+#endif
+#include "../settings/settings.hpp"
+#include <lwip/ip4_addr.h>
+
+// Helper to convert esp_ip4_addr_t to dotted string
+static String ipToString(const esp_ip4_addr_t &ip)
+{
+    char buf[16];
+    ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&ip), buf, sizeof(buf));
+    return String(buf);
+}
 
 CLIService *SerialSetup::cliService = NULL;
 API *SerialSetup::api = NULL;
 Websocket *SerialSetup::websocket = NULL;
-void (*SerialSetup::onWifiScanStart)() = NULL;
+TaskHandle_t SerialSetup::taskHandle = nullptr;
 
 void SerialSetup::setup(CLIService *cliService, API *api, Websocket *websocket)
 {
@@ -23,13 +40,16 @@ void SerialSetup::setup(CLIService *cliService, API *api, Websocket *websocket)
     cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "attraccess.configuration", [](const String &payload)
                                        { handleAttraccessConfiguration(payload); });
 
-    // Register WiFi scan handler
+    // Register WiFi scan handler (non-blocking; results sent from background task)
     cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", [](const String &payload)
                                        { handleWiFiScan(payload); });
 
     // Register WiFi connect handler
     cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "network.wifi.credentials", [](const String &payload)
                                        { handleWiFiConnect(payload); });
+
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "network.status", [](const String &payload)
+                                       { handleNetworkStatus(payload); });
 
     // register reboot handler
     cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "system.reboot", [](const String &payload)
@@ -42,6 +62,66 @@ void SerialSetup::setup(CLIService *cliService, API *api, Websocket *websocket)
                                        {
                                            Logger::setLogLevel(payload);
                                            SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "log.level", "success"); });
+
+    // MPR121 calibration helpers (only when MPR121 is compiled in)
+#if KEYPAD == KEYPAD_I2C_MPR121
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_SET, "keypad.mpr121.thresholds", [](const String &payload)
+                                       {
+                                           uint8_t t = 0, r = 0;
+                                           int sep = payload.indexOf(' ');
+                                           if (sep > 0) {
+                                               t = (uint8_t) payload.substring(0, sep).toInt();
+                                               r = (uint8_t) payload.substring(sep + 1).toInt();
+                                           }
+                                           if (t == 0 || r == 0) { SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "keypad.mpr121.thresholds", "error invalid_thresholds"); return; }
+                                           // Persist thresholds even if keypad inactive
+                                           Settings::saveMpr121Thresholds(t, r);
+                                           extern Keypad keypad; // declared in main.cpp
+                                           MPR121* m = static_cast<MPR121*>(keypad.getImplementation());
+                                           if (m) {
+                                               m->setThresholds(t, r);
+                                               SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "keypad.mpr121.thresholds", String("ok applied ") + t + " " + r);
+                                           } else {
+                                               SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_SET, "keypad.mpr121.thresholds", String("ok saved ") + t + " " + r + " (reboot to enable)");
+                                           } });
+
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "keypad.mpr121.dump", [](const String &payload)
+                                       {
+                                           uint8_t t=0,r=0; Settings::getMpr121Thresholds(t,r);
+                                           extern Keypad keypad; // declared in main.cpp
+                                           MPR121* m = static_cast<MPR121*>(keypad.getImplementation());
+                                           String out;
+                                           if (m) {
+                                               uint16_t base[12]; uint16_t filt[12];
+                                               m->getBaselineAndFiltered(base, filt);
+                                               out = "{";
+                                               for (uint8_t i=0;i<12;i++){ out += "\"" + String(i) + "\":[" + String(base[i]) + "," + String(filt[i]) + "]"; if(i<11) out += ","; }
+                                               out += "}";
+                                           } else {
+                                               out = String("{\"note\":\"inactive\",\"thresholds\":[") + t + "," + r + "]}";
+                                           }
+                                           SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "keypad.mpr121.dump", out); });
+#endif
+
+    // Keypad status
+    cliService->registerCommandHandler(CLI_SERVICE::CLI_COMMAND_GET, "keypad.status", [](const String &payload)
+                                       {
+                                           String out = "{";
+#if KEYPAD == KEYPAD_I2C_MPR121
+                                           out += "\"configured\":true,";
+                                           uint8_t t=0,r=0; Settings::getMpr121Thresholds(t,r);
+                                           extern Keypad keypad; MPR121* m = static_cast<MPR121*>(keypad.getImplementation());
+                                           if (m) { String s; m->getStatusJson(s,t,r); out += "\"detail\":" + s; }
+                                           else { out += "\"detail\":{\"type\":\"MPR121\",\"needsConfig\":true}"; }
+#elif KEYPAD == KEYPAD_I2C_FOLIO
+                                           out += "\"configured\":true,\"detail\":{\"type\":\"FOLIO\"}";
+#else
+                                           out += "\"configured\":false";
+#endif
+                                           out += "}";
+                                           SerialSetup::cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "keypad.status", out); });
+
+    startBackgroundTask();
 }
 
 void SerialSetup::handleFirmwareVersion(const String &payload)
@@ -201,13 +281,6 @@ void SerialSetup::handleAttraccessConfiguration(const String &payload)
 
 void SerialSetup::handleWiFiScan(const String &payload)
 {
-    // Validate that WiFi service is available
-    if (!onWifiScanStart)
-    {
-        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", "error wifi_service_unavailable");
-        return;
-    }
-
     // GET command should not have a payload
     if (payload.length() > 0)
     {
@@ -215,7 +288,7 @@ void SerialSetup::handleWiFiScan(const String &payload)
         return;
     }
 
-    onWifiScanStart();
+    Wifi::startScan();
 }
 
 String SerialSetup::getEncryptionTypeString(wifi_auth_mode_t encType)
@@ -253,7 +326,7 @@ void SerialSetup::onWifiScanDone(WifiNetwork *networks, uint8_t count)
     // Add each network to the JSON array
     for (uint8_t i = 0; i < count; i++)
     {
-        JsonObject network = networksArray.createNestedObject();
+        JsonObject network = networksArray.add<JsonObject>();
         network["ssid"] = networks[i].ssid;
         network["encryption"] = getEncryptionTypeString(networks[i].encryptionType);
         network["isOpen"] = networks[i].isOpen;
@@ -320,7 +393,70 @@ void SerialSetup::handleWiFiConnect(const String &payload)
     }
 }
 
-void SerialSetup::setOnWifiScanStartHandler(void (*handler)())
+void SerialSetup::startBackgroundTask()
 {
-    SerialSetup::onWifiScanStart = handler;
+    if (taskHandle != nullptr)
+    {
+        return;
+    }
+    xTaskCreate(&SerialSetup::taskFn, "serial_setup_task", 4096, nullptr, TASK_PRIORITY_SERIAL_SETUP, &taskHandle);
+}
+
+void SerialSetup::taskFn(void *param)
+{
+    while (true)
+    {
+        processWifiEvents();
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+void SerialSetup::processWifiEvents()
+{
+    State::WifiEvent ev;
+    while (State::getNextWifiEvent(ev))
+    {
+        if (ev.type == State::WIFI_EVENT_SCAN_DONE)
+        {
+            // Read scan results from Wifi and send response
+            auto results = Wifi::getKnownWifiNetworks();
+
+            JsonDocument doc;
+            JsonArray networksArray = doc.to<JsonArray>();
+            for (uint8_t i = 0; i < results.count; i++)
+            {
+                JsonObject network = networksArray.add<JsonObject>();
+                network["ssid"] = results.networks[i].ssid;
+                network["encryption"] = getEncryptionTypeString(results.networks[i].encryptionType);
+                network["isOpen"] = results.networks[i].isOpen;
+            }
+
+            String out;
+            serializeJson(doc, out);
+            cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.wifi.scan", out);
+        }
+    }
+}
+
+void SerialSetup::handleNetworkStatus(const String &payload)
+{
+    // GET command should not have a payload
+    if (payload.length() > 0)
+    {
+        cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.status", "error unexpected_payload");
+        return;
+    }
+
+    State::NetworkState state = State::getNetworkState();
+
+    JsonDocument doc;
+    doc["wifi_connected"] = state.wifi_connected;
+    doc["wifi_ssid"] = state.wifi_ssid;
+    doc["wifi_ip"] = ipToString(state.wifi_ip);
+    doc["ethernet_connected"] = state.ethernet_connected;
+    doc["ethernet_ip"] = ipToString(state.ethernet_ip);
+
+    String out;
+    serializeJson(doc, out);
+    cliService->sendResponse(CLI_SERVICE::CLI_COMMAND_GET, "network.status", out);
 }

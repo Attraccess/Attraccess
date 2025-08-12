@@ -1,22 +1,5 @@
 #include "oled.hpp"
 
-// OLED task function
-void OLED::taskFn(void *parameter)
-{
-    OLED *instance = (OLED *)parameter;
-
-    const int REFRESH_RATE_HZ = 60;
-    const int MS_PER_SECOND = 1000;
-    const int LOOP_DELAY_MS = (MS_PER_SECOND / REFRESH_RATE_HZ) / portTICK_PERIOD_MS;
-
-    while (true)
-    {
-        instance->logger.debug("OLED task loop");
-        instance->loop();
-        vTaskDelay(LOOP_DELAY_MS);
-    }
-}
-
 void OLED::setup()
 {
     this->logger.info("Setup");
@@ -27,6 +10,7 @@ void OLED::setup()
     uint8_t screen_init_cmd = SSD1306_SWITCHCAPVCC;
 #endif
 
+    // Avoid blocking during early startup
     this->screen.begin(screen_init_cmd, 0x3C);
 
     this->screen.clearDisplay();
@@ -38,43 +22,50 @@ void OLED::setup()
     this->screen.drawBitmap(x, y, icon_boot_logo, boot_logo_width, boot_logo_height, WHITE);
     this->screen.display();
 
-    xTaskCreate(OLED::taskFn, "OLEDTask", 2048, this, TASK_PRIORITY_DISPLAY_OLED, NULL);
-
     this->logger.info("SSD1306 initialized");
+    this->bootMillis = millis();
 }
 
 void OLED::transitionTo(DisplayState state)
 {
     this->logger.infof("Transition to display state: %d", state);
     this->_state = state;
-    this->updateScreen();
+    this->needsUpdate = true;
 }
 
-void OLED::onAppStateChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState)
+void OLED::onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData)
 {
     this->networkState = networkState;
     this->webSocketState = webSocketState;
     this->apiState = apiState;
+    this->apiEventData = apiEventData;
 
     this->logger.debugf("onAppStateChange wifi=%d eth=%d ws=%d apiAuth=%d",
                         networkState.wifi_connected,
                         networkState.ethernet_connected,
                         webSocketState.connected,
                         apiState.authenticated);
-    this->updateScreen();
-}
-
-void OLED::onApiEvent(State::ApiEventData apiEventData)
-{
-    this->apiEventData = apiEventData;
+    // Log API event only when it actually changed to avoid spam at boot
+    static State::ApiEventState lastLoggedEventState = (State::ApiEventState)-1;
+    static String lastLoggedEventType = "\0";
     const char *typeStr = this->apiEventData.payload["type"].is<const char *>() ? this->apiEventData.payload["type"].as<const char *>() : "";
-    this->logger.infof("onApiEvent state=%d type=%s", this->apiEventData.state, typeStr);
-    this->updateScreen();
+    if (lastLoggedEventState != this->apiEventData.state || lastLoggedEventType != String(typeStr))
+    {
+        this->logger.infof("onApiEvent state=%d type=%s", this->apiEventData.state, typeStr);
+        lastLoggedEventState = this->apiEventData.state;
+        lastLoggedEventType = String(typeStr);
+    }
+    this->needsUpdate = true;
 }
 
 void OLED::updateScreen()
 {
-    this->logger.debug("updateScreen");
+    if (!this->needsUpdate)
+    {
+        return;
+    }
+    // compute desired UI state from cached data
+    this->_state = this->computeDesiredState();
     draw_main_elements();
 
     switch (this->_state)
@@ -90,6 +81,9 @@ void OLED::updateScreen()
         break;
     case DISPLAY_STATE_WAITING_FOR_AUTHENTICATION:
         this->draw_authentication_ui();
+        break;
+    case DISPLAY_STATE_CONNECTED_WAITING_FOR_API_EVENT:
+        this->draw_waiting_for_commands_ui();
         break;
     case DISPLAY_STATE_RESOURCE_SELECTION:
         this->draw_resource_selection_ui();
@@ -118,11 +112,57 @@ void OLED::updateScreen()
     }
 
     this->screen.display();
+
+    this->needsUpdate = false;
+}
+
+IDisplay::DisplayState OLED::computeDesiredState() const
+{
+    // Keep boot logo for a short duration after startup
+    if (millis() < this->bootMillis + BOOT_DURATION_MS)
+    {
+        return DISPLAY_STATE_BOOTING;
+    }
+
+    if (!networkState.wifi_connected && !networkState.ethernet_connected)
+    {
+        return DISPLAY_STATE_WAITING_FOR_NETWORK;
+    }
+    if (!webSocketState.connected)
+    {
+        return DISPLAY_STATE_WAITING_FOR_WEBSOCKET;
+    }
+    if (!apiState.authenticated)
+    {
+        return DISPLAY_STATE_WAITING_FOR_AUTHENTICATION;
+    }
+
+    // Decide based on last API event
+    switch (this->apiEventData.state)
+    {
+    case State::ApiEventState::API_EVENT_STATE_DISPLAY_ERROR:
+        return DISPLAY_STATE_ERROR;
+    case State::ApiEventState::API_EVENT_STATE_DISPLAY_SUCCESS:
+        return DISPLAY_STATE_SUCCESS;
+    case State::ApiEventState::API_EVENT_STATE_DISPLAY_TEXT:
+        return DISPLAY_STATE_TEXT;
+    case State::ApiEventState::API_EVENT_STATE_CONFIRM_ACTION:
+        return DISPLAY_STATE_CONFIRM_ACTION;
+    case State::ApiEventState::API_EVENT_STATE_RESOURCE_SELECTION:
+        return DISPLAY_STATE_RESOURCE_SELECTION;
+    case State::ApiEventState::API_EVENT_STATE_WAIT_FOR_PROCESSING:
+        return DISPLAY_STATE_WAIT_FOR_PROCESSING;
+    case State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP:
+        return DISPLAY_STATE_WAIT_FOR_NFC_TAP;
+    case State::ApiEventState::API_EVENT_STATE_FIRMWARE_UPDATE:
+        return DISPLAY_STATE_FIRMWARE_UPDATE;
+    default:
+        return DISPLAY_STATE_CONNECTED_WAITING_FOR_API_EVENT;
+    }
 }
 
 void OLED::draw_booting_ui()
 {
-    this->logger.debug("draw_booting_ui");
     // draw the boot logo
     uint8_t boot_logo_width = 110;
     uint8_t boot_logo_height = 48;
@@ -133,7 +173,6 @@ void OLED::draw_booting_ui()
 
 void OLED::draw_nfc_tap_ui()
 {
-    this->logger.debug("draw_nfc_tap_ui");
     String lineOne = "Please tap card";
     String lineTwo = "";
     auto payload = this->apiEventData.payload;
@@ -197,15 +236,18 @@ void OLED::draw_nfc_tap_ui()
     // calculate width and height of text
     int16_t x1, y1;
     uint16_t w, h;
+
     this->screen.getTextBounds(lineOne, 0, 0, &x1, &y1, &w, &h);
 
     uint8_t center_x = SCREEN_WIDTH / 2;
     uint8_t center_y = SCREEN_HEIGHT / 2;
 
     // icon first
+
     this->screen.drawBitmap(center_x - (icon_width / 2), center_y - (icon_height / 2) - h, icon_nfc_tap, icon_width, icon_height, WHITE);
 
     // text below the icon
+
     this->screen.setCursor(center_x - (w / 2), center_y + (icon_height / 2) - h + 5);
     this->screen.print(lineOne);
 
@@ -216,7 +258,6 @@ void OLED::draw_nfc_tap_ui()
 
 void OLED::draw_main_elements()
 {
-    this->logger.debug("draw_main_elements");
     this->screen.clearDisplay();
     this->screen.setTextSize(1);
     this->screen.setTextColor(WHITE);
@@ -257,20 +298,20 @@ void OLED::draw_main_elements()
     // device name, top right
     int16_t x1, y1;
     uint16_t w, h;
-    this->screen.getTextBounds(this->apiState.deviceName, 0, 0, &x1, &y1, &w, &h);
-    this->screen.setCursor(SCREEN_WIDTH - w - 1, 1);
-    this->screen.print(this->apiState.deviceName);
+    {
+        this->screen.getTextBounds(this->apiState.deviceName, 0, 0, &x1, &y1, &w, &h);
+        this->screen.setCursor(SCREEN_WIDTH - w - 1, 1);
+        this->screen.print(this->apiState.deviceName);
+    }
 }
 
 void OLED::draw_network_connecting_ui()
 {
-    this->logger.debug("draw_network_connecting_ui");
     this->draw_two_line_message("Network", "Connecting...");
 }
 
 void OLED::draw_websocket_connecting_ui()
 {
-    this->logger.debug("draw_websocket_connecting_ui");
     if (this->webSocketState.hostname.length() == 0 || this->webSocketState.port == 0)
     {
         this->draw_two_line_message("Please configure API", "hostname/port not set");
@@ -282,21 +323,38 @@ void OLED::draw_websocket_connecting_ui()
 
 void OLED::draw_authentication_ui()
 {
-    this->logger.debug("draw_authentication_ui");
     this->draw_two_line_message("Authenticating", this->webSocketState.hostname + ":" + String(this->webSocketState.port));
+}
+
+void OLED::draw_waiting_for_commands_ui()
+{
+    this->draw_two_line_message("Connected", "Waiting for commands...");
 }
 
 void OLED::draw_error_ui()
 {
-    this->logger.debug("draw_error_ui");
     JsonObject payload = this->apiEventData.payload;
-    String error = payload["message"].as<String>();
+    String error;
+    if (payload["message"].is<String>() && !payload["message"].isNull())
+    {
+        error = payload["message"].as<String>();
+    }
+    else
+    {
+        // Fallback to a sane default (and avoid printing "null")
+        const char *typeStr = payload["type"].is<const char *>() ? payload["type"].as<const char *>() : "";
+        error = (strlen(typeStr) > 0) ? String(typeStr) : String("An error occurred");
+
+        // log the whole payload to debug why this happens
+        String payloadStr;
+        serializeJson(payload, payloadStr);
+        this->logger.errorf("Error payload: %s", payloadStr.c_str());
+    }
     this->draw_two_line_message("Error", error);
 }
 
 void OLED::draw_success_ui()
 {
-    this->logger.debug("draw_success_ui");
     JsonObject payload = this->apiEventData.payload;
     String success = payload["message"].as<String>();
     this->draw_two_line_message("Success", success);
@@ -304,7 +362,6 @@ void OLED::draw_success_ui()
 
 void OLED::draw_two_line_message(String line1, String line2)
 {
-    this->logger.debug("draw_two_line_message");
     this->screen.setTextSize(1);
     this->screen.setTextColor(WHITE);
 
@@ -328,7 +385,6 @@ void OLED::draw_two_line_message(String line1, String line2)
 
 void OLED::draw_resource_selection_ui()
 {
-    this->logger.debug("draw_resource_selection_ui");
     JsonObject payload = this->apiEventData.payload;
     String select_item_type = payload["itemType"].as<String>();
 
@@ -338,7 +394,6 @@ void OLED::draw_resource_selection_ui()
 
 void OLED::draw_text_ui()
 {
-    this->logger.debug("draw_text_ui");
     JsonObject payload = this->apiEventData.payload;
     String message = payload["message"].as<String>();
 
@@ -351,7 +406,6 @@ void OLED::draw_text_ui()
 
 void OLED::draw_confirm_action_ui()
 {
-    this->logger.debug("draw_confirm_action_ui");
     String title = "Confirm";
     String message = "> not sure what... <";
 
@@ -383,17 +437,15 @@ void OLED::draw_confirm_action_ui()
 
 void OLED::draw_firmware_update_ui()
 {
-    this->logger.debug("draw_firmware_update_ui");
     this->draw_two_line_message("Updating Firmware", "Please wait...");
 }
 
 void OLED::draw_wait_for_processing_ui()
 {
-    this->logger.debug("draw_wait_for_processing_ui");
     this->draw_two_line_message("Processing", "Please wait...");
 }
 
 void OLED::loop()
 {
-    // nothing to do here
+    this->updateScreen();
 }

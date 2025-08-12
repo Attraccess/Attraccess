@@ -1,11 +1,15 @@
 #pragma once
 
 #include <Arduino.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_netif.h"
 #include "esp_log.h"
 #include "../cli/CLIService.hpp"
 #include "../api/api.hpp"
 #include "../websocket/websocket.hpp"
+#include "../state/state.hpp"
+#include "task_priorities.h"
 
 class SerialSetup
 {
@@ -22,9 +26,12 @@ public:
     static void setup(CLIService *cliService, API *api, Websocket *websocket);
 
     static void onWifiScanDone(WifiNetwork *networks, uint8_t count);
-    static void setOnWifiScanStartHandler(void (*handler)());
 
 private:
+    static void startBackgroundTask();
+    static void taskFn(void *param);
+    static void processWifiEvents();
+    static TaskHandle_t taskHandle;
     static CLIService *cliService;
     static API *api;
     static Websocket *websocket;
@@ -35,9 +42,8 @@ private:
 
     static String wifiGetEncryptionTypeString(wifi_auth_mode_t encType);
 
-    static void (*onWifiScanStart)();
-
     static String getEncryptionTypeString(wifi_auth_mode_t encType);
     static void handleWiFiScan(const String &payload);
     static void handleWiFiConnect(const String &payload);
+    static void handleNetworkStatus(const String &payload);
 };

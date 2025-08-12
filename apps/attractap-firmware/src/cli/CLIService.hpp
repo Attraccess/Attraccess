@@ -5,6 +5,7 @@
 #include <vector>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "task_priorities.h"
 
 // Simple minimal CLI service for line-based serial commands.
 // Format per line: "<TYPE> <command> [payload...]"

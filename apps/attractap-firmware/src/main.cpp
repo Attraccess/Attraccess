@@ -12,7 +12,7 @@
 #include <Wire.h>
 #include "display/displayManager.hpp"
 
-#ifdef HAS_I2C_KEYPAD
+#ifdef KEYPAD
 #include "keypad/keypad.hpp"
 #endif
 
@@ -37,7 +37,7 @@ Websocket websocket;
 Neopixel leds;
 #endif
 
-#ifdef HAS_I2C_KEYPAD
+#ifdef KEYPAD
 Keypad keypad;
 #endif
 
@@ -68,14 +68,14 @@ void setup()
     nfc.setup();
     api.setup();
     cliService.setup();
-    firmwareUpdate.setup();
+    // firmwareUpdate.setup();
     SerialSetup::setup(&cliService, &api, &websocket);
 
 #ifdef PIN_NEOPIXEL_LED
     leds.setup();
 #endif
 
-#ifdef HAS_I2C_KEYPAD
+#ifdef KEYPAD
     keypad.setup();
 #endif
 }
@@ -89,5 +89,9 @@ void loop()
         lastDebug = millis();
     }
 
-    delay(100); // Reduced delay for more responsive callback processing
+    displayManager.loop();
+    // delay(10);
+    nfc.loop();
+    // leds.loop();
+    // delay(10);
 }

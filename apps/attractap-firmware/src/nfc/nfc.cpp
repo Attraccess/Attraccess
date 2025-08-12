@@ -1,10 +1,19 @@
 #include "nfc.hpp"
 
+void NFC::setup()
+{
+    // Avoid blocking NFC driver init; it configures internally
+    this->pn532.begin();
+
+    this->logger.info("Creating NFC task");
+    // xTaskCreate(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL);
+}
+
 void NFC::task_function(void *pvParameters)
 {
     NFC *nfc = (NFC *)pvParameters;
 
-    const int LOOP_DELAY_MS = 50; // 50ms delay for NFC operations
+    const int LOOP_DELAY_MS = 500; // faster loop to avoid long blocking sections
 
     while (true)
     {
@@ -13,26 +22,15 @@ void NFC::task_function(void *pvParameters)
     }
 }
 
-void NFC::setup()
-{
-    this->pn532.begin();
-
-    this->logger.info("Creating NFC task");
-    xTaskCreate(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL);
-}
-
 void NFC::loop()
 {
-    this->logger.debugf("loop: detected=%d ready=%d enableDetect=%d", this->nfc_is_detected, this->nfc_is_ready, this->loop_card_detection_is_enabled);
     if (!this->nfc_is_detected && !this->detectNfcModule())
     {
-        this->logger.debug("loop: detectNfcModule returned false");
         return;
     }
 
     if (!this->nfc_is_ready && !this->configureNfcModule())
     {
-        this->logger.debug("loop: configureNfcModule returned false");
         return;
     }
 
@@ -41,8 +39,15 @@ void NFC::loop()
 
     if (!this->loop_card_detection_is_enabled)
     {
-        this->logger.debug("loop: card detection disabled");
         return;
+    }
+
+    // log every 1s that we are looking for cards
+    static uint32_t lastCardDetectionLogTime = 0;
+    if (millis() - lastCardDetectionLogTime > 1000)
+    {
+        lastCardDetectionLogTime = millis();
+        logger.info("loop: Looking for cards");
     }
 
     char dicoveredUuid[16];       // Buffer for UID
@@ -52,7 +57,7 @@ void NFC::loop()
     memset(dicoveredUuid, 0, sizeof(dicoveredUuid));
     discoveredUuidLength = 0;
 
-    this->logger.debug("loop: waiting for card (discoverNfcCard)...");
+    // Keep PN532 polling responsive to avoid blocking other time-sensitive tasks
     if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
     {
         String uidHex = "";
@@ -67,10 +72,6 @@ void NFC::loop()
         logger.infof("loop: Detected card UID=%s", uidHex.c_str());
 
         State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_DETECTED, uidHex);
-    }
-    else
-    {
-        this->logger.debug("loop: no card detected");
     }
 }
 
@@ -132,6 +133,17 @@ void NFC::processNfcCommands()
         uint8_t authKey[16];
 
         this->hexStringToBytes(authKeyHex, authKey, 16);
+
+        char discoveredUuid[16];
+        uint8_t discoveredUuidLength;
+
+        bool foundCard = this->discoverNfcCard(discoveredUuid, &discoveredUuidLength, 1000);
+        if (!foundCard)
+        {
+            logger.error("authenticate Failed to find NFC card");
+            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_FAILED, command.payload);
+            break;
+        }
 
         bool success = this->authenticate(keyNumber, authKey, true);
         if (success)
@@ -226,20 +238,6 @@ bool NFC::configureNfcModule()
     return true;
 }
 
-bool NFC::waitForNfcCard(const uint32_t timeoutMs)
-{
-    logger.debug("waitForNfcCard version without expectedUuid");
-
-    char uid[16];      // Buffer for UID
-    uint8_t uidLength; // Length of UID
-
-    // Clear the buffer to prevent memory issues
-    memset(uid, 0, sizeof(uid));
-    uidLength = 0;
-
-    return this->waitForNfcCard(uid, &uidLength, timeoutMs);
-}
-
 bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const uint32_t timeoutMs)
 {
     logger.debug("waitForNfcCard version with detectedUid and detectedUidLength");
@@ -267,7 +265,7 @@ bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const ui
         // Wait for an ISO14443A card
         // readPassiveTargetID will return 1 if a card is found
         // It will populate uid and uidLength
-        if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
+        if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 100))
         {
 
             logger.info("waitForNfcCard Card is NTAG424.");
@@ -287,56 +285,8 @@ bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const ui
             return true;
         }
 
-        // Wait indicator removed for logger
-        delay(100); // Small delay before next check
-    }
-
-    logger.info("waitForNfcCard Timeout waiting for NFC card");
-    return false;
-}
-
-bool NFC::waitForNfcCardWithUID(const char *expectedUuid, const uint32_t timeoutMs)
-{
-    logger.debug("waitForNfcCard version with expectedUuid");
-
-    uint32_t startTime = millis();
-
-    while (millis() - startTime < timeoutMs)
-    {
-        char dicoveredUuid[16];       // Buffer for UID
-        uint8_t discoveredUuidLength; // Length of UID
-
-        // Clear the buffer to prevent memory issues
-        memset(dicoveredUuid, 0, sizeof(dicoveredUuid));
-        discoveredUuidLength = 0;
-
-        // Use discoverNfcCard directly instead of waitForNfcCard to avoid nested loops
-        if (!this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
-        {
-            delay(100); // Small delay before next check
-            continue;
-        }
-
-        if (expectedUuid == nullptr)
-        {
-            logger.info("waitForNfcCard NTAG424 card detected. SUCCESS!");
-            return true;
-        }
-
-        // compare UUIds
-        String discovoredUUIDString = "";
-        for (int i = 0; i < discoveredUuidLength; i++)
-        {
-            if (dicoveredUuid[i] < 0x10)
-                discovoredUUIDString += "0";
-            discovoredUUIDString += String(dicoveredUuid[i], HEX);
-        }
-
-        if (discovoredUUIDString.equalsIgnoreCase(String(expectedUuid)))
-        {
-            logger.info("waitForNfcCard UUID matches. SUCCESS!");
-            return true;
-        }
+        // Be cooperative with other tasks
+        delay(20);
     }
 
     logger.info("waitForNfcCard Timeout waiting for NFC card");
@@ -349,10 +299,13 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key, bool waitForRemovalAtEnd
     bool success = false;
     for (int i = 0; i < 3; i++)
     {
-
         if (this->pn532.ntag424_Authenticate(key, keyNumber, NFC::AUTH_CMD))
         {
             success = true;
+        }
+
+        if (success)
+        {
             break;
         }
 
@@ -391,6 +344,7 @@ bool NFC::changeKey(const uint8_t keyNumber, uint8_t authKey[16], uint8_t *oldKe
     }
 
     // 2. Change key
+
     if (!this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber))
     {
         logger.error("changeKey Failed to change key");
@@ -403,9 +357,12 @@ bool NFC::changeKey(const uint8_t keyNumber, uint8_t authKey[16], uint8_t *oldKe
         logger.error("changeKey Failed to authenticate with NFC card after changing key");
         return false;
     }
+    else
+    {
 
-    logger.info("changeKey Key change operation completed successfully");
-    return true;
+        logger.info("changeKey Key change operation completed successfully");
+        return true;
+    }
 }
 
 void NFC::waitForCardRemoval()
@@ -414,8 +371,12 @@ void NFC::waitForCardRemoval()
     uint8_t uidLength;
 
     logger.info("waitForCardRemoval Please remove the card.");
-    while (this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 50))
+    while (true)
     {
+        bool stillPresent = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 50);
+
+        if (!stillPresent)
+            break;
         // Wait indicator removed for logger
     }
 
@@ -427,12 +388,16 @@ bool NFC::discoverNfcCard(char *dicoveredUuid, uint8_t *discoveredUuidLength, co
     uint8_t uid[7];
     uint8_t uidLength;
 
-    if (!this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeoutMs))
+    bool gotTarget = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeoutMs);
+
+    if (!gotTarget)
     {
         return false;
     }
 
-    if (!this->pn532.ntag424_isNTAG424())
+    bool is424 = this->pn532.ntag424_isNTAG424();
+
+    if (!is424)
     {
         return false;
     }

@@ -1,63 +1,69 @@
 #include "keypad.hpp"
+#include "keypad_config.hpp"
+
+#if KEYPAD == KEYPAD_I2C_FOLIO
+#include "variations/folio/folio.hpp"
+#endif
+#if KEYPAD == KEYPAD_I2C_MPR121
+#include "variations/mpr121/mpr121.hpp"
+#endif
 
 void Keypad::setup()
 {
-    this->keyPad.begin();
-
-    xTaskCreate(Keypad::taskFn, "Keypad", 2048, this, 1, NULL);
+    xTaskCreate(Keypad::taskFn, "Keypad", 3072, this, TASK_PRIORITY_KEYPAD, NULL);
 }
 
 void Keypad::taskFn(void *parameter)
 {
     Keypad *instance = (Keypad *)parameter;
 
+    bool keypadSetupSuccess = false;
+#if KEYPAD == KEYPAD_I2C_FOLIO
+    instance->keypad = new Folio();
+    keypadSetupSuccess = instance->keypad->setup();
+#elif KEYPAD == KEYPAD_I2C_MPR121
+    instance->keypad = new MPR121();
+    keypadSetupSuccess = instance->keypad->setup();
+#else
+    instance->logger.error("Keypad not configured");
+    vTaskDelete(NULL);
+    return; // not reached
+#endif
+
+    if (!keypadSetupSuccess)
+    {
+        instance->logger.error("Keypad setup failed, continuing without keypad");
+        if (instance->keypad != nullptr)
+        {
+            delete instance->keypad;
+            instance->keypad = nullptr;
+        }
+        vTaskDelete(NULL);
+        return; // not reached
+    }
+
     while (true)
     {
         instance->loop();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(150));
     }
 }
 
 void Keypad::loop()
 {
-    uint8_t pressedKeyNum = this->keyPad.getKey();
-    if (pressedKeyNum == I2C_KEYPAD_FAIL)
+    if (this->keypad == nullptr)
     {
         return;
     }
 
-    if (pressedKeyNum == I2C_KEYPAD_THRESHOLD)
+    char key = this->keypad->checkForKeyPress();
+
+    if (key == IKeypad::KEYPAD_NO_KEY)
     {
         return;
     }
 
-    if (pressedKeyNum != I2C_KEYPAD_NOKEY)
-    {
-        if (pressedKeyNum < I2C_KEYPAD_NOKEY)
-        {
-            this->last_pressed_key_num = pressedKeyNum;
-            this->logger.debug(String("Key down: " + String(pressedKeyNum) + " " + this->keymap[pressedKeyNum]).c_str());
-        }
-        return;
-    }
-
-    if (this->last_pressed_key_num == I2C_KEYPAD_NOKEY)
-    {
-        // No prior keypress; ignore spurious release
-        return;
-    }
-
-    uint8_t releasedIndex = this->last_pressed_key_num;
-    this->last_pressed_key_num = I2C_KEYPAD_NOKEY;
-
-    if (releasedIndex >= I2C_KEYPAD_NOKEY)
-    {
-        return;
-    }
-
-    char key = this->keymap[releasedIndex];
-
-    if (key == '#')
+    if (key == IKeypad::KEYPAD_CONFIRM)
     {
         this->logger.debug(String("Key confirm: " + this->value).c_str());
         State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_KEYPAD_CONFIRM_PRESSED, this->value);
@@ -66,7 +72,7 @@ void Keypad::loop()
         return;
     }
 
-    if (key == 'D')
+    if (key == IKeypad::KEYPAD_CANCEL)
     {
         this->logger.debug(String("Key cancel: " + this->value).c_str());
         State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_KEYPAD_CANCEL_PRESSED);

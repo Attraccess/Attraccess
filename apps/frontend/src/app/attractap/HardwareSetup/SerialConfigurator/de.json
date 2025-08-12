@@ -7,5 +7,10 @@
     "progress": {
       "label": "Verbindung wird hergestellt..."
     }
+  },
+  "tabs": {
+    "main": "Hauptkonfiguration",
+    "keypad": "Tastatur",
+    "checkingKeypad": "Suche nach Tastatur..."
   }
 }
