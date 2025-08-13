@@ -73,30 +73,29 @@ char MPR121::checkForKeyPress()
     uint16_t t1 = this->capSensor.touched();
     // simple debounce: only accept stable reading over two consecutive polls
     this->currentlyTouched = (t0 == t1) ? t1 : this->lastTouched;
-}
 
-if (this->currentlyTouched != this->lastTouched)
-{
-    this->logger.debugf("touchMask: now=0x%03x prev=0x%03x", this->currentlyTouched, this->lastTouched);
-}
+    if (this->currentlyTouched != this->lastTouched)
+    {
+        this->logger.debugf("touchMask: now=0x%03x prev=0x%03x", this->currentlyTouched, this->lastTouched);
+    }
 
-for (uint8_t i = 0; i < 12; i++)
-{
-    // it if *is* touched and *wasnt* touched before, alert!
-    if ((this->currentlyTouched & _BV(i)) && !(this->lastTouched & _BV(i)))
+    for (uint8_t i = 0; i < 12; i++)
     {
-        this->logger.infof("Key %d pressed", i);
+        // it if *is* touched and *wasnt* touched before, alert!
+        if ((this->currentlyTouched & _BV(i)) && !(this->lastTouched & _BV(i)))
+        {
+            this->logger.infof("Key %d pressed", i);
+        }
+        // if it *was* touched and now *isnt*, alert!
+        if (!(this->currentlyTouched & _BV(i)) && (this->lastTouched & _BV(i)))
+        {
+            this->logger.infof("Key %d released", i);
+            // Update state before returning to avoid repeated releases
+            this->lastTouched = this->currentlyTouched;
+            return this->keymap[i];
+        }
     }
-    // if it *was* touched and now *isnt*, alert!
-    if (!(this->currentlyTouched & _BV(i)) && (this->lastTouched & _BV(i)))
-    {
-        this->logger.infof("Key %d released", i);
-        // Update state before returning to avoid repeated releases
-        this->lastTouched = this->currentlyTouched;
-        return this->keymap[i];
-    }
-}
-// reset our state
-this->lastTouched = this->currentlyTouched;
-return IKeypad::KEYPAD_NO_KEY;
+    // reset our state
+    this->lastTouched = this->currentlyTouched;
+    return IKeypad::KEYPAD_NO_KEY;
 }

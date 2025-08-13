@@ -45,13 +45,20 @@ void Keypad::taskFn(void *parameter)
     while (true)
     {
         instance->loop();
-        vTaskDelay(pdMS_TO_TICKS(150));
+        vTaskDelay(150 / portTICK_PERIOD_MS);
     }
 }
 
 void Keypad::loop()
 {
     if (this->keypad == nullptr)
+    {
+        return;
+    }
+
+    this->updateState();
+
+    if (!this->enableKeyChecking)
     {
         return;
     }
@@ -84,4 +91,28 @@ void Keypad::loop()
     this->logger.debug(String("Key pressed: " + String(key)).c_str());
     this->value += key;
     State::setKeypadValue(this->value);
+}
+
+void Keypad::updateState()
+{
+    uint32_t lastApiEventTime = State::getLastApiEventTime();
+    if (lastApiEventTime < this->lastApiStateCheckTime)
+    {
+        return;
+    }
+
+    this->lastApiStateCheckTime = lastApiEventTime;
+
+    State::ApiEventData apiEvent = State::getApiEventData();
+
+    switch (apiEvent.state)
+    {
+    case State::API_EVENT_STATE_CONFIRM_ACTION:
+    case State::API_EVENT_STATE_RESOURCE_SELECTION:
+        this->enableKeyChecking = true;
+        break;
+    default:
+        this->enableKeyChecking = false;
+        break;
+    }
 }

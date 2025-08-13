@@ -207,6 +207,20 @@ void SerialSetup::handleAttraccessStatus(const String &payload)
         AttraccessApiConfig config = Settings::getAttraccessApiConfig();
         AttraccessAuthConfig authConfig = Settings::getAttraccessAuthConfig();
 
+        State::NetworkState networkState = State::getNetworkState();
+        State::ApiState apiState = State::getApiState();
+        State::WebsocketState websocketState = State::getWebsocketState();
+
+        if (websocketState.connected)
+        {
+            status = "connected";
+        }
+
+        if ((networkState.wifi_connected || networkState.ethernet_connected) && websocketState.connected && apiState.authenticated)
+        {
+            status = "authenticated";
+        }
+
         // Build JSON response
         doc["hostname"] = config.hostname;
         doc["port"] = config.port;

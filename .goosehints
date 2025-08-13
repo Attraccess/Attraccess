@@ -1,4 +1,0 @@
-This repository is a NX monorepo (https://nx.dev) with pnpm as its package manager.
-When executing tasks, use pnpm nx run <project>:<task> to run them.
-When installing packages, use pnpm.
-When in doubt, take a look at the online documentation of any tool you want to use/develop with.

@@ -20,4 +20,8 @@ private:
     IKeypad *keypad;
     Logger logger;
     String value;
+
+    void updateState();
+    uint32_t lastApiStateCheckTime = 0;
+    bool enableKeyChecking = false;
 };
