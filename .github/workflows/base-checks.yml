@@ -51,3 +51,6 @@ jobs:
         env:
           NODE_ENV: production
         run: pnpm exec nx affected -t lint, test, build, e2e
+
+      - run: npx nx-cloud fix-ci
+        if: always()
