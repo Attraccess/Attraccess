@@ -24,12 +24,12 @@ public:
     }
 
     void setup();
-    void loop();
 
 private:
     Logger logger;
 
     static void taskFn(void *parameter);
+    void loop();
 
     uint32_t _bootTime;
     const uint32_t BOOT_DURATION_MS = 2000;

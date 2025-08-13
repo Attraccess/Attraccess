@@ -40,7 +40,7 @@ void DisplayManager::setup()
     this->display->setup();
 
     this->logger.infof("Creating DisplayManager task with stack %u bytes", 4096u);
-    // xTaskCreate(DisplayManager::taskFn, "DisplayManager", 4096, this, TASK_PRIORITY_DISPLAY_MANAGER, NULL);
+    xTaskCreate(DisplayManager::taskFn, "DisplayManager", 4096, this, TASK_PRIORITY_DISPLAY_MANAGER, NULL);
 }
 
 void DisplayManager::taskFn(void *parameter)

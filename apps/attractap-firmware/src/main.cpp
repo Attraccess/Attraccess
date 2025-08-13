@@ -88,10 +88,4 @@ void loop()
         mainLogger.debug(("loop running at " + String(millis()) + " ms").c_str());
         lastDebug = millis();
     }
-
-    displayManager.loop();
-    // delay(10);
-    nfc.loop();
-    // leds.loop();
-    // delay(10);
 }

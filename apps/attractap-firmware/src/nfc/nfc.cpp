@@ -6,14 +6,14 @@ void NFC::setup()
     this->pn532.begin();
 
     this->logger.info("Creating NFC task");
-    // xTaskCreate(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL);
+    xTaskCreatePinnedToCore(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL, 0);
 }
 
 void NFC::task_function(void *pvParameters)
 {
     NFC *nfc = (NFC *)pvParameters;
 
-    const int LOOP_DELAY_MS = 500; // faster loop to avoid long blocking sections
+    const int LOOP_DELAY_MS = 40; // faster loop to avoid long blocking sections
 
     while (true)
     {
