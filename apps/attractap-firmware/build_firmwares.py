@@ -160,14 +160,6 @@ def main():
             except subprocess.CalledProcessError:
                 print(f"Error: Build failed for environment '{env}'")
                 sys.exit(1)
-                
-            # Build filesystem image using temporary config
-            try:
-                print(f"Building filesystem image for {env}...")
-                subprocess.run(['platformio', 'run', '-c', temp_config_path, '--target', 'buildfs', '-e', env], check=True)
-            except subprocess.CalledProcessError:
-                print(f"Error: Filesystem build failed for environment '{env}'")
-                sys.exit(1)
             
             # Check firmware files
             firmware_path = f".pio/build/{env}/firmware.bin"
