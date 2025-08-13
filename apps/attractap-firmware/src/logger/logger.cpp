@@ -1,4 +1,9 @@
 #include "logger.hpp"
+// Ensure we can safely convert macro values to strings
+#ifndef STRINGIFY
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
+#endif
 
 LogLevel Logger::level = LOG_LEVEL_INFO;
 
@@ -19,7 +24,30 @@ Logger::Logger(const char *name) : name(name)
         Serial.println("Logger: no persisted log level, using LOG_LEVEL if exists");
 #ifdef LOG_LEVEL
         Serial.println("Logger: LOG_LEVEL is defined, using it");
-        Logger::setLevel(getLogLevelFromString(LOG_LEVEL));
+        const char *macroValue = STRINGIFY(LOG_LEVEL);
+
+        // If macro expands to a quoted string (e.g. "INFO"), trim quotes.
+        if (macroValue[0] == '"')
+        {
+            size_t length = strlen(macroValue);
+            if (length >= 2 && macroValue[length - 1] == '"')
+            {
+                char trimmed[16];
+                size_t copyLength = min((size_t)14, length - 2); // leave room for null terminator
+                memcpy(trimmed, macroValue + 1, copyLength);
+                trimmed[copyLength] = '\0';
+                Logger::setLevel(getLogLevelFromString(trimmed));
+            }
+            else
+            {
+                Logger::setLevel(getLogLevelFromString(macroValue));
+            }
+        }
+        else
+        {
+            // If macro expands to a bare token (e.g. INFO), STRINGIFY makes it "INFO"
+            Logger::setLevel(getLogLevelFromString(macroValue));
+        }
 #else
 
         Serial.println("Logger: no persisted log level, no LOG_LEVEL, using LOG_LEVEL_INFO");

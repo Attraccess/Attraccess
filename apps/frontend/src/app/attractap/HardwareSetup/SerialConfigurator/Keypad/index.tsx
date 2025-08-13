@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Card, CardBody, CircularProgress, cn, Input, Progress, Slider } from '@heroui/react';
+import { Alert, Button, Card, CardBody, CircularProgress, cn, Input, Progress } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ESPTools } from '../../../../../utils/esp-tools';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -274,7 +274,7 @@ export function AttractapSerialConfiguratorKeypad(props: Props) {
         })}
       </div>
     );
-  }, [keymap, validateDeltas, touchThreshold]);
+  }, [keymap, validateDeltas, touchThreshold, t]);
 
   if (!show) {
     return (

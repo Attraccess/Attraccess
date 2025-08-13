@@ -11,14 +11,14 @@ class WaitForConnectionScreen : public IScreen
 {
 public:
     WaitForConnectionScreen();
-    void onScreenEnter();
-    void onScreenExit();
-    void loop();
-    lv_obj_t *getScreen();
+    void onScreenEnter() override;
+    void onScreenExit() override;
+    void loop() override;
+    void onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData) override;
+    lv_obj_t *getScreen() override;
 
 private:
     lv_obj_t *screen;
-    uint32_t lastKnownAppStateChangeTime;
 
     lv_obj_t *currentStatusLabel;
     lv_obj_t *currentStatusDetailLabel;
@@ -37,6 +37,5 @@ private:
     void startDotsAnimation();
 
     void initialize();
-    void updateStatus();
     Logger logger;
 };

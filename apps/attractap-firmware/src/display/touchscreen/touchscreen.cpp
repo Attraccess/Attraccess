@@ -1,8 +1,5 @@
 #include "touchscreen.hpp"
 
-uint8_t Touchscreen::UPDATE_FREQ_HZ = 60;
-uint32_t Touchscreen::UPDATE_INTERVAL_MS = 1000 / Touchscreen::UPDATE_FREQ_HZ;
-
 void Touchscreen::xptPosition(uint16_t *xptX, uint16_t *xptY, uint8_t *xptZ, uint16_t *tftX, uint16_t *tftY)
 {
     uint16_t x, y;
@@ -91,60 +88,46 @@ void Touchscreen::setup()
     tft.fillScreen(TFT_BLACK); // clear screen
     tft.initDMA();
 
-    xTaskCreate(
-        Touchscreen::taskFn,
-        "Touchscreen",
-        4096,
-        this,
-        TASK_PRIORITY_DISPLAY_TOUCHSCREEN,
-        NULL);
-
-    logger.info("Setup complete");
-}
-
-void Touchscreen::taskFn(void *parameter)
-{
-    Touchscreen *touchscreen = (Touchscreen *)parameter;
-
-    touchscreen->logger.info("Setup LVGL");
+    this->logger.info("Setup LVGL");
     lv_init();
 
     // Create display and store reference
-    touchscreen->display = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
-    if (touchscreen->display == NULL)
+    this->display = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
+    if (this->display == NULL)
     {
-        touchscreen->logger.error("Failed to create LVGL display!");
+        this->logger.error("Failed to create LVGL display!");
         return;
     }
-    touchscreen->logger.info("LVGL display created");
+    this->logger.info("LVGL display created");
 
-    lv_display_set_buffers(touchscreen->display, touchscreen->draw_buf, NULL, sizeof(touchscreen->draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(this->display, this->draw_buf, NULL, sizeof(this->draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-    lv_display_set_flush_cb(touchscreen->display, flushDisplayWrapper);
-    touchscreen->logger.debug(("Display buffer set, size: " + String(sizeof(draw_buf)) + " bytes").c_str());
+    lv_display_set_flush_cb(this->display, flushDisplayWrapper);
+    this->logger.debug(("Display buffer set, size: " + String(sizeof(draw_buf)) + " bytes").c_str());
 
     // Store this instance pointer in display user_data for callback access
-    lv_display_set_user_data(touchscreen->display, touchscreen);
+    lv_display_set_user_data(this->display, this);
 
-    touchscreen->indev = lv_indev_create();
-    if (touchscreen->indev == NULL)
+    this->indev = lv_indev_create();
+    if (this->indev == NULL)
     {
-        touchscreen->logger.error("Failed to create LVGL input device!");
+        this->logger.error("Failed to create LVGL input device!");
         return;
     }
-    lv_indev_set_type(touchscreen->indev, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_read_cb(touchscreen->indev, readTouchpadWrapper);
+    lv_indev_set_type(this->indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(this->indev, readTouchpadWrapper);
 
     // Store this instance pointer in input device user_data for callback access
-    lv_indev_set_user_data(touchscreen->indev, touchscreen);
+    lv_indev_set_user_data(this->indev, this);
 
-    touchscreen->prepareApplicationOverlay();
+    this->prepareApplicationOverlay();
 
-    while (true)
-    {
-        touchscreen->loop();
-        delay(Touchscreen::UPDATE_INTERVAL_MS);
-    }
+    // Initialize boot timing and show initial screen
+    this->bootMillis = millis();
+    this->state = IDisplay::DisplayState::DISPLAY_STATE_BOOTING;
+    this->transitionTo(this->state);
+
+    logger.info("Setup complete");
 }
 
 void Touchscreen::prepareApplicationOverlay()
@@ -189,6 +172,25 @@ void Touchscreen::readTouchpadWrapper(lv_indev_t *indev, lv_indev_data_t *data)
     instance->readTouchpad(indev, data);
 }
 
+void Touchscreen::onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData)
+{
+    this->networkState = networkState;
+    this->websocketState = webSocketState;
+    this->apiState = apiState;
+    this->apiEventData = apiEventData;
+
+    if (apiState.deviceName.isEmpty())
+    {
+        lv_label_set_text(deviceNameLabel, FIRMWARE_FRIENDLY_NAME);
+    }
+    else
+    {
+        lv_label_set_text(deviceNameLabel, apiState.deviceName.c_str());
+    }
+
+    this->currentScreen->onDataChange(networkState, webSocketState, apiState, apiEventData);
+}
+
 void Touchscreen::loop()
 {
     feedLvgl();
@@ -199,9 +201,6 @@ void Touchscreen::loop()
     uint32_t minutes = (uptime % 3600000) / 60000;
     uint32_t seconds = (uptime % 60000) / 1000;
     lv_label_set_text_fmt(uptimeLabel, "%02d:%02d:%02d", hours, minutes, seconds);
-
-    getUpdatesFromAppState();
-    updateScreen();
 }
 
 void Touchscreen::feedLvgl()
@@ -223,48 +222,61 @@ void Touchscreen::feedLvgl()
     }
 }
 
-void Touchscreen::updateScreen()
+void Touchscreen::transitionTo(DisplayState state)
 {
-    bool isConnectedToNetwork = isConnectedToWifi || isConnectedToEthernet;
+    bool isConnectedToNetwork = this->networkState.wifi_connected || this->networkState.ethernet_connected;
 
     IScreen *oldScreen = currentScreen;
 
-    if (!isConnectedToNetwork || !isConnectedToWebsocket || !isConnectedToApi)
+    switch (state)
     {
-        this->currentScreen = &waitForConnectionScreen;
-    }
-    else if (this->nfcTapEnabled)
-    {
-        this->currentScreen = &nfcTapScreen;
-    }
-    else if (this->state == DISPLAY_STATE_ERROR)
-    {
-        this->currentScreen = &messageScreen;
-    }
-    else if (this->state == DISPLAY_STATE_SUCCESS)
-    {
-        this->currentScreen = &messageScreen;
-    }
-    else if (this->state == DISPLAY_STATE_TEXT)
-    {
-        this->currentScreen = &messageScreen;
-    }
-    else if (this->state == DISPLAY_STATE_SELECT_ITEM)
-    {
-        this->currentScreen = &messageScreen;
-    }
-    else if (this->state == DISPLAY_STATE_CONFIRM_ACTION)
-    {
-        this->currentScreen = &messageScreen;
-    }
-    else
-    {
-        this->currentScreen = &unknownStateScreen;
-    }
-
-    if (this->currentScreen == NULL)
-    {
-        return;
+    case IDisplay::DisplayState::DISPLAY_STATE_BOOTING:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Booting", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_NETWORK:
+        this->currentScreen = &this->waitForConnectionScreen;
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_WEBSOCKET:
+        this->currentScreen = &this->waitForConnectionScreen;
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_WAITING_FOR_AUTHENTICATION:
+        this->currentScreen = &this->waitForConnectionScreen;
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_CONNECTED_WAITING_FOR_API_EVENT:
+        this->currentScreen = &this->waitForConnectionScreen;
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_RESOURCE_SELECTION:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Select Resource", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_CONFIRM_ACTION:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Confirm Action", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_WAIT_FOR_NFC_TAP:
+        this->currentScreen = &this->nfcTapScreen;
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_SUCCESS:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Success", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_ERROR:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Error", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_TEXT:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Text", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_FIRMWARE_UPDATE:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Firmware Update", lv_color_hex(0xFFFFFF));
+        break;
+    case IDisplay::DisplayState::DISPLAY_STATE_WAIT_FOR_PROCESSING:
+        this->currentScreen = &this->messageScreen;
+        this->messageScreen.setMessage("Waiting for Processing", lv_color_hex(0xFFFFFF));
+        break;
     }
 
     if (oldScreen != this->currentScreen)
@@ -284,34 +296,4 @@ void Touchscreen::updateScreen()
     }
 
     this->currentScreen->loop();
-}
-
-void Touchscreen::getUpdatesFromAppState()
-{
-    uint32_t lastStateChangeTime = appState.getLastStateChangeTime();
-    if (lastStateChangeTime <= lastKnownAppStateChangeTime)
-    {
-        return;
-    }
-
-    lastKnownAppStateChangeTime = lastStateChangeTime;
-
-    logger.debug("app state changed, getting changes");
-    auto networkState = appState.getNetworkState();
-    auto websocketState = appState.getWebsocketState();
-    auto apiState = appState.getApiState();
-
-    isConnectedToWifi = networkState.wifi_connected;
-    isConnectedToEthernet = networkState.ethernet_connected;
-    isConnectedToWebsocket = websocketState.connected;
-    isConnectedToApi = apiState.authenticated;
-
-    if (apiState.deviceName.isEmpty())
-    {
-        lv_label_set_text(deviceNameLabel, FIRMWARE_FRIENDLY_NAME);
-    }
-    else
-    {
-        lv_label_set_text(deviceNameLabel, apiState.deviceName.c_str());
-    }
 }

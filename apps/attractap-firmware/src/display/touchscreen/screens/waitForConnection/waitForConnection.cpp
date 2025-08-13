@@ -1,6 +1,6 @@
 #include "waitForConnection.hpp"
 
-WaitForConnectionScreen::WaitForConnectionScreen() : screen(nullptr), currentStatusLabel(nullptr), currentStatusDetailLabel(nullptr), initialized(false), appState(), lastKnownAppStateChangeTime(0), logger("Touchscreen:WaitForConnection")
+WaitForConnectionScreen::WaitForConnectionScreen() : screen(nullptr), currentStatusLabel(nullptr), currentStatusDetailLabel(nullptr), initialized(false), logger("Touchscreen:WaitForConnection")
 {
     // Don't create LVGL objects here - they need to be created after lv_init()
 }
@@ -106,7 +106,7 @@ lv_obj_t *WaitForConnectionScreen::getScreen()
     return screen;
 }
 
-void WaitForConnectionScreen::updateStatus()
+void WaitForConnectionScreen::onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData)
 {
     if (!initialized)
     {
@@ -124,27 +124,7 @@ void WaitForConnectionScreen::updateStatus()
         return;
     }
 
-    uint32_t lastStateChangeTime = appState.getLastStateChangeTime();
-    // Only skip when we have already processed this or a newer change
-    if (lastKnownAppStateChangeTime >= lastStateChangeTime)
-    {
-        static uint32_t lastNoStateChangeDebugLogTime = 0;
-        uint32_t now = millis();
-        if (now - lastNoStateChangeDebugLogTime > 1000)
-        {
-            logger.debug("updateStatus: no change");
-            lastNoStateChangeDebugLogTime = now;
-        }
-        return;
-    }
-
-    lastKnownAppStateChangeTime = lastStateChangeTime;
-
     logger.debug("updateStatus");
-
-    auto networkState = appState.getNetworkState();
-    auto websocketState = appState.getWebsocketState();
-    auto apiState = appState.getApiState();
 
     bool isConnected = networkState.wifi_connected || networkState.ethernet_connected;
     if (!isConnected)
@@ -156,7 +136,7 @@ void WaitForConnectionScreen::updateStatus()
         return;
     }
 
-    if (websocketState.hostname.isEmpty() || websocketState.port == 0)
+    if (webSocketState.hostname.isEmpty() || webSocketState.port == 0)
     {
         logger.debug("updateStatus: API not configured");
         lv_label_set_text(currentStatusLabel, "Connecting to websocket");
@@ -164,12 +144,12 @@ void WaitForConnectionScreen::updateStatus()
         return;
     }
 
-    logger.debugf("updateStatus: set currentStatusDetailLabel to %s:%d", websocketState.hostname.c_str(), websocketState.port);
-    if (!websocketState.connected)
+    logger.debugf("updateStatus: set currentStatusDetailLabel to %s:%d", webSocketState.hostname.c_str(), webSocketState.port);
+    if (!webSocketState.connected)
     {
         logger.debug("updateStatus: set currentStatusLabel to Connecting to websocket");
         lv_label_set_text(currentStatusLabel, "Connecting to websocket");
-        lv_label_set_text(currentStatusDetailLabel, String(websocketState.hostname + ":" + websocketState.port).c_str());
+        lv_label_set_text(currentStatusDetailLabel, String(webSocketState.hostname + ":" + webSocketState.port).c_str());
         return;
     }
 
@@ -177,7 +157,7 @@ void WaitForConnectionScreen::updateStatus()
     {
         logger.debug("updateStatus: set currentStatusLabel to Connecting to API");
         lv_label_set_text(currentStatusLabel, "Authenticating with API");
-        lv_label_set_text(currentStatusDetailLabel, String(websocketState.hostname + ":" + websocketState.port).c_str());
+        lv_label_set_text(currentStatusDetailLabel, String(webSocketState.hostname + ":" + webSocketState.port).c_str());
         return;
     }
 
@@ -190,7 +170,7 @@ void WaitForConnectionScreen::updateStatus()
 
 void WaitForConnectionScreen::loop()
 {
-    this->updateStatus();
+    // nothing to do here
 }
 
 void WaitForConnectionScreen::dotsAnimExecCb(void *var, int32_t v)

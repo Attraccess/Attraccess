@@ -173,7 +173,10 @@ def main():
             firmware_path = f".pio/build/{env}/firmware.bin"
             bootloader_path = f".pio/build/{env}/bootloader.bin"
             partitions_path = f".pio/build/{env}/partitions.bin"
-            filesystem_path = f".pio/build/{env}/littlefs.bin"
+            # Prefer LittleFS if present, otherwise fall back to SPIFFS
+            littlefs_path = f".pio/build/{env}/littlefs.bin"
+            spiffs_path = f".pio/build/{env}/spiffs.bin"
+            filesystem_path = littlefs_path if os.path.exists(littlefs_path) else spiffs_path
             idedata_path = f".pio/build/{env}/idedata.json"
 
             # Check if any file is missing

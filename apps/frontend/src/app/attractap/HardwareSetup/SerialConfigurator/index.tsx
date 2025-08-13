@@ -69,7 +69,7 @@ export function AttractapSerialConfigurator(props: Props) {
           const available = type === 'MPR121';
           setIsKeypadAvailable(available);
           setIsCheckingKeypad(false);
-        } catch (err) {
+        } catch {
           setTimeout(check, 1500);
         }
       } catch {

@@ -15,37 +15,25 @@
 #include "task_priorities.h"
 #include "../../state/state.hpp"
 #include "../../logger/logger.hpp"
+#include "../../display/IDisplay.hpp"
 
-class Touchscreen
+class Touchscreen : public IDisplay
 {
 public:
-    enum DisplayState
-    {
-        DISPLAY_STATE_NONE,
-        DISPLAY_STATE_ERROR,
-        DISPLAY_STATE_SUCCESS,
-        DISPLAY_STATE_TEXT,
-        DISPLAY_STATE_SELECT_ITEM,
-        DISPLAY_STATE_CONFIRM_ACTION,
-    };
+    Touchscreen() : xptSPI(VSPI), xpt(XPT2046_CS, XPT2046_IRQ), tft(), draw_buf(), indev(), lastMillis(0), waitForConnectionScreen(), nfcTapScreen(), messageScreen(), unknownStateScreen(), currentScreen(nullptr), logger("Touchscreen") {}
 
-    Touchscreen() : xptSPI(VSPI), xpt(XPT2046_CS, XPT2046_IRQ), tft(), draw_buf(), indev(), lastMillis(0), lastKnownAppStateChangeTime(0), waitForConnectionScreen(), nfcTapScreen(), messageScreen(), unknownStateScreen(), isConnectedToWifi(false), isConnectedToEthernet(false), isConnectedToWebsocket(false), isConnectedToApi(false), nfcTapEnabled(false), currentScreen(nullptr), state(DISPLAY_STATE_NONE), logger("Touchscreen") {}
-
-    void setup();
+    void setup() override;
+    void loop() override;
+    void transitionTo(DisplayState state) override;
+    void onDataChange(State::NetworkState networkState, State::WebsocketState webSocketState, State::ApiState apiState, State::ApiEventData apiEventData) override;
 
     // Static wrapper functions for LVGL callbacks (multi-instance safe)
     static void flushDisplayWrapper(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void readTouchpadWrapper(lv_indev_t *indev, lv_indev_data_t *data);
 
 private:
-    static void taskFn(void *parameter);
-    void loop();
-
     static uint8_t UPDATE_FREQ_HZ;
     static uint32_t UPDATE_INTERVAL_MS;
-
-    uint32_t lastKnownAppStateChangeTime;
-    void getUpdatesFromAppState();
 
     uint32_t lastMillis;
 
@@ -64,12 +52,10 @@ private:
 
     DisplayState state;
 
-    bool isConnectedToApi;
-    bool isConnectedToWifi;
-    bool isConnectedToEthernet;
-    bool isConnectedToWebsocket;
-
-    bool nfcTapEnabled;
+    State::NetworkState networkState;
+    State::WebsocketState websocketState;
+    State::ApiState apiState;
+    State::ApiEventData apiEventData;
 
     IScreen *currentScreen;
     lv_obj_t *deviceNameLabel;
@@ -77,7 +63,6 @@ private:
     uint32_t bootMillis;
     lv_obj_t *uptimeLabel;
 
-    void updateScreen();
     void prepareApplicationOverlay();
 
     WaitForConnectionScreen waitForConnectionScreen;

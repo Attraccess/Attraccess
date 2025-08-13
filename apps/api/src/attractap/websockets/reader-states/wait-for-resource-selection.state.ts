@@ -26,8 +26,9 @@ export class WaitForResourceSelectionState implements ReaderState {
     // nothing to do here
   }
 
-  public async onEvent(data: AttractapEvent['data']) {
-    return undefined;
+  public async onEvent(_data: AttractapEvent['data']): Promise<void> {
+    void _data;
+    return;
   }
 
   public async onResponse(data: AttractapResponse['data']) {

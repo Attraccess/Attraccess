@@ -127,7 +127,7 @@ describe('ResetNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
+            type: AttractapEventType.WAIT_FOR_PROCESSING,
           }),
         })
       );
@@ -387,7 +387,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
+          type: AttractapEventType.WAIT_FOR_PROCESSING,
         }),
       })
     );
@@ -493,7 +493,7 @@ describe('ResetNTAG424State - Full Flow', () => {
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
+          type: AttractapEventType.WAIT_FOR_PROCESSING,
         }),
       })
     );

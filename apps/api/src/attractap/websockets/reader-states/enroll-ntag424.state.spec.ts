@@ -138,7 +138,7 @@ describe('EnrollNTAG424State', () => {
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
+            type: AttractapEventType.WAIT_FOR_PROCESSING,
           }),
         })
       );
@@ -403,13 +403,13 @@ describe('EnrollNTAG424State - Full Flow', () => {
       payload: { cardUID: mockCardUID },
     });
 
-    // Verify DISABLE_CARD_CHECKING and CHANGE_KEYS messages
+    // Verify WAIT_FOR_PROCESSING (disable card checking) and CHANGE_KEYS messages
     expect(mockSocket.sendMessage).toHaveBeenCalledTimes(3);
     expect(mockSocket.sendMessage).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         data: expect.objectContaining({
-          type: AttractapEventType.NFC_DISABLE_CARD_CHECKING,
+          type: AttractapEventType.WAIT_FOR_PROCESSING,
         }),
       })
     );
