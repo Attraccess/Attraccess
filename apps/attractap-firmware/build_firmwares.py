@@ -165,15 +165,12 @@ def main():
             firmware_path = f".pio/build/{env}/firmware.bin"
             bootloader_path = f".pio/build/{env}/bootloader.bin"
             partitions_path = f".pio/build/{env}/partitions.bin"
-            # Prefer LittleFS if present, otherwise fall back to SPIFFS
-            littlefs_path = f".pio/build/{env}/littlefs.bin"
-            spiffs_path = f".pio/build/{env}/spiffs.bin"
-            filesystem_path = littlefs_path if os.path.exists(littlefs_path) else spiffs_path
+
             idedata_path = f".pio/build/{env}/idedata.json"
 
             # Check if any file is missing
             missing_files = []
-            for file_path in [firmware_path, bootloader_path, partitions_path, filesystem_path]:
+            for file_path in [firmware_path, bootloader_path, partitions_path]:
                 if not os.path.exists(file_path):
                     missing_files.append(file_path)
                     
@@ -240,14 +237,12 @@ def main():
                             (0x0, "0x0", bootloader_path),
                             (0x8000, "0x8000", partitions_path),
                             (0x10000, "0x10000", firmware_path),
-                            (hex_to_int(fs_offset), fs_offset, filesystem_path)
                         ]
                     else:
                         flash_images = [
                             (0x1000, "0x1000", bootloader_path),
                             (0x8000, "0x8000", partitions_path),
                             (0x10000, "0x10000", firmware_path),
-                            (hex_to_int(fs_offset), fs_offset, filesystem_path)
                         ]
                 except Exception as e:
                     print(f"Warning: Failed to get partition information: {e}")
@@ -258,14 +253,12 @@ def main():
                             (0x0, "0x0", bootloader_path),
                             (0x8000, "0x8000", partitions_path),
                             (0x10000, "0x10000", firmware_path),
-                            (hex_to_int(fs_offset), fs_offset, filesystem_path)
                         ]
                     else:
                         flash_images = [
                             (0x1000, "0x1000", bootloader_path),
                             (0x8000, "0x8000", partitions_path),
                             (0x10000, "0x10000", firmware_path),
-                            (hex_to_int(fs_offset), fs_offset, filesystem_path)
                         ]
             
             # Sort by integer offset to ensure correct order
