@@ -13,7 +13,7 @@
 class Neopixel
 {
 public:
-    Neopixel() : logger("Neopixel") {}
+    Neopixel() : logger("Neopixel"), nfcAnimationActivated(false) {}
 
     void setup();
     void loop();
@@ -37,10 +37,11 @@ private:
     void runWaitForNfcTapAnimation();
     void runFirmwareUpdateAnimation();
 
+    void nfcAnimationWorkaround();
+    bool nfcAnimationActivated;
+
     // FastLED strip buffer (WS2812B / GRB)
     CRGB ledStrip[LED_COUNT];
-    // Off-screen framebuffer for composing each animation frame
-    CRGB frame[LED_COUNT];
 
     State::NetworkState networkState;
     State::WebsocketState websocketState;

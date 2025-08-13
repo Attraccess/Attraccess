@@ -28,17 +28,6 @@ namespace
         fill_solid(buffer, count, color);
     }
 
-    inline void flushFrame(CRGB *strip, CRGB *buffer, int count)
-    {
-        if (count <= 0)
-            return;
-        for (int i = 0; i < count; ++i)
-        {
-            strip[i] = buffer[i];
-        }
-        FastLED.show();
-    }
-
     // Colors (sRGB)
     const CRGB COLOR_BLUE_NET = CRGB(0x00, 0x7B, 0xFF); // #007BFF
     const CRGB COLOR_CYAN_WS = CRGB(0x00, 0xE5, 0xFF);  // #00E5FF
@@ -58,22 +47,17 @@ namespace
         return beatsin8(bpm, minV, maxV);
     }
 
-    inline int stepFromPeriod(uint32_t nowMs, uint16_t periodMs, int steps)
+    inline int headFromPeriod(uint16_t periodMs, int steps)
     {
         if (periodMs == 0 || steps <= 0)
             return 0;
-        uint32_t phase = nowMs % periodMs;
-        return (int)((uint64_t)phase * (uint32_t)steps / (uint32_t)periodMs);
+        uint8_t bpm = (uint8_t)(60000UL / periodMs);
+        return scale8(beat8(bpm), (uint8_t)steps);
     }
 }
 
 void Neopixel::setup()
 {
-    logger.info("Setup");
-    FastLED.addLeds<WS2812B, PIN_NEOPIXEL_LED>(ledStrip, LED_COUNT);
-    FastLED.setBrightness(255);
-    fillSolid(frame, LED_COUNT, CRGB::Black);
-    flushFrame(ledStrip, frame, LED_COUNT);
 
     xTaskCreatePinnedToCore(
         Neopixel::taskFn,
@@ -86,12 +70,18 @@ void Neopixel::setup()
 }
 void Neopixel::taskFn(void *parameter)
 {
+    Neopixel *instance = (Neopixel *)parameter;
+
+    instance->logger.info("Setup");
+    FastLED.addLeds<WS2812B, PIN_NEOPIXEL_LED, GRB>(instance->ledStrip, LED_COUNT);
+    FastLED.setBrightness(255);
+    fillSolid(instance->ledStrip, LED_COUNT, CRGB::Black);
+    FastLED.show();
+
     // const int REFRESH_RATE_HZ = 60;
     // const int MS_PER_SECOND = 1000;
     // const int LOOP_DELAY_MS = (MS_PER_SECOND / REFRESH_RATE_HZ);
     const int LOOP_DELAY_MS = 200;
-
-    Neopixel *instance = (Neopixel *)parameter;
 
     while (true)
     {
@@ -157,27 +147,35 @@ void Neopixel::runAnimation()
     switch (this->apiEventData.state)
     {
     case State::API_EVENT_STATE_DISPLAY_ERROR:
+        this->nfcAnimationActivated = false;
         this->runDisplayErrorAnimation();
         break;
     case State::API_EVENT_STATE_DISPLAY_SUCCESS:
+        this->nfcAnimationActivated = false;
         this->runDisplaySuccessAnimation();
         break;
     case State::API_EVENT_STATE_DISPLAY_TEXT:
+        this->nfcAnimationActivated = false;
         this->runDisplayTextAnimation();
         break;
     case State::API_EVENT_STATE_CONFIRM_ACTION:
+        this->nfcAnimationActivated = false;
         this->runConfirmActionAnimation();
         break;
     case State::API_EVENT_STATE_RESOURCE_SELECTION:
+        this->nfcAnimationActivated = false;
         this->runResourceSelectionAnimation();
         break;
     case State::API_EVENT_STATE_WAIT_FOR_PROCESSING:
-        this->runWaitForProcessingAnimation();
+        // this->runWaitForProcessingAnimation();
+        this->nfcAnimationWorkaround();
         break;
     case State::API_EVENT_STATE_WAIT_FOR_NFC_TAP:
-        this->runWaitForNfcTapAnimation();
+        // this->runWaitForNfcTapAnimation();
+        this->nfcAnimationWorkaround();
         break;
     case State::API_EVENT_STATE_FIRMWARE_UPDATE:
+        this->nfcAnimationActivated = false;
         this->runFirmwareUpdateAnimation();
         break;
     }
@@ -200,10 +198,9 @@ void Neopixel::runWaitingForNetworkAnimation()
     const uint8_t tail1 = 96;           // ~38%
     const uint8_t tail2 = 40;           // ~16%
 
-    uint32_t now = millis();
-    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
+    int head = headFromPeriod(revolutionMs, LED_COUNT);
 
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // Optional subtle background breathe (~5% base white)
     uint8_t bg = breathe8(12, 3, 10); // slow, very dim
@@ -211,27 +208,27 @@ void Neopixel::runWaitingForNetworkAnimation()
     {
         CRGB c = COLOR_WHITE;
         c.nscale8_video(bg);
-        addLedWrapped(frame, LED_COUNT, i, c);
+        addLedWrapped(ledStrip, LED_COUNT, i, c);
     }
 
     // Comet with 2-LED tail
     {
         CRGB c = COLOR_BLUE_NET;
         c.nscale8_video(headBrightness);
-        setLedWrapped(frame, LED_COUNT, head, c);
+        setLedWrapped(ledStrip, LED_COUNT, head, c);
     }
     {
         CRGB c = COLOR_BLUE_NET;
         c.nscale8_video(tail1);
-        addLedWrapped(frame, LED_COUNT, head - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 1, c);
     }
     {
         CRGB c = COLOR_BLUE_NET;
         c.nscale8_video(tail2);
-        addLedWrapped(frame, LED_COUNT, head - 2, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 2, c);
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -250,46 +247,50 @@ void Neopixel::runWaitingForWebsocketConnectionAnimation()
     const uint8_t headBrightness = 140; // ~55%
     const uint8_t tail = 64;            // ~25%
 
-    uint32_t now = millis();
-    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
+    int head = headFromPeriod(revolutionMs, LED_COUNT);
     int head2 = head + LED_COUNT / 2; // 180° apart
 
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // Two comets
     {
         CRGB c = COLOR_CYAN_WS;
         c.nscale8_video(headBrightness);
-        setLedWrapped(frame, LED_COUNT, head, c);
+        setLedWrapped(ledStrip, LED_COUNT, head, c);
     }
     {
         CRGB c = COLOR_CYAN_WS;
         c.nscale8_video(tail);
-        addLedWrapped(frame, LED_COUNT, head - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 1, c);
     }
     {
         CRGB c = COLOR_CYAN_WS;
         c.nscale8_video(headBrightness);
-        setLedWrapped(frame, LED_COUNT, head2, c);
+        setLedWrapped(ledStrip, LED_COUNT, head2, c);
     }
     {
         CRGB c = COLOR_CYAN_WS;
         c.nscale8_video(tail);
-        addLedWrapped(frame, LED_COUNT, head2 - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, head2 - 1, c);
     }
 
-    // Handshake micro‑flash every ~3s
-    if ((now % 3000) < 80)
+    // Handshake micro‑flash every ~3s (one frame)
     {
-        for (int i = 0; i < LED_COUNT; ++i)
+        static bool flash = false;
+        EVERY_N_MILLISECONDS_I(wsFlash, 3000) { flash = true; }
+        if (flash)
         {
-            CRGB c = COLOR_WHITE;
-            c.nscale8_video(28); // ~11%
-            addLedWrapped(frame, LED_COUNT, i, c);
+            flash = false;
+            for (int i = 0; i < LED_COUNT; ++i)
+            {
+                CRGB c = COLOR_WHITE;
+                c.nscale8_video(28);
+                addLedWrapped(ledStrip, LED_COUNT, i, c);
+            }
         }
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -306,27 +307,26 @@ void Neopixel::runWaitingForApiAuthenticationAnimation()
     // Breathe at ~0.6 Hz → 36 BPM
     uint8_t base = breathe8(36, 13, 64); // ~5% to ~25%
 
-    uint32_t now = millis();
     {
         CRGB c = COLOR_AMBER;
         c.nscale8_video(base);
-        fillSolid(frame, LED_COUNT, c);
+        fillSolid(ledStrip, LED_COUNT, c);
     }
 
     // Continuous running dot with short tail, slow pace (~2.4s per revolution)
-    int head = stepFromPeriod(now, 2400, LED_COUNT);
+    int head = headFromPeriod(2400, LED_COUNT);
     {
         CRGB c = COLOR_AMBER;
         c.nscale8_video(160);
-        addLedWrapped(frame, LED_COUNT, head, c);
+        addLedWrapped(ledStrip, LED_COUNT, head, c);
     }
     {
         CRGB c = COLOR_AMBER;
         c.nscale8_video(64);
-        addLedWrapped(frame, LED_COUNT, head - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 1, c);
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -342,7 +342,7 @@ void Neopixel::runWaitingForApiAuthenticationAnimation()
 void Neopixel::runDisplayErrorAnimation()
 {
     uint32_t now = millis();
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // Intro: 3 double‑flashes with even/odd alternation (~2.4s total)
     uint32_t sinceEvent = now - this->lastApiEventTime;
@@ -360,23 +360,32 @@ void Neopixel::runDisplayErrorAnimation()
             {
                 CRGB c = COLOR_RED_ERR;
                 c.nscale8_video(level);
-                setLedWrapped(frame, LED_COUNT, i, c);
+                setLedWrapped(ledStrip, LED_COUNT, i, c);
             }
         }
-        flushFrame(ledStrip, frame, LED_COUNT);
+        FastLED.show();
         return;
     }
 
     // Idle heartbeat at ~1 Hz
-    uint8_t beat = ((now % 1000) < 150) ? 96 : 0; // 150ms pulse, pure red
-    for (int i = 0; i < LED_COUNT; ++i)
+    // Heartbeat pulse ~1 Hz using FastLED timing
+    static uint8_t beatLevel = 0;
+    EVERY_N_MILLISECONDS_I(errBeat, 1000)
     {
-        CRGB c = COLOR_RED_ERR;
-        c.nscale8_video(beat);
-        addLedWrapped(frame, LED_COUNT, i, c);
+        beatLevel = 96;
+    }
+    if (beatLevel > 0)
+    {
+        beatLevel = qsub8(beatLevel, 32); // decay quickly over ~150ms
+        for (int i = 0; i < LED_COUNT; ++i)
+        {
+            CRGB c = COLOR_RED_ERR;
+            c.nscale8_video(beatLevel);
+            addLedWrapped(ledStrip, LED_COUNT, i, c);
+        }
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -391,55 +400,23 @@ void Neopixel::runDisplayErrorAnimation()
  */
 void Neopixel::runDisplaySuccessAnimation()
 {
-    uint32_t now = millis();
-    uint32_t sinceEvent = now - this->lastApiEventTime;
-
-    fillSolid(frame, LED_COUNT, CRGB::Black);
-
-    if (sinceEvent < 800)
+    const uint32_t sinceEvent = millis() - this->lastApiEventTime;
+    if (sinceEvent < 500)
     {
-        // Celebration: fast radial sparkle + progressive fill over ~800ms
-        int lit = (int)((sinceEvent * LED_COUNT) / 800);
-        for (int i = 0; i <= lit && i < LED_COUNT; ++i)
-        {
-            {
-                CRGB c = COLOR_GREEN_OK;
-                c.nscale8_video(200);
-                setLedWrapped(frame, LED_COUNT, i, c);
-            }
-        }
-        // subtle white sparkles on remaining LEDs (excitement)
-        for (int i = lit + 1; i < LED_COUNT; ++i)
-        {
-            if (((now + i * 73) % 120) < 20)
-            {
-                CRGB c = COLOR_WHITE;
-                c.nscale8_video(64);
-                addLedWrapped(frame, LED_COUNT, i, c);
-            }
-        }
-    }
-    else if (sinceEvent < 2800)
-    {
-        // Hold vivid green ~2s with gentle shimmer to read as celebratory
-        for (int i = 0; i < LED_COUNT; ++i)
-        {
-            uint8_t jitter = ((now + i * 41) % 250) < 12 ? 30 : 0; // brief local lift
-            CRGB c = COLOR_GREEN_OK;
-            c.nscale8_video(120 + jitter); // base ~47%
-            frame[i] = c;
-        }
-    }
-    else
-    {
-        // Idle upbeat breathe 0.5 Hz → 30 BPM, a bit brighter
-        uint8_t level = breathe8(30, 38, 96); // ~15% to ~38%
+        // solid green for first 500ms
         CRGB c = COLOR_GREEN_OK;
-        c.nscale8_video(level);
-        fillSolid(frame, LED_COUNT, c);
+        fillSolid(ledStrip, LED_COUNT, c);
+        FastLED.show();
+        return;
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    // Idle upbeat breathe 0.5 Hz → 30 BPM, breathing from 50% to 100% brightness
+    uint8_t level = breathe8(30, 128, 255); // 50% to 100% brightness
+    CRGB c = COLOR_GREEN_OK;
+    c.nscale8_video(level);
+    fillSolid(ledStrip, LED_COUNT, c);
+
+    FastLED.show();
 }
 
 /**
@@ -457,9 +434,9 @@ void Neopixel::runDisplayTextAnimation()
     {
         CRGB c = COLOR_WHITE;
         c.nscale8_video(level);
-        fillSolid(frame, LED_COUNT, c);
+        fillSolid(ledStrip, LED_COUNT, c);
     }
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -477,7 +454,7 @@ void Neopixel::runConfirmActionAnimation()
     // Two halves out of phase breathe (~0.8 Hz → 48 BPM)
     uint8_t levelA = breathe8(48, 26, 102); // green half
     uint8_t levelB = 128 - (levelA / 2);    // simple phase contrast
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     for (int i = 0; i < LED_COUNT; ++i)
     {
@@ -487,7 +464,7 @@ void Neopixel::runConfirmActionAnimation()
             {
                 CRGB c = COLOR_GREEN_OK;
                 c.nscale8_video(levelA);
-                setLedWrapped(frame, LED_COUNT, i, c);
+                setLedWrapped(ledStrip, LED_COUNT, i, c);
             }
         }
         else
@@ -495,31 +472,36 @@ void Neopixel::runConfirmActionAnimation()
             {
                 CRGB c = COLOR_BLUE_ACT;
                 c.nscale8_video(levelB);
-                setLedWrapped(frame, LED_COUNT, i, c);
+                setLedWrapped(ledStrip, LED_COUNT, i, c);
             }
         }
     }
 
     // Bidirectional sweep every ~1.5s for ~150ms
-    uint32_t phase = now % 1500;
-    if (phase < 150)
+    // Bidirectional sweep every ~1.5s (single-frame cue)
     {
-        int pos = stepFromPeriod(phase, 150, LED_COUNT);
-        // Green clockwise
+        static bool sweep = false;
+        EVERY_N_MILLISECONDS_I(confirmSweep, 1500) { sweep = true; }
+        if (sweep)
         {
-            CRGB c = COLOR_GREEN_OK;
-            c.nscale8_video(170);
-            addLedWrapped(frame, LED_COUNT, pos, c);
-        }
-        // Blue counter‑clockwise
-        {
-            CRGB c = COLOR_BLUE_ACT;
-            c.nscale8_video(170);
-            addLedWrapped(frame, LED_COUNT, (LED_COUNT - pos), c);
+            sweep = false;
+            int pos = headFromPeriod(150, LED_COUNT);
+            // Green clockwise
+            {
+                CRGB c = COLOR_GREEN_OK;
+                c.nscale8_video(170);
+                addLedWrapped(ledStrip, LED_COUNT, pos, c);
+            }
+            // Blue counter‑clockwise
+            {
+                CRGB c = COLOR_BLUE_ACT;
+                c.nscale8_video(170);
+                addLedWrapped(ledStrip, LED_COUNT, (LED_COUNT - pos), c);
+            }
         }
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -534,23 +516,23 @@ void Neopixel::runResourceSelectionAnimation()
 {
     const uint16_t stepMs = 250;
     uint32_t now = millis();
-    int head = stepFromPeriod(now, stepMs * LED_COUNT, LED_COUNT);
+    int head = headFromPeriod(stepMs * LED_COUNT, LED_COUNT);
 
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // Cursor and 1-LED tail (both white to read as a single moving unit)
     {
         CRGB c = COLOR_WHITE;
         c.nscale8_video(180);
-        setLedWrapped(frame, LED_COUNT, head, c);
+        setLedWrapped(ledStrip, LED_COUNT, head, c);
     } // brighter head
     {
         CRGB c = COLOR_WHITE;
         c.nscale8_video(60);
-        addLedWrapped(frame, LED_COUNT, head - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 1, c);
     } // softer tail
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -565,30 +547,30 @@ void Neopixel::runWaitForProcessingAnimation()
 {
     const uint16_t revolutionMs = 1333; // ~0.75 rev/s
     uint32_t now = millis();
-    int head = stepFromPeriod(now, revolutionMs, LED_COUNT);
+    int head = headFromPeriod(revolutionMs, LED_COUNT);
 
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // 2 bright adjacent + 2 fading tail
     {
         CRGB c = COLOR_ORANGE;
         c.nscale8_video(128);
-        setLedWrapped(frame, LED_COUNT, head, c);
+        setLedWrapped(ledStrip, LED_COUNT, head, c);
     }
     {
         CRGB c = COLOR_ORANGE;
         c.nscale8_video(128);
-        setLedWrapped(frame, LED_COUNT, head - 1, c);
+        setLedWrapped(ledStrip, LED_COUNT, head - 1, c);
     }
     {
         CRGB c = COLOR_ORANGE;
         c.nscale8_video(64);
-        addLedWrapped(frame, LED_COUNT, head - 2, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 2, c);
     }
     {
         CRGB c = COLOR_ORANGE;
         c.nscale8_video(32);
-        addLedWrapped(frame, LED_COUNT, head - 3, c);
+        addLedWrapped(ledStrip, LED_COUNT, head - 3, c);
     }
 
     // Subtle global overlay breathe (±5%)
@@ -597,10 +579,10 @@ void Neopixel::runWaitForProcessingAnimation()
     {
         CRGB c = COLOR_ORANGE;
         c.nscale8_video(overlay);
-        addLedWrapped(frame, LED_COUNT, i, c);
+        addLedWrapped(ledStrip, LED_COUNT, i, c);
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -615,13 +597,10 @@ void Neopixel::runWaitForProcessingAnimation()
 void Neopixel::runWaitForNfcTapAnimation()
 {
     // Attract pulses ~1.5 Hz → 90 BPM; animate opposing pairs moving inward
-    uint32_t now = millis();
-    uint32_t cycleMs = 1500;
-    uint32_t phase = now % cycleMs;
     // 4 steps across the ring, each ~375ms
-    int step = (phase * 4) / cycleMs; // 0..3
+    int step = headFromPeriod(1500, 4); // 0..3
 
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // Base magenta pairs, moving inward
     // Define pair starts: (0,4)->(1,5)->(2,6)->(3,7)
@@ -630,37 +609,43 @@ void Neopixel::runWaitForNfcTapAnimation()
     {
         CRGB c = COLOR_MAGENTA;
         c.nscale8_video(128);
-        setLedWrapped(frame, LED_COUNT, a, c);
+        setLedWrapped(ledStrip, LED_COUNT, a, c);
     }
     {
         CRGB c = COLOR_MAGENTA;
         c.nscale8_video(128);
-        setLedWrapped(frame, LED_COUNT, b, c);
+        setLedWrapped(ledStrip, LED_COUNT, b, c);
     }
     // Neighbor fade
     {
         CRGB c = COLOR_MAGENTA;
         c.nscale8_video(64);
-        addLedWrapped(frame, LED_COUNT, a + 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, a + 1, c);
     }
     {
         CRGB c = COLOR_MAGENTA;
         c.nscale8_video(64);
-        addLedWrapped(frame, LED_COUNT, b - 1, c);
+        addLedWrapped(ledStrip, LED_COUNT, b - 1, c);
     }
 
     // White sparkle invite every second pulse end (~80ms at phase wrap)
-    if (phase > cycleMs - 120)
+    // White sparkle invite once per cycle (~1.5s)
     {
-        for (int i = 0; i < LED_COUNT; ++i)
+        static bool invite = false;
+        EVERY_N_MILLISECONDS_I(inviteTick, 1500) { invite = true; }
+        if (invite)
         {
-            CRGB c = COLOR_WHITE;
-            c.nscale8_video(48);
-            addLedWrapped(frame, LED_COUNT, i, c);
+            invite = false;
+            for (int i = 0; i < LED_COUNT; ++i)
+            {
+                CRGB c = COLOR_WHITE;
+                c.nscale8_video(48);
+                addLedWrapped(ledStrip, LED_COUNT, i, c);
+            }
         }
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
 }
 
 /**
@@ -676,7 +661,7 @@ void Neopixel::runWaitForNfcTapAnimation()
 void Neopixel::runFirmwareUpdateAnimation()
 {
     uint32_t now = millis();
-    fillSolid(frame, LED_COUNT, CRGB::Black);
+    fillSolid(ledStrip, LED_COUNT, CRGB::Black);
 
     // If progress present, map 0..100 to 0..8 LEDs
     bool hasProgress = false;
@@ -703,7 +688,7 @@ void Neopixel::runFirmwareUpdateAnimation()
             {
                 CRGB c = COLOR_BLUE_ACT;
                 c.nscale8_video(90); // ~35%
-                setLedWrapped(frame, LED_COUNT, i, c);
+                setLedWrapped(ledStrip, LED_COUNT, i, c);
             }
             else if (i == lit)
             {
@@ -711,41 +696,66 @@ void Neopixel::runFirmwareUpdateAnimation()
                 uint8_t level = breathe8(32, 26, 90);
                 CRGB c = COLOR_BLUE_ACT;
                 c.nscale8_video(level);
-                setLedWrapped(frame, LED_COUNT, i, c);
+                setLedWrapped(ledStrip, LED_COUNT, i, c);
             }
         }
     }
     else
     {
         // Spinner wedge (3 LEDs) at ~0.8 rev/s → 1250ms per rev
-        int head = stepFromPeriod(now, 1250, LED_COUNT);
+        int head = headFromPeriod(1250, LED_COUNT);
         {
             CRGB c = COLOR_BLUE_ACT;
             c.nscale8_video(120);
-            setLedWrapped(frame, LED_COUNT, head, c);
+            setLedWrapped(ledStrip, LED_COUNT, head, c);
         }
         {
             CRGB c = COLOR_BLUE_ACT;
             c.nscale8_video(64);
-            addLedWrapped(frame, LED_COUNT, head - 1, c);
+            addLedWrapped(ledStrip, LED_COUNT, head - 1, c);
         }
         {
             CRGB c = COLOR_BLUE_ACT;
             c.nscale8_video(32);
-            addLedWrapped(frame, LED_COUNT, head - 2, c);
+            addLedWrapped(ledStrip, LED_COUNT, head - 2, c);
         }
     }
 
-    // Activity tick every ~2s (~80ms)
-    if ((now % 2000) < 80)
+    // Activity tick every ~2s (single-frame)
     {
-        for (int i = 0; i < LED_COUNT; ++i)
+        static bool tick = false;
+        EVERY_N_MILLISECONDS_I(updateTick, 2000) { tick = true; }
+        if (tick)
         {
-            CRGB c = COLOR_WHITE;
-            c.nscale8_video(28);
-            addLedWrapped(frame, LED_COUNT, i, c);
+            tick = false;
+            for (int i = 0; i < LED_COUNT; ++i)
+            {
+                CRGB c = COLOR_WHITE;
+                c.nscale8_video(28);
+                addLedWrapped(ledStrip, LED_COUNT, i, c);
+            }
         }
     }
 
-    flushFrame(ledStrip, frame, LED_COUNT);
+    FastLED.show();
+}
+
+void Neopixel::nfcAnimationWorkaround()
+{
+    if (this->nfcAnimationActivated)
+    {
+        return;
+    }
+
+    this->nfcAnimationActivated = true;
+
+    // make all leds solid white
+    for (int i = 0; i < LED_COUNT; ++i)
+    {
+        CRGB c = COLOR_WHITE;
+        c.nscale8_video(255);
+        setLedWrapped(ledStrip, LED_COUNT, i, c);
+    }
+
+    FastLED.show();
 }

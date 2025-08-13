@@ -59,8 +59,7 @@ void setup()
 
     Settings::setup();
 
-    // Initialize I2C for NFC
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL, I2C_FREQ);
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 
     displayManager.setup();
     Network::setup();
