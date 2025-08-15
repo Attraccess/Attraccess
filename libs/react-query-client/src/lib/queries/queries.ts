@@ -2,7 +2,7 @@
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetUserPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, GetSessionCookieDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetUserPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceFindMany = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
@@ -30,6 +30,14 @@ export const useAuthenticationServiceGetAllSsoProviders = <TData = Common.Authen
 export const useAuthenticationServiceGetOneSsoProviderById = <TData = Common.AuthenticationServiceGetOneSsoProviderByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceGetOneSsoProviderByIdKeyFn({ id }, queryKey), queryFn: () => AuthenticationService.getOneSsoProviderById({ id }) as TData, ...options });
+export const useAuthenticationServiceDiscoverAuthentikOidc = <TData = Common.AuthenticationServiceDiscoverAuthentikOidcDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ applicationName, host }: {
+  applicationName: string;
+  host: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceDiscoverAuthentikOidcKeyFn({ applicationName, host }, queryKey), queryFn: () => AuthenticationService.discoverAuthentikOidc({ applicationName, host }) as TData, ...options });
+export const useAuthenticationServiceDiscoverKeycloakOidc = <TData = Common.AuthenticationServiceDiscoverKeycloakOidcDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ host, realm }: {
+  host: string;
+  realm: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceDiscoverKeycloakOidcKeyFn({ host, realm }, queryKey), queryFn: () => AuthenticationService.discoverKeycloakOidc({ host, realm }) as TData, ...options });
 export const useAuthenticationServiceLoginWithOidc = <TData = Common.AuthenticationServiceLoginWithOidcDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ providerId, redirectTo }: {
   providerId: string;
   redirectTo?: unknown;
@@ -201,6 +209,11 @@ export const useAuthenticationServiceCreateSession = <TData = Common.Authenticat
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: { username?: string; password?: string; tokenLocation?: "cookie" | "body"; };
 }, TContext>({ mutationFn: ({ requestBody }) => AuthenticationService.createSession({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceGetSessionCookie = <TData = Common.AuthenticationServiceGetSessionCookieMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: GetSessionCookieDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: GetSessionCookieDto;
+}, TContext>({ mutationFn: ({ requestBody }) => AuthenticationService.getSessionCookie({ requestBody }) as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceCreateOneSsoProvider = <TData = Common.AuthenticationServiceCreateOneSsoProviderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: CreateSSOProviderDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

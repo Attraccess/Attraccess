@@ -1,0 +1,16 @@
+{
+  "title": "Keycloak Auto-Discovery",
+  "host": "Host",
+  "realm": "Realm",
+  "discover": "Discover",
+  "success": {
+    "title": "Success",
+    "description": "Configuration discovered successfully"
+  },
+  "error": {
+    "generic": {
+      "title": "Error",
+      "description": "Failed to discover configuration"
+    }
+  }
+}

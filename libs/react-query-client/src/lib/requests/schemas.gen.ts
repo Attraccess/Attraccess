@@ -263,6 +263,17 @@ export const $CreateSessionResponse = {
     required: ['user', 'authToken']
 } as const;
 
+export const $GetSessionCookieDto = {
+    type: 'object',
+    properties: {
+        authToken: {
+            type: 'string',
+            description: 'The authentication token'
+        }
+    },
+    required: ['authToken']
+} as const;
+
 export const $SSOProviderType = {
     type: 'string',
     enum: ['OIDC'],

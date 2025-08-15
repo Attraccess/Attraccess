@@ -31,6 +31,7 @@ import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
+import { ApiBadRequestResponse } from '@nestjs/swagger';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -187,6 +188,62 @@ export class SSOController {
   })
   async deleteOne(@Param('id') id: string): Promise<void> {
     return this.ssoService.deleteProvider(parseInt(id, 10));
+  }
+
+  @Get('discovery/authentik')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Proxy Authentik OIDC well-known discovery', operationId: 'discoverAuthentikOidc' })
+  @ApiQuery({ name: 'host', required: true, description: 'Authentik host, e.g. http://localhost:9000' })
+  @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
+  @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
+  @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
+  async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
+    if (!host || !applicationName) {
+      throw new UnauthorizedException('Missing required parameters');
+    }
+
+    const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+    const hasProtocol = /^https?:\/\//i.test(trimmedHost);
+    const origin = hasProtocol ? trimmedHost : `http://${trimmedHost}`;
+    const targetUrl = `${origin}/application/o/${encodeURIComponent(applicationName)}/.well-known/openid-configuration`;
+
+    const response = await fetch(targetUrl, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException(`Failed to fetch discovery: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  @Get('discovery/keycloak')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Proxy Keycloak OIDC well-known discovery', operationId: 'discoverKeycloakOidc' })
+  @ApiQuery({ name: 'host', required: true, description: 'Keycloak host, e.g. http://localhost:8080' })
+  @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
+  @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
+  @ApiBadRequestResponse({ description: 'Invalid host or realm' })
+  async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
+    if (!host || !realm) {
+      throw new UnauthorizedException('Missing required parameters');
+    }
+
+    const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+    const hasProtocol = /^https?:\/\//i.test(trimmedHost);
+    const origin = hasProtocol ? trimmedHost : `http://${trimmedHost}`;
+    const targetUrl = `${origin}/realms/${encodeURIComponent(realm)}/.well-known/openid-configuration`;
+
+    const response = await fetch(targetUrl, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException(`Failed to fetch discovery: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   @Get(`/${SSOProviderType.OIDC}/:providerId/login`)

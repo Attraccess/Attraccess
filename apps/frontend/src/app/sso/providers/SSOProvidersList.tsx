@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import {
   Button,
   Table,
@@ -18,8 +18,12 @@ import {
   Select,
   SelectItem,
   Divider,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react';
-import { Pencil, Trash, Key, FileCode, Eye, EyeOff, Download } from 'lucide-react';
+import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -39,17 +43,11 @@ import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
-import * as en from './translations/en';
-import * as de from './translations/de';
-
-// Interface for the OpenID Configuration response
-interface OpenIDConfiguration {
-  issuer: string;
-  authorization_endpoint: string;
-  token_endpoint: string;
-  userinfo_endpoint: string;
-  [key: string]: unknown;
-}
+import en from './translations/en.json';
+import de from './translations/de.json';
+import { AuthentikDiscoveryDialog } from './discovery/authentik';
+import { OpenIDConfiguration } from './discovery/OpenIDC.data';
+import { KeycloakDiscoveryDialog } from './discovery/keycloak';
 
 const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
@@ -75,10 +73,6 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [keycloakHost, setKeycloakHost] = useState('');
-  const [keycloakRealm, setKeycloakRealm] = useState('');
-  const [isDiscoverDialogOpen, setIsDiscoverDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
@@ -113,67 +107,22 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   );
 
-  // Function to discover OIDC configuration from Keycloak
-  const discoverOIDCConfiguration = async () => {
-    if (!keycloakHost || !keycloakRealm) {
-      showError({
-        title: t('errorGeneric'),
-        description: t('fillAllFields'),
-      });
-      return;
-    }
-
-    setIsDiscovering(true);
-
-    try {
-      // Normalize the host URL to ensure it doesn't end with a trailing slash
-      const normalizedHost = keycloakHost.endsWith('/') ? keycloakHost.slice(0, -1) : keycloakHost;
-
-      // Construct the well-known endpoint URL
-      const wellKnownUrl = `${normalizedHost}/realms/${keycloakRealm}/.well-known/openid-configuration`;
-
-      // Fetch the configuration
-      const response = await fetch(wellKnownUrl);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch configuration: ${response.statusText}`);
-      }
-
-      const config: OpenIDConfiguration = await response.json();
-
-      // Update the form values with the discovered configuration
-      setFormValues((prev) => ({
-        ...prev,
-        oidcConfiguration: {
-          ...prev.oidcConfiguration,
-          issuer: config.issuer,
-          authorizationURL: config.authorization_endpoint,
-          tokenURL: config.token_endpoint,
-          userInfoURL: config.userinfo_endpoint,
-          // We don't get clientId and clientSecret from the discovery endpoint
-          // Preserve existing values if they exist
-          clientId: prev.oidcConfiguration?.clientId ?? '',
-          clientSecret: prev.oidcConfiguration?.clientSecret ?? '',
-        },
-      }));
-
-      // Show success message
-      success({
-        title: t('discoverSuccess'),
-        description: config.issuer,
-      });
-
-      // Close the discovery dialog
-      setIsDiscoverDialogOpen(false);
-    } catch (err) {
-      showError({
-        title: t('discoverError'),
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
+  const onAutoDiscovery = useCallback((config: OpenIDConfiguration) => {
+    setFormValues((prev) => ({
+      ...prev,
+      oidcConfiguration: {
+        ...prev.oidcConfiguration,
+        issuer: config.issuer,
+        authorizationURL: config.authorization_endpoint,
+        tokenURL: config.token_endpoint,
+        userInfoURL: config.userinfo_endpoint,
+        // We don't get clientId and clientSecret from the discovery endpoint
+        // Preserve existing values if they exist
+        clientId: prev.oidcConfiguration?.clientId ?? '',
+        clientSecret: prev.oidcConfiguration?.clientSecret ?? '',
+      },
+    }));
+  }, []);
 
   // Set form values when provider details are loaded
   React.useEffect(() => {
@@ -374,59 +323,6 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         </div>
       )}
 
-      {/* Discover Configuration Dialog */}
-      <Modal
-        isOpen={isDiscoverDialogOpen}
-        onOpenChange={(open) => setIsDiscoverDialogOpen(open)}
-        size="md"
-        scrollBehavior="inside"
-        data-cy="sso-discover-config-modal"
-      >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>{t('discoverFromKeycloak')}</ModalHeader>
-              <ModalBody>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t('discoverDescription')}</p>
-                <div className="space-y-4">
-                  <Input
-                    label={t('keycloakHost')}
-                    value={keycloakHost}
-                    onChange={(e) => setKeycloakHost(e.target.value)}
-                    placeholder={t('discoverPlaceholder')}
-                    isRequired
-                    data-cy="sso-discover-config-keycloak-host-input"
-                  />
-
-                  <Input
-                    label={t('keycloakRealm')}
-                    value={keycloakRealm}
-                    onChange={(e) => setKeycloakRealm(e.target.value)}
-                    placeholder={t('realmPlaceholder')}
-                    isRequired
-                    data-cy="sso-discover-config-keycloak-realm-input"
-                  />
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="flat" onPress={onClose} data-cy="sso-discover-config-cancel-button">
-                  {t('cancel')}
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={discoverOIDCConfiguration}
-                  isLoading={isDiscovering}
-                  startContent={!isDiscovering && <Download size={16} />}
-                  data-cy="sso-discover-config-discover-button"
-                >
-                  {t('discover')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
-
       {/* Main Provider Form Modal */}
       <Modal
         isOpen={isOpen}
@@ -471,16 +367,39 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           <FileCode size={16} />
                           <span className="font-semibold">{t('oidcConfiguration')}</span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="primary"
-                          startContent={<Download size={16} />}
-                          onPress={() => setIsDiscoverDialogOpen(true)}
-                          data-cy="sso-provider-form-discover-from-keycloak-button"
-                        >
-                          {t('discoverFromKeycloak')}
-                        </Button>
+
+                        <AuthentikDiscoveryDialog onDiscovery={onAutoDiscovery}>
+                          {(onOpenAuthentikDiscovery) => (
+                            <KeycloakDiscoveryDialog onDiscovery={onAutoDiscovery}>
+                              {(onOpenKeycloakDiscovery) => (
+                                <Dropdown>
+                                  <DropdownTrigger>
+                                    <Button variant="light" startContent={<MoreVertical className="w-4 h-4" />}>
+                                      {t('autoDiscovery.label')}
+                                    </Button>
+                                  </DropdownTrigger>
+                                  <DropdownMenu aria-label="OIDC auto discovery options">
+                                    <DropdownItem
+                                      key="authentik"
+                                      onPress={onOpenAuthentikDiscovery}
+                                      data-cy="sso-provider-form-authentik-discovery-button"
+                                    >
+                                      {t('autoDiscovery.authentik')}
+                                    </DropdownItem>
+
+                                    <DropdownItem
+                                      key="keycloak"
+                                      onPress={onOpenKeycloakDiscovery}
+                                      data-cy="sso-provider-form-keycloak-discovery-button"
+                                    >
+                                      {t('autoDiscovery.keycloak')}
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              )}
+                            </KeycloakDiscoveryDialog>
+                          )}
+                        </AuthentikDiscoveryDialog>
                       </div>
 
                       <Input

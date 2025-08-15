@@ -55,6 +55,20 @@ export const useAuthenticationServiceGetOneSsoProviderByIdKey = "AuthenticationS
 export const UseAuthenticationServiceGetOneSsoProviderByIdKeyFn = ({ id }: {
   id: number;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceGetOneSsoProviderByIdKey, ...(queryKey ?? [{ id }])];
+export type AuthenticationServiceDiscoverAuthentikOidcDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.discoverAuthentikOidc>>;
+export type AuthenticationServiceDiscoverAuthentikOidcQueryResult<TData = AuthenticationServiceDiscoverAuthentikOidcDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthenticationServiceDiscoverAuthentikOidcKey = "AuthenticationServiceDiscoverAuthentikOidc";
+export const UseAuthenticationServiceDiscoverAuthentikOidcKeyFn = ({ applicationName, host }: {
+  applicationName: string;
+  host: string;
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceDiscoverAuthentikOidcKey, ...(queryKey ?? [{ applicationName, host }])];
+export type AuthenticationServiceDiscoverKeycloakOidcDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.discoverKeycloakOidc>>;
+export type AuthenticationServiceDiscoverKeycloakOidcQueryResult<TData = AuthenticationServiceDiscoverKeycloakOidcDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthenticationServiceDiscoverKeycloakOidcKey = "AuthenticationServiceDiscoverKeycloakOidc";
+export const UseAuthenticationServiceDiscoverKeycloakOidcKeyFn = ({ host, realm }: {
+  host: string;
+  realm: string;
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceDiscoverKeycloakOidcKey, ...(queryKey ?? [{ host, realm }])];
 export type AuthenticationServiceLoginWithOidcDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.loginWithOidc>>;
 export type AuthenticationServiceLoginWithOidcQueryResult<TData = AuthenticationServiceLoginWithOidcDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceLoginWithOidcKey = "AuthenticationServiceLoginWithOidc";
@@ -314,6 +328,7 @@ export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<Retu
 export type UsersServiceBulkUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.bulkUpdatePermissions>>;
 export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeof UsersService.setUserPassword>>;
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
+export type AuthenticationServiceGetSessionCookieMutationResult = Awaited<ReturnType<typeof AuthenticationService.getSessionCookie>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;

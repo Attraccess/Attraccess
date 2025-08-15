@@ -29,6 +29,14 @@ export const ensureUseAuthenticationServiceGetAllSsoProvidersData = (queryClient
 export const ensureUseAuthenticationServiceGetOneSsoProviderByIdData = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceGetOneSsoProviderByIdKeyFn({ id }), queryFn: () => AuthenticationService.getOneSsoProviderById({ id }) });
+export const ensureUseAuthenticationServiceDiscoverAuthentikOidcData = (queryClient: QueryClient, { applicationName, host }: {
+  applicationName: string;
+  host: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceDiscoverAuthentikOidcKeyFn({ applicationName, host }), queryFn: () => AuthenticationService.discoverAuthentikOidc({ applicationName, host }) });
+export const ensureUseAuthenticationServiceDiscoverKeycloakOidcData = (queryClient: QueryClient, { host, realm }: {
+  host: string;
+  realm: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceDiscoverKeycloakOidcKeyFn({ host, realm }), queryFn: () => AuthenticationService.discoverKeycloakOidc({ host, realm }) });
 export const ensureUseAuthenticationServiceLoginWithOidcData = (queryClient: QueryClient, { providerId, redirectTo }: {
   providerId: string;
   redirectTo?: unknown;

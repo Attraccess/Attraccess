@@ -6,6 +6,7 @@ import {
   SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
+  useAuthenticationServiceGetSessionCookie,
   useAuthenticationServiceRefreshSession,
   useAuthenticationServiceRefreshSessionKey,
   useUsersServiceGetCurrent,
@@ -98,6 +99,8 @@ export function useAuth() {
     enabled: isInitialized, // Only fetch when initialized
   });
 
+  const { mutateAsync: getSessionCookie } = useAuthenticationServiceGetSessionCookie();
+
   const { mutate: sessionLoginMutate } = useMutation({
     mutationFn: async (auth: CreateSessionResponse) => {
       // No need to store auth data - cookies are handled automatically by the server
@@ -105,6 +108,12 @@ export function useAuth() {
         console.error('[sessionLoginMutate] auth is null');
         throw new Error('Auth is null');
       }
+
+      await getSessionCookie({
+        requestBody: {
+          authToken: auth.authToken,
+        },
+      });
 
       // No manual token setting needed - cookies handle authentication
       // The server will have set the HTTP-only cookie automatically

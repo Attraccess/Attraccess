@@ -29,6 +29,14 @@ export const prefetchUseAuthenticationServiceGetAllSsoProviders = (queryClient: 
 export const prefetchUseAuthenticationServiceGetOneSsoProviderById = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceGetOneSsoProviderByIdKeyFn({ id }), queryFn: () => AuthenticationService.getOneSsoProviderById({ id }) });
+export const prefetchUseAuthenticationServiceDiscoverAuthentikOidc = (queryClient: QueryClient, { applicationName, host }: {
+  applicationName: string;
+  host: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceDiscoverAuthentikOidcKeyFn({ applicationName, host }), queryFn: () => AuthenticationService.discoverAuthentikOidc({ applicationName, host }) });
+export const prefetchUseAuthenticationServiceDiscoverKeycloakOidc = (queryClient: QueryClient, { host, realm }: {
+  host: string;
+  realm: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceDiscoverKeycloakOidcKeyFn({ host, realm }), queryFn: () => AuthenticationService.discoverKeycloakOidc({ host, realm }) });
 export const prefetchUseAuthenticationServiceLoginWithOidc = (queryClient: QueryClient, { providerId, redirectTo }: {
   providerId: string;
   redirectTo?: unknown;

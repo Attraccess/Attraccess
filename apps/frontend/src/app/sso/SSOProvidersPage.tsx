@@ -6,16 +6,13 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '@heroui/react';
 import { Plus } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as providerListEn from './providers/translations/en';
-import * as providerListDe from './providers/translations/de';
+import en from './providers/translations/en.json';
+import de from './providers/translations/de.json';
 
 export const SSOProvidersPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canManageSSO = hasPermission('canManageSystemConfiguration');
-  const { t } = useTranslations('ssoProvidersList', {
-    en: providerListEn,
-    de: providerListDe,
-  });
+  const { t } = useTranslations('ssoProvidersList', { en, de });
 
   // Reference to the SSOProvidersList component
   const providerListRef = React.useRef<SSOProvidersListRef>(null);

@@ -20,6 +20,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
       clientID: config.clientId,
       clientSecret: config.clientSecret,
       callbackURL,
+      scope: ['openid', 'email', 'profile'],
     });
 
     this.logger.log(`Initialized OIDC strategy with issuer: ${config.issuer} and callbackURL: ${callbackURL}`);
@@ -33,7 +34,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const oidcUserId = profile.id;
 
     if (emails.length === 0) {
-      this.logger.error('No emails found in SSO profile');
+      this.logger.error('No emails found in SSO profile', profile);
       throw new BadRequestException('No emails found in SSO profile');
     }
 

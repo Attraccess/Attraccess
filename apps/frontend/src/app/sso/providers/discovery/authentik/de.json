@@ -1,0 +1,16 @@
+{
+  "title": "Authentik Auto-Entdeckung",
+  "host": "Host",
+  "applicationName": "Applikationsname",
+  "discover": "Entdecken",
+  "success": {
+    "title": "Erfolgreich",
+    "description": "Konfiguration erfolgreich entdeckt"
+  },
+  "error": {
+    "generic": {
+      "title": "Fehler",
+      "description": "Fehler beim Entdecken der Konfiguration"
+    }
+  }
+}

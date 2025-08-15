@@ -161,6 +161,13 @@ export type CreateSessionResponse = {
     authToken: string;
 };
 
+export type GetSessionCookieDto = {
+    /**
+     * The authentication token
+     */
+    authToken: string;
+};
+
 /**
  * The type of the provider
  */
@@ -1638,6 +1645,12 @@ export type CreateSessionData = {
 
 export type CreateSessionResponse2 = CreateSessionResponse;
 
+export type GetSessionCookieData = {
+    requestBody: GetSessionCookieDto;
+};
+
+export type GetSessionCookieResponse = string;
+
 export type RefreshSessionData = {
     tokenLocation: string;
 };
@@ -1694,6 +1707,32 @@ export type DeleteOneSsoProviderData = {
 };
 
 export type DeleteOneSsoProviderResponse = unknown;
+
+export type DiscoverAuthentikOidcData = {
+    /**
+     * Authentik application slug
+     */
+    applicationName: string;
+    /**
+     * Authentik host, e.g. http://localhost:9000
+     */
+    host: string;
+};
+
+export type DiscoverAuthentikOidcResponse = unknown;
+
+export type DiscoverKeycloakOidcData = {
+    /**
+     * Keycloak host, e.g. http://localhost:8080
+     */
+    host: string;
+    /**
+     * Keycloak realm name
+     */
+    realm: string;
+};
+
+export type DiscoverKeycloakOidcResponse = unknown;
 
 export type LoginWithOidcData = {
     /**
@@ -2606,6 +2645,17 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/auth/session/token': {
+        post: {
+            req: GetSessionCookieData;
+            res: {
+                /**
+                 * The session cookie has been created
+                 */
+                200: string;
+            };
+        };
+    };
     '/api/auth/session/refresh': {
         get: {
             req: RefreshSessionData;
@@ -2742,6 +2792,44 @@ export type $OpenApiTs = {
                  * Provider not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/auth/sso/discovery/authentik': {
+        get: {
+            req: DiscoverAuthentikOidcData;
+            res: {
+                /**
+                 * OIDC configuration JSON
+                 */
+                200: unknown;
+                /**
+                 * Invalid host or applicationName
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/sso/discovery/keycloak': {
+        get: {
+            req: DiscoverKeycloakOidcData;
+            res: {
+                /**
+                 * OIDC configuration JSON
+                 */
+                200: unknown;
+                /**
+                 * Invalid host or realm
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
