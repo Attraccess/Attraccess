@@ -19,6 +19,7 @@ import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
+import AccountPage from '../account';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -110,6 +111,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/plugins',
     element: <PluginsList />,
     authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/account',
+    element: <AccountPage />,
+    authRequired: true,
   },
   {
     path: '/email-templates',

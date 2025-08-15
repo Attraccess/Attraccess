@@ -1,6 +1,4 @@
-
 {
-  "title": "Set User Password",
   "newPassword": "New Password",
   "confirmPassword": "Confirm Password",
   "actions": {

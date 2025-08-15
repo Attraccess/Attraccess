@@ -66,13 +66,17 @@ export class EmailService {
 
   private getBaseContext(user: User) {
     return {
-      'user.username': user.username,
-      'user.email': user.email,
-      'user.id': user.id,
-      'host.frontend': this.frontendUrl,
-      'host.backend': this.configService.get<string>('app.backendUrl'),
+      user: {
+        username: user.username,
+        email: user.email,
+        id: user.id,
+      },
+      host: {
+        frontend: this.frontendUrl,
+        backend: this.backendUrl,
+      },
       url: this.frontendUrl,
-    };
+    } as const;
   }
 
   async sendVerificationEmail(user: User, verificationToken: string) {
@@ -97,5 +101,24 @@ export class EmailService {
     };
 
     await this.sendEmail(user, EmailTemplateType.RESET_PASSWORD, context);
+  }
+
+  async sendUsernameChangedEmail(user: User, previousUsername: string) {
+    const base = this.getBaseContext(user) as unknown as {
+      user: { username: string; email: string; id: number };
+      host: { frontend: string; backend: string };
+      url: string;
+    };
+
+    const context = {
+      ...base,
+      user: {
+        ...base.user,
+        previousUsername,
+        newUsername: user.username,
+      },
+    };
+
+    await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED as EmailTemplateType, context);
   }
 }

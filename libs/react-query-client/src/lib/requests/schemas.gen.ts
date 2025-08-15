@@ -140,6 +140,18 @@ export const $ChangePasswordDto = {
     required: ['password', 'token']
 } as const;
 
+export const $ChangeUsernameDto = {
+    type: 'object',
+    properties: {
+        username: {
+            type: 'string',
+            description: 'The new username',
+            example: 'new_handle'
+        }
+    },
+    required: ['username']
+} as const;
+
 export const $UserNotFoundException = {
     type: 'object',
     properties: {}
@@ -546,7 +558,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'reset-password'],
+    enum: ['verify-email', 'reset-password', 'username-changed'],
     description: 'Template type/key used by the system'
 } as const;
 

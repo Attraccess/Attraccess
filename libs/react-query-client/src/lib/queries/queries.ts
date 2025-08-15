@@ -2,7 +2,7 @@
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetUserPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, ChangeUsernameDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetUserPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceFindMany = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
@@ -45,7 +45,7 @@ export const useAuthenticationServiceOidcLoginCallback = <TData = Common.Authent
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }, queryKey), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }) as TData, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerFindAll = <TData = Common.EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(queryKey), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() as TData, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerFindOne = <TData = Common.EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ type }: {
-  type: "verify-email" | "reset-password";
+  type: "verify-email" | "reset-password" | "username-changed";
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }, queryKey), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) as TData, ...options });
 export const useLicenseServiceGetLicenseInformation = <TData = Common.LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(queryKey), queryFn: () => LicenseService.getLicenseInformation() as TData, ...options });
 export const useResourcesServiceGetAllResources = <TData = Common.ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
@@ -376,6 +376,11 @@ export const useResourceFlowsServiceSaveResourceFlow = <TData = Common.ResourceF
   requestBody: ResourceFlowSaveDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceFlowsService.saveResourceFlow({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useUsersServiceChangeMyUsername = <TData = Common.UsersServiceChangeMyUsernameMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: ChangeUsernameDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: ChangeUsernameDto;
+}, TContext>({ mutationFn: ({ requestBody }) => UsersService.changeMyUsername({ requestBody }) as unknown as Promise<TData>, ...options });
 export const useUsersServiceUpdatePermissions = <TData = Common.UsersServiceUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;
   requestBody: UpdateUserPermissionsDto;
@@ -383,12 +388,19 @@ export const useUsersServiceUpdatePermissions = <TData = Common.UsersServiceUpda
   id: number;
   requestBody: UpdateUserPermissionsDto;
 }, TContext>({ mutationFn: ({ id, requestBody }) => UsersService.updatePermissions({ id, requestBody }) as unknown as Promise<TData>, ...options });
+export const useUsersServiceChangeUserUsername = <TData = Common.UsersServiceChangeUserUsernameMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+  requestBody: ChangeUsernameDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+  requestBody: ChangeUsernameDto;
+}, TContext>({ mutationFn: ({ id, requestBody }) => UsersService.changeUserUsername({ id, requestBody }) as unknown as Promise<TData>, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerUpdate = <TData = Common.EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: UpdateEmailTemplateDto;
-  type: "verify-email" | "reset-password";
+  type: "verify-email" | "reset-password" | "username-changed";
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: UpdateEmailTemplateDto;
-  type: "verify-email" | "reset-password";
+  type: "verify-email" | "reset-password" | "username-changed";
 }, TContext>({ mutationFn: ({ requestBody, type }) => EmailTemplatesService.emailTemplateControllerUpdate({ requestBody, type }) as unknown as Promise<TData>, ...options });
 export const useAttractapServiceUpdateReader = <TData = Common.AttractapServiceUpdateReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   readerId: number;

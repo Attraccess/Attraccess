@@ -5,6 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export enum EmailTemplateType {
   VERIFY_EMAIL = 'verify-email',
   RESET_PASSWORD = 'reset-password',
+  USERNAME_CHANGED = 'username-changed',
 }
 
 @Entity('email_templates')

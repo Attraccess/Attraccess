@@ -102,6 +102,10 @@ export class User {
   })
   updatedAt!: Date;
 
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  lastUsernameChangeAt!: Date | null;
+
   @OneToMany(() => ResourceIntroduction, (introduction) => introduction.receiverUser, {
     onDelete: 'CASCADE',
   })

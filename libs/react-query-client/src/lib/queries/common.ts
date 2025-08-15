@@ -82,7 +82,7 @@ export type EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse =
 export type EmailTemplatesServiceEmailTemplateControllerFindOneQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindOneKey = "EmailTemplatesServiceEmailTemplateControllerFindOne";
 export const UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn = ({ type }: {
-  type: "verify-email" | "reset-password";
+  type: "verify-email" | "reset-password" | "username-changed";
 }, queryKey?: Array<unknown>) => [useEmailTemplatesServiceEmailTemplateControllerFindOneKey, ...(queryKey ?? [{ type }])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -341,7 +341,9 @@ export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<Retu
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
+export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
+export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeUserUsername>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;

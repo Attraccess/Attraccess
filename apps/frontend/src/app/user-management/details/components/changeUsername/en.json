@@ -1,0 +1,15 @@
+{
+  "actions": {
+    "save": "Save"
+  },
+  "username": {
+    "label": "Username"
+  },
+  "messages": {
+    "updated": "Username updated"
+  },
+  "errors": {
+    "updateFailed": "Failed to update username",
+    "oncePerDay": "Username can only be changed once per day"
+  }
+}

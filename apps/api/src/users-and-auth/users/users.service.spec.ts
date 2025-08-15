@@ -3,13 +3,15 @@ import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository, UpdateResult } from 'typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
+import { EmailService } from '../../email/email.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
+  let emailService: { sendUsernameChangedEmail: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,6 +21,12 @@ describe('UsersService', () => {
           provide: LicenseService,
           useValue: {
             verifyLicense: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendUsernameChangedEmail: jest.fn(),
           },
         },
         {
@@ -37,6 +45,7 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
+    emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
   });
 
   it('should be defined', () => {
@@ -215,6 +224,7 @@ describe('UsersService', () => {
           emailVerificationTokenExpiresAt: null,
           passwordResetToken: null,
           passwordResetTokenExpiresAt: null,
+          lastUsernameChangeAt: null,
           resourceIntroductions: [],
           resourceUsages: [],
           resourceIntroducers: [],
@@ -242,6 +252,7 @@ describe('UsersService', () => {
           emailVerificationTokenExpiresAt: null,
           passwordResetToken: null,
           passwordResetTokenExpiresAt: null,
+          lastUsernameChangeAt: null,
           resourceIntroductions: [],
           resourceUsages: [],
           resourceIntroducers: [],
@@ -269,6 +280,108 @@ describe('UsersService', () => {
     it('should throw error for invalid pagination options', async () => {
       await expect(service.findMany({ page: 0, limit: 10 })).rejects.toThrow();
       await expect(service.findMany({ page: 1, limit: 0 })).rejects.toThrow();
+    });
+  });
+
+  describe('changeUsername', () => {
+    const baseUser = (overrides: Partial<User> = {}): User =>
+      ({
+        id: 1,
+        username: 'olduser',
+        email: 'user@example.com',
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isEmailVerified: false,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+        lastUsernameChangeAt: null,
+        resourceIntroductions: [],
+        resourceUsages: [],
+        resourceIntroducers: [],
+        groupMemberships: [],
+        nfcCards: [],
+        authenticationDetails: [],
+        resourceIntroducerPermissions: [],
+        externalIdentifier: null,
+        nfcKeySeedToken: null,
+        sessions: [],
+        ...overrides,
+      } as User);
+
+    it('should throw if target user not found', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(null);
+
+      await expect(service.changeUsername(123, 'newuser', baseUser())).rejects.toThrow(UserNotFoundException);
+    });
+
+    it("should forbid changing another user's username without permission", async () => {
+      const target = baseUser({ id: 2 });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(target);
+
+      await expect(service.changeUsername(2, 'newuser', baseUser({ id: 1 }))).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should enforce once-per-day limit for self-change when not admin', async () => {
+      const recent = new Date(Date.now() - 1 * 60 * 60 * 1000);
+      const me = baseUser({ id: 10, lastUsernameChangeAt: recent });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
+
+      await expect(service.changeUsername(10, 'newuser', me)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow self-change and update lastUsernameChangeAt and send email', async () => {
+      const me = baseUser({ id: 10, username: 'me' });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
+
+      const updated = { ...me, username: 'newuser', lastUsernameChangeAt: new Date() } as User;
+      const updateSpy = jest.spyOn(service, 'updateOne').mockResolvedValueOnce(updated);
+
+      const result = await service.changeUsername(10, 'newuser', me);
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          username: 'newuser',
+          lastUsernameChangeAt: expect.any(Date),
+        })
+      );
+      expect(emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'me');
+      expect(result).toBe(updated);
+    });
+
+    it("should allow admin to change another user's username without altering lastUsernameChangeAt", async () => {
+      const target = baseUser({ id: 20, username: 'target', lastUsernameChangeAt: null });
+      const admin = baseUser({
+        id: 1,
+        systemPermissions: { canManageResources: false, canManageSystemConfiguration: false, canManageUsers: true },
+      });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(target);
+
+      const updated = { ...target, username: 'new_admin_set' } as User;
+      const updateSpy = jest.spyOn(service, 'updateOne').mockResolvedValueOnce(updated);
+
+      const result = await service.changeUsername(20, 'new_admin_set', admin);
+
+      expect(updateSpy).toHaveBeenCalledWith(20, {
+        username: 'new_admin_set',
+        lastUsernameChangeAt: null,
+      });
+      expect(emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'target');
+      expect(result).toBe(updated);
+    });
+
+    it('should validate new username format', async () => {
+      const me = baseUser({ id: 10 });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
+
+      await expect(service.changeUsername(10, 'x', me)).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -36,3 +36,4 @@ export * from './1752851939278-create-session-table';
 export * from './1754061071643-resource-maintenance';
 export * from './1754214578982-nfc-card-seed-token';
 export * from './1754307072519-nfc-card-last-seen';
+export * from './1755263227552-username-last-changed';

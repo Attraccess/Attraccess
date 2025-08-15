@@ -1,0 +1,9 @@
+{
+  "messages": {
+    "updated": "Benutzername aktualisiert"
+  },
+  "errors": {
+    "updateFailed": "Aktualisierung des Benutzernamens fehlgeschlagen",
+    "oncePerDay": "Der Benutzername kann nur einmal pro Tag geändert werden"
+  }
+}

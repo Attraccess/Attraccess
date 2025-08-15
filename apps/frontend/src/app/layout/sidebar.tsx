@@ -19,6 +19,7 @@ import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
+import { useNavigate } from 'react-router-dom';
 
 function NavLink(
   props: Omit<LinkProps, 'children'> & {
@@ -54,6 +55,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
     en,
     de,
   });
+  const navigate = useNavigate();
 
   const routes = useAllRoutes();
   const sidebarItems = useSidebarItems();
@@ -242,6 +244,14 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                     data-cy="sidebar-language-de"
                   >
                     {t('languages.de')}
+                  </DropdownItem>
+                  <DropdownItem
+                    key="account"
+                    onPress={() => navigate('/account')}
+                    startContent={<User className="h-4 w-4" />}
+                    data-cy="sidebar-account-button"
+                  >
+                    {t('account')}
                   </DropdownItem>
                   <DropdownItem
                     key="logout"
