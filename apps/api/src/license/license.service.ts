@@ -83,7 +83,7 @@ export class LicenseService {
       return licenseData;
     }
 
-    const missingModules = (requirements.modules ?? []).filter((module) => licenseData.modules.includes(module));
+    const missingModules = (requirements.modules ?? []).filter((module) => !licenseData.modules.includes(module));
 
     if (missingModules.length > 0) {
       throw new LicenseError(
@@ -91,7 +91,7 @@ export class LicenseService {
       );
     }
 
-    const currentUsages = requirements.usageLimits;
+    const currentUsages = requirements.usageLimits ?? {};
     const reachedUsageLimits = Object.entries(currentUsages).filter(([module, currentUsage]) => {
       const limit = licenseData.usageLimits[module] || -1;
       if (limit === -1) {
