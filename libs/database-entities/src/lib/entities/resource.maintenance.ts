@@ -23,6 +23,11 @@ export class ResourceMaintenance {
   })
   updatedAt!: Date;
 
+  @Column({ type: 'int' })
+  @ApiProperty({
+    description: 'The ID of the resource',
+    example: 1,
+  })
   resourceId!: number;
 
   @ManyToOne(() => Resource, (resource) => resource.maintenances)

@@ -50,7 +50,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const now = useNow();
 
   const timezoneOfBrowser = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const [startTime, setStartTime] = useState<ZonedDateTime | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
+  const [startTime, setStartTime] = useState<ZonedDateTime>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
   const [endTime, setEndTime] = useState<ZonedDateTime | null>(null);
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
@@ -76,6 +76,19 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     setReason(existingMaintenance.reason ?? '');
     setHasEndDate(!!existingMaintenance.endTime);
   }, [existingMaintenance, timezoneOfBrowser]);
+
+  const onHasEndDateChange = useCallback(
+    (val: boolean) => {
+      if (val) {
+        setEndTime(parseAbsolute(existingMaintenance?.endTime ?? now.toISOString(), timezoneOfBrowser));
+      } else {
+        setEndTime(null);
+      }
+
+      setHasEndDate(val);
+    },
+    [existingMaintenance, timezoneOfBrowser, now]
+  );
 
   const onSaveSuccess = useCallback(() => {
     queryClient.invalidateQueries({
@@ -112,7 +125,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
         maintenanceId,
         requestBody: {
           startTime: startTime.toAbsoluteString(),
-          endTime: hasEndDate ? endTime?.toAbsoluteString() : undefined,
+          endTime: hasEndDate ? endTime?.toAbsoluteString() : null,
           reason,
         },
       });
@@ -156,7 +169,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 onChange={(value) => setStartTime(value as ZonedDateTime)}
               />
 
-              <Switch isSelected={hasEndDate} onValueChange={setHasEndDate}>
+              <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
                 {t('inputs.hasEndDate.label')}
               </Switch>
               {hasEndDate && (

@@ -181,8 +181,6 @@ export class ResourceMaintenanceService {
     // Order by start time (soonest first)
     queryBuilder.orderBy('maintenance.startTime', 'ASC');
 
-    this.logger.debug(queryBuilder.getSql());
-
     // Get total count
     const total = await queryBuilder.getCount();
 
