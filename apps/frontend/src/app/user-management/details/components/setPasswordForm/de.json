@@ -1,7 +1,4 @@
-
-
 {
-  "title": "Benutzerpasswort festlegen",
   "newPassword": "Neues Passwort",
   "confirmPassword": "Passwort bestätigen",
   "actions": {
@@ -14,4 +11,3 @@
   "passwordUpdated": "Passwort erfolgreich aktualisiert",
   "errorUpdatingPassword": "Fehler beim Aktualisieren des Passworts"
 }
-

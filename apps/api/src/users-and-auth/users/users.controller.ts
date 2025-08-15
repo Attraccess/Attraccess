@@ -30,6 +30,7 @@ import { GetUsersWithPermissionQueryDto, PermissionFilter } from './dtos/getUser
 import { ResetPasswordDto } from './dtos/resetPassword.dto';
 import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
+import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -219,6 +220,14 @@ export class UsersController {
   })
   async getCurrent(@Req() request: AuthenticatedRequest) {
     return request.user;
+  }
+
+  @Auth()
+  @Patch('me/username')
+  @ApiOperation({ summary: 'Change current user username (limit once per day)', operationId: 'changeMyUsername' })
+  @ApiResponse({ status: 200, description: 'Username changed.', type: User })
+  async changeMyUsername(@Req() request: AuthenticatedRequest, @Body() body: ChangeUsernameDto): Promise<User> {
+    return await this.usersService.changeUsername(request.user.id, body.username, request.user);
   }
 
   @Auth()
@@ -550,5 +559,17 @@ export class UsersController {
 
     this.logger.debug(`Password successfully updated for user ID: ${id}`);
     return { message: 'Password updated successfully' };
+  }
+
+  @Patch(':id/username')
+  @Auth('canManageUsers')
+  @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
+  @ApiResponse({ status: 200, description: 'Username changed.', type: User })
+  async changeUserUsername(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeUsernameDto,
+    @Req() request: AuthenticatedRequest
+  ): Promise<User> {
+    return await this.usersService.changeUsername(id, body.username, request.user);
   }
 }

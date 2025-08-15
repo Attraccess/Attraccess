@@ -261,7 +261,7 @@ export class ResourceMaintenanceController {
   ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
-    if (maintenance.resourceId !== resourceId) {
+    if (maintenance.resourceId !== Number(resourceId)) {
       throw new NotFoundException('Maintenance not found');
     }
 

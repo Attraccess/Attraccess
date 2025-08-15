@@ -7,6 +7,7 @@ import { PaginationOptions, PaginationOptionsSchema } from '../../types/request'
 import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
+import { EmailService } from '../../email/email.service';
 
 const FindOneOptionsSchema = z
   .object({
@@ -41,8 +42,24 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
-    private licenseService: LicenseService
+    private licenseService: LicenseService,
+    private emailService: EmailService
   ) {}
+
+  private validateUsernameOrThrow(username: string): void {
+    const trimmed = (username ?? '').trim();
+    // Centralized username validation rules
+    const minLength = 3;
+    const maxLength = 32;
+    const allowed = /^[a-zA-Z0-9_\-.]+$/;
+
+    if (trimmed.length < minLength || trimmed.length > maxLength) {
+      throw new BadRequestException('Invalid username length');
+    }
+    if (!allowed.test(trimmed)) {
+      throw new BadRequestException('Invalid username format');
+    }
+  }
 
   async findOne(options: FindOneOptions, relations?: string[]): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
@@ -76,6 +93,8 @@ export class UsersService {
 
   async createOne(data: { username: string; email: string; externalIdentifier: string | null }): Promise<User> {
     this.logger.debug(`Creating new user - username: ${data.username}, email: ${data.email}`);
+
+    this.validateUsernameOrThrow(data.username);
 
     // verifying usage limits
     const currentAmountOfUsers = await this.userRepository.count();
@@ -146,6 +165,10 @@ export class UsersService {
   async updateOne(id: number, updates: Partial<User>): Promise<User> {
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
 
+    if (updates.username) {
+      this.validateUsernameOrThrow(updates.username);
+    }
+
     // If email is being updated, check for uniqueness
     if (updates.email) {
       this.logger.debug(`Checking uniqueness for new email: ${updates.email}`);
@@ -183,6 +206,47 @@ export class UsersService {
 
     this.logger.debug(`User updated successfully, ID: ${id}`);
     return updatedUser;
+  }
+
+  async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+    const targetUser = await this.findOne({ id: targetUserId });
+    if (!targetUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    this.validateUsernameOrThrow(newUsername);
+
+    const isSelf = executingUser.id === targetUserId;
+    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+
+    if (!isSelf && !canManageUsers) {
+      throw new ForbiddenException("You do not have permission to change this user's username");
+    }
+
+    // Apply once-per-day restriction only when changing own username
+    if (isSelf && !canManageUsers) {
+      const now = new Date();
+      if (targetUser.lastUsernameChangeAt) {
+        const msSince = now.getTime() - new Date(targetUser.lastUsernameChangeAt).getTime();
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        if (msSince < oneDayMs) {
+          throw new BadRequestException('Username can only be changed once per day');
+        }
+      }
+    }
+
+    const oldUsername = targetUser.username;
+    const updated = await this.updateOne(targetUserId, {
+      username: newUsername,
+      lastUsernameChangeAt: isSelf ? new Date() : targetUser.lastUsernameChangeAt,
+    });
+
+    try {
+      await this.emailService.sendUsernameChangedEmail(updated, oldUsername);
+    } catch (e) {
+      this.logger.error('Failed to send username changed email', (e as Error).stack);
+    }
+    return updated;
   }
 
   async findMany(options: PaginationOptions & { search?: string; ids?: number[] }): Promise<PaginatedResponse<User>> {

@@ -99,6 +99,13 @@ export type ChangePasswordDto = {
     token: string;
 };
 
+export type ChangeUsernameDto = {
+    /**
+     * The new username
+     */
+    username: string;
+};
+
 export type UserNotFoundException = {
     [key: string]: unknown;
 };
@@ -367,7 +374,8 @@ export type PreviewMjmlResponseDto = {
  */
 export enum EmailTemplateType {
     VERIFY_EMAIL = 'verify-email',
-    RESET_PASSWORD = 'reset-password'
+    RESET_PASSWORD = 'reset-password',
+    USERNAME_CHANGED = 'username-changed'
 }
 
 export type EmailTemplate = {
@@ -1073,6 +1081,10 @@ export type ResourceMaintenance = {
      */
     updatedAt: string;
     /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
      * When the maintenance started
      */
     startTime: string;
@@ -1104,7 +1116,7 @@ export type UpdateMaintenanceDto = {
     /**
      * When the maintenance ends (optional)
      */
-    endTime?: string;
+    endTime?: string | null;
     /**
      * The reason for the maintenance
      */
@@ -1573,6 +1585,12 @@ export type ChangePasswordViaResetTokenResponse = unknown;
 
 export type GetCurrentResponse = User;
 
+export type ChangeMyUsernameData = {
+    requestBody: ChangeUsernameDto;
+};
+
+export type ChangeMyUsernameResponse = User;
+
 export type GetOneUserByIdData = {
     id: number;
 };
@@ -1627,6 +1645,13 @@ export type SetUserPasswordData = {
 export type SetUserPasswordResponse = {
     message?: string;
 };
+
+export type ChangeUserUsernameData = {
+    id: number;
+    requestBody: ChangeUsernameDto;
+};
+
+export type ChangeUserUsernameResponse = User;
 
 export type CreateSessionData = {
     requestBody: {
@@ -1760,7 +1785,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password';
+    type: 'verify-email' | 'reset-password' | 'username-changed';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -1770,7 +1795,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password';
+    type: 'verify-email' | 'reset-password' | 'username-changed';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
@@ -2470,6 +2495,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/me/username': {
+        patch: {
+            req: ChangeMyUsernameData;
+            res: {
+                /**
+                 * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users/{id}': {
         get: {
             req: GetOneUserByIdData;
@@ -2613,6 +2653,21 @@ export type $OpenApiTs = {
                  * User not found.
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/username': {
+        patch: {
+            req: ChangeUserUsernameData;
+            res: {
+                /**
+                 * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
