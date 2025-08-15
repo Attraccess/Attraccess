@@ -37,19 +37,49 @@ Attraccess requires several environment variables to function properly:
 
 #### Email Configuration
 
-| Variable                       | Description                                 | Required             | Default |
-| ------------------------------ | ------------------------------------------- | -------------------- | ------- |
-| `SMTP_SERVICE`                 | Email service type ("SMTP" or "Outlook365") | Yes                  | -       |
-| `SMTP_FROM`                    | Email address for outgoing messages         | Yes                  | -       |
-| `SMTP_HOST`                    | SMTP server hostname                        | If SMTP_SERVICE=SMTP | -       |
-| `SMTP_PORT`                    | SMTP server port                            | If SMTP_SERVICE=SMTP | -       |
-| `SMTP_USER`                    | SMTP authentication username                | Optional             | -       |
-| `SMTP_PASS`                    | SMTP authentication password                | Optional             | -       |
-| `SMTP_SECURE`                  | Use secure connection ("true"/"false")      | Optional             | "false" |
-| `SMTP_IGNORE_TLS`              | Ignore TLS ("true"/"false")                 | Optional             | "true"  |
-| `SMTP_REQUIRE_TLS`             | Require TLS ("true"/"false")                | Optional             | "false" |
-| `SMTP_TLS_REJECT_UNAUTHORIZED` | Reject unauthorized TLS ("true"/"false")    | Optional             | "true"  |
-| `SMTP_TLS_CIPHERS`             | TLS cipher configuration                    | Optional             | -       |
+| Variable       | Description                                 | Required | Default |
+| -------------- | ------------------------------------------- | -------- | ------- |
+| `SMTP_SERVICE` | Email service type ("SMTP" or "Outlook365") | Yes      | -       |
+| `SMTP_FROM`    | Email address for outgoing messages         | Yes      | -       |
+
+#### Licensing
+
+Attraccess requires a license key to run. Set it via the `LICENSE_KEY` environment variable.
+
+- Commercial users: Use the key you received after purchasing a license
+- Non-profit organizations: You may use Attraccess for free by setting `LICENSE_KEY` to exactly the following value:
+
+```
+I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md
+```
+
+Examples:
+
+- Docker Compose
+
+```yaml
+services:
+  attraccess:
+    image: attraccess/attraccess:latest
+    environment:
+      LICENSE_KEY: 'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
+```
+
+- Docker CLI
+
+```bash
+docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
+```
+
+| `SMTP_HOST` | SMTP server hostname | If SMTP_SERVICE=SMTP | - |
+| `SMTP_PORT` | SMTP server port | If SMTP_SERVICE=SMTP | - |
+| `SMTP_USER` | SMTP authentication username | Optional | - |
+| `SMTP_PASS` | SMTP authentication password | Optional | - |
+| `SMTP_SECURE` | Use secure connection ("true"/"false") | Optional | "false" |
+| `SMTP_IGNORE_TLS` | Ignore TLS ("true"/"false") | Optional | "true" |
+| `SMTP_REQUIRE_TLS` | Require TLS ("true"/"false") | Optional | "false" |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | Reject unauthorized TLS ("true"/"false") | Optional | "true" |
+| `SMTP_TLS_CIPHERS` | TLS cipher configuration | Optional | - |
 
 #### SSL Configuration
 

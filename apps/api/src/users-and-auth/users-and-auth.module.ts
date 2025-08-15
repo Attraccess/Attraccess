@@ -31,6 +31,8 @@ import { ConfigService } from '@nestjs/config';
 import { SSOController } from './auth/sso/sso.controller';
 import { AppConfigType } from '../config/app.config';
 import { CookieConfigService } from '../common/services/cookie-config.service';
+import { LicenseModule } from '../license/license.module';
+import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { CookieConfigService } from '../common/services/cookie-config.service';
     ]),
     PassportModule,
     EmailModule,
+    LicenseModule,
   ],
   providers: [
     UsersService,
@@ -53,6 +56,7 @@ import { CookieConfigService } from '../common/services/cookie-config.service';
     SessionStrategy,
     SSOService,
     CookieConfigService,
+    SSOOIDCGuard,
     {
       provide: SSOOIDCStrategy,
       useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {

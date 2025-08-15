@@ -5,6 +5,7 @@ import { User } from '@attraccess/database-entities';
 import { Repository, UpdateResult } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+import { LicenseService } from '../../license/license.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -14,6 +15,12 @@ describe('UsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        {
+          provide: LicenseService,
+          useValue: {
+            verifyLicense: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: {

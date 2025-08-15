@@ -1,11 +1,18 @@
 {
   "logout": "Logout",
+  "language": "Language",
+  "languages": {
+    "en": "English",
+    "de": "Deutsch"
+  },
   "docs": "Documentation",
   "reportBug": "Report a Bug",
   "requestFeature": "Request a Feature",
   "groups": {
-    "__default__": {
-      "resources": "Resources"
+    "##default##": {
+      "items": {
+        "resources": "Resources"
+      }
     },
     "attractap": {
       "label": "Attractap",

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { X, Settings, LogOut, User, ExternalLink } from 'lucide-react';
+import { X, Settings, LogOut, User, ExternalLink, Languages, Check } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -18,7 +18,7 @@ import { SystemPermissions } from '@attraccess/react-query-client';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
-import { SidebarItem, SidebarItemGroup, sidebarItems, useSidebarEndItems } from './sidebarItems';
+import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
 
 function NavLink(
   props: Omit<LinkProps, 'children'> & {
@@ -50,12 +50,13 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const { logout, user } = useAuth();
-  const { t } = useTranslations('sidebar', {
+  const { t, i18n } = useTranslations('sidebar', {
     en,
     de,
   });
 
   const routes = useAllRoutes();
+  const sidebarItems = useSidebarItems();
 
   const showNavItem = useCallback(
     (item: SidebarItem) => {
@@ -89,7 +90,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   // Get navigation items from routes that have sidebar config
   const navigationGroups: SidebarItemGroup[] = useMemo(() => {
     const defaultGroup: SidebarItemGroup = {
-      translationKey: '__default__',
+      translationKey: '##default##',
       items: [],
       icon: () => null,
       isGroup: true,
@@ -110,14 +111,14 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
     });
 
     return groups.filter((group) => group.items.length > 0);
-  }, [showNavItem]);
+  }, [showNavItem, sidebarItems]);
 
   const defaultGroupItems = useMemo(() => {
-    return navigationGroups.find((group) => group.translationKey === '__default__')?.items;
+    return navigationGroups.find((group) => group.translationKey === '##default##')?.items;
   }, [navigationGroups]);
 
   const otherGroups = useMemo(() => {
-    return navigationGroups.filter((group) => group.translationKey !== '__default__');
+    return navigationGroups.filter((group) => group.translationKey !== '##default##');
   }, [navigationGroups]);
 
   const sidebarEndItems = useSidebarEndItems();
@@ -164,11 +165,11 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                 key={item.path}
                 href={item.path}
                 icon={<item.icon size={16} />}
-                label={t('groups.__default__.items.' + item.translationKey)}
+                label={t('groups.##default##.items.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
               />
             ))}
-            <Accordion defaultSelectedKeys={['__default__']}>
+            <Accordion defaultSelectedKeys={['##default##']}>
               {otherGroups.map((group) => (
                 <AccordionItem
                   key={group.translationKey}
@@ -223,6 +224,25 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
+                  <DropdownItem key="language-label" isDisabled startContent={<Languages className="h-4 w-4" />}>
+                    {t('language')}
+                  </DropdownItem>
+                  <DropdownItem
+                    key="language-en"
+                    onPress={() => i18n.changeLanguage('en')}
+                    endContent={i18n.language?.startsWith('en') ? <Check className="h-4 w-4" /> : null}
+                    data-cy="sidebar-language-en"
+                  >
+                    {t('languages.en')}
+                  </DropdownItem>
+                  <DropdownItem
+                    key="language-de"
+                    onPress={() => i18n.changeLanguage('de')}
+                    endContent={i18n.language?.startsWith('de') ? <Check className="h-4 w-4" /> : null}
+                    data-cy="sidebar-language-de"
+                  >
+                    {t('languages.de')}
+                  </DropdownItem>
                   <DropdownItem
                     key="logout"
                     onPress={() => logout()}

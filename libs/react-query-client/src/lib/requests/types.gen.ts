@@ -408,6 +408,31 @@ export type UpdateEmailTemplateDto = {
     body?: string;
 };
 
+export type LicenseDataDto = {
+    /**
+     * Whether the license is valid
+     */
+    valid: boolean;
+    /**
+     * Reason for invalidity when not valid
+     */
+    reason?: string;
+    /**
+     * The raw payload as returned by the license server
+     */
+    modules: Array<(string)>;
+    /**
+     * The raw payload as returned by the license server
+     */
+    usageLimits: {
+        [key: string]: unknown;
+    };
+    /**
+     * Are you using this software for free as a non-profit?
+     */
+    isNonProfit: boolean;
+};
+
 export type CreateResourceDto = {
     /**
      * The name of the resource
@@ -1725,6 +1750,8 @@ export type EmailTemplateControllerUpdateData = {
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
 
+export type GetLicenseInformationResponse = LicenseDataDto;
+
 export type CreateOneResourceData = {
     formData: CreateResourceDto;
 };
@@ -2810,6 +2837,20 @@ export type $OpenApiTs = {
                  * Template not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/license-data': {
+        get: {
+            res: {
+                /**
+                 * The current license data.
+                 */
+                200: LicenseDataDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

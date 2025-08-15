@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
@@ -8,6 +8,7 @@ import { PaginatedResponse } from '../types/response';
 import { ResourceImageService } from './resourceImage.service';
 import { FileUpload } from '../common/types/file-upload.types';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
+import { LicenseError, LicenseService } from '../license/license.service';
 
 @Injectable()
 export class ResourcesService {
@@ -16,10 +17,27 @@ export class ResourcesService {
   constructor(
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-    private readonly resourceImageService: ResourceImageService
+    private readonly resourceImageService: ResourceImageService,
+    private readonly licenseService: LicenseService
   ) {}
 
   async createResource(dto: CreateResourceDto, image?: FileUpload): Promise<Resource> {
+    // verifying usage limits
+    const currentAmountOfResources = await this.resourceRepository.count();
+    try {
+      await this.licenseService.verifyLicense({
+        usageLimits: {
+          resources: currentAmountOfResources,
+        },
+      });
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking resource creation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
+
     const resource = this.resourceRepository.create({
       name: dto.name,
       description: dto.description,

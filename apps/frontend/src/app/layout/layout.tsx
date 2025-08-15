@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
+import { DonationPrompt } from '../../components/DonationPrompt';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -45,6 +46,9 @@ export function Layout({ children, noLayout }: LayoutProps) {
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-4">{children}</main>
+
+        {/* Global donation prompt for eligible users */}
+        <DonationPrompt />
       </div>
     </div>
   );

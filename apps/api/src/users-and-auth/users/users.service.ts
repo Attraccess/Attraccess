@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In } from 'typeorm';
 import { SystemPermissions, User } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,6 +6,7 @@ import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
 import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+import { LicenseError, LicenseService } from '../../license/license.service';
 
 const FindOneOptionsSchema = z
   .object({
@@ -39,7 +40,8 @@ export class UsersService {
 
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>
+    private userRepository: Repository<User>,
+    private licenseService: LicenseService
   ) {}
 
   async findOne(options: FindOneOptions, relations?: string[]): Promise<User | null> {
@@ -74,6 +76,22 @@ export class UsersService {
 
   async createOne(data: { username: string; email: string; externalIdentifier: string | null }): Promise<User> {
     this.logger.debug(`Creating new user - username: ${data.username}, email: ${data.email}`);
+
+    // verifying usage limits
+    const currentAmountOfUsers = await this.userRepository.count();
+    try {
+      await this.licenseService.verifyLicense({
+        usageLimits: {
+          users: currentAmountOfUsers,
+        },
+      });
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking user creation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
 
     // Check for existing email
     this.logger.debug(`Checking if email already exists: ${data.email}`);

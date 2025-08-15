@@ -14,6 +14,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import type { Response } from 'express';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
+import { LicenseService } from '../../../license/license.service';
 
 describe('SsoController', () => {
   let controller: SSOController;
@@ -110,6 +111,15 @@ describe('SsoController', () => {
           provide: ModuleRef,
           useValue: {
             get: jest.fn(),
+          },
+        },
+        {
+          provide: LicenseService,
+          useValue: {
+            verifyLicense: jest.fn().mockResolvedValue({
+              valid: true,
+              payload: { cfg: { modules: ['sso'], usageLimits: {} } },
+            }),
           },
         },
         SSOOIDCGuard,

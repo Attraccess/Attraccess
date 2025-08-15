@@ -12,6 +12,7 @@
 - **User Guides**
 
   - [Getting Started](user/getting-started.md)
+  - [Licensing](user/licensing.md)
   - [User Management](user/user-management.md)
   - [Plugins](user/plugins.md)
   - [Resource Take-Over](user/resource-takeover.md)

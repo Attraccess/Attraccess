@@ -1,10 +1,15 @@
 {
   "logout": "Abmelden",
+  "language": "Sprache",
+  "languages": {
+    "en": "Englisch",
+    "de": "Deutsch"
+  },
   "docs": "Dokumentation",
   "reportBug": "Fehler melden",
   "requestFeature": "Funktion vorschlagen",
   "groups": {
-    "__default__": {
+    "##default##": {
       "items": {
         "resources": "Ressourcen"
       }

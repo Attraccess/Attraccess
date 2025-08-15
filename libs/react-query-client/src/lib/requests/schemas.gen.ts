@@ -608,6 +608,38 @@ export const $UpdateEmailTemplateDto = {
     }
 } as const;
 
+export const $LicenseDataDto = {
+    type: 'object',
+    properties: {
+        valid: {
+            type: 'boolean',
+            description: 'Whether the license is valid'
+        },
+        reason: {
+            type: 'string',
+            description: 'Reason for invalidity when not valid'
+        },
+        modules: {
+            description: 'The raw payload as returned by the license server',
+            example: ['attractap', 'sso'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        usageLimits: {
+            type: 'object',
+            description: 'The raw payload as returned by the license server',
+            additionalProperties: true
+        },
+        isNonProfit: {
+            type: 'boolean',
+            description: 'Are you using this software for free as a non-profit?'
+        }
+    },
+    required: ['valid', 'modules', 'usageLimits', 'isNonProfit']
+} as const;
+
 export const $CreateResourceDto = {
     type: 'object',
     properties: {

@@ -25,6 +25,7 @@ import { WaitForNFCTapState, WaitForNFCTapStateStep } from './reader-states/wait
 import { AttractapFirmwareService } from '../firmware.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { Mutex } from 'async-mutex';
+import { LicenseModuleType, LicenseService } from '../../license/license.service';
 
 export interface GatewayServices {
   websocketService: WebsocketService;
@@ -66,8 +67,22 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(ResourceMaintenanceService)
   private resourceMaintenanceService: ResourceMaintenanceService;
 
+  @Inject(LicenseService)
+  private licenseService: LicenseService;
+
   public async handleConnection(client: AuthenticatedWebSocket) {
     this.logger.log('Client connected via WebSocket');
+
+    try {
+      await this.licenseService.verifyLicense({
+        modules: [LicenseModuleType.ATTRACTAP],
+      });
+    } catch (error) {
+      this.logger.error('Closing connection due to license error');
+      this.logger.error(error);
+      client.close();
+      return;
+    }
 
     client.id = nanoid(5);
 

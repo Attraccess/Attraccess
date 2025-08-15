@@ -12,12 +12,14 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import sessionConfig from '../config/session.config';
+import { LicenseModule } from '../license/license.module';
+import { LicenseService } from '../license/license.service';
 
 @Module({
   imports: [
@@ -93,8 +95,20 @@ import sessionConfig from '../config/session.config';
     AttractapModule,
     AnalyticsModule,
     EmailTemplateModule,
+    LicenseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(private readonly licenseService: LicenseService) {}
+
+  async onModuleInit() {
+    try {
+      await this.licenseService.verifyLicense();
+    } catch (error) {
+      console.error(error);
+      process.exit(1);
+    }
+  }
+}

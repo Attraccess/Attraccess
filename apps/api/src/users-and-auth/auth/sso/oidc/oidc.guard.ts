@@ -1,4 +1,11 @@
-import { BadRequestException, CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../../../../config/app.config';
 import { SSOOIDCStrategy } from './oidc.strategy';
@@ -10,6 +17,7 @@ import {
   InvalidSSOProviderTypeException,
   SSOProviderNotFoundException,
 } from '../errors';
+import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
 
 @Injectable()
 export class SSOOIDCGuard implements CanActivate {
@@ -18,12 +26,22 @@ export class SSOOIDCGuard implements CanActivate {
   public constructor(
     private ssoService: SSOService,
     private moduleRef: ModuleRef,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private licenseService: LicenseService
   ) {}
 
   async canActivate(context: ExecutionContext) {
     this.logger.debug('OIDC Guard activation attempted');
     const req = context.switchToHttp().getRequest();
+
+    // Enforce licensing for SSO usage
+    try {
+      await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'SSO not permitted by license';
+      this.logger.warn(`Blocking SSO request due to license: ${reason}`);
+      throw new ForbiddenException('SSO is not permitted by the current license');
+    }
 
     this.logger.debug(`Request URL: ${req.url}`);
     const appConfig = this.configService.get<AppConfigType>('app');

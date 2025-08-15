@@ -1,0 +1,14 @@
+{
+  "title": "Gefällt dir Attraccess?",
+  "subtitle": "Wir bieten eine dauerhafte, kostenlose Lizenz für gemeinnützige Organisationen.",
+  "body": "Wenn dir die Software hilft, erwäge bitte eine Unterstützung der Entwicklung oder teile die Liebe.",
+  "actions": {
+    "donate": "Auf GitHub sponsern",
+    "share": "Über uns berichten",
+    "hideForMonth": "Für 1 Monat ausblenden"
+  },
+  "share": {
+    "tweetText": "Wir nutzen Attraccess zur Verwaltung geteilter Ressourcen – sehr empfehlenswert!",
+    "tweetHashtags": "attraccess,software,automation,accesscontrol"
+  }
+}

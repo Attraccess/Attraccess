@@ -7,6 +7,7 @@ import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 import { ResourceImageService } from './resourceImage.service';
+import { LicenseService } from '../license/license.service';
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
@@ -17,6 +18,7 @@ describe('ResourcesService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     findAndCount: jest.fn(),
+    count: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
@@ -51,6 +53,12 @@ describe('ResourcesService', () => {
         {
           provide: ResourceImageService,
           useValue: mockResourceImageService,
+        },
+        {
+          provide: LicenseService,
+          useValue: {
+            verifyLicense: jest.fn().mockResolvedValue({ valid: true, payload: { cfg: {} } }),
+          },
         },
       ],
     }).compile();

@@ -99,7 +99,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     onError: (error) => {
       toast.error({
         title: t('update.error.toast.title'),
-        description: t('update.error.toast.description'),
+        description: t('update.error.toast.description') + ' ' + (error as Error).message,
       });
 
       console.error('Failed to update resource:', error, {
@@ -121,7 +121,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     onError: (error) => {
       toast.error({
         title: t('create.error.toast.title'),
-        description: t('create.error.toast.description'),
+        description: t('create.error.toast.description') + ' ' + (error as Error).message,
       });
 
       console.error('Failed to create resource:', error, {

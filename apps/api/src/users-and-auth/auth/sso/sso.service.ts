@@ -5,6 +5,7 @@ import { SSOProvider, SSOProviderOIDCConfiguration, SSOProviderType } from '@att
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 import { SSOProviderNotFoundException } from './errors';
+import { LicenseModuleType, LicenseService } from '../../../license/license.service';
 
 @Injectable()
 export class SSOService {
@@ -12,7 +13,8 @@ export class SSOService {
     @InjectRepository(SSOProvider)
     private ssoProviderRepository: Repository<SSOProvider>,
     @InjectRepository(SSOProviderOIDCConfiguration)
-    private oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>
+    private oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>,
+    private licenseService: LicenseService
   ) {}
 
   public async getAllProviders(): Promise<SSOProvider[]> {
@@ -46,6 +48,11 @@ export class SSOService {
   }
 
   public async createProvider(createDto: CreateSSOProviderDto): Promise<SSOProvider> {
+    // verifying usage limits
+    await this.licenseService.verifyLicense({
+      modules: [LicenseModuleType.SSO],
+    });
+
     const newProvider = this.ssoProviderRepository.create({
       name: createDto.name,
       type: createDto.type,
@@ -81,7 +88,7 @@ export class SSOService {
     await this.ssoProviderRepository.delete(id);
   }
 
-  public async createOIDCConfiguration(
+  private async createOIDCConfiguration(
     providerId: number,
     config: {
       issuer: string;
@@ -100,7 +107,7 @@ export class SSOService {
     return this.oidcConfigRepository.save(newConfig);
   }
 
-  public async updateOIDCConfiguration(
+  private async updateOIDCConfiguration(
     providerId: number,
     updateConfig: Partial<{
       issuer: string;

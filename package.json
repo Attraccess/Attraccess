@@ -20,6 +20,7 @@
     "@icons-pack/react-simple-icons": "^13.1.0",
     "@internationalized/date": "^3.8.0",
     "@khmyznikov/pwa-install": "^0.5.5",
+    "@licenso/client": "^1.2.0",
     "@million/lint": "^1.0.14",
     "@monaco-editor/react": "^4.7.0",
     "@nestjs-modules/mailer": "^2.0.2",

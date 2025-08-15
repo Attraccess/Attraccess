@@ -452,6 +452,22 @@ export interface UpdateEmailTemplateDto {
   body?: string;
 }
 
+export interface LicenseDataDto {
+  /** Whether the license is valid */
+  valid: boolean;
+  /** Reason for invalidity when not valid */
+  reason?: string;
+  /**
+   * The raw payload as returned by the license server
+   * @example ["attractap","sso"]
+   */
+  modules: string[];
+  /** The raw payload as returned by the license server */
+  usageLimits: Record<string, any>;
+  /** Are you using this software for free as a non-profit? */
+  isNonProfit: boolean;
+}
+
 export interface CreateResourceDto {
   /**
    * The name of the resource
@@ -1563,6 +1579,11 @@ export interface NFCCard {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * The date and time the NFC card was last seen
+   * @format date-time
+   */
+  lastSeen: string;
 }
 
 export interface AttractapFirmware {
@@ -1734,6 +1755,8 @@ export type EmailTemplateControllerFindAllData = EmailTemplate[];
 export type EmailTemplateControllerFindOneData = EmailTemplate;
 
 export type EmailTemplateControllerUpdateData = EmailTemplate;
+
+export type GetLicenseInformationData = LicenseDataDto;
 
 export type CreateOneResourceData = Resource;
 
@@ -2522,6 +2545,24 @@ export namespace EmailTemplates {
     export type RequestBody = UpdateEmailTemplateDto;
     export type RequestHeaders = {};
     export type ResponseBody = EmailTemplateControllerUpdateData;
+  }
+}
+
+export namespace License {
+  /**
+   * No description
+   * @tags License
+   * @name GetLicenseInformation
+   * @summary Get license information
+   * @request GET:/api/license-data
+   * @secure
+   */
+  export namespace GetLicenseInformation {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetLicenseInformationData;
   }
 }
 
@@ -4680,6 +4721,25 @@ export class Api<
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
+  license = {
+    /**
+     * No description
+     *
+     * @tags License
+     * @name GetLicenseInformation
+     * @summary Get license information
+     * @request GET:/api/license-data
+     * @secure
+     */
+    getLicenseInformation: (params: RequestParams = {}) =>
+      this.request<GetLicenseInformationData, void>({
+        path: `/api/license-data`,
+        method: "GET",
+        secure: true,
         format: "json",
         ...params,
       }),

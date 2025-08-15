@@ -18,6 +18,8 @@ import newGithubIssueUrl from 'new-github-issue-url';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
 import { useNow } from '../../hooks/useNow';
+import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useMemo } from 'react';
 
 export type SidebarItem = {
   path: string;
@@ -25,84 +27,108 @@ export type SidebarItem = {
   translationKey?: string;
   isExternal?: boolean;
   isGroup?: false;
+  licenseModule?: string;
 };
 
 export type SidebarItemGroup = {
   isGroup: true;
   icon: React.FunctionComponent<LucideProps>;
-  openByDefault?: boolean;
   items: SidebarItem[];
   translationKey: string;
+  licenseModule?: string;
 };
 
-export const sidebarItems: (SidebarItem | SidebarItemGroup)[] = [
-  {
-    translationKey: 'resources',
-    path: '/resources',
-    icon: DatabaseIcon,
-  },
-  {
-    translationKey: 'attractap',
-    isGroup: true,
-    icon: ComputerIcon,
-    items: [
+export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
+  return useMemo(() => {
+    // Resources group
+    const items: (SidebarItem | SidebarItemGroup)[] = [
       {
-        path: '/nfc-cards',
-        translationKey: 'nfcCards',
-        icon: NfcIcon,
+        translationKey: 'resources',
+        path: '/resources',
+        icon: DatabaseIcon,
       },
-      {
-        path: '/attractap',
-        translationKey: 'readers',
+    ];
+
+    if (license?.modules.includes('attractap')) {
+      items.push({
+        translationKey: 'attractap',
+        isGroup: true,
         icon: ComputerIcon,
-      },
-    ],
-  },
-  {
-    translationKey: 'auth',
-    isGroup: true,
-    icon: KeyIcon,
-    items: [
-      {
+        licenseModule: 'attractap',
+        items: [
+          {
+            path: '/nfc-cards',
+            translationKey: 'nfcCards',
+            icon: NfcIcon,
+          },
+          {
+            path: '/attractap',
+            translationKey: 'readers',
+            icon: ComputerIcon,
+          },
+        ],
+      });
+    }
+
+    // Auth group
+    const authGroup: SidebarItemGroup = {
+      translationKey: 'auth',
+      isGroup: true,
+      icon: KeyIcon,
+      items: [
+        {
+          path: '/users',
+          translationKey: 'userManagement',
+          icon: UsersIcon,
+        },
+      ],
+    };
+
+    if (license?.modules.includes('sso')) {
+      authGroup.items.unshift({
         path: '/sso/providers',
         translationKey: 'ssoProviders',
         icon: KeyIcon,
-      },
-      {
-        path: '/users',
-        translationKey: 'userManagement',
-        icon: UsersIcon,
-      },
-    ],
-  },
-  {
-    translationKey: 'system',
-    isGroup: true,
-    icon: CogIcon,
-    items: [
-      {
-        path: '/mqtt/servers',
-        translationKey: 'mqttServers',
-        icon: ServerIcon,
-      },
-      {
-        path: '/csv-export',
-        translationKey: 'csvExport',
-        icon: FileChartColumnIncreasingIcon,
-      },
-      {
-        path: '/plugins',
-        translationKey: 'plugins',
-        icon: PackageIcon,
-      },
-      {
-        path: '/email-templates',
-        translationKey: 'emailTemplates',
-        icon: MailIcon,
-      },
-    ],
-  },
-];
+        licenseModule: 'sso',
+      });
+    }
+
+    items.push(authGroup);
+
+    // System group
+    items.push({
+      translationKey: 'system',
+      isGroup: true,
+      icon: CogIcon,
+      items: [
+        {
+          path: '/mqtt/servers',
+          translationKey: 'mqttServers',
+          icon: ServerIcon,
+        },
+        {
+          path: '/csv-export',
+          translationKey: 'csvExport',
+          icon: FileChartColumnIncreasingIcon,
+        },
+        {
+          path: '/plugins',
+          translationKey: 'plugins',
+          icon: PackageIcon,
+        },
+        {
+          path: '/email-templates',
+          translationKey: 'emailTemplates',
+          icon: MailIcon,
+        },
+      ],
+    });
+
+    return items;
+  }, [license]);
+}
 
 export const useSidebarEndItems = () => {
   const { user } = useAuth();

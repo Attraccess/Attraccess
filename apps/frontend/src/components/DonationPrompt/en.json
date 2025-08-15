@@ -1,0 +1,14 @@
+{
+  "title": "Enjoying Attraccess?",
+  "subtitle": "We offer a free forever license for non-profits.",
+  "body": "If this software helps your mission, please consider supporting development or spread the word.",
+  "actions": {
+    "donate": "Sponsor on GitHub",
+    "share": "Share about us",
+    "hideForMonth": "Hide for 1 month"
+  },
+  "share": {
+    "tweetText": "We're using Attraccess to manage our shared resources – highly recommend!",
+    "tweetHashtags": "attraccess,software,automation,accesscontrol"
+  }
+}
