@@ -41,15 +41,14 @@ export const ensureUseAuthenticationServiceLoginWithOidcData = (queryClient: Que
   providerId: string;
   redirectTo?: unknown;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceLoginWithOidcKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithOidc({ providerId, redirectTo }) });
-export const ensureUseAuthenticationServiceOidcLoginCallbackData = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state, tokenLocation }: {
+export const ensureUseAuthenticationServiceOidcLoginCallbackData = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state }: {
   code: unknown;
   iss: unknown;
   providerId: string;
   redirectTo: string;
   sessionState: unknown;
   state: unknown;
-  tokenLocation: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }) });
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindAllData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindOneData = (queryClient: QueryClient, { type }: {
   type: "verify-email" | "reset-password";

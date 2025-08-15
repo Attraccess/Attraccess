@@ -1,18 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  CreateSessionResponse,
   OpenAPI,
   SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
-  useAuthenticationServiceGetSessionCookie,
-  useAuthenticationServiceRefreshSession,
-  useAuthenticationServiceRefreshSessionKey,
   useUsersServiceGetCurrent,
+  UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { getBaseUrl } from '../api';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface LoginCredentials {
   username: string;
@@ -20,36 +17,13 @@ interface LoginCredentials {
   tokenLocation: 'cookie' | 'body';
 }
 
-export function usePersistedAuth() {
-  // This hook is now just a placeholder since initialization is handled in useAuth
-  // We'll keep it for backward compatibility but it doesn't do anything
-}
-
-export function useRefreshSession() {
-  const { isInitialized } = useAuth();
-  const { data: refreshedSession } = useAuthenticationServiceRefreshSession({ tokenLocation: 'cookie' }, undefined, {
-    refetchInterval: 1000 * 60 * 20, // 20 minutes,
-    enabled: isInitialized,
-    retryOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
-  // Session refresh is now handled automatically by cookies
-  // No need to manually update tokens or localStorage
-  useEffect(() => {
-    if (refreshedSession) {
-      // Session was refreshed successfully, cookies are automatically updated by the server
-      // No client-side token management needed
-    }
-  }, [refreshedSession]);
-}
-
 export function useLogin() {
-  const { sessionLoginMutate } = useAuth();
-
+  const queryClient = useQueryClient();
   const login = useAuthenticationServiceCreateSession({
-    onSuccess: (data) => {
-      sessionLoginMutate(data);
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: UseUsersServiceGetCurrentKeyFn(),
+      });
     },
   });
 
@@ -67,7 +41,6 @@ export function useLogin() {
 }
 
 export function useAuth() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -99,45 +72,8 @@ export function useAuth() {
     enabled: isInitialized, // Only fetch when initialized
   });
 
-  const { mutateAsync: getSessionCookie } = useAuthenticationServiceGetSessionCookie();
-
-  const { mutate: sessionLoginMutate } = useMutation({
-    mutationFn: async (auth: CreateSessionResponse) => {
-      // No need to store auth data - cookies are handled automatically by the server
-      if (!auth) {
-        console.error('[sessionLoginMutate] auth is null');
-        throw new Error('Auth is null');
-      }
-
-      await getSessionCookie({
-        requestBody: {
-          authToken: auth.authToken,
-        },
-      });
-
-      // No manual token setting needed - cookies handle authentication
-      // The server will have set the HTTP-only cookie automatically
-
-      return auth;
-    },
-    onSuccess: () => {
-      setTimeout(() => {
-        // Invalidate all queries except the refresh session query to prevent infinite loop
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            // Don't invalidate the refresh session query
-            return !query.queryKey.includes(useAuthenticationServiceRefreshSessionKey);
-          },
-        });
-      }, 1000);
-    },
-  });
-
   const { mutate: deleteSession } = useAuthenticationServiceEndSession({
     onSuccess: async () => {
-      // No need to remove localStorage/sessionStorage - cookies are cleared by server
-      // No manual token clearing needed - server clears the HTTP-only cookie
-
       navigate('/', { replace: true });
       window.location.reload();
     },
@@ -151,7 +87,6 @@ export function useAuth() {
     user: currentUser ?? null,
     isAuthenticated: !!currentUser,
     isInitialized,
-    sessionLoginMutate,
     logout,
     hasPermission: (permission: keyof SystemPermissions) => {
       if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {

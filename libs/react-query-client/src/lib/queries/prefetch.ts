@@ -41,15 +41,14 @@ export const prefetchUseAuthenticationServiceLoginWithOidc = (queryClient: Query
   providerId: string;
   redirectTo?: unknown;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceLoginWithOidcKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithOidc({ providerId, redirectTo }) });
-export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state, tokenLocation }: {
+export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: QueryClient, { code, iss, providerId, redirectTo, sessionState, state }: {
   code: unknown;
   iss: unknown;
   providerId: string;
   redirectTo: string;
   sessionState: unknown;
   state: unknown;
-  tokenLocation: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
   type: "verify-email" | "reset-password";

@@ -55,13 +55,16 @@ export function KeycloakDiscoveryDialog(props: Props) {
       onClose();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
-      toast.error({ title: t('error.generic.title'), description: t('error.generic.description') });
+      toast.error({
+        title: t('error.generic.title'),
+        description: `${t('error.generic.description')} ${error instanceof Error ? error.message : error}`,
+      });
     } finally {
       setIsDiscovering(false);
     }
 
     setIsDiscovering(false);
-  }, [host, realm]);
+  }, [host, realm, toast, t, onDiscovery, onClose]);
 
   return (
     <>

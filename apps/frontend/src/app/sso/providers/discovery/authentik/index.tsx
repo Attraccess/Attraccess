@@ -55,13 +55,16 @@ export function AuthentikDiscoveryDialog(props: Props) {
       onClose();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
-      toast.error({ title: t('error.generic.title'), description: t('error.generic.description') });
+      toast.error({
+        title: t('error.generic.title'),
+        description: `${t('error.generic.description')} ${error instanceof Error ? error.message : error}`,
+      });
     } finally {
       setIsDiscovering(false);
     }
 
     setIsDiscovering(false);
-  }, [host, applicationName]);
+  }, [host, applicationName, toast, t, onDiscovery, onClose]);
 
   return (
     <>

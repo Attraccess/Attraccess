@@ -4,16 +4,8 @@ import { SessionService } from './session.service';
 import { LoginGuard } from '../strategies/login.guard';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
-import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation, ApiProperty } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
-
-class GetSessionCookieDto {
-  @ApiProperty({
-    description: 'The authentication token',
-    type: String,
-  })
-  authToken: string;
-}
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -72,26 +64,6 @@ export class AuthController {
         authToken: sessionToken,
       };
     }
-  }
-
-  @Post('/session/token')
-  @ApiOperation({ summary: 'get a session cookie by providing a auth token', operationId: 'getSessionCookie' })
-  @ApiResponse({
-    status: 200,
-    description: 'The session cookie has been created',
-    type: String,
-    schema: {
-      type: 'string',
-      enum: ['OK'],
-    },
-  })
-  async getSessionCookie(
-    @Body() body: GetSessionCookieDto,
-    @Res({ passthrough: true }) response: Response
-  ): Promise<string> {
-    this.cookieConfigService.setAuthCookie(response, body.authToken);
-
-    return 'OK';
   }
 
   @Get('/session/refresh')

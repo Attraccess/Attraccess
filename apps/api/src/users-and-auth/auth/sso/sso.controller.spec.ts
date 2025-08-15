@@ -233,8 +233,7 @@ describe('SsoController', () => {
       const result = await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
-        mockResponse as unknown as Response,
-        'cookie'
+        mockResponse as unknown as Response
       );
 
       expect(sessionService.createSession).toHaveBeenCalledWith(mockRequest.user, {
@@ -246,7 +245,7 @@ describe('SsoController', () => {
 
       expect(result).toEqual({
         user: mockRequest.user,
-        authToken: '', // Empty for web browsers
+        authToken: 'mock-session-token',
       });
     });
 
@@ -258,8 +257,7 @@ describe('SsoController', () => {
       const result = await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
-        mockResponse as unknown as Response,
-        'body'
+        mockResponse as unknown as Response
       );
 
       expect(sessionService.createSession).toHaveBeenCalledWith(mockRequest.user, {
@@ -281,8 +279,7 @@ describe('SsoController', () => {
       await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
-        mockResponse as unknown as Response,
-        'cookie'
+        mockResponse as unknown as Response
       );
 
       expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
@@ -301,21 +298,12 @@ describe('SsoController', () => {
       await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
-        mockResponse as unknown as Response,
-        'body'
+        mockResponse as unknown as Response
       );
 
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'auth=' +
-            encodeURIComponent(
-              JSON.stringify({
-                user: mockRequest.user,
-                authToken: 'mock-session-token',
-              })
-            )
-        )
+        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user)))
       );
     });
   });

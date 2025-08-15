@@ -79,15 +79,14 @@ export const UseAuthenticationServiceLoginWithOidcKeyFn = ({ providerId, redirec
 export type AuthenticationServiceOidcLoginCallbackDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.oidcLoginCallback>>;
 export type AuthenticationServiceOidcLoginCallbackQueryResult<TData = AuthenticationServiceOidcLoginCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceOidcLoginCallbackKey = "AuthenticationServiceOidcLoginCallback";
-export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }: {
+export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, providerId, redirectTo, sessionState, state }: {
   code: unknown;
   iss: unknown;
   providerId: string;
   redirectTo: string;
   sessionState: unknown;
   state: unknown;
-  tokenLocation: string;
-}, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state, tokenLocation }])];
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state }])];
 export type EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerFindAll>>;
 export type EmailTemplatesServiceEmailTemplateControllerFindAllQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindAllKey = "EmailTemplatesServiceEmailTemplateControllerFindAll";
@@ -328,7 +327,6 @@ export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<Retu
 export type UsersServiceBulkUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.bulkUpdatePermissions>>;
 export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeof UsersService.setUserPassword>>;
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
-export type AuthenticationServiceGetSessionCookieMutationResult = Awaited<ReturnType<typeof AuthenticationService.getSessionCookie>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;

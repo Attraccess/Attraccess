@@ -42,9 +42,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-
-import en from './translations/en.json';
-import de from './translations/de.json';
+import en from './en.json';
+import de from './de.json';
 import { AuthentikDiscoveryDialog } from './discovery/authentik';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { KeycloakDiscoveryDialog } from './discovery/keycloak';

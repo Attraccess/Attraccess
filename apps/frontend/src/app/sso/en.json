@@ -1,0 +1,7 @@
+{
+  "title": "SSO Providers",
+  "subtitle": "Manage Single Sign-On providers for system authentication",
+  "actions": {
+    "addNew": "Add new provider"
+  }
+}

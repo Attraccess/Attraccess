@@ -2,10 +2,9 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, Divider, Link } from '@heroui/react';
 import * as de from './ssoLogin.de.json';
 import * as en from './ssoLogin.en.json';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuthenticationServiceGetAllSsoProviders, SSOProvider } from '@attraccess/react-query-client';
-import { useAuth } from '../../hooks/useAuth';
 import { SSOLinkingRequiredModal } from './ssoLinkingRequiredModal';
 import { useCallbackURL } from './use-sso-callback-url';
 
@@ -32,41 +31,14 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
 export function SSOLogin() {
   const { isLoading, data: providers } = useAuthenticationServiceGetAllSsoProviders();
   const location = useLocation();
-  const { sessionLoginMutate } = useAuth();
-
-  const didExecuteSSOCallback = useRef(false);
 
   const query = useMemo(() => {
     return new URLSearchParams(location.search);
   }, [location]);
 
-  const authFromQuery = useMemo(() => {
-    const authString = query.get('auth');
-
-    if (!authString) {
-      return null;
-    }
-
-    return JSON.parse(authString);
-  }, [query]);
-
-  const handleSSOAuthSuccessCallback = useCallback(async () => {
-    if (didExecuteSSOCallback.current || !authFromQuery) {
-      return;
-    }
-
-    didExecuteSSOCallback.current = true;
-
-    sessionLoginMutate(authFromQuery);
-  }, [sessionLoginMutate, authFromQuery]);
-
   const ssoLinkingIsRequired = useMemo(() => {
     return query.get('accountLinking') === 'required';
   }, [query]);
-
-  useEffect(() => {
-    handleSSOAuthSuccessCallback();
-  }, [handleSSOAuthSuccessCallback]);
 
   if (providers?.length === 0 || isLoading) {
     return null;

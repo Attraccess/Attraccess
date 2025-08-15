@@ -161,13 +161,6 @@ export type CreateSessionResponse = {
     authToken: string;
 };
 
-export type GetSessionCookieDto = {
-    /**
-     * The authentication token
-     */
-    authToken: string;
-};
-
 /**
  * The type of the provider
  */
@@ -1645,12 +1638,6 @@ export type CreateSessionData = {
 
 export type CreateSessionResponse2 = CreateSessionResponse;
 
-export type GetSessionCookieData = {
-    requestBody: GetSessionCookieDto;
-};
-
-export type GetSessionCookieResponse = string;
-
 export type RefreshSessionData = {
     tokenLocation: string;
 };
@@ -1757,7 +1744,6 @@ export type OidcLoginCallbackData = {
     redirectTo: string;
     sessionState: unknown;
     state: unknown;
-    tokenLocation: string;
 };
 
 export type OidcLoginCallbackResponse = CreateSessionResponse;
@@ -2642,17 +2628,6 @@ export type $OpenApiTs = {
                  * Unauthorized - Invalid credentials
                  */
                 401: unknown;
-            };
-        };
-    };
-    '/api/auth/session/token': {
-        post: {
-            req: GetSessionCookieData;
-            res: {
-                /**
-                 * The session cookie has been created
-                 */
-                200: string;
             };
         };
     };
