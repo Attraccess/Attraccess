@@ -19,10 +19,11 @@ export class UpdateMaintenanceDto {
     format: 'date-time',
     example: '2025-01-01T18:00:00.000Z',
     required: false,
+    nullable: true,
   })
   @IsDateString()
   @IsOptional()
-  endTime?: string;
+  endTime?: string | null;
 
   @ApiProperty({
     description: 'The reason for the maintenance',

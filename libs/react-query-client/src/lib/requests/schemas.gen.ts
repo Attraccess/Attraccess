@@ -1586,6 +1586,11 @@ export const $ResourceMaintenance = {
             type: 'string',
             description: 'When the maintenance was last updated'
         },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource',
+            example: 1
+        },
         startTime: {
             type: 'string',
             description: 'When the maintenance started',
@@ -1604,7 +1609,7 @@ export const $ResourceMaintenance = {
             description: 'The reason for the maintenance'
         }
     },
-    required: ['id', 'createdAt', 'updatedAt', 'startTime']
+    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'startTime']
 } as const;
 
 export const $PaginatedMaintenanceResponse = {
@@ -1643,7 +1648,8 @@ export const $UpdateMaintenanceDto = {
             type: 'string',
             description: 'When the maintenance ends (optional)',
             format: 'date-time',
-            example: '2025-01-01T18:00:00.000Z'
+            example: '2025-01-01T18:00:00.000Z',
+            nullable: true
         },
         reason: {
             type: 'string',

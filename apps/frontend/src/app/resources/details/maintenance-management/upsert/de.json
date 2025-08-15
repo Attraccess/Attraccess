@@ -4,6 +4,9 @@
     "startTime": {
       "label": "Startzeit"
     },
+    "hasEndDate": {
+      "label": "Endzeit bereits bekannt?"
+    },
     "endTime": {
       "label": "Endzeit"
     },

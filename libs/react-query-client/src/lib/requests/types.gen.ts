@@ -1073,6 +1073,10 @@ export type ResourceMaintenance = {
      */
     updatedAt: string;
     /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
      * When the maintenance started
      */
     startTime: string;
@@ -1104,7 +1108,7 @@ export type UpdateMaintenanceDto = {
     /**
      * When the maintenance ends (optional)
      */
-    endTime?: string;
+    endTime?: string | null;
     /**
      * The reason for the maintenance
      */
