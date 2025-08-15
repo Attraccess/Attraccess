@@ -210,7 +210,6 @@ export class ResourceMaintenanceController {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
     if (maintenance.resourceId !== resourceId) {
-      console.log(maintenance.resourceId, resourceId);
       throw new NotFoundException('Maintenance not found');
     }
 
@@ -310,7 +309,6 @@ export class ResourceMaintenanceController {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
     if (maintenance.resourceId !== resourceId) {
-      console.log(maintenance.resourceId, resourceId);
       throw new NotFoundException('Maintenance not found');
     }
 
