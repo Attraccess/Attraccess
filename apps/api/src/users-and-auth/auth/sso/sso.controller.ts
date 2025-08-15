@@ -14,6 +14,7 @@ import {
   UnauthorizedException,
   UseFilters,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthGuard } from '@nestjs/passport';
@@ -199,7 +200,7 @@ export class SSOController {
   @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
   async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
     if (!host || !applicationName) {
-      throw new UnauthorizedException('Missing required parameters');
+      throw new BadRequestException('Missing required parameters');
     }
 
     const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;
@@ -227,7 +228,7 @@ export class SSOController {
   @ApiBadRequestResponse({ description: 'Invalid host or realm' })
   async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
     if (!host || !realm) {
-      throw new UnauthorizedException('Missing required parameters');
+      throw new BadRequestException('Missing required parameters');
     }
 
     const trimmedHost = host.endsWith('/') ? host.slice(0, -1) : host;

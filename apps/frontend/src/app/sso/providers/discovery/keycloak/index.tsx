@@ -21,7 +21,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
   const [realm, setRealm] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t } = useTranslations('oidc.disvoery.keycloak', {
+  const { t } = useTranslations('oidc.discovery.keycloak', {
     de,
     en,
   });
@@ -62,8 +62,6 @@ export function KeycloakDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-
-    setIsDiscovering(false);
   }, [host, realm, toast, t, onDiscovery, onClose]);
 
   return (

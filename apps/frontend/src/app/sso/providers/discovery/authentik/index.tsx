@@ -21,7 +21,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
   const [applicationName, setApplicationName] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t } = useTranslations('oidc.disvoery.authentik', {
+  const { t } = useTranslations('oidc.discovery.authentik', {
     de,
     en,
   });
@@ -62,8 +62,6 @@ export function AuthentikDiscoveryDialog(props: Props) {
     } finally {
       setIsDiscovering(false);
     }
-
-    setIsDiscovering(false);
   }, [host, applicationName, toast, t, onDiscovery, onClose]);
 
   return (
