@@ -74,7 +74,7 @@
       "cache": true,
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"],
       "options": {
-        "command": "AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org ATTRACCESS_FRONTEND_URL=http://localhost:4200 node dist/apps/api-swagger/main.js"
+        "command": "LICENSE_KEY=\"I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md\" AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org ATTRACCESS_FRONTEND_URL=http://localhost:4200 node dist/apps/api-swagger/main.js"
       }
     },
     "test": {
