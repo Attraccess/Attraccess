@@ -6,12 +6,18 @@ import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
 import { useCallback, useMemo, useState } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { NoResourcesFound } from './noResourcesFound';
 
-function getLocalStorageFilterKey(filter: 'onlyInUseByMe' | 'onlyWithPermissions') {
+enum PersistedFilterProps {
+  onlyInUseByMe = 'onlyInUseByMe',
+  onlyWithPermissions = 'onlyWithPermissions',
+  hideEmptyResourceGroups = 'hideEmptyResourceGroups',
+}
+function getLocalStorageFilterKey(filter: PersistedFilterProps) {
   return `resourceOverview.toolbar.filter.${filter}`;
 }
 
-function getValueFromLocalStorage(filter: 'onlyInUseByMe' | 'onlyWithPermissions', defaultValue: boolean) {
+function getValueFromLocalStorage(filter: PersistedFilterProps, defaultValue: boolean) {
   const value = localStorage.getItem(getLocalStorageFilterKey(filter));
   if (value === null) {
     return defaultValue;
@@ -24,22 +30,31 @@ export function ResourceOverview() {
 
   const [searchValue, setSearchValue] = useState('');
   const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    getValueFromLocalStorage('onlyInUseByMe', false)
+    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false)
   );
   const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    getValueFromLocalStorage('onlyWithPermissions', true)
+    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true)
+  );
+  const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
+    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true)
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);
 
   const setFilterByOnlyInUseByMe = useCallback((value: boolean) => {
     setFilterByOnlyInUseByMeState(value);
-    localStorage.setItem(getLocalStorageFilterKey('onlyInUseByMe'), value === true ? 'true' : 'false');
+    localStorage.setItem(
+      getLocalStorageFilterKey(PersistedFilterProps.onlyInUseByMe),
+      value === true ? 'true' : 'false'
+    );
   }, []);
 
   const setFilterByOnlyWithPermissions = useCallback((value: boolean) => {
     setFilterByOnlyWithPermissionsState(value);
-    localStorage.setItem(getLocalStorageFilterKey('onlyWithPermissions'), value === true ? 'true' : 'false');
+    localStorage.setItem(
+      getLocalStorageFilterKey(PersistedFilterProps.onlyWithPermissions),
+      value === true ? 'true' : 'false'
+    );
   }, []);
 
   const groupIds = useMemo(() => {
@@ -68,10 +83,14 @@ export function ResourceOverview() {
         onOnlyInUseByMeChanged={setFilterByOnlyInUseByMe}
         onlyWithPermissions={filterByOnlyWithPermissions}
         onOnlyWithPermissionsChanged={setFilterByOnlyWithPermissions}
+        hideEmptyResourceGroups={filterByHideEmptyResourceGroups}
+        onHideEmptyResourceGroupsChanged={setFilterByHideEmptyResourceGroupsState}
+        highlightSearch={allResources?.data.length === 0}
+        highlightFilter={allResources?.data.length === 0}
       />
 
       <div className="flex flex-row flex-wrap gap-4">
-        {!isLoadingAllResources && allResources?.data.length === 0 && <ResourceGroupCard groupId={'empty'} />}
+        {!isLoadingAllResources && allResources?.data.length === 0 && <NoResourcesFound />}
 
         {groupIds.map((id) => (
           <ResourceGroupCard
@@ -82,6 +101,7 @@ export function ResourceOverview() {
               onlyInUseByMe: filterByOnlyInUseByMe,
               onlyWithPermissions: filterByOnlyWithPermissions,
             }}
+            hideIfEmpty={filterByHideEmptyResourceGroups}
             className="flex flex-1 min-w-[100%] md:min-w-[500px]"
           />
         ))}

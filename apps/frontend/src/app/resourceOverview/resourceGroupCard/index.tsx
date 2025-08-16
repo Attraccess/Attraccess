@@ -38,12 +38,13 @@ import en from './en.json';
 import de from './de.json';
 
 interface Props {
-  groupId: number | 'none' | 'empty';
+  groupId: number | 'none';
   filter?: Pick<FilterProps, 'search' | 'onlyInUseByMe' | 'onlyWithPermissions'>;
+  hideIfEmpty: boolean;
 }
 
 export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'children'>>) {
-  const { groupId, filter, ...cardProps } = props;
+  const { groupId, filter, hideIfEmpty, ...cardProps } = props;
 
   const { t } = useTranslations('resourceGroupCard', { de, en });
   const { hasPermission, user } = useAuth();
@@ -60,22 +61,16 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     }
   );
 
-  const { data: resources, status: fetchStatus } = useResourcesServiceGetAllResources(
-    {
-      groupId: groupId === 'none' ? -1 : (groupId as number),
-      search: debouncedSearchValue?.trim() || undefined,
-      onlyInUseByMe: filter?.onlyInUseByMe,
-      onlyWithPermissions: filter?.onlyWithPermissions,
-      page,
-      limit: perPage,
-    },
-    undefined,
-    {
-      enabled: groupId !== 'empty',
-    }
-  );
+  const { data: resources, status: fetchStatus } = useResourcesServiceGetAllResources({
+    groupId: groupId === 'none' ? -1 : (groupId as number),
+    search: debouncedSearchValue?.trim() || undefined,
+    onlyInUseByMe: filter?.onlyInUseByMe,
+    onlyWithPermissions: filter?.onlyWithPermissions,
+    page,
+    limit: perPage,
+  });
 
-  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(groupId === 'empty' ? 'success' : fetchStatus);
+  const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   const totalPages = useMemo(() => {
     if (!resources?.total) {
@@ -107,20 +102,12 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       return t('ungrouped');
     }
 
-    if (groupId === 'empty') {
-      return t('empty.title');
-    }
-
     return group?.name ?? '';
   }, [groupId, group, t]);
 
   const subtitle = useMemo(() => {
     if (groupId === 'none') {
       return t('ungroupedDescription');
-    }
-
-    if (groupId === 'empty') {
-      return t('empty.description');
     }
 
     return group?.description ?? '';
@@ -130,14 +117,14 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     return groupId === 'none' || fetchStatusGroup === 'success';
   }, [groupId, fetchStatusGroup]);
 
-  if (groupId !== 'empty' && fetchStatus === 'success' && groupIsFetched && resources?.data.length === 0) {
+  if (hideIfEmpty && fetchStatus === 'success' && groupIsFetched && resources?.data.length === 0) {
     return null;
   }
 
   return (
     <Card aria-label={title ?? 'Resource Group Card'} {...cardProps}>
       <CardHeader className="flex flex-row justify-between">
-        {groupId === 'empty' || groupIsFetched ? (
+        {groupIsFetched ? (
           <PageHeader title={title} subtitle={subtitle} noMargin />
         ) : (
           <Skeleton className="w-full h-10" />

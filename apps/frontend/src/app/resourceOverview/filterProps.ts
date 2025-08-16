@@ -5,4 +5,6 @@ export interface FilterProps {
   onOnlyInUseByMeChanged: (value: boolean) => void;
   onlyWithPermissions: boolean;
   onOnlyWithPermissionsChanged: (value: boolean) => void;
+  hideEmptyResourceGroups: boolean;
+  onHideEmptyResourceGroupsChanged: (value: boolean) => void;
 }
