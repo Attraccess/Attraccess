@@ -5,5 +5,11 @@
   "errors": {
     "updateFailed": "Failed to update username",
     "oncePerDay": "Username can only be changed once per day"
+  },
+  "username": {
+    "label": "Username"
+  },
+  "actions": {
+    "save": "Save"
   }
 }

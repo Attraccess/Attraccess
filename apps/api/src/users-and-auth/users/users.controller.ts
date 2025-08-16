@@ -172,7 +172,7 @@ export class UsersController {
     return { message: 'OK' };
   }
 
-  @Post('/:userId/change-password')
+  @Post('/:userId/change-password-by-token')
   @ApiOperation({ summary: 'Change a user password after password reset', operationId: 'changePasswordViaResetToken' })
   @ApiResponse({
     status: 200,
@@ -511,8 +511,8 @@ export class UsersController {
     return result;
   }
 
-  @Post(':id/set-password')
-  @Auth('canManageUsers')
+  @Post(':id/password')
+  @Auth()
   @ApiOperation({ summary: "Set a user's password directly", operationId: 'setUserPassword' })
   @ApiResponse({
     status: 200,
@@ -529,10 +529,6 @@ export class UsersController {
     description: 'Invalid input data.',
   })
   @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage users.',
-  })
-  @ApiResponse({
     status: 404,
     description: 'User not found.',
   })
@@ -544,9 +540,9 @@ export class UsersController {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${request.user.id}`);
 
     // Prevent users from updating their own password through this endpoint
-    if (request.user.id === id) {
-      this.logger.warn(`User ${id} attempted to set their own password through admin endpoint`);
-      throw new ForbiddenException('You cannot set your own password through this endpoint');
+    if (request.user.id !== id && !request.user.systemPermissions.canManageUsers) {
+      this.logger.warn(`User ${id} attempted to change password of another user without permission`);
+      throw new ForbiddenException('You cannot change password of another user without permission');
     }
 
     const user = await this.usersService.findOne({ id });
