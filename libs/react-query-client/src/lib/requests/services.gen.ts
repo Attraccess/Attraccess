@@ -116,7 +116,7 @@ export class UsersService {
     public static changePasswordViaResetToken(data: ChangePasswordViaResetTokenData): CancelablePromise<ChangePasswordViaResetTokenResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/users/{userId}/change-password',
+            url: '/api/users/{userId}/change-password-by-token',
             path: {
                 userId: data.userId
             },
@@ -289,7 +289,7 @@ export class UsersService {
     public static setUserPassword(data: SetUserPasswordData): CancelablePromise<SetUserPasswordResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/users/{id}/set-password',
+            url: '/api/users/{id}/password',
             path: {
                 id: data.id
             },
@@ -298,7 +298,6 @@ export class UsersService {
             errors: {
                 400: 'Invalid input data.',
                 401: 'Unauthorized',
-                403: 'Forbidden - User does not have permission to manage users.',
                 404: 'User not found.'
             }
         });
