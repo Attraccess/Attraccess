@@ -2,12 +2,16 @@
   "title": "E-Mail-Vorlagen",
   "subtitle": "Verwalten Sie die vom System verwendeten E-Mail-Vorlagen.",
   "columns": {
-    "name": "Name",
-    "description": "Beschreibung",
+    "type": "Art",
     "subject": "Betreff",
     "actions": "Aktionen"
   },
   "editButton": "Bearbeiten",
   "noTemplates": "Keine E-Mail-Vorlagen gefunden.",
-  "loading": "E-Mail-Vorlagen werden geladen..."
+  "loading": "E-Mail-Vorlagen werden geladen...",
+  "templateTypes": {
+    "verify-email": "E-Mail Verifizierung",
+    "reset-password": "Passwort Zurücksetzen",
+    "username-changed": "Benutzername geändert"
+  }
 }

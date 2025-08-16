@@ -20,12 +20,12 @@ import {
   Link,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../components/pageHeader';
+import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
 
-import * as enTranslationsFile from './editEmailTemplate.en.json';
-import * as deTranslationsFile from './editEmailTemplate.de.json';
-import { useDebounce } from '../../hooks/useDebounce';
+import * as enTranslationsFile from './en.json';
+import * as deTranslationsFile from './de.json';
+import { useDebounce } from '../../../hooks/useDebounce';
 import { ExpandIcon } from 'lucide-react';
 import { useTheme } from '@heroui/use-theme';
 
