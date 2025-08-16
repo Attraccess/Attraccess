@@ -1,6 +1,7 @@
 {
   "alert": {
     "title": "No resources found",
-    "description": "Adjust your search or the filter-options to find resources"
+    "description": "Adjust your search or the filter-options to find resources",
+    "clear": "Clear filter and search"
   }
 }

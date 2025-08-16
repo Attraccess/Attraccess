@@ -17,7 +17,6 @@ import de from './app.de.json';
 import en from './app.en.json';
 import { ResetPassword } from './reset-password/resetPassword';
 import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
-import { PWAUpdatePrompt } from '../components/PWAUpdatePrompt';
 import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -156,12 +155,7 @@ export function App() {
     metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
   }, [setTheme]);
 
-  return (
-    <AppLayout>
-      <PWAUpdatePrompt />
-      {isInitialized ? <AppContent /> : <BootScreen />}
-    </AppLayout>
-  );
+  return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
 }
 
 export default App;
