@@ -43,6 +43,7 @@
     "reportBug": "Fehler melden",
     "requestFeature": "Funktion vorschlagen",
     "docs": "Dokumentation",
-    "dependencies": "Abhängigkeiten"
+    "dependencies": "Abhängigkeiten",
+    "changelog": "Änderungsprotokoll"
   }
 }

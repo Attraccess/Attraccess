@@ -5,6 +5,7 @@ import {
   ComputerIcon,
   DatabaseIcon,
   FileChartColumnIncreasingIcon,
+  GiftIcon,
   KeyIcon,
   LightbulbIcon,
   LucideProps,
@@ -194,6 +195,11 @@ export const useSidebarEndItems = () => {
       path: '/dependencies',
       icon: PackageIcon,
       translationKey: 'dependencies',
+    },
+    {
+      path: '/changelog',
+      icon: GiftIcon,
+      translationKey: 'changelog',
     },
     {
       path: getBaseUrl() + '/docs',

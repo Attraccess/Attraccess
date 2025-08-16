@@ -14,6 +14,7 @@
 export enum EmailTemplateType {
   VerifyEmail = "verify-email",
   ResetPassword = "reset-password",
+  UsernameChanged = "username-changed",
 }
 
 /** The type of the provider */
@@ -126,6 +127,14 @@ export interface ChangePasswordDto {
    * @example "1234567890"
    */
   token: string;
+}
+
+export interface ChangeUsernameDto {
+  /**
+   * The new username
+   * @example "new_handle"
+   */
+  username: string;
 }
 
 export type UserNotFoundException = object;
@@ -1156,6 +1165,11 @@ export interface ResourceMaintenance {
    */
   updatedAt: string;
   /**
+   * The ID of the resource
+   * @example 1
+   */
+  resourceId: number;
+  /**
    * When the maintenance started
    * @format date-time
    * @example "2025-01-01T00:00:00.000Z"
@@ -1191,7 +1205,7 @@ export interface UpdateMaintenanceDto {
    * @format date-time
    * @example "2025-01-01T18:00:00.000Z"
    */
-  endTime?: string;
+  endTime?: string | null;
   /**
    * The reason for the maintenance
    * @example "Scheduled maintenance for software updates"
@@ -1662,6 +1676,8 @@ export type ChangePasswordViaResetTokenData = any;
 
 export type GetCurrentData = User;
 
+export type ChangeMyUsernameData = User;
+
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
@@ -1695,6 +1711,8 @@ export interface SetUserPasswordData {
   message?: string;
 }
 
+export type ChangeUserUsernameData = User;
+
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
@@ -1726,6 +1744,24 @@ export type UpdateOneSsoProviderData = SSOProvider;
 
 export type DeleteOneSsoProviderData = any;
 
+export interface DiscoverAuthentikOidcParams {
+  /** Authentik host, e.g. http://localhost:9000 */
+  host: string;
+  /** Authentik application slug */
+  applicationName: string;
+}
+
+export type DiscoverAuthentikOidcData = any;
+
+export interface DiscoverKeycloakOidcParams {
+  /** Keycloak host, e.g. http://localhost:8080 */
+  host: string;
+  /** Keycloak realm name */
+  realm: string;
+}
+
+export type DiscoverKeycloakOidcData = any;
+
 export interface LoginWithOidcParams {
   /** The URL to redirect to after login (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication */
   redirectTo?: any;
@@ -1737,7 +1773,6 @@ export type LoginWithOidcData = any;
 
 export interface OidcLoginCallbackParams {
   redirectTo: string;
-  tokenLocation: string;
   code: any;
   iss: any;
   "session-state": any;
@@ -2164,6 +2199,22 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name ChangeMyUsername
+   * @summary Change current user username (limit once per day)
+   * @request PATCH:/api/users/me/username
+   * @secure
+   */
+  export namespace ChangeMyUsername {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ChangeUsernameDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeMyUsernameData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name GetOneUserById
    * @summary Get a user by ID
    * @request GET:/api/users/{id}
@@ -2273,6 +2324,24 @@ export namespace Users {
     export type RequestBody = SetUserPasswordDto;
     export type RequestHeaders = {};
     export type ResponseBody = SetUserPasswordData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ChangeUserUsername
+   * @summary Admin: Change a user's username (no limit)
+   * @request PATCH:/api/users/{id}/username
+   * @secure
+   */
+  export namespace ChangeUserUsername {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ChangeUsernameDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeUserUsernameData;
   }
 }
 
@@ -2430,6 +2499,48 @@ export namespace Authentication {
   }
 
   /**
+   * No description
+   * @tags Authentication
+   * @name DiscoverAuthentikOidc
+   * @summary Proxy Authentik OIDC well-known discovery
+   * @request GET:/api/auth/sso/discovery/authentik
+   * @secure
+   */
+  export namespace DiscoverAuthentikOidc {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** Authentik host, e.g. http://localhost:9000 */
+      host: string;
+      /** Authentik application slug */
+      applicationName: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DiscoverAuthentikOidcData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name DiscoverKeycloakOidc
+   * @summary Proxy Keycloak OIDC well-known discovery
+   * @request GET:/api/auth/sso/discovery/keycloak
+   * @secure
+   */
+  export namespace DiscoverKeycloakOidc {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** Keycloak host, e.g. http://localhost:8080 */
+      host: string;
+      /** Keycloak realm name */
+      realm: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DiscoverKeycloakOidcData;
+  }
+
+  /**
    * @description Login with OIDC and redirect to the callback URL (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
    * @tags Authentication
    * @name LoginWithOidc
@@ -2464,7 +2575,6 @@ export namespace Authentication {
     };
     export type RequestQuery = {
       redirectTo: string;
-      tokenLocation: string;
       code: any;
       iss: any;
       "session-state": any;
@@ -2520,7 +2630,7 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerFindOne {
     export type RequestParams = {
       /** Template type/type */
-      type: "verify-email" | "reset-password";
+      type: "verify-email" | "reset-password" | "username-changed";
     };
     export type RequestQuery = {};
     export type RequestBody = never;
@@ -2539,7 +2649,7 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerUpdate {
     export type RequestParams = {
       /** Template type/type */
-      type: "verify-email" | "reset-password";
+      type: "verify-email" | "reset-password" | "username-changed";
     };
     export type RequestQuery = {};
     export type RequestBody = UpdateEmailTemplateDto;
@@ -4299,6 +4409,26 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name ChangeMyUsername
+     * @summary Change current user username (limit once per day)
+     * @request PATCH:/api/users/me/username
+     * @secure
+     */
+    changeMyUsername: (data: ChangeUsernameDto, params: RequestParams = {}) =>
+      this.request<ChangeMyUsernameData, void>({
+        path: `/api/users/me/username`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name GetOneUserById
      * @summary Get a user by ID
      * @request GET:/api/users/{id}
@@ -4417,6 +4547,30 @@ export class Api<
       this.request<SetUserPasswordData, void>({
         path: `/api/users/${id}/set-password`,
         method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ChangeUserUsername
+     * @summary Admin: Change a user's username (no limit)
+     * @request PATCH:/api/users/{id}/username
+     * @secure
+     */
+    changeUserUsername: (
+      id: number,
+      data: ChangeUsernameDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ChangeUserUsernameData, void>({
+        path: `/api/users/${id}/username`,
+        method: "PATCH",
         body: data,
         secure: true,
         type: ContentType.Json,
@@ -4600,6 +4754,48 @@ export class Api<
       }),
 
     /**
+     * No description
+     *
+     * @tags Authentication
+     * @name DiscoverAuthentikOidc
+     * @summary Proxy Authentik OIDC well-known discovery
+     * @request GET:/api/auth/sso/discovery/authentik
+     * @secure
+     */
+    discoverAuthentikOidc: (
+      query: DiscoverAuthentikOidcParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DiscoverAuthentikOidcData, void>({
+        path: `/api/auth/sso/discovery/authentik`,
+        method: "GET",
+        query: query,
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name DiscoverKeycloakOidc
+     * @summary Proxy Keycloak OIDC well-known discovery
+     * @request GET:/api/auth/sso/discovery/keycloak
+     * @secure
+     */
+    discoverKeycloakOidc: (
+      query: DiscoverKeycloakOidcParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<DiscoverKeycloakOidcData, void>({
+        path: `/api/auth/sso/discovery/keycloak`,
+        method: "GET",
+        query: query,
+        secure: true,
+        ...params,
+      }),
+
+    /**
      * @description Login with OIDC and redirect to the callback URL (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
      *
      * @tags Authentication
@@ -4690,7 +4886,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerFindOne: (
-      type: "verify-email" | "reset-password",
+      type: "verify-email" | "reset-password" | "username-changed",
       params: RequestParams = {},
     ) =>
       this.request<EmailTemplateControllerFindOneData, void>({
@@ -4711,7 +4907,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerUpdate: (
-      type: "verify-email" | "reset-password",
+      type: "verify-email" | "reset-password" | "username-changed",
       data: UpdateEmailTemplateDto,
       params: RequestParams = {},
     ) =>

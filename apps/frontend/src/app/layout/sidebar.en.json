@@ -43,6 +43,7 @@
     "reportBug": "Report a Bug",
     "requestFeature": "Request a Feature",
     "docs": "Documentation",
-    "dependencies": "Dependencies"
+    "dependencies": "Dependencies",
+    "changelog": "Changelog"
   }
 }

@@ -132,16 +132,23 @@
     }
   },
   "release": {
-    "version": { "preVersionCommand": "pnpm nx run-many -t build" },
-    "projects": [
-      "api-client",
-      "database-entities",
-      "plugins-backend-sdk",
-      "plugins-frontend-sdk",
-      "plugins-frontend-ui",
-      "react-query-client",
-      "env"
-    ]
+    "version": {
+      "preVersionCommand": "pnpm nx run-many -t build",
+      "conventionalCommits": true,
+      "git": {
+        "commitMessage": "chore(release): {version} [skip ci]"
+      }
+    },
+    "changelog": {
+      "workspaceChangelog": {
+        "createRelease": "github"
+      },
+      "git": {
+        "commitMessage": "chore(release): {version} [skip ci]"
+      }
+    },
+    "#projects": ["apps/*", "libs/*", "!apps/attractap-firmware", "!apps/attractap-touch-firmware"],
+    "#projectsRelationship": "independent"
   },
   "nxCloudId": "688bc2bf431a85dc91337685"
 }
