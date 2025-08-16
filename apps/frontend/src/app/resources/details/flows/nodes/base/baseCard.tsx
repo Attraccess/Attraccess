@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardHeader, cn, useDisclosure } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, cn, Tooltip, useDisclosure } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Trash2Icon } from 'lucide-react';
@@ -13,8 +13,8 @@ interface Props {
   previewMode?: boolean;
   actions?: React.ReactNode;
   children?: React.ReactNode;
-  hasTarget?: boolean;
-  hasSource?: boolean;
+  inputs?: { id: string; label?: string }[];
+  outputs?: { id: string; label?: string }[];
   data?: {
     forceToolbarVisible?: boolean;
     toolbarPosition?: Position;
@@ -30,17 +30,7 @@ enum ProcessingState {
 }
 
 export function BaseNodeCard(props: Props) {
-  const {
-    showBodyInPreview = false,
-    title,
-    subtitle,
-    previewMode,
-    actions,
-    children,
-    hasTarget,
-    hasSource,
-    data,
-  } = props;
+  const { showBodyInPreview = false, title, subtitle, previewMode, actions, children, inputs, outputs, data } = props;
 
   const { removeNode } = useFlowContext();
   const nodeId = useNodeId();
@@ -115,6 +105,39 @@ export function BaseNodeCard(props: Props) {
 
   const handleMouseEnter = useCallback(() => setIsHovering(true), []);
   const handleMouseLeave = useCallback(() => setIsHovering(false), []);
+  const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
+    const handles = inputs ?? [];
+    return handles.map((handle, index) => {
+      const totalHandles = handles.length;
+      const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
+      return {
+        id: handle.id,
+        label: handle.label,
+        style: {
+          left: `${leftPercentage}%`,
+          top: '-15px',
+          transform: 'translateX(-50%)',
+        },
+      };
+    });
+  }, [inputs]);
+
+  const sourceHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
+    const handles = outputs ?? [];
+    return handles.map((handle, index) => {
+      const totalHandles = handles.length;
+      const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
+      return {
+        id: handle.id,
+        label: handle.label,
+        style: {
+          left: `${leftPercentage}%`,
+          bottom: '-15px',
+          transform: 'translateX(-50%)',
+        },
+      };
+    });
+  }, [outputs]);
 
   return (
     <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
@@ -141,14 +164,33 @@ export function BaseNodeCard(props: Props) {
       </NodeToolbar>
       <Card className={cardClasses}>
         <CardHeader className="flex flex-row justify-between">
-          <PageHeader noMargin title={title} subtitle={previewMode ? subtitle : undefined} />
+          <PageHeader noMargin title={title} subtitle={`${nodeId}: ${previewMode ? subtitle : undefined}`} />
         </CardHeader>
 
         {(!previewMode || showBodyInPreview) && children && <CardBody>{children}</CardBody>}
       </Card>
 
-      {!previewMode && hasTarget && <Handle type="target" position={Position.Top} className="!w-4 !h-4" />}
-      {!previewMode && hasSource && <Handle type="source" position={Position.Bottom} className="!w-4 !h-4" />}
+      {!previewMode &&
+        targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
+          <Tooltip content={label} key={handleId} isDisabled={!label}>
+            <Handle
+              key={handleId}
+              type="target"
+              position={Position.Top}
+              className="!w-4 !h-4"
+              style={style}
+              id={handleId}
+            />
+          </Tooltip>
+        ))}
+      <div style={{ position: 'relative', marginInline: '25px' }}>
+        {!previewMode &&
+          sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
+            <Tooltip content={label} key={handleId} isDisabled={!label}>
+              <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+            </Tooltip>
+          ))}
+      </div>
     </div>
   );
 }

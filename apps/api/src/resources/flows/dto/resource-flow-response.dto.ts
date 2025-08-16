@@ -14,13 +14,13 @@ export class ResourceFlowResponseDto {
     example: [
       {
         id: 'TGVgqDzCKXKVr-XGUD5V3',
-        type: ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED,
+        type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
         position: { x: 100, y: 200 },
         data: {},
       },
       {
         id: 'TGVgqDzCKXKVr-XGUD5V4',
-        type: ResourceFlowNodeType.ACTION_HTTP_SEND_REQUEST,
+        type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST,
         position: { x: 300, y: 200 },
         data: {
           url: 'https://example.com/webhook',

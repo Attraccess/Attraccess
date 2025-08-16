@@ -63,11 +63,11 @@ export function WaitNode(
 
   return (
     <BaseNodeCard
-      title={t('nodes.action.util.wait.title')}
-      subtitle={t('nodes.action.util.wait.description')}
+      title={t('nodes.processing.wait.title')}
+      subtitle={t('nodes.processing.wait.description')}
       previewMode={props.previewMode}
-      hasTarget={true}
-      hasSource={true}
+      inputs={[{ id: 'input' }]}
+      outputs={[{ id: 'output' }]}
       actions={<Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpenEditor} />}
     >
       <Input
@@ -80,8 +80,8 @@ export function WaitNode(
         <ModalContent>
           <ModalHeader>
             <PageHeader
-              title={t('nodes.action.util.wait.title')}
-              subtitle={t('nodes.action.util.wait.description')}
+              title={t('nodes.processing.wait.title')}
+              subtitle={t('nodes.processing.wait.description')}
               noMargin
             />
           </ModalHeader>

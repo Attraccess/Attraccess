@@ -4,11 +4,12 @@ import { AttraccessBaseNode } from './base';
 import { WaitNode } from './wait';
 import { MQTTSendMessageNode } from './mqtt/sendMessage';
 import { HTTPRequestNode } from './http/sendRequest';
+import { IfNode } from './if';
 
 export enum AttraccessNodeType {
   input = 'input',
   output = 'output',
-  inputOutput = 'input-output',
+  processing = 'processing',
 }
 
 export interface AttraccessNode {
@@ -22,19 +23,19 @@ export interface AttraccessNode {
 
 const nodeDefinitions = [
   {
-    key: 'event.resource.usage.started',
+    key: 'input.resource.usage.started',
     type: AttraccessNodeType.input,
   },
   {
-    key: 'event.resource.usage.stopped',
+    key: 'input.resource.usage.stopped',
     type: AttraccessNodeType.input,
   },
   {
-    key: 'event.resource.usage.takeover',
+    key: 'input.resource.usage.takeover',
     type: AttraccessNodeType.input,
   },
   {
-    key: 'action.mqtt.sendMessage',
+    key: 'output.mqtt.sendMessage',
     type: AttraccessNodeType.output,
   },
 ];
@@ -46,8 +47,16 @@ const simpleNodes = Object.fromEntries(
       component: ({ previewMode, resourceId }: { previewMode: boolean; resourceId: number }) => (
         <AttraccessBaseNode
           nodeType={node.key}
-          hasSource={node.type === AttraccessNodeType.input || node.type === AttraccessNodeType.inputOutput}
-          hasTarget={node.type === AttraccessNodeType.output || node.type === AttraccessNodeType.inputOutput}
+          inputs={
+            node.type === AttraccessNodeType.output || node.type === AttraccessNodeType.processing
+              ? [{ id: 'input' }]
+              : []
+          }
+          outputs={
+            node.type === AttraccessNodeType.input || node.type === AttraccessNodeType.processing
+              ? [{ id: 'output' }]
+              : []
+          }
           previewMode={previewMode}
         />
       ),
@@ -58,16 +67,20 @@ const simpleNodes = Object.fromEntries(
 
 export const AttraccessNodes: Record<string, AttraccessNode> = {
   ...simpleNodes,
-  'action.util.wait': {
+  'processing.wait': {
     component: WaitNode,
-    type: AttraccessNodeType.inputOutput,
+    type: AttraccessNodeType.processing,
   },
-  'action.mqtt.sendMessage': {
+  'output.mqtt.sendMessage': {
     component: MQTTSendMessageNode,
     type: AttraccessNodeType.output,
   },
-  'action.http.sendRequest': {
+  'output.http.sendRequest': {
     component: HTTPRequestNode,
     type: AttraccessNodeType.output,
+  },
+  'processing.if': {
+    component: IfNode,
+    type: AttraccessNodeType.processing,
   },
 };

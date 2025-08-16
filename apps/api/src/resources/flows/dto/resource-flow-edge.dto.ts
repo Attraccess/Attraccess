@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class ResourceFlowEdgeDto {
   @ApiProperty({
@@ -19,10 +19,32 @@ export class ResourceFlowEdgeDto {
   source: string;
 
   @ApiProperty({
+    description: 'The source handle id',
+    example: 'output',
+    type: 'string',
+    nullable: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  sourceHandle: string | null;
+
+  @ApiProperty({
     description: 'The target node id',
     example: 'TGVgqDzCKXKVr-XGUD5V4',
     type: 'string',
   })
   @IsString()
   target: string;
+
+  @ApiProperty({
+    description: 'The target handle id',
+    example: 'input',
+    type: 'string',
+    nullable: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  targetHandle: string | null;
 }

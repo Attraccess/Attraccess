@@ -1699,8 +1699,8 @@ export const $ResourceFlowNodeDto = {
         type: {
             type: 'string',
             description: 'The type of the node',
-            example: 'event.resource.usage.started',
-            enum: ['event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover', 'action.http.sendRequest', 'action.mqtt.sendMessage', 'action.util.wait']
+            example: 'input.resource.usage.started',
+            enum: ['input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
         },
         position: {
             description: 'The position of the node',
@@ -1744,10 +1744,22 @@ export const $ResourceFlowEdgeDto = {
             description: 'The source node id',
             example: 'TGVgqDzCKXKVr-XGUD5V3'
         },
+        sourceHandle: {
+            type: 'string',
+            description: 'The source handle id',
+            example: 'output',
+            nullable: true
+        },
         target: {
             type: 'string',
             description: 'The target node id',
             example: 'TGVgqDzCKXKVr-XGUD5V4'
+        },
+        targetHandle: {
+            type: 'string',
+            description: 'The target handle id',
+            example: 'input',
+            nullable: true
         }
     },
     required: ['id', 'source', 'target']
@@ -1793,7 +1805,7 @@ export const $ResourceFlowResponseDto = {
             example: [
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V3',
-                    type: 'event.resource.usage.started',
+                    type: 'input.resource.usage.started',
                     position: {
                         x: 100,
                         y: 200
@@ -1802,7 +1814,7 @@ export const $ResourceFlowResponseDto = {
                 },
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V4',
-                    type: 'action.http.sendRequest',
+                    type: 'output.http.sendRequest',
                     position: {
                         x: 300,
                         y: 200
@@ -1864,7 +1876,7 @@ export const $ResourceFlowSaveDto = {
             example: [
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V3',
-                    type: 'event.resource.usage.started',
+                    type: 'input.resource.usage.started',
                     position: {
                         x: 100,
                         y: 200
@@ -1873,7 +1885,7 @@ export const $ResourceFlowSaveDto = {
                 },
                 {
                     id: 'TGVgqDzCKXKVr-XGUD5V4',
-                    type: 'action.http.sendRequest',
+                    type: 'output.http.sendRequest',
                     position: {
                         x: 300,
                         y: 200

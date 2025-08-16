@@ -1,0 +1,28 @@
+{
+  "editor": {
+    "inputs": {
+      "path": {
+        "label": "Path"
+      },
+      "comparisonOperator": {
+        "label": "Operator",
+        "operators": {
+          "=": "is equal to",
+          "!=": "is not equal to",
+          ">": "is greater than",
+          "<": "is less than"
+        }
+      },
+      "comparisonValue": {
+        "label": "Value"
+      },
+      "comparisonValueIsPath": {
+        "label": "Value is Path"
+      }
+    },
+    "buttons": {
+      "close": "Close",
+      "save": "Save"
+    }
+  }
+}

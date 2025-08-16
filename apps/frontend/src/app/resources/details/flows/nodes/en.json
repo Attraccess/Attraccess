@@ -1,19 +1,5 @@
 {
-  "action": {
-    "http": {
-      "sendRequest": {
-        "title": "Send HTTP request",
-        "description": "This node sends a HTTP request."
-      }
-    },
-    "mqtt": {
-      "sendMessage": {
-        "title": "MQTT message send",
-        "description": "This node sends a MQTT message."
-      }
-    }
-  },
-  "event": {
+  "input": {
     "resource": {
       "usage": {
         "started": {
@@ -28,6 +14,30 @@
           "title": "Resource usage takeover",
           "description": "This node is triggered when a resource is taken over."
         }
+      }
+    }
+  },
+  "processing": {
+    "if": {
+      "title": "If",
+      "description": "If a value matches a comparison operator, the true-output is triggered, otherwise the false-output."
+    },
+    "wait": {
+      "title": "Wait",
+      "description": "This node waits for a certain time."
+    }
+  },
+  "output": {
+    "http": {
+      "sendRequest": {
+        "title": "Send HTTP request",
+        "description": "This node sends a HTTP request."
+      }
+    },
+    "mqtt": {
+      "sendMessage": {
+        "title": "MQTT message send",
+        "description": "This node sends a MQTT message."
       }
     }
   }

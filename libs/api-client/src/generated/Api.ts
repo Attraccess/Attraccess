@@ -15,6 +15,7 @@ export enum EmailTemplateType {
   VerifyEmail = "verify-email",
   ResetPassword = "reset-password",
   UsernameChanged = "username-changed",
+  PasswordChanged = "password-changed",
 }
 
 /** The type of the provider */
@@ -1234,15 +1235,16 @@ export interface ResourceFlowNodeDto {
   id: string;
   /**
    * The type of the node
-   * @example "event.resource.usage.started"
+   * @example "input.resource.usage.started"
    */
   type:
-    | "event.resource.usage.started"
-    | "event.resource.usage.stopped"
-    | "event.resource.usage.takeover"
-    | "action.http.sendRequest"
-    | "action.mqtt.sendMessage"
-    | "action.util.wait";
+    | "input.resource.usage.started"
+    | "input.resource.usage.stopped"
+    | "input.resource.usage.takeover"
+    | "output.http.sendRequest"
+    | "output.mqtt.sendMessage"
+    | "processing.wait"
+    | "processing.if";
   /**
    * The position of the node
    * @example {"x":100,"y":200}
@@ -1267,10 +1269,20 @@ export interface ResourceFlowEdgeDto {
    */
   source: string;
   /**
+   * The source handle id
+   * @example "output"
+   */
+  sourceHandle?: string | null;
+  /**
    * The target node id
    * @example "TGVgqDzCKXKVr-XGUD5V4"
    */
   target: string;
+  /**
+   * The target handle id
+   * @example "input"
+   */
+  targetHandle?: string | null;
 }
 
 export interface ValidationErrorDto {
@@ -1304,7 +1316,7 @@ export interface ValidationErrorDto {
 export interface ResourceFlowResponseDto {
   /**
    * Array of flow nodes defining the workflow steps
-   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"input.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"output.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
    */
   nodes: ResourceFlowNodeDto[];
   /**
@@ -1322,7 +1334,7 @@ export interface ResourceFlowResponseDto {
 export interface ResourceFlowSaveDto {
   /**
    * Array of flow nodes defining the workflow steps
-   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"event.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"action.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
+   * @example [{"id":"TGVgqDzCKXKVr-XGUD5V3","type":"input.resource.usage.started","position":{"x":100,"y":200},"data":{}},{"id":"TGVgqDzCKXKVr-XGUD5V4","type":"output.http.sendRequest","position":{"x":300,"y":200},"data":{"url":"https://example.com/webhook","method":"POST","headers":{"Content-Type":"application/json"},"body":"{\"message\": \"Resource usage started\"}"}}]
    */
   nodes: ResourceFlowNodeDto[];
   /**
@@ -2630,7 +2642,11 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerFindOne {
     export type RequestParams = {
       /** Template type/type */
-      type: "verify-email" | "reset-password" | "username-changed";
+      type:
+        | "verify-email"
+        | "reset-password"
+        | "username-changed"
+        | "password-changed";
     };
     export type RequestQuery = {};
     export type RequestBody = never;
@@ -2649,7 +2665,11 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerUpdate {
     export type RequestParams = {
       /** Template type/type */
-      type: "verify-email" | "reset-password" | "username-changed";
+      type:
+        | "verify-email"
+        | "reset-password"
+        | "username-changed"
+        | "password-changed";
     };
     export type RequestQuery = {};
     export type RequestBody = UpdateEmailTemplateDto;
@@ -4886,7 +4906,11 @@ export class Api<
      * @secure
      */
     emailTemplateControllerFindOne: (
-      type: "verify-email" | "reset-password" | "username-changed",
+      type:
+        | "verify-email"
+        | "reset-password"
+        | "username-changed"
+        | "password-changed",
       params: RequestParams = {},
     ) =>
       this.request<EmailTemplateControllerFindOneData, void>({
@@ -4907,7 +4931,11 @@ export class Api<
      * @secure
      */
     emailTemplateControllerUpdate: (
-      type: "verify-email" | "reset-password" | "username-changed",
+      type:
+        | "verify-email"
+        | "reset-password"
+        | "username-changed"
+        | "password-changed",
       data: UpdateEmailTemplateDto,
       params: RequestParams = {},
     ) =>

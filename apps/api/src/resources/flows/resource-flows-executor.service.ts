@@ -24,12 +24,19 @@ import {
   ResourceFlowActionHttpSendRequestNodeData,
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
+  ResourceFlowActionIfNodeData,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import axios from 'axios';
 import Handlebars from 'handlebars';
+import { get } from 'lodash-es';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
+
+interface NodeProcessingResult {
+  payload: object;
+  outputHandle?: string;
+}
 
 interface UsageEventData {
   resource: {
@@ -140,7 +147,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage started event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {
         event: {
           timestamp: event.startTime.toISOString(),
         },
@@ -172,7 +179,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage takeover event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, {
         event: {
           timestamp: event.takeoverTime.toISOString(),
         },
@@ -209,7 +216,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage ended event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED, {
+      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, {
         event: {
           timestamp: event.endTime.toISOString(),
         },
@@ -257,10 +264,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`
     );
 
-    await this.startFlow(eventNodes, eventData);
+    await this.startFlow(eventNodes, { payload: eventData });
   }
 
-  private async startFlow(node: ResourceFlowNode | ResourceFlowNode[], data: object) {
+  private async startFlow(node: ResourceFlowNode | ResourceFlowNode[], data: NodeProcessingResult) {
     const nodes = Array.isArray(node) ? node : [node];
 
     this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
@@ -294,12 +301,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async processNode(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: object) {
+  private async processNode(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: NodeProcessingResult) {
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
     const startTime = Date.now();
 
-    let responseOfNode: object = {};
+    let responseOfNode: NodeProcessingResult = { payload: {} };
 
     try {
       // Log the start of node processing
@@ -308,26 +315,32 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
-        payload: JSON.stringify({ input: resultOfPreviousNode }),
+        payload: JSON.stringify({ input: resultOfPreviousNode.payload }),
       });
 
       switch (node.type) {
-        case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED:
-        case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED:
-        case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER:
-          responseOfNode = resultOfPreviousNode;
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+          responseOfNode = {
+            payload: resultOfPreviousNode.payload,
+          };
           break;
 
-        case ResourceFlowNodeType.ACTION_WAIT:
-          responseOfNode = await this.processWaitNode(node, resultOfPreviousNode);
+        case ResourceFlowNodeType.PROCESSING_WAIT:
+          responseOfNode = await this.processWaitNode(node, resultOfPreviousNode.payload);
           break;
 
-        case ResourceFlowNodeType.ACTION_HTTP_SEND_REQUEST:
-          responseOfNode = await this.processHttpSendRequestNode(node, resultOfPreviousNode);
+        case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+          responseOfNode = await this.processHttpSendRequestNode(node, resultOfPreviousNode.payload);
           break;
 
-        case ResourceFlowNodeType.ACTION_MQTT_SEND_MESSAGE:
-          responseOfNode = await this.processMqttSendMessageNode(node, resultOfPreviousNode);
+        case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+          responseOfNode = await this.processMqttSendMessageNode(node, resultOfPreviousNode.payload);
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_IF:
+          responseOfNode = await this.processIfNode(node, resultOfPreviousNode.payload);
           break;
 
         default: {
@@ -350,7 +363,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
-        payload: JSON.stringify({ output: responseOfNode }),
+        payload: JSON.stringify({ output: responseOfNode.payload }),
       });
 
       await this.executeNextNodes(flowRunId, node, responseOfNode);
@@ -371,12 +384,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  private async executeNextNodes(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: object) {
+  private async executeNextNodes(
+    flowRunId: string,
+    node: ResourceFlowNode,
+    resultOfPreviousNode: NodeProcessingResult
+  ) {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
     const edgesFromThisNode = await this.flowEdgeRepository.find({
       where: {
         source: node.id,
+        sourceHandle: resultOfPreviousNode.outputHandle,
       },
     });
 
@@ -408,7 +426,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     await Promise.all(edgePromises);
   }
 
-  private async processWaitNode(node: ResourceFlowNode, input: object) {
+  private async processWaitNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
     const { duration, unit } = node.data as ResourceFlowActionUtilWaitNodeData;
 
     let waitDurationMs = duration * 1000;
@@ -420,10 +438,62 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     await new Promise((resolve) => setTimeout(resolve, waitDurationMs));
 
-    return input;
+    return { payload: input };
   }
 
-  private async processHttpSendRequestNode(node: ResourceFlowNode, input: object) {
+  private async processIfNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const {
+      path,
+      comparisonOperator,
+      comparisonValue: comparisonValueTemplate,
+      comparisonValueIsPath,
+    } = node.data as ResourceFlowActionIfNodeData;
+
+    const sourceValue = get(input, path, '');
+    let comparisonValue = comparisonValueTemplate;
+
+    if (comparisonValueIsPath) {
+      comparisonValue = get(input, comparisonValue, '');
+    }
+
+    console.log('path', path);
+    console.log('comparisonValue', comparisonValue);
+    console.log('comparisonOperator', comparisonOperator);
+    console.log('comparisonValueIsPath', comparisonValueIsPath);
+    console.log('sourceValue', sourceValue);
+    console.log('input', input);
+
+    let result = false;
+    switch (comparisonOperator) {
+      case '=':
+        result = String(comparisonValue) === String(sourceValue);
+        break;
+      case '!=':
+        result = String(comparisonValue) !== String(sourceValue);
+        break;
+      case '>':
+        result = Number(comparisonValue) > Number(sourceValue);
+        break;
+      case '<':
+        result = Number(comparisonValue) < Number(sourceValue);
+        break;
+      case '>=':
+        result = Number(comparisonValue) >= Number(sourceValue);
+        break;
+      case '<=':
+        result = Number(comparisonValue) <= Number(sourceValue);
+        break;
+      default:
+        throw new Error(`Unknown comparison operator: ${comparisonOperator}`);
+    }
+
+    return {
+      payload: input,
+      outputHandle: result ? 'output-true' : 'output-false',
+    };
+  }
+
+  private async processHttpSendRequestNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
     const data = node.data as ResourceFlowActionHttpSendRequestNodeData;
 
     const url = this.compileTemplate(data.url ?? '', input);
@@ -440,10 +510,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       data: body,
     });
 
-    return response.data;
+    return {
+      payload: response.data,
+    };
   }
 
-  private async processMqttSendMessageNode(node: ResourceFlowNode, input: object) {
+  private async processMqttSendMessageNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
     const { serverId, ...data } = node.data as ResourceFlowActionMqttSendMessageNodeData;
 
     const topic = this.compileTemplate(data.topic ?? '', input);
@@ -451,7 +523,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     await this.mqttClientService.publish(serverId, topic, payload);
 
-    return input;
+    return {
+      payload: input,
+    };
   }
 
   private compileTemplate(template: string, data: object): string {

@@ -18,12 +18,26 @@ export class ResourceFlowEdge {
   })
   source!: string;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'The source handle id',
+    example: 'TGVgqDzCKXKVr-XGUD5V3',
+  })
+  sourceHandle!: string | null;
+
   @Column({ type: 'text' })
   @ApiProperty({
     description: 'The target node id',
     example: 'TGVgqDzCKXKVr-XGUD5V3',
   })
   target!: string;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'The target handle id',
+    example: 'TGVgqDzCKXKVr-XGUD5V3',
+  })
+  targetHandle!: string | null;
 
   @CreateDateColumn()
   @ApiProperty({

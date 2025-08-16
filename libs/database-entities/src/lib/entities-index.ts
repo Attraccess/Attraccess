@@ -30,6 +30,7 @@ import {
   ResourceFlowActionHttpSendRequestNodeData,
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
+  ResourceFlowActionIfNodeData,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -74,6 +75,7 @@ export {
   ResourceFlowActionUtilWaitNodeData,
   AttractapFirmwareVersion,
   ResourceMaintenance,
+  ResourceFlowActionIfNodeData,
 };
 
 // Export the entities object

@@ -6,8 +6,8 @@ import { BaseNodeCard } from './baseCard';
 
 interface Props {
   nodeType: string;
-  hasTarget?: boolean;
-  hasSource?: boolean;
+  inputs?: { id: string; label?: string }[];
+  outputs?: { id: string; label?: string }[];
   previewMode?: boolean;
 }
 
@@ -26,8 +26,8 @@ export function AttraccessBaseNode(props: Props) {
       title={t('nodes.' + props.nodeType + '.title')}
       subtitle={props.previewMode ? t('nodes.' + props.nodeType + '.description') : undefined}
       previewMode={props.previewMode}
-      hasTarget={props.hasTarget}
-      hasSource={props.hasSource}
+      inputs={props.inputs}
+      outputs={props.outputs}
     />
   );
 }

@@ -143,7 +143,9 @@ export class ResourceFlowsService {
         const edge = new ResourceFlowEdge();
         edge.id = edgeData.id;
         edge.source = edgeData.source;
+        edge.sourceHandle = edgeData.sourceHandle;
         edge.target = edgeData.target;
+        edge.targetHandle = edgeData.targetHandle;
         edge.resource = resource;
         return edge;
       });

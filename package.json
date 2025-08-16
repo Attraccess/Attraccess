@@ -72,6 +72,7 @@
     "identity-obj-proxy": "^3.0.0",
     "jdenticon": "^3.3.0",
     "js-confetti": "^0.12.0",
+    "lodash-es": "^4.17.21",
     "lucide-react": "^0.475.0",
     "mjml": "^4.15.3",
     "mjml-react": "^2.0.8",

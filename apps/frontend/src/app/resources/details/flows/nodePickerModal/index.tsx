@@ -63,7 +63,7 @@ export function NodePickerModal(props: Props) {
     const groups: NodeGroup[] = [
       { type: AttraccessNodeType.input, nodes: [] },
       { type: AttraccessNodeType.output, nodes: [] },
-      { type: AttraccessNodeType.inputOutput, nodes: [] },
+      { type: AttraccessNodeType.processing, nodes: [] },
     ];
 
     // Group nodes by type

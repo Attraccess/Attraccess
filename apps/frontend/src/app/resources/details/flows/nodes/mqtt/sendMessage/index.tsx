@@ -95,11 +95,11 @@ export function MQTTSendMessageNode(
 
   return (
     <BaseNodeCard
-      title={t('nodes.action.mqtt.sendMessage.title')}
-      subtitle={t('nodes.action.mqtt.sendMessage.description')}
+      title={t('nodes.output.mqtt.sendMessage.title')}
+      subtitle={t('nodes.output.mqtt.sendMessage.description')}
       previewMode={props.previewMode}
-      hasTarget={true}
-      hasSource={false}
+      inputs={[{ id: 'input' }]}
+      outputs={[{ id: 'output' }]}
       actions={<Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpenEditor} />}
     >
       <div className="flex flex-col gap-2">
@@ -114,8 +114,8 @@ export function MQTTSendMessageNode(
         <ModalContent>
           <ModalHeader>
             <PageHeader
-              title={t('nodes.action.mqtt.sendMessage.title')}
-              subtitle={t('nodes.action.mqtt.sendMessage.description')}
+              title={t('nodes.output.mqtt.sendMessage.title')}
+              subtitle={t('nodes.output.mqtt.sendMessage.description')}
               noMargin
             />
           </ModalHeader>

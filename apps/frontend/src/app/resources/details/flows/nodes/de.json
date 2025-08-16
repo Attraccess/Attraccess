@@ -1,25 +1,5 @@
 {
-  "action": {
-    "http": {
-      "sendRequest": {
-        "title": "HTTP-Anfrage senden",
-        "description": "Sendet eine HTTP-Anfrage."
-      }
-    },
-    "mqtt": {
-      "sendMessage": {
-        "title": "MQTT-Nachricht senden",
-        "description": "Sendet eine MQTT-Nachricht."
-      }
-    },
-    "util": {
-      "wait": {
-        "title": "Warten",
-        "description": "Wartet eine bestimmte Zeit."
-      }
-    }
-  },
-  "event": {
+  "input": {
     "resource": {
       "usage": {
         "started": {
@@ -34,6 +14,38 @@
           "title": "Ressource wurde übernommen",
           "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird."
         }
+      }
+    }
+  },
+  "processing": {
+    "wait": {
+      "title": "Warten",
+      "description": "Wartet eine bestimmte Zeit."
+    },
+    "if": {
+      "title": "Wenn",
+      "description": "Wenn ein Wert einem Vergleichsoperator entspricht, wird der true-Output ausgelöst, ansonsten der false-Output.",
+      "outputs": {
+        "output-true": {
+          "label": "Wahr"
+        },
+        "output-false": {
+          "label": "Falsch"
+        }
+      }
+    }
+  },
+  "output": {
+    "http": {
+      "sendRequest": {
+        "title": "HTTP-Anfrage senden",
+        "description": "Sendet eine HTTP-Anfrage."
+      }
+    },
+    "mqtt": {
+      "sendMessage": {
+        "title": "MQTT-Nachricht senden",
+        "description": "Sendet eine MQTT-Nachricht."
       }
     }
   }

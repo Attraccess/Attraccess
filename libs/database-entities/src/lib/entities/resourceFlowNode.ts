@@ -4,12 +4,13 @@ import { z } from 'zod';
 import { Resource } from './resource.entity';
 
 export enum ResourceFlowNodeType {
-  EVENT_RESOURCE_USAGE_STARTED = 'event.resource.usage.started',
-  EVENT_RESOURCE_USAGE_STOPPED = 'event.resource.usage.stopped',
-  EVENT_RESOURCE_USAGE_TAKEOVER = 'event.resource.usage.takeover',
-  ACTION_HTTP_SEND_REQUEST = 'action.http.sendRequest',
-  ACTION_MQTT_SEND_MESSAGE = 'action.mqtt.sendMessage',
-  ACTION_WAIT = 'action.util.wait',
+  INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
+  INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
+  INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
+  OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
+  OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+  PROCESSING_WAIT = 'processing.wait',
+  PROCESSING_IF = 'processing.if',
 }
 
 // Zod schemas for node data validation
@@ -37,19 +38,30 @@ export const WaitNodeDataSchema = z.object({
   }),
 });
 
+export const IfNodeDataSchema = z.object({
+  path: z.string().min(1, 'Path is required'),
+  comparisonOperator: z.enum(['=', '!=', '>', '<', '>=', '<='], {
+    errorMap: () => ({ message: 'Comparison operator must be one of: =, !=, >, <, >=, <=' }),
+  }),
+  comparisonValueIsPath: z.boolean().default(false),
+  comparisonValue: z.string().min(1, 'Comparison value is required'),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
   switch (nodeType) {
-    case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED:
-    case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STOPPED:
-    case ResourceFlowNodeType.EVENT_RESOURCE_USAGE_TAKEOVER:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
       return EventNodeDataSchema;
-    case ResourceFlowNodeType.ACTION_HTTP_SEND_REQUEST:
+    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
-    case ResourceFlowNodeType.ACTION_MQTT_SEND_MESSAGE:
+    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
       return MqttSendMessageNodeDataSchema;
-    case ResourceFlowNodeType.ACTION_WAIT:
+    case ResourceFlowNodeType.PROCESSING_WAIT:
       return WaitNodeDataSchema;
+    case ResourceFlowNodeType.PROCESSING_IF:
+      return IfNodeDataSchema;
     default:
       throw new Error(`Unknown node type: ${nodeType}`);
   }
@@ -60,12 +72,14 @@ export type ResourceFlowEventNodeData = z.infer<typeof EventNodeDataSchema>;
 export type ResourceFlowActionHttpSendRequestNodeData = z.infer<typeof HttpRequestNodeDataSchema>;
 export type ResourceFlowActionMqttSendMessageNodeData = z.infer<typeof MqttSendMessageNodeDataSchema>;
 export type ResourceFlowActionUtilWaitNodeData = z.infer<typeof WaitNodeDataSchema>;
+export type ResourceFlowActionIfNodeData = z.infer<typeof IfNodeDataSchema>;
 
 export type ResourceFlowNodeData =
   | ResourceFlowEventNodeData
   | ResourceFlowActionHttpSendRequestNodeData
   | ResourceFlowActionMqttSendMessageNodeData
-  | ResourceFlowActionUtilWaitNodeData;
+  | ResourceFlowActionUtilWaitNodeData
+  | ResourceFlowActionIfNodeData;
 
 export class ResourceFlowNodePosition {
   @Column({ type: 'integer' })
@@ -98,7 +112,7 @@ export class ResourceFlowNode {
   })
   @ApiProperty({
     description: 'The type of the node',
-    example: ResourceFlowNodeType.EVENT_RESOURCE_USAGE_STARTED,
+    example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
   })
   type!: ResourceFlowNodeType;
 

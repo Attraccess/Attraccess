@@ -119,11 +119,11 @@ export function HTTPRequestNode(
 
   return (
     <BaseNodeCard
-      title={t('nodes.action.http.sendRequest.title')}
-      subtitle={t('nodes.action.http.sendRequest.description')}
+      title={t('nodes.output.http.sendRequest.title')}
+      subtitle={t('nodes.output.http.sendRequest.description')}
       previewMode={props.previewMode}
-      hasTarget={true}
-      hasSource={false}
+      inputs={[{ id: 'input' }]}
+      outputs={[{ id: 'output' }]}
       actions={<Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpenEditor} />}
     >
       <div className="flex flex-col gap-2">
@@ -140,8 +140,8 @@ export function HTTPRequestNode(
         <ModalContent>
           <ModalHeader>
             <PageHeader
-              title={t('nodes.action.http.sendRequest.title')}
-              subtitle={t('nodes.action.http.sendRequest.description')}
+              title={t('nodes.output.http.sendRequest.title')}
+              subtitle={t('nodes.output.http.sendRequest.description')}
               noMargin
             />
           </ModalHeader>
