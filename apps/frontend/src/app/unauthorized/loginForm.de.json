@@ -11,5 +11,6 @@
   "error": {
     "title": "Hoppla! Kleines Anmeldeproblem",
     "generic": "Bitte überprüfe deine Anmeldedaten und versuche es erneut"
-  }
+  },
+  "signingIn": "Anmelden..."
 }
