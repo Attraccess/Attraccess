@@ -1,73 +1,38 @@
 import { PageHeader } from '../../components/pageHeader';
-import { Card, CardBody, Button, Input } from '@heroui/react';
-import {
-  useUsersServiceChangeMyUsername,
-  useUsersServiceGetCurrent,
-  useUsersServiceGetCurrentKey,
-  ApiError,
-} from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
-import { useToastMessage } from '../../components/toastProvider';
+import { Card, CardBody, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import * as en from './en.json';
+import * as de from './de.json';
+import { UsernameForm } from './username';
+import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function AccountPage() {
   const { t } = useTranslations('account', { en, de });
-  const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
-  const [username, setUsername] = useState('');
-  const queryClient = useQueryClient();
-  const { success: showSuccess, error: showError } = useToastMessage();
 
-  useEffect(() => {
-    if (me?.username) setUsername(me.username);
-  }, [me?.username]);
-
-  const { mutate, isPending } = useUsersServiceChangeMyUsername({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
-      });
-      showSuccess({ title: t('messages.updated') });
-    },
-    onError: (rawError) => {
-      let messageToDisplay = t('errors.updateFailed');
-      if (rawError instanceof ApiError) {
-        const body = rawError.body as { message?: string | string[] } | undefined;
-        const msg = Array.isArray(body?.message) ? body?.message[0] : body?.message;
-        if (typeof msg === 'string' && msg.trim().length > 0) {
-          const lower = msg.toLowerCase();
-          if (lower.includes('once per day')) {
-            messageToDisplay = t('errors.oncePerDay');
-          } else {
-            messageToDisplay = msg;
-          }
-        }
-      } else if (rawError instanceof Error && rawError.message) {
-        messageToDisplay = rawError.message;
-      }
-      showError({ title: messageToDisplay });
-    },
-  });
-
-  const onSubmit = useCallback(() => {
-    mutate({
-      requestBody: { username },
-    });
-  }, [mutate, username]);
+  const { user: me } = useAuth();
 
   return (
     <div>
-      <PageHeader title="Account" backTo="/" />
-      <Card className="max-w-md">
-        <CardBody className="flex gap-2">
-          <Input label="Username" value={username} onValueChange={setUsername} isDisabled={isLoadingMe} />
-          <Button isLoading={isPending} onPress={onSubmit} color="primary">
-            Save
-          </Button>
-        </CardBody>
-      </Card>
+      <PageHeader title={t('title')} backTo="/" />
+
+      <div className="flex flex-row flex-wrap gap-4">
+        <Card className="max-w-md">
+          <CardHeader>
+            <PageHeader title={t('sections.profile')} noMargin />
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2">
+            <UsernameForm />
+          </CardBody>
+        </Card>
+
+        <Card className="max-w-md">
+          <CardHeader>
+            <PageHeader title={t('sections.security')} noMargin />
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2">{me && <SetPasswordForm userId={me.id} />} </CardBody>
+        </Card>
+      </div>
     </div>
   );
 }

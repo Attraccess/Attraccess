@@ -12,8 +12,8 @@ import { AttractapList } from '../attractap/AttractapList';
 import { NfcCardList } from '../attractap/NfcCardList';
 import { CsvExport } from '../csv-export/csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
-import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage'; // Placeholder - to be created
-import { EditEmailTemplatePage } from '../email-templates/EditEmailTemplatePage'; // Placeholder - to be created
+import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
+import { EditEmailTemplatePage } from '../email-templates/edit';
 import { ResourceGroupEditPage } from '../resource-groups';
 import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';

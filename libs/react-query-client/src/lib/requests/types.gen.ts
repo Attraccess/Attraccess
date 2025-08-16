@@ -2466,7 +2466,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/users/{userId}/change-password': {
+    '/api/users/{userId}/change-password-by-token': {
         post: {
             req: ChangePasswordViaResetTokenData;
             res: {
@@ -2627,7 +2627,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/users/{id}/set-password': {
+    '/api/users/{id}/password': {
         post: {
             req: SetUserPasswordData;
             res: {
@@ -2645,10 +2645,6 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
-                /**
-                 * Forbidden - User does not have permission to manage users.
-                 */
-                403: unknown;
                 /**
                  * User not found.
                  */

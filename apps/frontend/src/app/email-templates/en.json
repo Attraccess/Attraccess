@@ -2,12 +2,16 @@
   "title": "Email Templates",
   "subtitle": "Manage the email templates used by the system.",
   "columns": {
-    "name": "Name",
-    "description": "Description",
+    "type": "Type",
     "subject": "Subject",
     "actions": "Actions"
   },
   "editButton": "Edit",
   "noTemplates": "No email templates found.",
-  "loading": "Loading email templates..."
+  "loading": "Loading email templates...",
+  "templateTypes": {
+    "verify-email": "Email Verification",
+    "reset-password": "Password Reset",
+    "username-changed": "Username Changed"
+  }
 }
