@@ -26,13 +26,6 @@ import { AxiosError } from 'axios';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useNavigate } from 'react-router-dom';
 
-interface ResourceGroupUpsertModalProps {
-  children: (onOpen: () => void) => React.ReactNode;
-  /** If provided, the modal will be in edit mode */
-  resourceGroup?: ResourceGroup;
-  onUpserted?: (resourceGroup: ResourceGroup) => void;
-}
-
 type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
 
 // Define a more specific type for the expected error structure from the API
@@ -43,7 +36,14 @@ interface ApiValidationError {
   message?: string; // General error message field
 }
 
-export function ResourceGroupUpsertModal(props: Readonly<ResourceGroupUpsertModalProps>) {
+interface Props {
+  children: (onOpen: () => void) => React.ReactNode;
+  /** If provided, the modal will be in edit mode */
+  resourceGroup?: ResourceGroup;
+  onUpserted?: (resourceGroup: ResourceGroup) => void;
+}
+
+export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { isOpen, onOpen, onOpenChange, onClose: closeDisclosure } = useDisclosure();
   const { t } = useTranslations('resourceGroupUpsertModal', {
     en,

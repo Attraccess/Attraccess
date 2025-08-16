@@ -34,6 +34,12 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
             >
               {t('drawer.options.onlyWithPermissions')}
             </Switch>
+            <Switch
+              isSelected={filterProps.hideEmptyResourceGroups}
+              onValueChange={filterProps.onHideEmptyResourceGroupsChanged}
+            >
+              {t('drawer.options.hideEmptyResourceGroups')}
+            </Switch>
           </DrawerBody>
         </DrawerContent>
       </Drawer>

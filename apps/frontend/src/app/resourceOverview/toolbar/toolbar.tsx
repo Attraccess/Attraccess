@@ -6,18 +6,25 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
 import { useNavigate } from 'react-router-dom';
-
 import * as en from './toolbar.en.json';
 import * as de from './toolbar.de.json';
 import { ResourceScanner } from './scanner';
 import { ResourceFilter } from './filter';
 import { FilterProps } from '../filterProps';
+import { cn } from '@heroui/react';
 
 interface ToolbarProps {
   searchIsLoading?: boolean;
+  highlightSearch?: boolean;
+  highlightFilter?: boolean;
 }
 
-export function Toolbar({ searchIsLoading, ...filterProps }: Readonly<ToolbarProps & FilterProps>) {
+export function Toolbar({
+  searchIsLoading,
+  highlightSearch,
+  highlightFilter,
+  ...filterProps
+}: Readonly<ToolbarProps & FilterProps>) {
   const { hasPermission } = useAuth();
   const canManageResources = hasPermission('canManageResources');
   const navigate = useNavigate();
@@ -36,7 +43,8 @@ export function Toolbar({ searchIsLoading, ...filterProps }: Readonly<ToolbarPro
             value={filterProps.search}
             onChange={(e) => filterProps.onSearchChanged(e.target.value)}
             placeholder={t('searchPlaceholder')}
-            className={` ${searchIsLoading ? 'animate-pulse' : ''}`}
+            className={cn((searchIsLoading || highlightSearch) && 'animate-pulse')}
+            color={highlightSearch ? 'danger' : undefined}
             startContent={
               <>
                 <ResourceFilter
@@ -44,13 +52,16 @@ export function Toolbar({ searchIsLoading, ...filterProps }: Readonly<ToolbarPro
                   onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
                   onlyWithPermissions={filterProps.onlyWithPermissions}
                   onOnlyWithPermissionsChanged={filterProps.onOnlyWithPermissionsChanged}
+                  hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
+                  onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
                 >
                   {({ onOpen }) => (
                     <Button
                       size="sm"
                       variant="light"
-                      startContent={<ListFilterIcon size={18} />}
+                      startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
                       isIconOnly
+                      color={highlightFilter ? 'danger' : undefined}
                       onPress={onOpen}
                     />
                   )}
@@ -76,7 +87,7 @@ export function Toolbar({ searchIsLoading, ...filterProps }: Readonly<ToolbarPro
       <div className="flex flex-row gap-2 justify-end mb-6">
         {canManageResources && (
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
-            <ResourceGroupUpsertModal>
+            <ResourceGroupUpsertModal onUpserted={(resourceGroup) => navigate(`/resource-groups/${resourceGroup.id}`)}>
               {(onOpen: () => void) => (
                 <Button
                   radius="full"

@@ -3,7 +3,8 @@
     "title": "Filter",
     "options": {
       "onlyInUseByMe": "is in use by me",
-      "onlyWithPermissions": "I am already introduced / authorized"
+      "onlyWithPermissions": "I am already introduced / authorized",
+      "hideEmptyResourceGroups": "Hide empty resource groups"
     }
   }
 }

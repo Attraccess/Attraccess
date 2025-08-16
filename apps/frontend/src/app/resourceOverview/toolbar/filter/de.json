@@ -3,7 +3,8 @@
     "title": "Filtere Ressourcen",
     "options": {
       "onlyInUseByMe": "ist in Verwendung durch mich",
-      "onlyWithPermissions": "ich bin bereits Eingewiesen / Berechtigt"
+      "onlyWithPermissions": "ich bin bereits Eingewiesen / Berechtigt",
+      "hideEmptyResourceGroups": "leere Ressourcengruppen ausblenden"
     }
   }
 }

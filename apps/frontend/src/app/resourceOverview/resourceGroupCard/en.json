@@ -5,9 +5,5 @@
     "image": "Image",
     "name": "Name",
     "status": "Status"
-  },
-  "empty": {
-    "title": "No resources found",
-    "description": "Adjust your search to find resources"
   }
 }
