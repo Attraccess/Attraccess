@@ -44,6 +44,6 @@
     "requestFeature": "Funktion vorschlagen",
     "docs": "Dokumentation",
     "dependencies": "Abhängigkeiten",
-    "changelog": "Changelog"
+    "changelog": "Änderungsprotokoll"
   }
 }
