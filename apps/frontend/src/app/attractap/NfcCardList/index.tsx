@@ -15,6 +15,7 @@ import {
   ModalContent,
   Alert,
   Card,
+  cn,
 } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -33,6 +34,9 @@ import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/use
 
 import de from './de.json';
 import en from './en.json';
+import { NfcCardDeactivateModal } from './deactivate';
+import { NfcCardActivateModal } from './activate';
+import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
 
 interface DeleteModalProps {
   show: boolean;
@@ -109,10 +113,48 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 
   if (props.header === 'actions') {
     return (
-      <div>
-        <Button onPress={() => props.onDeleteClick()} data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}>
+      <div className="flex gap-2 flex-row flex-wrap">
+        <Button
+          variant="light"
+          color="danger"
+          size="sm"
+          startContent={<Trash2Icon />}
+          onPress={() => props.onDeleteClick()}
+          data-cy={`nfc-card-table-cell-delete-button-${props.card.id}`}
+        >
           {t('nfcCardsTable.actions.delete')}
         </Button>
+        {props.card.isActive ? (
+          <NfcCardDeactivateModal cardId={props.card.id}>
+            {(onOpen) => (
+              <Button
+                size="sm"
+                startContent={<XIcon />}
+                variant="light"
+                color="warning"
+                onPress={onOpen}
+                data-cy={`nfc-card-table-cell-deactivate-button-${props.card.id}`}
+              >
+                {t('nfcCardsTable.actions.deactivate')}
+              </Button>
+            )}
+          </NfcCardDeactivateModal>
+        ) : (
+          <NfcCardActivateModal cardId={props.card.id}>
+            {(onOpen) => (
+              <Button
+                size="sm"
+                startContent={<CheckIcon />}
+                variant="light"
+                color="success"
+                onPress={onOpen}
+                data-cy={`nfc-card-table-cell-activate-button-${props.card.id}`}
+              >
+                {t('nfcCardsTable.actions.activate')}
+              </Button>
+            )}
+          </NfcCardActivateModal>
+        )}
       </div>
     );
   }
@@ -258,7 +300,10 @@ export function NfcCardList() {
               emptyContent={<EmptyState />}
             >
               {(card) => (
-                <TableRow key={card.id}>
+                <TableRow
+                  key={card.id}
+                  className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
+                >
                   {headers.map((header) => (
                     <TableCell key={header}>
                       <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />

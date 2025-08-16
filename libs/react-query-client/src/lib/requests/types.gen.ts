@@ -1494,6 +1494,14 @@ export type NFCCard = {
      * The date and time the NFC card was last seen
      */
     lastSeen: string;
+    /**
+     * Whether the NFC card is active
+     */
+    isActive: boolean;
+};
+
+export type NfcCardSetActiveStateDto = {
+    [key: string]: unknown;
 };
 
 export type AttractapFirmware = {
@@ -2374,6 +2382,13 @@ export type GetAppKeyByUidData = {
 export type GetAppKeyByUidResponse = AppKeyResponseDto;
 
 export type GetAllCardsResponse = Array<NFCCard>;
+
+export type ToggleCardActiveData = {
+    id: number;
+    requestBody: NfcCardSetActiveStateDto;
+};
+
+export type ToggleCardActiveResponse = NFCCard;
 
 export type GetFirmwaresResponse = Array<AttractapFirmware>;
 
@@ -4037,6 +4052,21 @@ export type $OpenApiTs = {
                  * The list of all cards
                  */
                 200: Array<NFCCard>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/attractap/cards/{id}/active': {
+        patch: {
+            req: ToggleCardActiveData;
+            res: {
+                /**
+                 * The updated NFC card
+                 */
+                200: NFCCard;
                 /**
                  * Unauthorized
                  */
