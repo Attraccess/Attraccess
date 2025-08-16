@@ -61,8 +61,6 @@ export class AuthService {
       .execute();
   }
 
-
-
   private async getAuthenticationDetail(
     authenticationType: AuthenticationType,
     userId: number
@@ -151,8 +149,6 @@ export class AuthService {
     return user;
   }
 
-
-
   async generateEmailVerificationToken(user: User): Promise<string> {
     const token = nanoid();
 
@@ -213,5 +209,8 @@ export class AuthService {
 
     authenticationDetail.password = await this.hashPassword(password);
     await this.authenticationDetailRepository.save(authenticationDetail);
+
+    // Notify user about password change
+    await this.emailService.sendPasswordChangedEmail(user);
   }
 }

@@ -119,6 +119,11 @@ export class EmailService {
       },
     };
 
-    await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED as EmailTemplateType, context);
+    await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED, context);
+  }
+
+  async sendPasswordChangedEmail(user: User) {
+    const context = this.getBaseContext(user);
+    await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
   }
 }

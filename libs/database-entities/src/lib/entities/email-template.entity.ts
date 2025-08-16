@@ -6,6 +6,7 @@ export enum EmailTemplateType {
   VERIFY_EMAIL = 'verify-email',
   RESET_PASSWORD = 'reset-password',
   USERNAME_CHANGED = 'username-changed',
+  PASSWORD_CHANGED = 'password-changed',
 }
 
 @Entity('email_templates')
