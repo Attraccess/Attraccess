@@ -11,7 +11,9 @@
       "actions": "Aktionen"
     },
     "actions": {
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "deactivate": "Deaktivieren",
+      "activate": "Aktivieren"
     },
     "deleteModal": {
       "title": "NFC-Karte löschen",

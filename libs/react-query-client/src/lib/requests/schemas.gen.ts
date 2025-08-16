@@ -558,7 +558,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'reset-password', 'username-changed'],
+    enum: ['verify-email', 'reset-password', 'username-changed', 'password-changed'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -2317,9 +2317,18 @@ export const $NFCCard = {
             type: 'string',
             description: 'The date and time the NFC card was last seen',
             format: 'date-time'
+        },
+        isActive: {
+            type: 'boolean',
+            description: 'Whether the NFC card is active'
         }
     },
-    required: ['id', 'uid', 'user', 'createdAt', 'updatedAt', 'lastSeen']
+    required: ['id', 'uid', 'user', 'createdAt', 'updatedAt', 'lastSeen', 'isActive']
+} as const;
+
+export const $NfcCardSetActiveStateDto = {
+    type: 'object',
+    properties: {}
 } as const;
 
 export const $AttractapFirmware = {

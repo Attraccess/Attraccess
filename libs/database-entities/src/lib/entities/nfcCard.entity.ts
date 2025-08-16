@@ -50,4 +50,11 @@ export class NFCCard {
   })
   @ApiProperty({ description: 'The date and time the NFC card was last seen', type: 'string', format: 'date-time' })
   lastSeen!: Date;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  @ApiProperty({ description: 'Whether the NFC card is active' })
+  isActive!: boolean;
 }

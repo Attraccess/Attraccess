@@ -193,12 +193,12 @@ export class WaitForNFCTapState implements ReaderState {
     await this.socket.sendMessage(new AttractapEvent(AttractapEventType.WAIT_FOR_PROCESSING));
   }
 
-  private async onInvalidCard(): Promise<void> {
+  private async onInvalidCard(reason?: string): Promise<void> {
     await this.disableCardChecking();
 
     await this.socket.sendMessage(
       new AttractapEvent(AttractapEventType.DISPLAY_ERROR, {
-        message: `Invalid card`,
+        message: `Invalid card${reason ? `: ${reason}` : ''}`,
       })
     );
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -220,6 +220,11 @@ export class WaitForNFCTapState implements ReaderState {
     if (!nfcCard) {
       this.logger.debug(`NFC Card with UID ${data.payload.cardUID} not found`);
       return this.onInvalidCard();
+    }
+
+    if (!nfcCard.isActive) {
+      this.logger.debug(`NFC Card with UID ${data.payload.cardUID} is not active`);
+      return this.onInvalidCard('deactivated');
     }
 
     this.card = nfcCard;
