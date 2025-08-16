@@ -1,6 +1,7 @@
 {
   "alert": {
     "title": "Keine Ressourcen gefunden",
-    "description": "Passe deine Suche oder die Filter-Optionen an, um Ressourcen zu finden"
+    "description": "Passe deine Suche oder die Filter-Optionen an, um Ressourcen zu finden",
+    "clear": "Filter und Suche zurücksetzen"
   }
 }
