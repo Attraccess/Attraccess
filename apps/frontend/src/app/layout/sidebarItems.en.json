@@ -1,0 +1,11 @@
+{
+  "notLoggedIn": "Not logged in",
+  "reportBug": {
+    "title": "[Bug] ",
+    "body": "### Environment\n\n- **Browser:** {{browser}}\n- **Screen Size:** {{screenWidth}}x{{screenHeight}}\n- **Time:** {{time}}\n- **User ID:** {{userId}}\n- **URL:** {{url}}\n\n### Description\n\n<!-- Please describe the bug in detail. Include steps to reproduce. -->\n"
+  },
+  "requestFeature": {
+    "title": "[Feature Request] ",
+    "body": "### Environment\n\n- **Browser:** {{browser}}\n- **Screen Size:** {{screenWidth}}x{{screenHeight}}\n- **Time:** {{time}}\n- **User ID:** {{userId}}\n- **URL:** {{url}}\n\n### Description\n\n<!-- Please describe the feature request in detail. Explain the use case. -->\n"
+  }
+}

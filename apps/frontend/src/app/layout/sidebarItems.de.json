@@ -1,0 +1,11 @@
+{
+  "notLoggedIn": "Nicht angemeldet",
+  "reportBug": {
+    "title": "[Fehler] ",
+    "body": "### Umgebung\n\n- **Browser:** {{browser}}\n- **Bildschirmgröße:** {{screenWidth}}x{{screenHeight}}\n- **Zeit:** {{time}}\n- **Benutzer-ID:** {{userId}}\n- **URL:** {{url}}\n\n### Beschreibung\n\n<!-- Bitte beschreibe den Fehler im Detail. Füge Schritte zur Reproduktion hinzu. -->\n"
+  },
+  "requestFeature": {
+    "title": "[Funktionsanfrage] ",
+    "body": "### Umgebung\n\n- **Browser:** {{browser}}\n- **Bildschirmgröße:** {{screenWidth}}x{{screenHeight}}\n- **Zeit:** {{time}}\n- **Benutzer-ID:** {{userId}}\n- **URL:** {{url}}\n\n### Beschreibung\n\n<!-- Bitte beschreibe die Funktionsanfrage im Detail. Erkläre den Anwendungsfall. -->\n"
+  }
+}

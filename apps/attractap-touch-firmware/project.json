@@ -5,7 +5,7 @@
   "projectType": "application",
   "tags": [],
   "targets": {
-    "build": {
+    "not-build": {
       "executor": "nx:run-commands",
       "options": {
         "command": "cd apps/attractap-touch-firmware && python3 build_firmwares.py",

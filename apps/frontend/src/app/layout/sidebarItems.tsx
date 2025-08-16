@@ -21,6 +21,9 @@ import { getBaseUrl } from '../../api';
 import { useNow } from '../../hooks/useNow';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { useMemo } from 'react';
+import de from './sidebarItems.de.json';
+import en from './sidebarItems.en.json';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 export type SidebarItem = {
   path: string;
@@ -134,48 +137,44 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
 export const useSidebarEndItems = () => {
   const { user } = useAuth();
 
+  const { t } = useTranslations('sidebar.endItems', {
+    en,
+    de,
+  });
+
   const now = useNow();
+
+  const url = new URL(window.location.href);
+  url.hostname = 'redacted.hostname';
 
   const reportBugUrl = newGithubIssueUrl({
     user: 'Attraccess',
     repo: 'Attraccess',
-    title: '[Bug] ',
+    title: t('reportBug.title'),
     labels: ['bug'],
-    body: `
-### Environment / Umgebung
-
-- **Browser:** ${navigator.userAgent}
-- **Screen Size / Bildschirmgröße:** ${window.innerWidth}x${window.innerHeight}
-- **Time / Zeit:** ${now.toISOString()}
-- **User ID / Benutzer-ID:** ${user?.id || 'Not logged in / Nicht angemeldet'}
-- **URL:** ${window.location.href}
-
-### Description / Beschreibung
-
-<!-- Please describe the bug in detail. Include steps to reproduce. -->
-<!-- Bitte beschreibe den Fehler im Detail. Füge Schritte zur Reproduktion hinzu. -->
-      `,
+    body: t('reportBug.body', {
+      browser: navigator.userAgent,
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+      time: now.toISOString(),
+      userId: user?.id || t('notLoggedIn'),
+      url: url.toString(),
+    }),
   });
 
   const requestFeatureUrl = newGithubIssueUrl({
     user: 'Attraccess',
     repo: 'Attraccess',
-    title: '[Feature Request] ',
+    title: t('requestFeature.title'),
     labels: ['enhancement'],
-    body: `
-### Environment / Umgebung
-
-- **Browser:** ${navigator.userAgent}
-- **Screen Size / Bildschirmgröße:** ${window.innerWidth}x${window.innerHeight}
-- **Time / Zeit:** ${now.toISOString()}
-- **User ID / Benutzer-ID:** ${user?.id || 'Not logged in / Nicht angemeldet'}
-- **URL:** ${window.location.href}
-
-### Description / Beschreibung
-
-<!-- Please describe the feature request in detail. Explain the use case. -->
-<!-- Bitte beschreibe die Funktionsanfrage im Detail. Erkläre den Anwendungsfall. -->
-      `,
+    body: t('requestFeature.body', {
+      browser: navigator.userAgent,
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+      time: now.toISOString(),
+      userId: user?.id || t('notLoggedIn'),
+      url: url.toString(),
+    }),
   });
 
   return [

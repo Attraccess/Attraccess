@@ -8,7 +8,7 @@
   "targets": {
     "copy-attractap-assets": {
       "executor": "nx:run-commands",
-      "not_dependsOn": ["attractap-firmware:build", "attractap-touch-firmware:build"],
+      "dependsOn": ["attractap-firmware:build"],
       "cache": false,
       "options": {
         "command": "node {projectRoot}/copy-attractap-assets.js"

@@ -9,9 +9,9 @@ import de from './de.json';
 import en from './en.json';
 
 export default function ChangelogPage() {
-  const {t} = useTranslations('changelog', {
+  const { t } = useTranslations('changelog', {
     de,
-    en
+    en,
   });
 
   return (

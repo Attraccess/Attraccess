@@ -2168,7 +2168,7 @@ export namespace Users {
    * @tags Users
    * @name ChangePasswordViaResetToken
    * @summary Change a user password after password reset
-   * @request POST:/api/users/{userId}/change-password
+   * @request POST:/api/users/{userId}/change-password-by-token
    */
   export namespace ChangePasswordViaResetToken {
     export type RequestParams = {
@@ -2313,7 +2313,7 @@ export namespace Users {
    * @tags Users
    * @name SetUserPassword
    * @summary Set a user's password directly
-   * @request POST:/api/users/{id}/set-password
+   * @request POST:/api/users/{id}/password
    * @secure
    */
   export namespace SetUserPassword {
@@ -4372,7 +4372,7 @@ export class Api<
      * @tags Users
      * @name ChangePasswordViaResetToken
      * @summary Change a user password after password reset
-     * @request POST:/api/users/{userId}/change-password
+     * @request POST:/api/users/{userId}/change-password-by-token
      */
     changePasswordViaResetToken: (
       userId: number,
@@ -4380,7 +4380,7 @@ export class Api<
       params: RequestParams = {},
     ) =>
       this.request<ChangePasswordViaResetTokenData, void>({
-        path: `/api/users/${userId}/change-password`,
+        path: `/api/users/${userId}/change-password-by-token`,
         method: "POST",
         body: data,
         type: ContentType.Json,
@@ -4536,7 +4536,7 @@ export class Api<
      * @tags Users
      * @name SetUserPassword
      * @summary Set a user's password directly
-     * @request POST:/api/users/{id}/set-password
+     * @request POST:/api/users/{id}/password
      * @secure
      */
     setUserPassword: (
@@ -4545,7 +4545,7 @@ export class Api<
       params: RequestParams = {},
     ) =>
       this.request<SetUserPasswordData, void>({
-        path: `/api/users/${id}/set-password`,
+        path: `/api/users/${id}/password`,
         method: "POST",
         body: data,
         secure: true,
