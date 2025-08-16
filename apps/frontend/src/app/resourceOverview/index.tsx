@@ -93,7 +93,15 @@ export function ResourceOverview() {
       <ActiveUsageSessionsBanner onShowMySessions={() => setFilterByOnlyInUseByMe(true)} />
 
       <div className="flex flex-row flex-wrap gap-4">
-        {!isLoadingAllResources && allResources?.data.length === 0 && <NoResourcesFound />}
+        {!isLoadingAllResources && allResources?.data.length === 0 && (
+          <NoResourcesFound
+            onClearFilterAndSearch={() => {
+              setFilterByOnlyInUseByMe(false);
+              setFilterByOnlyWithPermissions(false);
+              setSearchValue('');
+            }}
+          />
+        )}
 
         {groupIds.map((id) => (
           <ResourceGroupCard
