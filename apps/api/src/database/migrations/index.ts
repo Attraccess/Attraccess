@@ -38,3 +38,4 @@ export * from './1754214578982-nfc-card-seed-token';
 export * from './1754307072519-nfc-card-last-seen';
 export * from './1755263227552-username-last-changed';
 export * from './1755349210809-password-changed-email';
+export * from './1755364822388-clean-db';
