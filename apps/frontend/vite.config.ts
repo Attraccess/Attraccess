@@ -5,7 +5,6 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 import federation from '@originjs/vite-plugin-federation';
 import { VitePWA } from 'vite-plugin-pwa';
-import replace from '@rollup/plugin-replace';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 
@@ -42,17 +41,16 @@ export default defineConfig({
         '@tanstack/react-query': { requiredVersion: '*' },
       },
     }),
-    replace({ __DATE__: new Date().toISOString(), __RELOAD_SW__: 'true', preventAssignment: true }),
     VitePWA({
-      mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
       workbox: {
-        clientsClaim: process.env.NODE_ENV === 'production',
-        skipWaiting: process.env.NODE_ENV === 'production',
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
+        cleanupOutdatedCaches: true,
       },
       includeAssets: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
       manifest: siteWebManifest,
-      registerType: process.env.NODE_ENV === 'production' ? 'autoUpdate' : 'prompt',
+      registerType: 'autoUpdate',
       srcDir: 'src',
       filename: 'service-worker.ts',
       strategies: 'injectManifest',

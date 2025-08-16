@@ -12,39 +12,17 @@ import { registerSW } from 'virtual:pwa-register';
 const oneMinute = 60 * 1000;
 const intervalMS = 15 * oneMinute;
 
-let updateInterval: NodeJS.Timeout;
-registerSW({
+// auto update SW and reload immediately when a new version is available
+const updateSW = registerSW({
+  immediate: true,
   onRegistered(r) {
-    if (!r) {
-      return;
-    }
-
-    const startUpdateCheck = () => {
-      if (updateInterval) {
-        clearInterval(updateInterval);
-      }
-
-      updateInterval = setInterval(() => r.update(), intervalMS);
-    };
-
-    const stopUpdateCheck = () => {
-      clearInterval(updateInterval);
-    };
-
-    // Start/stop checks based on page visibility
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        stopUpdateCheck();
-      } else {
-        r.update(); // Check once immediately
-        startUpdateCheck();
-      }
-    });
-
-    // Initial start if page is visible
-    if (!document.hidden) {
-      startUpdateCheck();
-    }
+    r &&
+      setInterval(() => {
+        r.update();
+      }, intervalMS);
+  },
+  onNeedRefresh() {
+    updateSW(true);
   },
 });
 
