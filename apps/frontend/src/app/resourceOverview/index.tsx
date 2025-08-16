@@ -95,7 +95,7 @@ export function ResourceOverview() {
       <div className="flex flex-row flex-wrap gap-4">
         {!isLoadingAllResources && allResources?.data.length === 0 && (
           <NoResourcesFound
-            onClearFilerAndSearch={() => {
+            onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
               setFilterByOnlyWithPermissions(false);
               setSearchValue('');

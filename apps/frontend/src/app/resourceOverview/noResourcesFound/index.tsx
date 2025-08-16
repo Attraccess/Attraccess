@@ -5,11 +5,11 @@ import de from './de.json';
 import en from './en.json';
 
 interface Props {
-  onClearFilerAndSearch: () => void;
+  onClearFilterAndSearch: () => void;
 }
 
 export function NoResourcesFound(props: Props) {
-  const { onClearFilerAndSearch } = props;
+  const { onClearFilterAndSearch } = props;
   const { t } = useTranslations('resourceOverview.noResourcesFound', {
     de,
     en,
@@ -22,7 +22,7 @@ export function NoResourcesFound(props: Props) {
         title={t('alert.title')}
         description={t('alert.description')}
         endContent={
-          <Button className="ml-4" onPress={onClearFilerAndSearch} size="sm" variant="flat" color="danger">
+          <Button className="ml-4" onPress={onClearFilterAndSearch} size="sm" variant="flat" color="danger">
             {t('alert.clear')}
           </Button>
         }
