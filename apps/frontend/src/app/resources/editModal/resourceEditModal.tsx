@@ -46,6 +46,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  const [deleteImage, setDeleteImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null | undefined>(undefined);
   const [formData, setFormData] = useState<UpdateResourceDto>({
     name: '',
@@ -150,6 +151,11 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     setSelectedImage(null);
   }, [resource, setFormData, setSelectedImage]);
 
+  const onImageSelected = useCallback((file: File | null) => {
+    setSelectedImage(file);
+    setDeleteImage(file === null);
+  }, []);
+
   // Update form data when resource changes
   useEffect(() => {
     if (!isOpen) {
@@ -171,7 +177,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           description: formData.description,
           allowTakeOver: formData.allowTakeOver,
           image: selectedImage ?? undefined,
-          deleteImage: selectedImage === null,
+          deleteImage,
         },
       });
       return;
@@ -185,7 +191,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         image: selectedImage ?? undefined,
       },
     });
-  }, [formData, selectedImage, props.resourceId, updateResource, createResource]);
+  }, [formData, selectedImage, props.resourceId, updateResource, createResource, deleteImage]);
 
   return (
     <>
@@ -234,7 +240,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                   <ImageUpload
                     label={t('inputs.image.label')}
                     id="image"
-                    onChange={setSelectedImage}
+                    onChange={onImageSelected}
                     className="w-full"
                     currentImageUrl={resource?.imageFilename ? filenameToUrl(resource?.imageFilename) : undefined}
                   />
