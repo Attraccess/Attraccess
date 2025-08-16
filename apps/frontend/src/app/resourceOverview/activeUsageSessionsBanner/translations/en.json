@@ -1,0 +1,16 @@
+{
+  "loadingTitle": "Checking your usage sessions",
+  "loadingDescription": "Loading...",
+  "title": "You have {{count}} active usage sessions",
+  "description": "You currently have {{count}} ongoing sessions. You can quickly filter to your sessions or end them all.",
+  "showMine": "Show mine",
+  "endAll": "End all",
+  "endedAllSuccess": "All your active usage sessions were ended.",
+  "endedAllError": "Failed to end all sessions. Some sessions may still be active.",
+  "modal.title": "End all your active sessions",
+  "modal.description": "We will end the session for each resource below.",
+  "modal.loadingList": "Loading active sessions...",
+  "modal.cancel": "Cancel",
+  "modal.confirm": "End all now",
+  "modal.completedTitle": "All sessions ended"
+}

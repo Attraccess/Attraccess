@@ -1,0 +1,16 @@
+{
+  "loadingTitle": "Sitzungen werden überprüft",
+  "loadingDescription": "Laden...",
+  "title": "Du hast {{count}} aktive Nutzungssitzungen",
+  "description": "Du hast aktuell {{count}} laufende Sitzungen. Du kannst schnell auf deine Sitzungen filtern oder alle beenden.",
+  "showMine": "Meine anzeigen",
+  "endAll": "Alle beenden",
+  "endedAllSuccess": "Alle aktiven Nutzungssitzungen wurden beendet.",
+  "endedAllError": "Fehler beim Beenden. Einige Sitzungen sind möglicherweise noch aktiv.",
+  "modal.title": "Alle aktiven Sitzungen beenden",
+  "modal.description": "Wir beenden die Sitzung für jede Ressource unten.",
+  "modal.loadingList": "Aktive Sitzungen werden geladen...",
+  "modal.cancel": "Abbrechen",
+  "modal.confirm": "Jetzt alle beenden",
+  "modal.completedTitle": "Alle Sitzungen beendet"
+}

@@ -7,6 +7,7 @@ import { ResourceGroupCard } from './resourceGroupCard';
 import { useCallback, useMemo, useState } from 'react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { NoResourcesFound } from './noResourcesFound';
+import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
 
 enum PersistedFilterProps {
   onlyInUseByMe = 'onlyInUseByMe',
@@ -88,6 +89,8 @@ export function ResourceOverview() {
         highlightSearch={allResources?.data.length === 0}
         highlightFilter={allResources?.data.length === 0}
       />
+
+      <ActiveUsageSessionsBanner onShowMySessions={() => setFilterByOnlyInUseByMe(true)} />
 
       <div className="flex flex-row flex-wrap gap-4">
         {!isLoadingAllResources && allResources?.data.length === 0 && <NoResourcesFound />}
