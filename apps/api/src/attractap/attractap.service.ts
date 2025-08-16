@@ -5,7 +5,7 @@ import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { nanoid } from 'nanoid';
 import { securelyHashToken } from './websockets/websocket.utils';
-import { ReaderUpdatedEvent } from './events';
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 
@@ -136,6 +136,12 @@ export class AttractapService {
     }
 
     return response;
+  }
+
+  public async deleteReader(id: number) {
+    await this.readerRepository.delete(id);
+
+    this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
   }
 
   /**

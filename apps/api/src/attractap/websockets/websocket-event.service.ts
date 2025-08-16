@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AttractapGateway } from './websocket.gateway';
-import { ReaderUpdatedEvent } from '../events';
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceUsageEndedEvent,
   ResourceUsageStartedEvent,
@@ -19,6 +19,12 @@ export class WebSocketEventService {
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event', event);
     await this.attractapGateway.restartReader(event.reader.id);
+  }
+
+  @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  public async onReaderDeleted(event: ReaderDeletedEvent) {
+    this.logger.debug('Got reader deleted event', event);
+    await this.attractapGateway.restartReader(event.readerId);
   }
 
   @OnEvent(ResourceUsageStartedEvent.EVENT_NAME)

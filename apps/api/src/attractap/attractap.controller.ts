@@ -12,6 +12,7 @@ import {
   Logger,
   ClassSerializerInterceptor,
   UseInterceptors,
+  Delete,
 } from '@nestjs/common';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AuthenticatedRequest, Auth, Attractap } from '@attraccess/plugins-backend-sdk';
@@ -142,5 +143,14 @@ export class AttractapController {
   @ApiResponse({ status: 404, description: 'Reader not found' })
   async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<Attractap> {
     return await this.attractapService.findReaderById(readerId);
+  }
+
+  @Delete(':readerId')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
+  @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
+  @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
+  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number): Promise<void> {
+    await this.attractapService.deleteReader(readerId);
   }
 }

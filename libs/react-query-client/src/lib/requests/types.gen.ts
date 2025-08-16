@@ -375,7 +375,8 @@ export type PreviewMjmlResponseDto = {
 export enum EmailTemplateType {
     VERIFY_EMAIL = 'verify-email',
     RESET_PASSWORD = 'reset-password',
-    USERNAME_CHANGED = 'username-changed'
+    USERNAME_CHANGED = 'username-changed',
+    PASSWORD_CHANGED = 'password-changed'
 }
 
 export type EmailTemplate = {
@@ -1785,7 +1786,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -1795,7 +1796,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
@@ -2354,6 +2355,15 @@ export type GetReaderByIdData = {
 };
 
 export type GetReaderByIdResponse = Attractap;
+
+export type DeleteReaderData = {
+    /**
+     * The ID of the reader to delete
+     */
+    readerId: number;
+};
+
+export type DeleteReaderResponse = unknown;
 
 export type GetReadersResponse = Array<Attractap>;
 
@@ -3975,6 +3985,19 @@ export type $OpenApiTs = {
                  * Reader not found
                  */
                 404: unknown;
+            };
+        };
+        delete: {
+            req: DeleteReaderData;
+            res: {
+                /**
+                 * Reader deleted successfully
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
