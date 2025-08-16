@@ -20,12 +20,18 @@ import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
 import AccountPage from '../account';
+import ChangelogPage from '../changelog/ChangelogPage';
 
 const coreRoutes: RouteConfig[] = [
   {
     path: '/',
     element: <Navigate to="/resources" replace />,
     authRequired: true,
+  },
+  {
+    path: '/changelog',
+    element: <ChangelogPage />,
+    authRequired: false,
   },
   {
     path: '/dependencies',
