@@ -11,5 +11,6 @@
   "error": {
     "title": "Oops! Sign-in hiccup",
     "generic": "Please check your credentials and try again"
-  }
+  },
+  "signingIn": "Signing in..."
 }
