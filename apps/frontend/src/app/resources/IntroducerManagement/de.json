@@ -1,18 +1,18 @@
 {
   "add": {
-    "successTitle": "Einführer hinzugefügt",
-    "successDescription": "Der Benutzer hat erfolgreich Einführer-Privilegien für diese Resource erhalten.",
-    "errorTitle": "Fehler beim Hinzufügen des Einführers",
-    "errorDescription": "Ein Fehler ist beim Gewähren der Einführer-Privilegien aufgetreten: {{error}}"
+    "successTitle": "Einweiser hinzugefügt",
+    "successDescription": "Der Benutzer hat erfolgreich Einweiser-Privilegien für diese Resource erhalten.",
+    "errorTitle": "Fehler beim Hinzufügen des Einweisers",
+    "errorDescription": "Ein Fehler ist beim Gewähren der Einweiser-Privilegien aufgetreten: {{error}}"
   },
   "remove": {
-    "successTitle": "Einführer entfernt",
-    "successDescription": "Die Einführer-Privilegien des Benutzers wurden erfolgreich für diese Resource widerrufen.",
-    "errorTitle": "Fehler beim Entfernen des Einführers",
-    "errorDescription": "Ein Fehler ist beim Widerrufen der Einführer-Privilegien aufgetreten: {{error}}"
+    "successTitle": "Einweiser entfernt",
+    "successDescription": "Die Einweiser-Privilegien des Benutzers wurden erfolgreich für diese Resource widerrufen.",
+    "errorTitle": "Fehler beim Entfernen des Einweisers",
+    "errorDescription": "Ein Fehler ist beim Widerrufen der Einweiser-Privilegien aufgetreten: {{error}}"
   },
   "load": {
-    "error": "Fehler beim Laden der Einführer",
-    "errorDescription": "Die Liste der Einführer für diese Resource konnte nicht geladen werden."
+    "error": "Fehler beim Laden der Einweiser",
+    "errorDescription": "Die Liste der Einweiser für diese Resource konnte nicht geladen werden."
   }
 }

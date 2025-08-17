@@ -1,8 +1,8 @@
 {
   "input": {
     "button": {
-      "title": "Taster",
-      "description": "Erzeugt eine Ausgabe, wenn der Taster auf der Resourcen Seite gedrückt wird."
+      "title": "Taste",
+      "description": "Erzeugt eine Ausgabe, wenn die Taste dieses Knotens auf der Resourcen Seite gedrückt wird."
     },
     "resource": {
       "usage": {
