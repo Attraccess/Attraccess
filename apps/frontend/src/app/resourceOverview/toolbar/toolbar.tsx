@@ -1,7 +1,6 @@
 import { Button } from '@heroui/button';
 import { Input } from '@heroui/input';
 import { SearchIcon, PlusIcon, ScanQrCodeIcon, ListFilterIcon } from 'lucide-react';
-import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
@@ -87,21 +86,6 @@ export function Toolbar({
       <div className="flex flex-row gap-2 justify-end mb-6">
         {canManageResources && (
           <div className="flex items-center gap-2 mr-1 hidden md:flex">
-            <ResourceGroupUpsertModal onUpserted={(resourceGroup) => navigate(`/resource-groups/${resourceGroup.id}`)}>
-              {(onOpen: () => void) => (
-                <Button
-                  radius="full"
-                  onPress={onOpen}
-                  startContent={<PlusIcon size={18} />}
-                  color="secondary"
-                  size="sm"
-                  data-cy="toolbar-open-create-resource-group-modal-button"
-                >
-                  {t('addGroup')}
-                </Button>
-              )}
-            </ResourceGroupUpsertModal>
-
             <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
               {(onOpen: () => void) => (
                 <Button

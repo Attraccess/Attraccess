@@ -14,6 +14,8 @@ import {
   CardBody,
   CardHeader,
   CardProps,
+  Checkbox,
+  Link,
   Pagination,
   Table,
   TableBody,
@@ -25,13 +27,13 @@ import {
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { GroupIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { GroupIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-
 import * as en from './en.json';
 import * as de from './de.json';
+import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 
 interface ManageResourceGroupsProps {
   resourceId: number;
@@ -50,14 +52,13 @@ export function ManageResourceGroups({
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
-  const { mutateAsync: addResourceToGroup, isPending: isAdding } = useResourcesServiceResourceGroupsAddResource();
+  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
 
-  const { mutateAsync: removeResourceFromGroup, isPending: isRemoving } =
-    useResourcesServiceResourceGroupsRemoveResource({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
-      },
-    });
+  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
+    },
+  });
 
   const isAdded = useCallback(
     (group: ResourceGroup) => {
@@ -121,14 +122,41 @@ export function ManageResourceGroups({
     return groupsWithResource.slice((page - 1) * perPage, page * perPage);
   }, [groupsWithResource, page]);
 
+  const onGroupCreated = useCallback(
+    (group: ResourceGroup) => {
+      handleGroupClick(group);
+    },
+    [handleGroupClick]
+  );
+
   return (
     <Card {...cardProps}>
       <CardHeader>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<GroupIcon />} noMargin />
+        <PageHeader
+          title={t('title')}
+          subtitle={t('subtitle')}
+          icon={<GroupIcon />}
+          noMargin
+          actions={
+            <ResourceGroupUpsertModal onUpserted={onGroupCreated}>
+              {(onOpen: () => void) => (
+                <Button
+                  radius="full"
+                  onPress={onOpen}
+                  startContent={<PlusIcon size={18} />}
+                  color="secondary"
+                  size="sm"
+                  data-cy="toolbar-open-create-resource-group-modal-button"
+                >
+                  {t('addGroup')}
+                </Button>
+              )}
+            </ResourceGroupUpsertModal>
+          }
+        />
       </CardHeader>
       <CardBody>
         <Table
-          isCompact
           shadow="none"
           removeWrapper
           bottomContent={
@@ -153,18 +181,18 @@ export function ManageResourceGroups({
                 className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
               >
                 <TableCell className="w-full">{group.name}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    isIconOnly
-                    isLoading={isAdding ?? isRemoving}
-                    onPress={() => {
+                <TableCell className="text-right flex items-center gap-2">
+                  <Checkbox
+                    size="lg"
+                    onValueChange={() => {
                       handleGroupClick(group);
                     }}
                     color={isAdded(group) ? 'danger' : 'primary'}
-                    startContent={
-                      isAdded(group) ? <Trash2Icon className="w-5 h-5" /> : <PlusIcon className="w-5 h-5" />
-                    }
-                  ></Button>
+                    isSelected={isAdded(group)}
+                  />
+                  <Link size="lg" href={`/resource-groups/${group.id}`} showAnchorIcon>
+                    {t('actions.openGroup')}
+                  </Link>
                 </TableCell>
               </TableRow>
             )}

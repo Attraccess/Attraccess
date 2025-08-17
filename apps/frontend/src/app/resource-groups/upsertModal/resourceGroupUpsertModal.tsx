@@ -24,7 +24,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { useToastMessage } from '../../../components/toastProvider';
-import { useNavigate } from 'react-router-dom';
 
 type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
 
@@ -61,7 +60,6 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { success, error: showErrorToast } = useToastMessage();
   const queryClient = useQueryClient();
   const isEditMode = !!props.resourceGroup;
-  const navigate = useNavigate();
 
   const handleSuccess = (createdOrUpdatedGroup: ResourceGroup) => {
     success({
@@ -70,10 +68,6 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
         ? t('successDescriptionUpdate', { name: createdOrUpdatedGroup.name })
         : t('successDescriptionCreate', { name: createdOrUpdatedGroup.name }),
     });
-
-    if (typeof props.onUpserted === 'function') {
-      props.onUpserted(createdOrUpdatedGroup);
-    }
 
     queryClient.invalidateQueries({
       queryKey: [useResourcesServiceResourceGroupsGetManyKey],
@@ -84,6 +78,10 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
     }
     setApiErrors({});
     closeDisclosure();
+
+    if (typeof props.onUpserted === 'function') {
+      props.onUpserted(createdOrUpdatedGroup);
+    }
   };
 
   const handleError = (error: AxiosError<ApiValidationError>) => {
@@ -111,7 +109,6 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const createMutation = useResourcesServiceResourceGroupsCreateOne({
     onSuccess: (data) => {
       handleSuccess(data);
-      navigate(`/resource-groups/${data.id}`);
     },
     onError: handleError,
   });
