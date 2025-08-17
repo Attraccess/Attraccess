@@ -276,6 +276,12 @@ export const useResourceFlowsServiceResourceFlowsControllerStreamEventsKey = "Re
 export const UseResourceFlowsServiceResourceFlowsControllerStreamEventsKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFlowsServiceResourceFlowsControllerStreamEventsKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourceFlowsServiceGetButtonsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getButtons>>;
+export type ResourceFlowsServiceGetButtonsQueryResult<TData = ResourceFlowsServiceGetButtonsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFlowsServiceGetButtonsKey = "ResourceFlowsServiceGetButtons";
+export const UseResourceFlowsServiceGetButtonsKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetButtonsKey, ...(queryKey ?? [{ resourceId }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -343,6 +349,7 @@ export type AccessControlServiceResourceGroupIntroducersRevokeMutationResult = A
 export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersGrant>>;
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
 export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenance>>;
+export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;

@@ -1,5 +1,9 @@
 {
   "input": {
+    "button": {
+      "title": "Taster",
+      "description": "Erzeugt eine Ausgabe, wenn der Taster auf der Resourcen Seite gedrückt wird."
+    },
     "resource": {
       "usage": {
         "started": {

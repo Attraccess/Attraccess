@@ -1700,7 +1700,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
         },
         position: {
             description: 'The position of the node',
@@ -1996,6 +1996,83 @@ export const $ResourceFlowLogsResponseDto = {
         }
     },
     required: ['total', 'page', 'limit', 'data']
+} as const;
+
+export const $ResourceFlowNodePosition = {
+    type: 'object',
+    properties: {
+        x: {
+            type: 'number',
+            description: 'The x position of the node',
+            example: 100
+        },
+        y: {
+            type: 'number',
+            description: 'The y position of the node',
+            example: 100
+        }
+    },
+    required: ['x', 'y']
+} as const;
+
+export const $ResourceFlowNode = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The unique identifier of the resource flow node',
+            example: 'TGVgqDzCKXKVr-XGUD5V3'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the node',
+            example: 'input.resource.usage.started'
+        },
+        position: {
+            description: 'The position of the node',
+            example: {
+                x: 100,
+                y: 100
+            },
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceFlowNodePosition'
+                }
+            ]
+        },
+        data: {
+            type: 'object',
+            description: 'The data of the node, depending on the type of the node',
+            example: {
+                url: 'https://example.com',
+                method: 'GET'
+            }
+        },
+        createdAt: {
+            type: 'string',
+            description: 'When the node was created',
+            format: 'date-time'
+        },
+        updatedAt: {
+            type: 'string',
+            description: 'When the node was last updated',
+            format: 'date-time'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The id of the resource that this node belongs to',
+            example: 1
+        },
+        resource: {
+            description: 'The resource being this node belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Resource'
+                }
+            ]
+        }
+    },
+    required: ['id', 'type', 'position', 'data', 'resourceId']
 } as const;
 
 export const $PluginMainFrontend = {

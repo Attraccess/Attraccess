@@ -1,5 +1,9 @@
 {
   "input": {
+    "button": {
+      "title": "Button",
+      "description": "This node is triggered when the button is pressed."
+    },
     "resource": {
       "usage": {
         "started": {

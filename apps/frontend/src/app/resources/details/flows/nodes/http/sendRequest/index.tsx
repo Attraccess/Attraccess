@@ -147,7 +147,11 @@ export function HTTPRequestNode(
           </ModalHeader>
           <ModalBody>
             <Input label={t('editor.inputs.url.label')} value={url} onChange={(e) => setUrl(e.target.value)} />
-            <Select label={t('editor.inputs.method.label')} value={method} onChange={(e) => setMethod(e.target.value)}>
+            <Select
+              label={t('editor.inputs.method.label')}
+              selectedKeys={method}
+              onChange={(e) => setMethod(e.target.value)}
+            >
               <SelectItem key="GET">GET</SelectItem>
               <SelectItem key="POST">POST</SelectItem>
               <SelectItem key="PUT">PUT</SelectItem>

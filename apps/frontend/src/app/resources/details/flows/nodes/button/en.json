@@ -1,0 +1,13 @@
+{
+  "editor": {
+    "inputs": {
+      "label": {
+        "label": "Label"
+      }
+    },
+    "buttons": {
+      "close": "Close",
+      "save": "Save"
+    }
+  }
+}

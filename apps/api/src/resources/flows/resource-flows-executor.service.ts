@@ -1,4 +1,11 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import {
@@ -30,6 +37,7 @@ import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import axios from 'axios';
 import Handlebars from 'handlebars';
 import { get } from 'lodash-es';
+import { ResourceUsageService } from '../usage/resourceUsage.service';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
@@ -78,7 +86,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly configService: ConfigService,
-    private readonly mqttClientService: MqttClientService
+    private readonly mqttClientService: MqttClientService,
+    private readonly resourceUsageService: ResourceUsageService
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -322,6 +331,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+        case ResourceFlowNodeType.INPUT_BUTTON:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
@@ -531,5 +541,32 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private compileTemplate(template: string, data: object): string {
     const compiledTemplate = Handlebars.compile(template);
     return compiledTemplate({ input: data });
+  }
+
+  public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
+    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
+
+    if (
+      !executingUserId ||
+      !activeResourceUsage ||
+      !activeResourceUsage.userId ||
+      activeResourceUsage.userId !== executingUserId
+    ) {
+      throw new ForbiddenException('You are not allowed to press this button');
+    }
+
+    const button = await this.flowNodeRepository.findOne({
+      where: {
+        resourceId,
+        type: ResourceFlowNodeType.INPUT_BUTTON,
+        id: buttonId.toString(),
+      },
+    });
+
+    if (!button) {
+      throw new NotFoundException('Button not found');
+    }
+
+    await this.startFlow(button, { payload: {} });
   }
 }

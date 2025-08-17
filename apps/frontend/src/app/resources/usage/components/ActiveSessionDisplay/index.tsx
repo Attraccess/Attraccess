@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import * as en from './translations/en.json';
 import * as de from './translations/de.json';
+import { FlowButtons } from './flowButtons';
 
 interface ActiveSessionDisplayProps {
   resourceId: number;
@@ -80,6 +81,8 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
     <>
       <div className="space-y-4">
         <SessionTimer startTime={startTime} />
+
+        <FlowButtons resourceId={resourceId} />
 
         <ButtonGroup fullWidth color="danger">
           <Button

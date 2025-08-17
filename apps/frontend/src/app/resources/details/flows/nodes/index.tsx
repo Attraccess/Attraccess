@@ -5,6 +5,7 @@ import { WaitNode } from './wait';
 import { MQTTSendMessageNode } from './mqtt/sendMessage';
 import { HTTPRequestNode } from './http/sendRequest';
 import { IfNode } from './if';
+import { ButtonNode } from './button';
 
 export enum AttraccessNodeType {
   input = 'input',
@@ -82,5 +83,9 @@ export const AttraccessNodes: Record<string, AttraccessNode> = {
   'processing.if': {
     component: IfNode,
     type: AttraccessNodeType.processing,
+  },
+  'input.button': {
+    component: ButtonNode,
+    type: AttraccessNodeType.input,
   },
 };

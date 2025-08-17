@@ -164,7 +164,7 @@ export function BaseNodeCard(props: Props) {
       </NodeToolbar>
       <Card className={cardClasses}>
         <CardHeader className="flex flex-row justify-between">
-          <PageHeader noMargin title={title} subtitle={`${nodeId}: ${previewMode ? subtitle : undefined}`} />
+          <PageHeader noMargin title={title} subtitle={previewMode ? subtitle : undefined} />
         </CardHeader>
 
         {(!previewMode || showBodyInPreview) && children && <CardBody>{children}</CardBody>}

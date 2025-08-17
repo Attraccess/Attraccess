@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Resource } from './resource.entity';
 
 export enum ResourceFlowNodeType {
+  INPUT_BUTTON = 'input.button',
   INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
   INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
   INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',

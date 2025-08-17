@@ -200,4 +200,10 @@ export class ResourceFlowsService {
       limit,
     };
   }
+
+  public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
+    return await this.flowNodeRepository.find({
+      where: { resourceId, type },
+    });
+  }
 }

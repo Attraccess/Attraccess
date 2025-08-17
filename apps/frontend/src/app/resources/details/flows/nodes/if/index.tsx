@@ -120,7 +120,7 @@ export function IfNode(
             <Input label={t('editor.inputs.path.label')} value={path} onValueChange={(value) => setPath(value)} />
             <Select
               label={t('editor.inputs.comparisonOperator.label')}
-              value={comparisonOperator}
+              selectedKeys={comparisonOperator}
               onChange={(e) => setComparisonOperator(e.target.value as ComparisonOperator)}
             >
               {Object.values(ComparisonOperator).map((operator) => (
