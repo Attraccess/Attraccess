@@ -176,17 +176,16 @@ jobs:
     needs: build-test
     runs-on: ubuntu-latest
     steps:
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # Cache node_modules
       - uses: actions/setup-node@v4
         with:
           node-version: v22.18.0
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
 
       # Download build artifacts - Updated path to ensure dist directory structure is preserved
       - name: Download build artifacts
