@@ -114,11 +114,6 @@ export class WaitForNFCTapState implements ReaderState {
         `Reader has not tapped a card within ${this.timeout_ms}ms, moving to ${this.timout_transition_state?.constructor.name}`
       );
 
-      console.log({
-        timout_transition_state: this.timout_transition_state,
-        timeout_ms: this.timeout_ms,
-      });
-
       await this.socket.transitionToState(this.timout_transition_state);
     }, this.timeout_ms);
   }

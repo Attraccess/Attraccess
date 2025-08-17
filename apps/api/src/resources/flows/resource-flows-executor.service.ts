@@ -466,13 +466,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       comparisonValue = get(input, comparisonValue, '');
     }
 
-    console.log('path', path);
-    console.log('comparisonValue', comparisonValue);
-    console.log('comparisonOperator', comparisonOperator);
-    console.log('comparisonValueIsPath', comparisonValueIsPath);
-    console.log('sourceValue', sourceValue);
-    console.log('input', input);
-
     let result = false;
     switch (comparisonOperator) {
       case '=':
