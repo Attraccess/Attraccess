@@ -20,7 +20,8 @@
     },
     "noData": "No Attractaps found",
     "actions": {
-      "editReader": "Edit"
+      "editReader": "Edit",
+      "deleteReader": "Delete"
     },
     "active": {
       "title": "Active Attractaps",

@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardBody,
 } from '@heroui/react';
-import { CpuIcon, LogsIcon, MoreVertical } from 'lucide-react';
+import { CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -31,6 +31,7 @@ import { useNow } from '../../../hooks/useNow';
 
 import de from './de.json';
 import en from './en.json';
+import { AttractapDeleteModal } from './delete';
 
 export const AttractapList = () => {
   const { t } = useTranslations('attractap-list', {
@@ -172,15 +173,33 @@ export const AttractapList = () => {
                 >
                   {(reader) => (
                     <TableRow key={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
-                      <TableCell>{reader.name}</TableCell>
-                      <TableCell>{formatDateTime(reader.lastConnection)}</TableCell>
-                      <TableCell>
+                      <TableCell className="w-full">{reader.name}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
+                      <TableCell className="flex-row flex">
                         <Button
+                          size="sm"
+                          startContent={<PencilIcon className="w-4 h-4" />}
+                          variant="light"
                           onPress={() => setOpenedReaderEditor(reader.id)}
                           data-cy={`attractap-list-edit-reader-button-${reader.id}`}
                         >
                           {t('table.actions.editReader')}
                         </Button>
+
+                        <AttractapDeleteModal readerId={reader.id}>
+                          {(onOpen) => (
+                            <Button
+                              startContent={<Trash2Icon className="w-4 h-4" />}
+                              size="sm"
+                              color="danger"
+                              variant="light"
+                              onPress={onOpen}
+                              data-cy={`attractap-list-delete-reader-button-${reader.id}`}
+                            >
+                              {t('table.actions.deleteReader')}
+                            </Button>
+                          )}
+                        </AttractapDeleteModal>
                       </TableCell>
                     </TableRow>
                   )}

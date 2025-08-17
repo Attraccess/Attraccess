@@ -5,7 +5,7 @@ import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { nanoid } from 'nanoid';
 import { securelyHashToken } from './websockets/websocket.utils';
-import { ReaderUpdatedEvent } from './events';
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 
@@ -52,12 +52,54 @@ export class AttractapService {
 
   public async createNFCCard(
     user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen'>
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>
   ): Promise<NFCCard> {
-    return await this.nfcCardRepository.save({
-      ...data,
-      user,
+    return await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+      await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
+
+      return await transactionalEntityManager.save(NFCCard, {
+        ...data,
+        user,
+        isActive: true,
+      });
     });
+  }
+
+  /**
+   * Activates an NFC card (deactivates all other cards for the same user)
+   * @param id The ID of the NFC card to activate
+   * @returns The activated NFC card
+   */
+  public async activateNFCCard(id: number): Promise<NFCCard> {
+    return await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
+      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
+
+      if (!card) {
+        throw new Error(`Card with ID ${id} not found`);
+      }
+
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .update(NFCCard)
+        .set({ isActive: false })
+        .where({ user: { id: card.user.id } })
+        .execute();
+
+      return await transactionalEntityManager.save(NFCCard, {
+        ...card,
+        isActive: true,
+      });
+    });
+  }
+
+  /**
+   * Deactivates an NFC card
+   * @param id The ID of the NFC card to deactivate
+   * @returns The deactivated NFC card
+   */
+  public async deactivateNFCCard(id: number): Promise<NFCCard> {
+    await this.nfcCardRepository.update(id, { isActive: false });
+    return await this.getNFCCardByID(id);
   }
 
   public async deleteNFCCard(id: number): Promise<DeleteResult> {
@@ -136,6 +178,12 @@ export class AttractapService {
     }
 
     return response;
+  }
+
+  public async deleteReader(id: number) {
+    await this.readerRepository.delete(id);
+
+    this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
   }
 
   /**

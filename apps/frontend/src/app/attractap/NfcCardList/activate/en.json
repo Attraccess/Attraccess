@@ -1,0 +1,6 @@
+{
+  "title": "Activate NFC card",
+  "description": "Are you sure you want to activate the NFC card? This will deactivate all other NFC cards you have.",
+  "cancel": "Cancel",
+  "activate": "Activate"
+}

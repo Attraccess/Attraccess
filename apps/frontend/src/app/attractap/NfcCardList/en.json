@@ -11,7 +11,9 @@
       "actions": "Actions"
     },
     "actions": {
-      "delete": "Delete"
+      "delete": "Delete",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
     },
     "deleteModal": {
       "title": "Delete NFC Card",
