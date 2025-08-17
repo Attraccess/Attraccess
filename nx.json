@@ -131,19 +131,16 @@
     }
   },
   "release": {
+    "git": {
+      "commitMessage": "chore(release): {version} [skip ci]"
+    },
     "version": {
       "preVersionCommand": "pnpm nx run-many -t build",
-      "conventionalCommits": true,
-      "git": {
-        "commitMessage": "chore(release): {version} [skip ci]"
-      }
+      "conventionalCommits": true
     },
     "changelog": {
       "workspaceChangelog": {
         "createRelease": "github"
-      },
-      "git": {
-        "commitMessage": "chore(release): {version} [skip ci]"
       }
     }
   },
