@@ -5,32 +5,15 @@ on:
   release:
     types: [published]
 
-  # Allow manual triggering for testing
-  workflow_dispatch:
-    inputs:
-      major:
-        description: 'Major version (e.g. 1)'
-        required: true
-        default: '1'
-      minor:
-        description: 'Minor version (e.g. 0)'
-        required: true
-        default: '0'
-      patch:
-        description: 'Patch version (e.g. 0)'
-        required: true
-        default: '0'
-
 # Define environment variables
 env:
-  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
   # Enable Docker BuildKit
   DOCKER_BUILDKIT: 1
   # Determine release version
-  RELEASE_VERSION: v${{ inputs.major }}.${{ inputs.minor }}.${{ inputs.patch }}
+  RELEASE_VERSION: ${{ github.event.release.tag_name }}
 
 # Define permissions
 permissions:
@@ -75,19 +58,6 @@ jobs:
         env:
           NODE_ENV: production
         run: pnpm nx run-many --target=lint,typecheck,test,e2e,build
-
-      - name: NX Release
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "GitHub Actions"
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-          pnpm exec nx release ${{ env.RELEASE_VERSION }} --skip-publish
-
-      # push back to main
-      - name: Push back to main
-        run: |
-          git push origin main
-          git push origin --tags
 
       # Upload build artifacts to be used in Docker build
       - name: Upload build artifacts
