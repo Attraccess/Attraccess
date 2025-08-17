@@ -143,7 +143,7 @@ jobs:
 
             ### GitHub Container Registry
             ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/${{ github.repository_name }}:${{ env.RELEASE_VERSION }}
+            docker pull ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
             ```
 
             ### Docker Hub
@@ -152,7 +152,7 @@ jobs:
             ```
 
             ### Image Details
-            - GitHub Registry: `ghcr.io/${{ github.repository_owner }}/${{ github.repository_name }}:${{ env.RELEASE_VERSION }}`
+            - GitHub Registry: `ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}`
             - Docker Hub: `${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}`
 
             ### Docker Run Example
@@ -160,7 +160,4 @@ jobs:
             docker run -p 3000:3000 ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}
             ```
 
-            ### Links
-            - [GitHub Container Registry](https://github.com/${{ github.repository }}/pkgs/container/${{ github.repository_name }})
-            - [Docker Hub](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }})
           append_body: true
