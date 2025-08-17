@@ -1238,6 +1238,7 @@ export interface ResourceFlowNodeDto {
    * @example "input.resource.usage.started"
    */
   type:
+    | "input.button"
     | "input.resource.usage.started"
     | "input.resource.usage.stopped"
     | "input.resource.usage.takeover"
@@ -1395,6 +1396,59 @@ export interface ResourceFlowLogsResponseDto {
   limit: number;
   /** Array of flow log entries, ordered by creation time (newest first) */
   data: ResourceFlowLog[];
+}
+
+export interface ResourceFlowNodePosition {
+  /**
+   * The x position of the node
+   * @example 100
+   */
+  x: number;
+  /**
+   * The y position of the node
+   * @example 100
+   */
+  y: number;
+}
+
+export interface ResourceFlowNode {
+  /**
+   * The unique identifier of the resource flow node
+   * @example "TGVgqDzCKXKVr-XGUD5V3"
+   */
+  id: string;
+  /**
+   * The type of the node
+   * @example "input.resource.usage.started"
+   */
+  type: string;
+  /**
+   * The position of the node
+   * @example {"x":100,"y":100}
+   */
+  position: ResourceFlowNodePosition;
+  /**
+   * The data of the node, depending on the type of the node
+   * @example {"url":"https://example.com","method":"GET"}
+   */
+  data: object;
+  /**
+   * When the node was created
+   * @format date-time
+   */
+  createdAt?: string;
+  /**
+   * When the node was last updated
+   * @format date-time
+   */
+  updatedAt?: string;
+  /**
+   * The id of the resource that this node belongs to
+   * @example 1
+   */
+  resourceId: number;
+  /** The resource being this node belongs to */
+  resource?: Resource;
 }
 
 export interface PluginMainFrontend {
@@ -1610,7 +1664,11 @@ export interface NFCCard {
    * @format date-time
    */
   lastSeen: string;
+  /** Whether the NFC card is active */
+  isActive: boolean;
 }
+
+export type NfcCardSetActiveStateDto = object;
 
 export interface AttractapFirmware {
   /**
@@ -2045,6 +2103,13 @@ export type GetResourceFlowLogsError = {
 
 export type ResourceFlowsControllerStreamEventsData = any;
 
+export interface PressButtonData {
+  /** @example "OK" */
+  message?: string;
+}
+
+export type GetButtonsData = ResourceFlowNode[];
+
 export type GetPluginsData = LoadedPluginManifest[];
 
 export type GetFrontendPluginFileData = string;
@@ -2059,11 +2124,15 @@ export type UpdateReaderData = UpdateReaderResponseDto;
 
 export type GetReaderByIdData = Attractap;
 
+export type DeleteReaderData = any;
+
 export type GetReadersData = Attractap[];
 
 export type GetAppKeyByUidData = AppKeyResponseDto;
 
 export type GetAllCardsData = NFCCard[];
+
+export type ToggleCardActiveData = NFCCard;
 
 export type GetFirmwaresData = AttractapFirmware[];
 
@@ -3776,6 +3845,51 @@ export namespace ResourceFlows {
     export type RequestHeaders = {};
     export type ResponseBody = ResourceFlowsControllerStreamEventsData;
   }
+
+  /**
+   * @description Press a button to trigger the flow
+   * @tags Resource Flows
+   * @name PressButton
+   * @summary Press a button
+   * @request POST:/api/resources/{resourceId}/flow/buttons/{buttonId}/press
+   * @secure
+   */
+  export namespace PressButton {
+    export type RequestParams = {
+      resourceId: number;
+      /**
+       * The ID of the button to press
+       * @example "lsHVcGBwIbOGxez5fBM68"
+       */
+      buttonId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = PressButtonData;
+  }
+
+  /**
+   * @description Get buttons for a resource
+   * @tags Resource Flows
+   * @name GetButtons
+   * @summary Get buttons
+   * @request GET:/api/resources/{resourceId}/flow/buttons
+   * @secure
+   */
+  export namespace GetButtons {
+    export type RequestParams = {
+      /**
+       * The ID of the resource to get buttons for
+       * @example 1
+       */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetButtonsData;
+  }
 }
 
 export namespace Plugins {
@@ -3927,6 +4041,28 @@ export namespace Attractap {
   /**
    * No description
    * @tags Attractap
+   * @name DeleteReader
+   * @summary Delete a reader
+   * @request DELETE:/api/attractap/readers/{readerId}
+   * @secure
+   */
+  export namespace DeleteReader {
+    export type RequestParams = {
+      /**
+       * The ID of the reader to delete
+       * @example 1
+       */
+      readerId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteReaderData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
    * @name GetReaders
    * @summary Get all readers
    * @request GET:/api/attractap/readers
@@ -3960,7 +4096,7 @@ export namespace Attractap {
    * No description
    * @tags Attractap
    * @name GetAllCards
-   * @summary Get all cards (to which you have access)
+   * @summary Get all of your cards
    * @request GET:/api/attractap/cards
    * @secure
    */
@@ -3970,6 +4106,24 @@ export namespace Attractap {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetAllCardsData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
+   * @name ToggleCardActive
+   * @summary Activate or deactivate an NFC card
+   * @request PATCH:/api/attractap/cards/{id}/active
+   * @secure
+   */
+  export namespace ToggleCardActive {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = NfcCardSetActiveStateDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ToggleCardActiveData;
   }
 
   /**
@@ -6069,6 +6223,46 @@ export class Api<
         secure: true,
         ...params,
       }),
+
+    /**
+     * @description Press a button to trigger the flow
+     *
+     * @tags Resource Flows
+     * @name PressButton
+     * @summary Press a button
+     * @request POST:/api/resources/{resourceId}/flow/buttons/{buttonId}/press
+     * @secure
+     */
+    pressButton: (
+      resourceId: number,
+      buttonId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<PressButtonData, void>({
+        path: `/api/resources/${resourceId}/flow/buttons/${buttonId}/press`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get buttons for a resource
+     *
+     * @tags Resource Flows
+     * @name GetButtons
+     * @summary Get buttons
+     * @request GET:/api/resources/{resourceId}/flow/buttons
+     * @secure
+     */
+    getButtons: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetButtonsData, void>({
+        path: `/api/resources/${resourceId}/flow/buttons`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
   };
   plugins = {
     /**
@@ -6230,6 +6424,23 @@ export class Api<
      * No description
      *
      * @tags Attractap
+     * @name DeleteReader
+     * @summary Delete a reader
+     * @request DELETE:/api/attractap/readers/{readerId}
+     * @secure
+     */
+    deleteReader: (readerId: number, params: RequestParams = {}) =>
+      this.request<DeleteReaderData, void>({
+        path: `/api/attractap/readers/${readerId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
      * @name GetReaders
      * @summary Get all readers
      * @request GET:/api/attractap/readers
@@ -6269,7 +6480,7 @@ export class Api<
      *
      * @tags Attractap
      * @name GetAllCards
-     * @summary Get all cards (to which you have access)
+     * @summary Get all of your cards
      * @request GET:/api/attractap/cards
      * @secure
      */
@@ -6278,6 +6489,30 @@ export class Api<
         path: `/api/attractap/cards`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
+     * @name ToggleCardActive
+     * @summary Activate or deactivate an NFC card
+     * @request PATCH:/api/attractap/cards/{id}/active
+     * @secure
+     */
+    toggleCardActive: (
+      id: number,
+      data: NfcCardSetActiveStateDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ToggleCardActiveData, void>({
+        path: `/api/attractap/cards/${id}/active`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
