@@ -87,6 +87,7 @@ jobs:
       - name: Push back to main
         run: |
           git push origin main
+          git push origin --tags
 
       # Upload build artifacts to be used in Docker build
       - name: Upload build artifacts
