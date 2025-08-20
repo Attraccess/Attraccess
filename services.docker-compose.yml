@@ -5,22 +5,16 @@ services:
       - '8025:8025'
       - '1025:1025'
 
-  mqtt:
-    image: eclipse-mosquitto:2.0
+  bunkerm:
+    image: bunkeriot/bunkerm:latest
+    restart: unless-stopped
     ports:
-      - '1883:1883'
-      - '9001:9001'
+      - '1883:1883' # MQTT broker port
+      - '9001:9001' # WebSocket port (if needed)
+      - '2000:2000' # Web UI
+      - '1900:1900' # Internal admin API
     volumes:
-      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
-      - ./data/mosquitto:/mosquitto/data
-      - ./log/mosquitto:/mosquitto/log
-
-  mqtt-explorer:
-    image: emqx/mqttx-web
-    ports:
-      - '4000:80'
-    depends_on:
-      - mqtt
+      - bunkerm:/bunkerm/data # persistent data storage
 
   webhook-site:
     image: tarampampam/webhook-tester:latest
@@ -30,7 +24,7 @@ services:
     ports:
       - '8084:8080'
     volumes:
-      - ./data/webhook-site:/storage
+      - webhook-site:/storage
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -42,7 +36,7 @@ services:
     ports:
       - '8090:8080'
     volumes:
-      - ./data/keycloak:/opt/keycloak/data
+      - keycloak:/opt/keycloak/data
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/health/ready']
       interval: 10s
@@ -92,8 +86,8 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_PG_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
     volumes:
-      - ./docker/authentik/media:/media
-      - ./docker/authentik/custom-templates:/templates
+      - authentik-media:/media
+      - authentik-templates:/templates
     env_file:
       - .env
     ports:
@@ -125,9 +119,9 @@ services:
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker/authentik/media:/media
-      - ./docker/authentik/certs:/certs
-      - ./docker/authentik/custom-templates:/templates
+      - authentik-media:/media
+      - authentik-certs:/certs
+      - authentik-templates:/templates
     env_file:
       - .env
     depends_on:
@@ -140,4 +134,16 @@ volumes:
   authentik-database:
     driver: local
   authentik-redis:
+    driver: local
+  bunkerm:
+    driver: local
+  authentik-media:
+    driver: local
+  authentik-templates:
+    driver: local
+  authentik-certs:
+    driver: local
+  keycloak:
+    driver: local
+  webhook-site:
     driver: local

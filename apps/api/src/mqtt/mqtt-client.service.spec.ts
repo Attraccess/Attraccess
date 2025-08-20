@@ -13,25 +13,42 @@ interface MqttClientServicePrivate {
   clients: Map<number, mqtt.MqttClient>;
 }
 
-// Mock mqtt module thoroughly to avoid actual connections
-jest.mock('mqtt', () => ({
-  connect: jest.fn(() => ({
-    connected: true,
-    connecting: false,
-    reconnecting: false,
-    on: jest.fn(),
-    once: jest.fn(),
-    end: jest.fn(),
-    publish: jest.fn((topic, message, callback) => {
-      if (typeof callback === 'function') {
-        callback();
-      }
-    }),
-  })),
-}));
+// Mock mqtt module thoroughly to avoid actual connections and timers
+jest.mock('mqtt', () => {
+  const { EventEmitter } = require('events');
+
+  function createMockClient() {
+    const emitter = new EventEmitter();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = {
+      connected: true,
+      connecting: false,
+      reconnecting: false,
+      on: emitter.on.bind(emitter),
+      once: emitter.once.bind(emitter),
+      end: jest.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      publish: jest.fn((topic: string, message: string, optsOrCb: any, cb?: any) => {
+        const callback = typeof optsOrCb === 'function' ? optsOrCb : cb;
+        if (typeof callback === 'function') {
+          callback();
+        }
+      }),
+      emit: emitter.emit.bind(emitter),
+    };
+    // Simulate successful connect asynchronously
+    setImmediate(() => client.emit('connect'));
+    return client;
+  }
+
+  return {
+    connect: jest.fn(() => createMockClient()),
+  };
+});
 
 describe('MqttClientService', () => {
   let service: MqttClientService;
+  let moduleRef: TestingModule;
   let mockRepository: Partial<Repository<MqttServer>>;
   let mockMonitoringService: Partial<MqttMonitoringService>;
 
@@ -78,7 +95,7 @@ describe('MqttClientService', () => {
       clearServerStats: jest.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    moduleRef = await Test.createTestingModule({
       providers: [
         MqttClientService,
         {
@@ -92,7 +109,7 @@ describe('MqttClientService', () => {
       ],
     }).compile();
 
-    service = module.get<MqttClientService>(MqttClientService);
+    service = moduleRef.get<MqttClientService>(MqttClientService);
 
     // Mock logger to prevent console output during tests
     jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
@@ -101,15 +118,11 @@ describe('MqttClientService', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
 
     // Mock the getOrCreateClient method to avoid actual connection attempts
-    jest
-      .spyOn(
-        service as unknown as MqttClientServicePrivate,
-        'getOrCreateClient'
-      )
-      .mockResolvedValue(mqtt.connect({}));
+    jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mqtt.connect({}));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await moduleRef?.close();
     jest.clearAllMocks();
   });
 
@@ -120,10 +133,7 @@ describe('MqttClientService', () => {
   describe('publish', () => {
     it('should successfully publish a message', async () => {
       // Arrange - mock the internal methods to avoid actual connections
-      const getOrCreateClientSpy = jest.spyOn(
-        service as unknown as MqttClientServicePrivate,
-        'getOrCreateClient'
-      );
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
@@ -142,36 +152,30 @@ describe('MqttClientService', () => {
 
     it('should throw an error if publishing fails', async () => {
       // Arrange - mock the client to throw an error on publish
-      const getOrCreateClientSpy = jest.spyOn(
-        service as unknown as MqttClientServicePrivate,
-        'getOrCreateClient'
-      );
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
       // Make publish callback throw an error
       mockClient.publish = jest
         .fn()
-        .mockImplementation((topic, message, callback) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockImplementation((topic: string, message: string, optionsOrCb?: any, cb?: (err?: Error) => void) => {
+          const callback = typeof optionsOrCb === 'function' ? optionsOrCb : cb;
           if (typeof callback === 'function') {
             callback(new Error('Publish error'));
           }
         });
 
       // Act & Assert
-      await expect(
-        service.publish(1, 'test/topic', 'test message')
-      ).rejects.toThrow('Publish error');
+      await expect(service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
     });
   });
 
   describe('testConnection', () => {
     it('should return success if connection is successful', async () => {
       // Arrange - mock the internal methods
-      const getOrCreateClientSpy = jest.spyOn(
-        service as unknown as MqttClientServicePrivate,
-        'getOrCreateClient'
-      );
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
       const mockClient = mqtt.connect({});
       getOrCreateClientSpy.mockResolvedValue(mockClient);
 
@@ -195,10 +199,7 @@ describe('MqttClientService', () => {
     it('should disconnect all clients', async () => {
       // Arrange - mock the clients map to have a client
       const mockClient = mqtt.connect({});
-      (service as unknown as MqttClientServicePrivate).clients.set(
-        1,
-        mockClient
-      );
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
 
       // Act
       await service.onModuleDestroy();

@@ -1,19 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import * as mqtt from 'mqtt';
 import { MqttClient } from 'mqtt';
 import { MqttMonitoringService } from './mqtt-monitoring.service';
-import {
-  TestConnectionResponseDto,
-  MqttServerStatusDto,
-} from './servers/dtos/mqtt-server.dto';
+import { TestConnectionResponseDto, MqttServerStatusDto } from './servers/dtos/mqtt-server.dto';
 
 @Injectable()
 export class MqttClientService implements OnModuleInit, OnModuleDestroy {
@@ -85,14 +77,10 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     this.monitoringService.onConnectAttempt(serverId);
 
     return new Promise((resolve, reject) => {
-      const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${
-        server.port
-      }`;
+      const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${server.port}`;
 
       const options: mqtt.IClientOptions = {
-        clientId:
-          server.clientId ||
-          `attraccess-api-${Math.random().toString(16).slice(2, 10)}`,
+        clientId: server.clientId || `attraccess-api-${Math.random().toString(16).slice(2, 10)}`,
         clean: true,
         reconnectPeriod: 5000,
       };
@@ -114,9 +102,8 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
       });
 
       client.on('error', (error) => {
-        this.logger.error(
-          `MQTT connection error for server ${server.name}: ${error.message}`
-        );
+        this.logger.error(`MQTT connection error for server ${server.name}: ${error.message}`);
+        this.logger.error(error);
         this.monitoringService.onConnectFailure(serverId, error.message);
         // Don't reject as the client will try to reconnect
       });
@@ -153,19 +140,13 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async publish(
-    serverId: number,
-    topic: string,
-    message: string
-  ): Promise<void> {
+  async publish(serverId: number, topic: string, message: string): Promise<void> {
     try {
       const client = await this.getOrCreateClient(serverId);
       return new Promise((resolve, reject) => {
-        client.publish(topic, message, (error) => {
+        client.publish(topic, message, { qos: 2, retain: true }, (error) => {
           if (error) {
-            this.logger.error(
-              `Failed to publish to topic ${topic}: ${error.message}`
-            );
+            this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
             this.monitoringService.onPublishFailure(serverId, error.message);
             reject(error);
           } else {
@@ -186,8 +167,7 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
   async testConnection(serverId: number): Promise<TestConnectionResponseDto> {
     try {
       await this.getOrCreateClient(serverId);
-      const healthStatus =
-        this.monitoringService.getConnectionHealthStatus(serverId);
+      const healthStatus = this.monitoringService.getConnectionHealthStatus(serverId);
       return {
         success: true,
         message: `Connection successful. ${healthStatus.details}`,
@@ -195,9 +175,7 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       return {
         success: false,
-        message: `Connection failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        message: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
@@ -205,8 +183,7 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
   async getStatusOfOne(serverId: number): Promise<MqttServerStatusDto> {
     const client = this.clients.get(serverId);
     const connected = client?.connected || false;
-    const healthStatus =
-      this.monitoringService.getConnectionHealthStatus(serverId);
+    const healthStatus = this.monitoringService.getConnectionHealthStatus(serverId);
 
     return {
       connected,
