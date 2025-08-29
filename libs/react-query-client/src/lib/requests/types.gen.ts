@@ -2181,6 +2181,7 @@ export type ResourceGroupIntroducersRevokeData = {
 export type ResourceGroupIntroducersRevokeResponse = unknown;
 
 export type ResourceIntroducersIsIntroducerData = {
+    includeGroups: boolean;
     resourceId: number;
     userId: number;
 };

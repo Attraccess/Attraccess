@@ -7,9 +7,13 @@ import {
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ResourceIntroduction, ResourceIntroducer, ResourceIntroductionHistoryItem])],
+  imports: [
+    TypeOrmModule.forFeature([ResourceIntroduction, ResourceIntroducer, ResourceIntroductionHistoryItem]),
+    ResourceIntroducersModule,
+  ],
   controllers: [ResourceIntroductionsController],
   providers: [ResourceIntroductionsService],
   exports: [ResourceIntroductionsService],

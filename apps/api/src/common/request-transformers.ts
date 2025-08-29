@@ -27,9 +27,9 @@ export const ToBoolean = () => {
   };
 };
 
-const valueToBoolean = (value: unknown) => {
+export const valueToBoolean = (value: unknown): boolean | undefined => {
   if (value === null || value === undefined) {
-    return value;
+    return value as undefined;
   }
 
   if (typeof value === 'boolean') {

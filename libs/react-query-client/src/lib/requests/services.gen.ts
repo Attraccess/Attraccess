@@ -1452,6 +1452,7 @@ export class AccessControlService {
      * @param data The data for the request.
      * @param data.resourceId
      * @param data.userId
+     * @param data.includeGroups
      * @returns IsResourceIntroducerResponseDto User is an introducer for the resource
      * @throws ApiError
      */
@@ -1462,6 +1463,9 @@ export class AccessControlService {
             path: {
                 resourceId: data.resourceId,
                 userId: data.userId
+            },
+            query: {
+                includeGroups: data.includeGroups
             }
         });
     }

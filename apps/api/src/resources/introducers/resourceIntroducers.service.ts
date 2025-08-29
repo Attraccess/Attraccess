@@ -37,8 +37,25 @@ export class ResourceIntroducersService {
     await this.resourceIntroducerRepository.remove(introducer);
   }
 
-  public async isIntroducer(resourceId: number, userId: number): Promise<boolean> {
+  public async isIntroducer(resourceId: number, userId: number, includeGroups: boolean): Promise<boolean> {
     const introducer = await this.getByResourceIdAndUserId(resourceId, userId);
-    return !!introducer;
+
+    if (introducer) {
+      return true;
+    }
+
+    if (includeGroups) {
+      const groupIntroducers = await this.resourceIntroducerRepository
+        .createQueryBuilder('introducer')
+        .leftJoin('introducer.resourceGroup', 'group')
+        .leftJoin('group.resources', 'resource')
+        .where('resource.id = :resourceId', { resourceId })
+        .andWhere('introducer.userId = :userId', { userId })
+        .getMany();
+
+      return groupIntroducers.length > 0;
+    }
+
+    return false;
   }
 }

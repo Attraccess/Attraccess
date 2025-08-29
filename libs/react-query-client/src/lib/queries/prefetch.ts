@@ -108,10 +108,11 @@ export const prefetchUseAccessControlServiceResourceGroupIntroducersIsIntroducer
   groupId: number;
   userId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) });
-export const prefetchUseAccessControlServiceResourceIntroducersIsIntroducer = (queryClient: QueryClient, { resourceId, userId }: {
+export const prefetchUseAccessControlServiceResourceIntroducersIsIntroducer = (queryClient: QueryClient, { includeGroups, resourceId, userId }: {
+  includeGroups: boolean;
   resourceId: number;
   userId: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ resourceId, userId }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) });
 export const prefetchUseAccessControlServiceResourceIntroducersGetMany = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) });

@@ -1981,6 +1981,12 @@ export type ResourceUsageGetActiveSessionData = GetActiveUsageSessionDto;
 
 export type ResourceUsageCanControlData = CanControlResponseDto;
 
+export interface ResourceIntroducersIsIntroducerParams {
+  includeGroups: boolean;
+  resourceId: number;
+  userId: number;
+}
+
 export type ResourceIntroducersIsIntroducerData =
   IsResourceIntroducerResponseDto;
 
@@ -3457,7 +3463,9 @@ export namespace AccessControl {
       resourceId: number;
       userId: number;
     };
-    export type RequestQuery = {};
+    export type RequestQuery = {
+      includeGroups: boolean;
+    };
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceIntroducersIsIntroducerData;
@@ -5843,13 +5851,13 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introducers/{userId}/is-introducer
      */
     resourceIntroducersIsIntroducer: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId, ...query }: ResourceIntroducersIsIntroducerParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersIsIntroducerData, any>({
         path: `/api/resources/${resourceId}/introducers/${userId}/is-introducer`,
         method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),

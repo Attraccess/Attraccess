@@ -50,7 +50,7 @@ export class ResourceUsageService {
       return true;
     }
 
-    if (await this.resourceIntroducersService.isIntroducer(resourceId, user.id)) {
+    if (await this.resourceIntroducersService.isIntroducer(resourceId, user.id, true)) {
       this.logger.debug(`User ${user.id} is an introducer for resource ${resourceId}`);
       return true;
     }
@@ -59,11 +59,6 @@ export class ResourceUsageService {
     for (const group of groupsOfResource) {
       if (await this.resourceGroupsIntroductionsService.hasValidIntroduction({ groupId: group.id, userId: user.id })) {
         this.logger.debug(`User ${user.id} has valid group introduction for resource ${resourceId}`);
-        return true;
-      }
-
-      if (await this.resourceGroupsIntroducersService.isIntroducer({ groupId: group.id, userId: user.id })) {
-        this.logger.debug(`User ${user.id} is a group introducer for resource ${resourceId}`);
         return true;
       }
     }
