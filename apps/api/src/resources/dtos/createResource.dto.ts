@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, MinLength, IsEnum, IsUrl, ValidateIf, IsBoolean } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
-import { DocumentationType } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType } from '@attraccess/database-entities';
 import { ToBoolean } from '../../common/request-transformers';
 
 export class CreateResourceDto {
@@ -12,6 +12,14 @@ export class CreateResourceDto {
   @IsString()
   @MinLength(1)
   name: string;
+
+  @ApiProperty({
+    description: 'The type of the resource',
+    example: ResourceType.Default,
+    enum: ResourceType,
+  })
+  @IsEnum(ResourceType)
+  type: ResourceType;
 
   @ApiProperty({
     description: 'A detailed description of the resource',

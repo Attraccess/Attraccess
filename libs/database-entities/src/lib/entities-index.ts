@@ -3,7 +3,7 @@ import { EmailTemplate } from './entities/email-template.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
-import { Resource, ResourceComputedView } from './entities/resource.entity';
+import { Resource, ResourceType } from './entities/resource.entity';
 import { ResourceGroup } from './entities/resourceGroup.entity';
 import { ResourceIntroduction } from './entities/resourceIntroduction.entity';
 import {
@@ -41,7 +41,6 @@ export {
   AuthenticationDetail,
   MqttServer,
   Resource,
-  ResourceComputedView,
   ResourceGroup,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
@@ -76,6 +75,7 @@ export {
   AttractapFirmwareVersion,
   ResourceMaintenance,
   ResourceFlowActionIfNodeData,
+  ResourceType,
 };
 
 // Export the entities object
@@ -85,7 +85,6 @@ export const entities = {
   RevokedToken,
   Session,
   Resource,
-  ResourceComputedView,
   ResourceGroup,
   ResourceUsage,
   ResourceIntroduction,

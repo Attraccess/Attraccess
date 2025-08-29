@@ -22,6 +22,11 @@ import { ResourceFlowLog } from './resourceFlowLog';
 import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
 
+export enum ResourceType {
+  Default = 'default',
+  Door = 'door',
+}
+
 @Entity()
 export class Resource {
   @PrimaryGeneratedColumn()
@@ -37,6 +42,14 @@ export class Resource {
     example: '3D Printer',
   })
   name!: string;
+
+  @Column({ type: 'simple-enum', enum: ResourceType })
+  @ApiProperty({
+    description: 'The type of the resource',
+    example: ResourceType.Default,
+    enum: ResourceType,
+  })
+  type!: ResourceType;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
@@ -131,23 +144,4 @@ export class Resource {
 
   @OneToMany(() => ResourceMaintenance, (maintenance) => maintenance.resource)
   maintenances!: ResourceMaintenance[];
-}
-
-@ViewEntity({
-  materialized: false,
-  expression: (connection) =>
-    connection
-      .createQueryBuilder()
-      .select('resource.id', 'id')
-      .addSelect('COALESCE(SUM(usage.usageInMinutes), -1)', 'totalUsageMinutes')
-      .from(Resource, 'resource')
-      .leftJoin(ResourceUsage, 'usage', 'usage.resourceId = resource.id')
-      .groupBy('resource.id'),
-})
-export class ResourceComputedView {
-  @ViewColumn()
-  id!: number;
-
-  @ViewColumn()
-  totalUsageMinutes!: number;
 }
