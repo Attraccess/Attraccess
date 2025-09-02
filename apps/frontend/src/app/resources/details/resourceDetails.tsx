@@ -10,7 +10,7 @@ import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
 import { PageHeader } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import {
   useResourcesServiceDeleteOneResource,
   useResourcesServiceGetOneResourceById,
@@ -49,20 +49,16 @@ function ResourceDetailsComponent() {
     de,
   });
 
-  const { data: isIntroducer } = useAccessControlServiceResourceIntroducersIsIntroducer(
-    { resourceId, userId: user?.id as number },
-    undefined,
-    {
-      enabled: !!user?.id,
-      refetchInterval: 3000,
-    }
-  );
-
   const canManageResources = hasPermission('canManageResources');
 
-  const canManageIntroductions = useMemo(
-    () => canManageResources || isIntroducer?.isIntroducer,
-    [canManageResources, isIntroducer]
+  const { data: isIntroducer } = useAccessControlServiceResourceIntroducersIsIntroducer(
+    {
+      resourceId,
+      userId: user?.id as number,
+      includeGroups: true,
+    },
+    undefined,
+    { enabled: !!user?.id }
   );
 
   const {
@@ -206,7 +202,7 @@ function ResourceDetailsComponent() {
       {/* Add the ManageResourceGroups component */}
 
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
-        {canManageIntroductions && (
+        {isIntroducer?.isIntroducer && (
           <ResourceIntroductionsManagement
             resourceId={resourceId}
             className="flex-1 min-w-80"

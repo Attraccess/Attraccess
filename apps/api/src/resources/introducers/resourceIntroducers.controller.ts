@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
 import { ResourceIntroducer } from '@attraccess/database-entities';
@@ -22,10 +22,13 @@ export class ResourceIntroducersController {
   })
   async isIntroducer(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('includeGroups') includeGroups: boolean
   ): Promise<IsResourceIntroducerResponseDto> {
+    const isResourceIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, userId, includeGroups);
+
     return {
-      isIntroducer: await this.resourceIntroducersService.isIntroducer(resourceId, userId),
+      isIntroducer: isResourceIntroducer,
     };
   }
 
