@@ -13,7 +13,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
-import { ResourceUsageStartedEvent, ResourceUsageEndedEvent } from '../usage/events/resource-usage.events';
+import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import { ApiTags } from '@nestjs/swagger';
 
 interface MessageEvent {
@@ -107,9 +107,11 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     return !!activeUsage;
   }
 
-  @OnEvent(ResourceUsageStartedEvent.EVENT_NAME)
-  handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
-    const { resource } = event;
+  @OnEvent(ResourceUsageEvent.EVENT_NAME)
+  handleResourceUsage(event: ResourceUsageEvent) {
+    const {
+      usage: { resource },
+    } = event;
 
     // Check if we have any subscribers for this resource
     if (!this.resourceSubjects.has(resource.id)) {
@@ -123,37 +125,12 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     const eventData = {
       ...event,
       inUse: true,
-      eventType: ResourceUsageStartedEvent.EVENT_NAME,
+      eventType: ResourceUsageEvent.EVENT_NAME,
     };
 
     // Emit the event to all subscribers
     subject.next({ data: eventData });
 
-    this.logger.debug(`Emitted ${ResourceUsageStartedEvent.EVENT_NAME} event for resource ${resource.id}`);
-  }
-
-  @OnEvent(ResourceUsageEndedEvent.EVENT_NAME)
-  handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
-    const { resource } = event;
-
-    // Check if we have any subscribers for this resource
-    if (!this.resourceSubjects.has(resource.id)) {
-      return;
-    }
-
-    // Get the subject for this resource
-    const subject = this.resourceSubjects.get(resource.id);
-
-    // Create event data with inUse flag
-    const eventData = {
-      ...event,
-      inUse: false,
-      eventType: 'resource.usage.ended',
-    };
-
-    // Emit the event to all subscribers
-    subject.next({ data: eventData });
-
-    this.logger.debug(`Emitted resource.usage.ended event for resource ${resource.id}`);
+    this.logger.debug(`Emitted ${ResourceUsageEvent.EVENT_NAME} event for resource ${resource.id}`);
   }
 }

@@ -251,6 +251,21 @@ export const useResourcesServiceResourceUsageStartSession = <TData = Common.Reso
   requestBody: StartUsageSessionDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourcesService.resourceUsageStartSession({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourcesServiceLockDoor = <TData = Common.ResourcesServiceLockDoorMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+}, TContext>({ mutationFn: ({ resourceId }) => ResourcesService.lockDoor({ resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourcesServiceUnlockDoor = <TData = Common.ResourcesServiceUnlockDoorMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+}, TContext>({ mutationFn: ({ resourceId }) => ResourcesService.unlockDoor({ resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourcesServiceUnlatchDoor = <TData = Common.ResourcesServiceUnlatchDoorMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+}, TContext>({ mutationFn: ({ resourceId }) => ResourcesService.unlatchDoor({ resourceId }) as unknown as Promise<TData>, ...options });
 export const useMqttServiceMqttServersCreateOne = <TData = Common.MqttServiceMqttServersCreateOneMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: CreateMqttServerDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

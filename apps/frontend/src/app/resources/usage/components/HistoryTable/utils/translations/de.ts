@@ -1,17 +1,30 @@
 export default {
-  // Headers
-  user: 'Benutzer',
-  startTime: 'Startzeit',
-  endTime: 'Endzeit',
-  duration: 'Dauer',
-  status: 'Status',
+  headers: {
+    user: 'Benutzer',
+    machine: {
+      startTime: 'Startzeit',
+      endTime: 'Endzeit',
+      duration: 'Dauer',
+    },
+    door: {
+      time: 'Zeit',
+      action: 'Aktion',
+    },
+  },
 
-  // Row items
-  unknownUser: 'Unbekannter Benutzer',
-  inProgress: 'In Benutzung',
+  rows: {
+    door: {
+      action: {
+        'door.lock': 'Abgeschlossen',
+        'door.unlock': 'Aufgeschlossen',
+        'door.unlatch': 'Falle geöffnet',
+      },
+    },
+    machine: {
+      inProgress: 'In Benutzung',
+    },
+  },
 
-  // Other
   noUsageHistory: 'Keine Nutzungshistorie für diese Ressource gefunden.',
-  errorLoadingHistory:
-    'Fehler beim Laden der Nutzungshistorie. Bitte versuchen Sie es erneut.',
+  errorLoadingHistory: 'Fehler beim Laden der Nutzungshistorie. Bitte versuchen Sie es erneut.',
 };

@@ -1,3 +1,6 @@
 {
-  "usageSession": "Nutzungssitzung"
+  "title": {
+    "machine": "Nutzungssitzung",
+    "door": "Türsteuerung"
+  }
 }

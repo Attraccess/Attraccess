@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesService } from './resources.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, DocumentationType } from '@attraccess/database-entities';
+import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
 import { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
@@ -79,6 +79,8 @@ describe('ResourcesService', () => {
       id,
       name,
       description,
+      type: ResourceType.Machine,
+      separateUnlockAndUnlatch: false,
       imageFilename: null,
       documentationType: DocumentationType.MARKDOWN,
       documentationMarkdown: `# Documentation ${id}`,
@@ -441,6 +443,8 @@ describe('ResourcesService', () => {
         id: 1,
         name: 'Resource 1',
         description: 'Description 1',
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Documentation 1',
@@ -483,6 +487,7 @@ describe('ResourcesService', () => {
     it('should create a new resource', async () => {
       const createDto: CreateResourceDto = {
         name: 'New Resource',
+        type: ResourceType.Machine,
         description: 'New Description',
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# New Documentation',
@@ -494,6 +499,8 @@ describe('ResourcesService', () => {
         id: 1,
         name: createDto.name,
         description: createDto.description,
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: createDto.documentationType,
         documentationMarkdown: createDto.documentationMarkdown,
@@ -522,11 +529,13 @@ describe('ResourcesService', () => {
       expect(result).toEqual(newResource);
       expect(resourceRepository.create).toHaveBeenCalledWith({
         name: createDto.name,
+        type: createDto.type,
         description: createDto.description,
         documentationType: createDto.documentationType || null,
         documentationMarkdown: createDto.documentationMarkdown || null,
         documentationUrl: createDto.documentationUrl || null,
         allowTakeOver: createDto.allowTakeOver || false,
+        separateUnlockAndUnlatch: false,
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });
@@ -537,6 +546,7 @@ describe('ResourcesService', () => {
       const resourceId = 1;
       const updateDto: UpdateResourceDto = {
         name: 'Updated Resource',
+        type: ResourceType.Machine,
         description: 'Updated Description',
         documentationType: DocumentationType.URL,
         documentationUrl: 'https://example.com/updated',
@@ -546,6 +556,8 @@ describe('ResourcesService', () => {
         id: resourceId,
         name: 'Old Resource',
         description: 'Old Description',
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Old Documentation',
@@ -590,6 +602,7 @@ describe('ResourcesService', () => {
       const resourceId = 999;
       const updateDto: UpdateResourceDto = {
         name: 'Updated Resource',
+        type: ResourceType.Machine,
       };
 
       jest.spyOn(service, 'getResourceById').mockRejectedValue(new ResourceNotFoundException(resourceId));
@@ -604,6 +617,8 @@ describe('ResourcesService', () => {
         id: 1,
         name: 'Resource 1',
         description: 'Description 1',
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Documentation 1',

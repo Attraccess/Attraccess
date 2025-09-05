@@ -1,3 +1,6 @@
 {
-  "usageSession": "Usage Session"
+  "title": {
+    "machine": "Usage Session",
+    "door": "Door Control"
+  }
 }

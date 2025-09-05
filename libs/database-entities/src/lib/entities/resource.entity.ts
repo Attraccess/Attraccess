@@ -5,8 +5,6 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
-  ViewEntity,
-  ViewColumn,
   ManyToMany,
   JoinTable,
 } from 'typeorm';
@@ -21,11 +19,7 @@ import { ResourceFlowEdge } from './resourceFlowEdge';
 import { ResourceFlowLog } from './resourceFlowLog';
 import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
-
-export enum ResourceType {
-  Default = 'default',
-  Door = 'door',
-}
+import { ResourceType } from './resource.type';
 
 @Entity()
 export class Resource {
@@ -46,10 +40,18 @@ export class Resource {
   @Column({ type: 'simple-enum', enum: ResourceType })
   @ApiProperty({
     description: 'The type of the resource',
-    example: ResourceType.Default,
+    example: ResourceType.Machine,
     enum: ResourceType,
   })
   type!: ResourceType;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+    example: false,
+    default: false,
+  })
+  separateUnlockAndUnlatch!: boolean | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

@@ -71,6 +71,87 @@ export class ResourceUsageController {
     return this.resourceUsageService.endSession(resourceId, req.user, dto);
   }
 
+  @Post('lock')
+  @Auth()
+  @ApiOperation({ summary: 'Lock a resource of door type', operationId: 'lockDoor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Door locked successfully.',
+    type: ResourceUsage,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid input data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async lockDoor(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest
+  ): Promise<ResourceUsage> {
+    return await this.resourceUsageService.lockDoor(resourceId, req.user);
+  }
+
+  @Post('unlock')
+  @Auth()
+  @ApiOperation({ summary: 'Unlock a resource of door type', operationId: 'unlockDoor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Door unlocked successfully.',
+    type: ResourceUsage,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid input data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async unlockDoor(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest
+  ): Promise<ResourceUsage> {
+    return await this.resourceUsageService.unlockDoor(resourceId, req.user);
+  }
+
+  @Post('unlatch')
+  @Auth()
+  @ApiOperation({ summary: 'Unlatch a resource of door type (if supported)', operationId: 'unlatchDoor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Door unlatch successfully.',
+    type: ResourceUsage,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid input data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async unlatchDoor(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest
+  ): Promise<ResourceUsage> {
+    return await this.resourceUsageService.unlatchDoor(resourceId, req.user);
+  }
+
   @Get('history')
   @Auth()
   @ApiOperation({ summary: 'Get usage history for a resource', operationId: 'resourceUsageGetHistory' })

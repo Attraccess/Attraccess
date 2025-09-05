@@ -80,6 +80,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
           selectedKey={selectedKey}
           onSelectionChange={(key) => setSelectedKey(key as string | null)}
           isClearable
+          inputProps={{ autoComplete: 'off', type: 'text' }}
           onClear={() => {
             setSelectedKey(null);
             setSearchTerm('');

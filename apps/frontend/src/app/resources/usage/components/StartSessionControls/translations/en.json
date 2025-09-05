@@ -1,17 +1,24 @@
 {
-  "noActiveSession": "No active session. Start using this resource by clicking the button below.",
-  "startSession": "Start Using Resource",
-  "sessionStarted": "Session Started",
-  "sessionStartedDescription": "You have successfully started using this resource.",
-  "sessionTakeOvernDescription": "You have successfully takeovern the session.",
-  "sessionTakeOverErrorDescription": "Failed to takeover the session. The other user might have ended their session, or an error occurred.",
-  "sessionStartError": "Failed to Start Session",
-  "sessionStartErrorDescription": "An error occurred while starting the session. Please try again.",
-  "alternativeStartSessionOptionsMenu": {
-    "label": "Alternative Session Start",
-    "startWithNotes": {
-      "label": "Start with Notes",
-      "description": "Start the session and provide notes."
+  "machine": {
+    "noActiveSession": "No active session. Start using this resource by clicking the button below.",
+    "startSession": "Start Using Resource",
+    "sessionStarted": "Session Started",
+    "sessionStartedDescription": "You have successfully started using this resource.",
+    "sessionTakeOvernDescription": "You have successfully takeovern the session.",
+    "sessionTakeOverErrorDescription": "Failed to takeover the session. The other user might have ended their session, or an error occurred.",
+    "sessionStartError": "Failed to Start Session",
+    "sessionStartErrorDescription": "An error occurred while starting the session. Please try again.",
+    "alternativeStartSessionOptionsMenu": {
+      "label": "Alternative Session Start",
+      "startWithNotes": {
+        "label": "Start with Notes",
+        "description": "Start the session and provide notes."
+      }
     }
+  },
+  "door": {
+    "unlock": "unlock",
+    "lock": "lock",
+    "unlatch": "unlatch"
   }
 }

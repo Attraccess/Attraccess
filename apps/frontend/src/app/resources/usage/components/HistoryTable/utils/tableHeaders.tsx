@@ -1,12 +1,14 @@
 import React, { ReactElement } from 'react';
 import { TableColumn } from '@heroui/react';
 import { TFunction } from 'i18next';
+import { Resource } from '@attraccess/react-query-client';
 
 /**
  * Generates table header columns based on user permissions
  */
 export function generateHeaderColumns(
   t: TFunction,
+  resource: Resource,
   showAllUsers: boolean,
   canManageResources: boolean
 ): ReactElement[] {
@@ -17,14 +19,23 @@ export function generateHeaderColumns(
     headers.push(<TableColumn key="user">{t('user')}</TableColumn>);
   }
 
-  headers.push(
-    <TableColumn key="startTime">{t('startTime')}</TableColumn>,
-    <TableColumn key="endTime" className="hidden md:table-cell">
-      {t('endTime')}
-    </TableColumn>,
-    <TableColumn key="duration">{t('duration')}</TableColumn>,
-    <TableColumn key="icons">{''}</TableColumn>
-  );
+  if (resource.type === 'machine') {
+    headers.push(
+      <TableColumn key="startTime">{t('headers.machine.startTime')}</TableColumn>,
+      <TableColumn key="endTime" className="hidden md:table-cell">
+        {t('headers.machine.endTime')}
+      </TableColumn>,
+      <TableColumn key="duration">{t('headers.machine.duration')}</TableColumn>,
+      <TableColumn key="icons">{''}</TableColumn>
+    );
+  } else if (resource.type === 'door') {
+    headers.push(
+      <TableColumn key="time">{t('headers.door.time')}</TableColumn>,
+      <TableColumn key="action" className="hidden md:table-cell">
+        {t('headers.door.action')}
+      </TableColumn>
+    );
+  }
 
   return headers;
 }

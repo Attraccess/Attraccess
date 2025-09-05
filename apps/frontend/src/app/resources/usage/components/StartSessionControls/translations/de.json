@@ -1,17 +1,32 @@
 {
-  "noActiveSession": "Keine aktive Sitzung. Beginnen Sie mit der Nutzung dieser Ressource, indem Sie auf die Schaltfläche unten klicken.",
-  "startSession": "Ressource verwenden",
-  "sessionStarted": "Sitzung gestartet",
-  "sessionStartedDescription": "Sie haben erfolgreich mit der Nutzung dieser Ressource begonnen.",
-  "sessionTakeOvernDescription": "Sie haben die Sitzung erfolgreich übernommen.",
-  "sessionTakeOverErrorDescription": "Fehler beim Übernehmen der Sitzung. Der andere Benutzer hat möglicherweise seine Sitzung beendet oder es ist ein Fehler aufgetreten.",
-  "sessionStartError": "Fehler beim Starten der Sitzung",
-  "sessionStartErrorDescription": "Beim Starten der Sitzung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
-  "alternativeStartSessionOptionsMenu": {
-    "label": "Alternative Sitzungsstart",
-    "startWithNotes": {
-      "label": "Mit Notizen starten",
-      "description": "Starten Sie die Sitzung und geben Sie Notizen an."
+  "machine": {
+    "noActiveSession": "Keine aktive Sitzung. Beginnen Sie mit der Nutzung dieser Ressource, indem Sie auf die Schaltfläche unten klicken.",
+    "startSession": "Ressource verwenden",
+    "sessionStarted": "Sitzung gestartet",
+    "sessionStartedDescription": "Sie haben erfolgreich mit der Nutzung dieser Ressource begonnen.",
+    "sessionTakeOvernDescription": "Sie haben die Sitzung erfolgreich übernommen.",
+    "sessionTakeOverErrorDescription": "Fehler beim Übernehmen der Sitzung. Der andere Benutzer hat möglicherweise seine Sitzung beendet oder es ist ein Fehler aufgetreten.",
+    "sessionStartError": "Fehler beim Starten der Sitzung",
+    "sessionStartErrorDescription": "Beim Starten der Sitzung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "alternativeStartSessionOptionsMenu": {
+      "label": "Alternative Sitzungsstart",
+      "startWithNotes": {
+        "label": "Mit Notizen starten",
+        "description": "Starten Sie die Sitzung und geben Sie Notizen an."
+      }
+    }
+  },
+  "door": {
+    "unlock": "aufschließen",
+    "lock": "abschließen",
+    "unlatch": "falle öffnen",
+    "success": {
+      "title": "Steuerung erfolgreich",
+      "description": "Die Steuerung wurde erfolgreich ausgeführt."
+    },
+    "error": {
+      "title": "Fehler beim Steuern der Tür",
+      "description": "Die Steuerung der Tür ist fehlgeschlagen. Bitte versuchen Sie es erneut."
     }
   }
 }

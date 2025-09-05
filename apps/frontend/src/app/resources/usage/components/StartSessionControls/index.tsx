@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
-import { PlayIcon, ChevronDownIcon } from 'lucide-react';
+import { PlayIcon, ChevronDownIcon, LockIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
@@ -8,6 +8,11 @@ import {
   useResourcesServiceResourceUsageStartSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
+  useResourcesServiceUnlockDoor,
+  useResourcesServiceGetOneResourceById,
+  StartUsageSessionDto,
+  useResourcesServiceUnlatchDoor,
+  useResourcesServiceLockDoor,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import * as en from './translations/en.json';
@@ -22,37 +27,52 @@ export function StartSessionControls(
 ) {
   const { resourceId, ...divProps } = props;
 
+  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+
   const { t } = useTranslations('startSessionControls', { en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
 
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
-  const startSession = useResourcesServiceResourceUsageStartSession({
-    onSuccess: () => {
-      setIsNotesModalOpen(false);
+  const onStartSuccess = useCallback(() => {
+    setIsNotesModalOpen(false);
 
-      // Invalidate the active session query to refetch data
-      queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
-      });
-      // Invalidate all history queries for this resource (regardless of pagination/user filters)
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
-          return (
-            query.queryKey[0] === baseHistoryKey[0] &&
-            query.queryKey.length > 1 &&
-            JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
-          );
-        },
-      });
-      success({
-        title: t('sessionStarted'),
-        description: t('sessionStartedDescription'),
-      });
-    },
-    onError: (err) => {
+    // Invalidate the active session query to refetch data
+    queryClient.invalidateQueries({
+      queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+    });
+    // Invalidate all history queries for this resource (regardless of pagination/user filters)
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+        return (
+          query.queryKey[0] === baseHistoryKey[0] &&
+          query.queryKey.length > 1 &&
+          JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
+        );
+      },
+    });
+
+    switch (resource?.type) {
+      case 'machine':
+        success({
+          title: t('machine.sessionStarted'),
+          description: t('machine.sessionStartedDescription'),
+        });
+        break;
+
+      case 'door':
+        success({
+          title: t('door.success.title'),
+          description: t('door.success.description'),
+        });
+        break;
+    }
+  }, [resourceId, t, queryClient, success, resource?.type]);
+
+  const onStartError = useCallback(
+    (err: unknown) => {
       let errorMessage = err;
       if (err instanceof Error) {
         errorMessage = err.message;
@@ -64,27 +84,73 @@ export function StartSessionControls(
         errorMessage = (err as any).body.error;
       }
 
-      showError({
-        title: t('sessionStartError'),
-        description: t('sessionStartErrorDescription') + ' ' + errorMessage,
-      });
+      switch (resource?.type) {
+        case 'machine':
+          showError({
+            title: t('machine.sessionStartError'),
+            description: t('machine.sessionStartErrorDescription') + ' ' + errorMessage,
+          });
+          break;
+
+        case 'door':
+          showError({
+            title: t('door.error.title'),
+            description: t('door.error.description') + ' ' + errorMessage,
+          });
+          break;
+      }
+
       console.error('Failed to start session:', JSON.stringify(err));
+    },
+    [t, showError, resource?.type]
+  );
+
+  const { mutate: startSession, isPending: startIsPending } = useResourcesServiceResourceUsageStartSession({
+    onSuccess: () => {
+      onStartSuccess();
+    },
+    onError: (err) => {
+      onStartError(err);
     },
   });
 
-  const handleStartSession = async (notes: string) => {
-    startSession.mutate({
+  const { mutate: unlockDoor, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
+    onSuccess: () => {
+      onStartSuccess();
+    },
+    onError: (err) => {
+      onStartError(err);
+    },
+  });
+
+  const { mutate: lockDoor, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
+    onSuccess: () => {
+      onStartSuccess();
+    },
+    onError: (err) => {
+      onStartError(err);
+    },
+  });
+
+  const { mutate: unlatchDoor, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
+    onSuccess: () => {
+      onStartSuccess();
+    },
+    onError: (err) => {
+      onStartError(err);
+    },
+  });
+
+  const handleStartSession = async (opts?: StartUsageSessionDto) => {
+    startSession({
       resourceId,
-      requestBody: { notes, forceTakeOver: false },
+      requestBody: opts ?? {},
     });
   };
 
-  const immediatelyStartSession = useCallback(() => {
-    startSession.mutate({
-      resourceId,
-      requestBody: {},
-    });
-  }, [startSession, resourceId]);
+  const isPending = useMemo(() => {
+    return startIsPending || unlockDoorIsPending || lockDoorIsPending || unlatchDoorIsPending;
+  }, [startIsPending, unlockDoorIsPending, lockDoorIsPending, unlatchDoorIsPending]);
 
   const handleOpenStartSessionModal = () => {
     setIsNotesModalOpen(true);
@@ -93,41 +159,77 @@ export function StartSessionControls(
   return (
     <div {...divProps}>
       <div className="space-y-4">
-        <p className="text-gray-500 dark:text-gray-400">{t('noActiveSession')}</p>
-
-        <ButtonGroup fullWidth color="primary">
-          <Button
-            isLoading={startSession.isPending}
-            startContent={<PlayIcon className="w-4 h-4" />}
-            onPress={immediatelyStartSession}
-          >
-            {t('startSession')}
-          </Button>
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger>
-              <Button isIconOnly>
-                <ChevronDownIcon />
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu disallowEmptySelection aria-label={t('alternativeStartSessionOptionsMenu.label')}>
-              <DropdownItem
-                key="startWithNotes"
-                description={t('alternativeStartSessionOptionsMenu.startWithNotes.description')}
-                onPress={handleOpenStartSessionModal}
+        {resource?.type === 'door' && (
+          <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
+            <Button
+              className="flex-1"
+              isLoading={isPending}
+              startContent={<LockIcon className="w-4 h-4" />}
+              onPress={() => lockDoor({ resourceId })}
+              color="danger"
+            >
+              {t('door.lock')}
+            </Button>
+            <Button
+              className="flex-1"
+              isLoading={isPending}
+              startContent={<LockIcon className="w-4 h-4" />}
+              onPress={() => unlockDoor({ resourceId })}
+              color="primary"
+            >
+              {t('door.unlock')}
+            </Button>
+            {resource.separateUnlockAndUnlatch && (
+              <Button
+                className="flex-1"
+                isLoading={isPending}
+                startContent={<LockIcon className="w-4 h-4" />}
+                onPress={() => unlatchDoor({ resourceId })}
+                color="secondary"
               >
-                {t('alternativeStartSessionOptionsMenu.startWithNotes.label')}
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        </ButtonGroup>
+                {t('door.unlatch')}
+              </Button>
+            )}
+          </div>
+        )}
+        {resource?.type === 'machine' && (
+          <>
+            <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
+            <ButtonGroup fullWidth color="primary">
+              <Button
+                isLoading={isPending}
+                startContent={<PlayIcon className="w-4 h-4" />}
+                onPress={() => handleStartSession()}
+              >
+                {t('machine.startSession')}
+              </Button>
+              <Dropdown placement="bottom-end">
+                <DropdownTrigger>
+                  <Button isIconOnly>
+                    <ChevronDownIcon />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu disallowEmptySelection aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
+                  <DropdownItem
+                    key="startWithNotes"
+                    description={t('machine.alternativeStartSessionOptionsMenu.startWithNotes.description')}
+                    onPress={handleOpenStartSessionModal}
+                  >
+                    {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </ButtonGroup>
+          </>
+        )}
       </div>
 
       <SessionNotesModal
         isOpen={isNotesModalOpen}
         onClose={() => setIsNotesModalOpen(false)}
-        onConfirm={handleStartSession}
+        onConfirm={(notes) => handleStartSession({ notes, forceTakeOver: false })}
         mode={SessionModalMode.START}
-        isSubmitting={startSession.isPending}
+        isSubmitting={isPending}
       />
     </div>
   );

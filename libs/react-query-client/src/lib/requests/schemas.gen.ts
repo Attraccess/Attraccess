@@ -660,6 +660,18 @@ export const $CreateResourceDto = {
             description: 'The name of the resource',
             example: '3D Printer'
         },
+        type: {
+            type: 'string',
+            description: 'The type of the resource',
+            example: 'machine',
+            enum: ['machine', 'door']
+        },
+        separateUnlockAndUnlatch: {
+            type: 'boolean',
+            description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+            example: false,
+            default: false
+        },
         description: {
             type: 'string',
             description: 'A detailed description of the resource',
@@ -695,7 +707,7 @@ This is a markdown documentation for the resource.`
             default: false
         }
     },
-    required: ['name']
+    required: ['name', 'type']
 } as const;
 
 export const $ResourceGroup = {
@@ -742,6 +754,18 @@ export const $Resource = {
             type: 'string',
             description: 'The name of the resource',
             example: '3D Printer'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the resource',
+            example: 'machine',
+            enum: ['machine', 'door']
+        },
+        separateUnlockAndUnlatch: {
+            type: 'boolean',
+            description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+            example: false,
+            default: false
         },
         description: {
             type: 'string',
@@ -795,7 +819,7 @@ This is a markdown documentation for the resource.`
             }
         }
     },
-    required: ['id', 'name', 'allowTakeOver', 'createdAt', 'updatedAt', 'groups']
+    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'groups']
 } as const;
 
 export const $PaginatedResourceResponseDto = {
@@ -827,6 +851,18 @@ export const $UpdateResourceDto = {
             type: 'string',
             description: 'The name of the resource',
             example: '3D Printer'
+        },
+        type: {
+            type: 'string',
+            description: 'The type of the resource',
+            example: 'machine',
+            enum: ['machine', 'door']
+        },
+        separateUnlockAndUnlatch: {
+            type: 'boolean',
+            description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+            example: false,
+            default: false
         },
         description: {
             type: 'string',
@@ -1397,6 +1433,12 @@ export const $ResourceUsage = {
             description: 'The unique identifier of the resource usage',
             example: 1
         },
+        usageAction: {
+            type: 'string',
+            description: 'The type of usage',
+            example: 'usage',
+            enum: ['usage', 'door.lock', 'door.unlock', 'door.unlatch']
+        },
         resourceId: {
             type: 'number',
             description: 'The ID of the resource being used',
@@ -1449,7 +1491,7 @@ export const $ResourceUsage = {
             example: 120
         }
     },
-    required: ['id', 'resourceId', 'startTime', 'usageInMinutes']
+    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes']
 } as const;
 
 export const $EndUsageSessionDto = {
@@ -1700,7 +1742,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
         },
         position: {
             description: 'The position of the node',

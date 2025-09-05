@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from './resourceUsage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, ResourceType, ResourceUsageAction, User } from '@attraccess/database-entities';
 import { Repository, IsNull, SelectQueryBuilder } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BadRequestException } from '@nestjs/common';
@@ -16,7 +16,7 @@ import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
-import { ResourceUsageStartedEvent, ResourceUsageEndedEvent } from './events/resource-usage.events';
+import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -174,11 +174,13 @@ describe('ResourceUsageService', () => {
       id: 1,
       name: 'Test Resource',
       allowTakeOver: false,
+      type: ResourceType.Machine,
     } as Resource;
     const mockResourceWithTakeOver: Resource = {
       id: 1,
       name: 'Test Resource',
       allowTakeOver: true,
+      type: ResourceType.Machine,
     } as Resource;
 
     it('should start a session successfully when no active session exists', async () => {
@@ -196,7 +198,13 @@ describe('ResourceUsageService', () => {
       // Mock getActiveSession to return null (no active session)
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(null) // For getActiveSession
-        .mockResolvedValueOnce({ id: 1, resourceId: 1, userId: 1 } as ResourceUsage); // For finding new session
+        .mockResolvedValueOnce({
+          id: 1,
+          resourceId: 1,
+          userId: 1,
+          usageAction: ResourceUsageAction.Usage,
+          endTime: null,
+        } as ResourceUsage); // For finding new session
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       resourceUsageRepository.createQueryBuilder.mockReturnValue(
@@ -205,11 +213,18 @@ describe('ResourceUsageService', () => {
 
       const result = await service.startSession(1, mockUser, dto);
 
-      expect(result).toEqual({ id: 1, resourceId: 1, userId: 1 });
+      expect(result).toMatchObject({
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+      });
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(ResourceUsage);
       expect(mockQueryBuilder.values).toHaveBeenCalledWith({
         resourceId: 1,
+        usageAction: ResourceUsageAction.Usage,
         userId: 1,
         startNotes: 'Test session',
         startTime: expect.any(Date),
@@ -217,7 +232,18 @@ describe('ResourceUsageService', () => {
         endNotes: null,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageStartedEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+
+      const emitted = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      expect(emitted).toBeDefined();
+      const usageEvent = emitted?.[1] as ResourceUsageEvent;
+      expect(usageEvent).toBeInstanceOf(ResourceUsageEvent);
+      expect(usageEvent.usage).toMatchObject({
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+      });
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -300,12 +326,18 @@ describe('ResourceUsageService', () => {
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
       const mockActiveSession = { id: 1, userId: 2, startTime: new Date(), user: { id: 2 } as User } as ResourceUsage;
+      const updatedEndedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session ended due to takeover by user 1',
+      } as ResourceUsage;
       const mockNewUsage = { id: 2, resourceId: 1, userId: 1 } as ResourceUsage;
 
       // Mock getActiveSession to return an active session, then mock findOne for new session
       resourceUsageRepository.findOne
-        .mockResolvedValueOnce(mockActiveSession) // For getActiveSession
-        .mockResolvedValueOnce(mockNewUsage); // For finding new session
+        .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
+        .mockResolvedValueOnce(updatedEndedSession) // 2) fetch updated ended session
+        .mockResolvedValueOnce(mockNewUsage); // 3) fetch newly created session
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       const mockInsertQueryBuilder = createMockQueryBuilder(null);
@@ -324,7 +356,25 @@ describe('ResourceUsageService', () => {
       });
       expect(mockUpdateQueryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
       expect(mockInsertQueryBuilder.insert).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith('resource.usage.taken_over', expect.any(Object));
+      // One event for the ended previous session and one takeover event
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageTakenOverEvent.EVENT_NAME, expect.any(Object));
+
+      const usageEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const usagePayload = usageEmit?.[1] as ResourceUsageEvent;
+      expect(usagePayload).toBeInstanceOf(ResourceUsageEvent);
+      expect(usagePayload.usage).toMatchObject({ id: 1, userId: 2, endNotes: expect.stringContaining('takeover') });
+
+      const takeoverEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageTakenOverEvent.EVENT_NAME);
+      const takeoverPayload = takeoverEmit?.[1] as ResourceUsageTakenOverEvent;
+      expect(takeoverPayload).toBeInstanceOf(ResourceUsageTakenOverEvent);
+      expect(takeoverPayload.resource).toMatchObject({
+        id: mockResourceWithTakeOver.id,
+        name: mockResourceWithTakeOver.name,
+      });
+      expect(takeoverPayload.newUser).toMatchObject({ id: mockUser.id });
+      expect(takeoverPayload.previousUser).toMatchObject({ id: mockActiveSession.user?.id });
+      expect(takeoverPayload.takeoverTime).toBeInstanceOf(Date);
     });
 
     it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
@@ -437,7 +487,12 @@ describe('ResourceUsageService', () => {
         endTime: expect.any(Date),
         endNotes: 'Session completed',
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEndedEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+
+      const emitted = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const eventPayload = emitted?.[1] as ResourceUsageEvent;
+      expect(eventPayload).toBeInstanceOf(ResourceUsageEvent);
+      expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
     });
 
     it('should throw error when no active session exists', async () => {
@@ -449,6 +504,132 @@ describe('ResourceUsageService', () => {
       await expect(service.endSession(1, mockUser, dto)).rejects.toThrow(
         new BadRequestException('No active session found')
       );
+    });
+  });
+
+  describe('door actions', () => {
+    const mockUser: User = { id: 5 } as User;
+    const doorResource: Resource = {
+      id: 10,
+      name: 'Front Door',
+      type: ResourceType.Door,
+      allowTakeOver: false,
+      separateUnlockAndUnlatch: false,
+    } as Resource;
+
+    beforeEach(() => {
+      // Common permission/maintenance happy-path mocks
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+    });
+
+    it('should lock a door and emit event', async () => {
+      resourceRepository.findOne.mockResolvedValue(doorResource);
+      const saved = {
+        id: 100,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorLock,
+        startTime: new Date(),
+        startNotes: null,
+        endTime: new Date(),
+        endNotes: null,
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+
+      const result = await service.lockDoor(10, mockUser);
+
+      expect(result).toBe(saved);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+
+      const emitted = eventEmitter.emit.mock.calls[0];
+      const payload = emitted[1] as ResourceUsageEvent;
+      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      expect(payload.usage).toMatchObject({
+        id: 100,
+        usageAction: ResourceUsageAction.DoorLock,
+        resourceId: 10,
+        userId: 5,
+      });
+    });
+
+    it('should unlock a door and emit event', async () => {
+      resourceRepository.findOne.mockResolvedValue(doorResource);
+      const saved = {
+        id: 101,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorUnlock,
+        startTime: new Date(),
+        startNotes: null,
+        endTime: new Date(),
+        endNotes: null,
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+
+      const result = await service.unlockDoor(10, mockUser);
+
+      expect(result).toBe(saved);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+
+      const emitted = eventEmitter.emit.mock.calls[0];
+      const payload = emitted[1] as ResourceUsageEvent;
+      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      expect(payload.usage).toMatchObject({
+        id: 101,
+        usageAction: ResourceUsageAction.DoorUnlock,
+        resourceId: 10,
+        userId: 5,
+      });
+    });
+
+    it('should unlatch a door when supported and emit event', async () => {
+      resourceRepository.findOne.mockResolvedValue({ ...doorResource, separateUnlockAndUnlatch: true } as Resource);
+      const saved = {
+        id: 102,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorUnlatch,
+        startTime: new Date(),
+        startNotes: null,
+        endTime: new Date(),
+        endNotes: null,
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+
+      const result = await service.unlatchDoor(10, mockUser);
+
+      expect(result).toBe(saved);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+
+      const emitted = eventEmitter.emit.mock.calls[0];
+      const payload = emitted[1] as ResourceUsageEvent;
+      expect(payload).toBeInstanceOf(ResourceUsageEvent);
+      expect(payload.usage).toMatchObject({
+        id: 102,
+        usageAction: ResourceUsageAction.DoorUnlatch,
+        resourceId: 10,
+        userId: 5,
+      });
+    });
+
+    it('should throw when operating non-door resource', async () => {
+      resourceRepository.findOne.mockResolvedValue({ ...doorResource, type: ResourceType.Machine } as Resource);
+
+      await expect(service.lockDoor(10, mockUser)).rejects.toThrow('Resource is not a door');
+      await expect(service.unlockDoor(10, mockUser)).rejects.toThrow('Resource is not a door');
+    });
+
+    it('should throw when unlatching unsupported door', async () => {
+      resourceRepository.findOne.mockResolvedValue({ ...doorResource, separateUnlockAndUnlatch: false } as Resource);
+
+      await expect(service.unlatchDoor(10, mockUser)).rejects.toThrow('Door does not support unlatching');
     });
   });
 });

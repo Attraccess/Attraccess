@@ -15,13 +15,11 @@ import {
   ResourceFlowLog,
   ResourceFlowLogType,
   Resource,
+  ResourceUsageAction,
+  ResourceUsage,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
-import {
-  ResourceUsageEndedEvent,
-  ResourceUsageStartedEvent,
-  ResourceUsageTakenOverEvent,
-} from '../usage/events/resource-usage.events';
+import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
@@ -149,34 +147,57 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  @OnEvent(ResourceUsageStartedEvent.EVENT_NAME)
-  async handleResourceUsageStarted(event: ResourceUsageStartedEvent) {
-    const { resource } = event;
+  @OnEvent(ResourceUsageEvent.EVENT_NAME)
+  async handleResourceUsageEvent(event: ResourceUsageEvent) {
+    const { usage } = event;
 
-    this.logger.log(`Handling resource usage started event for resource ID: ${resource.id}`);
+    switch (usage.usageAction) {
+      case ResourceUsageAction.Usage:
+        if (usage.endTime) {
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED);
+        } else {
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED);
+        }
+        break;
+      case ResourceUsageAction.DoorLock:
+        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED);
+        break;
+      case ResourceUsageAction.DoorUnlock:
+        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED);
+        break;
+      case ResourceUsageAction.DoorUnlatch:
+        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
+        break;
+    }
+  }
+
+  private async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {
+    const { resource } = usage;
+
+    this.logger.log(`Handling resource usage ended event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {
+      await this.triggerResourceUsageNode(resource.id, inputType, {
         event: {
-          timestamp: event.startTime.toISOString(),
+          timestamp: usage.endTime.toISOString(),
         },
         usage: {
-          start: event.startTime.toISOString(),
-          end: null,
+          start: usage.startTime.toISOString(),
+          end: usage.endTime.toISOString(),
         },
         user: {
-          id: event.user.id,
-          username: event.user.username,
-          externalIdentifier: event.user.externalIdentifier,
+          id: usage.user.id,
+          username: usage.user.username,
+          externalIdentifier: usage.user.externalIdentifier,
         },
         resource: {
-          id: event.resource.id,
-          name: event.resource.name,
+          id: usage.resource.id,
+          name: usage.resource.name,
         },
       });
-      this.logger.log(`Successfully processed resource usage started event for resource ID: ${resource.id}`);
+      this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resource.id}`);
     } catch (error) {
-      this.logger.error(`Failed to handle resource usage started event for resource ID: ${resource.id}`, error.stack);
+      this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }
@@ -188,7 +209,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logger.log(`Handling resource usage takeover event for resource ID: ${resource.id}`);
 
     try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, {
+      await this.triggerResourceUsageNode(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, {
         event: {
           timestamp: event.takeoverTime.toISOString(),
         },
@@ -218,39 +239,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
   }
 
-  @OnEvent(ResourceUsageEndedEvent.EVENT_NAME)
-  async handleResourceUsageEnded(event: ResourceUsageEndedEvent) {
-    const { resource } = event;
-
-    this.logger.log(`Handling resource usage ended event for resource ID: ${resource.id}`);
-
-    try {
-      await this.handleResourceUsageEvent(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, {
-        event: {
-          timestamp: event.endTime.toISOString(),
-        },
-        usage: {
-          start: event.startTime.toISOString(),
-          end: event.endTime.toISOString(),
-        },
-        user: {
-          id: event.user.id,
-          username: event.user.username,
-          externalIdentifier: event.user.externalIdentifier,
-        },
-        resource: {
-          id: event.resource.id,
-          name: event.resource.name,
-        },
-      });
-      this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resource.id}`);
-    } catch (error) {
-      this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resource.id}`, error.stack);
-      throw error;
-    }
-  }
-
-  private async handleResourceUsageEvent(
+  private async triggerResourceUsageNode(
     resourceId: number,
     eventType: ResourceFlowNodeType,
     eventData: UsageEventData

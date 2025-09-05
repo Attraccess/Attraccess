@@ -2,27 +2,12 @@
  * Events emitted when resource usage status changes
  */
 
-import { Resource, User } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 
-export class ResourceUsageStartedEvent {
-  public static readonly EVENT_NAME = 'resource.usage.started';
+export class ResourceUsageEvent {
+  public static readonly EVENT_NAME = 'resource.usage';
 
-  constructor(
-    public readonly resource: Pick<Resource, 'id' | 'name'>,
-    public readonly startTime: Date,
-    public readonly user: User
-  ) {}
-}
-
-export class ResourceUsageEndedEvent {
-  public static readonly EVENT_NAME = 'resource.usage.ended';
-
-  constructor(
-    public readonly resource: Pick<Resource, 'id' | 'name'>,
-    public readonly startTime: Date,
-    public readonly endTime: Date,
-    public readonly user: User
-  ) {}
+  constructor(public readonly usage: ResourceUsage) {}
 }
 
 export class ResourceUsageTakenOverEvent {

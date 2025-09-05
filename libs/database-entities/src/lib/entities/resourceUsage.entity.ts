@@ -1,7 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Resource, ResourceType as ResourceUsageType } from './resource.entity';
+import { Resource } from './resource.entity';
 import { User } from './user.entity';
+import { ResourceUsageAction } from './resourceUsage.type';
 
 @Entity()
 export class ResourceUsage {
@@ -12,6 +13,14 @@ export class ResourceUsage {
   })
   id!: number;
 
+  @Column({ type: 'simple-enum', enum: ResourceUsageAction })
+  @ApiProperty({
+    description: 'The type of usage',
+    example: ResourceUsageAction.Usage,
+    enum: ResourceUsageAction,
+  })
+  usageAction!: ResourceUsageAction;
+
   @Column({
     type: 'integer',
   })
@@ -20,14 +29,6 @@ export class ResourceUsage {
     example: 1,
   })
   resourceId!: number;
-
-  @Column({ type: 'simple-enum', enum: ResourceUsageType })
-  @ApiProperty({
-    description: 'The type of usage',
-    example: ResourceUsageType.Default,
-    enum: ResourceUsageType,
-  })
-  usageType!: ResourceUsageType;
 
   @Column({ nullable: true, type: 'integer' })
   @ApiProperty({

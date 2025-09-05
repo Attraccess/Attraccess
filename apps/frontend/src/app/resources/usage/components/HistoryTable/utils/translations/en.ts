@@ -1,16 +1,30 @@
 export default {
-  // Headers
-  user: 'User',
-  startTime: 'Start Time',
-  endTime: 'End Time',
-  duration: 'Duration',
-  status: 'Status',
+  headers: {
+    user: 'User',
+    machine: {
+      startTime: 'Start Time',
+      endTime: 'End Time',
+      duration: 'Duration',
+    },
+    door: {
+      time: 'Time',
+      action: 'Action',
+    },
+  },
 
-  // Row items
-  unknownUser: 'Unknown User',
-  inProgress: 'In Use',
+  rows: {
+    door: {
+      action: {
+        'door.lock': 'Locked',
+        'door.unlock': 'Unlocked',
+        'door.unlatch': 'Latch Opened',
+      },
+    },
+    machine: {
+      inProgress: 'In Use',
+    },
+  },
 
-  // Other
   noUsageHistory: 'No usage history found for this resource.',
   errorLoadingHistory: 'Error loading usage history. Please try again.',
 };

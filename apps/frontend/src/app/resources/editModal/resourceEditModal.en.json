@@ -1,18 +1,32 @@
 {
   "modalTitle": "Edit Resource",
   "inputs": {
+    "type": {
+      "options": {
+        "machine": "Machine",
+        "door": "Door"
+      }
+    },
     "name": {
       "label": "Name"
     },
     "description": {
       "label": "Description"
     },
-    "allowTakeOver": {
-      "label": "Allow Takeover",
-      "description": "If enabled, the resource can be taken over by other users without the current user having to release the resource."
-    },
     "image": {
       "label": "Image"
+    },
+    "machine": {
+      "allowTakeOver": {
+        "label": "Allow Takeover",
+        "description": "If enabled, the resource can be taken over by other users without the current user having to release the resource."
+      }
+    },
+    "door": {
+      "separateUnlockAndUnlatch": {
+        "label": "Separate Unlock and Unlatch",
+        "description": "Can be useful if the door needs to be unlocked and the latch needs to be opened separately"
+      }
     }
   },
   "create": {

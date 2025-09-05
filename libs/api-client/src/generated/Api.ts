@@ -485,6 +485,17 @@ export interface CreateResourceDto {
    */
   name: string;
   /**
+   * The type of the resource
+   * @example "machine"
+   */
+  type: "machine" | "door";
+  /**
+   * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+   * @default false
+   * @example false
+   */
+  separateUnlockAndUnlatch: boolean;
+  /**
    * A detailed description of the resource
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
    */
@@ -559,6 +570,17 @@ export interface Resource {
    */
   name: string;
   /**
+   * The type of the resource
+   * @example "machine"
+   */
+  type: "machine" | "door";
+  /**
+   * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+   * @default false
+   * @example false
+   */
+  separateUnlockAndUnlatch: boolean;
+  /**
    * A detailed description of the resource
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
    */
@@ -618,6 +640,17 @@ export interface UpdateResourceDto {
    * @example "3D Printer"
    */
   name?: string;
+  /**
+   * The type of the resource
+   * @example "machine"
+   */
+  type: "machine" | "door";
+  /**
+   * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+   * @default false
+   * @example false
+   */
+  separateUnlockAndUnlatch: boolean;
   /**
    * A detailed description of the resource
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
@@ -1033,6 +1066,11 @@ export interface ResourceUsage {
    */
   id: number;
   /**
+   * The type of usage
+   * @example "usage"
+   */
+  usageAction: "usage" | "door.lock" | "door.unlock" | "door.unlatch";
+  /**
    * The ID of the resource being used
    * @example 1
    */
@@ -1242,6 +1280,9 @@ export interface ResourceFlowNodeDto {
     | "input.resource.usage.started"
     | "input.resource.usage.stopped"
     | "input.resource.usage.takeover"
+    | "input.resource.door.unlocked"
+    | "input.resource.door.locked"
+    | "input.resource.door.unlatched"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "processing.wait"
@@ -1955,6 +1996,12 @@ export type ResourceGroupIntroducersRevokeData = any;
 export type ResourceUsageStartSessionData = ResourceUsage;
 
 export type ResourceUsageEndSessionData = ResourceUsage;
+
+export type LockDoorData = ResourceUsage;
+
+export type UnlockDoorData = ResourceUsage;
+
+export type UnlatchDoorData = ResourceUsage;
 
 export interface ResourceUsageGetHistoryParams {
   /**
@@ -3075,6 +3122,60 @@ export namespace Resources {
     export type RequestBody = EndUsageSessionDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceUsageEndSessionData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name LockDoor
+   * @summary Lock a resource of door type
+   * @request POST:/api/resources/{resourceId}/usage/lock
+   * @secure
+   */
+  export namespace LockDoor {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = LockDoorData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name UnlockDoor
+   * @summary Unlock a resource of door type
+   * @request POST:/api/resources/{resourceId}/usage/unlock
+   * @secure
+   */
+  export namespace UnlockDoor {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = UnlockDoorData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name UnlatchDoor
+   * @summary Unlatch a resource of door type (if supported)
+   * @request POST:/api/resources/{resourceId}/usage/unlatch
+   * @secure
+   */
+  export namespace UnlatchDoor {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = UnlatchDoorData;
   }
 
   /**
@@ -5447,6 +5548,60 @@ export class Api<
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name LockDoor
+     * @summary Lock a resource of door type
+     * @request POST:/api/resources/{resourceId}/usage/lock
+     * @secure
+     */
+    lockDoor: (resourceId: number, params: RequestParams = {}) =>
+      this.request<LockDoorData, void>({
+        path: `/api/resources/${resourceId}/usage/lock`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name UnlockDoor
+     * @summary Unlock a resource of door type
+     * @request POST:/api/resources/{resourceId}/usage/unlock
+     * @secure
+     */
+    unlockDoor: (resourceId: number, params: RequestParams = {}) =>
+      this.request<UnlockDoorData, void>({
+        path: `/api/resources/${resourceId}/usage/unlock`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name UnlatchDoor
+     * @summary Unlatch a resource of door type (if supported)
+     * @request POST:/api/resources/{resourceId}/usage/unlatch
+     * @secure
+     */
+    unlatchDoor: (resourceId: number, params: RequestParams = {}) =>
+      this.request<UnlatchDoorData, void>({
+        path: `/api/resources/${resourceId}/usage/unlatch`,
+        method: "POST",
+        secure: true,
         format: "json",
         ...params,
       }),

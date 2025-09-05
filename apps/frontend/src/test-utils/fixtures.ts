@@ -6,6 +6,8 @@ import { Resource } from '@attraccess/react-query-client';
 export function createMockResource(overrides?: Partial<Resource>): Resource {
   return {
     id: 1,
+    type: 'machine',
+    separateUnlockAndUnlatch: false,
     name: 'Test Resource',
     description: 'Test Description',
     imageFilename: 'test.jpg',

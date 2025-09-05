@@ -10,6 +10,7 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
   INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
+  INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   PROCESSING_WAIT = 'processing.wait',
@@ -58,6 +59,7 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+    case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
       return EventNodeDataSchema;
     case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;

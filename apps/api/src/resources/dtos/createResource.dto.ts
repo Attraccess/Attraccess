@@ -15,11 +15,22 @@ export class CreateResourceDto {
 
   @ApiProperty({
     description: 'The type of the resource',
-    example: ResourceType.Default,
+    example: ResourceType.Machine,
     enum: ResourceType,
   })
   @IsEnum(ResourceType)
   type: ResourceType;
+
+  @ApiProperty({
+    description: '(only for doors) wheter the door needs seperate actions for unlocking and unlatching',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  @ToBoolean()
+  separateUnlockAndUnlatch?: boolean;
 
   @ApiProperty({
     description: 'A detailed description of the resource',

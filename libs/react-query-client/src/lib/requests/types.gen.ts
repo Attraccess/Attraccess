@@ -448,6 +448,14 @@ export type CreateResourceDto = {
      */
     name: string;
     /**
+     * The type of the resource
+     */
+    type: 'machine' | 'door';
+    /**
+     * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+     */
+    separateUnlockAndUnlatch?: boolean;
+    /**
      * A detailed description of the resource
      */
     description?: string;
@@ -472,6 +480,14 @@ export type CreateResourceDto = {
      */
     allowTakeOver?: boolean;
 };
+
+/**
+ * The type of the resource
+ */
+export enum type2 {
+    MACHINE = 'machine',
+    DOOR = 'door'
+}
 
 /**
  * The type of documentation (markdown or url)
@@ -513,6 +529,14 @@ export type Resource = {
      * The name of the resource
      */
     name: string;
+    /**
+     * The type of the resource
+     */
+    type: 'machine' | 'door';
+    /**
+     * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+     */
+    separateUnlockAndUnlatch: boolean;
     /**
      * A detailed description of the resource
      */
@@ -563,6 +587,14 @@ export type UpdateResourceDto = {
      * The name of the resource
      */
     name?: string;
+    /**
+     * The type of the resource
+     */
+    type?: 'machine' | 'door';
+    /**
+     * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
+     */
+    separateUnlockAndUnlatch?: boolean;
     /**
      * A detailed description of the resource
      */
@@ -959,6 +991,10 @@ export type ResourceUsage = {
      */
     id: number;
     /**
+     * The type of usage
+     */
+    usageAction: 'usage' | 'door.lock' | 'door.unlock' | 'door.unlatch';
+    /**
      * The ID of the resource being used
      */
     resourceId: number;
@@ -995,6 +1031,16 @@ export type ResourceUsage = {
      */
     usageInMinutes: number;
 };
+
+/**
+ * The type of usage
+ */
+export enum usageAction {
+    USAGE = 'usage',
+    DOOR_LOCK = 'door.lock',
+    DOOR_UNLOCK = 'door.unlock',
+    DOOR_UNLATCH = 'door.unlatch'
+}
 
 export type EndUsageSessionDto = {
     /**
@@ -1143,7 +1189,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'processing.wait' | 'processing.if';
     /**
      * The position of the node
      */
@@ -1159,11 +1205,14 @@ export type ResourceFlowNodeDto = {
 /**
  * The type of the node
  */
-export enum type2 {
+export enum type3 {
     INPUT_BUTTON = 'input.button',
     INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
     INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
     INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
+    INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
+    INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
+    INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     PROCESSING_WAIT = 'processing.wait',
@@ -1282,7 +1331,7 @@ export type ResourceFlowLog = {
 /**
  * The type of the log entry
  */
-export enum type3 {
+export enum type4 {
     FLOW_START = 'flow.start',
     NODE_PROCESSING_STARTED = 'node.processing.started',
     NODE_PROCESSING_FAILED = 'node.processing.failed',
@@ -2010,6 +2059,24 @@ export type ResourceUsageEndSessionData = {
 };
 
 export type ResourceUsageEndSessionResponse = ResourceUsage;
+
+export type LockDoorData = {
+    resourceId: number;
+};
+
+export type LockDoorResponse = ResourceUsage;
+
+export type UnlockDoorData = {
+    resourceId: number;
+};
+
+export type UnlockDoorResponse = ResourceUsage;
+
+export type UnlatchDoorData = {
+    resourceId: number;
+};
+
+export type UnlatchDoorResponse = ResourceUsage;
 
 export type ResourceUsageGetHistoryData = {
     /**
@@ -3303,6 +3370,75 @@ export type $OpenApiTs = {
                 401: unknown;
                 /**
                  * Resource or session not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/usage/lock': {
+        post: {
+            req: LockDoorData;
+            res: {
+                /**
+                 * Door locked successfully.
+                 */
+                200: ResourceUsage;
+                /**
+                 * Bad Request - Invalid input data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/usage/unlock': {
+        post: {
+            req: UnlockDoorData;
+            res: {
+                /**
+                 * Door unlocked successfully.
+                 */
+                200: ResourceUsage;
+                /**
+                 * Bad Request - Invalid input data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/usage/unlatch': {
+        post: {
+            req: UnlatchDoorData;
+            res: {
+                /**
+                 * Door unlatch successfully.
+                 */
+                200: ResourceUsage;
+                /**
+                 * Bad Request - Invalid input data
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
                  */
                 404: unknown;
             };

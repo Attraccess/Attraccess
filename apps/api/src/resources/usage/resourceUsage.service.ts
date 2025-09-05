@@ -1,21 +1,16 @@
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions } from 'typeorm';
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { Resource, ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  ResourceUsageStartedEvent,
-  ResourceUsageEndedEvent,
-  ResourceUsageTakenOverEvent,
-} from './events/resource-usage.events';
+import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
-import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 
@@ -31,7 +26,6 @@ export class ResourceUsageService {
     private readonly resourceIntroductionService: ResourceIntroductionsService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
-    private readonly resourceGroupsIntroducersService: ResourceGroupsIntroducersService,
     private readonly resourceGroupsService: ResourceGroupsService,
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2
@@ -67,8 +61,12 @@ export class ResourceUsageService {
     return false;
   }
 
-  async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
-    this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
+  private async getResource(
+    resourceId: number,
+    user: User,
+    opts: { checkMaintenance: boolean; checkControlPermission: boolean }
+  ): Promise<Resource> {
+    const { checkMaintenance, checkControlPermission } = opts;
 
     const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
     if (!resource) {
@@ -77,27 +75,43 @@ export class ResourceUsageService {
     }
     this.logger.debug(`Found resource ${resourceId}: ${resource.name}`);
 
-    // Check if there's an active maintenance window
-    const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId);
-    if (hasActiveMaintenance) {
-      // Check if user can manage maintenance (which allows them to use during maintenance)
-      const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(user, resourceId);
+    if (checkMaintenance) {
+      // Check if there's an active maintenance window
+      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId);
+      if (hasActiveMaintenance) {
+        // Check if user can manage maintenance (which allows them to use during maintenance)
+        const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(user, resourceId);
 
-      if (!canManageMaintenance) {
-        this.logger.warn(
-          `User ${user.id} attempted to use resource ${resourceId} during maintenance window without permissions`
-        );
-        throw new ResourceUsageImpossibleMaintenanceInProgressException(resourceId);
+        if (!canManageMaintenance) {
+          this.logger.warn(
+            `User ${user.id} attempted to use resource ${resourceId} during maintenance window without permissions`
+          );
+          throw new ResourceUsageImpossibleMaintenanceInProgressException(resourceId);
+        }
+
+        this.logger.debug(`User ${user.id} has maintenance permissions, allowing usage during maintenance window`);
       }
-
-      this.logger.debug(`User ${user.id} has maintenance permissions, allowing usage during maintenance window`);
     }
 
-    const canStartSession = await this.canControllResource(resourceId, user);
+    if (checkControlPermission) {
+      const canStartSession = await this.canControllResource(resourceId, user);
 
-    if (!canStartSession) {
-      this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
-      throw new BadRequestException('You must complete the resource introduction before using it');
+      if (!canStartSession) {
+        this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
+        throw new BadRequestException('You must complete the resource introduction before using it');
+      }
+    }
+
+    return resource;
+  }
+
+  async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
+    this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
+
+    const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
+
+    if (resource.type !== ResourceType.Machine) {
+      throw new BadRequestException('Resource is not a machine');
     }
 
     const existingActiveSession = await this.getActiveSession(resourceId);
@@ -125,16 +139,13 @@ export class ResourceUsageService {
           .where('id = :id', { id: existingActiveSession.id })
           .execute();
 
+        const updatedSession = await this.resourceUsageRepository.findOne({
+          where: { id: existingActiveSession.id },
+          relations: ['user', 'resource'],
+        });
+
         // Emit event for the ended session
-        this.eventEmitter.emit(
-          ResourceUsageEndedEvent.EVENT_NAME,
-          new ResourceUsageEndedEvent(
-            existingActiveSession.resource,
-            existingActiveSession.startTime,
-            takeoverEndTime,
-            existingActiveSession.user
-          )
-        );
+        this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(updatedSession));
       } else if (dto.forceTakeOver && !resource.allowTakeOver) {
         this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
         throw new BadRequestException('This resource does not allow overtaking');
@@ -146,6 +157,7 @@ export class ResourceUsageService {
 
     const usageData = {
       resourceId,
+      usageAction: ResourceUsageAction.Usage,
       userId: user.id,
       startTime: new Date(),
       startNotes: dto.notes,
@@ -185,10 +197,7 @@ export class ResourceUsageService {
       );
     } else {
       // Emit event after successful save
-      this.eventEmitter.emit(
-        ResourceUsageStartedEvent.EVENT_NAME,
-        new ResourceUsageStartedEvent(resource, usageData.startTime, user)
-      );
+      this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(newSession));
     }
 
     return newSession;
@@ -233,8 +242,12 @@ export class ResourceUsageService {
 
     // Emit event after successful save
     this.eventEmitter.emit(
-      ResourceUsageEndedEvent.EVENT_NAME,
-      new ResourceUsageEndedEvent(activeSession.resource, activeSession.startTime, endTime, activeSession.user)
+      ResourceUsageEvent.EVENT_NAME,
+      new ResourceUsageEvent({
+        ...activeSession,
+        endTime,
+        endNotes: dto.notes,
+      })
     );
 
     // Fetch the updated record
@@ -242,6 +255,61 @@ export class ResourceUsageService {
       where: { id: activeSession.id },
       relations: ['resource', 'user'],
     });
+  }
+
+  private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {
+    const usageData = {
+      resourceId,
+      usageAction: action,
+      userId: user.id,
+      startTime: new Date(),
+      startNotes: null,
+      endTime: new Date(),
+      endNotes: null,
+    };
+
+    this.logger.debug(`persisting door action for resource ${resourceId}`, { usageData });
+
+    let usage = await this.resourceUsageRepository.save(usageData, { reload: true });
+    usage = await this.resourceUsageRepository.findOne({ where: { id: usage.id }, relations: ['user', 'resource'] });
+
+    console.log('emitting usage event', usage);
+
+    this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
+
+    return usage;
+  }
+
+  async lockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+    const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
+
+    if (resource.type !== ResourceType.Door) {
+      throw new BadRequestException('Resource is not a door');
+    }
+
+    return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorLock);
+  }
+
+  async unlockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+    const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
+    if (resource.type !== ResourceType.Door) {
+      throw new BadRequestException('Resource is not a door');
+    }
+
+    return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlock);
+  }
+
+  async unlatchDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+    const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
+    if (resource.type !== ResourceType.Door) {
+      throw new BadRequestException('Resource is not a door');
+    }
+
+    if (!resource.separateUnlockAndUnlatch) {
+      throw new BadRequestException('Door does not support unlatching');
+    }
+
+    return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlatch);
   }
 
   async getActiveSession(resourceId: number): Promise<ResourceUsage | null> {

@@ -4,18 +4,33 @@
     "update": "Ressource bearbeiten"
   },
   "inputs": {
+    "type": {
+      "options": {
+        "machine": "Maschine",
+        "door": "Tür"
+      }
+    },
     "name": {
       "label": "Name"
     },
     "description": {
       "label": "Beschreibung"
     },
-    "allowTakeOver": {
-      "label": "Übernahme erlauben",
-      "description": "Wenn aktiviert, kann die Ressource von anderen Benutzern übernommen werden ohne dass der aktuelle Nutzer die Ressource freigeben muss."
-    },
     "image": {
       "label": "Bild"
+    },
+    "machine": {
+      "allowTakeOver": {
+        "label": "Übernahme erlauben",
+        "description": "Wenn aktiviert, kann die Ressource von anderen Benutzern übernommen werden ohne dass der aktuelle Nutzer die Ressource freigeben muss."
+      }
+    },
+
+    "door": {
+      "separateUnlockAndUnlatch": {
+        "label": "Aufsperren und Falle öffnen separat",
+        "description": "Kann sinnvoll sein, wenn die Tür nicht nur aufsperren muss, sondern auch die Falle öffnen muss"
+      }
     }
   },
   "create": {

@@ -199,10 +199,8 @@ function ResourceDetailsComponent() {
         </div>
       </div>
 
-      {/* Add the ManageResourceGroups component */}
-
       <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
-        {isIntroducer?.isIntroducer && (
+        {(isIntroducer?.isIntroducer || canManageResources) && (
           <ResourceIntroductionsManagement
             resourceId={resourceId}
             className="flex-1 min-w-80"

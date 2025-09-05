@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
-import { Resource, DocumentationType } from '@attraccess/database-entities';
+import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { NotFoundException } from '@nestjs/common';
@@ -58,6 +58,8 @@ describe('ResourcesController', () => {
           id: 1,
           name: 'Test Resource',
           description: 'Test Description',
+          type: ResourceType.Machine,
+          separateUnlockAndUnlatch: false,
           imageFilename: 'test.jpg',
           documentationType: DocumentationType.MARKDOWN,
           documentationMarkdown: '# Test Documentation\n\nThis is a test documentation.',
@@ -109,6 +111,8 @@ describe('ResourcesController', () => {
         id: 1,
         name: 'Test Resource',
         description: 'Test Description',
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: 'test.jpg',
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Test Documentation\n\nThis is a test documentation.',
@@ -149,6 +153,7 @@ describe('ResourcesController', () => {
     it('should create a new resource', async () => {
       const createDto: CreateResourceDto = {
         name: 'New Resource',
+        type: ResourceType.Machine,
         description: 'New Description',
         documentationType: DocumentationType.URL,
         documentationUrl: 'https://example.com/docs',
@@ -159,6 +164,8 @@ describe('ResourcesController', () => {
         id: 1,
         name: createDto.name,
         description: createDto.description,
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: createDto.documentationType,
         documentationMarkdown: createDto.documentationMarkdown,
@@ -190,6 +197,7 @@ describe('ResourcesController', () => {
     it('should update an existing resource', async () => {
       const updateDto: UpdateResourceDto = {
         name: 'Updated Resource',
+        type: ResourceType.Machine,
         description: 'Updated Description',
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Updated Documentation\n\nThis is updated documentation.',
@@ -200,6 +208,8 @@ describe('ResourcesController', () => {
         id: 1,
         name: updateDto.name as string,
         description: updateDto.description as string,
+        type: ResourceType.Machine,
+        separateUnlockAndUnlatch: false,
         imageFilename: null,
         documentationType: updateDto.documentationType as DocumentationType,
         documentationMarkdown: updateDto.documentationMarkdown,
@@ -229,6 +239,7 @@ describe('ResourcesController', () => {
     it('should throw NotFoundException if resource not found', async () => {
       const updateDto: UpdateResourceDto = {
         name: 'Updated Resource',
+        type: ResourceType.Machine,
       };
 
       jest.spyOn(service, 'updateResource').mockRejectedValue(new NotFoundException());

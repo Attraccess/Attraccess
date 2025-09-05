@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Form,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Switch,
+  Tab,
+  Tabs,
   useDisclosure,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -24,9 +24,10 @@ import {
   useResourcesServiceCreateOneResource,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ImageUpload } from '../../../components/imageUpload';
 import { useToastMessage } from '../../../components/toastProvider';
-import { filenameToUrl } from '../../../api';
+import { SharedDataTab } from './tabs/shared';
+import { MachineTab } from './tabs/machine';
+import { DoorTab } from './tabs/door';
 
 interface ResourceEditModalProps {
   resourceId?: Resource['id'];
@@ -52,6 +53,8 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     name: '',
     description: '',
     allowTakeOver: false,
+    type: 'machine',
+    separateUnlockAndUnlatch: false,
   });
 
   const setField = useCallback(
@@ -134,20 +137,13 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
   });
 
   const clearForm = useCallback(() => {
-    if (resource) {
-      setFormData({
-        name: resource.name,
-        description: resource.description || '',
-        allowTakeOver: resource.allowTakeOver || false,
-      });
-    } else {
-      // Fallback if resource is somehow not available, though it's a required prop
-      setFormData({
-        name: '',
-        description: '',
-        allowTakeOver: false,
-      });
-    }
+    setFormData({
+      name: resource?.name || '',
+      description: resource?.description || '',
+      allowTakeOver: resource?.allowTakeOver || false,
+      type: resource?.type || 'machine',
+      separateUnlockAndUnlatch: resource?.separateUnlockAndUnlatch || false,
+    });
     setSelectedImage(null);
   }, [resource, setFormData, setSelectedImage]);
 
@@ -178,6 +174,8 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           allowTakeOver: formData.allowTakeOver,
           image: selectedImage ?? undefined,
           deleteImage,
+          type: formData.type,
+          separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
         },
       });
       return;
@@ -189,6 +187,8 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         description: formData.description as string,
         allowTakeOver: formData.allowTakeOver,
         image: selectedImage ?? undefined,
+        type: formData.type as 'machine' | 'door',
+        separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
       },
     });
   }, [formData, selectedImage, props.resourceId, updateResource, createResource, deleteImage]);
@@ -196,7 +196,13 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
   return (
     <>
       {props.children?.(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside" data-cy="resource-edit-modal">
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        scrollBehavior="inside"
+        data-cy="resource-edit-modal"
+        size="3xl"
+      >
         <ModalContent>
           {(onClose) => (
             <>
@@ -209,43 +215,26 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     e.preventDefault();
                     onSubmit();
                   }}
+                  className="flex flex-row gap-2 w-full"
                 >
-                  <Input
-                    isRequired
-                    label={t('inputs.name.label')}
-                    value={formData.name}
-                    onChange={(e) => setField('name', e.target.value)}
-                    isInvalid={!formData.name}
-                    required
-                    data-cy="resource-edit-modal-name-input"
-                  />
-                  <Input
-                    label={t('inputs.description.label')}
-                    value={formData.description}
-                    onChange={(e) => setField('description', e.target.value)}
-                    data-cy="resource-edit-modal-description-input"
-                  />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <SharedDataTab t={t} formData={formData} setField={setField} onImageSelected={onImageSelected} />
+                  </div>
 
-                  <Switch
-                    isSelected={formData.allowTakeOver}
-                    onValueChange={(value) => setField('allowTakeOver', value)}
-                    data-cy="resource-edit-modal-allow-takeover-switch"
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-small">{t('inputs.allowTakeOver.label')}</span>
-                      <span className="text-tiny text-default-400">{t('inputs.allowTakeOver.description')}</span>
-                    </div>
-                  </Switch>
-
-                  <ImageUpload
-                    label={t('inputs.image.label')}
-                    id="image"
-                    onChange={onImageSelected}
-                    className="w-full"
-                    currentImageUrl={resource?.imageFilename ? filenameToUrl(resource?.imageFilename) : undefined}
-                  />
-
-                  <button hidden type="submit" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <Tabs
+                      onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
+                      selectedKey={formData.type}
+                      destroyInactiveTabPanel={false}
+                    >
+                      <Tab key="machine" title={t('inputs.type.options.machine')}>
+                        <MachineTab t={t} formData={formData} setField={setField} />
+                      </Tab>
+                      <Tab key="door" title={t('inputs.type.options.door')}>
+                        <DoorTab t={t} formData={formData} setField={setField} />
+                      </Tab>
+                    </Tabs>
+                  </div>
                 </Form>
               </ModalBody>
 

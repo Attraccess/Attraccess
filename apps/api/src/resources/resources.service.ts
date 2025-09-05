@@ -45,6 +45,8 @@ export class ResourcesService {
       documentationMarkdown: dto.documentationMarkdown || null,
       documentationUrl: dto.documentationUrl || null,
       allowTakeOver: dto.allowTakeOver || false,
+      type: dto.type,
+      separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
     });
 
     // Save the resource first to get an ID
@@ -92,6 +94,8 @@ export class ResourcesService {
 
     // Update only provided fields
     if (dto.name !== undefined) resource.name = dto.name;
+    if (dto.type !== undefined) resource.type = dto.type;
+    if (dto.separateUnlockAndUnlatch !== undefined) resource.separateUnlockAndUnlatch = dto.separateUnlockAndUnlatch;
     if (dto.description !== undefined) resource.description = dto.description;
 
     // Handle documentation fields
