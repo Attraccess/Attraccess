@@ -302,11 +302,15 @@ export class ResourceUsageService {
   async unlatchDoor(resourceId: number, user: User): Promise<ResourceUsage> {
     const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
     if (resource.type !== ResourceType.Door) {
-      throw new BadRequestException('Resource is not a door');
+      throw new BadRequestException(
+        `Resource (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) is not a door`
+      );
     }
 
     if (!resource.separateUnlockAndUnlatch) {
-      throw new BadRequestException('Door does not support unlatching');
+      throw new BadRequestException(
+        `Door (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) does not support unlatching`
+      );
     }
 
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlatch);

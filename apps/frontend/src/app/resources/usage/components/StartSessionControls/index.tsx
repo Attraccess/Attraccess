@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
 import { PlayIcon, ChevronDownIcon, LockIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -148,10 +148,6 @@ export function StartSessionControls(
     });
   };
 
-  const isPending = useMemo(() => {
-    return startIsPending || unlockDoorIsPending || lockDoorIsPending || unlatchDoorIsPending;
-  }, [startIsPending, unlockDoorIsPending, lockDoorIsPending, unlatchDoorIsPending]);
-
   const handleOpenStartSessionModal = () => {
     setIsNotesModalOpen(true);
   };
@@ -163,7 +159,7 @@ export function StartSessionControls(
           <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
             <Button
               className="flex-1"
-              isLoading={isPending}
+              isLoading={lockDoorIsPending}
               startContent={<LockIcon className="w-4 h-4" />}
               onPress={() => lockDoor({ resourceId })}
               color="danger"
@@ -172,7 +168,7 @@ export function StartSessionControls(
             </Button>
             <Button
               className="flex-1"
-              isLoading={isPending}
+              isLoading={unlockDoorIsPending}
               startContent={<LockIcon className="w-4 h-4" />}
               onPress={() => unlockDoor({ resourceId })}
               color="primary"
@@ -182,7 +178,7 @@ export function StartSessionControls(
             {resource.separateUnlockAndUnlatch && (
               <Button
                 className="flex-1"
-                isLoading={isPending}
+                isLoading={unlatchDoorIsPending}
                 startContent={<LockIcon className="w-4 h-4" />}
                 onPress={() => unlatchDoor({ resourceId })}
                 color="secondary"
@@ -197,7 +193,7 @@ export function StartSessionControls(
             <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
             <ButtonGroup fullWidth color="primary">
               <Button
-                isLoading={isPending}
+                isLoading={startIsPending}
                 startContent={<PlayIcon className="w-4 h-4" />}
                 onPress={() => handleStartSession()}
               >
@@ -229,7 +225,7 @@ export function StartSessionControls(
         onClose={() => setIsNotesModalOpen(false)}
         onConfirm={(notes) => handleStartSession({ notes, forceTakeOver: false })}
         mode={SessionModalMode.START}
-        isSubmitting={isPending}
+        isSubmitting={startIsPending}
       />
     </div>
   );

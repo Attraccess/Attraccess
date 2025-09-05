@@ -629,7 +629,9 @@ describe('ResourceUsageService', () => {
     it('should throw when unlatching unsupported door', async () => {
       resourceRepository.findOne.mockResolvedValue({ ...doorResource, separateUnlockAndUnlatch: false } as Resource);
 
-      await expect(service.unlatchDoor(10, mockUser)).rejects.toThrow('Door does not support unlatching');
+      await expect(service.unlatchDoor(10, mockUser)).rejects.toThrow(
+        'Door (ID: 10, Name: Front Door) does not support unlatching'
+      );
     });
   });
 });
