@@ -9,6 +9,7 @@ interface Props {
   inputs?: { id: string; label?: string }[];
   outputs?: { id: string; label?: string }[];
   previewMode?: boolean;
+  unsupported?: boolean;
 }
 
 export function AttraccessBaseNode(props: Props) {
@@ -24,10 +25,17 @@ export function AttraccessBaseNode(props: Props) {
   return (
     <BaseNodeCard
       title={t('nodes.' + props.nodeType + '.title')}
-      subtitle={props.previewMode ? t('nodes.' + props.nodeType + '.description') : undefined}
+      subtitle={
+        props.previewMode
+          ? t('nodes.' + props.nodeType + '.description')
+          : props.unsupported
+          ? t('nodes.unsupportedForResourceType')
+          : undefined
+      }
       previewMode={props.previewMode}
       inputs={props.inputs}
       outputs={props.outputs}
+      unsupported={props.unsupported}
     />
   );
 }

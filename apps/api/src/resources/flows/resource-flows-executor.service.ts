@@ -174,16 +174,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {
     const { resource } = usage;
 
-    this.logger.log(`Handling resource usage ended event for resource ID: ${resource.id}`);
+    this.logger.log(`Handling resource usage event for resource ID: ${resource.id}`);
 
     try {
       await this.triggerResourceUsageNode(resource.id, inputType, {
         event: {
-          timestamp: usage.endTime.toISOString(),
+          timestamp: (usage.endTime ?? usage.startTime)?.toISOString(),
         },
         usage: {
           start: usage.startTime.toISOString(),
-          end: usage.endTime.toISOString(),
+          end: usage.endTime ? usage.endTime.toISOString() : null,
         },
         user: {
           id: usage.user.id,
@@ -195,9 +195,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           name: usage.resource.name,
         },
       });
-      this.logger.log(`Successfully processed resource usage ended event for resource ID: ${resource.id}`);
+      this.logger.log(`Successfully processed resource usage event for resource ID: ${resource.id}`);
     } catch (error) {
-      this.logger.error(`Failed to handle resource usage ended event for resource ID: ${resource.id}`, error.stack);
+      this.logger.error(`Failed to handle resource usage event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }
@@ -320,6 +320,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
@@ -343,14 +346,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           break;
 
         default: {
+          const message = `Unknown node type: ${node.type} for node ID: ${node.id}`;
           await this.createFlowLog({
             flowRunId,
             nodeId: node.id,
             resourceId: node.resourceId,
             type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-            payload: JSON.stringify({ error: `Unknown node type: ${node.type} for node ID: ${node.id}` }),
+            payload: JSON.stringify({ error: message }),
           });
-          throw new Error(`Unknown node type: ${node.type} for node ID: ${node.id}`);
+          throw new Error(message);
         }
       }
 

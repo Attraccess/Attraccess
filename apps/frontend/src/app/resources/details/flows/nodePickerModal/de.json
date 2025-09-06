@@ -3,6 +3,6 @@
   "nodeType": {
     "input": "Eingabe",
     "output": "Ausgabe",
-    "input-output": "Eingabe/Ausgabe"
+    "processing": "Verarbeitung"
   }
 }

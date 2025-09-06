@@ -14,6 +14,7 @@ import {
 import { ResourceFlowLog } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../../../api';
 import { events } from 'fetch-event-stream';
+import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
 
@@ -29,6 +30,9 @@ interface FlowContextType {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   resourceId: number;
+  resourceType: 'machine' | 'door';
+  resourceSeparateUnlockAndUnlatch: boolean;
+  resourceAllowTakeOver: boolean;
   liveLogs: ResourceFlowLog[];
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
@@ -44,6 +48,7 @@ interface FlowProviderProps {
 export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nodes) => applyNodeChanges(changes, nodes));
@@ -152,6 +157,9 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       setNodes,
       setEdges,
       resourceId,
+      resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
+      resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
+      resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
       liveLogs: liveLogs ?? [],
       addLiveLogReceiver,
       removeLiveLogReceiver,
@@ -168,6 +176,9 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       setNodes,
       setEdges,
       resourceId,
+      resource?.type,
+      resource?.separateUnlockAndUnlatch,
+      resource?.allowTakeOver,
       liveLogs,
       addLiveLogReceiver,
       removeLiveLogReceiver,

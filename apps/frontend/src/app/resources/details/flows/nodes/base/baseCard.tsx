@@ -1,11 +1,14 @@
 import { Button, Card, CardBody, CardHeader, cn, Tooltip, useDisclosure } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
-import { Trash2Icon } from 'lucide-react';
+import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../../flowContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DeleteConfirmationModal } from '../../../../../../components/deleteConfirmationModal';
 import { ResourceFlowLog } from '@attraccess/react-query-client';
+import de from './de.json';
+import en from './en.json';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   title: string;
@@ -20,6 +23,7 @@ interface Props {
     toolbarPosition?: Position;
   };
   showBodyInPreview?: boolean;
+  unsupported?: boolean;
 }
 
 enum ProcessingState {
@@ -34,6 +38,14 @@ export function BaseNodeCard(props: Props) {
 
   const { removeNode } = useFlowContext();
   const nodeId = useNodeId();
+  const { t } = useTranslations('resource-flows.baseCard', {
+    de: {
+      nodes: de,
+    },
+    en: {
+      nodes: en,
+    },
+  });
 
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
 
@@ -100,8 +112,9 @@ export function BaseNodeCard(props: Props) {
       'animate-pulse border-2 border-blue-500': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
+      'opacity-60 grayscale border-dashed': props.unsupported,
     });
-  }, [processingState]);
+  }, [processingState, props.unsupported]);
 
   const handleMouseEnter = useCallback(() => setIsHovering(true), []);
   const handleMouseLeave = useCallback(() => setIsHovering(false), []);
@@ -169,6 +182,12 @@ export function BaseNodeCard(props: Props) {
 
         {(!previewMode || showBodyInPreview) && children && <CardBody>{children}</CardBody>}
       </Card>
+
+      {!previewMode && props.unsupported && (
+        <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
+          <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
+        </div>
+      )}
 
       {!previewMode &&
         targetHandlesWithStyles.map(({ id: handleId, label, style }) => (

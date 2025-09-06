@@ -20,6 +20,7 @@ interface Props {
   onSelect: (nodeType: string) => void;
   children: (open: () => void) => React.ReactNode;
   nodeTypes?: AttraccessNodeType[];
+  allowedNodeKeys?: string[];
 }
 
 interface NodeEntry {
@@ -50,20 +51,28 @@ export function NodePickerModal(props: Props) {
 
   // Filter nodes by allowed types if specified
   const availableNodes = useMemo((): NodeEntry[] => {
-    if (!Array.isArray(props.nodeTypes) || props.nodeTypes.length === 0) {
-      return allNodesArray;
+    let filtered = allNodesArray;
+
+    if (Array.isArray(props.nodeTypes) && props.nodeTypes.length > 0) {
+      filtered = filtered.filter((nodeEntry) =>
+        (props.nodeTypes as AttraccessNodeType[]).includes(nodeEntry.node.type)
+      );
     }
 
-    return allNodesArray.filter((nodeEntry) => (props.nodeTypes as AttraccessNodeType[]).includes(nodeEntry.node.type));
-  }, [allNodesArray, props.nodeTypes]);
+    if (Array.isArray(props.allowedNodeKeys) && props.allowedNodeKeys.length > 0) {
+      filtered = filtered.filter((nodeEntry) => props.allowedNodeKeys?.includes(nodeEntry.key));
+    }
+
+    return filtered;
+  }, [allNodesArray, props.nodeTypes, props.allowedNodeKeys]);
 
   // Group nodes by their type
   const nodeGroups = useMemo((): NodeGroup[] => {
     // Initialize groups array
     const groups: NodeGroup[] = [
       { type: AttraccessNodeType.input, nodes: [] },
-      { type: AttraccessNodeType.output, nodes: [] },
       { type: AttraccessNodeType.processing, nodes: [] },
+      { type: AttraccessNodeType.output, nodes: [] },
     ];
 
     // Group nodes by type

@@ -18,6 +18,20 @@
           "title": "Resource usage takeover",
           "description": "This node is triggered when a resource is taken over."
         }
+      },
+      "door": {
+        "locked": {
+          "title": "Door locked",
+          "description": "This node is triggered when the door is locked."
+        },
+        "unlocked": {
+          "title": "Door unlocked",
+          "description": "This node is triggered when the door is unlocked."
+        },
+        "unlatched": {
+          "title": "Door unlatched",
+          "description": "This node is triggered when the door is unlatched."
+        }
       }
     }
   },
@@ -44,5 +58,6 @@
         "description": "This node sends a MQTT message."
       }
     }
-  }
+  },
+  "unsupportedForResourceType": "This node is unsupported for the current resource type and will never run."
 }

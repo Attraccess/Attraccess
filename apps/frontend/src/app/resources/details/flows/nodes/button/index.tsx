@@ -26,6 +26,7 @@ export function ButtonNode(
   const nodeId = useNodeId();
   const node = useNodesData(nodeId as string);
   const { updateNodeData } = useFlowContext();
+  const { resourceType } = useFlowContext();
 
   const [label, setLabel] = useState<string>((node?.data.label as string) ?? '');
 
@@ -65,6 +66,7 @@ export function ButtonNode(
       subtitle={t('nodes.input.button.description')}
       previewMode={props.previewMode}
       outputs={[{ id: 'output' }]}
+      unsupported={resourceType !== 'machine'}
       actions={<Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpenEditor} />}
     >
       <Input label={t('editor.inputs.label.label')} isReadOnly value={label} />

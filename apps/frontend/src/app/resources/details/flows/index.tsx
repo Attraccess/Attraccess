@@ -316,7 +316,22 @@ function FlowsPageInner() {
             </LogViewer>
 
             <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
-            <NodePickerModal onSelect={addStartNode}>
+            <NodePickerModal
+              onSelect={addStartNode}
+              allowedNodeKeys={
+                resource?.type === 'door'
+                  ? Object.entries(AttraccessNodes)
+                      .filter(([, v]) => !v.supportedResourceTypes || v.supportedResourceTypes.includes('door'))
+                      .map(([k]) => k)
+                      .filter((key) =>
+                        resource?.separateUnlockAndUnlatch ? true : key !== 'input.resource.door.unlatched'
+                      )
+                  : Object.entries(AttraccessNodes)
+                      .filter(([, v]) => !v.supportedResourceTypes || v.supportedResourceTypes.includes('machine'))
+                      .map(([k]) => k)
+                      .filter((key) => (resource?.allowTakeOver ? true : key !== 'input.resource.usage.takeover'))
+              }
+            >
               {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
             </NodePickerModal>
           </Panel>

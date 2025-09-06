@@ -18,6 +18,20 @@
           "title": "Ressource wurde übernommen",
           "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird."
         }
+      },
+      "door": {
+        "locked": {
+          "title": "Tür verriegelt",
+          "description": "Dieser Knoten wird ausgelöst, wenn die Tür verriegelt wird."
+        },
+        "unlocked": {
+          "title": "Tür entriegelt",
+          "description": "Dieser Knoten wird ausgelöst, wenn die Tür entriegelt wird."
+        },
+        "unlatched": {
+          "title": "Tür-Falle geöffnet",
+          "description": "Dieser Knoten wird ausgelöst, wenn die Tür-Falle geöffnet wird."
+        }
       }
     }
   },
@@ -52,5 +66,6 @@
         "description": "Sendet eine MQTT-Nachricht."
       }
     }
-  }
+  },
+  "unsupportedForResourceType": "Dieser Knoten wird für den aktuellen Ressourcentyp nie ausgeführt."
 }
