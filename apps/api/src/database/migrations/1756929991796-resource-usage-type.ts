@@ -14,7 +14,7 @@ export class ResourceUsageType1756929991796 implements MigrationInterface {
       ELSE (julianday("endTime") - julianday("startTime")) * 1440
     END) STORED, "usageType" varchar CHECK( "usageType" IN ('machine','door') ) NOT NULL, CONSTRAINT "FK_8177b2b424a6d31c533d57b95cc" FOREIGN KEY ("resourceId") REFERENCES "resource" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_6f80e3fc0cf8bfce60e25a6805f" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
     await queryRunner.query(
-      `INSERT INTO "temporary_resource_usage"("id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageType") SELECT "id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", 'usage' FROM "resource_usage"`
+      `INSERT INTO "temporary_resource_usage"("id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageType") SELECT "id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", 'machine' FROM "resource_usage"`
     );
     await queryRunner.query(`DROP TABLE "resource_usage"`);
     await queryRunner.query(`ALTER TABLE "temporary_resource_usage" RENAME TO "resource_usage"`);
