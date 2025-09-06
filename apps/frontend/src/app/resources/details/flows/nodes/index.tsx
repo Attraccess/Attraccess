@@ -108,7 +108,7 @@ const simpleNodes = Object.fromEntries(
   nodeDefinitions.map((node) => [
     node.key,
     {
-      component: SimpleNodeComponent,
+      component: (props: NodeProps & { previewMode?: boolean }) => <SimpleNodeComponent {...props} node={node} />,
       type: node.type,
       supportedResourceTypes: node.supportedResourceTypes,
     },
