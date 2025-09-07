@@ -2,17 +2,34 @@
   "resourceInUseBy": "Resource currently in use by:",
   "unknownUser": "Unknown User",
   "sessionStarted": "Session Started",
-  "takeoverAvailable": "This resource allows takeover. You can end the current session and start your own.",
-  "takeoverResource": "Takeover Resource",
-  "takeoverOptionsMenu": {
-    "label": "Alternative takeover options",
-    "takeoverWithNotes": {
-      "label": "Takeover with Notes",
-      "description": "End the current session and start your own with notes"
-    }
+  "takeover": {
+    "available": "This resource allows takeover. You can end the current session and start your own.",
+    "button": "Takeover Resource",
+    "optionsMenu": {
+      "label": "Alternative takeover options",
+      "takeoverWithNotes": {
+        "label": "Takeover with Notes",
+        "description": "End the current session and start your own with notes"
+      }
+    },
+    "successful": "Takeover Successful",
+    "successfulDescription": "You have successfully taken over the resource and started a new session.",
+    "error": "Takeover Failed",
+    "errorDescription": "Failed to takeover the resource. Please try again or contact support."
   },
-  "takeoverSuccessful": "Resource Takeover Successful",
-  "takeoverSuccessfulDescription": "You have successfully taken over the resource and started a new session.",
-  "takeoverError": "Takeover Failed",
-  "takeoverErrorDescription": "Failed to takeover the resource. Please try again or contact support."
+  "stopOtherUserSession": {
+    "available": "As an introducer / administrator, you can end the session of the other user.",
+    "button": "Stop Other User Session",
+    "optionsMenu": {
+      "label": "Alternative stop other user session options",
+      "stopOtherUserSessionWithNotes": {
+        "label": "Stop other user session with Notes",
+        "description": "Stop the current session of the other user and start your own with notes"
+      }
+    },
+    "successful": "Other User Session Stopped",
+    "successfulDescription": "You have successfully stopped the session of the other user.",
+    "error": "Other User Session Stop Failed",
+    "errorDescription": "Failed to stop the session of the other user. Please try again or contact support."
+  }
 }

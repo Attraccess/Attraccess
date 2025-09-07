@@ -2,17 +2,34 @@
   "resourceInUseBy": "Ressource wird derzeit verwendet von:",
   "unknownUser": "Unbekannter Benutzer",
   "sessionStarted": "Sitzung gestartet",
-  "takeoverAvailable": "Diese Ressource erlaubt Übernahme. Sie können die aktuelle Sitzung beenden und Ihre eigene starten.",
-  "takeoverResource": "Ressource übernehmen",
-  "takeoverOptionsMenu": {
-    "label": "Alternative Übernahme-Optionen",
-    "takeoverWithNotes": {
-      "label": "Mit Notizen übernehmen",
-      "description": "Aktuelle Sitzung beenden und eigene mit Notizen starten"
-    }
+  "takeover": {
+    "available": "Diese Ressource erlaubt Übernahme. Sie können die aktuelle Sitzung beenden und Ihre eigene starten.",
+    "button": "Ressource übernehmen",
+    "optionsMenu": {
+      "label": "Alternative Übernahme-Optionen",
+      "takeoverWithNotes": {
+        "label": "Mit Notizen übernehmen",
+        "description": "Aktuelle Sitzung beenden und eigene mit Notizen starten"
+      }
+    },
+    "successful": "Ressourcen-Übernahme erfolgreich",
+    "successfulDescription": "Sie haben die Ressource erfolgreich übernommen und eine neue Sitzung gestartet.",
+    "error": "Übernahme fehlgeschlagen",
+    "errorDescription": "Die Übernahme der Ressource ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support."
   },
-  "takeoverSuccessful": "Ressourcen-Übernahme erfolgreich",
-  "takeoverSuccessfulDescription": "Sie haben die Ressource erfolgreich übernommen und eine neue Sitzung gestartet.",
-  "takeoverError": "Übernahme fehlgeschlagen",
-  "takeoverErrorDescription": "Die Übernahme der Ressource ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support."
+  "stopOverUserSession": {
+    "available": "Als Einführer / Administrator können Sie die Sitzung des anderen Benutzers beenden.",
+    "button": "Andere Benutzer-Sitzung beenden",
+    "optionsMenu": {
+      "label": "Alternative Beendigung-Optionen",
+      "stopOtherUserSessionWithNotes": {
+        "label": "Mit Notizen beenden",
+        "description": "Aktuelle Sitzung mit Notizen beenden"
+      }
+    },
+    "successful": "Andere Benutzer-Sitzung beendet",
+    "successfulDescription": "Sie haben die Sitzung des anderen Benutzers erfolgreich beendet.",
+    "error": "Andere Benutzer-Sitzung beenden fehlgeschlagen",
+    "errorDescription": "Die Sitzung des anderen Benutzers ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support."
+  }
 }
