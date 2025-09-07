@@ -8,9 +8,10 @@ import {
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
   useResourcesServiceResourceUsageGetActiveSession,
-  useAccessControlServiceResourceIntroducersGetMany,
   useResourcesServiceResourceUsageCanControl,
   useResourcesServiceGetOneResourceById,
+  useAccessControlServiceResourceIntroducersIsIntroducer,
+  useResourcesServiceResourceUsageEndSession,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -28,34 +29,32 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
-  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
+  const [isStopOtherUserSessionNotesModalOpen, setIsStopOtherUserSessionNotesModalOpen] = useState(false);
 
-  // Fetch resource data
-  // const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-
-  // Fetch active session data
   const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
   const { data: access } = useResourcesServiceResourceUsageCanControl({ resourceId });
 
-  // Get list of users who can give introductions
-  const { data: introducers } = useAccessControlServiceResourceIntroducersGetMany({ resourceId });
-
-  // Calculate permissions
-  const canManageResources = hasPermission('canManageResources');
-  const isIntroducer = useMemo(() => {
-    return introducers?.some((introducer) => introducer.userId === user?.id);
-  }, [introducers, user]);
+  const { data: permissions } = useAccessControlServiceResourceIntroducersIsIntroducer(
+    { resourceId, userId: user?.id as number, includeGroups: true },
+    undefined,
+    {
+      enabled: !!user?.id,
+    }
+  );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const canStartSession = canManageResources || access?.canControl || isIntroducer;
+  const canManageResources = hasPermission('canManageResources');
+  const canStartSession = canManageResources || access?.canControl || permissions?.isIntroducer;
   const canTakeover = resource?.allowTakeOver && canStartSession;
+  const canStopOtherUserSession = permissions?.isIntroducer || canManageResources;
 
   const startSession = useResourcesServiceResourceUsageStartSession({
     onSuccess: () => {
-      setIsNotesModalOpen(false);
+      setIsTakeoverNotesModalOpen(false);
 
       // Invalidate the active session query to refetch data
       queryClient.invalidateQueries({
@@ -73,18 +72,52 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         },
       });
       success({
-        title: t('takeoverSuccessful'),
-        description: t('takeoverSuccessfulDescription'),
+        title: t('takeover.successful'),
+        description: t('takeover.successfulDescription'),
       });
     },
     onError: (err) => {
       showError({
-        title: t('takeoverError'),
-        description: t('takeoverErrorDescription'),
+        title: t('takeover.error'),
+        description: t('takeover.errorDescription'),
       });
       console.error('Failed to takeover session:', err);
     },
   });
+
+  const stopSession = useResourcesServiceResourceUsageEndSession({
+    onSuccess: () => {
+      setIsTakeoverNotesModalOpen(false);
+
+      // Invalidate the active session query to refetch data
+      queryClient.invalidateQueries({
+        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+      });
+      // Invalidate all history queries for this resource (regardless of pagination/user filters)
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+          return (
+            query.queryKey[0] === baseHistoryKey[0] &&
+            query.queryKey.length > 1 &&
+            JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
+          );
+        },
+      });
+
+      success({
+        title: t('stopOtherUserSession.successful'),
+        description: t('stopOtherUserSession.successfulDescription'),
+      });
+    },
+  });
+
+  const handleStopOtherUserSessionWithNotes = async (notes: string) => {
+    stopSession.mutate({
+      resourceId,
+      requestBody: { notes },
+    });
+  };
 
   const handleTakeoverWithNotes = async (notes: string) => {
     startSession.mutate({
@@ -101,8 +134,19 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   }, [startSession, resourceId]);
 
   const handleOpenTakeoverModal = () => {
-    setIsNotesModalOpen(true);
+    setIsTakeoverNotesModalOpen(true);
   };
+
+  const handleOpenStopOtherUserSessionModal = () => {
+    setIsStopOtherUserSessionNotesModalOpen(true);
+  };
+
+  const handleImmediateStopOtherUserSession = useCallback(() => {
+    stopSession.mutate({
+      resourceId,
+      requestBody: {},
+    });
+  }, [stopSession, resourceId]);
 
   // Early return if no active session or it belongs to current user
   if (!activeSession || activeSession.userId === user?.id) {
@@ -125,14 +169,14 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
 
         {canTakeover && (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('takeoverAvailable')}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('takeover.available')}</p>
             <ButtonGroup fullWidth color="warning">
               <Button
                 isLoading={startSession.isPending}
                 startContent={<UserX className="w-4 h-4" />}
                 onPress={handleImmediateTakeover}
               >
-                {t('takeoverResource')}
+                {t('takeover.button')}
               </Button>
               <Dropdown placement="bottom-end">
                 <DropdownTrigger>
@@ -140,13 +184,44 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                     <ChevronDownIcon />
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu disallowEmptySelection aria-label={t('takeoverOptionsMenu.label')}>
+                <DropdownMenu disallowEmptySelection aria-label={t('takeover.optionsMenu.label')}>
                   <DropdownItem
                     key="takeoverWithNotes"
-                    description={t('takeoverOptionsMenu.takeoverWithNotes.description')}
+                    description={t('takeover.optionsMenu.takeoverWithNotes.description')}
                     onPress={handleOpenTakeoverModal}
                   >
-                    {t('takeoverOptionsMenu.takeoverWithNotes.label')}
+                    {t('takeover.optionsMenu.takeoverWithNotes.label')}
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </ButtonGroup>
+          </div>
+        )}
+
+        {canStopOtherUserSession && (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('stopOtherUserSession.available')}</p>
+            <ButtonGroup fullWidth color="danger">
+              <Button
+                isLoading={startSession.isPending}
+                startContent={<UserX className="w-4 h-4" />}
+                onPress={handleImmediateStopOtherUserSession}
+              >
+                {t('stopOtherUserSession.button')}
+              </Button>
+              <Dropdown placement="bottom-end">
+                <DropdownTrigger>
+                  <Button isIconOnly>
+                    <ChevronDownIcon />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu disallowEmptySelection aria-label={t('stopOtherUserSession.optionsMenu.label')}>
+                  <DropdownItem
+                    key="stopOtherUserSessionWithNotes"
+                    description={t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.description')}
+                    onPress={handleOpenStopOtherUserSessionModal}
+                  >
+                    {t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.label')}
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
@@ -156,11 +231,19 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
       </div>
 
       <SessionNotesModal
-        isOpen={isNotesModalOpen}
-        onClose={() => setIsNotesModalOpen(false)}
+        isOpen={isTakeoverNotesModalOpen}
+        onClose={() => setIsTakeoverNotesModalOpen(false)}
         onConfirm={handleTakeoverWithNotes}
         mode={SessionModalMode.START}
         isSubmitting={startSession.isPending}
+      />
+
+      <SessionNotesModal
+        isOpen={isStopOtherUserSessionNotesModalOpen}
+        onClose={() => setIsStopOtherUserSessionNotesModalOpen(false)}
+        onConfirm={handleStopOtherUserSessionWithNotes}
+        mode={SessionModalMode.END}
+        isSubmitting={stopSession.isPending}
       />
     </>
   );
