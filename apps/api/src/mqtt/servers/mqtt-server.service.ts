@@ -2,10 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
-import {
-  CreateMqttServerDto,
-  UpdateMqttServerDto,
-} from './dtos/mqtt-server.dto';
+import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 
 @Injectable()
 export class MqttServerService {
@@ -27,7 +24,6 @@ export class MqttServerService {
   async findOne(id: number): Promise<MqttServer> {
     const server = await this.mqttServerRepository.findOne({
       where: { id },
-      relations: ['resourceConfigs'],
     });
 
     if (!server) {
@@ -48,10 +44,7 @@ export class MqttServerService {
   /**
    * Update an existing MQTT server
    */
-  async update(
-    id: number,
-    updateMqttServerDto: UpdateMqttServerDto
-  ): Promise<MqttServer> {
+  async update(id: number, updateMqttServerDto: UpdateMqttServerDto): Promise<MqttServer> {
     const server = await this.findOne(id);
 
     // Update the server with the new values
