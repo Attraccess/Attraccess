@@ -117,6 +117,10 @@ export function HTTPRequestNode(
     return new URL(urlString);
   }, [node?.data.url]);
 
+  const selectionToSet = useCallback((selection: string) => {
+    return new Set(selection ? [selection] : []);
+  }, []);
+
   return (
     <BaseNodeCard
       title={t('nodes.output.http.sendRequest.title')}
@@ -129,7 +133,7 @@ export function HTTPRequestNode(
       <div className="flex flex-col gap-2">
         <Input label={t('editor.inputs.method.label')} isReadOnly value={node?.data.method as string} />
         <Input
-          label={t('editor.inputs.url.origin.label')}
+          label={t('editor.inputs.url.label')}
           isReadOnly
           value={urlObject?.origin}
           title={urlObject?.toString()}
@@ -149,16 +153,11 @@ export function HTTPRequestNode(
             <Input label={t('editor.inputs.url.label')} value={url} onChange={(e) => setUrl(e.target.value)} />
             <Select
               label={t('editor.inputs.method.label')}
-              selectedKeys={method}
-              onChange={(e) => setMethod(e.target.value)}
+              items={['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((i) => ({ method: i }))}
+              selectedKeys={selectionToSet(method)}
+              onSelectionChange={(keys) => setMethod((keys as Set<string>).values().next().value as string)}
             >
-              <SelectItem key="GET">GET</SelectItem>
-              <SelectItem key="POST">POST</SelectItem>
-              <SelectItem key="PUT">PUT</SelectItem>
-              <SelectItem key="PATCH">PATCH</SelectItem>
-              <SelectItem key="DELETE">DELETE</SelectItem>
-              <SelectItem key="HEAD">HEAD</SelectItem>
-              <SelectItem key="OPTIONS">OPTIONS</SelectItem>
+              {(item) => <SelectItem key={item.method}>{item.method}</SelectItem>}
             </Select>
 
             <div className="flex flex-col gap-2">
