@@ -227,13 +227,19 @@ export class ResourceUsageService {
 
     this.logger.debug(`Ending session ${activeSession.id} at ${endTime.toISOString()}`);
 
+    let endNotes = dto.notes;
+
+    if (!isSessionOwner) {
+      endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
+    }
+
     // Update session with end time and notes - using explicit update to avoid the generated column
     await this.resourceUsageRepository
       .createQueryBuilder()
       .update(ResourceUsage)
       .set({
         endTime,
-        endNotes: dto.notes,
+        endNotes,
       })
       .where('id = :id', { id: activeSession.id })
       .execute();
