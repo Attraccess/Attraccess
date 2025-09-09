@@ -32,7 +32,7 @@ ENV PLUGIN_DIR=/app/storage/plugins
 # Install dependencies directly from the Nx-generated package.json
 WORKDIR /app/dist/apps/api
 RUN corepack enable && corepack prepare && \
-    pnpm install # --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Back to app root for consistent starting dir
 WORKDIR /app
