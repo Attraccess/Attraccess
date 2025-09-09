@@ -10,6 +10,7 @@ import {
 } from './dto';
 import { ResourceFlowLogEvent, ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { Observable, Subject } from 'rxjs';
+import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 
 @ApiTags('Resource Flows')
 @Controller('resources/:resourceId/flow')
@@ -21,6 +22,24 @@ export class ResourceFlowsController {
     private readonly resourceFlowsService: ResourceFlowsService,
     private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService
   ) {}
+
+  @Get('node-schemas')
+  @ApiOperation({
+    summary: 'Get node schemas',
+    description: 'Get the schemas for all node types',
+    operationId: 'getNodeSchemas',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Node schemas retrieved successfully',
+    type: ResourceFlowNodeSchemaDto,
+    isArray: true,
+  })
+  public async getNodeSchemas(
+    @Param('resourceId', ParseIntPipe) resourceId: number
+  ): Promise<ResourceFlowNodeSchemaDto[]> {
+    return await this.resourceFlowsService.getNodeSchemas(resourceId);
+  }
 
   @Get()
   @ApiOperation({

@@ -1170,6 +1170,52 @@ export type UpdateMaintenanceDto = {
     reason?: string;
 };
 
+export type ResourceFlowNodeSchemaDto = {
+    /**
+     * The name of the node type
+     */
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'processing.wait' | 'processing.if';
+    /**
+     * The schema for a node type
+     */
+    configSchema: {
+        [key: string]: unknown;
+    };
+    /**
+     * The inputs for a node type
+     */
+    inputs: Array<(string)>;
+    /**
+     * The outputs for a node type
+     */
+    outputs: Array<(string)>;
+    /**
+     * Whether the node type is supported by this resource
+     */
+    supportedByResource: boolean;
+    /**
+     * Whether the node type is an output node
+     */
+    isOutput: boolean;
+};
+
+/**
+ * The name of the node type
+ */
+export enum type3 {
+    INPUT_BUTTON = 'input.button',
+    INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
+    INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
+    INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
+    INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
+    INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
+    INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+    OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
+    OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+    PROCESSING_WAIT = 'processing.wait',
+    PROCESSING_IF = 'processing.if'
+}
+
 export type ResourceFlowNodePositionDto = {
     /**
      * The x position of the node
@@ -1201,23 +1247,6 @@ export type ResourceFlowNodeDto = {
         [key: string]: unknown;
     };
 };
-
-/**
- * The type of the node
- */
-export enum type3 {
-    INPUT_BUTTON = 'input.button',
-    INPUT_RESOURCE_USAGE_STARTED = 'input.resource.usage.started',
-    INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
-    INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
-    INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
-    INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
-    INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
-    OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
-    OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
-    PROCESSING_WAIT = 'processing.wait',
-    PROCESSING_IF = 'processing.if'
-}
 
 export type ResourceFlowEdgeDto = {
     /**
@@ -2397,6 +2426,12 @@ export type CancelMaintenanceData = {
 };
 
 export type CancelMaintenanceResponse = void;
+
+export type GetNodeSchemasData = {
+    resourceId: number;
+};
+
+export type GetNodeSchemasResponse = Array<ResourceFlowNodeSchemaDto>;
 
 export type GetResourceFlowData = {
     /**
@@ -4010,6 +4045,21 @@ export type $OpenApiTs = {
                  * Maintenance not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow/node-schemas': {
+        get: {
+            req: GetNodeSchemasData;
+            res: {
+                /**
+                 * Node schemas retrieved successfully
+                 */
+                200: Array<ResourceFlowNodeSchemaDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

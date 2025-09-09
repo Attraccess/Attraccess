@@ -22,8 +22,8 @@ import { useCallback, useMemo, useState } from 'react';
 import de from './de.json';
 import en from './en.json';
 
-import nodeTranslationsDe from '../nodes/de.json';
-import nodeTranslationsEn from '../nodes/en.json';
+import nodeTranslationsDe from '../node/de.json';
+import nodeTranslationsEn from '../node/en.json';
 import { useFlowContext } from '../flowContext';
 
 interface Props {

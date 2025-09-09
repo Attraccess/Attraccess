@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function AttractapSelect(props: Props) {
-  const { data: readers } = useAttractapServiceGetReaders();
+  const { data: readers, isLoading } = useAttractapServiceGetReaders();
 
   const selectionToSet = useCallback((selection: Props['selection']) => {
     return new Set(selection ? [selection] : []);
@@ -48,6 +48,7 @@ export function AttractapSelect(props: Props) {
       selectedKeys={value}
       onSelectionChange={(keys) => setValue(keys as Set<number>)}
       data-cy="attractap-select"
+      isLoading={isLoading}
     >
       {(reader) => (
         <SelectItem aria-label={reader.name} key={reader.id} data-cy={`attractap-select-item-${reader.id}`}>

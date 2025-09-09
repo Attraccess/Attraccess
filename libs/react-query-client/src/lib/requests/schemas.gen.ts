@@ -1713,6 +1713,45 @@ export const $UpdateMaintenanceDto = {
     }
 } as const;
 
+export const $ResourceFlowNodeSchemaDto = {
+    type: 'object',
+    properties: {
+        type: {
+            type: 'string',
+            description: 'The name of the node type',
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
+        },
+        configSchema: {
+            type: 'object',
+            description: 'The schema for a node type',
+            additionalProperties: true
+        },
+        inputs: {
+            description: 'The inputs for a node type',
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        outputs: {
+            description: 'The outputs for a node type',
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        supportedByResource: {
+            type: 'boolean',
+            description: 'Whether the node type is supported by this resource'
+        },
+        isOutput: {
+            type: 'boolean',
+            description: 'Whether the node type is an output node'
+        }
+    },
+    required: ['type', 'configSchema', 'inputs', 'outputs', 'supportedByResource', 'isOutput']
+} as const;
+
 export const $ResourceFlowNodePositionDto = {
     type: 'object',
     properties: {

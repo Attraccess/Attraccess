@@ -1,29 +1,25 @@
-import { Button, Card, CardBody, CardHeader, cn, Tooltip, useDisclosure } from '@heroui/react';
-import { PageHeader } from '../../../../../../components/pageHeader';
+import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { NodeProps } from '@xyflow/react';
+import { TFunction } from 'i18next';
+import { Button, Card, CardBody, CardHeader, cn, Code, Tooltip, useDisclosure } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
-import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
-import { useFlowContext } from '../../flowContext';
+import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { useFlowContext } from '../flowContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DeleteConfirmationModal } from '../../../../../../components/deleteConfirmationModal';
+import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal';
 import { ResourceFlowLog } from '@attraccess/react-query-client';
-import de from './de.json';
-import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNodePreviewRows } from './preview';
+import { NodeEditor } from './editor';
 
 interface Props {
-  title: string;
-  subtitle?: string;
+  tNodeTranslations: TFunction;
+  schema: ResourceFlowNodeSchemaDto;
+  node?: NodeProps;
   previewMode?: boolean;
-  actions?: React.ReactNode;
-  children?: React.ReactNode;
-  inputs?: { id: string; label?: string }[];
-  outputs?: { id: string; label?: string }[];
   data?: {
     forceToolbarVisible?: boolean;
     toolbarPosition?: Position;
   };
-  showBodyInPreview?: boolean;
-  unsupported?: boolean;
 }
 
 enum ProcessingState {
@@ -33,19 +29,11 @@ enum ProcessingState {
   FAILED = 'failed',
 }
 
-export function BaseNodeCard(props: Props) {
-  const { showBodyInPreview = false, title, subtitle, previewMode, actions, children, inputs, outputs, data } = props;
+export function AttraccessNode(props: Props) {
+  const { schema, previewMode, tNodeTranslations: t, data } = props;
 
   const { removeNode } = useFlowContext();
   const nodeId = useNodeId();
-  const { t } = useTranslations('resource-flows.baseCard', {
-    de: {
-      nodes: de,
-    },
-    en: {
-      nodes: en,
-    },
-  });
 
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
 
@@ -74,7 +62,7 @@ export function BaseNodeCard(props: Props) {
           break;
       }
     },
-    [nodeId]
+    [nodeId],
   );
 
   const { addLiveLogReceiver, removeLiveLogReceiver } = useFlowContext();
@@ -102,8 +90,6 @@ export function BaseNodeCard(props: Props) {
     onClose: userDoesNotWantToDelete,
   } = useDisclosure();
 
-  const [isHovering, setIsHovering] = useState(false);
-
   const cardClasses = useMemo(() => {
     const baseClasses = 'bg-gray-100 dark:bg-gray-800 w-64 overflow-visible';
 
@@ -112,20 +98,17 @@ export function BaseNodeCard(props: Props) {
       'animate-pulse border-2 border-blue-500': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
-      'opacity-60 grayscale border-dashed': props.unsupported,
+      'opacity-60 grayscale border-dashed': !schema.supportedByResource,
     });
-  }, [processingState, props.unsupported]);
+  }, [processingState, schema]);
 
-  const handleMouseEnter = useCallback(() => setIsHovering(true), []);
-  const handleMouseLeave = useCallback(() => setIsHovering(false), []);
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
-    const handles = inputs ?? [];
-    return handles.map((handle, index) => {
-      const totalHandles = handles.length;
+    return schema.inputs.map((inputName, index) => {
+      const totalHandles = schema.inputs.length;
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
-        id: handle.id,
-        label: handle.label,
+        id: inputName,
+        label: t('nodes.' + schema.type + '.inputs.' + inputName),
         style: {
           left: `${leftPercentage}%`,
           top: '-15px',
@@ -133,16 +116,15 @@ export function BaseNodeCard(props: Props) {
         },
       };
     });
-  }, [inputs]);
+  }, [schema, t]);
 
   const sourceHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
-    const handles = outputs ?? [];
-    return handles.map((handle, index) => {
-      const totalHandles = handles.length;
+    return schema.outputs.map((outputName, index) => {
+      const totalHandles = schema.outputs.length;
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
-        id: handle.id,
-        label: handle.label,
+        id: outputName,
+        label: t('nodes.' + schema.type + '.outputs.' + outputName),
         style: {
           left: `${leftPercentage}%`,
           bottom: '-15px',
@@ -150,20 +132,40 @@ export function BaseNodeCard(props: Props) {
         },
       };
     });
-  }, [outputs]);
+  }, [schema, t]);
+
+  const actions = useMemo(() => {
+    if (previewMode) {
+      return undefined;
+    }
+
+    const properties = schema.configSchema.properties as Record<string, unknown>;
+
+    if (Object.keys(properties).length === 0) {
+      return undefined;
+    }
+
+    return (
+      <NodeEditor schema={schema} tNodeTranslations={t}>
+        {(onOpen) => <Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />}
+      </NodeEditor>
+    );
+  }, [previewMode, schema, t]);
+
+  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
 
   return (
-    <div onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div>
       <DeleteConfirmationModal
         isOpen={showDeleteConfirmation}
         onClose={userDoesNotWantToDelete}
         onConfirm={remove}
-        itemName={title}
+        itemName={t('nodes.' + schema.type + '.title')}
       />
 
-      <NodeToolbar isVisible={data?.forceToolbarVisible || isHovering || undefined} position={data?.toolbarPosition}>
+      <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
         <div className="flex flex-row gap-2">
-          {previewMode ? undefined : actions}
+          {actions}
           {!previewMode && (
             <Button
               isIconOnly
@@ -176,14 +178,60 @@ export function BaseNodeCard(props: Props) {
         </div>
       </NodeToolbar>
       <Card className={cardClasses}>
-        <CardHeader className="flex flex-row justify-between">
-          <PageHeader noMargin title={title} subtitle={previewMode ? subtitle : undefined} />
+        <CardHeader className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center min-w-0">
+              <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
+            </div>
+            {!previewMode && (
+              <Tooltip
+                content={
+                  processingState === ProcessingState.PROCESSING
+                    ? 'Processing'
+                    : processingState === ProcessingState.COMPLETED
+                      ? 'Completed'
+                      : processingState === ProcessingState.FAILED
+                        ? 'Failed'
+                        : 'Idle'
+                }
+              >
+                <span
+                  className={cn(
+                    'w-2 h-2 rounded-full shrink-0',
+                    processingState === ProcessingState.PROCESSING
+                      ? 'bg-blue-500 animate-pulse'
+                      : processingState === ProcessingState.COMPLETED
+                        ? 'bg-green-500'
+                        : processingState === ProcessingState.FAILED
+                          ? 'bg-red-500'
+                          : 'bg-default-400',
+                  )}
+                />
+              </Tooltip>
+            )}
+          </div>
+          {previewMode && (
+            <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
+          )}
         </CardHeader>
 
-        {(!previewMode || showBodyInPreview) && children && <CardBody>{children}</CardBody>}
+        {!previewMode && previewRows.length > 0 && (
+          <CardBody className="pt-0">
+            <div className="flex flex-col gap-2">
+              {previewRows.map((row) => (
+                <div className="flex flex-col gap-2">
+                  <small>{row.label}</small>
+                  <Code className="text-ellipsis overflow-hidden" title={row.value}>
+                    {row.value}
+                  </Code>
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        )}
       </Card>
 
-      {!previewMode && props.unsupported && (
+      {!previewMode && !schema.supportedByResource && (
         <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
           <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
         </div>

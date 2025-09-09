@@ -10,7 +10,7 @@ const EmailEnvSchema = z.object({
 const SMTP_ENV_SCHEMA = z.object({
   SMTP_HOST: z.string().min(1, { message: 'SMTP_HOST is required' }),
   SMTP_PORT: z.coerce.number().positive({ message: 'SMTP_PORT must be a positive number' }),
-  SMTP_SECURE: z.string().transform((val) => val.toLowerCase() === 'true').default('false'),
+  SMTP_SECURE: z.string().transform((val) => val.toLowerCase() === 'true').default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().min(1, { message: 'SMTP_FROM email is required' }),

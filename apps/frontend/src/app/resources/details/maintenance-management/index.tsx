@@ -62,7 +62,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
           isPast,
         };
       }),
-    [maintenances?.data, now]
+    [maintenances?.data, now],
   );
 
   return (
@@ -110,7 +110,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               <TableRow
                 className={cn(
                   maintenance.isActive && 'border-l-8 border-l-warning',
-                  maintenance.isPast && 'line-through'
+                  maintenance.isPast && 'line-through',
                 )}
               >
                 <TableCell>
@@ -119,7 +119,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 <TableCell>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
-                <TableCell className="overflow-hidden text-ellipsis">{maintenance.reason}</TableCell>
+                <TableCell className="overflow-hidden text-ellipsis" title={maintenance.reason}>
+                  {maintenance.reason}
+                </TableCell>
                 <TableCell align="right">
                   <ResourceMaintenanceUpsertModal resourceId={resourceId} maintenanceId={maintenance.id}>
                     {(open) => <Button onPress={open} isIconOnly startContent={<PencilIcon className="w-4 h-4" />} />}

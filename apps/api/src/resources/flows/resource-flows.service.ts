@@ -8,10 +8,19 @@ import {
   ResourceFlowLog,
   getNodeDataSchema,
   ResourceFlowNodeType,
+  EventNodeDataSchema,
+  HttpRequestNodeDataSchema,
+  MqttSendMessageNodeDataSchema,
+  WaitNodeDataSchema,
+  ResourceType,
+  ButtonNodeDataSchema,
+  IfNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
 import { PaginatedResponse } from '../../types/response';
+import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
+import { z } from 'zod';
 
 export interface ValidationError {
   nodeId: string;
@@ -37,7 +46,7 @@ export class ResourceFlowsService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceFlowLog)
-    private readonly flowLogRepository: Repository<ResourceFlowLog>
+    private readonly flowLogRepository: Repository<ResourceFlowLog>,
   ) {}
 
   async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
@@ -204,6 +213,86 @@ export class ResourceFlowsService {
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
     return await this.flowNodeRepository.find({
       where: { resourceId, type },
+    });
+  }
+
+  public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
+    const resource = await this.resourceRepository.findOne({
+      where: { id: resourceId },
+    });
+
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    return Object.values(ResourceFlowNodeType).map((type) => {
+      const schema: ResourceFlowNodeSchemaDto = {
+        type,
+        configSchema: {},
+        inputs: [],
+        outputs: [],
+        supportedByResource: false,
+        isOutput: false,
+      };
+
+      switch (type) {
+        case ResourceFlowNodeType.INPUT_BUTTON:
+          schema.configSchema = z.toJSONSchema(ButtonNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          break;
+
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          break;
+
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Door;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+          schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+          schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_WAIT:
+          schema.configSchema = z.toJSONSchema(WaitNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_IF:
+          schema.configSchema = z.toJSONSchema(IfNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output-true', 'output-false'];
+          schema.supportedByResource = true;
+          break;
+
+        default:
+          throw new Error(`Unknown node type: ${type}`);
+      }
+
+      return schema;
     });
   }
 }

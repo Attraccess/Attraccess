@@ -11,12 +11,14 @@ import {
   Edge,
   useReactFlow,
   NodeTypes,
+  NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ResourceFlowEdgeDto,
   ResourceFlowLog,
   ResourceFlowNodeDto,
+  useResourceFlowsServiceGetNodeSchemas,
   useResourceFlowsServiceGetResourceFlow,
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
@@ -29,16 +31,17 @@ import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
 import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { AttraccessNodes } from './nodes';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
-
 import de from './de.json';
 import en from './en.json';
+import { AttraccessNode } from './node';
+import nodesDeTranslations from './node/de.json';
+import nodesEnTranslations from './node/en.json';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -91,6 +94,10 @@ function FlowsPageInner() {
   const { theme } = useTheme();
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
   const { t } = useTranslations('resources.details.flows', { de, en });
+  const { t: tNodeTranslations } = useTranslations('resource-flows.node', {
+    de: nodesDeTranslations,
+    en: nodesEnTranslations,
+  });
   const { setPullToRefreshIsEnabled } = usePtrStore();
   const queryClient = useQueryClient();
 
@@ -216,13 +223,21 @@ function FlowsPageInner() {
     [addNode]
   );
 
+  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: Number(resourceId) });
   const flowNodeTypes = useMemo(() => {
+    if (!nodeSchemas) {
+      return {};
+    }
+
     const types: NodeTypes = {};
-    Object.entries(AttraccessNodes).forEach(([key, value]) => {
-      types[key] = value.component;
+    nodeSchemas.forEach((nodeSchema) => {
+      types[nodeSchema.type] = (props: NodeProps) => (
+        <AttraccessNode tNodeTranslations={tNodeTranslations} schema={nodeSchema} node={props} />
+      );
     });
+
     return types;
-  }, []);
+  }, [nodeSchemas, tNodeTranslations]);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [, setFlowExecutionHadError] = useState(false);
@@ -317,20 +332,9 @@ function FlowsPageInner() {
 
             <Button isIconOnly startContent={<LayoutGridIcon />} onPress={layout} />
             <NodePickerModal
+              tNodeTranslations={tNodeTranslations}
               onSelect={addStartNode}
-              allowedNodeKeys={
-                resource?.type === 'door'
-                  ? Object.entries(AttraccessNodes)
-                      .filter(([, v]) => !v.supportedResourceTypes || v.supportedResourceTypes.includes('door'))
-                      .map(([k]) => k)
-                      .filter((key) =>
-                        resource?.separateUnlockAndUnlatch ? true : key !== 'input.resource.door.unlatched'
-                      )
-                  : Object.entries(AttraccessNodes)
-                      .filter(([, v]) => !v.supportedResourceTypes || v.supportedResourceTypes.includes('machine'))
-                      .map(([k]) => k)
-                      .filter((key) => (resource?.allowTakeOver ? true : key !== 'input.resource.usage.takeover'))
-              }
+              resourceId={Number(resourceId)}
             >
               {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
             </NodePickerModal>

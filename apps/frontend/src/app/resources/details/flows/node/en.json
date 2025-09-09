@@ -1,0 +1,198 @@
+{
+  "editor": {
+    "buttons": {
+      "save": "Save"
+    }
+  },
+  "nodes": {
+    "unsupportedForResourceType": "not supported by this resource",
+    "input": {
+      "button": {
+        "title": "Button",
+        "description": "This node is triggered when the button is pressed.",
+        "outputs": {
+          "output": "Output"
+        },
+        "preview": {
+          "label": "Label"
+        },
+        "config": {
+          "label": {
+            "label": "Label"
+          }
+        }
+      },
+      "resource": {
+        "usage": {
+          "started": {
+            "title": "Resource usage started",
+            "description": "This node is triggered when a resource is started.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "stopped": {
+            "title": "Resource usage stopped",
+            "description": "This node is triggered when a resource is stopped.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "takeover": {
+            "title": "Resource usage takeover",
+            "description": "This node is triggered when a resource is taken over.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "door": {
+          "locked": {
+            "title": "Door locked",
+            "description": "This node is triggered when the door is locked.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "unlocked": {
+            "title": "Door unlocked",
+            "description": "This node is triggered when the door is unlocked.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "unlatched": {
+            "title": "Door unlatched",
+            "description": "This node is triggered when the door is unlatched.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        }
+      }
+    },
+    "processing": {
+      "wait": {
+        "title": "Wait",
+        "description": "This node waits for a certain time.",
+        "inputs": {
+          "input": "Input"
+        },
+        "outputs": {
+          "output": "Output"
+        },
+        "preview": {
+          "duration": "Duration"
+        },
+        "config": {
+          "duration": {
+            "label": "Duration"
+          },
+          "unit": {
+            "label": "Unit",
+            "enum": {
+              "seconds": "Seconds",
+              "minutes": "Minutes",
+              "hours": "Hours"
+            }
+          }
+        }
+      },
+      "if": {
+        "title": "If",
+        "description": "If a value matches a comparison operator, the true-output is triggered, otherwise the false-output.",
+        "inputs": {
+          "input": "Input"
+        },
+        "outputs": {
+          "output-true": "True",
+          "output-false": "False"
+        },
+        "preview": {
+          "summary": "Condition"
+        },
+        "config": {
+          "path": {
+            "label": "Payload Path"
+          },
+          "comparisonOperator": {
+            "label": "Operator",
+            "enum": {
+              "=": "is equal to",
+              "!=": "is not equal to",
+              ">": "is greater than",
+              "<": "is less than",
+              ">=": "is greater than or equal to",
+              "<=": "is less than or equal to"
+            }
+          },
+          "comparisonValueIsPath": {
+            "label": "Comparison value is a payload path"
+          },
+          "comparisonValue": {
+            "label": "Comparison value"
+          }
+        }
+      }
+    },
+    "output": {
+      "http": {
+        "sendRequest": {
+          "title": "Send HTTP request",
+          "description": "This node sends a HTTP request.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "method": "Method",
+            "url": "URL"
+          },
+          "config": {
+            "url": {
+              "label": "URL"
+            },
+            "method": {
+              "label": "Method"
+            },
+            "headers": {
+              "label": "Headers",
+              "add": "Add header"
+            },
+            "body": {
+              "label": "Body"
+            }
+          }
+        }
+      },
+      "mqtt": {
+        "sendMessage": {
+          "title": "MQTT message send",
+          "description": "This node sends a MQTT message.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "preview": {
+            "topic": "Topic"
+          },
+          "config": {
+            "topic": {
+              "label": "Topic"
+            },
+            "serverId": {
+              "label": "Server"
+            },
+            "payload": {
+              "label": "Payload"
+            }
+          }
+        }
+      }
+    }
+  }
+}

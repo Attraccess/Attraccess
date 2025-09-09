@@ -494,7 +494,7 @@ export interface CreateResourceDto {
    * @default false
    * @example false
    */
-  separateUnlockAndUnlatch: boolean;
+  separateUnlockAndUnlatch?: boolean;
   /**
    * A detailed description of the resource
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
@@ -644,13 +644,13 @@ export interface UpdateResourceDto {
    * The type of the resource
    * @example "machine"
    */
-  type: "machine" | "door";
+  type?: "machine" | "door";
   /**
    * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
    * @default false
    * @example false
    */
-  separateUnlockAndUnlatch: boolean;
+  separateUnlockAndUnlatch?: boolean;
   /**
    * A detailed description of the resource
    * @example "Prusa i3 MK3S+ 3D printer with 0.4mm nozzle"
@@ -1250,6 +1250,32 @@ export interface UpdateMaintenanceDto {
    * @example "Scheduled maintenance for software updates"
    */
   reason?: string;
+}
+
+export interface ResourceFlowNodeSchemaDto {
+  /** The name of the node type */
+  type:
+    | "input.button"
+    | "input.resource.usage.started"
+    | "input.resource.usage.stopped"
+    | "input.resource.usage.takeover"
+    | "input.resource.door.unlocked"
+    | "input.resource.door.locked"
+    | "input.resource.door.unlatched"
+    | "output.http.sendRequest"
+    | "output.mqtt.sendMessage"
+    | "processing.wait"
+    | "processing.if";
+  /** The schema for a node type */
+  configSchema: Record<string, any>;
+  /** The inputs for a node type */
+  inputs: string[];
+  /** The outputs for a node type */
+  outputs: string[];
+  /** Whether the node type is supported by this resource */
+  supportedByResource: boolean;
+  /** Whether the node type is an output node */
+  isOutput: boolean;
 }
 
 export interface ResourceFlowNodePositionDto {
@@ -2098,6 +2124,8 @@ export type GetMaintenanceData = ResourceMaintenance;
 export type UpdateMaintenanceData = ResourceMaintenance;
 
 export type CancelMaintenanceData = any;
+
+export type GetNodeSchemasData = ResourceFlowNodeSchemaDto[];
 
 export type GetResourceFlowData = ResourceFlowResponseDto;
 
@@ -3858,6 +3886,24 @@ export namespace ResourceMaintenances {
 }
 
 export namespace ResourceFlows {
+  /**
+   * @description Get the schemas for all node types
+   * @tags Resource Flows
+   * @name GetNodeSchemas
+   * @summary Get node schemas
+   * @request GET:/api/resources/{resourceId}/flow/node-schemas
+   * @secure
+   */
+  export namespace GetNodeSchemas {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetNodeSchemasData;
+  }
+
   /**
    * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
    * @tags Resource Flows
@@ -6304,6 +6350,24 @@ export class Api<
       }),
   };
   resourceFlows = {
+    /**
+     * @description Get the schemas for all node types
+     *
+     * @tags Resource Flows
+     * @name GetNodeSchemas
+     * @summary Get node schemas
+     * @request GET:/api/resources/{resourceId}/flow/node-schemas
+     * @secure
+     */
+    getNodeSchemas: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetNodeSchemasData, void>({
+        path: `/api/resources/${resourceId}/flow/node-schemas`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
     /**
      * @description Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
      *

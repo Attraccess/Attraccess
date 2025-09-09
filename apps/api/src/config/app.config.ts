@@ -7,7 +7,7 @@ const AppEnvSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     LICENSE_KEY: z
       .string({
-        required_error:
+        error:
           'LICENSE_KEY is required. If you are a non-profit organization, you may use Attraccess for free by setting LICENSE_KEY to: "I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"',
       })
       .min(1, {

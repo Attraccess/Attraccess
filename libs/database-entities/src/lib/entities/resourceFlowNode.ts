@@ -20,33 +20,38 @@ export enum ResourceFlowNodeType {
 // Zod schemas for node data validation
 export const EventNodeDataSchema = z.object({}).optional();
 
+export const ButtonNodeDataSchema = z.object({
+  label: z.string().min(1, 'Label is required'),
+});
+
 export const HttpRequestNodeDataSchema = z.object({
   url: z.string().url('Invalid URL format'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], {
-    errorMap: () => ({ message: 'Method must be one of: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS' }),
-  }),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
   headers: z.record(z.string(), z.string()).optional().default({}),
-  body: z.string().optional().default(''),
+  body: z.string().optional().default('').meta({
+    stringVariant: 'multiline',
+  }),
 });
 
 export const MqttSendMessageNodeDataSchema = z.object({
-  serverId: z.number().int().positive('Server ID must be a positive integer'),
+  serverId: z.number().int().positive('Server ID must be a positive integer').meta({
+    selectFromEntity: 'mqttServer',
+    entityProperty: 'id',
+  }),
   topic: z.string().min(1, 'Topic is required'),
-  payload: z.string().optional().default(''),
+  payload: z.string().optional().default('').meta({
+    stringVariant: 'multiline',
+  }),
 });
 
 export const WaitNodeDataSchema = z.object({
   duration: z.number().int().positive('Duration must be a positive integer'),
-  unit: z.enum(['seconds', 'minutes', 'hours'], {
-    errorMap: () => ({ message: 'Unit must be seconds, minutes, or hours' }),
-  }),
+  unit: z.enum(['seconds', 'minutes', 'hours']),
 });
 
 export const IfNodeDataSchema = z.object({
   path: z.string().min(1, 'Path is required'),
-  comparisonOperator: z.enum(['=', '!=', '>', '<', '>=', '<='], {
-    errorMap: () => ({ message: 'Comparison operator must be one of: =, !=, >, <, >=, <=' }),
-  }),
+  comparisonOperator: z.enum(['=', '!=', '>', '<', '>=', '<=']),
   comparisonValueIsPath: z.boolean().default(false),
   comparisonValue: z.string().min(1, 'Comparison value is required'),
 });
@@ -54,6 +59,8 @@ export const IfNodeDataSchema = z.object({
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
   switch (nodeType) {
+    case ResourceFlowNodeType.INPUT_BUTTON:
+      return ButtonNodeDataSchema;
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:

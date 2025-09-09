@@ -32,6 +32,8 @@ import {
   ResourceFlowActionMqttSendMessageNodeData,
   ResourceFlowActionUtilWaitNodeData,
   ResourceFlowActionIfNodeData,
+  ButtonNodeDataSchema,
+  IfNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -79,6 +81,8 @@ export {
   ResourceFlowActionIfNodeData,
   ResourceType,
   ResourceUsageAction,
+  ButtonNodeDataSchema,
+  IfNodeDataSchema,
 };
 
 // Export the entities object
