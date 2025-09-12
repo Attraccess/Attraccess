@@ -13,7 +13,7 @@ export function BillingDashboardPage() {
       <PageHeader title={t('title')} icon={<ChartNoAxesCombinedIcon />} />
 
       <div className="flex flex-row flex-wrap gap-4">
-        <SummaryCard className="flex-grow" transactionsPerPage={30} />
+        <SummaryCard className="flex-grow" transactionsPerPage={15} />
       </div>
     </div>
   );

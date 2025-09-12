@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsInt, IsNumber, IsOptional, IsPositive, Min } from 'class-validator';
 import { z } from 'zod';
 
@@ -21,6 +22,7 @@ export class PaginationOptionsDto implements PaginationOptions {
   @IsInt()
   @IsNumber()
   @Min(1)
+  @Transform(({ value }) => (typeof value === 'string' ? Number(value) : value))
   page = 1;
 
   @ApiProperty({
@@ -34,5 +36,6 @@ export class PaginationOptionsDto implements PaginationOptions {
   @IsInt()
   @IsNumber()
   @Min(1)
+  @Transform(({ value }) => (typeof value === 'string' ? Number(value) : value))
   limit = 10;
 }
