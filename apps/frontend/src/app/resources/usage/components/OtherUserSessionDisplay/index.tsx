@@ -17,15 +17,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface OtherUserSessionDisplayProps {
   resourceId: number;
 }
 
 export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const { t } = useTranslations('otherUserSessionDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
@@ -42,7 +42,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
     undefined,
     {
       enabled: !!user?.id,
-    }
+    },
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });

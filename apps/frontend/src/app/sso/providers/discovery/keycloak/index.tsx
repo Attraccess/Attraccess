@@ -21,7 +21,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
   const [realm, setRealm] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t } = useTranslations('oidc.discovery.keycloak', {
+  const { t } = useTranslations({
     de,
     en,
   });

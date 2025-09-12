@@ -10,8 +10,8 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { IntroducerManagement } from '../../../components/IntroducerManagement';
 
 interface ResourceGroupIntroducerManagementProps {
@@ -19,11 +19,11 @@ interface ResourceGroupIntroducerManagementProps {
 }
 
 export function ResoureGroupIntroducerManagement(
-  props: Readonly<ResourceGroupIntroducerManagementProps & Omit<CardProps, 'children'>>
+  props: Readonly<ResourceGroupIntroducerManagementProps & Omit<CardProps, 'children'>>,
 ) {
   const { groupId, ...cardProps } = props;
 
-  const { t } = useTranslations('resourceGroupIntroducerManagement', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
 

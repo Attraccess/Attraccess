@@ -29,7 +29,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
 
-  const { t } = useTranslations('documentationModal', {
+  const { t } = useTranslations({
     en,
     de,
   });

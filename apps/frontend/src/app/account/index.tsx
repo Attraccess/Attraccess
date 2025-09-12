@@ -1,14 +1,14 @@
 import { PageHeader } from '../../components/pageHeader';
 import { Card, CardBody, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { UsernameForm } from './username';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AccountPage() {
-  const { t } = useTranslations('account', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { user: me } = useAuth();
 

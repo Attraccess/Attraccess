@@ -6,8 +6,8 @@ import { Alert } from '@heroui/alert';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/modal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
-import * as en from './registrationForm.en.json';
-import * as de from './registrationForm.de.json';
+import en from './registrationForm.en.json';
+import de from './registrationForm.de.json';
 import { useUsersServiceCreateOneUser, UseUsersServiceFindManyKeyFn, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -16,7 +16,7 @@ interface RegisterFormProps {
 }
 
 export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
-  const { t } = useTranslations('register', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -86,7 +86,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         setError(messageToDisplay);
       }
     },
-    [createUser, onOpen, t]
+    [createUser, onOpen, t],
   );
 
   return (

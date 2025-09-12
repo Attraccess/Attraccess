@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 export function EditMqttServerPage() {
   const { serverId } = useParams<{ serverId: string }>();
-  const { t } = useTranslations('mqttServerEdit', { en, de });
+  const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();

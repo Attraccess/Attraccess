@@ -11,8 +11,8 @@ import {
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
 
 interface ActiveSessionDisplayProps {
@@ -21,7 +21,7 @@ interface ActiveSessionDisplayProps {
 }
 
 export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDisplayProps) {
-  const { t } = useTranslations('activeSessionDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);

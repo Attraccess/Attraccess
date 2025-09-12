@@ -16,7 +16,7 @@ interface Props {
 export function SSOLinkingRequiredModal(props: Props) {
   const { show } = props;
 
-  const { t } = useTranslations('ssoLinkingRequiredModal', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -46,7 +46,7 @@ export function SSOLinkingRequiredModal(props: Props) {
   const callbackURL = useCallbackURL(
     ssoProviderId ? parseInt(ssoProviderId, 10) : -1,
     ssoProviderType as SSOProviderType,
-    cleanHref
+    cleanHref,
   );
 
   const { mutate: linkMutation, isPending: linkingIsLoading } = useAuthenticationServiceLinkUserToExternalAccount({

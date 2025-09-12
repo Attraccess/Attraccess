@@ -16,7 +16,7 @@ function DocumentationViewComponent() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
-  const { t } = useTranslations('documentationModal', {
+  const { t } = useTranslations({
     en,
     de,
   });

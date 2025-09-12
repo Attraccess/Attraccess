@@ -26,7 +26,6 @@ description: Provides general information and guidelines for working with the At
 - **Other Key Libraries/Frameworks:**
   - React Query (client-side data fetching and caching, see `libs/react-query-client`)
   - HeroUI (primary frontend component library, aiming for minimal custom styling for a unified UX)
-  - i18next (frontend internationalization/translations)
   - Passport.js (authentication middleware for NestJS backend)
   - Zustand (client-side state management, often used with React Query)
 

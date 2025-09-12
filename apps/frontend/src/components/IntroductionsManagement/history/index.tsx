@@ -7,8 +7,8 @@ import { EmptyState } from '../../../components/emptyState';
 import { IntroductionStatusChip } from '../../IntroductionStatusChip';
 import { ResourceIntroductionHistoryItem } from '@attraccess/react-query-client';
 
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 interface Props {
   isOpen: boolean;
@@ -19,7 +19,7 @@ interface Props {
 export function IntroductionHistoryModal(props: Readonly<Props>) {
   const { isOpen, history, isLoading, onClose } = props;
 
-  const { t } = useTranslations('introductionHistoryModal', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const orderedHistory = useMemo(() => {
     return [...history].sort((a, b) => {

@@ -27,12 +27,12 @@ function NavLink(
     icon: React.ReactNode;
     isExternal?: boolean;
     'data-cy'?: string;
-  }
+  },
 ) {
   return (
     <Link
       {...props}
-      target={props.target ?? props.isExternal ? '_blank' : undefined}
+      target={(props.target ?? props.isExternal) ? '_blank' : undefined}
       className="flex items-center px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
       color="foreground"
       underline="none"
@@ -51,7 +51,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const { logout, user } = useAuth();
-  const { t, i18n } = useTranslations('sidebar', {
+  const { t, language, setLanguage } = useTranslations({
     en,
     de,
   });
@@ -81,12 +81,12 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
       ) as (keyof SystemPermissions)[];
 
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true
+        (permission) => user.systemPermissions[permission] === true,
       );
 
       return userHasAllRequiredPermissions;
     },
-    [user, routes]
+    [user, routes],
   );
 
   // Get navigation items from routes that have sidebar config
@@ -231,16 +231,16 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   </DropdownItem>
                   <DropdownItem
                     key="language-en"
-                    onPress={() => i18n.changeLanguage('en')}
-                    endContent={i18n.language?.startsWith('en') ? <Check className="h-4 w-4" /> : null}
+                    onPress={() => setLanguage('en')}
+                    endContent={language === 'en' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-en"
                   >
                     {t('languages.en')}
                   </DropdownItem>
                   <DropdownItem
                     key="language-de"
-                    onPress={() => i18n.changeLanguage('de')}
-                    endContent={i18n.language?.startsWith('de') ? <Check className="h-4 w-4" /> : null}
+                    onPress={() => setLanguage('de')}
+                    endContent={language === 'de' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-de"
                   >
                     {t('languages.de')}

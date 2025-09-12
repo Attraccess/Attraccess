@@ -12,8 +12,8 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { ResourceIntroductionHistoryModal } from './history';
 import { IntroductionsManagement } from '../../../components/IntroductionsManagement';
 
@@ -22,10 +22,10 @@ interface ResourceIntroductionsManagementProps {
 }
 
 export function ResourceIntroductionsManagement(
-  props: Readonly<ResourceIntroductionsManagementProps & Omit<CardProps, 'children'>>
+  props: Readonly<ResourceIntroductionsManagementProps & Omit<CardProps, 'children'>>,
 ) {
   const { resourceId, ...rest } = props;
-  const { t } = useTranslations('resourceIntroductionsManagement', { en, de });
+  const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -73,7 +73,7 @@ export function ResourceIntroductionsManagement(
         queryKey: [UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId: user.id })],
       });
     },
-    [grantIntroductionMutation, resourceId, queryClient]
+    [grantIntroductionMutation, resourceId, queryClient],
   );
 
   const { mutateAsync: revokeIntroductionMutation, isPending: isRevoking } =
@@ -109,7 +109,7 @@ export function ResourceIntroductionsManagement(
         queryKey: [UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId: user.id })],
       });
     },
-    [revokeIntroductionMutation, resourceId, queryClient]
+    [revokeIntroductionMutation, resourceId, queryClient],
   );
 
   if (error) {

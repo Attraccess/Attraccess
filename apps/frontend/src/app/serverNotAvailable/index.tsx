@@ -5,7 +5,7 @@ import en from './en.json';
 import { Image } from '@heroui/react';
 
 export function ServerNotAvailable() {
-  const { t } = useTranslations('serverNotAvailable', {
+  const { t } = useTranslations({
     de,
     en,
   });

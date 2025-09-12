@@ -54,7 +54,7 @@ function CardSkeleton() {
 }
 
 export function Dependencies() {
-  const { t } = useTranslations('dependencies', {
+  const { t } = useTranslations({
     de,
     en,
   });

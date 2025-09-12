@@ -31,7 +31,7 @@ import { useTheme } from '@heroui/use-theme';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
-  const { t } = useTranslations('editEmailTemplate', { en: enTranslationsFile, de: deTranslationsFile });
+  const { t } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
 
   const { type: templateType } = useParams<{ type: string }>();
 
@@ -119,7 +119,7 @@ export function EditEmailTemplatePage() {
         type: templateType as 'verify-email' | 'reset-password',
       });
     },
-    [updateTemplate, subject, body, templateType]
+    [updateTemplate, subject, body, templateType],
   );
 
   return (

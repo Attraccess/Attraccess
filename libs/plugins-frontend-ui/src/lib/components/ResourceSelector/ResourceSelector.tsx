@@ -17,7 +17,7 @@ export const ListboxWrapper = ({ children }: PropsWithChildren) => (
 export function ResourceSelector(props: Props) {
   const [search, setSearch] = useState('');
 
-  const { t } = useTranslations('plugin-attractap-resource-selector', {
+  const { t } = useTranslations({
     de,
     en,
   });

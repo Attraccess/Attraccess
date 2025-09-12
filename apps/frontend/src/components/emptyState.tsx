@@ -2,7 +2,7 @@ import { MehIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 export const EmptyState = () => {
-  const { t } = useTranslations('emptyState', {
+  const { t } = useTranslations({
     en: {
       message: 'No entries found',
     },

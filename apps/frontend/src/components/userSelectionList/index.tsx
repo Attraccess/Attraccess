@@ -57,7 +57,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     rowClassName,
   } = props;
 
-  const { t } = useTranslations('userSelectionList', {
+  const { t } = useTranslations({
     de,
     en,
   });

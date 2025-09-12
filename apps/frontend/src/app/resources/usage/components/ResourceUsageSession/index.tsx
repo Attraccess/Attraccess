@@ -14,8 +14,8 @@ import {
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
 } from '@attraccess/react-query-client';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
 
 type ResourceUsageSessionProps = {
@@ -24,7 +24,7 @@ type ResourceUsageSessionProps = {
 } & Omit<React.ComponentProps<typeof Card>, 'resource'>;
 
 export function ResourceUsageSession({ resourceId, resource, ...rest }: ResourceUsageSessionProps) {
-  const { t } = useTranslations('resourceUsageSession', { en, de });
+  const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('canManageResources');
 
@@ -34,7 +34,7 @@ export function ResourceUsageSession({ resourceId, resource, ...rest }: Resource
     undefined,
     {
       refetchInterval: 3000,
-    }
+    },
   );
 
   // Get list of users who can give introductions
@@ -48,7 +48,7 @@ export function ResourceUsageSession({ resourceId, resource, ...rest }: Resource
     undefined,
     {
       refetchInterval: 3000,
-    }
+    },
   );
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);

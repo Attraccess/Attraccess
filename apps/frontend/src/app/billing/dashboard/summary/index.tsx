@@ -34,7 +34,7 @@ interface Props {
 
 export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
   const { transactionsPerPage = 5, userId: userIdFromProps, isDisabled, ...cardProps } = props;
-  const { t } = useTranslations('billingDashboard.balance', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { user: currentUser } = useAuth();
 

@@ -217,8 +217,6 @@ export default defineConfig({
         'react/jsx-runtime',
         'react-pluggable',
         '@heroui/react',
-        'i18next',
-        'react-i18next',
         'i18next-browser-languagedetector',
         '@tanstack/react-query',
         '@attraccess/react-query-client',
@@ -248,8 +246,6 @@ The following dependencies must be shared for proper integration with Attraccess
   'react/jsx-runtime',
   'react-pluggable',
   '@heroui/react',
-  'i18next',
-  'react-i18next',
   'i18next-browser-languagedetector',
   '@tanstack/react-query',
   '@attraccess/react-query-client',
@@ -260,58 +256,40 @@ The following dependencies must be shared for proper integration with Attraccess
 #### Understanding Each Shared Dependency
 
 1. **react** - Core React library for building user interfaces
-
    - Purpose: Foundation for all React components
    - [Documentation](https://reactjs.org/docs/getting-started.html)
 
 2. **react-dom** - React package for DOM manipulation and rendering
-
    - Purpose: Renders React components to the DOM
    - [Documentation](https://reactjs.org/docs/react-dom.html)
 
 3. **react/jsx-runtime** - JSX transformer for React
-
    - Purpose: Enables JSX syntax in React applications
    - Part of the React package, automatically used by build tools
 
 4. **react-pluggable** - Plugin framework for React applications
-
    - Purpose: Core plugin architecture that enables plugin functionality
    - [Documentation](https://github.com/adarshpastakia/react-pluggable)
 
 5. **@heroui/react** - UI component library of Attraccess
-
    - Purpose: Provides UI components and styling for the application
    - [Documentation](https://www.heroui.com/)
 
-6. **i18next** - Internationalization framework
-
-   - Purpose: Enables multi-language support in the application
-   - [Documentation](https://www.i18next.com/)
-
-7. **react-i18next** - React bindings for i18next
-
-   - Purpose: React-specific hooks and components for i18next
-   - [Documentation](https://react.i18next.com/)
-
-8. **i18next-browser-languagedetector** - Language detection for i18next
-
+6. **i18next-browser-languagedetector** - Language detection for i18next
    - Purpose: Automatically detects the user's browser language
    - [Documentation](https://github.com/i18next/i18next-browser-languageDetector)
 
-9. **@tanstack/react-query** - Data fetching and caching library
-
+7. **@tanstack/react-query** - Data fetching and caching library
    - Purpose: Manages API requests, caching, and state
    - [Documentation](https://tanstack.com/query/latest)
 
-10. **@attraccess/react-query-client** - Attraccess-specific React Query client
+8. **@attraccess/react-query-client** - Attraccess-specific React Query client
+   - Purpose: Pre-configured React Query client for Attraccess API endpoints
+   - Internal library specific to Attraccess
 
-    - Purpose: Pre-configured React Query client for Attraccess API endpoints
-    - Internal library specific to Attraccess
-
-11. **@attraccess/plugins-frontend-ui** - Attraccess UI components for plugins
-    - Purpose: Shared UI components to maintain consistent look and feel
-    - Internal library specific to Attraccess
+9. **@attraccess/plugins-frontend-ui** - Attraccess UI components for plugins
+   - Purpose: Shared UI components to maintain consistent look and feel
+   - Internal library specific to Attraccess
 
 If you don't properly share these dependencies:
 

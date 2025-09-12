@@ -1,6 +1,5 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { NodeProps } from '@xyflow/react';
-import { TFunction } from 'i18next';
 import { Button, Card, CardBody, CardHeader, cn, Code, Tooltip, useDisclosure } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
@@ -10,6 +9,7 @@ import { DeleteConfirmationModal } from '../../../../../components/deleteConfirm
 import { ResourceFlowLog } from '@attraccess/react-query-client';
 import { useNodePreviewRows } from './preview';
 import { NodeEditor } from './editor';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   tNodeTranslations: TFunction;

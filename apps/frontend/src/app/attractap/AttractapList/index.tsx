@@ -34,7 +34,7 @@ import en from './en.json';
 import { AttractapDeleteModal } from './delete';
 
 export const AttractapList = () => {
-  const { t } = useTranslations('attractap-list', {
+  const { t } = useTranslations({
     de,
     en,
   });

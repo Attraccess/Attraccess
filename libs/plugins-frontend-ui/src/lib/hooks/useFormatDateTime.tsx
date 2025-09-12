@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslationState } from '../i18n';
 
 export interface DateTimeOptions {
   showTime?: boolean;
@@ -9,7 +9,7 @@ export interface DateTimeOptions {
 
 export function useDateTimeFormatter(options?: DateTimeOptions) {
   const { showTime = true, showDate = true, showSeconds = false } = options ?? {};
-  const { i18n } = useTranslation();
+  const { language } = useTranslationState();
 
   const formatter = useMemo(() => {
     const formatOptions: Intl.DateTimeFormatOptions = {};
@@ -30,8 +30,8 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
       formatOptions.year = 'numeric';
     }
 
-    return new Intl.DateTimeFormat(i18n.language, formatOptions);
-  }, [showDate, showTime, showSeconds, i18n.language]);
+    return new Intl.DateTimeFormat(language, formatOptions);
+  }, [showDate, showTime, showSeconds, language]);
 
   return useCallback(
     (date?: Date | string | number | null, fallback?: string | React.ReactNode) => {
@@ -46,7 +46,7 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
 
       return formatter.format(dateAsDate);
     },
-    [formatter]
+    [formatter],
   );
 }
 

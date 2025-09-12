@@ -20,7 +20,7 @@ export function NfcCardDeactivateModal(props: Props) {
 
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('attractap-deactivate-card-modal', {
+  const { t } = useTranslations({
     de,
     en,
   });

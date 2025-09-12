@@ -31,8 +31,8 @@ import { GroupIcon, PlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../components/pageHeader';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/resourceGroupUpsertModal';
 
 interface ManageResourceGroupsProps {
@@ -43,7 +43,7 @@ export function ManageResourceGroups({
   resourceId,
   ...cardProps
 }: Readonly<ManageResourceGroupsProps & Omit<CardProps, 'children'>>) {
-  const { t } = useTranslations('manageResourceGroups', { de, en });
+  const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
@@ -64,7 +64,7 @@ export function ManageResourceGroups({
     (group: ResourceGroup) => {
       return resource?.groups.some((g) => g.id === group.id);
     },
-    [resource?.groups]
+    [resource?.groups],
   );
 
   const handleGroupClick = useCallback(
@@ -86,7 +86,7 @@ export function ManageResourceGroups({
       });
       queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
     },
-    [addResourceToGroup, removeResourceFromGroup, resourceId, isAdded, queryClient]
+    [addResourceToGroup, removeResourceFromGroup, resourceId, isAdded, queryClient],
   );
 
   const groupsWithResource = useMemo(() => {
@@ -126,7 +126,7 @@ export function ManageResourceGroups({
     (group: ResourceGroup) => {
       handleGroupClick(group);
     },
-    [handleGroupClick]
+    [handleGroupClick],
   );
 
   return (

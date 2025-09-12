@@ -1,10 +1,8 @@
-import React from 'react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalProps } from '@heroui/modal';
 import { Button } from '@heroui/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
-import { Trans } from 'react-i18next';
+import { useTranslations, Trans } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
 
 interface DeleteConfirmationModalProps extends Omit<ModalProps, 'children'> {
   isOpen: boolean;
@@ -22,7 +20,7 @@ export function DeleteConfirmationModal({
   isDeleting,
   ...rest
 }: Readonly<DeleteConfirmationModalProps>) {
-  const { t } = useTranslations('deleteConfirmation', {
+  const { t } = useTranslations({
     en,
     de,
   });

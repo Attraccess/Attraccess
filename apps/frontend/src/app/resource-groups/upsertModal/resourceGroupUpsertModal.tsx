@@ -11,8 +11,8 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './resourceGroupUpsertModal.en.json';
-import * as de from './resourceGroupUpsertModal.de.json';
+import en from './resourceGroupUpsertModal.en.json';
+import de from './resourceGroupUpsertModal.de.json';
 import {
   ResourceGroup,
   useResourcesServiceResourceGroupsCreateOne,
@@ -44,7 +44,7 @@ interface Props {
 
 export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { isOpen, onOpen, onOpenChange, onClose: closeDisclosure } = useDisclosure();
-  const { t } = useTranslations('resourceGroupUpsertModal', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -166,7 +166,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       }
     },
     // Dependencies should include the specific mutations if used directly
-    [isEditMode, props.resourceGroup, formData, createMutation, updateMutation]
+    [isEditMode, props.resourceGroup, formData, createMutation, updateMutation],
   );
 
   const getFieldError = (fieldName: keyof FormData) => {

@@ -1,0 +1,32 @@
+{
+  "headers": {
+    "user": "User",
+    "machine": {
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "duration": "Duration"
+    },
+    "door": {
+      "time": "Time",
+      "action": "Action"
+    }
+  },
+
+  "rows": {
+    "door": {
+      "action": {
+        "door": {
+          "lock": "Locked",
+          "unlock": "Unlocked",
+          "unlatch": "Latch Opened"
+        }
+      }
+    },
+    "machine": {
+      "inProgress": "In Use"
+    }
+  },
+
+  "noUsageHistory": "No usage history found for this resource.",
+  "errorLoadingHistory": "Error loading usage history. Please try again."
+}

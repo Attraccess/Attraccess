@@ -15,21 +15,21 @@ import {
   useResourcesServiceLockDoor,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface StartSessionControlsProps {
   resourceId: number;
 }
 
 export function StartSessionControls(
-  props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>
+  props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
   const { resourceId, ...divProps } = props;
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { t } = useTranslations('startSessionControls', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -102,7 +102,7 @@ export function StartSessionControls(
 
       console.error('Failed to start session:', JSON.stringify(err));
     },
-    [t, showError, resource?.type]
+    [t, showError, resource?.type],
   );
 
   const { mutate: startSession, isPending: startIsPending } = useResourcesServiceResourceUsageStartSession({

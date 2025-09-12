@@ -44,7 +44,7 @@ function ResourceDetailsComponent() {
   const { success, error: showError } = useToastMessage();
   useQrCodeAction({ resourceId });
 
-  const { t } = useTranslations('resourceDetails', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -58,7 +58,7 @@ function ResourceDetailsComponent() {
       includeGroups: true,
     },
     undefined,
-    { enabled: !!user?.id }
+    { enabled: !!user?.id },
   );
 
   const {

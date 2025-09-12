@@ -4,8 +4,8 @@ import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 import { User, useUsersServiceFindMany, useUsersServiceGetOneUserById } from '@attraccess/react-query-client';
 
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 interface UserSearchProps {
   label?: string;
@@ -21,7 +21,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, onSelectionChange, autocompleteProps, afterAutocomplete, wrapperProps, afterSelection } =
     props;
 
-  const { t } = useTranslations('userSearch', {
+  const { t } = useTranslations({
     en,
     de,
   });

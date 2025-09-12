@@ -1,6 +1,6 @@
 import React, { ReactElement } from 'react';
 import { TableColumn } from '@heroui/react';
-import { TFunction } from 'i18next';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { Resource } from '@attraccess/react-query-client';
 
 /**
@@ -10,7 +10,7 @@ export function generateHeaderColumns(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean
+  canManageResources: boolean,
 ): ReactElement[] {
   const headers: ReactElement[] = [];
 
@@ -26,14 +26,14 @@ export function generateHeaderColumns(
         {t('headers.machine.endTime')}
       </TableColumn>,
       <TableColumn key="duration">{t('headers.machine.duration')}</TableColumn>,
-      <TableColumn key="icons">{''}</TableColumn>
+      <TableColumn key="icons">{''}</TableColumn>,
     );
   } else if (resource.type === 'door') {
     headers.push(
       <TableColumn key="time">{t('headers.door.time')}</TableColumn>,
       <TableColumn key="action" className="hidden md:table-cell">
         {t('headers.door.action')}
-      </TableColumn>
+      </TableColumn>,
     );
   }
 

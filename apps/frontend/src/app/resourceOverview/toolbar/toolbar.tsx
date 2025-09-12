@@ -5,8 +5,8 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
 import { useNavigate } from 'react-router-dom';
-import * as en from './toolbar.en.json';
-import * as de from './toolbar.de.json';
+import en from './toolbar.en.json';
+import de from './toolbar.de.json';
 import { ResourceScanner } from './scanner';
 import { ResourceFilter } from './filter';
 import { FilterProps } from '../filterProps';
@@ -28,7 +28,7 @@ export function Toolbar({
   const canManageResources = hasPermission('canManageResources');
   const navigate = useNavigate();
 
-  const { t } = useTranslations('toolbar', {
+  const { t } = useTranslations({
     en,
     de,
   });

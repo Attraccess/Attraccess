@@ -6,8 +6,8 @@ import { Alert } from '@heroui/alert';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { useLogin } from '../../hooks/useAuth';
-import * as en from './loginForm.en.json';
-import * as de from './loginForm.de.json';
+import en from './loginForm.en.json';
+import de from './loginForm.de.json';
 
 interface LoginFormProps {
   onNeedsAccount: () => void;
@@ -15,7 +15,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) {
-  const { t } = useTranslations('login', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -39,12 +39,12 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
         tokenLocation: 'cookie',
       });
     },
-    [login]
+    [login],
   );
 
   const memoizedArrowRight = useMemo(
     () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    []
+    [],
   );
 
   return (
@@ -75,6 +75,7 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
           required
           isDisabled={isPending}
           data-cy="login-form-username-input"
+          autoComplete="username"
         />
         <PasswordInput
           id="password"

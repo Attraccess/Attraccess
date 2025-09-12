@@ -1,7 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, Divider, Link } from '@heroui/react';
-import * as de from './ssoLogin.de.json';
-import * as en from './ssoLogin.en.json';
+import de from './ssoLogin.de.json';
+import en from './ssoLogin.en.json';
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuthenticationServiceGetAllSsoProviders, SSOProvider } from '@attraccess/react-query-client';
@@ -13,7 +13,7 @@ interface SSOLoginButtonProps {
 }
 
 function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
-  const { t } = useTranslations('ssoLoginButton', {
+  const { t } = useTranslations({
     de,
     en,
   });

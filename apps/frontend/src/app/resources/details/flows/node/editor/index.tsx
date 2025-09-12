@@ -2,10 +2,10 @@ import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { Button, Form, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
-import { TFunction } from 'i18next';
 import { useFlowContext } from '../../flowContext';
 import { Property, PropertyInput } from './property-input';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;

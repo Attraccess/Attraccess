@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslationState } from '../i18n';
 
 /**
  * A hook for formatting duration values using the Intl.DurationFormat API (if supported)
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
  * @returns A function that formats minutes into a localized duration string
  */
 export function useFormatedDuration(minutes: number) {
-  const { i18n } = useTranslation();
+  const { language } = useTranslationState();
 
   const formatDuration = useCallback(
     (minutes: number) => {
@@ -31,7 +31,7 @@ export function useFormatedDuration(minutes: number) {
           fields.push('minutes');
 
           // @ts-expect-error - DurationFormat is a new API not yet in TypeScript definitions
-          const formatter = new Intl.DurationFormat(i18n.language, {
+          const formatter = new Intl.DurationFormat(language, {
             style: 'narrow',
             fields,
             minutesDisplay: 'always',
@@ -50,13 +50,13 @@ export function useFormatedDuration(minutes: number) {
         console.warn('Intl.DurationFormat not supported', error);
 
         // Fallback for browsers that don't support Intl.DurationFormat
-        if (i18n.language.startsWith('de')) {
+        if (language.startsWith('de')) {
           return `${days}T ${hours}Std. ${remainingMinutes}Min.`;
         }
         return `${days}T ${hours}h ${remainingMinutes}m`;
       }
     },
-    [i18n.language]
+    [language],
   );
 
   const formattedDuration = useMemo(() => formatDuration(minutes), [minutes, formatDuration]);

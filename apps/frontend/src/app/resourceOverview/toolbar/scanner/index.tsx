@@ -17,7 +17,7 @@ export function ResourceScanner(props: Props) {
 
   const navigate = useNavigate();
   const toast = useToastMessage();
-  const { t } = useTranslations('ResourceScanner', { de, en });
+  const { t } = useTranslations({ de, en });
 
   const frontendOrigin = window.location.origin;
 
@@ -37,7 +37,7 @@ export function ResourceScanner(props: Props) {
         navigate(url.pathname + url.search + url.hash);
       }
     },
-    [navigate, frontendOrigin, toast, t]
+    [navigate, frontendOrigin, toast, t],
   );
 
   return (

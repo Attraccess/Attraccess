@@ -13,7 +13,7 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
   const { children, ...filterProps } = props;
   const { isOpen, onOpenChange, onOpen } = useDisclosure();
 
-  const { t } = useTranslations('resourceOverview.toolbar.filter', {
+  const { t } = useTranslations({
     de,
     en,
   });

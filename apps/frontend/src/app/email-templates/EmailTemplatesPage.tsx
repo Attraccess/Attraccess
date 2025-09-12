@@ -8,12 +8,12 @@ import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { EmptyState } from '../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { useMemo } from 'react';
 
 export function EmailTemplatesPage() {
-  const { t } = useTranslations('emailTemplates', { en, de });
+  const { t } = useTranslations({ en, de });
   const { data: emailTemplates, status: fetchStatus } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);

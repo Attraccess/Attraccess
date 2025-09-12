@@ -21,7 +21,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
   const [applicationName, setApplicationName] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t } = useTranslations('oidc.discovery.authentik', {
+  const { t } = useTranslations({
     de,
     en,
   });

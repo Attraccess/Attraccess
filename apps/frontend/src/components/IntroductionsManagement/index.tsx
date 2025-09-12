@@ -17,8 +17,8 @@ import {
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { PageHeader } from '../pageHeader';
 import { Action, UserSelectionList } from '../userSelectionList';
 import { useHasValidIntroduction } from '../../hooks/useHasValidIntroduction';
@@ -49,7 +49,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
     ...rest
   } = props;
 
-  const { t } = useTranslations('introductionsManagement', { en, de });
+  const { t } = useTranslations({ en, de });
   const [comment, setComment] = useState<string | undefined>(undefined);
   const { isOpen: commentModalIsOpen, onOpen: openCommentModal, onClose: closeCommentModal } = useDisclosure();
   const [action, setAction] = useState<'grant' | 'revoke'>('grant');
@@ -63,35 +63,34 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
 
   const Actions = useMemo(
     () =>
-      (user: UserWithIntroductionStatus): Action<UserWithIntroductionStatus>[] =>
-        [
-          {
-            key: 'history',
-            onClick: (clickedUser) => {
-              const introductionOfUser = (introductions ?? []).find((intro) => intro.receiverUserId === clickedUser.id);
+      (user: UserWithIntroductionStatus): Action<UserWithIntroductionStatus>[] => [
+        {
+          key: 'history',
+          onClick: (clickedUser) => {
+            const introductionOfUser = (introductions ?? []).find((intro) => intro.receiverUserId === clickedUser.id);
 
-              if (!introductionOfUser) {
-                return;
-              }
+            if (!introductionOfUser) {
+              return;
+            }
 
-              onHistoryModalOpen({ user: clickedUser, introduction: introductionOfUser });
-            },
-            isIconOnly: true,
-            startContent: <HistoryIcon className="w-4 h-4" />,
+            onHistoryModalOpen({ user: clickedUser, introduction: introductionOfUser });
           },
-          {
-            key: 'grant-revoke',
-            label: user.hasValidIntroduction ? t('actions.revoke') : t('actions.grant'),
-            isLoading: isRevoking ?? isGranting,
-            onClick: (user) => {
-              setSelectedUser(user);
-              setComment(undefined);
-              setAction(user.hasValidIntroduction ? 'revoke' : 'grant');
-              openCommentModal();
-            },
+          isIconOnly: true,
+          startContent: <HistoryIcon className="w-4 h-4" />,
+        },
+        {
+          key: 'grant-revoke',
+          label: user.hasValidIntroduction ? t('actions.revoke') : t('actions.grant'),
+          isLoading: isRevoking ?? isGranting,
+          onClick: (user) => {
+            setSelectedUser(user);
+            setComment(undefined);
+            setAction(user.hasValidIntroduction ? 'revoke' : 'grant');
+            openCommentModal();
           },
-        ],
-    [onHistoryModalOpen, isRevoking, isGranting, t, introductions, openCommentModal]
+        },
+      ],
+    [onHistoryModalOpen, isRevoking, isGranting, t, introductions, openCommentModal],
   );
 
   const userWithIntroductionStatus = useMemo((): UserWithIntroductionStatus[] => {

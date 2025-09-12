@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslationState } from '../i18n';
 
 export function useNumberFormatter(options?: Intl.NumberFormatOptions) {
-  const { i18n } = useTranslation();
+  const { language } = useTranslationState();
 
   const formatter = useMemo(() => {
-    return new Intl.NumberFormat(i18n.language, options);
-  }, [i18n.language, options]);
+    return new Intl.NumberFormat(language, options);
+  }, [language, options]);
 
   return useCallback(
     (num?: string | number | null) => {
@@ -21,7 +21,7 @@ export function useNumberFormatter(options?: Intl.NumberFormatOptions) {
 
       return formatter.format(numAsNumber);
     },
-    [formatter]
+    [formatter],
   );
 }
 

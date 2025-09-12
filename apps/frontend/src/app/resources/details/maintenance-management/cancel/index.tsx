@@ -23,7 +23,7 @@ export function ResourceMaintenanceCancelModal(props: Props) {
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('resources.details.maintenanceManagement.cancel', {
+  const { t } = useTranslations({
     de,
     en,
   });

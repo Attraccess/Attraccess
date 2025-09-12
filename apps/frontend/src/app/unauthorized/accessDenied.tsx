@@ -10,7 +10,7 @@ import de from './accessDenied.de.json';
 
 export const AccessDenied = memo(function AccessDeniedComponent() {
   const navigate = useNavigate();
-  const { t } = useTranslations('access-denied', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const handleGoBack = () => {
     navigate(-1);

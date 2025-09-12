@@ -5,8 +5,8 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 interface SetPasswordFormProps {
   userId: number;
@@ -16,7 +16,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
   userId,
   ...divProps
 }) => {
-  const { t } = useTranslations('setPasswordForm', { en, de });
+  const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { mutate: setPasswordMutate, isPending: isSettingPassword } = useUsersServiceSetUserPassword({
     onSuccess: () => {

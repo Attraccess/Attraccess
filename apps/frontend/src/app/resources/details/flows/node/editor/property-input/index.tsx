@@ -11,8 +11,8 @@ import {
   Textarea,
 } from '@heroui/react';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
-import { TFunction } from 'i18next';
 import { PlusIcon, XIcon } from 'lucide-react';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'object' | 'boolean';

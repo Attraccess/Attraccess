@@ -13,9 +13,8 @@ import { Select } from '../../../../../components/select';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-
-import * as en from './utils/translations/en';
-import * as de from './utils/translations/de';
+import en from './utils/translations/en.json';
+import de from './utils/translations/de.json';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -30,7 +29,7 @@ export const HistoryTable = ({
   canManageResources,
   onSessionClick,
 }: HistoryTableProps) => {
-  const { t } = useTranslations('historyTable', { en, de });
+  const { t } = useTranslations({ en, de });
   const { user } = useAuth();
 
   const [page, setPage] = useState(1);
@@ -49,7 +48,7 @@ export const HistoryTable = ({
     (key: string) => {
       handleRowsPerPageChange(Number(key));
     },
-    [handleRowsPerPageChange]
+    [handleRowsPerPageChange],
   );
 
   const {
@@ -66,7 +65,7 @@ export const HistoryTable = ({
     undefined,
     {
       enabled: !!user,
-    }
+    },
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });

@@ -1,7 +1,7 @@
 import { ReactElement } from 'react';
 import { TableCell, Chip } from '@heroui/react';
 import { Resource, ResourceUsage } from '@attraccess/react-query-client';
-import { TFunction } from 'i18next';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { DurationDisplay, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { DoorOpenIcon, LockIcon, MessageSquareText, UnlockIcon } from 'lucide-react';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
@@ -14,7 +14,7 @@ export function generateRowCells(
   t: TFunction,
   resource: Resource,
   showAllUsers: boolean,
-  canManageResources: boolean
+  canManageResources: boolean,
 ): ReactElement[] {
   const cells: ReactElement[] = [];
 
@@ -23,7 +23,7 @@ export function generateRowCells(
     cells.push(
       <TableCell key={`user-${session.id}`}>
         <AttraccessUser user={session.user} />
-      </TableCell>
+      </TableCell>,
     );
   }
 
@@ -49,7 +49,7 @@ export function generateRowCells(
       </TableCell>,
       <TableCell key={`icons-${session.id}`} className="flex items-center gap-2">
         {hasNotes && <MessageSquareText />}
-      </TableCell>
+      </TableCell>,
     );
   } else if (resource.type === 'door') {
     cells.push(
@@ -63,7 +63,7 @@ export function generateRowCells(
           {session.usageAction === 'door.unlatch' && <DoorOpenIcon />}
           {t('rows.door.action.' + session.usageAction)}
         </div>
-      </TableCell>
+      </TableCell>,
     );
   }
 

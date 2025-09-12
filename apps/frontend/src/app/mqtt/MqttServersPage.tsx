@@ -10,7 +10,7 @@ import { MqttServerList } from './servers/MqttServerList';
 export function MqttServersPage() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { t } = useTranslations('mqttServersPage', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const canManageMqtt = hasPermission('canManageResources');
 
@@ -29,7 +29,12 @@ export function MqttServersPage() {
         <CardHeader>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2>{t('title')}</h2>
-            <Button color="primary" startContent={<Plus size={16} />} onPress={handleAddNewServer} data-cy="mqtt-servers-page-add-new-server-button">
+            <Button
+              color="primary"
+              startContent={<Plus size={16} />}
+              onPress={handleAddNewServer}
+              data-cy="mqtt-servers-page-add-new-server-button"
+            >
               {t('addNewServer')}
             </Button>
           </div>

@@ -1,24 +1,9 @@
-import i18nFactory from 'i18next';
-import { initReactI18next, useTranslation } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
-import { useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { create } from 'zustand';
+import { get } from 'lodash-es';
+import { compile as handlebarsCompile } from 'handlebars';
 
-i18nFactory
-  .use(initReactI18next)
-  .use(LanguageDetector)
-  .init({
-    fallbackLng: 'en',
-    supportedLngs: ['en', 'de'],
-    defaultNS: 'common',
-    fallbackNS: 'common',
-
-    interpolation: {
-      escapeValue: false,
-    },
-  });
-
-export const i18n = i18nFactory;
-
+export const I18N_LANGUAGE_STORAGE_KEY = 'language';
 type TranslationRecord = Record<string, unknown>;
 
 interface TranslationModule {
@@ -30,38 +15,103 @@ interface TranslationModules {
   de: TranslationModule | TranslationRecord;
 }
 
-export function useTranslations<T extends TranslationModules>(
-  namespace: string,
-  translations: T
-): ReturnType<typeof useTranslation> {
-  const [isLoaded, setIsLoaded] = useState(false);
+type Language = keyof TranslationModules;
 
-  useEffect(() => {
-    // Add translations for each language
-    Object.entries(translations).forEach(([lang, module]) => {
-      if (!i18n.hasResourceBundle(lang, namespace)) {
-        i18n.addResourceBundle(lang, namespace, module.default ?? module, true, true);
+interface TranslationState {
+  language: Language;
+  setLanguage: (language: Language) => void;
+}
+export const useTranslationState = create<TranslationState>((set) => ({
+  language: 'en',
+  setLanguage: (language) => {
+    console.log('setLanguage', language);
+    set({ language });
+    localStorage.setItem(I18N_LANGUAGE_STORAGE_KEY, language);
+  },
+}));
+
+export type TFunction = (key: string, data?: Record<string, unknown>) => string;
+
+interface UseTranslationsResponse {
+  t: TFunction;
+  tExists: (key: string) => boolean;
+  language: Language;
+  setLanguage: (language: Language) => void;
+}
+
+export function useTranslations(translations: TranslationModules): UseTranslationsResponse {
+  const { language, setLanguage } = useTranslationState();
+
+  const activeTranslations = useMemo(() => {
+    return translations[language];
+  }, [language, translations]);
+
+  const fallbackTranslations = useMemo(() => {
+    return translations['en'];
+  }, [translations]);
+
+  const getTranslationRaw = useCallback(
+    (key: string) => {
+      const fallbackTranslation = get(fallbackTranslations, key);
+      const translation = get(activeTranslations, key, fallbackTranslation);
+      return translation;
+    },
+    [activeTranslations, fallbackTranslations],
+  );
+
+  const getTranslationTemplate = useCallback(
+    (key: string) => {
+      const translation = getTranslationRaw(key);
+      if (translation === undefined) {
+        return undefined;
       }
-    });
-    setIsLoaded(true);
+      return handlebarsCompile(translation);
+    },
+    [getTranslationRaw],
+  );
 
-    // Cleanup when component unmounts
-    return () => {
-      Object.keys(translations).forEach((lang) => {
-        i18n.removeResourceBundle(lang, namespace);
-      });
-    };
-  }, [namespace, translations]);
+  const t = useCallback(
+    (key: string, data?: Record<string, unknown>) => {
+      const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
+      const translationTemplate = getTranslationTemplate(key);
+      if (translationTemplate === undefined) {
+        console.log('translationTemplate is undefined', {
+          key,
+          activeTranslations,
+          fallbackTranslations,
+          translations,
+        });
+        return ABSOLUTE_FALLBACK_TRANSLATION;
+      }
+      return translationTemplate(data);
+    },
+    [getTranslationTemplate, activeTranslations, fallbackTranslations, translations],
+  );
 
-  const translation = useTranslation(namespace);
+  const tExists = useCallback(
+    (key: string) => {
+      const translation = getTranslationRaw(key);
+      return translation !== undefined;
+    },
+    [getTranslationRaw],
+  );
 
-  // Return empty strings for translations until loaded to prevent showing translation keys
-  if (!isLoaded) {
-    return {
-      ...translation,
-      t: () => '',
-    } as ReturnType<typeof useTranslation>;
+  return {
+    t,
+    tExists,
+    language,
+    setLanguage,
+  };
+}
+
+export function detectAndSetLanguage() {
+  const localStorageLanguage = localStorage.getItem(I18N_LANGUAGE_STORAGE_KEY);
+  const sessionStorageLanguage = sessionStorage.getItem(I18N_LANGUAGE_STORAGE_KEY);
+  let navigatorLanguage = navigator.language;
+  if (navigatorLanguage.includes('-')) {
+    navigatorLanguage = navigatorLanguage.split('-')[0];
   }
 
-  return translation;
+  const language = localStorageLanguage || sessionStorageLanguage || navigatorLanguage;
+  useTranslationState.getState().setLanguage(language as Language);
 }

@@ -9,11 +9,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 export function UsernameForm() {
-  const { t } = useTranslations('account.username', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
   const [username, setUsername] = useState('');

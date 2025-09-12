@@ -9,12 +9,11 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { useCallback, useMemo } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessNode } from '../node';
-import { TFunction } from 'i18next';
 
 interface Props {
   onSelect: (nodeType: string) => void;
@@ -31,7 +30,7 @@ interface NodeGroup {
 export function NodePickerModal(props: Props) {
   const { isOpen, onOpenChange, onClose, onOpen } = useDisclosure();
 
-  const { t } = useTranslations('nodePicker', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -89,7 +88,7 @@ export function NodePickerModal(props: Props) {
       props.onSelect(nodeType);
       onClose();
     },
-    [props, onClose]
+    [props, onClose],
   );
 
   return (

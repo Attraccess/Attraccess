@@ -161,7 +161,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
 export const useSidebarEndItems = () => {
   const { user } = useAuth();
 
-  const { t } = useTranslations('sidebar.endItems', {
+  const { t } = useTranslations({
     en,
     de,
   });

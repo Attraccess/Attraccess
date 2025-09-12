@@ -10,7 +10,7 @@ interface Props {
 
 export function NoResourcesFound(props: Props) {
   const { onClearFilterAndSearch } = props;
-  const { t } = useTranslations('resourceOverview.noResourcesFound', {
+  const { t } = useTranslations({
     de,
     en,
   });

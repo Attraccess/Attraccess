@@ -12,7 +12,7 @@ import de from './de.json';
 export const SSOProvidersPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const canManageSSO = hasPermission('canManageSystemConfiguration');
-  const { t } = useTranslations('sso.providers', { en, de });
+  const { t } = useTranslations({ en, de });
 
   // Reference to the SSOProvidersList component
   const providerListRef = React.useRef<SSOProvidersListRef>(null);

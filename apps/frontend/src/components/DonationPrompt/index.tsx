@@ -36,7 +36,7 @@ function userHasAnyManagePermission(user: User | null): boolean {
 }
 
 export function DonationPrompt() {
-  const { t } = useTranslations('DonationPrompt', { en, de });
+  const { t } = useTranslations({ en, de });
   const { user } = useAuth();
 
   const isEligible = useMemo(() => userHasAnyManagePermission(user), [user]);

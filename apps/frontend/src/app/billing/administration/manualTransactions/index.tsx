@@ -2,8 +2,8 @@ import { Button, Card, CardBody, CardFooter, CardHeader, CardProps, NumberInput 
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { useCallback, useState } from 'react';
 import {
   ApiError,
@@ -18,10 +18,9 @@ interface Props {
   userId?: number;
 }
 
-const I18N_NAMESPACE = 'billingAdministration.manualTransactions';
 export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'>) {
   const { userId, ...cardProps } = props;
-  const { t, i18n } = useTranslations(I18N_NAMESPACE, { en, de });
+  const { t, tExists } = useTranslations({ en, de });
 
   const [amount, setAmount] = useState<number>(0);
 
@@ -47,7 +46,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
         const errorMessage = ((error as ApiError).body as { message?: string | string[] } | undefined)?.message;
 
         const baseKey = 'toast.error.';
-        const translationExists = i18n.exists(I18N_NAMESPACE + ':' + baseKey + errorMessage);
+        const translationExists = tExists(baseKey + errorMessage);
 
         const fullBaseKey = translationExists ? baseKey + errorMessage : baseKey + 'generic';
 

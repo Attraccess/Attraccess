@@ -33,7 +33,7 @@ interface Props {
 export function AttractapSerialConfiguratorAttraccess(props: Props) {
   const { className } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.attraccess', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -165,7 +165,7 @@ export function AttractapSerialConfiguratorAttraccess(props: Props) {
         updateStatus();
       }, 1000);
     },
-    [updateStatus, apiConnectionData]
+    [updateStatus, apiConnectionData],
   );
 
   const openDeviceSettings = useCallback(() => {

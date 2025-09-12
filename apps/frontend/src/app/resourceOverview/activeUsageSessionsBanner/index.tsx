@@ -19,7 +19,7 @@ type ActiveUsageSessionsBannerProps = {
 };
 
 export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const { t } = useTranslations('activeUsageSessionsBanner', { en, de });
+  const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const { success, error: showError } = useToastMessage();
 
@@ -102,7 +102,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
             localStatuses[r.id] = 'error';
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'error' }));
           }
-        })
+        }),
       );
 
       // Invalidate lists regardless of outcome
