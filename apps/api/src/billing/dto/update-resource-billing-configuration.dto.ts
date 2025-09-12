@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsPositive } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, Min } from 'class-validator';
 
 export class UpdateResourceBillingConfigurationDto {
   @ApiProperty({
@@ -11,6 +11,7 @@ export class UpdateResourceBillingConfigurationDto {
   @IsNumber()
   @IsOptional()
   @IsPositive()
+  @Min(0)
   creditsPerUsage?: number;
 
   @ApiProperty({
@@ -22,5 +23,6 @@ export class UpdateResourceBillingConfigurationDto {
   @IsNumber()
   @IsOptional()
   @IsPositive()
+  @Min(0)
   creditsPerMinute?: number;
 }
