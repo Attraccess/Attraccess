@@ -41,7 +41,6 @@ export function NodeEditor(props: Props) {
   }, [nodeId, data, updateNodeData, onClose]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown) => {
-    console.log('onInputChange', propertyName, value);
     setData((prev) => ({ ...prev, [propertyName]: value }));
   }, []);
 

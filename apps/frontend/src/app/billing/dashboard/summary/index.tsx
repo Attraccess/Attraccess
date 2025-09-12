@@ -73,7 +73,6 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
         if (originalTransaction) {
           originalDetails = getDetailsCellContent(originalTransaction);
         }
-        console.log('originalDetails', originalDetails);
         type = 'refund';
         details = { originalDetails, originalId: originalTransaction?.id };
       } else if (transaction.resourceUsageId) {
