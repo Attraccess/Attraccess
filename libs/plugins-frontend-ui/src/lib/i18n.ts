@@ -75,11 +75,17 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
       const translationTemplate = getTranslationTemplate(key);
       if (translationTemplate === undefined) {
+        console.log('translationTemplate is undefined', {
+          key,
+          activeTranslations,
+          fallbackTranslations,
+          translations,
+        });
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
       return translationTemplate(data);
     },
-    [getTranslationTemplate],
+    [getTranslationTemplate, activeTranslations, fallbackTranslations, translations],
   );
 
   const tExists = useCallback(

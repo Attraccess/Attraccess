@@ -10,8 +10,8 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { IntroducerManagement } from '../../../components/IntroducerManagement';
 
 interface ResourceIntroducerManagementProps {

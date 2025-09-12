@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Loading } from './loading';
 import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './verifyEmail.en.json';
-import * as de from './verifyEmail.de.json';
+import en from './verifyEmail.en.json';
+import de from './verifyEmail.de.json';
 import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 

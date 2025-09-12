@@ -3,8 +3,8 @@ import { useTranslations } from '../../i18n';
 import { User as UserComponent, UserProps } from '@heroui/react';
 import { toSvg } from 'jdenticon';
 import { useMemo } from 'react';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 interface AttraccessUserProps {
   user?: User;

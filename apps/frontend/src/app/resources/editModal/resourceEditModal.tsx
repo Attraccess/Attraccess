@@ -12,8 +12,8 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './resourceEditModal.en.json';
-import * as de from './resourceEditModal.de.json';
+import en from './resourceEditModal.en.json';
+import de from './resourceEditModal.de.json';
 import {
   useResourcesServiceUpdateOneResource,
   UpdateResourceDto,

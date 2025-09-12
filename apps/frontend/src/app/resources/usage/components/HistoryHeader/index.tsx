@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { Checkbox } from '@heroui/react';
 import { History, Users } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './translations/en';
-import * as de from './translations/de';
+import en from './translations/en';
+import de from './translations/de';
 
 interface HistoryHeaderProps {
   title: string;

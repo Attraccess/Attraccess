@@ -5,8 +5,8 @@ import { Loading } from '../loading';
 import { Button, Card, CardBody, CardFooter, CardHeader, Form } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { useUsersServiceChangePasswordViaResetToken } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 

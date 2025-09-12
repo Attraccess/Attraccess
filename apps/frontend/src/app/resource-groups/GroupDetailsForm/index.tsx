@@ -11,8 +11,8 @@ import {
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 import { PageHeader } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useNavigate } from 'react-router-dom';

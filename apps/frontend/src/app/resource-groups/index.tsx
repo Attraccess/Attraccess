@@ -6,8 +6,8 @@ import { GroupDetailsForm } from './GroupDetailsForm';
 import { ResoureGroupIntroducerManagement } from './IntroducerManagement';
 import { ResourceGroupIntroductionsManagement } from './IntroductionsManagement';
 import { Spinner } from '@heroui/react';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { GroupIcon } from 'lucide-react';
 
 export function ResourceGroupEditPage() {

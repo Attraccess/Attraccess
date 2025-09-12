@@ -11,8 +11,8 @@ import {
   useDisclosure,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './resourceGroupUpsertModal.en.json';
-import * as de from './resourceGroupUpsertModal.de.json';
+import en from './resourceGroupUpsertModal.en.json';
+import de from './resourceGroupUpsertModal.de.json';
 import {
   ResourceGroup,
   useResourcesServiceResourceGroupsCreateOne,

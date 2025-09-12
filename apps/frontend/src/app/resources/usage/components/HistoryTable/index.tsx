@@ -13,9 +13,8 @@ import { Select } from '../../../../../components/select';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-
-import * as en from './utils/translations/en';
-import * as de from './utils/translations/de';
+import en from './utils/translations/en.json';
+import de from './utils/translations/de.json';
 
 interface HistoryTableProps {
   resourceId: number;

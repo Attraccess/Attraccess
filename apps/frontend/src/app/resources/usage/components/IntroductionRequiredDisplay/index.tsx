@@ -2,8 +2,8 @@ import { Alert, Divider, Spinner } from '@heroui/react';
 import { Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { useAccessControlServiceResourceIntroducersGetMany } from '@attraccess/react-query-client';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface IntroductionRequiredDisplayProps {
   resourceId: number;

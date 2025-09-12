@@ -6,8 +6,8 @@ import { ResourceUsage } from '@attraccess/react-query-client';
 import { HistoryTable } from './components/HistoryTable';
 import { HistoryHeader } from './components/HistoryHeader';
 import { UsageNotesModal } from './components/UsageNotesModal';
-import * as en from './translations/resourceUsageHistory.en';
-import * as de from './translations/resourceUsageHistory.de';
+import en from './translations/resourceUsageHistory.en';
+import de from './translations/resourceUsageHistory.de';
 
 type ResourceUsageHistoryProps = {
   resourceId: number;

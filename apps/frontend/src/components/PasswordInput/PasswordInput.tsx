@@ -4,8 +4,8 @@ import { Button } from '@heroui/button';
 import { Tooltip } from '@heroui/tooltip';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './PasswordInput.en.json';
-import * as de from './PasswordInput.de.json';
+import en from './PasswordInput.en.json';
+import de from './PasswordInput.de.json';
 
 // Omit 'type' from InputProps since we always want it to be 'password' or 'text'
 export interface PasswordInputProps extends Omit<InputProps, 'type' | 'endContent'> {

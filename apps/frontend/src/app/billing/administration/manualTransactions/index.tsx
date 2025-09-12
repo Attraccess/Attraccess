@@ -2,8 +2,8 @@ import { Button, Card, CardBody, CardFooter, CardHeader, CardProps, NumberInput 
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { useCallback, useState } from 'react';
 import {
   ApiError,

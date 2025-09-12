@@ -4,8 +4,8 @@ import { Trash2Icon, AwardIcon } from 'lucide-react';
 import { User, ResourceIntroducer } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UserSelectionList } from '../userSelectionList';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { PageHeader } from '../pageHeader';
 
 interface IntroducerManagementProps {

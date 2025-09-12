@@ -17,8 +17,8 @@ import {
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { PageHeader } from '../pageHeader';
 import { Action, UserSelectionList } from '../userSelectionList';
 import { useHasValidIntroduction } from '../../hooks/useHasValidIntroduction';

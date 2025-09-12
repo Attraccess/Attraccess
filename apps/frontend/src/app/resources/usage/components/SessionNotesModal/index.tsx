@@ -3,8 +3,8 @@ import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@herou
 import { Button } from '@heroui/button';
 import { Textarea } from '@heroui/input';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './translations/en';
-import * as de from './translations/de';
+import en from './translations/en';
+import de from './translations/de';
 
 export enum SessionModalMode {
   START = 'start',

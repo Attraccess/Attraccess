@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Spinner, Textarea } from '@heroui/react';
 import { ResourceUsage } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import * as en from './translations/en';
-import * as de from './translations/de';
+import en from './translations/en';
+import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 
 interface UsageNotesModalProps {

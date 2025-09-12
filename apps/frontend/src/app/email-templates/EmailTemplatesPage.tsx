@@ -8,8 +8,8 @@ import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { EmptyState } from '../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 import { useMemo } from 'react';
 
 export function EmailTemplatesPage() {

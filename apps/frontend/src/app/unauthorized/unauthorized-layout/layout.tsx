@@ -1,7 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import React from 'react';
-import * as en from './en.json';
-import * as de from './de.json';
+import en from './en.json';
+import de from './de.json';
 
 interface UnauthorizedLayoutProps {
   children: React.ReactNode;

@@ -6,8 +6,8 @@ import { Alert } from '@heroui/alert';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { useLogin } from '../../hooks/useAuth';
-import * as en from './loginForm.en.json';
-import * as de from './loginForm.de.json';
+import en from './loginForm.en.json';
+import de from './loginForm.de.json';
 
 interface LoginFormProps {
   onNeedsAccount: () => void;

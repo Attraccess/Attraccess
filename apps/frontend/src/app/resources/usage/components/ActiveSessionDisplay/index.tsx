@@ -11,8 +11,8 @@ import {
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import * as en from './translations/en.json';
-import * as de from './translations/de.json';
+import en from './translations/en.json';
+import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
 
 interface ActiveSessionDisplayProps {
