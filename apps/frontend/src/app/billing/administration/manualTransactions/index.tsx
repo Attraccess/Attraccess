@@ -28,36 +28,37 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
-  const { mutate: createManualTransaction } = useBillingServiceCreateManualTransaction({
-    onSuccess: () => {
-      toast.success({
-        title: t('toast.success.title'),
-        description: t('toast.success.description'),
-      });
+  const { mutate: createManualTransaction, isPending: isCreatingManualTransaction } =
+    useBillingServiceCreateManualTransaction({
+      onSuccess: () => {
+        toast.success({
+          title: t('toast.success.title'),
+          description: t('toast.success.description'),
+        });
 
-      queryClient.invalidateQueries({
-        queryKey: [useBillingServiceGetBillingTransactionsKey],
-      });
-      queryClient.invalidateQueries({
-        queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: userId as number }),
-      });
-    },
-    onError: (error: Error) => {
-      const errorMessage = ((error as ApiError).body as { message?: string | string[] } | undefined)?.message;
+        queryClient.invalidateQueries({
+          queryKey: [useBillingServiceGetBillingTransactionsKey],
+        });
+        queryClient.invalidateQueries({
+          queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: userId as number }),
+        });
+      },
+      onError: (error: Error) => {
+        const errorMessage = ((error as ApiError).body as { message?: string | string[] } | undefined)?.message;
 
-      const baseKey = 'toast.error.';
-      const translationExists = i18n.exists(I18N_NAMESPACE + ':' + baseKey + errorMessage);
+        const baseKey = 'toast.error.';
+        const translationExists = i18n.exists(I18N_NAMESPACE + ':' + baseKey + errorMessage);
 
-      const fullBaseKey = translationExists ? baseKey + errorMessage : baseKey + 'generic';
+        const fullBaseKey = translationExists ? baseKey + errorMessage : baseKey + 'generic';
 
-      toast.error({
-        title: t(fullBaseKey + '.title'),
-        description: t(fullBaseKey + '.description', {
-          error: errorMessage,
-        }),
-      });
-    },
-  });
+        toast.error({
+          title: t(fullBaseKey + '.title'),
+          description: t(fullBaseKey + '.description', {
+            error: errorMessage,
+          }),
+        });
+      },
+    });
 
   const handleCreateTransaction = useCallback(() => {
     if (!userId) {
@@ -78,7 +79,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
       </CardBody>
 
       <CardFooter>
-        <Button color="primary" onPress={handleCreateTransaction}>
+        <Button color="primary" onPress={handleCreateTransaction} isLoading={isCreatingManualTransaction}>
           {t('actions.createTransaction')}
         </Button>
       </CardFooter>
