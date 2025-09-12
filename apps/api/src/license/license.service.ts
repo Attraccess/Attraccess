@@ -20,6 +20,7 @@ export enum LicenseUsageLimitType {
 export enum LicenseModuleType {
   ATTRACTAP = 'attractap',
   SSO = 'sso',
+  BILLING = 'billing',
 }
 
 interface LicenseRequirements {
@@ -45,7 +46,7 @@ export class LicenseService {
         valid: true,
         modules: Object.values(LicenseModuleType),
         usageLimits: Object.fromEntries(
-          Object.values(LicenseUsageLimitType).map((usageLimit) => [usageLimit, Infinity])
+          Object.values(LicenseUsageLimitType).map((usageLimit) => [usageLimit, Infinity]),
         ),
         isNonProfit: true,
       };
@@ -56,7 +57,7 @@ export class LicenseService {
     const licenseData = await verifyLicense(
       appConfig.LICENSE_KEY,
       appConfig.LICENSO_PUBLIC_KEY,
-      appConfig.LICENSO_DEVICE_ID
+      appConfig.LICENSO_DEVICE_ID,
     );
 
     const dto: LicenseDataDto = {
@@ -87,7 +88,7 @@ export class LicenseService {
 
     if (missingModules.length > 0) {
       throw new LicenseError(
-        `Trying to use module(s) that are not included in the license: ${missingModules.join(', ')}`
+        `Trying to use module(s) that are not included in the license: ${missingModules.join(', ')}`,
       );
     }
 
@@ -102,7 +103,7 @@ export class LicenseService {
 
     if (reachedUsageLimits.length > 0) {
       throw new LicenseError(
-        `Trying to use more than the allowed amount of ${reachedUsageLimits.map(([module]) => module).join(', ')}`
+        `Trying to use more than the allowed amount of ${reachedUsageLimits.map(([module]) => module).join(', ')}`,
       );
     }
 

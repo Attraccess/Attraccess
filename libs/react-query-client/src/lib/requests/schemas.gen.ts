@@ -45,9 +45,14 @@ export const $SystemPermissions = {
             type: 'boolean',
             description: 'Whether the user can manage users',
             example: false
+        },
+        canManageBilling: {
+            type: 'boolean',
+            description: 'Whether the user can manage billing',
+            example: false
         }
     },
-    required: ['canManageResources', 'canManageSystemConfiguration', 'canManageUsers']
+    required: ['canManageResources', 'canManageSystemConfiguration', 'canManageUsers', 'canManageBilling']
 } as const;
 
 export const $User = {
@@ -96,9 +101,13 @@ export const $User = {
             description: 'The external (origin) identifier of the user, if the user is authenticated via SSO',
             example: '1234567890',
             nullable: true
+        },
+        creditBalance: {
+            type: 'number',
+            description: 'The credit balance of the user'
         }
     },
-    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt']
+    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance']
 } as const;
 
 export const $VerifyEmailDto = {
@@ -2546,4 +2555,124 @@ export const $AttractapFirmware = {
         }
     },
     required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA']
+} as const;
+
+export const $BalanceDto = {
+    type: 'object',
+    properties: {
+        value: {
+            type: 'number',
+            description: 'The balance of the user'
+        }
+    },
+    required: ['value']
+} as const;
+
+export const $BillingTransaction = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the billing transaction',
+            example: 1
+        },
+        userId: {
+            type: 'number',
+            description: 'The ID of the user',
+            example: 1
+        },
+        user: {
+            description: 'The user who the billing transaction belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the billing transaction was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the billing transaction was last updated'
+        },
+        amount: {
+            type: 'number',
+            description: 'The credit amount of the billing transaction (negative for refunds/top-ups)'
+        },
+        initiatorId: {
+            type: 'number',
+            description: 'The user ID of the user who caused the billing transaction'
+        },
+        initiator: {
+            description: 'The user who initiated the billing transaction',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        resourceUsageId: {
+            type: 'number',
+            description: 'The resource usage ID of the resource usage that caused the billing transaction'
+        },
+        resourceUsage: {
+            description: 'The resource usage that caused the billing transaction',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceUsage'
+                }
+            ]
+        },
+        refundOfId: {
+            type: 'number',
+            description: 'The billing transaction ID of the billing transaction that is being refunded'
+        },
+        refundOf: {
+            description: 'The billing transaction that is being refunded',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BillingTransaction'
+                }
+            ]
+        }
+    },
+    required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf']
+} as const;
+
+export const $TransactionsDto = {
+    type: 'object',
+    properties: {
+        data: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/BillingTransaction'
+            }
+        },
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        }
+    },
+    required: ['data', 'total', 'page', 'limit']
+} as const;
+
+export const $ModifyBalanceDto = {
+    type: 'object',
+    properties: {
+        amount: {
+            type: 'number',
+            description: 'The amount to modify the balance by',
+            example: 100
+        }
+    },
+    required: ['amount']
 } as const;

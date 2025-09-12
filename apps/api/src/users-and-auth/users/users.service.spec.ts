@@ -113,6 +113,7 @@ describe('UsersService', () => {
           canManageResources: true,
           canManageSystemConfiguration: true,
           canManageUsers: true,
+          canManageBilling: true,
         },
       });
     });
@@ -149,7 +150,7 @@ describe('UsersService', () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValueOnce({ id: 1 } as User);
 
       await expect(
-        service.createOne({ username: 'test', email: 'existing@example.com', externalIdentifier: null })
+        service.createOne({ username: 'test', email: 'existing@example.com', externalIdentifier: null }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -160,7 +161,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({ id: 1 } as User); // username check
 
       await expect(
-        service.createOne({ username: 'existing', email: 'test@example.com', externalIdentifier: null })
+        service.createOne({ username: 'existing', email: 'test@example.com', externalIdentifier: null }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -216,6 +217,7 @@ describe('UsersService', () => {
             canManageResources: false,
             canManageSystemConfiguration: false,
             canManageUsers: false,
+            canManageBilling: false,
           },
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -235,6 +237,9 @@ describe('UsersService', () => {
           externalIdentifier: null,
           nfcKeySeedToken: null,
           sessions: [],
+          billingTransactions: [],
+          initiatedBillingTransactions: [],
+          creditBalance: 0,
         } as User,
         {
           id: 2,
@@ -244,6 +249,7 @@ describe('UsersService', () => {
             canManageResources: false,
             canManageSystemConfiguration: false,
             canManageUsers: false,
+            canManageBilling: false,
           },
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -263,6 +269,9 @@ describe('UsersService', () => {
           externalIdentifier: null,
           nfcKeySeedToken: null,
           sessions: [],
+          billingTransactions: [],
+          initiatedBillingTransactions: [],
+          creditBalance: 0,
         } as User,
       ];
 
@@ -313,7 +322,7 @@ describe('UsersService', () => {
         nfcKeySeedToken: null,
         sessions: [],
         ...overrides,
-      } as User);
+      }) as User;
 
     it('should throw if target user not found', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(null);
@@ -350,7 +359,7 @@ describe('UsersService', () => {
         expect.objectContaining({
           username: 'newuser',
           lastUsernameChangeAt: expect.any(Date),
-        })
+        }),
       );
       expect(emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'me');
       expect(result).toBe(updated);
@@ -360,7 +369,12 @@ describe('UsersService', () => {
       const target = baseUser({ id: 20, username: 'target', lastUsernameChangeAt: null });
       const admin = baseUser({
         id: 1,
-        systemPermissions: { canManageResources: false, canManageSystemConfiguration: false, canManageUsers: true },
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: true,
+          canManageBilling: false,
+        },
       });
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(target);
 

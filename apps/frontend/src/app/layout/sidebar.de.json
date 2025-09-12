@@ -22,6 +22,14 @@
         "nfcCards": "NFC-Karten"
       }
     },
+    "billing": {
+      "label": "Zahlungen",
+      "items": {
+        "dashboard": "Dashboard",
+        "administration": "Verwaltung",
+        "csvExport": "CSV-Export"
+      }
+    },
     "auth": {
       "label": "Authentifizierung",
       "items": {
@@ -34,8 +42,7 @@
       "items": {
         "plugins": "Plugins",
         "emailTemplates": "E-Mail-Vorlagen",
-        "mqttServers": "MQTT-Server",
-        "csvExport": "CSV-Export"
+        "mqttServers": "MQTT-Server"
       }
     }
   },

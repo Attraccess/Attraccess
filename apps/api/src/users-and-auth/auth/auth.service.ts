@@ -46,11 +46,17 @@ export class AuthService {
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
     @InjectRepository(RevokedToken)
-    private revokedTokenRepository: Repository<RevokedToken>
+    private revokedTokenRepository: Repository<RevokedToken>,
   ) {
     this.logger.debug('AuthService initialized');
     // Clean up expired revoked tokens periodically
-    setInterval(() => this.cleanupExpiredTokens(), 24 * 60 * 60 * 1000); // Run daily
+    setInterval(
+      () =>
+        this.cleanupExpiredTokens().catch((e) =>
+          this.logger.error('Failed to cleanup expired tokens', e.message, e.stack),
+        ),
+      24 * 60 * 60 * 1000,
+    ); // Run daily
   }
 
   private async cleanupExpiredTokens() {
@@ -63,7 +69,7 @@ export class AuthService {
 
   private async getAuthenticationDetail(
     authenticationType: AuthenticationType,
-    userId: number
+    userId: number,
   ): Promise<AuthenticationDetail> {
     const details = await this.authenticationDetailRepository.findOne({
       where: { userId, type: authenticationType },
@@ -79,7 +85,7 @@ export class AuthService {
 
   async validateAuthenticationDetails<T extends AuthenticationType>(
     userId: number,
-    options: AuthenticationOptions<T>
+    options: AuthenticationOptions<T>,
   ): Promise<boolean> {
     const authenticationDetails = await this.getAuthenticationDetail(options.type, userId);
 
@@ -103,7 +109,7 @@ export class AuthService {
 
   async addAuthenticationDetails<T extends AuthenticationType>(
     userId: number,
-    options: AuthenticationOptions<T>
+    options: AuthenticationOptions<T>,
   ): Promise<AuthenticationDetail> {
     const authenticationDetail = new AuthenticationDetail();
     authenticationDetail.userId = userId;
@@ -126,7 +132,7 @@ export class AuthService {
 
   async getUserByUsernameAndAuthenticationDetails<T extends AuthenticationType>(
     username: string,
-    options: AuthenticationOptions<T>
+    options: AuthenticationOptions<T>,
   ): Promise<User | null> {
     const user = await this.usersService.findOne({ username });
 

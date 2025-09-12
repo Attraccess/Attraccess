@@ -1,8 +1,11 @@
 import {
+  BanknoteIcon,
   BookOpenIcon,
   BugIcon,
+  ChartNoAxesCombinedIcon,
   CogIcon,
   ComputerIcon,
+  CreditCardIcon,
   DatabaseIcon,
   FileChartColumnIncreasingIcon,
   GiftIcon,
@@ -76,6 +79,32 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       });
     }
 
+    if (license?.modules.includes('billing')) {
+      items.push({
+        translationKey: 'billing',
+        isGroup: true,
+        icon: CreditCardIcon,
+        licenseModule: 'billing',
+        items: [
+          {
+            path: '/billing',
+            translationKey: 'dashboard',
+            icon: ChartNoAxesCombinedIcon,
+          },
+          {
+            path: '/billing/administration',
+            translationKey: 'administration',
+            icon: BanknoteIcon,
+          },
+          {
+            path: '/billing/csv-export',
+            translationKey: 'csvExport',
+            icon: FileChartColumnIncreasingIcon,
+          },
+        ],
+      });
+    }
+
     // Auth group
     const authGroup: SidebarItemGroup = {
       translationKey: 'auth',
@@ -111,11 +140,6 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           path: '/mqtt/servers',
           translationKey: 'mqttServers',
           icon: ServerIcon,
-        },
-        {
-          path: '/csv-export',
-          translationKey: 'csvExport',
-          icon: FileChartColumnIncreasingIcon,
         },
         {
           path: '/plugins',

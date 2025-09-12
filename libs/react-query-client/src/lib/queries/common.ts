@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -333,6 +333,20 @@ export const UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRa
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type BillingServiceGetBillingBalanceDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingBalance>>;
+export type BillingServiceGetBillingBalanceQueryResult<TData = BillingServiceGetBillingBalanceDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetBillingBalanceKey = "BillingServiceGetBillingBalance";
+export const UseBillingServiceGetBillingBalanceKeyFn = ({ userId }: {
+  userId: number;
+}, queryKey?: Array<unknown>) => [useBillingServiceGetBillingBalanceKey, ...(queryKey ?? [{ userId }])];
+export type BillingServiceGetBillingTransactionsDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingTransactions>>;
+export type BillingServiceGetBillingTransactionsQueryResult<TData = BillingServiceGetBillingTransactionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetBillingTransactionsKey = "BillingServiceGetBillingTransactions";
+export const UseBillingServiceGetBillingTransactionsKeyFn = ({ limit, page, userId }: {
+  limit?: number;
+  page?: number;
+  userId: number;
+}, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionsKey, ...(queryKey ?? [{ limit, page, userId }])];
 export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof UsersService.createOneUser>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;
@@ -364,6 +378,7 @@ export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
+export type BillingServiceCreateManualTransactionMutationResult = Awaited<ReturnType<typeof BillingService.createManualTransaction>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;

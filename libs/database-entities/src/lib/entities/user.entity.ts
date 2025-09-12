@@ -7,6 +7,7 @@ import { AuthenticationDetail } from './authenticationDetail.entity';
 import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { NFCCard } from './nfcCard.entity';
 import { Session } from './session.entity';
+import { BillingTransaction } from './billing-transaction.entity';
 
 export class SystemPermissions {
   @Column({ default: false, type: 'boolean' })
@@ -29,6 +30,13 @@ export class SystemPermissions {
     example: false,
   })
   canManageUsers!: boolean;
+
+  @Column({ default: false, type: 'boolean' })
+  @ApiProperty({
+    description: 'Whether the user can manage billing',
+    example: false,
+  })
+  canManageBilling!: boolean;
 }
 
 export type SystemPermission = keyof SystemPermissions;
@@ -148,4 +156,18 @@ export class User {
     onDelete: 'CASCADE',
   })
   sessions!: Session[];
+
+  @OneToMany(() => BillingTransaction, (transaction) => transaction.user, {
+    onDelete: 'CASCADE',
+  })
+  billingTransactions!: BillingTransaction[];
+
+  @OneToMany(() => BillingTransaction, (transaction) => transaction.initiator, {
+    onDelete: 'CASCADE',
+  })
+  initiatedBillingTransactions!: BillingTransaction[];
+
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({ description: 'The credit balance of the user' })
+  creditBalance!: number;
 }

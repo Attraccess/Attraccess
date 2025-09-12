@@ -40,6 +40,10 @@ export type SystemPermissions = {
      * Whether the user can manage users
      */
     canManageUsers: boolean;
+    /**
+     * Whether the user can manage billing
+     */
+    canManageBilling: boolean;
 };
 
 export type User = {
@@ -71,6 +75,10 @@ export type User = {
      * The external (origin) identifier of the user, if the user is authenticated via SSO
      */
     externalIdentifier?: string | null;
+    /**
+     * The credit balance of the user
+     */
+    creditBalance: number;
 };
 
 export type VerifyEmailDto = {
@@ -1675,6 +1683,78 @@ export type AttractapFirmware = {
     filenameOTA: string;
 };
 
+export type BalanceDto = {
+    /**
+     * The balance of the user
+     */
+    value: number;
+};
+
+export type BillingTransaction = {
+    /**
+     * The unique identifier of the billing transaction
+     */
+    id: number;
+    /**
+     * The ID of the user
+     */
+    userId: number;
+    /**
+     * The user who the billing transaction belongs to
+     */
+    user: User;
+    /**
+     * The date and time the billing transaction was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the billing transaction was last updated
+     */
+    updatedAt: string;
+    /**
+     * The credit amount of the billing transaction (negative for refunds/top-ups)
+     */
+    amount: number;
+    /**
+     * The user ID of the user who caused the billing transaction
+     */
+    initiatorId: number;
+    /**
+     * The user who initiated the billing transaction
+     */
+    initiator: User;
+    /**
+     * The resource usage ID of the resource usage that caused the billing transaction
+     */
+    resourceUsageId: number;
+    /**
+     * The resource usage that caused the billing transaction
+     */
+    resourceUsage: ResourceUsage;
+    /**
+     * The billing transaction ID of the billing transaction that is being refunded
+     */
+    refundOfId: number;
+    /**
+     * The billing transaction that is being refunded
+     */
+    refundOf: BillingTransaction;
+};
+
+export type TransactionsDto = {
+    data: Array<BillingTransaction>;
+    total: number;
+    page: number;
+    limit: number;
+};
+
+export type ModifyBalanceDto = {
+    /**
+     * The amount to modify the balance by
+     */
+    amount: number;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -2594,6 +2674,33 @@ export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
 };
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeResponse = Array<ResourceUsage>;
+
+export type GetBillingBalanceData = {
+    userId: number;
+};
+
+export type GetBillingBalanceResponse = BalanceDto;
+
+export type GetBillingTransactionsData = {
+    /**
+     * The number of items per page
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+    userId: number;
+};
+
+export type GetBillingTransactionsResponse = TransactionsDto;
+
+export type CreateManualTransactionData = {
+    requestBody: ModifyBalanceDto;
+    userId: number;
+};
+
+export type CreateManualTransactionResponse = number;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -4421,6 +4528,49 @@ export type $OpenApiTs = {
                  * The resource usage hours in the date range
                  */
                 200: Array<ResourceUsage>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{userId}/billing/balance': {
+        get: {
+            req: GetBillingBalanceData;
+            res: {
+                /**
+                 * The billing balance for the user.
+                 */
+                200: BalanceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{userId}/billing/transactions': {
+        get: {
+            req: GetBillingTransactionsData;
+            res: {
+                /**
+                 * The billing transactions for the user.
+                 */
+                200: TransactionsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreateManualTransactionData;
+            res: {
+                /**
+                 * The billing balance for the user has been topped up.
+                 */
+                200: number;
                 /**
                  * Unauthorized
                  */

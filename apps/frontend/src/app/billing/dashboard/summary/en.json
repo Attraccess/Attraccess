@@ -1,0 +1,21 @@
+{
+  "title": "Summary",
+  "balance": "{{balance}} Credits",
+  "transactions": {
+    "table": {
+      "columns": {
+        "id": "ID",
+        "dateTime": "Date",
+        "details": "Details",
+        "amount": "Amount"
+      },
+      "cells": {
+        "details": {
+          "refund": "Refund for {{originalDetails}} ({{originalId}})",
+          "resourceUsage": "Usage of {{resourceUsage.resource.name}}",
+          "manual": "Manual transaction by {{initiator.username}}"
+        }
+      }
+    }
+  }
+}

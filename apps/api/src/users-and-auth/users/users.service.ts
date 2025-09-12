@@ -43,7 +43,7 @@ export class UsersService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private licenseService: LicenseService,
-    private emailService: EmailService
+    private emailService: EmailService,
   ) {}
 
   private validateUsernameOrThrow(username: string): void {
@@ -145,6 +145,7 @@ export class UsersService {
         canManageResources: true,
         canManageSystemConfiguration: true,
         canManageUsers: true,
+        canManageBilling: true,
       };
 
       user.systemPermissions = permissions;
@@ -297,7 +298,7 @@ export class UsersService {
 
   async findByPermission(
     permission: keyof SystemPermissions,
-    options: PaginationOptions & { search?: string }
+    options: PaginationOptions & { search?: string },
   ): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding users with permission "${permission}" and options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
@@ -329,7 +330,7 @@ export class UsersService {
     const [users, total] = await query.getManyAndCount();
 
     this.logger.debug(
-      `Found ${total} total users with permission "${permission}", returning page ${page} with ${users.length} results`
+      `Found ${total} total users with permission "${permission}", returning page ${page} with ${users.length} results`,
     );
     return {
       data: users,

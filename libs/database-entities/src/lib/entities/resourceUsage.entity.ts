@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsageAction } from './resourceUsage.type';
+import { BillingTransaction } from './billing-transaction.entity';
 
 @Entity()
 export class ResourceUsage {
@@ -100,4 +101,9 @@ export class ResourceUsage {
     example: 120,
   })
   usageInMinutes!: number;
+
+  @OneToMany(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
+    onDelete: 'CASCADE',
+  })
+  billingTransactions!: BillingTransaction[];
 }

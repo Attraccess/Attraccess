@@ -62,6 +62,11 @@ export interface SystemPermissions {
    * @example false
    */
   canManageUsers: boolean;
+  /**
+   * Whether the user can manage billing
+   * @example false
+   */
+  canManageBilling: boolean;
 }
 
 export interface User {
@@ -100,6 +105,8 @@ export interface User {
    * @example "1234567890"
    */
   externalIdentifier?: string | null;
+  /** The credit balance of the user */
+  creditBalance: number;
 }
 
 export interface VerifyEmailDto {
@@ -1780,6 +1787,65 @@ export interface AttractapFirmware {
   filenameOTA: string;
 }
 
+export interface BalanceDto {
+  /** The balance of the user */
+  value: number;
+}
+
+export interface BillingTransaction {
+  /**
+   * The unique identifier of the billing transaction
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the user
+   * @example 1
+   */
+  userId: number;
+  /** The user who the billing transaction belongs to */
+  user: User;
+  /**
+   * The date and time the billing transaction was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the billing transaction was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The credit amount of the billing transaction (negative for refunds/top-ups) */
+  amount: number;
+  /** The user ID of the user who caused the billing transaction */
+  initiatorId: number;
+  /** The user who initiated the billing transaction */
+  initiator: User;
+  /** The resource usage ID of the resource usage that caused the billing transaction */
+  resourceUsageId: number;
+  /** The resource usage that caused the billing transaction */
+  resourceUsage: ResourceUsage;
+  /** The billing transaction ID of the billing transaction that is being refunded */
+  refundOfId: number;
+  /** The billing transaction that is being refunded */
+  refundOf: BillingTransaction;
+}
+
+export interface TransactionsDto {
+  data: BillingTransaction[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ModifyBalanceDto {
+  /**
+   * The amount to modify the balance by
+   * @example 100
+   */
+  amount: number;
+}
+
 export interface InfoData {
   /** @example "Attraccess API" */
   name?: string;
@@ -2236,6 +2302,26 @@ export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeData =
   ResourceUsage[];
+
+export type GetBillingBalanceData = BalanceDto;
+
+export interface GetBillingTransactionsParams {
+  /**
+   * The page number to retrieve
+   * @example 1
+   */
+  page?: number;
+  /**
+   * The number of items per page
+   * @example 10
+   */
+  limit?: number;
+  userId: number;
+}
+
+export type GetBillingTransactionsData = TransactionsDto;
+
+export type CreateManualTransactionData = number;
 
 export namespace System {
   /**
@@ -4345,6 +4431,73 @@ export namespace Analytics {
     export type RequestHeaders = {};
     export type ResponseBody =
       AnalyticsControllerGetResourceUsageHoursInDateRangeData;
+  }
+}
+
+export namespace Billing {
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingBalance
+   * @summary Get the billing balance for a user
+   * @request GET:/api/users/{userId}/billing/balance
+   * @secure
+   */
+  export namespace GetBillingBalance {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingBalanceData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingTransactions
+   * @summary Get the billing transactions for a user
+   * @request GET:/api/users/{userId}/billing/transactions
+   * @secure
+   */
+  export namespace GetBillingTransactions {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * The page number to retrieve
+       * @example 1
+       */
+      page?: number;
+      /**
+       * The number of items per page
+       * @example 10
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingTransactionsData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name CreateManualTransaction
+   * @summary Top up or charge the billing balance for a user
+   * @request POST:/api/users/{userId}/billing/transactions
+   * @secure
+   */
+  export namespace CreateManualTransaction {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ModifyBalanceDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateManualTransactionData;
   }
 }
 
@@ -6804,6 +6957,71 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  billing = {
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingBalance
+     * @summary Get the billing balance for a user
+     * @request GET:/api/users/{userId}/billing/balance
+     * @secure
+     */
+    getBillingBalance: (userId: number, params: RequestParams = {}) =>
+      this.request<GetBillingBalanceData, void>({
+        path: `/api/users/${userId}/billing/balance`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingTransactions
+     * @summary Get the billing transactions for a user
+     * @request GET:/api/users/{userId}/billing/transactions
+     * @secure
+     */
+    getBillingTransactions: (
+      { userId, ...query }: GetBillingTransactionsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetBillingTransactionsData, void>({
+        path: `/api/users/${userId}/billing/transactions`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name CreateManualTransaction
+     * @summary Top up or charge the billing balance for a user
+     * @request POST:/api/users/{userId}/billing/transactions
+     * @secure
+     */
+    createManualTransaction: (
+      userId: number,
+      data: ModifyBalanceDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateManualTransactionData, void>({
+        path: `/api/users/${userId}/billing/transactions`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

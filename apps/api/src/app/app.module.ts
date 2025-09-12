@@ -20,6 +20,7 @@ import { EmailTemplateModule } from '../email-template/email-template.module';
 import sessionConfig from '../config/session.config';
 import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { LicenseService } from '../license/license.service';
     AnalyticsModule,
     EmailTemplateModule,
     LicenseModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

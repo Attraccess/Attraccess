@@ -21,6 +21,8 @@ import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
 import AccountPage from '../account';
 import ChangelogPage from '../changelog/ChangelogPage';
+import { BillingDashboardPage } from '../billing/dashboard';
+import { BillingAdministrationPage } from '../billing/administration';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -109,9 +111,19 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageSystemConfiguration',
   },
   {
-    path: '/csv-export',
+    path: '/billing',
+    element: <BillingDashboardPage />,
+    authRequired: true,
+  },
+  {
+    path: '/billing/administration',
+    element: <BillingAdministrationPage />,
+    authRequired: 'canManageBilling',
+  },
+  {
+    path: '/billing/csv-export',
     element: <CsvExport />,
-    authRequired: 'canManageResources',
+    authRequired: 'canManageBilling',
   },
   {
     path: '/plugins',
@@ -145,12 +157,12 @@ export function useAllRoutes() {
     (pluginManifest: PluginManifestWithPlugin) => {
       const pluginRoutes = pluginStore.executeFunction(
         `${pluginManifest.plugin.getPluginName()}.GET_ROUTES`,
-        pluginManifest
+        pluginManifest,
       );
 
       return pluginRoutes;
     },
-    [pluginStore]
+    [pluginStore],
   );
 
   useEffect(() => {
