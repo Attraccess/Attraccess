@@ -45,3 +45,4 @@ export * from './1755385236330-refactor-resource-flow-type';
 export * from './1755425568558-flows-button-input';
 export * from './1757191106307-resource-type-doors';
 export * from './1757479833653-billing-transactions';
+export * from './1757700785897-resource-billing-configuration';

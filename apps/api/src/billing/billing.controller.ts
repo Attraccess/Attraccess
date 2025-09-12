@@ -1,4 +1,9 @@
-import { Auth, AuthenticatedRequest, BillingTransaction } from '@attraccess/plugins-backend-sdk';
+import {
+  Auth,
+  AuthenticatedRequest,
+  BillingTransaction,
+  ResourceBillingConfiguration,
+} from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
@@ -6,6 +11,7 @@ import { PaginationOptionsDto } from '../types/request';
 import { ModifyBalanceDto } from './dto/modify-balance.dto';
 import { TransactionsDto } from './dto/transactions.dto';
 import { BalanceDto } from './dto/balance.dto';
+import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 
 @ApiTags('Billing')
 @Controller()
@@ -57,5 +63,36 @@ export class BillingController {
     @Body() body: ModifyBalanceDto,
   ): Promise<BillingTransaction> {
     return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
+  }
+
+  @Get('/resources/:resourceId/billing/configuration')
+  @ApiOperation({ summary: 'Get the billing configuration for a resource', operationId: 'getBillingConfiguration' })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing configuration for the resource.',
+    type: ResourceBillingConfiguration,
+  })
+  async getBillingConfiguration(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+  ): Promise<ResourceBillingConfiguration> {
+    return await this.billingService.getResourceBillingConfiguration(resourceId);
+  }
+
+  @Post('/resources/:resourceId/billing/configuration')
+  @Auth('canManageBilling')
+  @ApiOperation({
+    summary: 'Update the billing configuration for a resource',
+    operationId: 'updateBillingConfiguration',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing configuration for the resource has been updated.',
+    type: ResourceBillingConfiguration,
+  })
+  async updateBillingConfiguration(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() body: UpdateResourceBillingConfigurationDto,
+  ): Promise<ResourceBillingConfiguration> {
+    return await this.billingService.updateResourceBillingConfiguration(resourceId, body);
   }
 }

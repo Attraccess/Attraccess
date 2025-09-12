@@ -20,6 +20,7 @@ import { ResourceFlowLog } from './resourceFlowLog';
 import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
 import { ResourceType } from './resource.type';
+import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
 
 @Entity()
 export class Resource {
@@ -146,4 +147,7 @@ export class Resource {
 
   @OneToMany(() => ResourceMaintenance, (maintenance) => maintenance.resource)
   maintenances!: ResourceMaintenance[];
+
+  @OneToMany(() => ResourceBillingConfiguration, (configuration) => configuration.resource)
+  billingConfigurations!: ResourceBillingConfiguration[];
 }
