@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsPositive, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsPositive, Min } from 'class-validator';
 import { z } from 'zod';
 
 export const PaginationOptionsSchema = z.object({
@@ -14,10 +14,12 @@ export class PaginationOptionsDto implements PaginationOptions {
     description: 'The page number to retrieve',
     example: 1,
     required: false,
+    type: Number,
   })
   @IsOptional()
   @IsPositive()
   @IsInt()
+  @IsNumber()
   @Min(1)
   page = 1;
 
@@ -25,10 +27,12 @@ export class PaginationOptionsDto implements PaginationOptions {
     description: 'The number of items per page',
     example: 10,
     required: false,
+    type: Number,
   })
   @IsOptional()
   @IsPositive()
   @IsInt()
+  @IsNumber()
   @Min(1)
   limit = 10;
 }

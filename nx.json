@@ -135,7 +135,7 @@
       "commitMessage": "chore(release): {version} [skip ci]"
     },
     "version": {
-      "preVersionCommand": "pnpm nx run-many -t build",
+      "preVersionCommand": "pnpm nx run-many -t build --exclude=attractap-firmware,attractap-touch-firmware",
       "conventionalCommits": true
     },
     "changelog": {

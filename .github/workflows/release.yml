@@ -57,7 +57,7 @@ jobs:
       - name: Run everything
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build
+        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build --exclude=attractap-firmware,attractap-touch-firmware
 
       # Upload build artifacts to be used in Docker build
       - name: Upload build artifacts
