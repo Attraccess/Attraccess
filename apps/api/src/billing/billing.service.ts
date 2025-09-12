@@ -113,7 +113,14 @@ export class BillingService {
     }
 
     const configuration = await this.getResourceBillingConfiguration(usage.resource.id);
-    const credits = configuration.creditsPerUsage * usage.usageInMinutes;
+
+    let credits = configuration.creditsPerMinute * Math.ceil(usage.usageInMinutes);
+    credits += configuration.creditsPerUsage;
+
+    console.log('credits', credits);
+    console.log('usage.usageInMinutes', usage.usageInMinutes);
+    console.log('configuration.creditsPerMinute', configuration.creditsPerMinute);
+    console.log('configuration.creditsPerUsage', configuration.creditsPerUsage);
 
     if (credits === 0) {
       return;

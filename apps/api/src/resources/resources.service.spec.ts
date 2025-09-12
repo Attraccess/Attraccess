@@ -99,6 +99,7 @@ describe('ResourcesService', () => {
       flowLogs: [],
       attractapReaders: [],
       maintenances: [],
+      billingConfigurations: [],
     });
 
     beforeEach(() => {
@@ -171,7 +172,7 @@ describe('ResourcesService', () => {
 
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
-          { search: '%test%' }
+          { search: '%test%' },
         );
       });
 
@@ -179,7 +180,7 @@ describe('ResourcesService', () => {
         await service.listResources({ search: '' });
 
         expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
-          expect.stringContaining('LOWER(resource.name) LIKE LOWER(:search)')
+          expect.stringContaining('LOWER(resource.name) LIKE LOWER(:search)'),
         );
       });
     });
@@ -316,7 +317,7 @@ describe('ResourcesService', () => {
         // Verify search filter
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
-          { search: '%test%' }
+          { search: '%test%' },
         );
 
         // Verify group filter
@@ -346,7 +347,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
-          { search: '%test%' }
+          { search: '%test%' },
         );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2] });
       });
@@ -368,7 +369,7 @@ describe('ResourcesService', () => {
         // Should add search filter
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
-          { search: '%test%' }
+          { search: '%test%' },
         );
       });
     });
@@ -431,7 +432,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('groups.id = :groupId', { groupId: 1 });
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
           '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
-          { search: '%test%' }
+          { search: '%test%' },
         );
       });
     });
@@ -463,6 +464,7 @@ describe('ResourcesService', () => {
         flowLogs: [],
         attractapReaders: [],
         maintenances: [],
+        billingConfigurations: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);
@@ -519,6 +521,7 @@ describe('ResourcesService', () => {
         flowLogs: [],
         attractapReaders: [],
         maintenances: [],
+        billingConfigurations: [],
       };
 
       resourceRepository.create.mockReturnValue(newResource);
@@ -576,6 +579,7 @@ describe('ResourcesService', () => {
         flowLogs: [],
         attractapReaders: [],
         maintenances: [],
+        billingConfigurations: [],
       };
 
       const updatedResource = {
@@ -637,6 +641,7 @@ describe('ResourcesService', () => {
         flowLogs: [],
         attractapReaders: [],
         maintenances: [],
+        billingConfigurations: [],
       };
 
       resourceRepository.find.mockResolvedValue([mockResource]);

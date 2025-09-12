@@ -1178,6 +1178,126 @@ export type UpdateMaintenanceDto = {
     reason?: string;
 };
 
+export type BalanceDto = {
+    /**
+     * The balance of the user
+     */
+    value: number;
+};
+
+export type BillingTransaction = {
+    /**
+     * The unique identifier of the billing transaction
+     */
+    id: number;
+    /**
+     * The ID of the user
+     */
+    userId: number;
+    /**
+     * The user who the billing transaction belongs to
+     */
+    user: User;
+    /**
+     * The date and time the billing transaction was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the billing transaction was last updated
+     */
+    updatedAt: string;
+    /**
+     * The credit amount of the billing transaction (negative for refunds/top-ups)
+     */
+    amount: number;
+    /**
+     * The user ID of the user who caused the billing transaction
+     */
+    initiatorId: number;
+    /**
+     * The user who initiated the billing transaction
+     */
+    initiator: User;
+    /**
+     * The resource usage ID of the resource usage that caused the billing transaction
+     */
+    resourceUsageId: number;
+    /**
+     * The resource usage that caused the billing transaction
+     */
+    resourceUsage: ResourceUsage;
+    /**
+     * The billing transaction ID of the billing transaction that is being refunded
+     */
+    refundOfId: number;
+    /**
+     * The billing transaction that is being refunded
+     */
+    refundOf: BillingTransaction;
+};
+
+export type TransactionsDto = {
+    data: Array<BillingTransaction>;
+    total: number;
+    page: number;
+    limit: number;
+};
+
+export type ModifyBalanceDto = {
+    /**
+     * The amount to modify the balance by
+     */
+    amount: number;
+};
+
+export type ResourceBillingConfiguration = {
+    /**
+     * The unique identifier of the resource billing configuration
+     */
+    id: number;
+    /**
+     * The date and time the billing transaction was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the billing transaction was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
+     * The resource
+     */
+    resource?: {
+        [key: string]: unknown;
+    };
+    /**
+     * The credit cost per usage
+     */
+    creditsPerUsage: number;
+    /**
+     * The credit cost per minute
+     */
+    creditsPerMinute: number;
+    /**
+     * Whether billing is enabled
+     */
+    isBillingEnabled: boolean;
+};
+
+export type UpdateResourceBillingConfigurationDto = {
+    /**
+     * The credit cost per usage
+     */
+    creditsPerUsage?: number;
+    /**
+     * The credit cost per minute
+     */
+    creditsPerMinute?: number;
+};
+
 export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
@@ -1681,78 +1801,6 @@ export type AttractapFirmware = {
      * The filename of the firmware for OTA updates (zlib compressed)
      */
     filenameOTA: string;
-};
-
-export type BalanceDto = {
-    /**
-     * The balance of the user
-     */
-    value: number;
-};
-
-export type BillingTransaction = {
-    /**
-     * The unique identifier of the billing transaction
-     */
-    id: number;
-    /**
-     * The ID of the user
-     */
-    userId: number;
-    /**
-     * The user who the billing transaction belongs to
-     */
-    user: User;
-    /**
-     * The date and time the billing transaction was created
-     */
-    createdAt: string;
-    /**
-     * The date and time the billing transaction was last updated
-     */
-    updatedAt: string;
-    /**
-     * The credit amount of the billing transaction (negative for refunds/top-ups)
-     */
-    amount: number;
-    /**
-     * The user ID of the user who caused the billing transaction
-     */
-    initiatorId: number;
-    /**
-     * The user who initiated the billing transaction
-     */
-    initiator: User;
-    /**
-     * The resource usage ID of the resource usage that caused the billing transaction
-     */
-    resourceUsageId: number;
-    /**
-     * The resource usage that caused the billing transaction
-     */
-    resourceUsage: ResourceUsage;
-    /**
-     * The billing transaction ID of the billing transaction that is being refunded
-     */
-    refundOfId: number;
-    /**
-     * The billing transaction that is being refunded
-     */
-    refundOf: BillingTransaction;
-};
-
-export type TransactionsDto = {
-    data: Array<BillingTransaction>;
-    total: number;
-    page: number;
-    limit: number;
-};
-
-export type ModifyBalanceDto = {
-    /**
-     * The amount to modify the balance by
-     */
-    amount: number;
 };
 
 export type InfoResponse = {
@@ -2507,6 +2555,46 @@ export type CancelMaintenanceData = {
 
 export type CancelMaintenanceResponse = void;
 
+export type GetBillingBalanceData = {
+    userId: number;
+};
+
+export type GetBillingBalanceResponse = BalanceDto;
+
+export type GetBillingTransactionsData = {
+    /**
+     * The number of items per page
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+    userId: number;
+};
+
+export type GetBillingTransactionsResponse = TransactionsDto;
+
+export type CreateManualTransactionData = {
+    requestBody: ModifyBalanceDto;
+    userId: number;
+};
+
+export type CreateManualTransactionResponse = number;
+
+export type GetBillingConfigurationData = {
+    resourceId: number;
+};
+
+export type GetBillingConfigurationResponse = ResourceBillingConfiguration;
+
+export type UpdateBillingConfigurationData = {
+    requestBody: UpdateResourceBillingConfigurationDto;
+    resourceId: number;
+};
+
+export type UpdateBillingConfigurationResponse = ResourceBillingConfiguration;
+
 export type GetNodeSchemasData = {
     resourceId: number;
 };
@@ -2674,33 +2762,6 @@ export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
 };
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeResponse = Array<ResourceUsage>;
-
-export type GetBillingBalanceData = {
-    userId: number;
-};
-
-export type GetBillingBalanceResponse = BalanceDto;
-
-export type GetBillingTransactionsData = {
-    /**
-     * The number of items per page
-     */
-    limit?: number;
-    /**
-     * The page number to retrieve
-     */
-    page?: number;
-    userId: number;
-};
-
-export type GetBillingTransactionsResponse = TransactionsDto;
-
-export type CreateManualTransactionData = {
-    requestBody: ModifyBalanceDto;
-    userId: number;
-};
-
-export type CreateManualTransactionResponse = number;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -4155,6 +4216,77 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/{userId}/billing/balance': {
+        get: {
+            req: GetBillingBalanceData;
+            res: {
+                /**
+                 * The billing balance for the user.
+                 */
+                200: BalanceDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{userId}/billing/transactions': {
+        get: {
+            req: GetBillingTransactionsData;
+            res: {
+                /**
+                 * The billing transactions for the user.
+                 */
+                200: TransactionsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreateManualTransactionData;
+            res: {
+                /**
+                 * The billing balance for the user has been topped up.
+                 */
+                200: number;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/billing/configuration': {
+        get: {
+            req: GetBillingConfigurationData;
+            res: {
+                /**
+                 * The billing configuration for the resource.
+                 */
+                200: ResourceBillingConfiguration;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: UpdateBillingConfigurationData;
+            res: {
+                /**
+                 * The billing configuration for the resource has been updated.
+                 */
+                200: ResourceBillingConfiguration;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/resources/{resourceId}/flow/node-schemas': {
         get: {
             req: GetNodeSchemasData;
@@ -4528,49 +4660,6 @@ export type $OpenApiTs = {
                  * The resource usage hours in the date range
                  */
                 200: Array<ResourceUsage>;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-    };
-    '/api/users/{userId}/billing/balance': {
-        get: {
-            req: GetBillingBalanceData;
-            res: {
-                /**
-                 * The billing balance for the user.
-                 */
-                200: BalanceDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-    };
-    '/api/users/{userId}/billing/transactions': {
-        get: {
-            req: GetBillingTransactionsData;
-            res: {
-                /**
-                 * The billing transactions for the user.
-                 */
-                200: TransactionsDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-        post: {
-            req: CreateManualTransactionData;
-            res: {
-                /**
-                 * The billing balance for the user has been topped up.
-                 */
-                200: number;
                 /**
                  * Unauthorized
                  */

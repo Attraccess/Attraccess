@@ -1846,6 +1846,45 @@ export interface ModifyBalanceDto {
   amount: number;
 }
 
+export interface ResourceBillingConfiguration {
+  /**
+   * The unique identifier of the resource billing configuration
+   * @example 1
+   */
+  id: number;
+  /**
+   * The date and time the billing transaction was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the billing transaction was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the resource */
+  resourceId: number;
+  /** The resource */
+  resource?: object;
+  /** The credit cost per usage */
+  creditsPerUsage: number;
+  /** The credit cost per minute */
+  creditsPerMinute: number;
+}
+
+export interface UpdateResourceBillingConfigurationDto {
+  /**
+   * The credit cost per usage
+   * @example 100
+   */
+  creditsPerUsage?: number;
+  /**
+   * The credit cost per minute
+   * @example 100
+   */
+  creditsPerMinute?: number;
+}
+
 export interface InfoData {
   /** @example "Attraccess API" */
   name?: string;
@@ -2322,6 +2361,10 @@ export interface GetBillingTransactionsParams {
 export type GetBillingTransactionsData = TransactionsDto;
 
 export type CreateManualTransactionData = number;
+
+export type GetBillingConfigurationData = ResourceBillingConfiguration;
+
+export type UpdateBillingConfigurationData = ResourceBillingConfiguration;
 
 export namespace System {
   /**
@@ -4498,6 +4541,42 @@ export namespace Billing {
     export type RequestBody = ModifyBalanceDto;
     export type RequestHeaders = {};
     export type ResponseBody = CreateManualTransactionData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingConfiguration
+   * @summary Get the billing configuration for a resource
+   * @request GET:/api/resources/{resourceId}/billing/configuration
+   * @secure
+   */
+  export namespace GetBillingConfiguration {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name UpdateBillingConfiguration
+   * @summary Update the billing configuration for a resource
+   * @request POST:/api/resources/{resourceId}/billing/configuration
+   * @secure
+   */
+  export namespace UpdateBillingConfiguration {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateResourceBillingConfigurationDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateBillingConfigurationData;
   }
 }
 
@@ -7018,6 +7097,48 @@ export class Api<
     ) =>
       this.request<CreateManualTransactionData, void>({
         path: `/api/users/${userId}/billing/transactions`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingConfiguration
+     * @summary Get the billing configuration for a resource
+     * @request GET:/api/resources/{resourceId}/billing/configuration
+     * @secure
+     */
+    getBillingConfiguration: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetBillingConfigurationData, void>({
+        path: `/api/resources/${resourceId}/billing/configuration`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name UpdateBillingConfiguration
+     * @summary Update the billing configuration for a resource
+     * @request POST:/api/resources/{resourceId}/billing/configuration
+     * @secure
+     */
+    updateBillingConfiguration: (
+      resourceId: number,
+      data: UpdateResourceBillingConfigurationDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateBillingConfigurationData, void>({
+        path: `/api/resources/${resourceId}/billing/configuration`,
         method: "POST",
         body: data,
         secure: true,

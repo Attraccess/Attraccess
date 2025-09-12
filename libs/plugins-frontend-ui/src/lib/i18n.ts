@@ -6,13 +6,9 @@ import { compile as handlebarsCompile } from 'handlebars';
 export const I18N_LANGUAGE_STORAGE_KEY = 'language';
 type TranslationRecord = Record<string, unknown>;
 
-interface TranslationModule {
-  default: TranslationRecord;
-}
-
-interface TranslationModules {
-  en: TranslationModule | TranslationRecord;
-  de: TranslationModule | TranslationRecord;
+interface TranslationModules<T extends TranslationRecord = TranslationRecord> {
+  en: T;
+  de: T;
 }
 
 type Language = keyof TranslationModules;

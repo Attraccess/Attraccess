@@ -13,6 +13,8 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
+import { BillingService } from '../../billing/billing.service';
+import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 
 @Injectable()
 export class ResourceUsageService {
@@ -28,7 +30,8 @@ export class ResourceUsageService {
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
     private readonly resourceGroupsService: ResourceGroupsService,
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly billingService: BillingService,
   ) {}
 
   public async canControllResource(resourceId: number, user: User): Promise<boolean> {
@@ -64,7 +67,7 @@ export class ResourceUsageService {
   private async getResource(
     resourceId: number,
     user: User,
-    opts: { checkMaintenance: boolean; checkControlPermission: boolean }
+    opts: { checkMaintenance: boolean; checkControlPermission: boolean },
   ): Promise<Resource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
@@ -84,7 +87,7 @@ export class ResourceUsageService {
 
         if (!canManageMaintenance) {
           this.logger.warn(
-            `User ${user.id} attempted to use resource ${resourceId} during maintenance window without permissions`
+            `User ${user.id} attempted to use resource ${resourceId} during maintenance window without permissions`,
           );
           throw new ResourceUsageImpossibleMaintenanceInProgressException(resourceId);
         }
@@ -114,16 +117,24 @@ export class ResourceUsageService {
       throw new BadRequestException('Resource is not a machine');
     }
 
+    const resourceBillingConfiguration = await this.billingService.getResourceBillingConfiguration(resourceId);
+    if (resourceBillingConfiguration.isBillingEnabled) {
+      const balance = await this.billingService.getBalance(user.id);
+      if (balance < resourceBillingConfiguration.creditsPerUsage + resourceBillingConfiguration.creditsPerMinute) {
+        throw new InsufficientBalanceError();
+      }
+    }
+
     const existingActiveSession = await this.getActiveSession(resourceId);
     if (existingActiveSession) {
       this.logger.debug(
-        `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`
+        `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
       );
 
       // If there's an active session, check if takeover is allowed
       if (dto.forceTakeOver && resource.allowTakeOver) {
         this.logger.debug(
-          `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`
+          `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`,
         );
 
         const takeoverEndTime = new Date();
@@ -145,7 +156,7 @@ export class ResourceUsageService {
         });
 
         // Emit event for the ended session
-        this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(updatedSession));
+        await this.emitUsageEvent(updatedSession.id);
       } else if (dto.forceTakeOver && !resource.allowTakeOver) {
         this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
         throw new BadRequestException('This resource does not allow overtaking');
@@ -193,11 +204,11 @@ export class ResourceUsageService {
       // Emit event for the takeover
       this.eventEmitter.emit(
         ResourceUsageTakenOverEvent.EVENT_NAME,
-        new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user)
+        new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
       );
     } else {
       // Emit event after successful save
-      this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(newSession));
+      this.emitUsageEvent(newSession.id);
     }
 
     return newSession;
@@ -218,7 +229,7 @@ export class ResourceUsageService {
 
     if (!isSessionOwner && !canManageResources) {
       this.logger.warn(
-        `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`
+        `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
       );
       throw new ForbiddenException('You are not authorized to end this session');
     }
@@ -247,20 +258,21 @@ export class ResourceUsageService {
     this.logger.debug(`Successfully ended session ${activeSession.id}`);
 
     // Emit event after successful save
-    this.eventEmitter.emit(
-      ResourceUsageEvent.EVENT_NAME,
-      new ResourceUsageEvent({
-        ...activeSession,
-        endTime,
-        endNotes: dto.notes,
-      })
-    );
+    await this.emitUsageEvent(activeSession.id);
 
     // Fetch the updated record
     return await this.resourceUsageRepository.findOne({
       where: { id: activeSession.id },
       relations: ['resource', 'user'],
     });
+  }
+
+  private async emitUsageEvent(usageId: number): Promise<void> {
+    const usage = await this.resourceUsageRepository.findOne({
+      where: { id: usageId },
+      relations: ['resource', 'user'],
+    });
+    this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
   }
 
   private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {
@@ -279,9 +291,7 @@ export class ResourceUsageService {
     let usage = await this.resourceUsageRepository.save(usageData, { reload: true });
     usage = await this.resourceUsageRepository.findOne({ where: { id: usage.id }, relations: ['user', 'resource'] });
 
-    console.log('emitting usage event', usage);
-
-    this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
+    await this.emitUsageEvent(usage.id);
 
     return usage;
   }
@@ -309,13 +319,13 @@ export class ResourceUsageService {
     const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
     if (resource.type !== ResourceType.Door) {
       throw new BadRequestException(
-        `Resource (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) is not a door`
+        `Resource (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) is not a door`,
       );
     }
 
     if (!resource.separateUnlockAndUnlatch) {
       throw new BadRequestException(
-        `Door (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) does not support unlatching`
+        `Door (ID: ${resourceId}${resource.name ? `, Name: ${resource.name}` : ''}) does not support unlatching`,
       );
     }
 
@@ -336,7 +346,7 @@ export class ResourceUsageService {
     resourceId: number,
     page = 1,
     limit = 10,
-    userId?: number
+    userId?: number,
   ): Promise<{ data: ResourceUsage[]; total: number }> {
     const whereClause: FindOneOptions<ResourceUsage>['where'] = { resourceId };
 

@@ -1,0 +1,19 @@
+{
+  "title": "Billing",
+  "free": {
+    "title": "Free",
+    "description": "This resource is free to use. No credits required."
+  },
+  "perUse": {
+    "label": "Per use",
+    "value": "{{credits}} credits"
+  },
+  "perMinute": {
+    "label": "Per minute",
+    "value": "{{credits}} credits"
+  },
+  "example": {
+    "label": "Example cost (10 min)",
+    "value": "{{credits}} credits"
+  }
+}

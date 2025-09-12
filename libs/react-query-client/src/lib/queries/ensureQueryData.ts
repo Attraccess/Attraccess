@@ -138,6 +138,17 @@ export const ensureUseResourceMaintenancesServiceGetMaintenanceData = (queryClie
   maintenanceId: number;
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) });
+export const ensureUseBillingServiceGetBillingBalanceData = (queryClient: QueryClient, { userId }: {
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingBalanceKeyFn({ userId }), queryFn: () => BillingService.getBillingBalance({ userId }) });
+export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: QueryClient, { limit, page, userId }: {
+  limit?: number;
+  page?: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
+export const ensureUseBillingServiceGetBillingConfigurationData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) });
 export const ensureUseResourceFlowsServiceGetNodeSchemasData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetNodeSchemasKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getNodeSchemas({ resourceId }) });
@@ -175,11 +186,3 @@ export const ensureUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursIn
   end: string;
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange({ end, start }) });
-export const ensureUseBillingServiceGetBillingBalanceData = (queryClient: QueryClient, { userId }: {
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingBalanceKeyFn({ userId }), queryFn: () => BillingService.getBillingBalance({ userId }) });
-export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: QueryClient, { limit, page, userId }: {
-  limit?: number;
-  page?: number;
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });

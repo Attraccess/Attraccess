@@ -138,6 +138,17 @@ export const prefetchUseResourceMaintenancesServiceGetMaintenance = (queryClient
   maintenanceId: number;
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) });
+export const prefetchUseBillingServiceGetBillingBalance = (queryClient: QueryClient, { userId }: {
+  userId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingBalanceKeyFn({ userId }), queryFn: () => BillingService.getBillingBalance({ userId }) });
+export const prefetchUseBillingServiceGetBillingTransactions = (queryClient: QueryClient, { limit, page, userId }: {
+  limit?: number;
+  page?: number;
+  userId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
+export const prefetchUseBillingServiceGetBillingConfiguration = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) });
 export const prefetchUseResourceFlowsServiceGetNodeSchemas = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetNodeSchemasKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getNodeSchemas({ resourceId }) });
@@ -175,11 +186,3 @@ export const prefetchUseAnalyticsServiceAnalyticsControllerGetResourceUsageHours
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange({ end, start }) });
-export const prefetchUseBillingServiceGetBillingBalance = (queryClient: QueryClient, { userId }: {
-  userId: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingBalanceKeyFn({ userId }), queryFn: () => BillingService.getBillingBalance({ userId }) });
-export const prefetchUseBillingServiceGetBillingTransactions = (queryClient: QueryClient, { limit, page, userId }: {
-  limit?: number;
-  page?: number;
-  userId: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });

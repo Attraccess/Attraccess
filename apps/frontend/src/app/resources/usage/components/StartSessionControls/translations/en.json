@@ -6,8 +6,18 @@
     "sessionStartedDescription": "You have successfully started using this resource.",
     "sessionTakeOvernDescription": "You have successfully takeovern the session.",
     "sessionTakeOverErrorDescription": "Failed to takeover the session. The other user might have ended their session, or an error occurred.",
-    "sessionStartError": "Failed to Start Session",
-    "sessionStartErrorDescription": "An error occurred while starting the session. Please try again.",
+    "start": {
+      "error": {
+        "generic": {
+          "title": "Failed to Start Session",
+          "description": "An error occurred while starting the session: {{error}}"
+        },
+        "INSUFFICIENT_BALANCE": {
+          "title": "Insufficient Balance",
+          "description": "You do not have enough credits to start the session. Please add more credits."
+        }
+      }
+    },
     "alternativeStartSessionOptionsMenu": {
       "label": "Alternative Session Start",
       "startWithNotes": {
@@ -19,6 +29,18 @@
   "door": {
     "unlock": "unlock",
     "lock": "lock",
-    "unlatch": "unlatch"
+    "unlatch": "unlatch",
+    "start": {
+      "error": {
+        "generic": {
+          "title": "Failed to Control Door",
+          "description": "An error occurred while controlling the door. Please try again."
+        }
+      }
+    },
+    "success": {
+      "title": "Success",
+      "description": "The door was controlled successfully."
+    }
   }
 }

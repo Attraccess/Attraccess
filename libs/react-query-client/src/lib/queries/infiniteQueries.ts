@@ -52,19 +52,19 @@ export const useResourceMaintenancesServiceFindMaintenancesInfinite = <TData = I
     nextPage: string;
   }).nextPage, ...options
 });
-export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = InfiniteData<Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, resourceId }: {
-  limit?: number;
-  resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceFlowsService.getResourceFlowLogs({ limit, page: pageParam as number, resourceId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
-  }).nextPage, ...options
-});
 export const useBillingServiceGetBillingTransactionsInfinite = <TData = InfiniteData<Common.BillingServiceGetBillingTransactionsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, userId }: {
   limit?: number;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, userId }, queryKey), queryFn: ({ pageParam }) => BillingService.getBillingTransactions({ limit, page: pageParam as number, userId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+    nextPage: string;
+  }).nextPage, ...options
+});
+export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = InfiniteData<Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, resourceId }: {
+  limit?: number;
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceFlowsService.getResourceFlowLogs({ limit, page: pageParam as number, resourceId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
     nextPage: string;
   }).nextPage, ...options
 });

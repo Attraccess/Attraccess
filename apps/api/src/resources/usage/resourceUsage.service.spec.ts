@@ -1,7 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from './resourceUsage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, ResourceUsage, ResourceType, ResourceUsageAction, User } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceUsage,
+  ResourceType,
+  ResourceUsageAction,
+  User,
+  ResourceBillingConfiguration,
+} from '@attraccess/database-entities';
 import { Repository, IsNull, SelectQueryBuilder } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BadRequestException } from '@nestjs/common';
@@ -17,6 +24,8 @@ import { ResourceMaintenanceService } from '../maintenances/maintenance.service'
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
+import { BillingService } from '../../billing/billing.service';
+import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -29,6 +38,7 @@ describe('ResourceUsageService', () => {
   let resourceGroupsService: jest.Mocked<ResourceGroupsService>;
   let resourceMaintenanceService: jest.Mocked<ResourceMaintenanceService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
+  let billingService: jest.Mocked<BillingService>;
 
   const mockRepository = () => ({
     find: jest.fn(),
@@ -80,6 +90,11 @@ describe('ResourceUsageService', () => {
     hasActiveMaintenance: jest.fn(),
     canManageMaintenance: jest.fn(),
   };
+
+  const mockBillingService = {
+    getResourceBillingConfiguration: jest.fn(),
+    getBalance: jest.fn(),
+  } as unknown as jest.Mocked<BillingService>;
 
   type MockQueryBuilder = {
     where: jest.Mock;
@@ -149,6 +164,10 @@ describe('ResourceUsageService', () => {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
+        {
+          provide: BillingService,
+          useValue: mockBillingService,
+        },
       ],
     }).compile();
 
@@ -162,6 +181,14 @@ describe('ResourceUsageService', () => {
     resourceGroupsService = module.get(ResourceGroupsService);
     resourceMaintenanceService = module.get(ResourceMaintenanceService);
     eventEmitter = module.get(EventEmitter2);
+    billingService = module.get(BillingService);
+
+    // Default: billing disabled to avoid interfering with tests that don't explicitly mock billing
+    billingService.getResourceBillingConfiguration.mockResolvedValue({
+      isBillingEnabled: false,
+      creditsPerUsage: 0,
+      creditsPerMinute: 0,
+    } as ResourceBillingConfiguration);
   });
 
   afterEach(() => {
@@ -197,18 +224,25 @@ describe('ResourceUsageService', () => {
 
       // Mock getActiveSession to return null (no active session)
       resourceUsageRepository.findOne
-        .mockResolvedValueOnce(null) // For getActiveSession
+        .mockResolvedValueOnce(null) // 1) getActiveSession
         .mockResolvedValueOnce({
           id: 1,
           resourceId: 1,
           userId: 1,
           usageAction: ResourceUsageAction.Usage,
           endTime: null,
-        } as ResourceUsage); // For finding new session
+        } as ResourceUsage) // 2) fetch newly created session
+        .mockResolvedValueOnce({
+          id: 1,
+          resourceId: 1,
+          userId: 1,
+          usageAction: ResourceUsageAction.Usage,
+          endTime: null,
+        } as ResourceUsage); // 3) emitUsageEvent fetch by id
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       resourceUsageRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
       const result = await service.startSession(1, mockUser, dto);
@@ -288,7 +322,7 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
-        new BadRequestException('Resource is currently in use by another user')
+        new BadRequestException('Resource is currently in use by another user'),
       );
     });
 
@@ -309,7 +343,7 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
-        new BadRequestException('This resource does not allow overtaking')
+        new BadRequestException('This resource does not allow overtaking'),
       );
     });
 
@@ -337,7 +371,8 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
         .mockResolvedValueOnce(updatedEndedSession) // 2) fetch updated ended session
-        .mockResolvedValueOnce(mockNewUsage); // 3) fetch newly created session
+        .mockResolvedValueOnce(updatedEndedSession) // 3) emitUsageEvent fetch for ended session
+        .mockResolvedValueOnce(mockNewUsage); // 4) fetch newly created session
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       const mockInsertQueryBuilder = createMockQueryBuilder(null);
@@ -388,7 +423,7 @@ describe('ResourceUsageService', () => {
       resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
-        ResourceUsageImpossibleMaintenanceInProgressException
+        ResourceUsageImpossibleMaintenanceInProgressException,
       );
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
@@ -418,7 +453,7 @@ describe('ResourceUsageService', () => {
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       resourceUsageRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
       const result = await service.startSession(1, mockUser, dto);
@@ -426,6 +461,86 @@ describe('ResourceUsageService', () => {
       expect(result).toEqual({ id: 1, resourceId: 1, userId: 1 });
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
+    });
+
+    it('should reject start when billing is enabled and balance is insufficient', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue({
+        id: 1,
+        name: 'Test Resource',
+        allowTakeOver: false,
+        type: ResourceType.Machine,
+      } as Resource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      billingService.getResourceBillingConfiguration.mockResolvedValue({
+        isBillingEnabled: true,
+        creditsPerUsage: 5,
+        creditsPerMinute: 10,
+      } as ResourceBillingConfiguration);
+      billingService.getBalance.mockResolvedValue(10); // 10 < 5 + 10 -> insufficient
+
+      await expect(service.startSession(1, { id: 1 } as User, dto)).rejects.toBeInstanceOf(InsufficientBalanceError);
+
+      expect(billingService.getResourceBillingConfiguration).toHaveBeenCalledWith(1);
+      expect(billingService.getBalance).toHaveBeenCalledWith(1);
+      expect(resourceUsageRepository.createQueryBuilder).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+    });
+
+    it('should start when billing is enabled and balance is sufficient', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      const mockResource: Resource = {
+        id: 1,
+        name: 'Test Resource',
+        allowTakeOver: false,
+        type: ResourceType.Machine,
+      } as Resource;
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      billingService.getResourceBillingConfiguration.mockResolvedValue({
+        isBillingEnabled: true,
+        creditsPerUsage: 5,
+        creditsPerMinute: 10,
+      } as ResourceBillingConfiguration);
+      billingService.getBalance.mockResolvedValue(20); // 20 >= 15 -> sufficient
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(null) // For getActiveSession
+        .mockResolvedValueOnce({
+          id: 1,
+          resourceId: 1,
+          userId: 1,
+          usageAction: ResourceUsageAction.Usage,
+          endTime: null,
+        } as ResourceUsage); // For finding new session
+
+      const mockQueryBuilder = createMockQueryBuilder(null);
+      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.startSession(1, { id: 1 } as User, dto);
+
+      expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null });
+      expect(billingService.getResourceBillingConfiguration).toHaveBeenCalledWith(1);
+      expect(billingService.getBalance).toHaveBeenCalledWith(1);
+      expect(mockQueryBuilder.insert).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
     });
   });
 
@@ -469,14 +584,15 @@ describe('ResourceUsageService', () => {
       } as ResourceUsage;
       const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
 
-      // Mock getActiveSession to return an active session
+      // Mock getActiveSession to return an active session, emitUsageEvent fetch, then final fetch
       resourceUsageRepository.findOne
-        .mockResolvedValueOnce(mockActiveSession) // For getActiveSession
-        .mockResolvedValueOnce(mockUpdatedSession); // For finding updated session
+        .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
+        .mockResolvedValueOnce(mockUpdatedSession) // 2) emitUsageEvent fetch
+        .mockResolvedValueOnce(mockUpdatedSession); // 3) fetch updated session to return
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       resourceUsageRepository.createQueryBuilder.mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
       const result = await service.endSession(1, mockUser, dto);
@@ -502,7 +618,7 @@ describe('ResourceUsageService', () => {
       resourceUsageRepository.findOne.mockResolvedValue(null);
 
       await expect(service.endSession(1, mockUser, dto)).rejects.toThrow(
-        new BadRequestException('No active session found')
+        new BadRequestException('No active session found'),
       );
     });
   });
@@ -630,7 +746,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue({ ...doorResource, separateUnlockAndUnlatch: false } as Resource);
 
       await expect(service.unlatchDoor(10, mockUser)).rejects.toThrow(
-        'Door (ID: 10, Name: Front Door) does not support unlatching'
+        'Door (ID: 10, Name: Front Door) does not support unlatching',
       );
     });
   });

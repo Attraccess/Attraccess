@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { InfoResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, VerifyEmailData, VerifyEmailResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, GetOneUserByIdData, GetOneUserByIdResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, MqttServersTestConnectionData, MqttServersTestConnectionResponse, MqttServersGetStatusOfOneData, MqttServersGetStatusOfOneResponse, MqttServersGetStatusOfAllResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, UpdateMaintenanceData, UpdateMaintenanceResponse, CancelMaintenanceData, CancelMaintenanceResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, AnalyticsControllerGetResourceUsageHoursInDateRangeData, AnalyticsControllerGetResourceUsageHoursInDateRangeResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse } from './types.gen';
+import type { InfoResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, VerifyEmailData, VerifyEmailResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, GetOneUserByIdData, GetOneUserByIdResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, MqttServersTestConnectionData, MqttServersTestConnectionResponse, MqttServersGetStatusOfOneData, MqttServersGetStatusOfOneResponse, MqttServersGetStatusOfAllResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, UpdateMaintenanceData, UpdateMaintenanceResponse, CancelMaintenanceData, CancelMaintenanceResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingConfigurationData, GetBillingConfigurationResponse, UpdateBillingConfigurationData, UpdateBillingConfigurationResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, AnalyticsControllerGetResourceUsageHoursInDateRangeData, AnalyticsControllerGetResourceUsageHoursInDateRangeResponse } from './types.gen';
 
 export class SystemService {
     /**
@@ -1855,6 +1855,121 @@ export class ResourceMaintenancesService {
     
 }
 
+export class BillingService {
+    /**
+     * Get the billing balance for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @returns BalanceDto The billing balance for the user.
+     * @throws ApiError
+     */
+    public static getBillingBalance(data: GetBillingBalanceData): CancelablePromise<GetBillingBalanceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{userId}/billing/balance',
+            path: {
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing transactions for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @param data.page The page number to retrieve
+     * @param data.limit The number of items per page
+     * @returns TransactionsDto The billing transactions for the user.
+     * @throws ApiError
+     */
+    public static getBillingTransactions(data: GetBillingTransactionsData): CancelablePromise<GetBillingTransactionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{userId}/billing/transactions',
+            path: {
+                userId: data.userId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Top up or charge the billing balance for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @param data.requestBody
+     * @returns number The billing balance for the user has been topped up.
+     * @throws ApiError
+     */
+    public static createManualTransaction(data: CreateManualTransactionData): CancelablePromise<CreateManualTransactionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/{userId}/billing/transactions',
+            path: {
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing configuration for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceBillingConfiguration The billing configuration for the resource.
+     * @throws ApiError
+     */
+    public static getBillingConfiguration(data: GetBillingConfigurationData): CancelablePromise<GetBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/billing/configuration',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update the billing configuration for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.requestBody
+     * @returns ResourceBillingConfiguration The billing configuration for the resource has been updated.
+     * @throws ApiError
+     */
+    public static updateBillingConfiguration(data: UpdateBillingConfigurationData): CancelablePromise<UpdateBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/billing/configuration',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+}
+
 export class ResourceFlowsService {
     /**
      * Get node schemas
@@ -2327,78 +2442,6 @@ export class AnalyticsService {
                 start: data.start,
                 end: data.end
             },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-}
-
-export class BillingService {
-    /**
-     * Get the billing balance for a user
-     * @param data The data for the request.
-     * @param data.userId
-     * @returns BalanceDto The billing balance for the user.
-     * @throws ApiError
-     */
-    public static getBillingBalance(data: GetBillingBalanceData): CancelablePromise<GetBillingBalanceResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/users/{userId}/billing/balance',
-            path: {
-                userId: data.userId
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Get the billing transactions for a user
-     * @param data The data for the request.
-     * @param data.userId
-     * @param data.page The page number to retrieve
-     * @param data.limit The number of items per page
-     * @returns TransactionsDto The billing transactions for the user.
-     * @throws ApiError
-     */
-    public static getBillingTransactions(data: GetBillingTransactionsData): CancelablePromise<GetBillingTransactionsResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/users/{userId}/billing/transactions',
-            path: {
-                userId: data.userId
-            },
-            query: {
-                page: data.page,
-                limit: data.limit
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Top up or charge the billing balance for a user
-     * @param data The data for the request.
-     * @param data.userId
-     * @param data.requestBody
-     * @returns number The billing balance for the user has been topped up.
-     * @throws ApiError
-     */
-    public static createManualTransaction(data: CreateManualTransactionData): CancelablePromise<CreateManualTransactionResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/users/{userId}/billing/transactions',
-            path: {
-                userId: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
             errors: {
                 401: 'Unauthorized'
             }

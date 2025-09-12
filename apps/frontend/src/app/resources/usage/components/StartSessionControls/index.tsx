@@ -13,6 +13,7 @@ import {
   StartUsageSessionDto,
   useResourcesServiceUnlatchDoor,
   useResourcesServiceLockDoor,
+  ApiError,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -29,9 +30,9 @@ export function StartSessionControls(
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { t } = useTranslations({ en, de });
-  const { success, error: showError } = useToastMessage();
+  const { t, tExists } = useTranslations({ en, de });
   const queryClient = useQueryClient();
+  const toast = useToastMessage();
 
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
@@ -56,53 +57,44 @@ export function StartSessionControls(
 
     switch (resource?.type) {
       case 'machine':
-        success({
+        toast.success({
           title: t('machine.sessionStarted'),
           description: t('machine.sessionStartedDescription'),
         });
         break;
 
       case 'door':
-        success({
+        toast.success({
           title: t('door.success.title'),
           description: t('door.success.description'),
         });
         break;
     }
-  }, [resourceId, t, queryClient, success, resource?.type]);
+  }, [resourceId, t, queryClient, toast, resource?.type]);
 
   const onStartError = useCallback(
-    (err: unknown) => {
-      let errorMessage = err;
-      if (err instanceof Error) {
-        errorMessage = err.message;
+    (error: ApiError) => {
+      if (!resource) {
+        return;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((err as any).body?.error) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        errorMessage = (err as any).body.error;
-      }
+      const errorMessage = (error.body as { message?: string | string[] } | undefined)?.message ?? error.message;
 
-      switch (resource?.type) {
-        case 'machine':
-          showError({
-            title: t('machine.sessionStartError'),
-            description: t('machine.sessionStartErrorDescription') + ' ' + errorMessage,
-          });
-          break;
+      const baseKey = resource.type + '.start.error.';
+      const translationExists = tExists(baseKey + errorMessage);
 
-        case 'door':
-          showError({
-            title: t('door.error.title'),
-            description: t('door.error.description') + ' ' + errorMessage,
-          });
-          break;
-      }
+      const fullBaseKey = translationExists ? baseKey + errorMessage : baseKey + 'generic';
 
-      console.error('Failed to start session:', JSON.stringify(err));
+      toast.error({
+        title: t(fullBaseKey + '.title'),
+        description: t(fullBaseKey + '.description', {
+          error: errorMessage,
+        }),
+      });
+
+      console.error('Failed to start session:', JSON.stringify(error));
     },
-    [t, showError, resource?.type],
+    [t, toast, resource, tExists],
   );
 
   const { mutate: startSession, isPending: startIsPending } = useResourcesServiceResourceUsageStartSession({
@@ -110,7 +102,7 @@ export function StartSessionControls(
       onStartSuccess();
     },
     onError: (err) => {
-      onStartError(err);
+      onStartError(err as ApiError);
     },
   });
 
@@ -119,7 +111,7 @@ export function StartSessionControls(
       onStartSuccess();
     },
     onError: (err) => {
-      onStartError(err);
+      onStartError(err as ApiError);
     },
   });
 
@@ -128,7 +120,7 @@ export function StartSessionControls(
       onStartSuccess();
     },
     onError: (err) => {
-      onStartError(err);
+      onStartError(err as ApiError);
     },
   });
 
@@ -137,7 +129,7 @@ export function StartSessionControls(
       onStartSuccess();
     },
     onError: (err) => {
-      onStartError(err);
+      onStartError(err as ApiError);
     },
   });
 

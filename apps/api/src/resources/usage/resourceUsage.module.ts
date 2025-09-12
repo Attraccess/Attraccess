@@ -7,6 +7,7 @@ import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.mo
 import { ResourceIntroductionsModule } from '../introductions/resourceIntroductions.module';
 import { ResourceGroupsModule } from '../groups/resourceGroups.module';
 import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
+import { BillingModule } from '../../billing/billing.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
     ResourceIntroductionsModule,
     ResourceGroupsModule,
     ResourceMaintenanceModule,
+    BillingModule,
   ],
   controllers: [ResourceUsageController],
   providers: [ResourceUsageService],

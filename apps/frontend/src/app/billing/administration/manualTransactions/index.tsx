@@ -43,7 +43,8 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
         });
       },
       onError: (error: Error) => {
-        const errorMessage = ((error as ApiError).body as { message?: string | string[] } | undefined)?.message;
+        const errorMessage =
+          ((error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? error.message;
 
         const baseKey = 'toast.error.';
         const translationExists = tExists(baseKey + errorMessage);

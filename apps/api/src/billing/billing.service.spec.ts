@@ -2,9 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BillingService } from './billing.service';
-import { BillingTransaction, User } from '@attraccess/database-entities';
+import {
+  BillingTransaction,
+  ResourceBillingConfiguration,
+  ResourceUsage,
+  ResourceUsageAction,
+  User,
+} from '@attraccess/database-entities';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { InsufficientBalanceError } from './errors/insufficient-balance.error';
+import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -26,6 +33,12 @@ describe('BillingService', () => {
           provide: getRepositoryToken(User),
           useValue: {
             findOneBy: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ResourceBillingConfiguration),
+          useValue: {
+            save: jest.fn(),
           },
         },
       ],
@@ -109,6 +122,91 @@ describe('BillingService', () => {
 
       expect(billingTransactionRepository.save).toHaveBeenCalledWith({ userId: 1, initiatorId: 2, amount: -20 });
       expect(result).toEqual({ id: 456 });
+    });
+  });
+
+  describe('handleResourceUsageEvent', () => {
+    it('does nothing for non-Usage actions', async () => {
+      const usage = {
+        id: 10,
+        usageAction: ResourceUsageAction.DoorLock,
+        endTime: new Date(),
+        usageInMinutes: 3,
+        resource: { id: 99 },
+        userId: 7,
+      } as unknown as ResourceUsage;
+
+      const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
+
+      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+
+      expect(getConfigSpy).not.toHaveBeenCalled();
+      expect(billingTransactionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when session is not ended (endTime is null)', async () => {
+      const usage = {
+        id: 11,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+        usageInMinutes: -1,
+        resource: { id: 100 },
+        userId: 8,
+      } as unknown as ResourceUsage;
+
+      const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
+
+      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+
+      expect(getConfigSpy).not.toHaveBeenCalled();
+      expect(billingTransactionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when computed credits are zero', async () => {
+      const usage = {
+        id: 12,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: new Date(),
+        usageInMinutes: 5,
+        resource: { id: 101 },
+        userId: 9,
+      } as unknown as ResourceUsage;
+
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
+
+      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(101);
+      expect(billingTransactionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('creates a negative billing transaction when credits > 0', async () => {
+      const usage = {
+        id: 13,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: new Date(),
+        usageInMinutes: 2.4,
+        resource: { id: 102 },
+        userId: 10,
+      } as unknown as ResourceUsage;
+
+      // ceil(2.4) = 3 -> 3 * 10 + 5 = 35 credits
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 5 } as ResourceBillingConfiguration);
+
+      billingTransactionRepository.save.mockResolvedValue({ id: 999 } as BillingTransaction);
+
+      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102);
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith({
+        userId: 10,
+        resourceUsageId: 13,
+        amount: -35,
+      });
     });
   });
 });
