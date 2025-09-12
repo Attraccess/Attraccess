@@ -95,12 +95,20 @@ describe('BillingService', () => {
       expect(result).toEqual({ id: 123 });
     });
 
-    it('throws InsufficientBalanceError when negative charge and insufficient balance (with current code logic)', async () => {
-      // Note: The current implementation compares currentBalance < amount for negative amounts
-      // to trigger the error, ensure currentBalance is less than the negative amount
-      userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: -100 } as User);
+    it('throws InsufficientBalanceError when resulting balance would be negative', async () => {
+      userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
 
       await expect(service.createManualTransaction(1, 2, -20, true)).rejects.toBeInstanceOf(InsufficientBalanceError);
+    });
+
+    it('allows negative charge when balance stays non-negative', async () => {
+      userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
+      billingTransactionRepository.save.mockResolvedValue({ id: 456 } as BillingTransaction);
+
+      const result = await service.createManualTransaction(1, 2, -20, true);
+
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith({ userId: 1, initiatorId: 2, amount: -20 });
+      expect(result).toEqual({ id: 456 });
     });
   });
 });

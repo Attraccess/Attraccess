@@ -11,6 +11,7 @@
       },
       "cells": {
         "details": {
+          "unknown": "Transaktionsart unbekannt",
           "refund": "Rückerstattung für {{originalDetails}} ({{originalId}})",
           "resourceUsage": "Nutzung von {{resourceUsage.resource.name}}",
           "manual": "Manuelle Transaktion durch {{initiator.username}}"

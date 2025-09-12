@@ -11,12 +11,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
 
-export enum BillingTransactionType {
-  MANUAL_TOP_UP = 'manual_top_up',
-  MANUAL_CHARGE = 'manual_charge',
-  MANUAL_REFUND = 'manual_refund',
-}
-
 @Entity()
 export class BillingTransaction {
   @PrimaryGeneratedColumn()

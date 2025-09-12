@@ -84,7 +84,8 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
         details = { initiator: transaction.initiator };
       } else {
         console.error('Unknown transaction type', transaction);
-        throw new Error('Unknown transaction type');
+        type = 'unknown';
+        details = { transaction };
       }
 
       return t('transactions.table.cells.details.' + type, details) as string;
@@ -132,7 +133,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (
-              <TableRow>
+              <TableRow key={transaction.id}>
                 <TableCell>{transaction.id}</TableCell>
                 <TableCell>
                   <DateTimeDisplay date={transaction.createdAt} />

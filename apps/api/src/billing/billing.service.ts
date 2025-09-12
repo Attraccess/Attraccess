@@ -59,7 +59,7 @@ export class BillingService {
 
     const amountIsNegative = amount < 0;
 
-    if (amountIsNegative && failOnInsufficientBalance && currentBalance < amount) {
+    if (amountIsNegative && failOnInsufficientBalance && currentBalance + amount < 0) {
       throw new InsufficientBalanceError();
     }
 
