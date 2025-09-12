@@ -17,7 +17,7 @@ interface Props {
 export function MaintenanceInProgressDisplay(props: Props) {
   const { resourceId } = props;
 
-  const { t } = useTranslations('maintenanceInProgressDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances(
     {
@@ -29,7 +29,7 @@ export function MaintenanceInProgressDisplay(props: Props) {
     undefined,
     {
       refetchInterval: 5000,
-    }
+    },
   );
 
   const { data: permissions } = useResourceMaintenancesServiceCanManageMaintenance({

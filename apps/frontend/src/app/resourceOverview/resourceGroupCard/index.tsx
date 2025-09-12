@@ -46,7 +46,7 @@ interface Props {
 export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'children'>>) {
   const { groupId, filter, hideIfEmpty, ...cardProps } = props;
 
-  const { t } = useTranslations('resourceGroupCard', { de, en });
+  const { t } = useTranslations({ de, en });
   const { hasPermission, user } = useAuth();
 
   const debouncedSearchValue = useDebounce(filter?.search, 250);
@@ -58,7 +58,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     undefined,
     {
       enabled: typeof groupId === 'number',
-    }
+    },
   );
 
   const { data: resources, status: fetchStatus } = useResourcesServiceGetAllResources({
@@ -90,7 +90,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     undefined,
     {
       enabled: !!groupId && !!user?.id && groupId !== 'none',
-    }
+    },
   );
 
   const hasAccessToGroupSettings = useMemo(() => {

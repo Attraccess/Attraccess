@@ -17,7 +17,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   const [isFileInvalid, setIsFileInvalid] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToastMessage();
-  const { t } = useTranslations('upload-plugin-modal', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { mutate: uploadPlugin, isPending } = usePluginsServiceUploadPlugin({
     onSuccess: () => {

@@ -45,7 +45,7 @@ interface DeleteModalProps {
 }
 
 const NfcCardDeleteModal = (props: DeleteModalProps) => {
-  const { t } = useTranslations('attractap-delete-card-modal', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -98,7 +98,7 @@ interface NfcCardTableCellProps {
 }
 
 const NfcCardTableCell = (props: NfcCardTableCellProps) => {
-  const { t } = useTranslations('nfccard-list-table-cell', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -183,7 +183,7 @@ const NfcCardTableCell = (props: NfcCardTableCellProps) => {
 };
 
 const EnrollNfcCardButton = () => {
-  const { t } = useTranslations('attractap-enroll-nfc-card-button', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -236,7 +236,7 @@ const EnrollNfcCardButton = () => {
 };
 
 export function NfcCardList() {
-  const { t } = useTranslations('nfccard-list', {
+  const { t } = useTranslations({
     de,
     en,
   });

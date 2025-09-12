@@ -25,7 +25,7 @@ export function ImageUpload({
   currentImageUrl,
   ...rest
 }: Readonly<ImageUploadProps>) {
-  const { t } = useTranslations('imageUpload', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -79,7 +79,7 @@ export function ImageUpload({
 
       return true;
     },
-    [error, t]
+    [error, t],
   );
 
   const handleFileChange = useCallback(
@@ -104,7 +104,7 @@ export function ImageUpload({
 
       onChange(file);
     },
-    [onChange, validateFile]
+    [onChange, validateFile],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -137,7 +137,7 @@ export function ImageUpload({
         onChange(file);
       }
     },
-    [onChange, validateFile]
+    [onChange, validateFile],
   );
 
   const handleRemoveFile = useCallback(() => {

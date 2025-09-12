@@ -28,7 +28,7 @@ export function Toolbar({
   const canManageResources = hasPermission('canManageResources');
   const navigate = useNavigate();
 
-  const { t } = useTranslations('toolbar', {
+  const { t } = useTranslations({
     en,
     de,
   });

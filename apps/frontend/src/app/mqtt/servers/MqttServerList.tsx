@@ -67,7 +67,7 @@ function ServerListItem({ id, name, host, port, onEdit, onDelete, t }: ServerLis
 }
 
 export function MqttServerList() {
-  const { t } = useTranslations('mqttServersList', { en, de });
+  const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();

@@ -1,6 +1,6 @@
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
-import { TFunction } from 'i18next';
 import { useMemo } from 'react';
 
 interface Props {

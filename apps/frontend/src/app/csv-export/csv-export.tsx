@@ -20,7 +20,7 @@ import { ResourceUsageExport } from './resource-usage/resourceUsageExport';
 import { useNow } from '../../hooks/useNow';
 
 export function CsvExport() {
-  const { t } = useTranslations('csv-export', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -38,12 +38,12 @@ export function CsvExport() {
 
   const dateRangeStartFormatted = useMemo(
     () => formatDateTime(dateRange?.start?.toDate(getLocalTimeZone())),
-    [formatDateTime, dateRange]
+    [formatDateTime, dateRange],
   );
 
   const dateRangeEndFormatted = useMemo(
     () => formatDateTime(dateRange?.end?.toDate(getLocalTimeZone())),
-    [formatDateTime, dateRange]
+    [formatDateTime, dateRange],
   );
 
   const now = useNow();

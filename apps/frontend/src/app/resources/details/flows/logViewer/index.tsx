@@ -34,7 +34,7 @@ interface Props {
 export function LogViewer(props: Props) {
   const { isOpen, onOpenChange, onOpen } = useDisclosure();
 
-  const { t } = useTranslations('resources.details.flows.logViewer', {
+  const { t } = useTranslations({
     de: {
       ...de,
       nodes: nodeTranslationsDe,
@@ -70,10 +70,13 @@ export function LogViewer(props: Props) {
   }, [logsWithNodes]);
 
   const logsByRunId = useMemo(() => {
-    return (logsOrdered ?? []).reduce((acc, log) => {
-      acc[log.flowRunId] = [...(acc[log.flowRunId] ?? []), log];
-      return acc;
-    }, {} as Record<string, (ResourceFlowLog & { node: ResourceFlowNodeDto | undefined })[]>);
+    return (logsOrdered ?? []).reduce(
+      (acc, log) => {
+        acc[log.flowRunId] = [...(acc[log.flowRunId] ?? []), log];
+        return acc;
+      },
+      {} as Record<string, (ResourceFlowLog & { node: ResourceFlowNodeDto | undefined })[]>,
+    );
   }, [logsOrdered]);
 
   const firstNodeOfRun = useCallback(
@@ -81,7 +84,7 @@ export function LogViewer(props: Props) {
       const logsOfRun = logsOrdered.filter((log) => log.flowRunId === runId);
       return logsOfRun[0];
     },
-    [logsOrdered]
+    [logsOrdered],
   );
 
   const formatDateTime = useDateTimeFormatter({

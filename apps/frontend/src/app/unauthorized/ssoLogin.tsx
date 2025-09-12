@@ -13,7 +13,7 @@ interface SSOLoginButtonProps {
 }
 
 function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
-  const { t } = useTranslations('ssoLoginButton', {
+  const { t } = useTranslations({
     de,
     en,
   });

@@ -14,7 +14,7 @@ interface HistoryHeaderProps {
 
 export const HistoryHeader = memo(
   ({ title, showAllUsers, setShowAllUsers, canManageResources }: HistoryHeaderProps) => {
-    const { t } = useTranslations('historyHeader', { en, de });
+    const { t } = useTranslations({ en, de });
 
     return (
       <div className="flex items-center justify-between gap-x-4 gap-y-4 flex-wrap">
@@ -32,7 +32,7 @@ export const HistoryHeader = memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 HistoryHeader.displayName = 'HistoryHeader';

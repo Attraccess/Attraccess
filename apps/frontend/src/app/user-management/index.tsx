@@ -25,7 +25,7 @@ import * as de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
 
 export const UserManagementPage: React.FC = () => {
-  const { t } = useTranslations('userManagementPage', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);

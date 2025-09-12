@@ -13,7 +13,7 @@ interface Props {
 export function StatusChip(props: Readonly<Props>) {
   const { resourceId } = props;
 
-  const { t } = useTranslations('statusChip', { de, en });
+  const { t } = useTranslations({ de, en });
 
   const { data: session } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
 

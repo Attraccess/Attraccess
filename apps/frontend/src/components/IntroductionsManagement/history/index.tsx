@@ -19,7 +19,7 @@ interface Props {
 export function IntroductionHistoryModal(props: Readonly<Props>) {
   const { isOpen, history, isLoading, onClose } = props;
 
-  const { t } = useTranslations('introductionHistoryModal', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const orderedHistory = useMemo(() => {
     return [...history].sort((a, b) => {

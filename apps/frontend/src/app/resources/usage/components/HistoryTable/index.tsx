@@ -30,7 +30,7 @@ export const HistoryTable = ({
   canManageResources,
   onSessionClick,
 }: HistoryTableProps) => {
-  const { t } = useTranslations('historyTable', { en, de });
+  const { t } = useTranslations({ en, de });
   const { user } = useAuth();
 
   const [page, setPage] = useState(1);
@@ -49,7 +49,7 @@ export const HistoryTable = ({
     (key: string) => {
       handleRowsPerPageChange(Number(key));
     },
-    [handleRowsPerPageChange]
+    [handleRowsPerPageChange],
   );
 
   const {
@@ -66,7 +66,7 @@ export const HistoryTable = ({
     undefined,
     {
       enabled: !!user,
-    }
+    },
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });

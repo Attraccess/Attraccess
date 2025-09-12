@@ -31,7 +31,7 @@ export const PasswordInput: React.FC<PasswordInputProps & Required<Pick<InputPro
   ...inputProps
 }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const { t } = useTranslations('passwordInput', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);

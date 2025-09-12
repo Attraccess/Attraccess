@@ -19,7 +19,7 @@ interface UserPermissionFormProps {
 }
 
 export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) => {
-  const { t } = useTranslations('userPermissionForm', { en, de });
+  const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const queryClient = useQueryClient();
 

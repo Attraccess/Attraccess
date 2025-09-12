@@ -53,7 +53,7 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
       ...node,
       width: node.measured?.width ?? 0,
       height: node.measured?.height ?? 0,
-    })
+    }),
   );
 
   Dagre.layout(g);
@@ -93,8 +93,8 @@ function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
-  const { t } = useTranslations('resources.details.flows', { de, en });
-  const { t: tNodeTranslations } = useTranslations('resource-flows.node', {
+  const { t } = useTranslations({ de, en });
+  const { t: tNodeTranslations } = useTranslations({
     de: nodesDeTranslations,
     en: nodesEnTranslations,
   });
@@ -113,7 +113,7 @@ function FlowsPageInner() {
     undefined,
     {
       enabled: !!resourceId,
-    }
+    },
   );
 
   const {
@@ -220,7 +220,7 @@ function FlowsPageInner() {
       };
       addNode(newNode);
     },
-    [addNode]
+    [addNode],
   );
 
   const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: Number(resourceId) });
@@ -274,7 +274,7 @@ function FlowsPageInner() {
         });
       }
     },
-    [setFlowIsRunning, setFlowExecutionHadError]
+    [setFlowIsRunning, setFlowExecutionHadError],
   );
 
   useEffect(() => {

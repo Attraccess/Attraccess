@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function AttractapEditor(props: Readonly<Props>) {
-  const { t } = useTranslations('attractap-editor', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -77,7 +77,7 @@ export function AttractapEditor(props: Readonly<Props>) {
       e.preventDefault();
       await save();
     },
-    [save]
+    [save],
   );
 
   return (

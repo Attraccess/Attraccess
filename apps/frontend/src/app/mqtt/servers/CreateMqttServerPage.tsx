@@ -22,7 +22,7 @@ interface CreateMqttServerPageProps {
 
 export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>) {
   const { onSuccess } = props || {};
-  const { t } = useTranslations('mqttServerCreate', { en, de });
+  const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
@@ -187,7 +187,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
 export function CreateMqttServerPage(props?: Readonly<CreateMqttServerPageProps>) {
   const navigate = useNavigate();
 
-  const { t } = useTranslations('mqttServerCreatePage', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const handleCancel = useCallback(() => {
     if (props?.onCancel) {

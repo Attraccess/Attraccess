@@ -32,7 +32,7 @@ interface Props {
 export function AttractapSerialConfiguratorKeypad(props: Props) {
   const { className } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.keypad', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -259,7 +259,7 @@ export function AttractapSerialConfiguratorKeypad(props: Props) {
       <div className="grid grid-cols-3 gap-2">
         {layout.map((label, pos) => {
           const idx = charToIndex[label];
-          const delta = Number.isInteger(idx) ? validateDeltas[idx] ?? 0 : 0;
+          const delta = Number.isInteger(idx) ? (validateDeltas[idx] ?? 0) : 0;
           const progressVal =
             touchThreshold != null ? Math.min(100, Math.round((delta / Math.max(1, touchThreshold)) * 100)) : 0;
           return (

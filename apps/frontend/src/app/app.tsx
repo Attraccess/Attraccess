@@ -48,7 +48,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
       ) as (keyof SystemPermissions)[];
 
       const userHasAllRequiredPermissions = requiredPermissions.every(
-        (permission) => user.systemPermissions[permission] === true
+        (permission) => user.systemPermissions[permission] === true,
       );
 
       if (!userHasAllRequiredPermissions) {
@@ -67,7 +67,7 @@ function useRoutesWithAuthElements(routes: RouteConfig[]) {
       routesWithAuthElements.map((route: RouteConfig, index) => (
         <Route key={route.path} path={route.path} element={route.element} />
       )),
-    [routesWithAuthElements]
+    [routesWithAuthElements],
   );
 }
 
@@ -76,7 +76,7 @@ function AppLayout(props: PropsWithChildren) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { t } = useTranslations('app', { de, en });
+  const { t } = useTranslations({ de, en });
 
   const { pullToRefreshIsEnabled } = usePtrStore();
 

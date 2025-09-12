@@ -61,7 +61,7 @@ export function PluginsList() {
     },
   });
 
-  const { t } = useTranslations('plugins-list', {
+  const { t } = useTranslations({
     en,
     de,
   });

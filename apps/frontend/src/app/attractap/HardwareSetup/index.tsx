@@ -23,7 +23,7 @@ interface ContentProps {
 function Content(props: ContentProps) {
   const { state, setState, openDeviceSettings } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -107,7 +107,7 @@ interface Props {
 export function AttractapHardwareSetup(props: Props) {
   const { children, openDeviceSettings } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup', {
+  const { t } = useTranslations({
     de,
     en,
   });

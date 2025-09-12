@@ -8,7 +8,7 @@ interface UnauthorizedLayoutProps {
 }
 
 export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
-  const { t } = useTranslations('unauthorized-layout', {
+  const { t } = useTranslations({
     en,
     de,
   });

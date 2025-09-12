@@ -20,7 +20,7 @@ export function NfcCardActivateModal(props: Props) {
 
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('attractap-activate-card-modal', {
+  const { t } = useTranslations({
     de,
     en,
   });

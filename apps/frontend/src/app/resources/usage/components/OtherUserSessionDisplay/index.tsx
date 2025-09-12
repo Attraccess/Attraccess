@@ -25,7 +25,7 @@ interface OtherUserSessionDisplayProps {
 }
 
 export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const { t } = useTranslations('otherUserSessionDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
@@ -42,7 +42,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
     undefined,
     {
       enabled: !!user?.id,
-    }
+    },
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });

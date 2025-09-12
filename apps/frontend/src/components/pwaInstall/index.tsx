@@ -11,7 +11,7 @@ declare global {
 }
 
 export function PWAInstall() {
-  const { t } = useTranslations('pwaInstall', {
+  const { t } = useTranslations({
     en,
     de,
   });

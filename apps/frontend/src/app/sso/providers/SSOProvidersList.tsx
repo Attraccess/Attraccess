@@ -66,7 +66,7 @@ export interface SSOProvidersListRef {
 }
 
 export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentPropsWithoutRef<'div'>>((props, ref) => {
-  const { t } = useTranslations('ssoProvidersList', { en, de });
+  const { t } = useTranslations({ en, de });
   const { data: providers, status: fetchStatus, error } = useAuthenticationServiceGetAllSsoProviders();
   const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
@@ -103,7 +103,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     undefined,
     {
       enabled: !!editingProvider,
-    }
+    },
   );
 
   const onAutoDiscovery = useCallback((config: OpenIDConfiguration) => {

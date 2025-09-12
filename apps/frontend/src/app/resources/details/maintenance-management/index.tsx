@@ -32,7 +32,7 @@ interface Props {
 export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>) {
   const { resourceId, ...cardProps } = props;
 
-  const { t } = useTranslations('resource.details.maintenanceManagement', {
+  const { t } = useTranslations({
     de,
     en,
   });

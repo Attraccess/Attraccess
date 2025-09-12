@@ -15,7 +15,7 @@ interface Props {
 export function WebSerialConsole({ children }: Props) {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
-  const { t } = useTranslations('webserialConsole', {
+  const { t } = useTranslations({
     de,
     en,
   });

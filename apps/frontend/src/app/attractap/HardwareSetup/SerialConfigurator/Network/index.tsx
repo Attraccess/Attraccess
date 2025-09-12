@@ -31,7 +31,7 @@ interface Props {
 export function AttractapSerialConfiguratorNetwork(props: Props) {
   const { className } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator.network', {
+  const { t } = useTranslations({
     de,
     en,
   });

@@ -29,7 +29,7 @@ interface Props {
 export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'startContent' | 'onPress'>) {
   const { resourceId, buttonIconSize, ...buttonProps } = props;
 
-  const { t } = useTranslations('ResourceQrCode', { de, en });
+  const { t } = useTranslations({ de, en });
 
   const id = useMemo(() => {
     return nanoid();

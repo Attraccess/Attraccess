@@ -24,7 +24,7 @@ interface GroupDetailsFormProps {
 export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<CardProps, 'children'>>) {
   const { groupId, ...rest } = props;
 
-  const { t } = useTranslations('groupDetailsForm', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');

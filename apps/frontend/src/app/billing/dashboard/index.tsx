@@ -6,7 +6,7 @@ import { ChartNoAxesCombinedIcon } from 'lucide-react';
 import { SummaryCard } from './summary';
 
 export function BillingDashboardPage() {
-  const { t } = useTranslations('billingDashboard', { en, de });
+  const { t } = useTranslations({ en, de });
 
   return (
     <div>

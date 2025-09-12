@@ -21,7 +21,7 @@ interface ActiveSessionDisplayProps {
 }
 
 export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDisplayProps) {
-  const { t } = useTranslations('activeSessionDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);

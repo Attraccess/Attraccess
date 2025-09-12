@@ -8,6 +8,9 @@ import { queryClient } from './api/queryClient';
 import { PluginProvider } from './app/plugins/plugin-provider';
 import { PWAInstall } from './components/pwaInstall';
 import { registerSW } from 'virtual:pwa-register';
+import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
+
+detectAndSetLanguage();
 
 const oneMinute = 60 * 1000;
 const intervalMS = 15 * oneMinute;
@@ -38,5 +41,5 @@ root.render(
         </StrictMode>
       </PluginProvider>
     </BrowserRouter>
-  </QueryClientProvider>
+  </QueryClientProvider>,
 );

@@ -36,7 +36,7 @@ function DocumentationEditorComponent() {
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('documentationEditor', {
+  const { t } = useTranslations({
     en,
     de,
   });

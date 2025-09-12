@@ -21,7 +21,7 @@ export function FirmwareFlasher(props: Props) {
     filename: props.firmware.filename,
   });
 
-  const { t } = useTranslations('attractap.firmwareFlasher', {
+  const { t } = useTranslations({
     de,
     en,
   });

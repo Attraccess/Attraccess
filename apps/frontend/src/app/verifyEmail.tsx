@@ -14,7 +14,7 @@ export function VerifyEmail() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { t } = useTranslations('verifyEmail', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
@@ -90,14 +90,30 @@ export function VerifyEmail() {
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </CardHeader>
           <CardBody>
-            <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="verify-email-error-alert" />
+            <Alert
+              color="danger"
+              title={t('error.errorTitle')}
+              description={error}
+              data-cy="verify-email-error-alert"
+            />
           </CardBody>
           <CardFooter>
-            <Button fullWidth color="primary" onPress={activateEmail} isDisabled={verifyEmail.isPending} data-cy="verify-email-error-try-again-button">
+            <Button
+              fullWidth
+              color="primary"
+              onPress={activateEmail}
+              isDisabled={verifyEmail.isPending}
+              data-cy="verify-email-error-try-again-button"
+            >
               {t('error.tryAgain')}
             </Button>
             <Spacer y={2} />
-            <Button fullWidth variant="bordered" onPress={() => navigate('/')} data-cy="verify-email-error-back-to-login-button">
+            <Button
+              fullWidth
+              variant="bordered"
+              onPress={() => navigate('/')}
+              data-cy="verify-email-error-back-to-login-button"
+            >
               {t('error.backToLogin')}
             </Button>
           </CardFooter>

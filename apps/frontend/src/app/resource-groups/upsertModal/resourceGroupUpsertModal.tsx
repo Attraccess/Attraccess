@@ -44,7 +44,7 @@ interface Props {
 
 export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { isOpen, onOpen, onOpenChange, onClose: closeDisclosure } = useDisclosure();
-  const { t } = useTranslations('resourceGroupUpsertModal', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -166,7 +166,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       }
     },
     // Dependencies should include the specific mutations if used directly
-    [isEditMode, props.resourceGroup, formData, createMutation, updateMutation]
+    [isEditMode, props.resourceGroup, formData, createMutation, updateMutation],
   );
 
   const getFieldError = (fieldName: keyof FormData) => {

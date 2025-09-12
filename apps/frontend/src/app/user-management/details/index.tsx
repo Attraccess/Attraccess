@@ -13,7 +13,7 @@ import { Card, CardBody, CardHeader } from '@heroui/react';
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
 
-  const { t } = useTranslations('userManagementDetails', {
+  const { t } = useTranslations({
     en,
     de,
   });

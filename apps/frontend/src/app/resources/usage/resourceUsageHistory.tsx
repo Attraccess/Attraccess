@@ -15,7 +15,7 @@ type ResourceUsageHistoryProps = {
 
 // Main component
 export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHistoryProps) {
-  const { t } = useTranslations('resourceUsageHistory', { en, de });
+  const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canManageResources = hasPermission('canManageResources');
 

@@ -16,7 +16,7 @@ interface RegisterFormProps {
 }
 
 export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
-  const { t } = useTranslations('register', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -86,7 +86,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         setError(messageToDisplay);
       }
     },
-    [createUser, onOpen, t]
+    [createUser, onOpen, t],
   );
 
   return (

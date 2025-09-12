@@ -7,7 +7,7 @@ import de from './de.json';
 import en from './en.json';
 
 export function BootScreen() {
-  const { t } = useTranslations('bootScreen', { de, en });
+  const { t } = useTranslations({ de, en });
 
   return (
     <UnauthorizedLayout>

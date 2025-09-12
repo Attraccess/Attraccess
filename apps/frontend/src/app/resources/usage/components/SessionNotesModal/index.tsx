@@ -20,7 +20,7 @@ export type SessionNotesModalProps = {
 };
 
 export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitting }: SessionNotesModalProps) => {
-  const { t } = useTranslations('sessionNotesModal', { en, de });
+  const { t } = useTranslations({ en, de });
   const [notes, setNotes] = useState('');
 
   const handleConfirm = () => {
@@ -29,7 +29,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
   };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onClose} scrollBehavior='inside'>
+    <Modal isOpen={isOpen} onOpenChange={onClose} scrollBehavior="inside">
       <ModalContent className="sm:max-w-md">
         <ModalHeader>{mode === SessionModalMode.START ? t('title.start') : t('title.end')}</ModalHeader>
 

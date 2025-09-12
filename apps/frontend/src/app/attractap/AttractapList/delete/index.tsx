@@ -17,7 +17,7 @@ export function AttractapDeleteModal(props: Props) {
 
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('attractap-delete-modal', {
+  const { t } = useTranslations({
     de,
     en,
   });

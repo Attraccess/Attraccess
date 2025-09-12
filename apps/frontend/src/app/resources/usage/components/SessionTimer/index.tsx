@@ -9,7 +9,7 @@ interface SessionTimerProps {
 }
 
 export function SessionTimer({ startTime }: SessionTimerProps) {
-  const { t } = useTranslations('sessionTimer', { en, de });
+  const { t } = useTranslations({ en, de });
   const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function SessionTimer({ startTime }: SessionTimerProps) {
       setElapsedTime(
         `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds
           .toString()
-          .padStart(2, '0')}`
+          .padStart(2, '0')}`,
       );
     };
 

@@ -21,7 +21,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, onSelectionChange, autocompleteProps, afterAutocomplete, wrapperProps, afterSelection } =
     props;
 
-  const { t } = useTranslations('userSearch', {
+  const { t } = useTranslations({
     en,
     de,
   });

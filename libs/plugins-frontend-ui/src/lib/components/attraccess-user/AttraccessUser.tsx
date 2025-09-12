@@ -14,7 +14,7 @@ interface AttraccessUserProps {
 export function AttraccessUser(props: AttraccessUserProps & Omit<UserProps, 'avatarProps' | 'description' | 'name'>) {
   const { user, description, ...userComponentProps } = props;
 
-  const { t } = useTranslations('attraccessUser', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const avatarIcon = useMemo(() => {
     const svg = toSvg(user?.id || 'unknown', 100);

@@ -1,5 +1,5 @@
 import { Resource, UpdateResourceDto } from '@attraccess/react-query-client';
-import { TFunction } from 'i18next';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface EditorTabProps {
   t: TFunction;

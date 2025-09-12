@@ -23,7 +23,7 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
   const [username, setUsername] = useState('');
   const queryClient = useQueryClient();
 
-  const { t } = useTranslations('changeUsername', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success: showSuccess, error: showError } = useToastMessage();
 
   const { data: user, isLoading: isLoadingUser } = useUsersServiceGetOneUserById({ id: userId });

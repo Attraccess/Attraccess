@@ -15,7 +15,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) {
-  const { t } = useTranslations('login', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -39,12 +39,12 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
         tokenLocation: 'cookie',
       });
     },
-    [login]
+    [login],
   );
 
   const memoizedArrowRight = useMemo(
     () => <ArrowRight className="group-hover:translate-x-1 transition-transform" />,
-    []
+    [],
   );
 
   return (
@@ -75,6 +75,7 @@ export function LoginForm({ onNeedsAccount, onForgotPassword }: LoginFormProps) 
           required
           isDisabled={isPending}
           data-cy="login-form-username-input"
+          autoComplete="username"
         />
         <PasswordInput
           id="password"

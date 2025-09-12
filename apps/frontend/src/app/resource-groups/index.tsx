@@ -12,7 +12,7 @@ import { GroupIcon } from 'lucide-react';
 
 export function ResourceGroupEditPage() {
   const { groupId } = useParams<{ groupId: string }>();
-  const { t } = useTranslations('resourceGroupEditPage', { en, de });
+  const { t } = useTranslations({ en, de });
   const numericGroupId = Number(groupId);
 
   const {

@@ -10,7 +10,7 @@ import { Card, CardBody, CardHeader } from '@heroui/react';
 import { SummaryCard } from '../dashboard/summary';
 
 export function BillingAdministrationPage() {
-  const { t } = useTranslations('billingAdministration', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const [user, setUser] = useState<User | null>(null);
 

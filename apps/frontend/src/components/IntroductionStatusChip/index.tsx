@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function IntroductionStatusChip(props: Readonly<Props>) {
-  const { t } = useTranslations('introductionStatusChip', { de, en });
+  const { t } = useTranslations({ de, en });
 
   if (props.isValid) {
     return <Chip color="success">{t('status.isValid')}</Chip>;

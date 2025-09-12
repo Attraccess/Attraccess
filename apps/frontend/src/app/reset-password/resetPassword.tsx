@@ -13,7 +13,7 @@ import { useToastMessage } from '../../components/toastProvider';
 export function ResetPassword() {
   const query = useUrlQuery();
   const navigate = useNavigate();
-  const { t } = useTranslations('resetPassword', { en, de });
+  const { t } = useTranslations({ en, de });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 

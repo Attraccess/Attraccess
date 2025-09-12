@@ -16,7 +16,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
   userId,
   ...divProps
 }) => {
-  const { t } = useTranslations('setPasswordForm', { en, de });
+  const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { mutate: setPasswordMutate, isPending: isSettingPassword } = useUsersServiceSetUserPassword({
     onSuccess: () => {

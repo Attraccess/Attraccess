@@ -37,7 +37,7 @@ interface Props {
 export function ResourceMaintenanceUpsertModal(props: Props) {
   const { resourceId, maintenanceId, children: activator } = props;
 
-  const { t } = useTranslations('resource.details.maintenanceManagement.create', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -63,7 +63,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     undefined,
     {
       enabled: maintenanceId !== undefined,
-    }
+    },
   );
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
 
       setHasEndDate(val);
     },
-    [existingMaintenance, timezoneOfBrowser, now]
+    [existingMaintenance, timezoneOfBrowser, now],
   );
 
   const onSaveSuccess = useCallback(() => {

@@ -8,7 +8,7 @@ import { SetPasswordForm } from '../user-management/details/components/setPasswo
 import { useAuth } from '../../hooks/useAuth';
 
 export default function AccountPage() {
-  const { t } = useTranslations('account', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const { user: me } = useAuth();
 

@@ -39,7 +39,7 @@ interface ResourceEditModalProps {
 export function ResourceEditModal(props: ResourceEditModalProps) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { t } = useTranslations('resourceEditModal', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -61,7 +61,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     <T extends keyof UpdateResourceDto>(field: T, value: UpdateResourceDto[T]) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
     },
-    [setFormData]
+    [setFormData],
   );
 
   const onUpsertSuccess = useCallback(
@@ -85,7 +85,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.onUpdated, props.resourceId, queryClient]
+    [props.onUpdated, props.resourceId, queryClient],
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: props.resourceId as number }, undefined, {

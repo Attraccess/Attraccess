@@ -16,7 +16,7 @@ interface Props {
 export function AttractapSerialConfigurator(props: Props) {
   const { openDeviceSettings } = props;
 
-  const { t } = useTranslations('attractap.hardwareSetup.serialConfigurator', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -24,7 +24,7 @@ export function AttractapSerialConfigurator(props: Props) {
   const [error, setError] = useState<ESPToolsResult['error'] | null>(null);
   const espTools = useRef<ESPTools | null>(ESPTools.getInstance());
   const [state, setState] = useState<'idle' | 'connecting' | 'connected' | 'error'>(
-    espTools.current?.isConnected ? 'connected' : 'idle'
+    espTools.current?.isConnected ? 'connected' : 'idle',
   );
 
   const [selectedTab, setSelectedTab] = useState<'main' | 'keypad'>('main');

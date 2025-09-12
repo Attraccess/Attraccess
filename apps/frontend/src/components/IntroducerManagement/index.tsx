@@ -21,7 +21,7 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
   const { isLoadingIntroducers, introducers, onGrantIntroducer, onRevokeIntroducer, isGranting, isRevoking, ...rest } =
     props;
 
-  const { t } = useTranslations('introducerManagement', { en, de });
+  const { t } = useTranslations({ en, de });
 
   const introducerUsers = useMemo(() => {
     return introducers?.map((introducer) => introducer.user);

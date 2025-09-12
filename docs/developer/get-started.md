@@ -17,7 +17,6 @@ Attraccess is a comprehensive resource management system for tracking and managi
 - **Styling**: Tailwind CSS with HeroUI components
 - **Data Fetching**: TanStack React Query
 - **Routing**: React Router DOM
-- **Internationalization**: i18next
 - **Testing**: Jest, Testing Library, Vitest
 
 ### Backend

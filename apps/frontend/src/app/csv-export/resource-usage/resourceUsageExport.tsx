@@ -41,7 +41,7 @@ interface CsvColumn {
 }
 
 export function ResourceUsageExport(props: ExportProps) {
-  const { t } = useTranslations('csv-export.resourceUsageHours', {
+  const { t } = useTranslations({
     de,
     en,
   });
@@ -133,7 +133,7 @@ export function ResourceUsageExport(props: ExportProps) {
   }, [formatUsageDuration, formatDateTimeFull]);
 
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Array<string>>(
-    availableCsvColumns.filter((col) => col.selectedByDefault).map((col) => col.csvHeader)
+    availableCsvColumns.filter((col) => col.selectedByDefault).map((col) => col.csvHeader),
   );
 
   const selectedColumns = useMemo(() => {
@@ -154,7 +154,7 @@ export function ResourceUsageExport(props: ExportProps) {
             typeof cell === 'string' && (cell.includes(';') || cell.includes('"') || cell.includes('\n'));
           const escaped = String(cell).replace(/"/g, '""');
           return needsQuoting ? `"${escaped}"` : escaped;
-        })
+        }),
       ) as Array<Array<string>>;
   }, [resourceUsageExport, selectedColumns]);
 

@@ -26,7 +26,7 @@ export function useQrCodeAction(props: Props) {
   const navigate = useNavigate();
   const actionExecutedRef = useRef<string | null>(null);
 
-  const { t } = useTranslations('useQrCodeAction', {
+  const { t } = useTranslations({
     en,
     de,
   });
@@ -93,7 +93,7 @@ export function useQrCodeAction(props: Props) {
         },
       });
     },
-    [startResourceMutate, resourceId]
+    [startResourceMutate, resourceId],
   );
 
   const stopResource = useCallback(() => {

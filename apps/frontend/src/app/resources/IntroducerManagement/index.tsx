@@ -19,11 +19,11 @@ interface ResourceIntroducerManagementProps {
 }
 
 export function ResoureIntroducerManagement(
-  props: Readonly<ResourceIntroducerManagementProps & Omit<CardProps, 'children'>>
+  props: Readonly<ResourceIntroducerManagementProps & Omit<CardProps, 'children'>>,
 ) {
   const { resourceId, ...rest } = props;
 
-  const { t } = useTranslations('resourceIntroducerManagement', { en, de });
+  const { t } = useTranslations({ en, de });
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
 

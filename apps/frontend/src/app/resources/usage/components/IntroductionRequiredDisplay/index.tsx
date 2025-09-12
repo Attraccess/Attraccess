@@ -10,7 +10,7 @@ interface IntroductionRequiredDisplayProps {
 }
 
 export function IntroductionRequiredDisplay({ resourceId }: Readonly<IntroductionRequiredDisplayProps>) {
-  const { t } = useTranslations('introductionRequiredDisplay', { en, de });
+  const { t } = useTranslations({ en, de });
 
   // Get list of users who can give introductions
   const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetMany({

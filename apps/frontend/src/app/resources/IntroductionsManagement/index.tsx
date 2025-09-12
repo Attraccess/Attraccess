@@ -22,10 +22,10 @@ interface ResourceIntroductionsManagementProps {
 }
 
 export function ResourceIntroductionsManagement(
-  props: Readonly<ResourceIntroductionsManagementProps & Omit<CardProps, 'children'>>
+  props: Readonly<ResourceIntroductionsManagementProps & Omit<CardProps, 'children'>>,
 ) {
   const { resourceId, ...rest } = props;
-  const { t } = useTranslations('resourceIntroductionsManagement', { en, de });
+  const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -73,7 +73,7 @@ export function ResourceIntroductionsManagement(
         queryKey: [UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId: user.id })],
       });
     },
-    [grantIntroductionMutation, resourceId, queryClient]
+    [grantIntroductionMutation, resourceId, queryClient],
   );
 
   const { mutateAsync: revokeIntroductionMutation, isPending: isRevoking } =
@@ -109,7 +109,7 @@ export function ResourceIntroductionsManagement(
         queryKey: [UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId: user.id })],
       });
     },
-    [revokeIntroductionMutation, resourceId, queryClient]
+    [revokeIntroductionMutation, resourceId, queryClient],
   );
 
   if (error) {
