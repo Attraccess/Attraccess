@@ -82,7 +82,7 @@ export function StartSessionControls(
         error,
         t,
         tExists,
-        baseTranslationKey: resource.type + '.start.error.',
+        baseTranslationKey: resource.type + '.start.error',
       });
 
       console.error('Failed to start session:', JSON.stringify(error));
