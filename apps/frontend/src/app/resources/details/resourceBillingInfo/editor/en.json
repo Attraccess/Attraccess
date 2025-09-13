@@ -1,0 +1,30 @@
+{
+  "title": "Usage-based Billing",
+  "inputs": {
+    "creditsPerUsage": {
+      "label": "Credits per usage",
+      "description": "This amount will be deducted once per usage."
+    },
+    "creditsPerMinute": {
+      "label": "Credits per minute",
+      "description": "This amount will be deducted per minute of the session duration."
+    }
+  },
+  "actions": {
+    "save": "Save"
+  },
+  "success": {
+    "toast": {
+      "title": "Billing updated",
+      "description": "The usage-based billing has been updated successfully."
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Error updating billing",
+        "description": "The usage-based billing could not be updated. Please try again."
+      }
+    }
+  }
+}

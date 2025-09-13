@@ -78,18 +78,11 @@ export function StartSessionControls(
         return;
       }
 
-      const errorMessage = (error.body as { message?: string | string[] } | undefined)?.message ?? error.message;
-
-      const baseKey = resource.type + '.start.error.';
-      const translationExists = tExists(baseKey + errorMessage);
-
-      const fullBaseKey = translationExists ? baseKey + errorMessage : baseKey + 'generic';
-
-      toast.error({
-        title: t(fullBaseKey + '.title'),
-        description: t(fullBaseKey + '.description', {
-          error: errorMessage,
-        }),
+      toast.apiError({
+        error,
+        t,
+        tExists,
+        baseTranslationKey: resource.type + '.start.error.',
       });
 
       console.error('Failed to start session:', JSON.stringify(error));

@@ -11,16 +11,19 @@ import {
   TableRow,
   TableCell,
   TableColumn,
+  Button,
 } from '@heroui/react';
-import { CreditCard, Info } from 'lucide-react';
+import { CreditCard, Edit2Icon, Info } from 'lucide-react';
 import {
   useBillingServiceGetBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
+  useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../components/pageHeader';
+import { ResourceBillingInfoEditor } from './editor';
 
 interface Props {
   resourceId: number;
@@ -31,6 +34,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration({ resourceId });
+  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
@@ -39,6 +43,10 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
   }
 
   if (!configuration) {
+    return null;
+  }
+
+  if (resource?.type !== 'machine') {
     return null;
   }
 
@@ -56,11 +64,24 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           title={t('title')}
           icon={<CreditCard />}
           actions={
-            isFree && (
-              <Chip color="success" variant="flat" size="sm">
-                {t('free.title')}
-              </Chip>
-            )
+            <>
+              {isFree && (
+                <Chip color="success" variant="flat" size="sm">
+                  {t('free.title')}
+                </Chip>
+              )}
+              <ResourceBillingInfoEditor resourceId={resourceId}>
+                {(onOpen) => (
+                  <Button
+                    size="sm"
+                    color="primary"
+                    isIconOnly
+                    startContent={<Edit2Icon size={12} />}
+                    onPress={onOpen}
+                  />
+                )}
+              </ResourceBillingInfoEditor>
+            </>
           }
           noMargin
         />

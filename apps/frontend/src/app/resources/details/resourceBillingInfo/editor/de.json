@@ -1,0 +1,30 @@
+{
+  "title": "Nutzungsbasierte Abrechnung",
+  "inputs": {
+    "creditsPerUsage": {
+      "label": "Credits pro Nutzung",
+      "description": "Dieser Betrag wird einmalig pro Nutzung abgezogen."
+    },
+    "creditsPerMinute": {
+      "label": "Credits pro Minute",
+      "description": "Dieser Betrag wird pro Minute der Sitzungsdauer abgezogen."
+    }
+  },
+  "actions": {
+    "save": "Speichern"
+  },
+  "success": {
+    "toast": {
+      "title": "Abrechnung aktualisiert",
+      "description": "Die Nutzungsbasierte Abrechnung wurde erfolgreich aktualisiert."
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Aktualisieren der Abrechnung",
+        "description": "Die Nutzungsbasierte Abrechnung konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut."
+      }
+    }
+  }
+}

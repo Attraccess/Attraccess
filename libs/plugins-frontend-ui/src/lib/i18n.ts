@@ -27,10 +27,11 @@ export const useTranslationState = create<TranslationState>((set) => ({
 }));
 
 export type TFunction = (key: string, data?: Record<string, unknown>) => string;
+export type TExists = (key: string) => boolean;
 
 interface UseTranslationsResponse {
   t: TFunction;
-  tExists: (key: string) => boolean;
+  tExists: TExists;
   language: Language;
   setLanguage: (language: Language) => void;
 }
