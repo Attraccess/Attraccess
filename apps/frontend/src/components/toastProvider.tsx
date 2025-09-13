@@ -67,8 +67,8 @@ export function useToastMessage() {
       const translationExists = props.tExists(props.baseTranslationKey + errorMessage);
 
       const fullBaseKey = translationExists
-        ? props.baseTranslationKey + errorMessage
-        : props.baseTranslationKey + (props.fallbackKey ?? 'generic');
+        ? props.baseTranslationKey + '.' + errorMessage
+        : props.baseTranslationKey + '.' + (props.fallbackKey ?? 'generic');
 
       showToast({
         type: 'error',

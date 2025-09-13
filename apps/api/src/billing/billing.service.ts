@@ -4,7 +4,7 @@ import {
   ResourceUsageAction,
   User,
 } from '@attraccess/database-entities';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
@@ -94,11 +94,32 @@ export class BillingService {
     resourceId: number,
     data: UpdateResourceBillingConfigurationDto,
   ): Promise<ResourceBillingConfiguration> {
-    const existingConfiguration = await this.resourceBillingConfigurationRepository.findOneBy({ resourceId });
-    if (!existingConfiguration) {
+    const configuration = await this.resourceBillingConfigurationRepository.findOneBy({ resourceId });
+    if (!configuration) {
       throw new ResourceBillingConfigurationNotFoundException(resourceId);
     }
-    return await this.resourceBillingConfigurationRepository.save({ ...existingConfiguration, ...data });
+
+    if (data.creditsPerMinute === null) {
+      data.creditsPerMinute = 0;
+    }
+    if (data.creditsPerMinute !== undefined) {
+      if (data.creditsPerMinute < 0) {
+        throw new BadRequestException('Credits per minute cannot be negative');
+      }
+      configuration.creditsPerMinute = data.creditsPerMinute;
+    }
+
+    if (data.creditsPerUsage === null) {
+      data.creditsPerUsage = 0;
+    }
+    if (data.creditsPerUsage !== undefined) {
+      if (data.creditsPerUsage < 0) {
+        throw new BadRequestException('Credits per usage cannot be negative');
+      }
+      configuration.creditsPerUsage = data.creditsPerUsage;
+    }
+
+    return await this.resourceBillingConfigurationRepository.save(configuration);
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
