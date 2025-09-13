@@ -2,6 +2,7 @@
 
 import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { SumupTransactionCallbackDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const ensureUseUsersServiceFindManyData = (queryClient: QueryClient, { ids, limit, page, search }: {
@@ -149,6 +150,11 @@ export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: Q
 export const ensureUseBillingServiceGetBillingConfigurationData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) });
+export const ensureUseBillingServiceGetSumUpConfigurationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetSumUpConfigurationKeyFn(), queryFn: () => BillingService.getSumUpConfiguration() });
+export const ensureUseBillingServiceGetSumUpReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetSumUpReadersKeyFn(), queryFn: () => BillingService.getSumUpReaders() });
+export const ensureUseBillingServiceSumUpTopUpCallbackData = (queryClient: QueryClient, { requestBody }: {
+  requestBody: SumupTransactionCallbackDto;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceSumUpTopUpCallbackKeyFn({ requestBody }), queryFn: () => BillingService.sumUpTopUpCallback({ requestBody }) });
 export const ensureUseResourceFlowsServiceGetNodeSchemasData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetNodeSchemasKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getNodeSchemas({ resourceId }) });

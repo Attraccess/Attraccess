@@ -125,7 +125,7 @@ function renderParsedNodes(
   return rendered;
 }
 
-export function Trans(props: TransProps) {
+export function I18nTransComponent(props: TransProps) {
   const { i18nKey, values, components, t } = props;
 
   const translation = useMemo(() => t(i18nKey, values), [t, i18nKey, values]);

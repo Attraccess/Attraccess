@@ -25,9 +25,10 @@
     "billing": {
       "label": "Zahlungen",
       "items": {
-        "dashboard": "Dashboard",
+        "dashboard": "Übersicht",
         "administration": "Verwaltung",
-        "csvExport": "CSV-Export"
+        "csvExport": "CSV-Export",
+        "sumup": "SumUp"
       }
     },
     "auth": {

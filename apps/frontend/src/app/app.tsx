@@ -76,7 +76,7 @@ function AppLayout(props: PropsWithChildren) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { t } = useTranslations({ de, en });
+  const { t, language } = useTranslations({ de, en });
 
   const { pullToRefreshIsEnabled } = usePtrStore();
 
@@ -98,7 +98,7 @@ function AppLayout(props: PropsWithChildren) {
       }
       isPullable={pullToRefreshIsEnabled}
     >
-      <HeroUIProvider navigate={navigate} labelPlacement="inside" locale={navigator.language}>
+      <HeroUIProvider navigate={navigate} labelPlacement="inside" locale={language}>
         <ToastProvider>
           <ReactFlowProvider>
             <Layout noLayout={!isAuthenticated || serverIsNotAvailable}>

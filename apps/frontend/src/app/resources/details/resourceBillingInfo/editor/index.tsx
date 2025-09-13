@@ -1,7 +1,7 @@
 import {
   useBillingServiceGetBillingConfiguration,
   UseBillingServiceGetBillingConfigurationKeyFn,
-  useBillingServiceUpdateBillingConfiguration,
+  useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
 import {
   Button,
@@ -36,7 +36,7 @@ export function ResourceBillingInfoEditor(props: Props) {
   const queryClient = useQueryClient();
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration({ resourceId });
-  const { mutate: updateConfiguration, isPending: isSaving } = useBillingServiceUpdateBillingConfiguration({
+  const { mutate: updateConfiguration, isPending: isSaving } = useBillingServiceUpdateResourceBillingConfiguration({
     onSuccess: () => {
       toast.success({
         title: t('success.toast.title'),

@@ -1,6 +1,6 @@
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalProps } from '@heroui/modal';
 import { Button } from '@heroui/button';
-import { useTranslations, Trans } from '@attraccess/plugins-frontend-ui';
+import { useTranslations, I18nTransComponent } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
@@ -31,7 +31,7 @@ export function DeleteConfirmationModal({
         <ModalHeader>{t('title')}</ModalHeader>
         <ModalBody>
           <div className="text-lg">
-            <Trans
+            <I18nTransComponent
               t={t}
               count={1}
               i18nKey="message"

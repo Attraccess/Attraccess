@@ -5,6 +5,7 @@ import { BillingModule } from './billing.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { BillingTransaction, ResourceBillingConfiguration, User } from '@attraccess/database-entities';
+import { SumUpService } from './sumup.service';
 
 describe('BillingModule', () => {
   describe('metadata', () => {
@@ -33,6 +34,7 @@ describe('BillingModule', () => {
         controllers: [BillingController],
         providers: [
           BillingService,
+          { provide: SumUpService, useValue: {} },
           { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: jest.fn(), save: jest.fn() } },
           { provide: getRepositoryToken(User), useValue: { findOneBy: jest.fn() } },
           { provide: getRepositoryToken(ResourceBillingConfiguration), useValue: { save: jest.fn() } },

@@ -64,7 +64,7 @@ export function useToastMessage() {
       const errorMessage =
         ((props.error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? props.error.message;
 
-      const translationExists = props.tExists(props.baseTranslationKey + errorMessage);
+      const translationExists = props.tExists(props.baseTranslationKey + '.' + errorMessage);
 
       const fullBaseKey = translationExists
         ? props.baseTranslationKey + '.' + errorMessage

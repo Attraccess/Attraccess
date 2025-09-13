@@ -2,6 +2,7 @@
 
 import { UseQueryResult } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { SumupTransactionCallbackDto } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -277,6 +278,20 @@ export const useBillingServiceGetBillingConfigurationKey = "BillingServiceGetBil
 export const UseBillingServiceGetBillingConfigurationKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useBillingServiceGetBillingConfigurationKey, ...(queryKey ?? [{ resourceId }])];
+export type BillingServiceGetSumUpConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getSumUpConfiguration>>;
+export type BillingServiceGetSumUpConfigurationQueryResult<TData = BillingServiceGetSumUpConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetSumUpConfigurationKey = "BillingServiceGetSumUpConfiguration";
+export const UseBillingServiceGetSumUpConfigurationKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetSumUpConfigurationKey, ...(queryKey ?? [])];
+export type BillingServiceGetSumUpReadersDefaultResponse = Awaited<ReturnType<typeof BillingService.getSumUpReaders>>;
+export type BillingServiceGetSumUpReadersQueryResult<TData = BillingServiceGetSumUpReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetSumUpReadersKey = "BillingServiceGetSumUpReaders";
+export const UseBillingServiceGetSumUpReadersKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetSumUpReadersKey, ...(queryKey ?? [])];
+export type BillingServiceSumUpTopUpCallbackDefaultResponse = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
+export type BillingServiceSumUpTopUpCallbackQueryResult<TData = BillingServiceSumUpTopUpCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceSumUpTopUpCallbackKey = "BillingServiceSumUpTopUpCallback";
+export const UseBillingServiceSumUpTopUpCallbackKeyFn = ({ requestBody }: {
+  requestBody: SumupTransactionCallbackDto;
+}, queryKey?: Array<unknown>) => [useBillingServiceSumUpTopUpCallbackKey, ...(queryKey ?? [{ requestBody }])];
 export type ResourceFlowsServiceGetNodeSchemasDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getNodeSchemas>>;
 export type ResourceFlowsServiceGetNodeSchemasQueryResult<TData = ResourceFlowsServiceGetNodeSchemasDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceFlowsServiceGetNodeSchemasKey = "ResourceFlowsServiceGetNodeSchemas";
@@ -380,7 +395,11 @@ export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
 export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenance>>;
 export type BillingServiceCreateManualTransactionMutationResult = Awaited<ReturnType<typeof BillingService.createManualTransaction>>;
-export type BillingServiceUpdateBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateBillingConfiguration>>;
+export type BillingServiceUpdateResourceBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateResourceBillingConfiguration>>;
+export type BillingServiceSetSumUpApiKeyMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpApiKey>>;
+export type BillingServiceSetSumUpConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpConfiguration>>;
+export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
+export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
@@ -408,5 +427,6 @@ export type MqttServiceMqttServersDeleteOneMutationResult = Awaited<ReturnType<t
 export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersRevoke>>;
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.cancelMaintenance>>;
+export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

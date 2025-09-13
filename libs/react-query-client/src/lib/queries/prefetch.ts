@@ -2,6 +2,7 @@
 
 import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { SumupTransactionCallbackDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
@@ -149,6 +150,11 @@ export const prefetchUseBillingServiceGetBillingTransactions = (queryClient: Que
 export const prefetchUseBillingServiceGetBillingConfiguration = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) });
+export const prefetchUseBillingServiceGetSumUpConfiguration = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetSumUpConfigurationKeyFn(), queryFn: () => BillingService.getSumUpConfiguration() });
+export const prefetchUseBillingServiceGetSumUpReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetSumUpReadersKeyFn(), queryFn: () => BillingService.getSumUpReaders() });
+export const prefetchUseBillingServiceSumUpTopUpCallback = (queryClient: QueryClient, { requestBody }: {
+  requestBody: SumupTransactionCallbackDto;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceSumUpTopUpCallbackKeyFn({ requestBody }), queryFn: () => BillingService.sumUpTopUpCallback({ requestBody }) });
 export const prefetchUseResourceFlowsServiceGetNodeSchemas = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetNodeSchemasKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getNodeSchemas({ resourceId }) });

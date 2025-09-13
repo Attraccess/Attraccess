@@ -1259,6 +1259,245 @@ export interface UpdateMaintenanceDto {
   reason?: string;
 }
 
+export interface BalanceDto {
+  /** The balance of the user */
+  value: number;
+}
+
+export interface BillingTransaction {
+  /**
+   * The unique identifier of the billing transaction
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the user
+   * @example 1
+   */
+  userId: number;
+  /** The user who the billing transaction belongs to */
+  user: User;
+  /**
+   * The date and time the billing transaction was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the billing transaction was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The credit amount of the billing transaction (negative for refunds/top-ups) */
+  amount: number;
+  /** The user ID of the user who caused the billing transaction */
+  initiatorId: number;
+  /** The user who initiated the billing transaction */
+  initiator: User;
+  /** The resource usage ID of the resource usage that caused the billing transaction */
+  resourceUsageId: number;
+  /** The resource usage that caused the billing transaction */
+  resourceUsage: ResourceUsage;
+  /** The billing transaction ID of the billing transaction that is being refunded */
+  refundOfId: number;
+  /** The billing transaction that is being refunded */
+  refundOf: BillingTransaction;
+  /** The external reference e.g. sumup transaction ID */
+  externalReference: string;
+  /** The status of the billing transaction */
+  status: "pending" | "completed" | "failed";
+}
+
+export interface TransactionsDto {
+  data: BillingTransaction[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ModifyBalanceDto {
+  /**
+   * The amount to modify the balance by
+   * @example 100
+   */
+  amount: number;
+}
+
+export interface ResourceBillingConfiguration {
+  /**
+   * The unique identifier of the resource billing configuration
+   * @example 1
+   */
+  id: number;
+  /**
+   * The date and time the billing transaction was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the billing transaction was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the resource */
+  resourceId: number;
+  /** The resource */
+  resource?: object;
+  /** The credit cost per usage */
+  creditsPerUsage: number;
+  /** The credit cost per minute */
+  creditsPerMinute: number;
+  /** Whether billing is enabled */
+  isBillingEnabled: boolean;
+}
+
+export interface UpdateResourceBillingConfigurationDto {
+  /**
+   * The credit cost per usage
+   * @example 100
+   */
+  creditsPerUsage?: number | null;
+  /**
+   * The credit cost per minute
+   * @example 100
+   */
+  creditsPerMinute?: number | null;
+}
+
+export interface SetSumUpApiKeyDto {
+  /**
+   * The API key for the SumUp API
+   * @example "1234567890"
+   */
+  apiKey: string;
+}
+
+export interface SetSumUpConfigurationDto {
+  /**
+   * The currency for the SumUp configuration
+   * @example "EUR"
+   */
+  currency: "EUR";
+  /**
+   * The currency to credits rate for the SumUp configuration, e.g. 100 means 100 credits for 1 (currency) unit
+   * @example 100
+   */
+  currencyToCreditsRate: number;
+  /**
+   * Whether to adjust existing balances
+   * @example true
+   */
+  adjustExistingBalances?: boolean;
+}
+
+export interface SumUpConfigurationDto {
+  /**
+   * Whether the SumUp configuration is enabled
+   * @example true
+   */
+  enabled: boolean;
+  /**
+   * The currency for the SumUp configuration
+   * @example "EUR"
+   */
+  currency: "EUR";
+  /**
+   * The currency to credits rate for the SumUp configuration
+   * @example 100
+   */
+  currencyToCreditsRate: number;
+}
+
+export interface SumUpReaderDevice {
+  /** @example "1234567890" */
+  identifier: string;
+  /** @example "solo" */
+  model: "solo" | "virtual-solo";
+}
+
+export interface SumUpReaderDto {
+  /** @example "1234567890" */
+  id: string;
+  /** @example "Reader 1" */
+  name: string;
+  /** @example "active" */
+  status: "unknown" | "processing" | "paired" | "expired";
+  /** @example "device" */
+  device: SumUpReaderDevice;
+  /** @example {} */
+  meta?: Record<string, any>;
+  /**
+   * @format date-time
+   * @example "2021-01-01T00:00:00.000Z"
+   */
+  created_at: string;
+  /**
+   * @format date-time
+   * @example "2021-01-01T00:00:00.000Z"
+   */
+  updated_at: string;
+}
+
+export interface PairSumUpReaderDto {
+  /** @example "1234567890" */
+  pairingCode: string;
+  /** @example "Reader 1" */
+  name: string;
+}
+
+export interface SumupTopUpDto {
+  /** @example 100 */
+  tokenCount: number;
+  /** @example "1234567890" */
+  readerId: string;
+}
+
+export interface Payload {
+  /**
+   * The ID of the transaction
+   * @example "1234567890"
+   */
+  client_transaction_id: string;
+  /**
+   * The merchant code
+   * @example "MPMGEBZF"
+   */
+  merchant_code: string;
+  /**
+   * The status of the transaction
+   * @example "successful"
+   */
+  status: "successful" | "failed";
+  /**
+   * The ID of the transaction
+   * @example "8f0973dc-60df-4a8c-80ee-a06103c1d10e"
+   */
+  transaction_id: string;
+}
+
+export interface SumupTransactionCallbackDto {
+  /**
+   * The ID of the transaction
+   * @example "1234567890"
+   */
+  id: string;
+  /**
+   * The type of the transaction
+   * @example "solo.transaction.updated"
+   */
+  event_type: "solo.transaction.updated";
+  /**
+   * The payload of the transaction
+   * @example {"client_transaction_id":"1234567890","merchant_code":"MPMGEBZF","status":"successful","transaction_id":"8f0973dc-60df-4a8c-80ee-a06103c1d10e"}
+   */
+  payload: Payload;
+  /**
+   * The timestamp of the transaction
+   * @format date-time
+   * @example "2025-09-13T21:31:56.984208Z"
+   */
+  timestamp: string;
+}
+
 export interface ResourceFlowNodeSchemaDto {
   /** The name of the node type */
   type:
@@ -1787,104 +2026,6 @@ export interface AttractapFirmware {
   filenameOTA: string;
 }
 
-export interface BalanceDto {
-  /** The balance of the user */
-  value: number;
-}
-
-export interface BillingTransaction {
-  /**
-   * The unique identifier of the billing transaction
-   * @example 1
-   */
-  id: number;
-  /**
-   * The ID of the user
-   * @example 1
-   */
-  userId: number;
-  /** The user who the billing transaction belongs to */
-  user: User;
-  /**
-   * The date and time the billing transaction was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * The date and time the billing transaction was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-  /** The credit amount of the billing transaction (negative for refunds/top-ups) */
-  amount: number;
-  /** The user ID of the user who caused the billing transaction */
-  initiatorId: number;
-  /** The user who initiated the billing transaction */
-  initiator: User;
-  /** The resource usage ID of the resource usage that caused the billing transaction */
-  resourceUsageId: number;
-  /** The resource usage that caused the billing transaction */
-  resourceUsage: ResourceUsage;
-  /** The billing transaction ID of the billing transaction that is being refunded */
-  refundOfId: number;
-  /** The billing transaction that is being refunded */
-  refundOf: BillingTransaction;
-}
-
-export interface TransactionsDto {
-  data: BillingTransaction[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface ModifyBalanceDto {
-  /**
-   * The amount to modify the balance by
-   * @example 100
-   */
-  amount: number;
-}
-
-export interface ResourceBillingConfiguration {
-  /**
-   * The unique identifier of the resource billing configuration
-   * @example 1
-   */
-  id: number;
-  /**
-   * The date and time the billing transaction was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * The date and time the billing transaction was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-  /** The ID of the resource */
-  resourceId: number;
-  /** The resource */
-  resource?: object;
-  /** The credit cost per usage */
-  creditsPerUsage: number;
-  /** The credit cost per minute */
-  creditsPerMinute: number;
-}
-
-export interface UpdateResourceBillingConfigurationDto {
-  /**
-   * The credit cost per usage
-   * @example 100
-   */
-  creditsPerUsage?: number;
-  /**
-   * The credit cost per minute
-   * @example 100
-   */
-  creditsPerMinute?: number;
-}
-
 export interface InfoData {
   /** @example "Attraccess API" */
   name?: string;
@@ -2230,6 +2371,43 @@ export type UpdateMaintenanceData = ResourceMaintenance;
 
 export type CancelMaintenanceData = any;
 
+export type GetBillingBalanceData = BalanceDto;
+
+export interface GetBillingTransactionsParams {
+  /**
+   * The page number to retrieve
+   * @example 1
+   */
+  page?: number;
+  /**
+   * The number of items per page
+   * @example 10
+   */
+  limit?: number;
+  userId: number;
+}
+
+export type GetBillingTransactionsData = TransactionsDto;
+
+export type CreateManualTransactionData = number;
+
+export type GetBillingConfigurationData = ResourceBillingConfiguration;
+
+export type UpdateResourceBillingConfigurationData =
+  ResourceBillingConfiguration;
+
+export type SetSumUpApiKeyData = string;
+
+export type SetSumUpConfigurationData = SumUpConfigurationDto;
+
+export type GetSumUpConfigurationData = SumUpConfigurationDto;
+
+export type GetSumUpReadersData = SumUpReaderDto[];
+
+export type PairSumUpReaderData = SumUpReaderDto;
+
+export type SumUpTopUpCallbackData = any;
+
 export type GetNodeSchemasData = ResourceFlowNodeSchemaDto[];
 
 export type GetResourceFlowData = ResourceFlowResponseDto;
@@ -2341,30 +2519,6 @@ export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
 
 export type AnalyticsControllerGetResourceUsageHoursInDateRangeData =
   ResourceUsage[];
-
-export type GetBillingBalanceData = BalanceDto;
-
-export interface GetBillingTransactionsParams {
-  /**
-   * The page number to retrieve
-   * @example 1
-   */
-  page?: number;
-  /**
-   * The number of items per page
-   * @example 10
-   */
-  limit?: number;
-  userId: number;
-}
-
-export type GetBillingTransactionsData = TransactionsDto;
-
-export type CreateManualTransactionData = number;
-
-export type GetBillingConfigurationData = ResourceBillingConfiguration;
-
-export type UpdateBillingConfigurationData = ResourceBillingConfiguration;
 
 export namespace System {
   /**
@@ -4014,6 +4168,239 @@ export namespace ResourceMaintenances {
   }
 }
 
+export namespace Billing {
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingBalance
+   * @summary Get the billing balance for a user
+   * @request GET:/api/users/{userId}/billing/balance
+   * @secure
+   */
+  export namespace GetBillingBalance {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingBalanceData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingTransactions
+   * @summary Get the billing transactions for a user
+   * @request GET:/api/users/{userId}/billing/transactions
+   * @secure
+   */
+  export namespace GetBillingTransactions {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {
+      /**
+       * The page number to retrieve
+       * @example 1
+       */
+      page?: number;
+      /**
+       * The number of items per page
+       * @example 10
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingTransactionsData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name CreateManualTransaction
+   * @summary Top up or charge the billing balance for a user
+   * @request POST:/api/users/{userId}/billing/transactions
+   * @secure
+   */
+  export namespace CreateManualTransaction {
+    export type RequestParams = {
+      userId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ModifyBalanceDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateManualTransactionData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingConfiguration
+   * @summary Get the billing configuration for a resource
+   * @request GET:/api/resources/{resourceId}/billing/configuration
+   * @secure
+   */
+  export namespace GetBillingConfiguration {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name UpdateResourceBillingConfiguration
+   * @summary Update the billing configuration for a resource
+   * @request POST:/api/resources/{resourceId}/billing/configuration
+   * @secure
+   */
+  export namespace UpdateResourceBillingConfiguration {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateResourceBillingConfigurationDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateResourceBillingConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name SetSumUpApiKey
+   * @summary Set the SumUp configuration
+   * @request POST:/api/billing/sumup/configuration/api-key
+   * @secure
+   */
+  export namespace SetSumUpApiKey {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SetSumUpApiKeyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetSumUpApiKeyData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name SetSumUpConfiguration
+   * @summary Set the SumUp configuration
+   * @request POST:/api/billing/sumup/configuration
+   * @secure
+   */
+  export namespace SetSumUpConfiguration {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SetSumUpConfigurationDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetSumUpConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetSumUpConfiguration
+   * @summary Get the SumUp configuration
+   * @request GET:/api/billing/sumup/configuration
+   * @secure
+   */
+  export namespace GetSumUpConfiguration {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetSumUpConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetSumUpReaders
+   * @summary Get the linked SumUp readers
+   * @request GET:/api/billing/sumup/readers
+   * @secure
+   */
+  export namespace GetSumUpReaders {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetSumUpReadersData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name PairSumUpReader
+   * @summary Pair a SumUp reader
+   * @request POST:/api/billing/sumup/readers/pair
+   * @secure
+   */
+  export namespace PairSumUpReader {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = PairSumUpReaderDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = PairSumUpReaderData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name RemoveSumUpReader
+   * @summary Remove a SumUp reader
+   * @request DELETE:/api/billing/sumup/readers/{readerId}
+   * @secure
+   */
+  export namespace RemoveSumUpReader {
+    export type RequestParams = {
+      readerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = any;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name TopUpWithSumUpReader
+   * @summary Top up using a SumUp reader
+   * @request POST:/api/billing/sumup/top-up
+   * @secure
+   */
+  export namespace TopUpWithSumUpReader {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SumupTopUpDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = any;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name SumUpTopUpCallback
+   * @summary Callback from SumUp
+   * @request GET:/api/billing/sumup/top-up/callback
+   * @secure
+   */
+  export namespace SumUpTopUpCallback {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SumupTransactionCallbackDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SumUpTopUpCallbackData;
+  }
+}
+
 export namespace ResourceFlows {
   /**
    * @description Get the schemas for all node types
@@ -4474,109 +4861,6 @@ export namespace Analytics {
     export type RequestHeaders = {};
     export type ResponseBody =
       AnalyticsControllerGetResourceUsageHoursInDateRangeData;
-  }
-}
-
-export namespace Billing {
-  /**
-   * No description
-   * @tags Billing
-   * @name GetBillingBalance
-   * @summary Get the billing balance for a user
-   * @request GET:/api/users/{userId}/billing/balance
-   * @secure
-   */
-  export namespace GetBillingBalance {
-    export type RequestParams = {
-      userId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = GetBillingBalanceData;
-  }
-
-  /**
-   * No description
-   * @tags Billing
-   * @name GetBillingTransactions
-   * @summary Get the billing transactions for a user
-   * @request GET:/api/users/{userId}/billing/transactions
-   * @secure
-   */
-  export namespace GetBillingTransactions {
-    export type RequestParams = {
-      userId: number;
-    };
-    export type RequestQuery = {
-      /**
-       * The page number to retrieve
-       * @example 1
-       */
-      page?: number;
-      /**
-       * The number of items per page
-       * @example 10
-       */
-      limit?: number;
-    };
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = GetBillingTransactionsData;
-  }
-
-  /**
-   * No description
-   * @tags Billing
-   * @name CreateManualTransaction
-   * @summary Top up or charge the billing balance for a user
-   * @request POST:/api/users/{userId}/billing/transactions
-   * @secure
-   */
-  export namespace CreateManualTransaction {
-    export type RequestParams = {
-      userId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = ModifyBalanceDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = CreateManualTransactionData;
-  }
-
-  /**
-   * No description
-   * @tags Billing
-   * @name GetBillingConfiguration
-   * @summary Get the billing configuration for a resource
-   * @request GET:/api/resources/{resourceId}/billing/configuration
-   * @secure
-   */
-  export namespace GetBillingConfiguration {
-    export type RequestParams = {
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = GetBillingConfigurationData;
-  }
-
-  /**
-   * No description
-   * @tags Billing
-   * @name UpdateBillingConfiguration
-   * @summary Update the billing configuration for a resource
-   * @request POST:/api/resources/{resourceId}/billing/configuration
-   * @secure
-   */
-  export namespace UpdateBillingConfiguration {
-    export type RequestParams = {
-      resourceId: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = UpdateResourceBillingConfigurationDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = UpdateBillingConfigurationData;
   }
 }
 
@@ -6581,6 +6865,270 @@ export class Api<
         ...params,
       }),
   };
+  billing = {
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingBalance
+     * @summary Get the billing balance for a user
+     * @request GET:/api/users/{userId}/billing/balance
+     * @secure
+     */
+    getBillingBalance: (userId: number, params: RequestParams = {}) =>
+      this.request<GetBillingBalanceData, void>({
+        path: `/api/users/${userId}/billing/balance`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingTransactions
+     * @summary Get the billing transactions for a user
+     * @request GET:/api/users/{userId}/billing/transactions
+     * @secure
+     */
+    getBillingTransactions: (
+      { userId, ...query }: GetBillingTransactionsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetBillingTransactionsData, void>({
+        path: `/api/users/${userId}/billing/transactions`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name CreateManualTransaction
+     * @summary Top up or charge the billing balance for a user
+     * @request POST:/api/users/{userId}/billing/transactions
+     * @secure
+     */
+    createManualTransaction: (
+      userId: number,
+      data: ModifyBalanceDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateManualTransactionData, void>({
+        path: `/api/users/${userId}/billing/transactions`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingConfiguration
+     * @summary Get the billing configuration for a resource
+     * @request GET:/api/resources/{resourceId}/billing/configuration
+     * @secure
+     */
+    getBillingConfiguration: (resourceId: number, params: RequestParams = {}) =>
+      this.request<GetBillingConfigurationData, void>({
+        path: `/api/resources/${resourceId}/billing/configuration`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name UpdateResourceBillingConfiguration
+     * @summary Update the billing configuration for a resource
+     * @request POST:/api/resources/{resourceId}/billing/configuration
+     * @secure
+     */
+    updateResourceBillingConfiguration: (
+      resourceId: number,
+      data: UpdateResourceBillingConfigurationDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateResourceBillingConfigurationData, void>({
+        path: `/api/resources/${resourceId}/billing/configuration`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name SetSumUpApiKey
+     * @summary Set the SumUp configuration
+     * @request POST:/api/billing/sumup/configuration/api-key
+     * @secure
+     */
+    setSumUpApiKey: (data: SetSumUpApiKeyDto, params: RequestParams = {}) =>
+      this.request<SetSumUpApiKeyData, void>({
+        path: `/api/billing/sumup/configuration/api-key`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name SetSumUpConfiguration
+     * @summary Set the SumUp configuration
+     * @request POST:/api/billing/sumup/configuration
+     * @secure
+     */
+    setSumUpConfiguration: (
+      data: SetSumUpConfigurationDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetSumUpConfigurationData, void>({
+        path: `/api/billing/sumup/configuration`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetSumUpConfiguration
+     * @summary Get the SumUp configuration
+     * @request GET:/api/billing/sumup/configuration
+     * @secure
+     */
+    getSumUpConfiguration: (params: RequestParams = {}) =>
+      this.request<GetSumUpConfigurationData, void>({
+        path: `/api/billing/sumup/configuration`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetSumUpReaders
+     * @summary Get the linked SumUp readers
+     * @request GET:/api/billing/sumup/readers
+     * @secure
+     */
+    getSumUpReaders: (params: RequestParams = {}) =>
+      this.request<GetSumUpReadersData, void>({
+        path: `/api/billing/sumup/readers`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name PairSumUpReader
+     * @summary Pair a SumUp reader
+     * @request POST:/api/billing/sumup/readers/pair
+     * @secure
+     */
+    pairSumUpReader: (data: PairSumUpReaderDto, params: RequestParams = {}) =>
+      this.request<PairSumUpReaderData, void>({
+        path: `/api/billing/sumup/readers/pair`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name RemoveSumUpReader
+     * @summary Remove a SumUp reader
+     * @request DELETE:/api/billing/sumup/readers/{readerId}
+     * @secure
+     */
+    removeSumUpReader: (readerId: string, params: RequestParams = {}) =>
+      this.request<any, void>({
+        path: `/api/billing/sumup/readers/${readerId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name TopUpWithSumUpReader
+     * @summary Top up using a SumUp reader
+     * @request POST:/api/billing/sumup/top-up
+     * @secure
+     */
+    topUpWithSumUpReader: (data: SumupTopUpDto, params: RequestParams = {}) =>
+      this.request<any, void>({
+        path: `/api/billing/sumup/top-up`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name SumUpTopUpCallback
+     * @summary Callback from SumUp
+     * @request GET:/api/billing/sumup/top-up/callback
+     * @secure
+     */
+    sumUpTopUpCallback: (
+      data: SumupTransactionCallbackDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SumUpTopUpCallbackData, void>({
+        path: `/api/billing/sumup/top-up/callback`,
+        method: "GET",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+  };
   resourceFlows = {
     /**
      * @description Get the schemas for all node types
@@ -7036,113 +7584,6 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
-        format: "json",
-        ...params,
-      }),
-  };
-  billing = {
-    /**
-     * No description
-     *
-     * @tags Billing
-     * @name GetBillingBalance
-     * @summary Get the billing balance for a user
-     * @request GET:/api/users/{userId}/billing/balance
-     * @secure
-     */
-    getBillingBalance: (userId: number, params: RequestParams = {}) =>
-      this.request<GetBillingBalanceData, void>({
-        path: `/api/users/${userId}/billing/balance`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Billing
-     * @name GetBillingTransactions
-     * @summary Get the billing transactions for a user
-     * @request GET:/api/users/{userId}/billing/transactions
-     * @secure
-     */
-    getBillingTransactions: (
-      { userId, ...query }: GetBillingTransactionsParams,
-      params: RequestParams = {},
-    ) =>
-      this.request<GetBillingTransactionsData, void>({
-        path: `/api/users/${userId}/billing/transactions`,
-        method: "GET",
-        query: query,
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Billing
-     * @name CreateManualTransaction
-     * @summary Top up or charge the billing balance for a user
-     * @request POST:/api/users/{userId}/billing/transactions
-     * @secure
-     */
-    createManualTransaction: (
-      userId: number,
-      data: ModifyBalanceDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<CreateManualTransactionData, void>({
-        path: `/api/users/${userId}/billing/transactions`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Billing
-     * @name GetBillingConfiguration
-     * @summary Get the billing configuration for a resource
-     * @request GET:/api/resources/{resourceId}/billing/configuration
-     * @secure
-     */
-    getBillingConfiguration: (resourceId: number, params: RequestParams = {}) =>
-      this.request<GetBillingConfigurationData, void>({
-        path: `/api/resources/${resourceId}/billing/configuration`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Billing
-     * @name UpdateBillingConfiguration
-     * @summary Update the billing configuration for a resource
-     * @request POST:/api/resources/{resourceId}/billing/configuration
-     * @secure
-     */
-    updateBillingConfiguration: (
-      resourceId: number,
-      data: UpdateResourceBillingConfigurationDto,
-      params: RequestParams = {},
-    ) =>
-      this.request<UpdateBillingConfigurationData, void>({
-        path: `/api/resources/${resourceId}/billing/configuration`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
         format: "json",
         ...params,
       }),

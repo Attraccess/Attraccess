@@ -1,0 +1,29 @@
+{
+  "title": "Credits Aufladen",
+  "inputs": {
+    "reader": {
+      "label": "Reader"
+    },
+    "amount": {
+      "label": "Amount",
+      "description": "The amount of credits to load"
+    }
+  },
+  "actions": {
+    "topUp": "Credits aufladen"
+  },
+  "success": {
+    "toast": {
+      "title": "Credits erfolgreich geladen",
+      "description": "Credits wurden erfolgreich geladen"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Laden von Credits",
+        "description": "Credits konnten nicht geladen werden"
+      }
+    }
+  }
+}

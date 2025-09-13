@@ -11,6 +11,12 @@ import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
 
+export enum BillingTransactionStatus {
+  Pending = 'pending',
+  Completed = 'completed',
+  Failed = 'failed',
+}
+
 @Entity()
 export class BillingTransaction {
   @PrimaryGeneratedColumn()
@@ -78,4 +84,12 @@ export class BillingTransaction {
   @JoinColumn({ name: 'refundOfId' })
   @ApiProperty({ description: 'The billing transaction that is being refunded', type: () => BillingTransaction })
   refundOf!: BillingTransaction | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'The external reference e.g. sumup transaction ID' })
+  externalReference!: string | null;
+
+  @Column({ type: 'simple-enum', enum: BillingTransactionStatus })
+  @ApiProperty({ description: 'The status of the billing transaction', enum: BillingTransactionStatus })
+  status!: BillingTransactionStatus;
 }

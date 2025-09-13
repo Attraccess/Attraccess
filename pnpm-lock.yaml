@@ -104,6 +104,9 @@ importers:
       '@rollup/plugin-replace':
         specifier: ^6.0.2
         version: 6.0.2(rollup@4.40.2)
+      '@sumup/sdk':
+        specifier: ^0.0.4
+        version: 0.0.4
       '@tailwindcss/typography':
         specifier: ^0.5.16
         version: 0.5.16(tailwindcss@3.4.3(ts-node@10.9.1(@swc/core@1.5.29(@swc/helpers@0.5.17))(@types/node@20.17.43)(typescript@5.8.3)))
@@ -5560,6 +5563,10 @@ packages:
 
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+
+  '@sumup/sdk@0.0.4':
+    resolution: {integrity: sha512-nH3VzeMCbVdFHGSMAR9CO+316SMBwjJEJUT0HzbVzOVqTtrnlPbb4w3LIROpuk+IRSATXY5IHtXi9kHE67PfVQ==}
+    engines: {node: '>=18'}
 
   '@surma/rollup-plugin-off-main-thread@2.2.3':
     resolution: {integrity: sha512-lR8q/9W7hZpMWweNiAKU7NQerBnzQQLvi8qnTDU/fxItPhtZVMbPV3lbCwjhIlNBe9Bbr5V+KHshvWmVSG9cxQ==}
@@ -23026,6 +23033,8 @@ snapshots:
   '@standard-schema/spec@1.0.0': {}
 
   '@standard-schema/utils@0.3.0': {}
+
+  '@sumup/sdk@0.0.4': {}
 
   '@surma/rollup-plugin-off-main-thread@2.2.3':
     dependencies:

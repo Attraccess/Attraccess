@@ -1,0 +1,42 @@
+{
+  "status": {
+    "enabled": {
+      "title": "Aktiviert"
+    },
+    "disabled": {
+      "title": "Deaktiviert"
+    },
+    "loading": {
+      "title": "Wird geladen..."
+    }
+  },
+  "title": "Zugangsdaten",
+  "subtitle": "Verbinden Sie Attraccess mit Ihrem SumUp-Konto um digitale Zahlungen zu ermöglichen.",
+  "inputs": {
+    "apiKey": {
+      "label": "API-Schlüssel",
+      "description": "Sie können Ihren API-Schlüssel in der SumUp-Konsole finden."
+    }
+  },
+  "actions": {
+    "save": "Speichern"
+  },
+  "success": {
+    "toast": {
+      "title": "Zugangsdaten aktualisiert",
+      "description": "Zugangsdaten wurden erfolgreich aktualisiert"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Aktualisieren der Zugangsdaten",
+        "description": "Zugangsdaten konnten nicht aktualisiert werden. Bitte versuchen Sie es erneut."
+      },
+      "Invalid API key": {
+        "title": "Ungültiger API-Schlüssel",
+        "description": "Der API-Schlüssel ist ungültig. Bitte versuchen Sie es erneut."
+      }
+    }
+  }
+}

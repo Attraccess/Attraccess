@@ -104,7 +104,9 @@ describe('BillingService', () => {
 
       const result = await service.createManualTransaction(1, 2, 100);
 
-      expect(billingTransactionRepository.save).toHaveBeenCalledWith({ userId: 1, initiatorId: 2, amount: 100 });
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, initiatorId: 2, amount: 100 }),
+      );
       expect(result).toEqual({ id: 123 });
     });
 
@@ -120,7 +122,9 @@ describe('BillingService', () => {
 
       const result = await service.createManualTransaction(1, 2, -20, true);
 
-      expect(billingTransactionRepository.save).toHaveBeenCalledWith({ userId: 1, initiatorId: 2, amount: -20 });
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, initiatorId: 2, amount: -20 }),
+      );
       expect(result).toEqual({ id: 456 });
     });
   });
@@ -202,11 +206,13 @@ describe('BillingService', () => {
       await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102);
-      expect(billingTransactionRepository.save).toHaveBeenCalledWith({
-        userId: 10,
-        resourceUsageId: 13,
-        amount: -35,
-      });
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 10,
+          resourceUsageId: 13,
+          amount: -35,
+        }),
+      );
     });
   });
 });

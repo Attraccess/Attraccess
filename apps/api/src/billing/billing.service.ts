@@ -3,6 +3,7 @@ import {
   ResourceBillingConfiguration,
   ResourceUsageAction,
   User,
+  BillingTransactionStatus,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,10 +12,10 @@ import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { PaginationOptions } from '../types/request';
 import { TransactionsDto } from './dto/transactions.dto';
 import { InsufficientBalanceError } from './errors/insufficient-balance.error';
-import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
-import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
+import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
+import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 
 @Injectable()
 export class BillingService {
@@ -74,7 +75,12 @@ export class BillingService {
       throw new InsufficientBalanceError();
     }
 
-    return await this.billingTransactionRepository.save({ userId, initiatorId, amount });
+    return await this.billingTransactionRepository.save({
+      userId,
+      initiatorId,
+      amount,
+      status: BillingTransactionStatus.Completed,
+    });
   }
 
   async getResourceBillingConfiguration(resourceId: number): Promise<ResourceBillingConfiguration> {
@@ -151,6 +157,7 @@ export class BillingService {
       userId: usage.userId,
       resourceUsageId: usage.id,
       amount: -credits,
+      status: BillingTransactionStatus.Completed,
     } as Partial<BillingTransaction>);
   }
 }

@@ -21,7 +21,7 @@ export function Auth(...permissions: SystemPermission[]) {
     NeedsSystemPermissions(permissions),
     UseGuards(DualAuthGuard, SystemPermissionsGuard),
     ApiBearerAuth(),
-    ApiUnauthorizedResponse({ description: 'Unauthorized' })
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
   );
 }
 
@@ -56,7 +56,6 @@ export class SystemPermissionsGuard implements CanActivate {
     // Check each permission individually and log the result
     const results = permissionsArray.map((permission) => {
       const hasPermission = user.systemPermissions[permission] === true;
-      this.logger.debug(`Permission '${permission}': ${hasPermission}`);
       return hasPermission;
     });
 

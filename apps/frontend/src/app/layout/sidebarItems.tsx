@@ -27,6 +27,7 @@ import { useMemo } from 'react';
 import de from './sidebarItems.de.json';
 import en from './sidebarItems.en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { SumUpIcon } from '../../components/icons/sumup.icon';
 
 export type SidebarItem = {
   path: string;
@@ -95,6 +96,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
             path: '/billing/administration',
             translationKey: 'administration',
             icon: BanknoteIcon,
+          },
+          {
+            path: '/billing/sumup',
+            translationKey: 'sumup',
+            icon: (props) => <SumUpIcon width={16} height={16} {...props} />,
           },
           {
             path: '/billing/csv-export',

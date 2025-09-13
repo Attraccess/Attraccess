@@ -6,6 +6,7 @@ import { BillingTransaction, User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { DeepPartial } from 'typeorm';
 import { TransactionsDto } from './dto/transactions.dto';
+import { SumUpService } from './sumup.service';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
@@ -39,6 +40,10 @@ describe('BillingController', () => {
         {
           provide: BillingService,
           useValue: service,
+        },
+        {
+          provide: SumUpService,
+          useValue: {},
         },
       ],
     }).compile();

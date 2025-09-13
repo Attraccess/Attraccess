@@ -4,6 +4,7 @@ import en from './en.json';
 import de from './de.json';
 import { ChartNoAxesCombinedIcon } from 'lucide-react';
 import { SummaryCard } from './summary';
+import { BillingDashboardTopupCard } from './topup';
 
 export function BillingDashboardPage() {
   const { t } = useTranslations({ en, de });
@@ -13,6 +14,7 @@ export function BillingDashboardPage() {
       <PageHeader title={t('title')} icon={<ChartNoAxesCombinedIcon />} />
 
       <div className="flex flex-row flex-wrap gap-4">
+        <BillingDashboardTopupCard className="flex-grow sm:flex-none" />
         <SummaryCard className="flex-grow" transactionsPerPage={15} />
       </div>
     </div>
