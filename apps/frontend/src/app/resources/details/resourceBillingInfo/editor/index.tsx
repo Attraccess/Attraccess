@@ -1,6 +1,7 @@
 import {
   useBillingServiceGetBillingConfiguration,
   UseBillingServiceGetBillingConfigurationKeyFn,
+  useBillingServiceGetSumUpConfiguration,
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
 import {
@@ -35,7 +36,8 @@ export function ResourceBillingInfoEditor(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration({ resourceId });
+  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
+  const { data: resourceBillingConfiguration } = useBillingServiceGetBillingConfiguration({ resourceId });
   const { mutate: updateConfiguration, isPending: isSaving } = useBillingServiceUpdateResourceBillingConfiguration({
     onSuccess: () => {
       toast.success({
@@ -57,13 +59,13 @@ export function ResourceBillingInfoEditor(props: Props) {
     },
   });
 
-  const [creditsPerUsage, setCreditsPerUsage] = useState(configuration?.creditsPerUsage ?? 0);
-  const [creditsPerMinute, setCreditsPerMinute] = useState(configuration?.creditsPerMinute ?? 0);
+  const [creditsPerUsage, setCreditsPerUsage] = useState(resourceBillingConfiguration?.creditsPerUsage ?? 0);
+  const [creditsPerMinute, setCreditsPerMinute] = useState(resourceBillingConfiguration?.creditsPerMinute ?? 0);
 
   useEffect(() => {
-    setCreditsPerUsage(configuration?.creditsPerUsage ?? 0);
-    setCreditsPerMinute(configuration?.creditsPerMinute ?? 0);
-  }, [configuration]);
+    setCreditsPerUsage(resourceBillingConfiguration?.creditsPerUsage ?? 0);
+    setCreditsPerMinute(resourceBillingConfiguration?.creditsPerMinute ?? 0);
+  }, [resourceBillingConfiguration]);
 
   const onSubmit = useCallback(async () => {
     updateConfiguration({
@@ -86,7 +88,7 @@ export function ResourceBillingInfoEditor(props: Props) {
           <ModalBody>
             <Form onSubmit={onSubmit}>
               <NumberInput
-                label={t('inputs.creditsPerUsage.label')}
+                label={t('inputs.creditsPerUsage.label', { currency: configuration?.currency })}
                 description={t('inputs.creditsPerUsage.description')}
                 value={creditsPerUsage}
                 minValue={0}
@@ -96,7 +98,7 @@ export function ResourceBillingInfoEditor(props: Props) {
                 defaultValue={0}
               />
               <NumberInput
-                label={t('inputs.creditsPerMinute.label')}
+                label={t('inputs.creditsPerMinute.label', { currency: configuration?.currency })}
                 description={t('inputs.creditsPerMinute.description')}
                 value={creditsPerMinute}
                 minValue={0}

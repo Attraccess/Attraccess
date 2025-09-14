@@ -1,29 +1,34 @@
 {
-  "title": "Credits Aufladen",
+  "title": "Guthaben Aufladen",
+  "subtitle": "Wählen Sie ein Geldkarten-Lesegerät und wählen Sie den Betrag, den Sie aufladen möchten.",
   "inputs": {
     "reader": {
-      "label": "Reader"
+      "label": "Geldkarten-Lesegerät"
     },
     "amount": {
-      "label": "Amount",
-      "description": "The amount of credits to load"
+      "label": "Betrag",
+      "description": "Wählen Sie den Betrag, den Sie aufladen möchten"
     }
   },
   "actions": {
-    "topUp": "Credits aufladen"
+    "topUp": "Jetzt {{amount}} {{currency}} aufladen"
   },
   "success": {
     "toast": {
-      "title": "Credits erfolgreich geladen",
-      "description": "Credits wurden erfolgreich geladen"
+      "title": "Guthaben erfolgreich geladen",
+      "description": "Guthaben wurde erfolgreich geladen"
     }
   },
   "error": {
     "toast": {
       "generic": {
-        "title": "Fehler beim Laden von Credits",
-        "description": "Credits konnten nicht geladen werden"
+        "title": "Fehler bei der Guthabenaufladung",
+        "description": "Etwas ist schief gelaufen"
       }
     }
+  },
+  "topUpInstructions": {
+    "title": "Wie geht's weiter?",
+    "description": "Nachdem klick auf \"Jetzt aufladen\", gehen Sie bitte zum Geldkarten-Lesegerät und folgen Sie den Anweisungen auf dem Bildschirm des Lesegeräts. \nSobald die Transaktion abgeschlossen ist, kann es bis zu 60 Sekunden dauern, \nbis das Guthaben auf Ihrem Konto erscheint. Den aktuellen Status können Sie in der Transaktionshistorie einsehen."
   }
 }

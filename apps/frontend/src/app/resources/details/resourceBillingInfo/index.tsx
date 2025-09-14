@@ -16,6 +16,7 @@ import {
 import { CreditCard, Edit2Icon, Info } from 'lucide-react';
 import {
   useBillingServiceGetBillingConfiguration,
+  useBillingServiceGetSumUpConfiguration,
   useLicenseServiceGetLicenseInformation,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
@@ -33,7 +34,8 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
   const { resourceId, ...cardProps } = props;
 
   const { t } = useTranslations({ en, de });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration({ resourceId });
+  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
+  const { data: resourceBillingConfiguration } = useBillingServiceGetBillingConfiguration({ resourceId });
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
@@ -42,7 +44,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return null;
   }
 
-  if (!configuration) {
+  if (!resourceBillingConfiguration) {
     return null;
   }
 
@@ -50,8 +52,8 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return null;
   }
 
-  const creditsPerUsage = configuration.creditsPerUsage ?? 0;
-  const creditsPerMinute = configuration.creditsPerMinute ?? 0;
+  const creditsPerUsage = resourceBillingConfiguration.creditsPerUsage ?? 0;
+  const creditsPerMinute = resourceBillingConfiguration.creditsPerMinute ?? 0;
   const isFree = creditsPerUsage === 0 && creditsPerMinute === 0;
 
   const exampleMinutes = 10;
@@ -112,15 +114,21 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
               <TableBody>
                 <TableRow>
                   <TableCell>{t('perUse.label')}</TableCell>
-                  <TableCell>{t('perUse.value', { credits: creditsPerUsage })}</TableCell>
+                  <TableCell>
+                    {t('perUse.value', { credits: creditsPerUsage, currency: configuration?.currency })}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>{t('perMinute.label')}</TableCell>
-                  <TableCell>{t('perMinute.value', { credits: creditsPerMinute })}</TableCell>
+                  <TableCell>
+                    {t('perMinute.value', { credits: creditsPerMinute, currency: configuration?.currency })}
+                  </TableCell>
                 </TableRow>
                 <TableRow className="text-default-500">
                   <TableCell>{t('example.label')}</TableCell>
-                  <TableCell>{t('example.value', { credits: exampleCost })}</TableCell>
+                  <TableCell>
+                    {t('example.value', { credits: exampleCost, currency: configuration?.currency })}
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>

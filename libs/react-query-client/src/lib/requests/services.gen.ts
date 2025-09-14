@@ -2083,7 +2083,7 @@ export class BillingService {
     public static topUpWithSumUpReader(data: TopUpWithSumUpReaderData): CancelablePromise<void> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/billing/sumup/top-up',
+            url: '/api/billing/top-up/sumup',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -2101,10 +2101,20 @@ export class BillingService {
      */
     public static sumUpTopUpCallback(data: SumUpTopUpCallbackData): CancelablePromise<SumUpTopUpCallbackResponse> {
         return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/billing/sumup/top-up/callback',
+            method: 'POST',
+            url: '/api/billing/top-up/sumup/callback',
             body: data.requestBody,
-            mediaType: 'application/json',
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * @throws ApiError
+     */
+    public static billingControllerStreamEvents(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/billing/transactions/live',
             errors: {
                 401: 'Unauthorized'
             }

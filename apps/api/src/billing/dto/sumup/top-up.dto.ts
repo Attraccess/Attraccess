@@ -1,11 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 
 export class SumupTopUpDto {
   @IsNumber()
   @IsNotEmpty()
-  @ApiProperty({ type: Number, example: 100 })
-  tokenCount: number;
+  @Min(1)
+  @ApiProperty({ type: Number, example: 100, minimum: 1 })
+  amount: number;
 
   @IsString()
   @IsNotEmpty()

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString } from 'class-validator';
+import { IsEnum, IsObject, IsString } from 'class-validator';
 
 export enum SumupTransactionEventType {
   SoloTransactionUpdated = 'solo.transaction.updated',
@@ -69,6 +69,7 @@ export class SumupTransactionCallbackDto {
     },
     type: Payload,
   })
+  @IsObject()
   payload: Payload;
 
   @ApiProperty({

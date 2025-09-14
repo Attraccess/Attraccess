@@ -17,17 +17,7 @@
     "currency": {
       "label": "Währung",
       "description": "Wählen Sie die Währung für die Zahlungen"
-    },
-    "currencyToCreditsRate": {
-      "label": "Währung zu Credits Rate",
-      "description": "Wieviele Credits sollen pro 1 (Währung) verrechnet werden"
-    },
-    "exampleExchange": "1 {{currency}} = {{credits}} Credits",
-    "adjustExistingBalances": {
-      "label": "Bestehende Guthaben anpassen",
-      "description": "Wenn diese Option aktiviert ist, werden die bestehenden Guthaben angepasst, um die neue Währung zu Credits Rate zu berücksichtigen"
-    },
-    "exampleAdjustedBalances": "Guthaben vorher: {{oldBalance}} Credits, Guthaben nachher: {{newBalance}} Credits"
+    }
   },
   "actions": {
     "save": "Speichern"

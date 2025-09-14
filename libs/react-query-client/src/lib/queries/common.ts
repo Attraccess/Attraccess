@@ -2,7 +2,6 @@
 
 import { UseQueryResult } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-import { SumupTransactionCallbackDto } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -286,12 +285,10 @@ export type BillingServiceGetSumUpReadersDefaultResponse = Awaited<ReturnType<ty
 export type BillingServiceGetSumUpReadersQueryResult<TData = BillingServiceGetSumUpReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetSumUpReadersKey = "BillingServiceGetSumUpReaders";
 export const UseBillingServiceGetSumUpReadersKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetSumUpReadersKey, ...(queryKey ?? [])];
-export type BillingServiceSumUpTopUpCallbackDefaultResponse = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
-export type BillingServiceSumUpTopUpCallbackQueryResult<TData = BillingServiceSumUpTopUpCallbackDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useBillingServiceSumUpTopUpCallbackKey = "BillingServiceSumUpTopUpCallback";
-export const UseBillingServiceSumUpTopUpCallbackKeyFn = ({ requestBody }: {
-  requestBody: SumupTransactionCallbackDto;
-}, queryKey?: Array<unknown>) => [useBillingServiceSumUpTopUpCallbackKey, ...(queryKey ?? [{ requestBody }])];
+export type BillingServiceBillingControllerStreamEventsDefaultResponse = Awaited<ReturnType<typeof BillingService.billingControllerStreamEvents>>;
+export type BillingServiceBillingControllerStreamEventsQueryResult<TData = BillingServiceBillingControllerStreamEventsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceBillingControllerStreamEventsKey = "BillingServiceBillingControllerStreamEvents";
+export const UseBillingServiceBillingControllerStreamEventsKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceBillingControllerStreamEventsKey, ...(queryKey ?? [])];
 export type ResourceFlowsServiceGetNodeSchemasDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getNodeSchemas>>;
 export type ResourceFlowsServiceGetNodeSchemasQueryResult<TData = ResourceFlowsServiceGetNodeSchemasDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceFlowsServiceGetNodeSchemasKey = "ResourceFlowsServiceGetNodeSchemas";
@@ -400,6 +397,7 @@ export type BillingServiceSetSumUpApiKeyMutationResult = Awaited<ReturnType<type
 export type BillingServiceSetSumUpConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpConfiguration>>;
 export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
 export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
+export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;

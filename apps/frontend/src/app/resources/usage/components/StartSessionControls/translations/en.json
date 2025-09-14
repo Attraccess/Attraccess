@@ -14,7 +14,7 @@
         },
         "INSUFFICIENT_BALANCE": {
           "title": "Insufficient Balance",
-          "description": "You do not have enough credits to start the session. Please add more credits."
+          "description": "You do not have enough money to start the session. Please add more money."
         }
       }
     },

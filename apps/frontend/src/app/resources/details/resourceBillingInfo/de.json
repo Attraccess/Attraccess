@@ -2,18 +2,18 @@
   "title": "Abrechnung",
   "free": {
     "title": "Kostenlos",
-    "description": "Diese Ressource ist kostenlos nutzbar. Keine Credits erforderlich."
+    "description": "Diese Ressource ist kostenlos nutzbar."
   },
   "perUse": {
     "label": "Pro Nutzung",
-    "value": "{{credits}} Credits"
+    "value": "{{credits}} {{currency}}"
   },
   "perMinute": {
     "label": "Pro Minute",
-    "value": "{{credits}} Credits"
+    "value": "{{credits}} {{currency}}"
   },
   "example": {
     "label": "Beispielkosten (10 Min)",
-    "value": "{{credits}} Credits"
+    "value": "{{credits}} {{currency}}"
   }
 }

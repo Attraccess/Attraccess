@@ -1931,19 +1931,9 @@ export const $SetSumUpConfigurationDto = {
             description: 'The currency for the SumUp configuration',
             example: 'EUR',
             enum: ['EUR']
-        },
-        currencyToCreditsRate: {
-            type: 'number',
-            description: 'The currency to credits rate for the SumUp configuration, e.g. 100 means 100 credits for 1 (currency) unit',
-            example: 100
-        },
-        adjustExistingBalances: {
-            type: 'boolean',
-            description: 'Whether to adjust existing balances',
-            example: true
         }
     },
-    required: ['currency', 'currencyToCreditsRate']
+    required: ['currency']
 } as const;
 
 export const $SumUpConfigurationDto = {
@@ -1959,14 +1949,9 @@ export const $SumUpConfigurationDto = {
             description: 'The currency for the SumUp configuration',
             example: 'EUR',
             enum: ['EUR']
-        },
-        currencyToCreditsRate: {
-            type: 'number',
-            description: 'The currency to credits rate for the SumUp configuration',
-            example: 100
         }
     },
-    required: ['enabled', 'currency', 'currencyToCreditsRate']
+    required: ['enabled', 'currency']
 } as const;
 
 export const $SumUpReaderDevice = {
@@ -2046,16 +2031,17 @@ export const $PairSumUpReaderDto = {
 export const $SumupTopUpDto = {
     type: 'object',
     properties: {
-        tokenCount: {
+        amount: {
             type: 'number',
-            example: 100
+            example: 100,
+            minimum: 1
         },
         readerId: {
             type: 'string',
             example: '1234567890'
         }
     },
-    required: ['tokenCount', 'readerId']
+    required: ['amount', 'readerId']
 } as const;
 
 export const $Payload = {

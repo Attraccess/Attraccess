@@ -1,13 +1,12 @@
 {
   "title": "Manual Transactions",
-  "subtitle": "Add or subtract credits manually to a user.",
+  "subtitle": "Add or subtract balance manually to a user.",
   "inputs": {
     "amount": "Amount"
   },
   "actions": {
     "createTransaction": "Create Transaction"
   },
-  "balance": "{{balance}} Credits",
   "toast": {
     "error": {
       "generic": {
@@ -16,7 +15,7 @@
       },
       "INSUFFICIENT_BALANCE": {
         "title": "Insufficient Balance",
-        "description": "The user does not have enough credits."
+        "description": "The user does not have enough balance."
       }
     },
     "success": {

@@ -10,11 +10,14 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Logger,
   Param,
   ParseIntPipe,
   Post,
   Query,
   Req,
+  Request,
+  Sse,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
@@ -31,10 +34,13 @@ import { PairSumUpReaderDto } from './dto/sumup/pair-sumup-reader.dto';
 import { SetSumUpConfigurationDto } from './dto/sumup/set-sumup-configuration.dto';
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
+import { Observable } from 'rxjs';
 
 @ApiTags('Billing')
 @Controller()
 export class BillingController {
+  private readonly logger = new Logger(BillingController.name);
+
   constructor(
     private readonly billingService: BillingService,
     private readonly sumUpService: SumUpService,
@@ -186,7 +192,7 @@ export class BillingController {
     return await this.sumUpService.removeReader(readerId);
   }
 
-  @Post('/billing/sumup/top-up')
+  @Post('/billing/top-up/sumup')
   @Auth()
   @ApiOperation({
     summary: 'Top up using a SumUp reader',
@@ -196,10 +202,10 @@ export class BillingController {
     @Body() body: SumupTopUpDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<BillingTransaction> {
-    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.tokenCount);
+    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
   }
 
-  @Post('/billing/sumup/top-up/callback')
+  @Post('/billing/top-up/sumup/callback')
   @ApiOperation({
     summary: 'Callback from SumUp',
     operationId: 'sumUpTopUpCallback',
@@ -208,5 +214,26 @@ export class BillingController {
     await this.sumUpService.handleTransactionCallback(data);
 
     return { message: 'OK' };
+  }
+
+  @Sse('/billing/transactions/live')
+  @Auth()
+  async streamEvents(
+    @Request() request: AuthenticatedRequest,
+  ): Promise<Observable<{ data: BillingTransaction | { keepalive: true } }>> {
+    this.logger.log(`Client connected to SSE for user ${request.user.id}`);
+
+    // Get the subject for this resource
+    const subject = this.sumUpService.getTransactionSubject(request.user.id);
+
+    // Send initial state immediately
+    setTimeout(async () => {
+      subject.next({
+        data: { keepalive: true },
+      });
+    }, 100);
+
+    // Create an observable from the subject
+    return subject.asObservable();
   }
 }

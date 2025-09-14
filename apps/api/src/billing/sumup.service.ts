@@ -11,6 +11,8 @@ import { Currency, SetSumUpConfigurationDto } from './dto/sumup/set-sumup-config
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../config/app.config';
 import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { Subject } from 'rxjs';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -18,6 +20,8 @@ export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 export class SumUpService {
   private readonly logger = new Logger(SumUpService.name);
   private readonly appConfig: AppConfigType;
+  private readonly transactionSubjects: Map<number, Subject<{ data: BillingTransaction | { keepalive: true } }>> =
+    new Map();
 
   constructor(
     @InjectRepository(Setting)
@@ -28,6 +32,13 @@ export class SumUpService {
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
   ) {
     this.appConfig = this.configService.get<AppConfigType>('app');
+  }
+
+  public getTransactionSubject(userId: number): Subject<{ data: BillingTransaction | { keepalive: true } }> {
+    if (!this.transactionSubjects.has(userId)) {
+      this.transactionSubjects.set(userId, new Subject<{ data: BillingTransaction | { keepalive: true } }>());
+    }
+    return this.transactionSubjects.get(userId);
   }
 
   async setApiKey(token: string): Promise<void> {
@@ -50,64 +61,26 @@ export class SumUpService {
   }
 
   async setConfiguration(nextConfigurationData: SetSumUpConfigurationDto): Promise<SumUpConfigurationDto> {
-    if (nextConfigurationData.currencyToCreditsRate <= 0) {
-      throw new BadRequestException('Currency to credits rate must be greater than 0');
-    }
-
     if (!Object.values(Currency).includes(nextConfigurationData.currency)) {
       throw new BadRequestException('Invalid currency');
     }
 
-    await this.settingRepository.manager.transaction(async (transactionalEntityManager) => {
-      const existingCurrency = await transactionalEntityManager.findOneBy(Setting, {
+    const existingCurrency = await this.settingRepository.findOneBy({
+      parent: 'sumup',
+      key: 'currency',
+    });
+
+    if (existingCurrency) {
+      await this.settingRepository.update(existingCurrency.id, {
+        value: nextConfigurationData.currency,
+      });
+    } else {
+      await this.settingRepository.insert({
         parent: 'sumup',
         key: 'currency',
+        value: nextConfigurationData.currency,
       });
-      const existingCurrencyToCreditsRate = await transactionalEntityManager.findOneBy(Setting, {
-        parent: 'sumup',
-        key: 'currencyToCreditsRate',
-      });
-
-      if (nextConfigurationData.adjustExistingBalances) {
-        const currentCurrencyToCreditsRate = existingCurrencyToCreditsRate
-          ? Number(existingCurrencyToCreditsRate.value)
-          : 100;
-
-        const factor = nextConfigurationData.currencyToCreditsRate / currentCurrencyToCreditsRate;
-
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .update(User)
-          .set({
-            creditBalance: () => `creditBalance * ${factor}`,
-          })
-          .execute();
-      }
-
-      if (existingCurrency) {
-        await transactionalEntityManager.update(Setting, existingCurrency.id, {
-          value: nextConfigurationData.currency,
-        });
-      } else {
-        await transactionalEntityManager.insert(Setting, {
-          parent: 'sumup',
-          key: 'currency',
-          value: nextConfigurationData.currency,
-        });
-      }
-
-      if (existingCurrencyToCreditsRate) {
-        await transactionalEntityManager.update(Setting, existingCurrencyToCreditsRate.id, {
-          value: nextConfigurationData.currencyToCreditsRate.toString(),
-        });
-      } else {
-        await transactionalEntityManager.insert(Setting, {
-          parent: 'sumup',
-          key: 'currencyToCreditsRate',
-          value: nextConfigurationData.currencyToCreditsRate.toString(),
-        });
-      }
-    });
+    }
 
     return await this.getConfiguration();
   }
@@ -119,7 +92,6 @@ export class SumUpService {
       return {
         enabled: false,
         currency: Currency.EUR,
-        currencyToCreditsRate: 100,
       };
     }
 
@@ -134,18 +106,6 @@ export class SumUpService {
     }
 
     const currency = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'currency' });
-    const currencyToCreditsRate = await this.settingRepository.findOneBy({
-      parent: 'sumup',
-      key: 'currencyToCreditsRate',
-    });
-
-    let currencyToCreditsRateValue = 100;
-    if (currencyToCreditsRate) {
-      currencyToCreditsRateValue = Number(currencyToCreditsRate.value);
-      if (isNaN(currencyToCreditsRateValue)) {
-        currencyToCreditsRateValue = 100;
-      }
-    }
 
     let currencyValue = Currency.EUR;
     if (currency) {
@@ -155,7 +115,6 @@ export class SumUpService {
     return {
       enabled: isEnabled,
       currency: currencyValue,
-      currencyToCreditsRate: currencyToCreditsRateValue,
     };
   }
 
@@ -213,16 +172,7 @@ export class SumUpService {
     }
   }
 
-  async topUpWithReader(userId: number, readerId: string, tokenCount: number): Promise<BillingTransaction> {
-    const currencyToCreditsRate = await this.settingRepository.findOneBy({
-      parent: 'sumup',
-      key: 'currencyToCreditsRate',
-    });
-    let currencyToCreditsRateValue = Number(currencyToCreditsRate?.value);
-    if (isNaN(currencyToCreditsRateValue)) {
-      currencyToCreditsRateValue = 100;
-    }
-
+  async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
     const currency = await this.settingRepository.findOneBy({
       parent: 'sumup',
       key: 'currency',
@@ -242,27 +192,45 @@ export class SumUpService {
         throw new BadRequestException('Unsupported currency');
     }
 
-    const currencyAmount = tokenCount * currencyToCreditsRateValue;
-
     const sumUp = await this.getSumUp();
     const merchant = await sumUp.merchant.get();
     const merchantCode = merchant.merchant_profile.merchant_code;
-    const checkout = await sumUp.readers.createCheckout(merchantCode, readerId, {
-      description: 'Attraccess Top-up',
-      total_amount: {
-        currency: 'EUR',
-        value: currencyAmount,
-        minor_unit: minorUnit,
-      },
-      return_url: this.appConfig.ATTRACCESS_URL + '/api/billing/sumup/top-up/callback',
-    });
 
-    return await this.billingTransactionRepository.save({
-      userId,
-      amount: tokenCount,
-      externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
-      status: BillingTransactionStatus.Pending,
-    });
+    let returnUrl: string;
+    if (this.appConfig.ATTRACCESS_URL.startsWith('https://')) {
+      returnUrl = this.appConfig.ATTRACCESS_URL + '/api/billing/top-up/sumup/callback';
+    }
+
+    try {
+      const checkout = await sumUp.readers.createCheckout(merchantCode, readerId, {
+        description: 'Attraccess Top-up',
+        total_amount: {
+          currency: 'EUR',
+          value: amount * 10 ** minorUnit,
+          minor_unit: minorUnit,
+        },
+        return_url: returnUrl,
+      });
+
+      const transaction = await this.billingTransactionRepository.save({
+        userId,
+        amount: amount,
+        externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
+        status: BillingTransactionStatus.Pending,
+      });
+
+      this.getTransactionSubject(userId).next({ data: transaction });
+
+      return transaction;
+    } catch (error) {
+      if (error.error.errors.details === 'Not Found' && error.status === 404) {
+        throw new BadRequestException('READER_NOT_FOUND');
+      }
+
+      console.log('error', JSON.stringify(error, null, 2));
+
+      throw error;
+    }
   }
 
   async handleTransactionCallback(data: DeepPartial<SumupTransactionCallbackDto>): Promise<void> {
@@ -277,18 +245,24 @@ export class SumUpService {
       return;
     }
 
+    await this.updateTransactionStatusBySumupServer(transactionId);
+  }
+
+  private async updateTransactionStatusBySumupServer(sumupTransactionId: string): Promise<void> {
     const transaction = await this.billingTransactionRepository.findOneBy({
-      externalReference: `sumup_topup_transaction:${transactionId}`,
+      externalReference: `sumup_topup_transaction:${sumupTransactionId}`,
     });
+
     if (!transaction) {
-      this.logger.warn('Received sumup webhook event for unknown transaction', { transactionId, fullEvent: data });
-      return;
+      throw new BadRequestException('Sumup transaction not found');
     }
 
     const sumup = await this.getSumUp();
     const merchant = await sumup.merchant.get();
     const merchantCode = merchant.merchant_profile.merchant_code;
-    const sumUpTransactionData = await sumup.transactions.get(merchantCode, { client_transaction_id: transactionId });
+    const sumUpTransactionData = await sumup.transactions.get(merchantCode, {
+      client_transaction_id: sumupTransactionId,
+    });
 
     switch (sumUpTransactionData.status) {
       case 'CANCELLED':
@@ -308,13 +282,34 @@ export class SumUpService {
         break;
 
       default:
-        this.logger.warn('Received sumup webhook event for unknown transaction status', {
-          transactionId,
-          fullEvent: data,
-        });
-        return;
+        throw new BadRequestException('Unknown sumup transaction status');
     }
 
-    await this.billingTransactionRepository.save(transaction);
+    const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+    this.getTransactionSubject(transaction.userId).next({ data: updatedTransaction });
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async processPendingTransactions(): Promise<void> {
+    const transactions = await this.billingTransactionRepository.findBy({
+      status: BillingTransactionStatus.Pending,
+    });
+
+    for (const transaction of transactions) {
+      if (!transaction.externalReference.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
+        continue;
+      }
+
+      const transactionId = transaction.externalReference.split(':')[1];
+      if (!transactionId) {
+        this.logger.error('Stored sumup transaction ID is invalid', { transactionId: transaction.externalReference });
+        transaction.status = BillingTransactionStatus.Failed;
+        const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+        this.getTransactionSubject(transaction.userId).next({ data: updatedTransaction });
+        continue;
+      }
+
+      await this.updateTransactionStatusBySumupServer(transactionId);
+    }
   }
 }

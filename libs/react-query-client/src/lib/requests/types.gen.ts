@@ -1327,14 +1327,6 @@ export type SetSumUpConfigurationDto = {
      * The currency for the SumUp configuration
      */
     currency: 'EUR';
-    /**
-     * The currency to credits rate for the SumUp configuration, e.g. 100 means 100 credits for 1 (currency) unit
-     */
-    currencyToCreditsRate: number;
-    /**
-     * Whether to adjust existing balances
-     */
-    adjustExistingBalances?: boolean;
 };
 
 /**
@@ -1353,10 +1345,6 @@ export type SumUpConfigurationDto = {
      * The currency for the SumUp configuration
      */
     currency: 'EUR';
-    /**
-     * The currency to credits rate for the SumUp configuration
-     */
-    currencyToCreditsRate: number;
 };
 
 export type SumUpReaderDevice = {
@@ -1394,7 +1382,7 @@ export type PairSumUpReaderDto = {
 };
 
 export type SumupTopUpDto = {
-    tokenCount: number;
+    amount: number;
     readerId: string;
 };
 
@@ -4558,7 +4546,7 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/billing/sumup/top-up': {
+    '/api/billing/top-up/sumup': {
         post: {
             req: TopUpWithSumUpReaderData;
             res: {
@@ -4569,11 +4557,17 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/billing/sumup/top-up/callback': {
-        get: {
+    '/api/billing/top-up/sumup/callback': {
+        post: {
             req: SumUpTopUpCallbackData;
             res: {
-                200: unknown;
+                201: unknown;
+            };
+        };
+    };
+    '/api/billing/transactions/live': {
+        get: {
+            res: {
                 /**
                  * Unauthorized
                  */

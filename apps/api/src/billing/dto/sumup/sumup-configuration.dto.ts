@@ -21,12 +21,4 @@ export class SumUpConfigurationDto {
     enum: Currency,
   })
   currency!: Currency;
-
-  @IsNumber()
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'The currency to credits rate for the SumUp configuration',
-    example: 100,
-  })
-  currencyToCreditsRate!: number;
 }
