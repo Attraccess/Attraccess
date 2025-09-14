@@ -199,7 +199,7 @@ export class BillingController {
     return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.tokenCount);
   }
 
-  @Get('/billing/sumup/top-up/callback')
+  @Post('/billing/sumup/top-up/callback')
   @ApiOperation({
     summary: 'Callback from SumUp',
     operationId: 'sumUpTopUpCallback',
