@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useBillingServiceGetBillingBalanceKey,
+  UseBillingServiceGetBillingBalanceKeyFn,
   useBillingServiceGetBillingTransactionsKey,
 } from '@attraccess/react-query-client';
+import { useAuth } from '../../hooks/useAuth';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,12 +37,18 @@ export function Layout({ children, noLayout }: LayoutProps) {
     setIsOpen(!isOpen);
   };
 
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
+
+  const onLiveTransactionUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
+    queryClient.invalidateQueries({
+      queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: currentUser?.id ?? 0 }),
+    });
+  }, [currentUser, queryClient]);
+
   useLiveTransactionUpdates({
-    onUpdate: () => {
-      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
-      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingBalanceKey] });
-    },
+    onUpdate: onLiveTransactionUpdate,
   });
 
   if (noLayout) {

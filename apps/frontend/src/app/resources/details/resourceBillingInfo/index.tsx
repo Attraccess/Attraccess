@@ -50,7 +50,9 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
   const formatNumber = useNumberFormatter();
 
   const { user: currentUser } = useAuth();
-  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 });
+  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
+    refetchInterval: 5000,
+  });
 
   const adjustedBalance = useMemo(() => {
     if (!configuration) {
