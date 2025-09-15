@@ -5,6 +5,7 @@ import {
   User,
   BillingTransactionStatus,
   Setting,
+  BillingTransactionItem,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -33,6 +34,8 @@ export class BillingService {
     private readonly liveNotificationsService: LiveNotificationsService,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
+    @InjectRepository(BillingTransactionItem)
+    private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -102,7 +105,7 @@ export class BillingService {
       where: { userId },
       skip: (page - 1) * limit,
       take: limit,
-      relations: ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf'],
+      relations: ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'],
       order: { createdAt: 'DESC', id: 'DESC' },
     });
 
@@ -215,20 +218,36 @@ export class BillingService {
 
     const configuration = await this.getResourceBillingConfiguration(usage.resource.id);
 
-    let credits = configuration.creditsPerMinute * Math.ceil(usage.usageInMinutes);
-    credits += configuration.creditsPerUsage;
+    const creditsForUsageDuration = configuration.creditsPerMinute * Math.ceil(usage.usageInMinutes);
+    const creditsForSession = configuration.creditsPerUsage;
+    let totalCredits = creditsForUsageDuration;
+    totalCredits += creditsForSession;
 
-    if (credits === 0) {
+    if (totalCredits === 0) {
       return;
     }
 
-    const transaction = await this.billingTransactionRepository.save({
-      userId: usage.userId,
-      resourceUsageId: usage.id,
-      amount: -credits,
-      status: BillingTransactionStatus.Completed,
-    } as Partial<BillingTransaction>);
+    await this.billingTransactionItemRepository.manager.transaction(async (transactionalEntityManager) => {
+      const transaction = await transactionalEntityManager.save(BillingTransaction, {
+        userId: usage.userId,
+        resourceUsageId: usage.id,
+        amount: -totalCredits,
+        status: BillingTransactionStatus.Completed,
+      } as Partial<BillingTransaction>);
 
-    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+      await transactionalEntityManager.save(BillingTransactionItem, {
+        billingTransactionId: transaction.id,
+        name: 'PER_SESSION',
+        value: creditsForSession,
+      });
+
+      await transactionalEntityManager.save(BillingTransactionItem, {
+        billingTransactionId: transaction.id,
+        name: 'PER_MINUTE',
+        value: creditsForUsageDuration,
+      });
+
+      this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    });
   }
 }

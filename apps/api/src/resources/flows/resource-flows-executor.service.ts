@@ -85,7 +85,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly configService: ConfigService,
     private readonly mqttClientService: MqttClientService,
-    private readonly resourceUsageService: ResourceUsageService
+    private readonly resourceUsageService: ResourceUsageService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -131,7 +131,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
 
     this.logger.log(
-      `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`
+      `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
     );
 
     try {
@@ -242,7 +242,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async triggerResourceUsageNode(
     resourceId: number,
     eventType: ResourceFlowNodeType,
-    eventData: UsageEventData
+    eventData: UsageEventData,
   ) {
     this.logger.debug(`Looking for flow nodes of type '${eventType}' for resource ID: ${resourceId}`);
 
@@ -259,7 +259,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     this.logger.log(
-      `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`
+      `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`,
     );
 
     await this.startFlow(eventNodes, { payload: eventData });
@@ -283,7 +283,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       await Promise.all(
         nodes.map((node) => {
           return this.processNode(flowRunId, node, data);
-        })
+        }),
       );
       this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
     } catch (error) {
@@ -324,6 +324,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
+        case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
@@ -374,7 +376,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       const processingTime = Date.now() - startTime;
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
-        error.stack
+        error.stack,
       );
 
       await this.createFlowLog({
@@ -390,7 +392,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async executeNextNodes(
     flowRunId: string,
     node: ResourceFlowNode,
-    resultOfPreviousNode: NodeProcessingResult
+    resultOfPreviousNode: NodeProcessingResult,
   ) {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
@@ -403,13 +405,13 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     if (edgesFromThisNode.length === 0) {
       this.logger.debug(
-        `No outgoing edges found from node ID: ${node.id} (Type: ${node.type}) - flow execution stops here`
+        `No outgoing edges found from node ID: ${node.id} (Type: ${node.type}) - flow execution stops here`,
       );
       return;
     }
 
     this.logger.debug(
-      `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`
+      `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`,
     );
 
     // Execute each edge individually instead of deduplicating target nodes
@@ -495,7 +497,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const url = this.compileTemplate(data.url ?? '', input);
     const method = this.compileTemplate(data.method ?? '', input);
     const headers = Object.fromEntries(
-      Object.entries(data.headers).map(([key, value]) => [key, this.compileTemplate(value, input)])
+      Object.entries(data.headers).map(([key, value]) => [key, this.compileTemplate(value, input)]),
     );
     const body = this.compileTemplate(data.body ?? '', input);
 

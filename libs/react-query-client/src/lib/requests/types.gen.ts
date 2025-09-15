@@ -1185,6 +1185,37 @@ export type BalanceDto = {
     value: number;
 };
 
+export type BillingTransactionItem = {
+    /**
+     * The unique identifier of the billing transaction item
+     */
+    id: number;
+    /**
+     * The ID of the billing transaction
+     */
+    billingTransactionId: number;
+    /**
+     * The billing transaction
+     */
+    billingTransaction: BillingTransaction;
+    /**
+     * The name of the billing transaction item
+     */
+    name: string;
+    /**
+     * The description of the billing transaction item
+     */
+    description: string | null;
+    /**
+     * The external reference of the billing transaction item
+     */
+    externalReference: string | null;
+    /**
+     * The value of the billing transaction item
+     */
+    value: number;
+};
+
 export type BillingTransaction = {
     /**
      * The unique identifier of the billing transaction
@@ -1242,6 +1273,10 @@ export type BillingTransaction = {
      * The status of the billing transaction
      */
     status: 'pending' | 'completed' | 'failed';
+    /**
+     * The custom items of the billing transaction
+     */
+    items: BillingTransactionItem;
 };
 
 /**

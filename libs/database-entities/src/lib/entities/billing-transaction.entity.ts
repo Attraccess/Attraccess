@@ -6,10 +6,12 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
+import { BillingTransactionItem as BillingTransactionItems } from './billing-transaction-item.entity';
 
 export enum BillingTransactionStatus {
   Pending = 'pending',
@@ -92,4 +94,10 @@ export class BillingTransaction {
   @Column({ type: 'simple-enum', enum: BillingTransactionStatus })
   @ApiProperty({ description: 'The status of the billing transaction', enum: BillingTransactionStatus })
   status!: BillingTransactionStatus;
+
+  @OneToMany(() => BillingTransactionItems, (customItem) => customItem.billingTransaction, {
+    onDelete: 'CASCADE',
+  })
+  @ApiProperty({ description: 'The custom items of the billing transaction', type: () => BillingTransactionItems })
+  items!: BillingTransactionItems[];
 }

@@ -1733,6 +1733,53 @@ export const $BalanceDto = {
     required: ['value']
 } as const;
 
+export const $BillingTransactionItem = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the billing transaction item',
+            example: 1
+        },
+        billingTransactionId: {
+            type: 'number',
+            description: 'The ID of the billing transaction',
+            example: 1
+        },
+        billingTransaction: {
+            description: 'The billing transaction',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BillingTransaction'
+                }
+            ]
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the billing transaction item',
+            example: 'Credit top-up'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the billing transaction item',
+            example: 'Credit top-up for user 1',
+            nullable: true
+        },
+        externalReference: {
+            type: 'string',
+            description: 'The external reference of the billing transaction item',
+            example: '1234567890',
+            nullable: true
+        },
+        value: {
+            type: 'number',
+            description: 'The value of the billing transaction item',
+            example: '100'
+        }
+    },
+    required: ['id', 'billingTransactionId', 'billingTransaction', 'name', 'description', 'externalReference', 'value']
+} as const;
+
 export const $BillingTransaction = {
     type: 'object',
     properties: {
@@ -1812,9 +1859,17 @@ export const $BillingTransaction = {
             type: 'string',
             description: 'The status of the billing transaction',
             enum: ['pending', 'completed', 'failed']
+        },
+        items: {
+            description: 'The custom items of the billing transaction',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BillingTransactionItem'
+                }
+            ]
         }
     },
-    required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf', 'externalReference', 'status']
+    required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf', 'externalReference', 'status', 'items']
 } as const;
 
 export const $TransactionsDto = {
@@ -1999,12 +2054,7 @@ export const $SumUpReaderDto = {
             enum: ['unknown', 'processing', 'paired', 'expired']
         },
         device: {
-            example: 'device',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumUpReaderDevice'
-                }
-            ]
+            '$ref': '#/components/schemas/SumUpReaderDevice'
         },
         meta: {
             type: 'object',

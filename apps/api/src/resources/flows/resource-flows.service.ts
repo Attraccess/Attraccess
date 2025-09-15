@@ -289,7 +289,8 @@ export class ResourceFlowsService {
           break;
 
         default:
-          throw new Error(`Unknown node type: ${type}`);
+          const exhaustiveCheck: never = type;
+          throw new Error(`Unknown node type: ${exhaustiveCheck}`);
       }
 
       return schema;
