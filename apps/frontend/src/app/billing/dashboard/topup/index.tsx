@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Select } from '../../../../components/select';
 import { TransactionProcessingCard } from './transactionProcessingStatus';
 import { useAuth } from '../../../../hooks/useAuth';
-import { frontendCurrencyToApiCurrency } from '../../../../utils/currency';
+import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../utils/currency';
 
 type Props = Omit<CardProps, 'children'> & {
   title?: string;
@@ -67,15 +67,19 @@ export function BillingDashboardTopupCard(props: Props) {
   const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 });
 
   useEffect(() => {
+    if (!configuration) {
+      return;
+    }
+
     let actualDesiredAmount = desiredAmount ?? DEFAULT_DESIRED_AMOUNT;
     if (desiredAmount !== undefined) {
       if ((balance?.value ?? 0) < 0) {
-        actualDesiredAmount += Math.abs(balance?.value ?? 0);
+        actualDesiredAmount += apiCurrencyToFrontendCurrency(Math.abs(balance?.value ?? 0), configuration.minorUnit);
       }
     }
 
-    setAmount(actualDesiredAmount);
-  }, [balance, desiredAmount]);
+    setAmount(Math.ceil(actualDesiredAmount));
+  }, [balance, desiredAmount, configuration]);
 
   const onSubmit = useCallback(() => {
     if (!readerId) {
