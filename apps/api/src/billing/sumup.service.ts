@@ -189,6 +189,7 @@ export class SumUpService {
     });
 
     if (!transaction) {
+      this.logger.error('updateTransactionStatusBySumupServer: Sumup transaction not found', { sumupTransactionId });
       throw new BadRequestException('Sumup transaction not found');
     }
 
@@ -217,21 +218,43 @@ export class SumUpService {
         break;
 
       default:
+        this.logger.error('updateTransactionStatusBySumupServer: Unknown sumup transaction status', {
+          sumupTransactionId,
+          sumUpTransactionData,
+        });
         throw new BadRequestException('Unknown sumup transaction status');
     }
 
+    this.logger.debug('updateTransactionStatusBySumupServer: Updating transaction status', {
+      sumupTransactionId,
+      sumUpTransactionData,
+      transaction,
+    });
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+
+    this.logger.debug('updateTransactionStatusBySumupServer: Transaction status updated', {
+      sumupTransactionId,
+      sumUpTransactionData,
+      transaction,
+    });
   }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async processPendingTransactions(): Promise<void> {
+    this.logger.debug('processPendingTransactions: starting');
+
     const transactions = await this.billingTransactionRepository.findBy({
       status: BillingTransactionStatus.Pending,
     });
 
+    this.logger.debug('processPendingTransactions: found ', transactions.length, ' pending transactions');
+
     for (const transaction of transactions) {
       if (!transaction.externalReference.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
+        this.logger.debug('processPendingTransactions: skipping non-sumup transaction', {
+          transactionId: transaction.externalReference,
+        });
         continue;
       }
 
@@ -246,5 +269,7 @@ export class SumUpService {
 
       await this.updateTransactionStatusBySumupServer(transactionId);
     }
+
+    this.logger.debug('processPendingTransactions: finished');
   }
 }

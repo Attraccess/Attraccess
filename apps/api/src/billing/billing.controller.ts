@@ -233,6 +233,7 @@ export class BillingController {
     operationId: 'sumUpTopUpCallback',
   })
   async sumUpTopUpCallback(@Body() data: SumupTransactionCallbackDto): Promise<{ message: string }> {
+    this.logger.debug('Received SumUp callback', { data });
     await this.sumUpService.handleTransactionCallback(data);
 
     return { message: 'OK' };
