@@ -5,10 +5,7 @@
     "en": "English",
     "de": "Deutsch"
   },
-  "docs": "Documentation",
   "account": "Account",
-  "reportBug": "Report a Bug",
-  "requestFeature": "Request a Feature",
   "groups": {
     "##default##": {
       "items": {
@@ -48,10 +45,17 @@
     }
   },
   "endItems": {
-    "reportBug": "Report a Bug",
-    "requestFeature": "Request a Feature",
     "docs": "Documentation",
     "dependencies": "Dependencies",
-    "changelog": "Changelog"
+    "changelog": "Changelog",
+    "groups": {
+      "feedback": {
+        "label": "Feedback",
+        "items": {
+          "reportBug": "Report a Bug",
+          "requestFeature": "Request a Feature"
+        }
+      }
+    }
   }
 }

@@ -209,16 +209,23 @@ export const useSidebarEndItems = () => {
 
   return [
     {
-      path: reportBugUrl,
-      icon: BugIcon,
-      translationKey: 'reportBug',
-      isExternal: true,
-    },
-    {
-      path: requestFeatureUrl,
-      icon: LightbulbIcon,
-      translationKey: 'requestFeature',
-      isExternal: true,
+      isGroup: true,
+      icon: MailIcon,
+      translationKey: 'feedback',
+      items: [
+        {
+          path: reportBugUrl,
+          icon: BugIcon,
+          translationKey: 'reportBug',
+          isExternal: true,
+        },
+        {
+          path: requestFeatureUrl,
+          icon: LightbulbIcon,
+          translationKey: 'requestFeature',
+          isExternal: true,
+        },
+      ],
     },
     {
       path: '/dependencies',
@@ -236,5 +243,5 @@ export const useSidebarEndItems = () => {
       translationKey: 'docs',
       isExternal: true,
     },
-  ] as SidebarItem[];
+  ] as (SidebarItem | SidebarItemGroup)[];
 };

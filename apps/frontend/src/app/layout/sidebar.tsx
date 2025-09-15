@@ -125,6 +125,24 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
   const sidebarEndItems = useSidebarEndItems();
 
+  const { groups: sidebarEndGroups, soloItems: sidebarEndSoloItems } = useMemo(() => {
+    const groups: SidebarItemGroup[] = [];
+    const soloItems: SidebarItem[] = [];
+
+    sidebarEndItems.forEach((item) => {
+      if ((item as SidebarItemGroup).isGroup) {
+        groups.push(item as SidebarItemGroup);
+        return;
+      }
+
+      soloItems.push(item as SidebarItem);
+    });
+
+    console.log(groups, soloItems);
+
+    return { groups, soloItems };
+  }, [sidebarEndItems]);
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -196,7 +214,29 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
         {/* Helpful Links */}
         <div className="py-4">
           <nav className="px-2 space-y-1">
-            {sidebarEndItems.map((item) => (
+            <Accordion isCompact>
+              {sidebarEndGroups.map((group) => (
+                <AccordionItem
+                  key={group.translationKey}
+                  title={t('endItems.groups.' + group.translationKey + '.label')}
+                  startContent={<group.icon size={16} />}
+                  isCompact
+                  className="text-sm"
+                >
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      href={item.path}
+                      icon={<item.icon size={16} />}
+                      label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
+                      isExternal={item.isExternal}
+                      size="sm"
+                    />
+                  ))}
+                </AccordionItem>
+              ))}
+            </Accordion>
+            {sidebarEndSoloItems.map((item) => (
               <NavLink
                 key={item.path}
                 href={item.path}
