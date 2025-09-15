@@ -92,8 +92,6 @@ export class BillingService {
       throw new UserNotFoundException(userId);
     }
 
-    console.log('getBalance', user.creditBalance);
-
     return user.creditBalance;
   }
 

@@ -23,7 +23,6 @@ export function TransactionProcessingCard(props: Props) {
 
   const onUpdate = useCallback(
     (transaction: BillingTransaction) => {
-      console.log('got update', transaction.id, transactionId, transaction.status);
       if (transaction.id !== transactionId) {
         return;
       }
