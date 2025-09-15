@@ -27,7 +27,7 @@ export function Select(props: Props) {
     return new Set(selection ? [selection] : []);
   }, []);
 
-  const [value, setValue] = useState(selectionToSet(props.selectedKey));
+  const [value, setValue] = useState(selectionToSet(selectedKey));
 
   const handleSelectionChange = useCallback(
     (keys: SharedSelection) => {

@@ -27,7 +27,7 @@ export class SumUpReaderDto implements SumUp.Readers.Reader {
   })
   status: SumUp.Readers.ReaderStatus;
 
-  @ApiProperty({ type: SumUpReaderDevice, example: 'device' })
+  @ApiProperty({ type: SumUpReaderDevice })
   device: SumUpReaderDevice;
 
   @ApiProperty({ type: Object, example: {}, required: false, additionalProperties: true })
