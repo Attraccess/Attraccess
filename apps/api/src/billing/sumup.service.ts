@@ -135,6 +135,7 @@ export class SumUpService {
     let returnUrl: string;
     if (this.appConfig.ATTRACCESS_URL.startsWith('https://')) {
       returnUrl = this.appConfig.ATTRACCESS_URL + '/api/billing/top-up/sumup/callback';
+      this.logger.debug('setting returl_url for sumup checkout', { returnUrl });
     }
 
     try {

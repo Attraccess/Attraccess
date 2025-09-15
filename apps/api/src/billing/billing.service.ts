@@ -41,7 +41,7 @@ export class BillingService {
     }
 
     const existingCurrency = await this.settingRepository.findOneBy({
-      parent: 'sumup',
+      parent: 'billing',
       key: 'currency',
     });
 
@@ -51,7 +51,7 @@ export class BillingService {
       });
     } else {
       await this.settingRepository.insert({
-        parent: 'sumup',
+        parent: 'billing',
         key: 'currency',
         value: nextConfigurationData.currency,
       });
@@ -193,11 +193,11 @@ export class BillingService {
       configuration.creditsPerUsage = data.creditsPerUsage;
     }
 
-    if (data.creditsPerUsage % 1 !== 0) {
+    if (data.creditsPerUsage !== undefined && data.creditsPerUsage % 1 !== 0) {
       throw new BadRequestException('Credits per usage must be an integer (multiply by currency minor unit)');
     }
 
-    if (data.creditsPerMinute % 1 !== 0) {
+    if (data.creditsPerMinute !== undefined && data.creditsPerMinute % 1 !== 0) {
       throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
     }
 

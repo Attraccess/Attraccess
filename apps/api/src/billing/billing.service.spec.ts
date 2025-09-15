@@ -14,11 +14,17 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { InsufficientBalanceError } from './errors/insufficient-balance.error';
 import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
+import { BadRequestException } from '@nestjs/common';
+import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
+import { Currency } from './dto/set-configuration.dto';
 
 describe('BillingService', () => {
   let service: BillingService;
   let billingTransactionRepository: jest.Mocked<Repository<BillingTransaction>>;
   let userRepository: jest.Mocked<Repository<User>>;
+  let settingRepository: jest.Mocked<Repository<Setting>>;
+  let resourceBillingConfigurationRepository: jest.Mocked<Repository<ResourceBillingConfiguration>>;
+  let liveNotificationsService: { notifyTransactionUpdate: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,6 +47,8 @@ describe('BillingService', () => {
         {
           provide: getRepositoryToken(ResourceBillingConfiguration),
           useValue: {
+            findOneBy: jest.fn(),
+            create: jest.fn(),
             save: jest.fn(),
           },
         },
@@ -60,6 +68,11 @@ describe('BillingService', () => {
       Repository<BillingTransaction>
     >;
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
+    settingRepository = module.get(getRepositoryToken(Setting)) as jest.Mocked<Repository<Setting>>;
+    resourceBillingConfigurationRepository = module.get(
+      getRepositoryToken(ResourceBillingConfiguration),
+    ) as jest.Mocked<Repository<ResourceBillingConfiguration>>;
+    liveNotificationsService = module.get(LiveNotificationsService);
   });
 
   it('should be defined', () => {
@@ -95,7 +108,7 @@ describe('BillingService', () => {
           where: { userId: 7 },
           skip: 10,
           take: 10,
-          relations: expect.arrayContaining(['initiator', 'resourceUsage', 'refundOf']),
+          relations: expect.arrayContaining(['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf']),
           order: { createdAt: 'DESC', id: 'DESC' },
         }),
       );
@@ -119,6 +132,7 @@ describe('BillingService', () => {
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: 100 }),
       );
       expect(result).toEqual({ id: 123 });
+      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({ id: 123 });
     });
 
     it('throws InsufficientBalanceError when resulting balance would be negative', async () => {
@@ -137,6 +151,22 @@ describe('BillingService', () => {
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: -20 }),
       );
       expect(result).toEqual({ id: 456 });
+    });
+
+    it('throws when amount is fractional', async () => {
+      userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
+      await expect(service.createManualTransaction(1, 2, 10.5)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('allows negative resulting balance when failOnInsufficientBalance is false', async () => {
+      userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
+      billingTransactionRepository.save.mockResolvedValue({ id: 789 } as BillingTransaction);
+
+      const result = await service.createManualTransaction(1, 2, -20, false);
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, initiatorId: 2, amount: -20 }),
+      );
+      expect(result).toEqual({ id: 789 });
     });
   });
 
@@ -224,6 +254,171 @@ describe('BillingService', () => {
           amount: -35,
         }),
       );
+      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({ id: 999 });
+    });
+  });
+
+  describe('getResourceBillingConfiguration', () => {
+    it('creates and saves default configuration when none exists', async () => {
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(null);
+      const created = { resourceId: 42, creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration;
+      resourceBillingConfigurationRepository.create.mockReturnValue(created);
+      resourceBillingConfigurationRepository.save.mockResolvedValue(created);
+
+      const result = await service.getResourceBillingConfiguration(42);
+      expect(resourceBillingConfigurationRepository.create).toHaveBeenCalledWith({
+        resourceId: 42,
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+      });
+      expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(created);
+      expect(result).toBe(created);
+    });
+
+    it('returns existing configuration when present', async () => {
+      const existing = { resourceId: 7, creditsPerUsage: 1, creditsPerMinute: 2 } as ResourceBillingConfiguration;
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(existing);
+
+      const result = await service.getResourceBillingConfiguration(7);
+      expect(resourceBillingConfigurationRepository.findOneBy).toHaveBeenCalledWith({ resourceId: 7 });
+      expect(result).toBe(existing);
+    });
+  });
+
+  describe('updateResourceBillingConfiguration', () => {
+    it('throws when configuration not found', async () => {
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(null);
+      await expect(
+        service.updateResourceBillingConfiguration(1, { creditsPerUsage: 1, creditsPerMinute: 1 }),
+      ).rejects.toBeInstanceOf(ResourceBillingConfigurationNotFoundException);
+    });
+
+    it('throws when creditsPerMinute is negative', async () => {
+      const cfg = { resourceId: 1, creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration;
+
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerMinute: -1 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('throws when creditsPerUsage is negative', async () => {
+      const cfg = { resourceId: 1, creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration;
+
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerUsage: -1 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('coerces nulls to 0 and saves', async () => {
+      const cfg = { resourceId: 1, creditsPerUsage: 5, creditsPerMinute: 6 } as ResourceBillingConfiguration;
+
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+      resourceBillingConfigurationRepository.save.mockImplementation(
+        async (arg) => arg as ResourceBillingConfiguration,
+      );
+
+      const result = await service.updateResourceBillingConfiguration(1, {
+        creditsPerUsage: null,
+        creditsPerMinute: null,
+      });
+
+      expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ creditsPerUsage: 0, creditsPerMinute: 0 }),
+      );
+      expect(result.creditsPerUsage).toBe(0);
+      expect(result.creditsPerMinute).toBe(0);
+    });
+
+    it('throws on fractional values', async () => {
+      const cfg = { resourceId: 1, creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration;
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerUsage: 1.5 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      await expect(service.updateResourceBillingConfiguration(1, { creditsPerMinute: 2.2 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('allows partial update without validating undefined fields', async () => {
+      const cfg = { resourceId: 1, creditsPerUsage: 1, creditsPerMinute: 2 } as ResourceBillingConfiguration;
+
+      resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(cfg);
+      resourceBillingConfigurationRepository.save.mockImplementation(
+        async (arg) => arg as ResourceBillingConfiguration,
+      );
+
+      const result = await service.updateResourceBillingConfiguration(1, { creditsPerUsage: 3 });
+      expect(result.creditsPerUsage).toBe(3);
+      expect(result.creditsPerMinute).toBe(2);
+    });
+  });
+
+  describe('configuration currency', () => {
+    it('setConfiguration throws on invalid currency', async () => {
+      await expect(service.setConfiguration({ currency: 'USD' as Currency })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('setConfiguration updates existing currency setting and returns configuration', async () => {
+      settingRepository.findOneBy.mockResolvedValueOnce({
+        id: 1,
+        parent: 'billing',
+        key: 'currency',
+        value: 'EUR',
+      } as Setting);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settingRepository.update.mockResolvedValue({} as any);
+      // getConfiguration call
+      settingRepository.findOneBy.mockResolvedValueOnce({
+        id: 1,
+        parent: 'billing',
+        key: 'currency',
+        value: 'EUR',
+      } as Setting);
+
+      const result = await service.setConfiguration({ currency: Currency.EUR });
+      expect(settingRepository.update).toHaveBeenCalledWith(1, { value: Currency.EUR });
+      expect(result).toEqual({ currency: Currency.EUR, minorUnit: 2 });
+    });
+
+    it('setConfiguration inserts currency when not existing and returns configuration', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settingRepository.findOneBy.mockResolvedValueOnce(null as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settingRepository.insert.mockResolvedValue({} as any);
+      // getConfiguration call
+      settingRepository.findOneBy.mockResolvedValueOnce({
+        id: 2,
+        parent: 'billing',
+        key: 'currency',
+        value: 'EUR',
+      } as Setting);
+
+      const result = await service.setConfiguration({ currency: Currency.EUR });
+      expect(settingRepository.insert).toHaveBeenCalledWith({
+        parent: 'billing',
+        key: 'currency',
+        value: Currency.EUR,
+      });
+      expect(result).toEqual({ currency: Currency.EUR, minorUnit: 2 });
+    });
+
+    it('getConfiguration returns defaults when no setting present', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      settingRepository.findOneBy.mockResolvedValue(null as any);
+      const result = await service.getConfiguration();
+      expect(result).toEqual({ currency: Currency.EUR, minorUnit: 2 });
+    });
+
+    it('getConfiguration throws on unsupported currency value from DB', async () => {
+      settingRepository.findOneBy.mockResolvedValue({ value: 'USD' } as Setting);
+      await expect(service.getConfiguration()).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });
