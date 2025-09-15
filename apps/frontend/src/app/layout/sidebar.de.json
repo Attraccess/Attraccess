@@ -5,10 +5,7 @@
     "en": "Englisch",
     "de": "Deutsch"
   },
-  "docs": "Dokumentation",
   "account": "Konto",
-  "reportBug": "Fehler melden",
-  "requestFeature": "Funktion vorschlagen",
   "groups": {
     "##default##": {
       "items": {
@@ -48,10 +45,17 @@
     }
   },
   "endItems": {
-    "reportBug": "Fehler melden",
-    "requestFeature": "Funktion vorschlagen",
     "docs": "Dokumentation",
     "dependencies": "Abhängigkeiten",
-    "changelog": "Änderungsprotokoll"
+    "changelog": "Änderungsprotokoll",
+    "groups": {
+      "feedback": {
+        "label": "Feedback",
+        "items": {
+          "reportBug": "Fehler melden",
+          "requestFeature": "Funktion vorschlagen"
+        }
+      }
+    }
   }
 }
