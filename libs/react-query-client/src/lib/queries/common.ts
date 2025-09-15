@@ -271,12 +271,16 @@ export const UseBillingServiceGetBillingTransactionsKeyFn = ({ limit, page, user
   page?: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionsKey, ...(queryKey ?? [{ limit, page, userId }])];
+export type BillingServiceGetResourceBillingConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getResourceBillingConfiguration>>;
+export type BillingServiceGetResourceBillingConfigurationQueryResult<TData = BillingServiceGetResourceBillingConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetResourceBillingConfigurationKey = "BillingServiceGetResourceBillingConfiguration";
+export const UseBillingServiceGetResourceBillingConfigurationKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useBillingServiceGetResourceBillingConfigurationKey, ...(queryKey ?? [{ resourceId }])];
 export type BillingServiceGetBillingConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingConfiguration>>;
 export type BillingServiceGetBillingConfigurationQueryResult<TData = BillingServiceGetBillingConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetBillingConfigurationKey = "BillingServiceGetBillingConfiguration";
-export const UseBillingServiceGetBillingConfigurationKeyFn = ({ resourceId }: {
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useBillingServiceGetBillingConfigurationKey, ...(queryKey ?? [{ resourceId }])];
+export const UseBillingServiceGetBillingConfigurationKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetBillingConfigurationKey, ...(queryKey ?? [])];
 export type BillingServiceGetSumUpConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getSumUpConfiguration>>;
 export type BillingServiceGetSumUpConfigurationQueryResult<TData = BillingServiceGetSumUpConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetSumUpConfigurationKey = "BillingServiceGetSumUpConfiguration";
@@ -394,7 +398,7 @@ export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited
 export type BillingServiceCreateManualTransactionMutationResult = Awaited<ReturnType<typeof BillingService.createManualTransaction>>;
 export type BillingServiceUpdateResourceBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateResourceBillingConfiguration>>;
 export type BillingServiceSetSumUpApiKeyMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpApiKey>>;
-export type BillingServiceSetSumUpConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpConfiguration>>;
+export type BillingServiceSetBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.setBillingConfiguration>>;
 export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
 export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
 export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;

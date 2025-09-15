@@ -13,12 +13,6 @@
   "actions": {
     "topUp": "Topup {{amount}} {{currency}}"
   },
-  "success": {
-    "toast": {
-      "title": "Topup successful",
-      "description": "Topup was successful"
-    }
-  },
   "error": {
     "toast": {
       "generic": {
@@ -26,5 +20,9 @@
         "description": "Something went wrong"
       }
     }
+  },
+  "topUpInstructions": {
+    "title": "How to continue?",
+    "description": "After clicking \"Topup\", please go to the card reader and follow the instructions on the screen of the reader. \nOnce the transaction is complete, it may take up to 60 seconds \nuntil the balance appears on your account. \nYou can check the current status in the transaction history."
   }
 }

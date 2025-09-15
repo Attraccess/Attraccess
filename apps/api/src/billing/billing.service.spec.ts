@@ -8,7 +8,9 @@ import {
   ResourceUsage,
   ResourceUsageAction,
   User,
+  Setting,
 } from '@attraccess/database-entities';
+import { LiveNotificationsService } from './liveNotificationsService';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { InsufficientBalanceError } from './errors/insufficient-balance.error';
 import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
@@ -22,6 +24,7 @@ describe('BillingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillingService,
+        { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
         {
           provide: getRepositoryToken(BillingTransaction),
           useValue: {
@@ -39,6 +42,14 @@ describe('BillingService', () => {
           provide: getRepositoryToken(ResourceBillingConfiguration),
           useValue: {
             save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Setting),
+          useValue: {
+            findOneBy: jest.fn(),
+            insert: jest.fn(),
+            update: jest.fn(),
           },
         },
       ],

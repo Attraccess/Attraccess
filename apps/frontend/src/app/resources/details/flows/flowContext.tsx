@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode, useMemo, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, ReactNode, useMemo, useState, useRef } from 'react';
 import {
   Node,
   Edge,
@@ -12,9 +12,8 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import { ResourceFlowLog } from '@attraccess/react-query-client';
-import { getBaseUrl } from '../../../../api';
-import { events } from 'fetch-event-stream';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useLiveLogs } from './liveLogs';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
 
@@ -59,30 +58,30 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
 
   const onConnect = useCallback(
     (params: Edge | Connection) => setEdges((eds: Edge[]) => addEdge(params, eds)),
-    [setEdges]
+    [setEdges],
   );
 
   const updateNodeData = useCallback(
     (nodeId: string, data: object) => {
       setNodes((nodes) =>
-        nodes.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node))
+        nodes.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node)),
       );
     },
-    [setNodes]
+    [setNodes],
   );
 
   const addNode = useCallback(
     (node: Node) => {
       setNodes((nodes) => [...nodes, node]);
     },
-    [setNodes]
+    [setNodes],
   );
 
   const removeNode = useCallback(
     (nodeId: string) => {
       setNodes((nodes) => nodes.filter((node) => node.id !== nodeId));
     },
-    [setNodes]
+    [setNodes],
   );
 
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
@@ -105,44 +104,10 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     liveLogReceivers.current = liveLogReceivers.current.filter((r) => r !== receiver);
   }, []);
 
-  const [liveLogs, setLiveLogs] = useState<ResourceFlowLog[]>([]);
-  const connectToLiveLogs = useCallback(async () => {
-    const url = `${getBaseUrl()}/api/resources/${resourceId}/flow/logs/live`;
-
-    const abortController = new AbortController();
-
-    const res = await fetch(url, {
-      method: 'GET',
-      credentials: 'include', // Include cookies for authentication
-      signal: abortController.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to connect to SSE: ${res.status} ${res.statusText}`);
-    }
-
-    const stream = events(res, abortController.signal);
-
-    for await (const event of stream) {
-      try {
-        const nextPacket = JSON.parse(event.data as string);
-
-        if (nextPacket.keepalive) {
-          continue;
-        }
-
-        setLiveLogs((prev) => [...prev, nextPacket]);
-
-        publishLiveLog(nextPacket);
-      } catch (parseError) {
-        console.error('[FlowContext] Error parsing event data:', parseError, event);
-      }
-    }
-  }, [publishLiveLog, resourceId]);
-
-  useEffect(() => {
-    connectToLiveLogs();
-  }, [connectToLiveLogs]);
+  const { liveLogs } = useLiveLogs({
+    resourceId,
+    onUpdate: publishLiveLog,
+  });
 
   const value: FlowContextType = useMemo(
     () => ({
@@ -182,7 +147,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       liveLogs,
       addLiveLogReceiver,
       removeLiveLogReceiver,
-    ]
+    ],
   );
 
   return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;

@@ -1,10 +1,13 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { Alert, Button, Card, CardBody, CardFooter, CardHeader, CardProps, cn, Form, NumberInput } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {
+  BillingTransaction,
+  useBillingServiceGetBillingBalance,
+  useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactionsKey,
   useBillingServiceGetSumUpConfiguration,
   useBillingServiceGetSumUpReaders,
@@ -14,22 +17,32 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { Select } from '../../../../components/select';
-import { config } from 'process';
+import { TransactionProcessingCard } from './transactionProcessingStatus';
+import { useAuth } from '../../../../hooks/useAuth';
+import { frontendCurrencyToApiCurrency } from '../../../../utils/currency';
 
-export function BillingDashboardTopupCard(props: Omit<CardProps, 'children'>) {
+type Props = Omit<CardProps, 'children'> & {
+  title?: string;
+  subtitle?: string;
+  desiredAmount?: number;
+  onProcessingComplete?: () => void;
+};
+
+export function BillingDashboardTopupCard(props: Props) {
+  const { title, subtitle, desiredAmount, onProcessingComplete, ...cardProps } = props;
   const { t, tExists } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
+  const [topUpTransaction, setTopUpTransaction] = useState<BillingTransaction | null>(null);
+
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: sumUpConfiguration } = useBillingServiceGetSumUpConfiguration();
   const { data: readers } = useBillingServiceGetSumUpReaders();
   const { mutate: topUpWithSumUpReader, isPending: isPendingTopUpWithSumUpReader } =
     useBillingServiceTopUpWithSumUpReader({
-      onSuccess: () => {
-        toast.success({
-          title: t('success.toast.title'),
-          description: t('success.toast.description'),
-        });
+      onSuccess: (topupTransaction) => {
+        setTopUpTransaction(topupTransaction);
         queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
       },
       onError: (error: Error) => {
@@ -42,34 +55,67 @@ export function BillingDashboardTopupCard(props: Omit<CardProps, 'children'>) {
       },
     });
 
-  const [amount, setAmount] = useState<number>(1);
+  const DEFAULT_DESIRED_AMOUNT = 10;
+  const [amount, setAmount] = useState<number>(desiredAmount ?? DEFAULT_DESIRED_AMOUNT);
   const [readerId, setReaderId] = useState<string>('');
 
   useEffect(() => {
     setReaderId(readers?.[0]?.id ?? '');
   }, [readers]);
 
+  const { user: currentUser } = useAuth();
+  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 });
+
+  useEffect(() => {
+    let actualDesiredAmount = desiredAmount ?? DEFAULT_DESIRED_AMOUNT;
+    if (desiredAmount !== undefined) {
+      if ((balance?.value ?? 0) < 0) {
+        actualDesiredAmount += Math.abs(balance?.value ?? 0);
+      }
+    }
+
+    setAmount(actualDesiredAmount);
+  }, [balance, desiredAmount]);
+
   const onSubmit = useCallback(() => {
     if (!readerId) {
       return;
     }
 
+    if (!configuration) {
+      return;
+    }
+
     topUpWithSumUpReader({
       requestBody: {
-        amount,
+        amount: frontendCurrencyToApiCurrency(amount, configuration.minorUnit),
         readerId,
       },
     });
-  }, [amount, topUpWithSumUpReader, readerId]);
+  }, [amount, topUpWithSumUpReader, readerId, configuration]);
 
-  if (!configuration?.enabled) {
+  const formatNumber = useNumberFormatter();
+
+  if (!sumUpConfiguration?.enabled) {
     return null;
   }
 
+  if (topUpTransaction) {
+    return (
+      <TransactionProcessingCard
+        transactionId={topUpTransaction?.id}
+        onProcessingComplete={() => {
+          setTopUpTransaction(null);
+          onProcessingComplete?.();
+        }}
+      />
+    );
+  }
+
   return (
-    <Card {...props} className={cn('max-w-full', props.className)}>
+    <Card {...cardProps} className={cn('max-w-full', props.className)}>
       <CardHeader>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<SumUpIcon />} noMargin />
+        <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
       </CardHeader>
 
       <CardBody>
@@ -112,7 +158,7 @@ export function BillingDashboardTopupCard(props: Omit<CardProps, 'children'>) {
           isLoading={isPendingTopUpWithSumUpReader}
           isDisabled={!readerId || amount === 0}
         >
-          {t('actions.topUp', { amount: amount, currency: configuration?.currency })}
+          {t('actions.topUp', { amount: formatNumber(amount), currency: configuration?.currency })}
         </Button>
       </CardFooter>
     </Card>

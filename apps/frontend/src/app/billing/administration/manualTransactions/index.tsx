@@ -8,10 +8,12 @@ import { useCallback, useState } from 'react';
 import {
   useBillingServiceCreateManualTransaction,
   UseBillingServiceGetBillingBalanceKeyFn,
+  useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactionsKey,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { frontendCurrencyToApiCurrency } from '../../../../utils/currency';
 
 interface Props {
   userId?: number;
@@ -25,6 +27,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
 
   const queryClient = useQueryClient();
   const toast = useToastMessage();
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
   const { mutate: createManualTransaction, isPending: isCreatingManualTransaction } =
     useBillingServiceCreateManualTransaction({
@@ -46,7 +49,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
           error,
           t,
           tExists,
-          baseTranslationKey: 'toast.error.',
+          baseTranslationKey: 'toast.error',
         });
       },
     });
@@ -56,8 +59,14 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
       return;
     }
 
-    createManualTransaction({ userId: userId, requestBody: { amount } });
-  }, [userId, amount, createManualTransaction]);
+    if (!configuration) {
+      return;
+    }
+
+    const adjustedAmount = frontendCurrencyToApiCurrency(amount, configuration.minorUnit);
+
+    createManualTransaction({ userId: userId, requestBody: { amount: adjustedAmount } });
+  }, [userId, amount, createManualTransaction, configuration]);
 
   return (
     <Card {...cardProps}>

@@ -10,7 +10,7 @@ import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
 import { PageHeader } from '../../../components/pageHeader';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import {
   useResourcesServiceDeleteOneResource,
   useResourcesServiceGetOneResourceById,
@@ -71,6 +71,8 @@ function ResourceDetailsComponent() {
   const deleteResource = useResourcesServiceDeleteOneResource();
 
   const { data: maintenancePermissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+
+  const [insufficientBalanceDesiredAmount, setInsufficientBalanceDesiredAmount] = useState(10);
 
   const handleDelete = async () => {
     try {
@@ -191,8 +193,13 @@ function ResourceDetailsComponent() {
             resource={resource}
             data-cy="resource-usage-session"
             className="sm:flex-1 flex-grow"
+            insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
           />
-          <ResourceBillingInfo resourceId={resourceId} className="sm:flex-none flex-grow" />
+          <ResourceBillingInfo
+            resourceId={resourceId}
+            className="sm:flex-none flex-grow"
+            onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
+          />
         </div>
 
         <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">

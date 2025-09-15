@@ -12,33 +12,88 @@ import {
   TableCell,
   TableColumn,
   Button,
+  NumberInput,
+  cn,
+  Skeleton,
 } from '@heroui/react';
 import { CreditCard, Edit2Icon, Info } from 'lucide-react';
 import {
+  useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetSumUpConfiguration,
+  useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../../../hooks/useAuth';
+import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
 
 interface Props {
   resourceId: number;
+  onExampleAmountChange?: (amount: number) => void;
 }
 
 export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) {
-  const { resourceId, ...cardProps } = props;
+  const { resourceId, onExampleAmountChange, ...cardProps } = props;
 
   const { t } = useTranslations({ en, de });
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
-  const { data: resourceBillingConfiguration } = useBillingServiceGetBillingConfiguration({ resourceId });
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: resourceBillingConfiguration } = useBillingServiceGetResourceBillingConfiguration({ resourceId });
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const formatNumber = useNumberFormatter();
+
+  const { user: currentUser } = useAuth();
+  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 });
+
+  const adjustedBalance = useMemo(() => {
+    if (!configuration) {
+      return 0;
+    }
+
+    return apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit);
+  }, [balance, configuration]);
+
+  const creditsPerUsage = useMemo(() => {
+    if (!configuration) {
+      return 0;
+    }
+
+    return apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration.minorUnit);
+  }, [resourceBillingConfiguration, configuration]);
+
+  const creditsPerMinute = useMemo(() => {
+    if (!configuration) {
+      return 0;
+    }
+
+    return apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration.minorUnit);
+  }, [resourceBillingConfiguration, configuration]);
+
+  const isFree = useMemo(() => {
+    return creditsPerUsage === 0 && creditsPerMinute === 0;
+  }, [creditsPerUsage, creditsPerMinute]);
+
+  const [exampleMinutes, setExampleMinutes] = useState(10);
+
+  const exampleCost = useMemo(
+    () => creditsPerUsage + creditsPerMinute * exampleMinutes,
+    [creditsPerUsage, creditsPerMinute, exampleMinutes],
+  );
+
+  const exampleResultingBalance = useMemo(() => {
+    return adjustedBalance - exampleCost;
+  }, [adjustedBalance, exampleCost]);
+
+  useEffect(() => {
+    onExampleAmountChange?.(exampleCost);
+  }, [exampleCost, onExampleAmountChange]);
 
   if (!license?.modules.includes('billing')) {
     return null;
@@ -52,12 +107,9 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return null;
   }
 
-  const creditsPerUsage = resourceBillingConfiguration.creditsPerUsage ?? 0;
-  const creditsPerMinute = resourceBillingConfiguration.creditsPerMinute ?? 0;
-  const isFree = creditsPerUsage === 0 && creditsPerMinute === 0;
-
-  const exampleMinutes = 10;
-  const exampleCost = creditsPerUsage + creditsPerMinute * exampleMinutes;
+  if (!configuration) {
+    return <Skeleton className="h-10 w-full" />;
+  }
 
   return (
     <Card {...cardProps}>
@@ -109,25 +161,59 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             <Table removeWrapper hideHeader>
               <TableHeader>
                 <TableColumn> </TableColumn>
-                <TableColumn> </TableColumn>
+                <TableColumn align="end"> </TableColumn>
               </TableHeader>
               <TableBody>
                 <TableRow>
+                  <TableCell>{t('balance.label')}</TableCell>
+                  <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+                    {t('balance.value', {
+                      credits: formatNumber(adjustedBalance),
+                      currency: configuration.currency,
+                    })}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
                   <TableCell>{t('perUse.label')}</TableCell>
-                  <TableCell>
-                    {t('perUse.value', { credits: creditsPerUsage, currency: configuration?.currency })}
+                  <TableCell className="text-warning">
+                    {t('perUse.value', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>{t('perMinute.label')}</TableCell>
-                  <TableCell>
-                    {t('perMinute.value', { credits: creditsPerMinute, currency: configuration?.currency })}
+                  <TableCell className="text-warning">
+                    {t('perMinute.value', {
+                      credits: formatNumber(creditsPerMinute),
+                      currency: configuration.currency,
+                    })}
                   </TableCell>
                 </TableRow>
-                <TableRow className="text-default-500">
-                  <TableCell>{t('example.label')}</TableCell>
+                <TableRow className="border-b border-divider border-t">
                   <TableCell>
-                    {t('example.value', { credits: exampleCost, currency: configuration?.currency })}
+                    <NumberInput
+                      size="sm"
+                      value={exampleMinutes}
+                      onValueChange={(value) => setExampleMinutes(value)}
+                      label={t('example.label', { minutes: exampleMinutes })}
+                      minValue={0}
+                      defaultValue={10}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {t('example.value', {
+                      credits: formatNumber(exampleCost),
+                      currency: configuration.currency,
+                      minutes: exampleMinutes,
+                    })}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>{t('exampleResultingBalance.label')}</TableCell>
+                  <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+                    {t('exampleResultingBalance.value', {
+                      credits: formatNumber(exampleResultingBalance),
+                      currency: configuration.currency,
+                    })}
                   </TableCell>
                 </TableRow>
               </TableBody>

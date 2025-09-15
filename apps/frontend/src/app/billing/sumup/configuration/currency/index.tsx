@@ -2,10 +2,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {
-  currency as SumUpCurrency,
-  useBillingServiceGetSumUpConfiguration,
-  useBillingServiceGetSumUpConfigurationKey,
-  useBillingServiceSetSumUpConfiguration,
+  currency as BillingCurrency,
+  useBillingServiceGetBillingConfiguration,
+  useBillingServiceGetBillingConfigurationKey,
+  useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { Button, Card, CardBody, CardHeader, Form, CardProps, CardFooter } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -20,37 +20,36 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
-  const { mutate: setSumUpConfiguration, isPending: isPendingSetSumUpConfiguration } =
-    useBillingServiceSetSumUpConfiguration({
-      onError: (error: Error) => {
-        toast.apiError({
-          error,
-          t,
-          tExists,
-          baseTranslationKey: 'error.toast',
-        });
-      },
-      onSuccess: () => {
-        toast.success({
-          title: t('success.toast.title'),
-          description: t('success.toast.description'),
-        });
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { mutate: setConfiguration, isPending: isPendingSetConfiguration } = useBillingServiceSetBillingConfiguration({
+    onError: (error: Error) => {
+      toast.apiError({
+        error,
+        t,
+        tExists,
+        baseTranslationKey: 'error.toast',
+      });
+    },
+    onSuccess: () => {
+      toast.success({
+        title: t('success.toast.title'),
+        description: t('success.toast.description'),
+      });
 
-        queryClient.invalidateQueries({
-          queryKey: [useBillingServiceGetSumUpConfigurationKey],
-        });
-      },
-    });
+      queryClient.invalidateQueries({
+        queryKey: [useBillingServiceGetBillingConfigurationKey],
+      });
+    },
+  });
 
-  const [currency, setCurrency] = useState<SumUpCurrency>(
-    (configuration?.currency as SumUpCurrency) || SumUpCurrency.EUR,
+  const [currency, setCurrency] = useState<BillingCurrency>(
+    (configuration?.currency as BillingCurrency) || BillingCurrency.EUR,
   );
 
   const configFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    setCurrency((configuration?.currency as SumUpCurrency) || SumUpCurrency.EUR);
+    setCurrency((configuration?.currency as BillingCurrency) || BillingCurrency.EUR);
   }, [configuration]);
 
   const onSubmitConfiguration = useCallback(() => {
@@ -58,12 +57,12 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
       return;
     }
 
-    setSumUpConfiguration({
+    setConfiguration({
       requestBody: {
         currency,
       },
     });
-  }, [setSumUpConfiguration, currency]);
+  }, [setConfiguration, currency]);
 
   return (
     <Card {...props}>
@@ -80,17 +79,17 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
           className="flex flex-col gap-4"
         >
           <Select
-            items={Object.values(SumUpCurrency).map((currency) => ({ key: currency, label: currency }))}
+            items={Object.values(BillingCurrency).map((currency) => ({ key: currency, label: currency }))}
             label={t('inputs.currency.label')}
             selectedKey={currency}
-            onSelectionChange={(key) => setCurrency(key as SumUpCurrency)}
+            onSelectionChange={(key) => setCurrency(key as BillingCurrency)}
           />
 
           <input type="submit" hidden />
         </Form>
 
         <CardFooter>
-          <Button color="primary" onPress={onSubmitConfiguration} isLoading={isPendingSetSumUpConfiguration}>
+          <Button color="primary" onPress={onSubmitConfiguration} isLoading={isPendingSetConfiguration}>
             {t('actions.save')}
           </Button>
         </CardFooter>

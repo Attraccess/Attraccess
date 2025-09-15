@@ -4,6 +4,10 @@
     "title": "Kostenlos",
     "description": "Diese Ressource ist kostenlos nutzbar."
   },
+  "balance": {
+    "label": "Aktuelles Guthaben",
+    "value": "{{credits}} {{currency}}"
+  },
   "perUse": {
     "label": "Pro Nutzung",
     "value": "{{credits}} {{currency}}"
@@ -13,7 +17,11 @@
     "value": "{{credits}} {{currency}}"
   },
   "example": {
-    "label": "Beispielkosten (10 Min)",
+    "label": "Beispielkosten ({{minutes}} Min)",
+    "value": "{{credits}} {{currency}}"
+  },
+  "exampleResultingBalance": {
+    "label": "Resultierendes Guthaben",
     "value": "{{credits}} {{currency}}"
   }
 }

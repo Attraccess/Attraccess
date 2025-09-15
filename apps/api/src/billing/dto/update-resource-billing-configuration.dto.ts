@@ -4,7 +4,7 @@ import { IsNumber, IsOptional, Min } from 'class-validator';
 export class UpdateResourceBillingConfigurationDto {
   @ApiProperty({
     description: 'The credit cost per usage',
-    example: 100,
+    example: 5,
     required: false,
     type: Number,
     nullable: true,
@@ -16,7 +16,7 @@ export class UpdateResourceBillingConfigurationDto {
 
   @ApiProperty({
     description: 'The credit cost per minute',
-    example: 100,
+    example: 0.2,
     required: false,
     type: Number,
     nullable: true,

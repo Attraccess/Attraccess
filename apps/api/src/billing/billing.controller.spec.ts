@@ -7,6 +7,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { DeepPartial } from 'typeorm';
 import { TransactionsDto } from './dto/transactions.dto';
 import { SumUpService } from './sumup.service';
+import { LiveNotificationsService } from './liveNotificationsService';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
@@ -44,6 +45,10 @@ describe('BillingController', () => {
         {
           provide: SumUpService,
           useValue: {},
+        },
+        {
+          provide: LiveNotificationsService,
+          useValue: { getTransactionSubject: jest.fn() },
         },
       ],
     }).compile();

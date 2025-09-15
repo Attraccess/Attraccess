@@ -1,6 +1,5 @@
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Badge,
   Card,
   CardBody,
   CardHeader,
@@ -8,6 +7,7 @@ import {
   Chip,
   cn,
   Pagination,
+  Skeleton,
   Spinner,
   Table,
   TableBody,
@@ -23,15 +23,12 @@ import { useAuth } from '../../../../hooks/useAuth';
 import {
   BillingTransaction,
   useBillingServiceGetBillingBalance,
-  UseBillingServiceGetBillingBalanceKeyFn,
+  useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
-  useBillingServiceGetBillingTransactionsKey,
-  useBillingServiceGetSumUpConfiguration,
 } from '@attraccess/react-query-client';
 import { CreditCardIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { useLiveTransactionUpdates } from './live-updates';
-import { useQueryClient } from '@tanstack/react-query';
+import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
 
 interface Props {
   transactionsPerPage?: number;
@@ -44,21 +41,10 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
   const { t } = useTranslations({ en, de });
 
   const { user: currentUser } = useAuth();
-  const queryClient = useQueryClient();
 
   const userId = useMemo(() => userIdFromProps ?? currentUser?.id, [userIdFromProps, currentUser]);
 
-  useLiveTransactionUpdates({
-    onUpdate: () => {
-      queryClient.invalidateQueries({
-        queryKey: [useBillingServiceGetBillingTransactionsKey],
-      });
-      queryClient.invalidateQueries({
-        queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: userId ?? 0 }),
-      });
-    },
-  });
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
   const { data: balance, isLoading: isLoadingBalance } = useBillingServiceGetBillingBalance(
     { userId: userId ?? 0 },
     undefined,
@@ -130,6 +116,12 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     }
   }, []);
 
+  const formatNumber = useNumberFormatter();
+
+  if (!configuration) {
+    return <Skeleton className="h-10 w-full" />;
+  }
+
   return (
     <Card {...cardProps}>
       <CardHeader>
@@ -141,7 +133,10 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
             <Spinner />
           ) : (
             <p className="text-2xl font-bold">
-              {t('balance', { balance: balance?.value, currency: configuration?.currency })}
+              {t('balance', {
+                balance: formatNumber(apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit)),
+                currency: configuration.currency,
+              })}
             </p>
           )}
         </div>
@@ -184,7 +179,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                 <TableCell>{getDetailsCellContent(transaction)}</TableCell>
                 <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                   {transaction.amount > 0 && '+'}
-                  {transaction.amount}
+                  {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
               </TableRow>
             )}

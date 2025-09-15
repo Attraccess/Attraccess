@@ -61,7 +61,11 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     },
   );
 
-  const { data: resources, status: fetchStatus } = useResourcesServiceGetAllResources({
+  const {
+    data: resources,
+    status: fetchStatus,
+    isFetched: isFetchedResources,
+  } = useResourcesServiceGetAllResources({
     groupId: groupId === 'none' ? -1 : (groupId as number),
     search: debouncedSearchValue?.trim() || undefined,
     onlyInUseByMe: filter?.onlyInUseByMe,
@@ -190,7 +194,9 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       </CardBody>
 
       <CardFooter className="flex w-full justify-center">
-        <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+        {isFetchedResources && (
+          <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+        )}
       </CardFooter>
     </Card>
   );

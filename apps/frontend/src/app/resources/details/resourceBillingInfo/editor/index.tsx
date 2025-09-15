@@ -1,7 +1,7 @@
 import {
   useBillingServiceGetBillingConfiguration,
-  UseBillingServiceGetBillingConfigurationKeyFn,
-  useBillingServiceGetSumUpConfiguration,
+  useBillingServiceGetResourceBillingConfiguration,
+  UseBillingServiceGetResourceBillingConfigurationKeyFn,
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
 import {
@@ -22,6 +22,8 @@ import de from './de.json';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../../../../hooks/useAuth';
+import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../../utils/currency';
 
 interface Props {
   resourceId: number;
@@ -36,8 +38,8 @@ export function ResourceBillingInfoEditor(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
-  const { data: resourceBillingConfiguration } = useBillingServiceGetBillingConfiguration({ resourceId });
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: resourceBillingConfiguration } = useBillingServiceGetResourceBillingConfiguration({ resourceId });
   const { mutate: updateConfiguration, isPending: isSaving } = useBillingServiceUpdateResourceBillingConfiguration({
     onSuccess: () => {
       toast.success({
@@ -45,7 +47,7 @@ export function ResourceBillingInfoEditor(props: Props) {
         description: t('success.toast.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }),
+        queryKey: UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }),
       });
       onClose();
     },
@@ -59,23 +61,48 @@ export function ResourceBillingInfoEditor(props: Props) {
     },
   });
 
-  const [creditsPerUsage, setCreditsPerUsage] = useState(resourceBillingConfiguration?.creditsPerUsage ?? 0);
-  const [creditsPerMinute, setCreditsPerMinute] = useState(resourceBillingConfiguration?.creditsPerMinute ?? 0);
+  const [creditsPerUsage, setCreditsPerUsage] = useState(
+    apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration?.minorUnit ?? 1),
+  );
+  const [creditsPerMinute, setCreditsPerMinute] = useState(
+    apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration?.minorUnit ?? 1),
+  );
 
   useEffect(() => {
-    setCreditsPerUsage(resourceBillingConfiguration?.creditsPerUsage ?? 0);
-    setCreditsPerMinute(resourceBillingConfiguration?.creditsPerMinute ?? 0);
-  }, [resourceBillingConfiguration]);
+    if (!configuration) {
+      return;
+    }
+
+    setCreditsPerUsage(
+      apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration.minorUnit),
+    );
+    setCreditsPerMinute(
+      apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration.minorUnit),
+    );
+  }, [resourceBillingConfiguration, configuration]);
 
   const onSubmit = useCallback(async () => {
+    if (!configuration) {
+      return;
+    }
+
     updateConfiguration({
       resourceId,
       requestBody: {
-        creditsPerUsage,
-        creditsPerMinute,
+        creditsPerUsage: frontendCurrencyToApiCurrency(creditsPerUsage, configuration.minorUnit),
+        creditsPerMinute: frontendCurrencyToApiCurrency(creditsPerMinute, configuration.minorUnit),
       },
     });
-  }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute]);
+  }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, configuration]);
+
+  const { user } = useAuth();
+  if (!user?.systemPermissions.canManageBilling) {
+    return null;
+  }
+
+  if (!configuration) {
+    return null;
+  }
 
   return (
     <>
@@ -88,21 +115,19 @@ export function ResourceBillingInfoEditor(props: Props) {
           <ModalBody>
             <Form onSubmit={onSubmit}>
               <NumberInput
-                label={t('inputs.creditsPerUsage.label', { currency: configuration?.currency })}
+                label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
                 description={t('inputs.creditsPerUsage.description')}
                 value={creditsPerUsage}
                 minValue={0}
-                step={1}
                 onValueChange={(value) => setCreditsPerUsage(value)}
                 isClearable
                 defaultValue={0}
               />
               <NumberInput
-                label={t('inputs.creditsPerMinute.label', { currency: configuration?.currency })}
+                label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
                 description={t('inputs.creditsPerMinute.description')}
                 value={creditsPerMinute}
                 minValue={0}
-                step={1}
                 onValueChange={(value) => setCreditsPerMinute(value)}
                 isClearable
                 defaultValue={0}

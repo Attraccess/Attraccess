@@ -1899,13 +1899,13 @@ export const $UpdateResourceBillingConfigurationDto = {
         creditsPerUsage: {
             type: 'number',
             description: 'The credit cost per usage',
-            example: 100,
+            example: 5,
             nullable: true
         },
         creditsPerMinute: {
             type: 'number',
             description: 'The credit cost per minute',
-            example: 100,
+            example: 0.2,
             nullable: true
         }
     }
@@ -1923,17 +1923,35 @@ export const $SetSumUpApiKeyDto = {
     required: ['apiKey']
 } as const;
 
-export const $SetSumUpConfigurationDto = {
+export const $SetBillingConfigurationDto = {
     type: 'object',
     properties: {
         currency: {
             type: 'string',
-            description: 'The currency for the SumUp configuration',
+            description: 'The currency to use',
             example: 'EUR',
             enum: ['EUR']
         }
     },
     required: ['currency']
+} as const;
+
+export const $BillingConfigurationDto = {
+    type: 'object',
+    properties: {
+        currency: {
+            type: 'string',
+            description: 'The currency to use',
+            example: 'EUR',
+            enum: ['EUR']
+        },
+        minorUnit: {
+            type: 'number',
+            description: 'The minor unit of the currency',
+            example: 2
+        }
+    },
+    required: ['currency', 'minorUnit']
 } as const;
 
 export const $SumUpConfigurationDto = {
@@ -1943,15 +1961,9 @@ export const $SumUpConfigurationDto = {
             type: 'boolean',
             description: 'Whether the SumUp configuration is enabled',
             example: true
-        },
-        currency: {
-            type: 'string',
-            description: 'The currency for the SumUp configuration',
-            example: 'EUR',
-            enum: ['EUR']
         }
     },
-    required: ['enabled', 'currency']
+    required: ['enabled']
 } as const;
 
 export const $SumUpReaderDevice = {

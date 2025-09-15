@@ -1,4 +1,6 @@
 {
+  "title": "Zugangsdaten",
+  "subtitle": "Verbinden Sie Attraccess mit Ihrem SumUp-Konto um digitale Zahlungen zu ermöglichen.",
   "status": {
     "enabled": {
       "title": "Aktiviert"
@@ -10,8 +12,6 @@
       "title": "Wird geladen..."
     }
   },
-  "title": "Zugangsdaten",
-  "subtitle": "Verbinden Sie Attraccess mit Ihrem SumUp-Konto um digitale Zahlungen zu ermöglichen.",
   "inputs": {
     "apiKey": {
       "label": "API-Schlüssel",

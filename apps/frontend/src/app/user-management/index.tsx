@@ -33,7 +33,11 @@ export const UserManagementPage: React.FC = () => {
 
   const debouncedSearch = useDebounce(search, 500);
 
-  const { data: searchResult, status: fetchStatus } = useUsersServiceFindMany({ limit, page, search: debouncedSearch });
+  const {
+    data: searchResult,
+    status: fetchStatus,
+    isFetched: isFetchedSearchResult,
+  } = useUsersServiceFindMany({ limit, page, search: debouncedSearch });
 
   const fetchState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
@@ -102,7 +106,9 @@ export const UserManagementPage: React.FC = () => {
         </CardBody>
 
         <CardFooter className="flex w-full justify-end">
-          <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+          {isFetchedSearchResult && (
+            <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+          )}
         </CardFooter>
       </Card>
     </div>

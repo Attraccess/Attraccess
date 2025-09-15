@@ -1,18 +1,17 @@
-import { BillingTransaction, Setting, User, BillingTransactionStatus } from '@attraccess/database-entities';
+import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
-import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 import { SumUp } from '@sumup/sdk';
 import { EncryptionService } from '../encryption/encryption.service';
 import { SumUpMerchantDto } from './dto/sumup/sumup-merchant.dto';
 import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
-import { Currency, SetSumUpConfigurationDto } from './dto/sumup/set-sumup-configuration.dto';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../config/app.config';
 import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Subject } from 'rxjs';
+import { LiveNotificationsService } from './liveNotificationsService';
+import { BillingService } from './billing.service';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -20,8 +19,6 @@ export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 export class SumUpService {
   private readonly logger = new Logger(SumUpService.name);
   private readonly appConfig: AppConfigType;
-  private readonly transactionSubjects: Map<number, Subject<{ data: BillingTransaction | { keepalive: true } }>> =
-    new Map();
 
   constructor(
     @InjectRepository(Setting)
@@ -30,15 +27,10 @@ export class SumUpService {
     private readonly configService: ConfigService,
     @InjectRepository(BillingTransaction)
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
+    private readonly liveNotificationsService: LiveNotificationsService,
+    private readonly billingService: BillingService,
   ) {
     this.appConfig = this.configService.get<AppConfigType>('app');
-  }
-
-  public getTransactionSubject(userId: number): Subject<{ data: BillingTransaction | { keepalive: true } }> {
-    if (!this.transactionSubjects.has(userId)) {
-      this.transactionSubjects.set(userId, new Subject<{ data: BillingTransaction | { keepalive: true } }>());
-    }
-    return this.transactionSubjects.get(userId);
   }
 
   async setApiKey(token: string): Promise<void> {
@@ -60,62 +52,19 @@ export class SumUpService {
     }
   }
 
-  async setConfiguration(nextConfigurationData: SetSumUpConfigurationDto): Promise<SumUpConfigurationDto> {
-    if (!Object.values(Currency).includes(nextConfigurationData.currency)) {
-      throw new BadRequestException('Invalid currency');
-    }
-
-    const existingCurrency = await this.settingRepository.findOneBy({
-      parent: 'sumup',
-      key: 'currency',
-    });
-
-    if (existingCurrency) {
-      await this.settingRepository.update(existingCurrency.id, {
-        value: nextConfigurationData.currency,
-      });
-    } else {
-      await this.settingRepository.insert({
-        parent: 'sumup',
-        key: 'currency',
-        value: nextConfigurationData.currency,
-      });
-    }
-
-    return await this.getConfiguration();
-  }
-
-  async getConfiguration(): Promise<SumUpConfigurationDto> {
+  async getIsEnabled(): Promise<boolean> {
     const apiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
 
     if (!apiKey) {
-      return {
-        enabled: false,
-        currency: Currency.EUR,
-      };
+      return false;
     }
 
-    let isEnabled = false;
-    if (apiKey) {
-      try {
-        this.encryptionService.decrypt(apiKey.value);
-        isEnabled = true;
-      } catch {
-        // nothing to do
-      }
+    try {
+      this.encryptionService.decrypt(apiKey.value);
+      return true;
+    } catch {
+      return false;
     }
-
-    const currency = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'currency' });
-
-    let currencyValue = Currency.EUR;
-    if (currency) {
-      currencyValue = (currency.value as Currency) ?? Currency.EUR;
-    }
-
-    return {
-      enabled: isEnabled,
-      currency: currencyValue,
-    };
   }
 
   private async getSumUp(): Promise<SumUp> {
@@ -173,24 +122,11 @@ export class SumUpService {
   }
 
   async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
-    const currency = await this.settingRepository.findOneBy({
-      parent: 'sumup',
-      key: 'currency',
-    });
-    let currencyValue = Currency.EUR;
-    if (currency) {
-      currencyValue = (currency.value as Currency) ?? Currency.EUR;
+    if (amount % 1 !== 0) {
+      throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
     }
 
-    let minorUnit: number;
-    switch (currencyValue) {
-      case Currency.EUR:
-        minorUnit = 2;
-        break;
-
-      default:
-        throw new BadRequestException('Unsupported currency');
-    }
+    const { currency, minorUnit } = await this.billingService.getConfiguration();
 
     const sumUp = await this.getSumUp();
     const merchant = await sumUp.merchant.get();
@@ -205,8 +141,8 @@ export class SumUpService {
       const checkout = await sumUp.readers.createCheckout(merchantCode, readerId, {
         description: 'Attraccess Top-up',
         total_amount: {
-          currency: 'EUR',
-          value: amount * 10 ** minorUnit,
+          currency,
+          value: amount,
           minor_unit: minorUnit,
         },
         return_url: returnUrl,
@@ -219,15 +155,13 @@ export class SumUpService {
         status: BillingTransactionStatus.Pending,
       });
 
-      this.getTransactionSubject(userId).next({ data: transaction });
+      this.liveNotificationsService.notifyTransactionUpdate(transaction);
 
       return transaction;
     } catch (error) {
-      if (error.error.errors.details === 'Not Found' && error.status === 404) {
+      if (error.error.errors.detail === 'Not Found' && error.status === 404) {
         throw new BadRequestException('READER_NOT_FOUND');
       }
-
-      console.log('error', JSON.stringify(error, null, 2));
 
       throw error;
     }
@@ -286,10 +220,10 @@ export class SumUpService {
     }
 
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-    this.getTransactionSubject(transaction.userId).next({ data: updatedTransaction });
+    this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async processPendingTransactions(): Promise<void> {
     const transactions = await this.billingTransactionRepository.findBy({
       status: BillingTransactionStatus.Pending,
@@ -305,7 +239,7 @@ export class SumUpService {
         this.logger.error('Stored sumup transaction ID is invalid', { transactionId: transaction.externalReference });
         transaction.status = BillingTransactionStatus.Failed;
         const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-        this.getTransactionSubject(transaction.userId).next({ data: updatedTransaction });
+        this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
         continue;
       }
 

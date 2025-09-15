@@ -121,9 +121,9 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
       <Table
         {...tableProps}
         bottomContent={
-          <div className="flex w-full justify-center">
+          selectedUsers && (
             <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-          </div>
+          )
         }
       >
         <TableHeader>

@@ -146,9 +146,10 @@ export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: Q
   page?: number;
   userId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
-export const ensureUseBillingServiceGetBillingConfigurationData = (queryClient: QueryClient, { resourceId }: {
+export const ensureUseBillingServiceGetResourceBillingConfigurationData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) });
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getResourceBillingConfiguration({ resourceId }) });
+export const ensureUseBillingServiceGetBillingConfigurationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn(), queryFn: () => BillingService.getBillingConfiguration() });
 export const ensureUseBillingServiceGetSumUpConfigurationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetSumUpConfigurationKeyFn(), queryFn: () => BillingService.getSumUpConfiguration() });
 export const ensureUseBillingServiceGetSumUpReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetSumUpReadersKeyFn(), queryFn: () => BillingService.getSumUpReaders() });
 export const ensureUseBillingServiceBillingControllerStreamEventsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceBillingControllerStreamEventsKeyFn(), queryFn: () => BillingService.billingControllerStreamEvents() });

@@ -27,14 +27,16 @@ import { TransactionsDto } from './dto/transactions.dto';
 import { BalanceDto } from './dto/balance.dto';
 import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
 import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
-import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
+import { BillingConfigurationDto } from './dto/configuration.dto';
 import { SumUpService } from './sumup.service';
 import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
 import { PairSumUpReaderDto } from './dto/sumup/pair-sumup-reader.dto';
-import { SetSumUpConfigurationDto } from './dto/sumup/set-sumup-configuration.dto';
+import { SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 import { Observable } from 'rxjs';
+import { LiveNotificationsService } from './liveNotificationsService';
+import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 
 @ApiTags('Billing')
 @Controller()
@@ -44,6 +46,7 @@ export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly sumUpService: SumUpService,
+    private readonly liveNotificationsService: LiveNotificationsService,
   ) {}
 
   @Get('/users/:userId/billing/balance')
@@ -96,13 +99,16 @@ export class BillingController {
 
   @Get('/resources/:resourceId/billing/configuration')
   @Auth()
-  @ApiOperation({ summary: 'Get the billing configuration for a resource', operationId: 'getBillingConfiguration' })
+  @ApiOperation({
+    summary: 'Get the billing configuration for a resource',
+    operationId: 'getResourceBillingConfiguration',
+  })
   @ApiResponse({
     status: 200,
     description: 'The billing configuration for the resource.',
     type: ResourceBillingConfiguration,
   })
-  async getBillingConfiguration(
+  async getResourceBillingConfiguration(
     @Param('resourceId', ParseIntPipe) resourceId: number,
   ): Promise<ResourceBillingConfiguration> {
     return await this.billingService.getResourceBillingConfiguration(resourceId);
@@ -138,26 +144,37 @@ export class BillingController {
     return 'OK';
   }
 
-  @Post('/billing/sumup/configuration')
+  @Post('/billing/configuration')
   @Auth('canManageBilling')
   @ApiOperation({
-    summary: 'Set the SumUp configuration',
-    operationId: 'setSumUpConfiguration',
+    summary: 'Set the billing configuration',
+    operationId: 'setBillingConfiguration',
   })
-  @ApiResponse({ status: 200, description: 'The SumUp configuration has been set.', type: SumUpConfigurationDto })
-  async setSumUpConfiguration(@Body() body: SetSumUpConfigurationDto): Promise<SumUpConfigurationDto> {
-    return await this.sumUpService.setConfiguration(body);
+  @ApiResponse({ status: 200, description: 'The billing configuration has been set.', type: BillingConfigurationDto })
+  async setBillingConfiguration(@Body() body: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
+    return await this.billingService.setConfiguration(body);
+  }
+
+  @Get('/billing/configuration')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get the billing configuration',
+    operationId: 'getBillingConfiguration',
+  })
+  @ApiResponse({ status: 200, description: 'The current billing configuration.', type: BillingConfigurationDto })
+  async getBillingConfiguration(): Promise<BillingConfigurationDto> {
+    return await this.billingService.getConfiguration();
   }
 
   @Get('/billing/sumup/configuration')
-  @Auth('canManageBilling')
+  @Auth()
   @ApiOperation({
     summary: 'Get the SumUp configuration',
     operationId: 'getSumUpConfiguration',
   })
   @ApiResponse({ status: 200, description: 'The current SumUp configuration.', type: SumUpConfigurationDto })
   async getSumUpConfiguration(): Promise<SumUpConfigurationDto> {
-    return await this.sumUpService.getConfiguration();
+    return { enabled: await this.sumUpService.getIsEnabled() };
   }
 
   @Get('/billing/sumup/readers')
@@ -198,6 +215,11 @@ export class BillingController {
     summary: 'Top up using a SumUp reader',
     operationId: 'topUpWithSumUpReader',
   })
+  @ApiResponse({
+    status: 200,
+    description: 'The billing transaction for the user has been topped up.',
+    type: BillingTransaction,
+  })
   async topUpWithSumUpReader(
     @Body() body: SumupTopUpDto,
     @Req() request: AuthenticatedRequest,
@@ -218,20 +240,11 @@ export class BillingController {
 
   @Sse('/billing/transactions/live')
   @Auth()
-  async streamEvents(
-    @Request() request: AuthenticatedRequest,
-  ): Promise<Observable<{ data: BillingTransaction | { keepalive: true } }>> {
+  async streamEvents(@Request() request: AuthenticatedRequest): Promise<Observable<{ data: BillingTransaction }>> {
     this.logger.log(`Client connected to SSE for user ${request.user.id}`);
 
     // Get the subject for this resource
-    const subject = this.sumUpService.getTransactionSubject(request.user.id);
-
-    // Send initial state immediately
-    setTimeout(async () => {
-      subject.next({
-        data: { keepalive: true },
-      });
-    }, 100);
+    const subject = this.liveNotificationsService.getTransactionSubject(request.user.id);
 
     // Create an observable from the subject
     return subject.asObservable();

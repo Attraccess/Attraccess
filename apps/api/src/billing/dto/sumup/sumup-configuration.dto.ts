@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsNotEmpty, IsNumber } from 'class-validator';
-import { Currency } from './set-sumup-configuration.dto';
+import { IsBoolean, IsNotEmpty } from 'class-validator';
 
 export class SumUpConfigurationDto {
   @IsBoolean()
@@ -11,14 +10,4 @@ export class SumUpConfigurationDto {
     required: true,
   })
   enabled!: boolean;
-
-  @IsEnum(Currency)
-  @IsNotEmpty()
-  @ApiProperty({
-    description: 'The currency for the SumUp configuration',
-    example: Currency.EUR,
-    required: true,
-    enum: Currency,
-  })
-  currency!: Currency;
 }

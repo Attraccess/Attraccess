@@ -1322,29 +1322,36 @@ export type SetSumUpApiKeyDto = {
     apiKey: string;
 };
 
-export type SetSumUpConfigurationDto = {
+export type SetBillingConfigurationDto = {
     /**
-     * The currency for the SumUp configuration
+     * The currency to use
      */
     currency: 'EUR';
 };
 
 /**
- * The currency for the SumUp configuration
+ * The currency to use
  */
 export enum currency {
     EUR = 'EUR'
 }
+
+export type BillingConfigurationDto = {
+    /**
+     * The currency to use
+     */
+    currency: 'EUR';
+    /**
+     * The minor unit of the currency
+     */
+    minorUnit: number;
+};
 
 export type SumUpConfigurationDto = {
     /**
      * Whether the SumUp configuration is enabled
      */
     enabled: boolean;
-    /**
-     * The currency for the SumUp configuration
-     */
-    currency: 'EUR';
 };
 
 export type SumUpReaderDevice = {
@@ -2723,11 +2730,11 @@ export type CreateManualTransactionData = {
 
 export type CreateManualTransactionResponse = number;
 
-export type GetBillingConfigurationData = {
+export type GetResourceBillingConfigurationData = {
     resourceId: number;
 };
 
-export type GetBillingConfigurationResponse = ResourceBillingConfiguration;
+export type GetResourceBillingConfigurationResponse = ResourceBillingConfiguration;
 
 export type UpdateResourceBillingConfigurationData = {
     requestBody: UpdateResourceBillingConfigurationDto;
@@ -2742,11 +2749,13 @@ export type SetSumUpApiKeyData = {
 
 export type SetSumUpApiKeyResponse = string;
 
-export type SetSumUpConfigurationData = {
-    requestBody: SetSumUpConfigurationDto;
+export type SetBillingConfigurationData = {
+    requestBody: SetBillingConfigurationDto;
 };
 
-export type SetSumUpConfigurationResponse = SumUpConfigurationDto;
+export type SetBillingConfigurationResponse = BillingConfigurationDto;
+
+export type GetBillingConfigurationResponse = BillingConfigurationDto;
 
 export type GetSumUpConfigurationResponse = SumUpConfigurationDto;
 
@@ -2765,6 +2774,8 @@ export type RemoveSumUpReaderData = {
 export type TopUpWithSumUpReaderData = {
     requestBody: SumupTopUpDto;
 };
+
+export type TopUpWithSumUpReaderResponse = BillingTransaction;
 
 export type SumUpTopUpCallbackData = {
     requestBody: SumupTransactionCallbackDto;
@@ -4438,7 +4449,7 @@ export type $OpenApiTs = {
     };
     '/api/resources/{resourceId}/billing/configuration': {
         get: {
-            req: GetBillingConfigurationData;
+            req: GetResourceBillingConfigurationData;
             res: {
                 /**
                  * The billing configuration for the resource.
@@ -4479,20 +4490,34 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/billing/sumup/configuration': {
+    '/api/billing/configuration': {
         post: {
-            req: SetSumUpConfigurationData;
+            req: SetBillingConfigurationData;
             res: {
                 /**
-                 * The SumUp configuration has been set.
+                 * The billing configuration has been set.
                  */
-                200: SumUpConfigurationDto;
+                200: BillingConfigurationDto;
                 /**
                  * Unauthorized
                  */
                 401: unknown;
             };
         };
+        get: {
+            res: {
+                /**
+                 * The current billing configuration.
+                 */
+                200: BillingConfigurationDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/configuration': {
         get: {
             res: {
                 /**
@@ -4550,6 +4575,10 @@ export type $OpenApiTs = {
         post: {
             req: TopUpWithSumUpReaderData;
             res: {
+                /**
+                 * The billing transaction for the user has been topped up.
+                 */
+                200: BillingTransaction;
                 /**
                  * Unauthorized
                  */

@@ -66,6 +66,12 @@ export class EncryptionService {
     }
 
     const payload = this.decodeBase64Url(encoded);
+    // Enforce canonical base64url encoding to prevent alternate encodings of the same bytes
+    // from being accepted as valid tokens (guards against non-canonical tampering).
+    const canonical = this.encodeBase64Url(payload);
+    if (canonical !== encoded) {
+      throw new Error('decrypt: token payload not canonical');
+    }
     if (payload.length < IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES + 1) {
       throw new Error('decrypt: token payload too short');
     }

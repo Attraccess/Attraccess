@@ -5,12 +5,12 @@ export enum Currency {
   EUR = 'EUR',
 }
 
-export class SetSumUpConfigurationDto {
+export class SetBillingConfigurationDto {
   @IsString()
   @IsNotEmpty()
   @IsEnum(Currency)
   @ApiProperty({
-    description: 'The currency for the SumUp configuration',
+    description: 'The currency to use',
     example: Currency.EUR,
     required: true,
     enum: Currency,

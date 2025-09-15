@@ -4,8 +4,9 @@ import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { BillingModule } from './billing.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
-import { BillingTransaction, ResourceBillingConfiguration, User } from '@attraccess/database-entities';
+import { BillingTransaction, ResourceBillingConfiguration, Setting, User } from '@attraccess/database-entities';
 import { SumUpService } from './sumup.service';
+import { LiveNotificationsService } from './liveNotificationsService';
 
 describe('BillingModule', () => {
   describe('metadata', () => {
@@ -34,10 +35,18 @@ describe('BillingModule', () => {
         controllers: [BillingController],
         providers: [
           BillingService,
+          { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           { provide: SumUpService, useValue: {} },
           { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: jest.fn(), save: jest.fn() } },
           { provide: getRepositoryToken(User), useValue: { findOneBy: jest.fn() } },
-          { provide: getRepositoryToken(ResourceBillingConfiguration), useValue: { save: jest.fn() } },
+          {
+            provide: getRepositoryToken(ResourceBillingConfiguration),
+            useValue: { save: jest.fn(), findOneBy: jest.fn(), create: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(Setting),
+            useValue: { findOneBy: jest.fn(), insert: jest.fn(), update: jest.fn() },
+          },
         ],
       }).compile();
     });

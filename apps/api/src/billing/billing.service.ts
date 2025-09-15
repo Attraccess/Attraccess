@@ -4,6 +4,7 @@ import {
   ResourceUsageAction,
   User,
   BillingTransactionStatus,
+  Setting,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -16,6 +17,9 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
 import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
 import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-billing-configuration.dto';
+import { LiveNotificationsService } from './liveNotificationsService';
+import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
+import { BillingConfigurationDto } from './dto/configuration.dto';
 
 @Injectable()
 export class BillingService {
@@ -26,13 +30,69 @@ export class BillingService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(ResourceBillingConfiguration)
     private readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
+    private readonly liveNotificationsService: LiveNotificationsService,
+    @InjectRepository(Setting)
+    private readonly settingRepository: Repository<Setting>,
   ) {}
+
+  async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
+    if (!Object.values(Currency).includes(nextConfigurationData.currency)) {
+      throw new BadRequestException('Invalid currency');
+    }
+
+    const existingCurrency = await this.settingRepository.findOneBy({
+      parent: 'sumup',
+      key: 'currency',
+    });
+
+    if (existingCurrency) {
+      await this.settingRepository.update(existingCurrency.id, {
+        value: nextConfigurationData.currency,
+      });
+    } else {
+      await this.settingRepository.insert({
+        parent: 'sumup',
+        key: 'currency',
+        value: nextConfigurationData.currency,
+      });
+    }
+
+    return await this.getConfiguration();
+  }
+
+  public async getConfiguration(): Promise<BillingConfigurationDto> {
+    const currency = await this.settingRepository.findOneBy({
+      parent: 'billing',
+      key: 'currency',
+    });
+    let currencyValue = Currency.EUR;
+    if (currency) {
+      currencyValue = (currency.value as Currency) ?? Currency.EUR;
+    }
+
+    let minorUnit: number;
+    switch (currencyValue) {
+      case Currency.EUR:
+        minorUnit = 2;
+        break;
+
+      default:
+        throw new BadRequestException('Unsupported currency');
+    }
+
+    return {
+      currency: currencyValue,
+      minorUnit,
+    };
+  }
 
   async getBalance(userId: number): Promise<number> {
     const user = await this.userRepository.findOneBy({ id: userId });
     if (!user) {
       throw new UserNotFoundException(userId);
     }
+
+    console.log('getBalance', user.creditBalance);
 
     return user.creditBalance;
   }
@@ -67,6 +127,10 @@ export class BillingService {
       throw new UserNotFoundException(userId);
     }
 
+    if (amount % 1 !== 0) {
+      throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
+    }
+
     const currentBalance = user.creditBalance;
 
     const amountIsNegative = amount < 0;
@@ -75,12 +139,16 @@ export class BillingService {
       throw new InsufficientBalanceError();
     }
 
-    return await this.billingTransactionRepository.save({
+    const transaction = await this.billingTransactionRepository.save({
       userId,
       initiatorId,
       amount,
       status: BillingTransactionStatus.Completed,
     });
+
+    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+
+    return transaction;
   }
 
   async getResourceBillingConfiguration(resourceId: number): Promise<ResourceBillingConfiguration> {
@@ -125,11 +193,19 @@ export class BillingService {
       configuration.creditsPerUsage = data.creditsPerUsage;
     }
 
+    if (data.creditsPerUsage % 1 !== 0) {
+      throw new BadRequestException('Credits per usage must be an integer (multiply by currency minor unit)');
+    }
+
+    if (data.creditsPerMinute % 1 !== 0) {
+      throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
+    }
+
     return await this.resourceBillingConfigurationRepository.save(configuration);
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
-  async handleResourceUsageEvent(event: ResourceUsageEvent) {
+  async handleResourceUsageEvent(event: ResourceUsageEvent): Promise<BillingTransaction> {
     const { usage } = event;
     if (usage.usageAction !== ResourceUsageAction.Usage) {
       return;
@@ -144,20 +220,17 @@ export class BillingService {
     let credits = configuration.creditsPerMinute * Math.ceil(usage.usageInMinutes);
     credits += configuration.creditsPerUsage;
 
-    console.log('credits', credits);
-    console.log('usage.usageInMinutes', usage.usageInMinutes);
-    console.log('configuration.creditsPerMinute', configuration.creditsPerMinute);
-    console.log('configuration.creditsPerUsage', configuration.creditsPerUsage);
-
     if (credits === 0) {
       return;
     }
 
-    await this.billingTransactionRepository.save({
+    const transaction = await this.billingTransactionRepository.save({
       userId: usage.userId,
       resourceUsageId: usage.id,
       amount: -credits,
       status: BillingTransactionStatus.Completed,
     } as Partial<BillingTransaction>);
+
+    this.liveNotificationsService.notifyTransactionUpdate(transaction);
   }
 }

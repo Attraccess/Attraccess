@@ -13,12 +13,6 @@
   "actions": {
     "topUp": "Jetzt {{amount}} {{currency}} aufladen"
   },
-  "success": {
-    "toast": {
-      "title": "Guthaben erfolgreich geladen",
-      "description": "Guthaben wurde erfolgreich geladen"
-    }
-  },
   "error": {
     "toast": {
       "generic": {
@@ -29,6 +23,6 @@
   },
   "topUpInstructions": {
     "title": "Wie geht's weiter?",
-    "description": "Nachdem klick auf \"Jetzt aufladen\", gehen Sie bitte zum Geldkarten-Lesegerät und folgen Sie den Anweisungen auf dem Bildschirm des Lesegeräts. \nSobald die Transaktion abgeschlossen ist, kann es bis zu 60 Sekunden dauern, \nbis das Guthaben auf Ihrem Konto erscheint. Den aktuellen Status können Sie in der Transaktionshistorie einsehen."
+    "description": "Nachdem klick auf \"Jetzt aufladen\", gehen Sie bitte zum Geldkarten-Lesegerät \nund folgen Sie den Anweisungen auf dem Bildschirm des Lesegeräts. \nSobald die Transaktion abgeschlossen ist, kann es bis zu 60 Sekunden dauern, \nbis das Guthaben auf Ihrem Konto erscheint. \nDen aktuellen Status können Sie in der Transaktionshistorie einsehen."
   }
 }
