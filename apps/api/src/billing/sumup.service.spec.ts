@@ -302,7 +302,7 @@ describe('SumUpService', () => {
       await expect(
         service.handleTransactionCallback({
           event_type: 'OTHER' as SumupTransactionEventType,
-          payload: { transaction_id: 'tx' },
+          payload: { client_transaction_id: 'tx' },
         }),
       ).resolves.toBeUndefined();
     });
@@ -314,7 +314,7 @@ describe('SumUpService', () => {
         .mockResolvedValue(undefined);
       await service.handleTransactionCallback({
         event_type: 'solo.transaction.updated' as SumupTransactionEventType,
-        payload: { transaction_id: 'abc' },
+        payload: { client_transaction_id: 'abc' },
       });
       expect(spy).toHaveBeenCalledWith('abc');
     });

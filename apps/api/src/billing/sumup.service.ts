@@ -174,7 +174,7 @@ export class SumUpService {
       return;
     }
 
-    const transactionId = data.payload?.transaction_id;
+    const transactionId = data.payload?.client_transaction_id;
     if (!transactionId) {
       this.logger.warn('Received sumup webhook event with no transaction id', { fullEvent: data });
       return;
