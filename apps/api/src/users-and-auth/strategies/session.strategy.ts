@@ -53,8 +53,6 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       return sessionCookie;
     }
 
-    this.logger.debug('No token found in request', { headers: req.headers, cookies: req.cookies });
-
     return null;
   }
 }

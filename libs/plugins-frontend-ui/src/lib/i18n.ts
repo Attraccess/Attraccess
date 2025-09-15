@@ -1,7 +1,15 @@
 import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import { get } from 'lodash-es';
-import { compile as handlebarsCompile } from 'handlebars';
+import * as Handlebars from 'handlebars';
+
+// Customize Handlebars escaping: keep quotes/apostrophes as-is, escape only &, <, >
+// This ensures names like Jappy's render correctly while still preventing HTML injection.
+Handlebars.Utils.escapeExpression = (input: unknown): string => {
+  const str = String(input ?? '');
+  // Order matters: escape & first to avoid double escaping
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+};
 
 export const I18N_LANGUAGE_STORAGE_KEY = 'language';
 type TranslationRecord = Record<string, unknown>;
@@ -62,7 +70,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       if (translation === undefined) {
         return undefined;
       }
-      return handlebarsCompile(translation);
+      return Handlebars.compile(translation);
     },
     [getTranslationRaw],
   );

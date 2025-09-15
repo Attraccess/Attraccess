@@ -23,6 +23,7 @@ import AccountPage from '../account';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { BillingDashboardPage } from '../billing/dashboard';
 import { BillingAdministrationPage } from '../billing/administration';
+import { SumUpPage } from '../billing/sumup';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -123,6 +124,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/billing/csv-export',
     element: <CsvExport />,
+    authRequired: 'canManageBilling',
+  },
+  {
+    path: '/billing/sumup',
+    element: <SumUpPage />,
     authRequired: 'canManageBilling',
   },
   {

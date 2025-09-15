@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from './loading';
@@ -6,23 +6,31 @@ import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './verifyEmail.en.json';
 import de from './verifyEmail.de.json';
-import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
+import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { getTranslationKeyForApiError } from '../utils/apiError';
 
 export function VerifyEmail() {
   const query = useUrlQuery();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({ en, de });
 
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
 
   const verifyEmail = useUsersServiceVerifyEmail();
   const queryClient = useQueryClient();
+  const didSendRequest = useRef(false);
 
   const activateEmail = useCallback(async () => {
+    if (didSendRequest.current) {
+      return;
+    }
+
+    didSendRequest.current = true;
+
     if (!token || !email) {
       setError(t('apiErrors.invalidLink'));
       return;
@@ -36,23 +44,20 @@ export function VerifyEmail() {
       queryClient.invalidateQueries({
         queryKey: [UseUsersServiceGetCurrentKeyFn()[0]],
       });
-    } catch (err) {
-      const error = err as { error?: { message?: string } };
-      const errorMessage = error.error?.message || t('apiErrors.unexpectedError');
+    } catch (error) {
+      const { key, errorMessage } = getTranslationKeyForApiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'apiErrors',
+        fallbackKey: 'unexpectedError',
+      });
 
-      // Check if a translation exists for this error message
-      const translationKey = `apiErrors.${errorMessage}`;
-      const translation = t(translationKey);
-
-      if (translation !== translationKey) {
-        setError(translation);
-      } else {
-        // If no translation exists, use the original error message
-        setError(errorMessage);
-      }
+      const translation = t(key, { error: errorMessage });
+      setError(translation);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, email, t, queryClient]);
+  }, [token, email, t, tExists, queryClient]);
 
   useEffect(() => {
     activateEmail();

@@ -9,7 +9,6 @@ import {
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { Select } from '../../../../../components/select';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
@@ -33,28 +32,17 @@ export const HistoryTable = ({
   const { user } = useAuth();
 
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage] = useState(5);
 
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);
   }, []);
 
-  const handleRowsPerPageChange = useCallback((newRowsPerPage: number) => {
-    setRowsPerPage(newRowsPerPage);
-    setPage(1);
-  }, []);
-
-  const handleSelectionChange = useCallback(
-    (key: string) => {
-      handleRowsPerPageChange(Number(key));
-    },
-    [handleRowsPerPageChange],
-  );
-
   const {
     data: usageHistory,
     error,
     status: fetchStatus,
+    isFetched: isFetchedUsageHistory,
   } = useResourcesServiceResourceUsageGetHistory(
     {
       resourceId,
@@ -113,22 +101,7 @@ export const HistoryTable = ({
       aria-label="Resource usage history"
       shadow="none"
       data-cy="resource-usage-history-table"
-      bottomContent={
-        <div className="flex justify-between items-center mt-4">
-          <div className="flex items-center gap-2">
-            <Select
-              selectedKey={rowsPerPage.toString()}
-              onSelectionChange={handleSelectionChange}
-              items={[5, 10, 25, 50].map((item) => ({
-                key: item.toString(),
-                label: item.toString(),
-              }))}
-              label="Rows per page"
-            />
-          </div>
-          <Pagination total={totalPages} page={page} onChange={handlePageChange} />
-        </div>
-      }
+      bottomContent={isFetchedUsageHistory && <Pagination total={totalPages} page={page} onChange={handlePageChange} />}
     >
       <TableHeader>{headerColumns}</TableHeader>
       <TableBody

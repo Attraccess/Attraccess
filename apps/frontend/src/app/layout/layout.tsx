@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
+import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useBillingServiceGetBillingBalanceKey,
+  useBillingServiceGetBillingTransactionsKey,
+} from '@attraccess/react-query-client';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,6 +35,14 @@ export function Layout({ children, noLayout }: LayoutProps) {
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
+
+  const queryClient = useQueryClient();
+  useLiveTransactionUpdates({
+    onUpdate: () => {
+      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
+      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingBalanceKey] });
+    },
+  });
 
   if (noLayout) {
     return <div className="bg-gray-100 dark:bg-gray-900">{children}</div>;

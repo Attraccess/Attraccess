@@ -21,9 +21,15 @@ import { MaintenanceInProgressDisplay } from './maintenance';
 type ResourceUsageSessionProps = {
   resourceId: number;
   resource: Resource;
+  insufficientBalanceDesiredAmount?: number;
 } & Omit<React.ComponentProps<typeof Card>, 'resource'>;
 
-export function ResourceUsageSession({ resourceId, resource, ...rest }: ResourceUsageSessionProps) {
+export function ResourceUsageSession({
+  resourceId,
+  resource,
+  insufficientBalanceDesiredAmount,
+  ...rest
+}: ResourceUsageSessionProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('canManageResources');
@@ -95,7 +101,12 @@ export function ResourceUsageSession({ resourceId, resource, ...rest }: Resource
       return <MaintenanceInProgressDisplay resourceId={resourceId} />;
     }
 
-    return <StartSessionControls resourceId={resourceId} />;
+    return (
+      <StartSessionControls
+        resourceId={resourceId}
+        insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+      />
+    );
   };
 
   return (

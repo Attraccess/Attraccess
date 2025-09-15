@@ -1,11 +1,13 @@
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Card,
   CardBody,
   CardHeader,
   CardProps,
+  Chip,
   cn,
   Pagination,
+  Skeleton,
   Spinner,
   Table,
   TableBody,
@@ -21,10 +23,12 @@ import { useAuth } from '../../../../hooks/useAuth';
 import {
   BillingTransaction,
   useBillingServiceGetBillingBalance,
+  useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { CreditCardIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
 
 interface Props {
   transactionsPerPage?: number;
@@ -40,6 +44,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
   const userId = useMemo(() => userIdFromProps ?? currentUser?.id, [userIdFromProps, currentUser]);
 
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
   const { data: balance, isLoading: isLoadingBalance } = useBillingServiceGetBillingBalance(
     { userId: userId ?? 0 },
     undefined,
@@ -81,6 +86,8 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
       } else if (transaction.initiatorId) {
         type = 'manual';
         details = { initiator: transaction.initiator };
+      } else if (transaction.externalReference?.startsWith('sumup_topup_transaction')) {
+        type = 'sumup:topup';
       } else {
         console.error('Unknown transaction type', transaction);
         type = 'unknown';
@@ -96,6 +103,25 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
     return Math.ceil((transactions?.total ?? 0) / transactionsPerPage);
   }, [transactions?.total, transactionsPerPage]);
 
+  const statusColor = useCallback((status: BillingTransaction['status']) => {
+    switch (status) {
+      case 'pending':
+        return 'warning';
+      case 'completed':
+        return 'success';
+      case 'failed':
+        return 'danger';
+      default:
+        return 'default';
+    }
+  }, []);
+
+  const formatNumber = useNumberFormatter();
+
+  if (!configuration) {
+    return <Skeleton className="h-10 w-full" />;
+  }
+
   return (
     <Card {...cardProps}>
       <CardHeader>
@@ -106,7 +132,12 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           {isLoadingBalance ? (
             <Spinner />
           ) : (
-            <p className="text-2xl font-bold">{t('balance', { balance: balance?.value })}</p>
+            <p className="text-2xl font-bold">
+              {t('balance', {
+                balance: formatNumber(apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit)),
+                currency: configuration.currency,
+              })}
+            </p>
           )}
         </div>
 
@@ -125,22 +156,30 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           }
         >
           <TableHeader>
-            <TableColumn>{t('transactions.table.columns.id')}</TableColumn>
-            <TableColumn>{t('transactions.table.columns.dateTime')}</TableColumn>
-            <TableColumn>{t('transactions.table.columns.details')}</TableColumn>
+            <TableColumn align="start">{t('transactions.table.columns.id')}</TableColumn>
+            <TableColumn align="start">{t('transactions.table.columns.dateTime')}</TableColumn>
+            <TableColumn align="start">{t('transactions.table.columns.status')}</TableColumn>
+            <TableColumn align="start" className="w-full">
+              {t('transactions.table.columns.details')}
+            </TableColumn>
             <TableColumn align="end">{t('transactions.table.columns.amount')}</TableColumn>
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (
-              <TableRow key={transaction.id}>
+              <TableRow key={transaction.id} className="wrap-none">
                 <TableCell>{transaction.id}</TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <DateTimeDisplay date={transaction.createdAt} />
+                </TableCell>
+                <TableCell>
+                  <Chip color={statusColor(transaction.status)}>
+                    {t('transactions.table.cells.status.' + transaction.status)}
+                  </Chip>
                 </TableCell>
                 <TableCell>{getDetailsCellContent(transaction)}</TableCell>
                 <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                   {transaction.amount > 0 && '+'}
-                  {transaction.amount}
+                  {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
               </TableRow>
             )}

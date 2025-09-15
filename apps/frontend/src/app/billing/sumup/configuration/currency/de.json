@@ -1,0 +1,42 @@
+{
+  "title": "Konfiguration",
+  "subtitle": "Konfigurieren Sie Attraccess für SumUp",
+  "status": {
+    "enabled": {
+      "title": "Aktiviert"
+    },
+    "disabled": {
+      "title": "Deaktiviert"
+    },
+    "loading": {
+      "title": "Wird geladen..."
+    }
+  },
+  "inputs": {
+    "currency": {
+      "label": "Währung",
+      "description": "Wählen Sie die Währung für die Zahlungen"
+    }
+  },
+  "actions": {
+    "save": "Speichern"
+  },
+  "success": {
+    "toast": {
+      "title": "Konfiguration aktualisiert",
+      "description": "Konfiguration wurde erfolgreich aktualisiert"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Aktualisieren der Konfiguration",
+        "description": "Konfiguration konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut."
+      },
+      "Invalid API key": {
+        "title": "Ungültiger API-Schlüssel",
+        "description": "Der API-Schlüssel ist ungültig. Bitte versuchen Sie es erneut."
+      }
+    }
+  }
+}

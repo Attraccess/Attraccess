@@ -1,0 +1,33 @@
+{
+  "title": "Karten-Lesegerät einrichten",
+  "subtitle": "Bitte geben Sie den Pairing-Code und den Namen des Karten-Lesegeräts ein.",
+  "inputs": {
+    "pairingCode": "Pairing-Code",
+    "name": "Name"
+  },
+  "actions": {
+    "pair": "Karten-Lesegerät einrichten"
+  },
+  "success": {
+    "toast": {
+      "title": "Karten-Lesegerät eingerichtet",
+      "description": "Karten-Lesegerät wurde erfolgreich eingerichtet"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Karten-Lesegerät eingerichten",
+        "description": "Karten-Lesegerät konnte nicht eingerichtet werden"
+      },
+      "malformed pairing code": {
+        "title": "Ungültiger Pairing-Code",
+        "description": "Der Pairing-Code ist ungültig. Bitte versuchen Sie es erneut."
+      },
+      "no pairing for code": {
+        "title": "Ungültiger Pairing-Code",
+        "description": "Der Pairing-Code ist ungültig. Bitte versuchen Sie es erneut."
+      }
+    }
+  }
+}

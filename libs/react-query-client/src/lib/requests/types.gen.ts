@@ -1234,7 +1234,24 @@ export type BillingTransaction = {
      * The billing transaction that is being refunded
      */
     refundOf: BillingTransaction;
+    /**
+     * The external reference e.g. sumup transaction ID
+     */
+    externalReference: string;
+    /**
+     * The status of the billing transaction
+     */
+    status: 'pending' | 'completed' | 'failed';
 };
+
+/**
+ * The status of the billing transaction
+ */
+export enum status {
+    PENDING = 'pending',
+    COMPLETED = 'completed',
+    FAILED = 'failed'
+}
 
 export type TransactionsDto = {
     data: Array<BillingTransaction>;
@@ -1291,12 +1308,143 @@ export type UpdateResourceBillingConfigurationDto = {
     /**
      * The credit cost per usage
      */
-    creditsPerUsage?: number;
+    creditsPerUsage?: number | null;
     /**
      * The credit cost per minute
      */
-    creditsPerMinute?: number;
+    creditsPerMinute?: number | null;
 };
+
+export type SetSumUpApiKeyDto = {
+    /**
+     * The API key for the SumUp API
+     */
+    apiKey: string;
+};
+
+export type SetBillingConfigurationDto = {
+    /**
+     * The currency to use
+     */
+    currency: 'EUR';
+};
+
+/**
+ * The currency to use
+ */
+export enum currency {
+    EUR = 'EUR'
+}
+
+export type BillingConfigurationDto = {
+    /**
+     * The currency to use
+     */
+    currency: 'EUR';
+    /**
+     * The minor unit of the currency
+     */
+    minorUnit: number;
+};
+
+export type SumUpConfigurationDto = {
+    /**
+     * Whether the SumUp configuration is enabled
+     */
+    enabled: boolean;
+};
+
+export type SumUpReaderDevice = {
+    identifier: string;
+    model: 'solo' | 'virtual-solo';
+};
+
+export enum model {
+    SOLO = 'solo',
+    VIRTUAL_SOLO = 'virtual-solo'
+}
+
+export type SumUpReaderDto = {
+    id: string;
+    name: string;
+    status: 'unknown' | 'processing' | 'paired' | 'expired';
+    device: SumUpReaderDevice;
+    meta?: {
+        [key: string]: unknown;
+    };
+    created_at: string;
+    updated_at: string;
+};
+
+export enum status2 {
+    UNKNOWN = 'unknown',
+    PROCESSING = 'processing',
+    PAIRED = 'paired',
+    EXPIRED = 'expired'
+}
+
+export type PairSumUpReaderDto = {
+    pairingCode: string;
+    name: string;
+};
+
+export type SumupTopUpDto = {
+    amount: number;
+    readerId: string;
+};
+
+export type Payload = {
+    /**
+     * The ID of the transaction
+     */
+    client_transaction_id: string;
+    /**
+     * The merchant code
+     */
+    merchant_code: string;
+    /**
+     * The status of the transaction
+     */
+    status: 'successful' | 'failed';
+    /**
+     * The ID of the transaction
+     */
+    transaction_id: string;
+};
+
+/**
+ * The status of the transaction
+ */
+export enum status3 {
+    SUCCESSFUL = 'successful',
+    FAILED = 'failed'
+}
+
+export type SumupTransactionCallbackDto = {
+    /**
+     * The ID of the transaction
+     */
+    id: string;
+    /**
+     * The type of the transaction
+     */
+    event_type: 'solo.transaction.updated';
+    /**
+     * The payload of the transaction
+     */
+    payload: Payload;
+    /**
+     * The timestamp of the transaction
+     */
+    timestamp: string;
+};
+
+/**
+ * The type of the transaction
+ */
+export enum event_type {
+    SOLO_TRANSACTION_UPDATED = 'solo.transaction.updated'
+}
 
 export type ResourceFlowNodeSchemaDto = {
     /**
@@ -2582,18 +2730,58 @@ export type CreateManualTransactionData = {
 
 export type CreateManualTransactionResponse = number;
 
-export type GetBillingConfigurationData = {
+export type GetResourceBillingConfigurationData = {
     resourceId: number;
 };
 
-export type GetBillingConfigurationResponse = ResourceBillingConfiguration;
+export type GetResourceBillingConfigurationResponse = ResourceBillingConfiguration;
 
-export type UpdateBillingConfigurationData = {
+export type UpdateResourceBillingConfigurationData = {
     requestBody: UpdateResourceBillingConfigurationDto;
     resourceId: number;
 };
 
-export type UpdateBillingConfigurationResponse = ResourceBillingConfiguration;
+export type UpdateResourceBillingConfigurationResponse = ResourceBillingConfiguration;
+
+export type SetSumUpApiKeyData = {
+    requestBody: SetSumUpApiKeyDto;
+};
+
+export type SetSumUpApiKeyResponse = string;
+
+export type SetBillingConfigurationData = {
+    requestBody: SetBillingConfigurationDto;
+};
+
+export type SetBillingConfigurationResponse = BillingConfigurationDto;
+
+export type GetBillingConfigurationResponse = BillingConfigurationDto;
+
+export type GetSumUpConfigurationResponse = SumUpConfigurationDto;
+
+export type GetSumUpReadersResponse = Array<SumUpReaderDto>;
+
+export type PairSumUpReaderData = {
+    requestBody: PairSumUpReaderDto;
+};
+
+export type PairSumUpReaderResponse = SumUpReaderDto;
+
+export type RemoveSumUpReaderData = {
+    readerId: string;
+};
+
+export type TopUpWithSumUpReaderData = {
+    requestBody: SumupTopUpDto;
+};
+
+export type TopUpWithSumUpReaderResponse = BillingTransaction;
+
+export type SumUpTopUpCallbackData = {
+    requestBody: SumupTransactionCallbackDto;
+};
+
+export type SumUpTopUpCallbackResponse = unknown;
 
 export type GetNodeSchemasData = {
     resourceId: number;
@@ -4261,7 +4449,7 @@ export type $OpenApiTs = {
     };
     '/api/resources/{resourceId}/billing/configuration': {
         get: {
-            req: GetBillingConfigurationData;
+            req: GetResourceBillingConfigurationData;
             res: {
                 /**
                  * The billing configuration for the resource.
@@ -4274,12 +4462,141 @@ export type $OpenApiTs = {
             };
         };
         post: {
-            req: UpdateBillingConfigurationData;
+            req: UpdateResourceBillingConfigurationData;
             res: {
                 /**
                  * The billing configuration for the resource has been updated.
                  */
                 200: ResourceBillingConfiguration;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/configuration/api-key': {
+        post: {
+            req: SetSumUpApiKeyData;
+            res: {
+                /**
+                 * The SumUp apiKey has been set.
+                 */
+                200: string;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/configuration': {
+        post: {
+            req: SetBillingConfigurationData;
+            res: {
+                /**
+                 * The billing configuration has been set.
+                 */
+                200: BillingConfigurationDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        get: {
+            res: {
+                /**
+                 * The current billing configuration.
+                 */
+                200: BillingConfigurationDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/configuration': {
+        get: {
+            res: {
+                /**
+                 * The current SumUp configuration.
+                 */
+                200: SumUpConfigurationDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/readers': {
+        get: {
+            res: {
+                /**
+                 * The linked SumUp readers.
+                 */
+                200: Array<SumUpReaderDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/readers/pair': {
+        post: {
+            req: PairSumUpReaderData;
+            res: {
+                /**
+                 * The created SumUp reader.
+                 */
+                200: SumUpReaderDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/sumup/readers/{readerId}': {
+        delete: {
+            req: RemoveSumUpReaderData;
+            res: {
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/top-up/sumup': {
+        post: {
+            req: TopUpWithSumUpReaderData;
+            res: {
+                /**
+                 * The billing transaction for the user has been topped up.
+                 */
+                200: BillingTransaction;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/top-up/sumup/callback': {
+        post: {
+            req: SumUpTopUpCallbackData;
+            res: {
+                201: unknown;
+            };
+        };
+    };
+    '/api/billing/transactions/live': {
+        get: {
+            res: {
                 /**
                  * Unauthorized
                  */

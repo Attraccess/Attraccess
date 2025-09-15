@@ -18,15 +18,18 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
 import de from './translations/de.json';
+import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
+import { InsufficientBalanceModal } from './insufficientBalanceModal';
 
 interface StartSessionControlsProps {
   resourceId: number;
+  insufficientBalanceDesiredAmount?: number;
 }
 
 export function StartSessionControls(
   props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
-  const { resourceId, ...divProps } = props;
+  const { resourceId, insufficientBalanceDesiredAmount, ...divProps } = props;
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
@@ -35,6 +38,7 @@ export function StartSessionControls(
   const toast = useToastMessage();
 
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isInsufficientBalance, setIsInsufficientBalance] = useState(false);
 
   const onStartSuccess = useCallback(() => {
     setIsNotesModalOpen(false);
@@ -76,6 +80,17 @@ export function StartSessionControls(
     (error: ApiError) => {
       if (!resource) {
         return;
+      }
+
+      const { errorMessage } = getTranslationKeyForApiError({
+        error,
+        t,
+        tExists,
+        baseTranslationKey: resource.type + '.start.error',
+      });
+
+      if (errorMessage === 'INSUFFICIENT_BALANCE') {
+        setIsInsufficientBalance(true);
       }
 
       toast.apiError({
@@ -211,6 +226,12 @@ export function StartSessionControls(
         onConfirm={(notes) => handleStartSession({ notes, forceTakeOver: false })}
         mode={SessionModalMode.START}
         isSubmitting={startIsPending}
+      />
+
+      <InsufficientBalanceModal
+        isOpen={isInsufficientBalance}
+        onClose={() => setIsInsufficientBalance(false)}
+        desiredAmount={insufficientBalanceDesiredAmount}
       />
     </div>
   );

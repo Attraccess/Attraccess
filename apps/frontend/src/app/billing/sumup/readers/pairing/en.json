@@ -1,0 +1,33 @@
+{
+  "title": "Pair a SumUp reader",
+  "subtitle": "Please enter the pairing code and the name of the reader.",
+  "inputs": {
+    "pairingCode": "Pairing code",
+    "name": "Name"
+  },
+  "actions": {
+    "pair": "Pair"
+  },
+  "success": {
+    "toast": {
+      "title": "SumUp reader paired",
+      "description": "The SumUp reader has been paired successfully"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Pair a SumUp reader",
+        "description": "The SumUp reader could not be paired"
+      },
+      "malformed pairing code": {
+        "title": "Invalid pairing code",
+        "description": "The pairing code is invalid. Please try again."
+      },
+      "no pairing for code": {
+        "title": "Invalid pairing code",
+        "description": "The pairing code is invalid. Please try again."
+      }
+    }
+  }
+}

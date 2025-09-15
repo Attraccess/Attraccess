@@ -2,11 +2,11 @@
   "title": "Usage-based Billing",
   "inputs": {
     "creditsPerUsage": {
-      "label": "Credits per usage",
+      "label": "{{currency}} per usage",
       "description": "This amount will be deducted once per usage."
     },
     "creditsPerMinute": {
-      "label": "Credits per minute",
+      "label": "{{currency}} per minute",
       "description": "This amount will be deducted per minute of the session duration."
     }
   },

@@ -1803,9 +1803,18 @@ export const $BillingTransaction = {
                     '$ref': '#/components/schemas/BillingTransaction'
                 }
             ]
+        },
+        externalReference: {
+            type: 'string',
+            description: 'The external reference e.g. sumup transaction ID'
+        },
+        status: {
+            type: 'string',
+            description: 'The status of the billing transaction',
+            enum: ['pending', 'completed', 'failed']
         }
     },
-    required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf']
+    required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf', 'externalReference', 'status']
 } as const;
 
 export const $TransactionsDto = {
@@ -1890,14 +1899,227 @@ export const $UpdateResourceBillingConfigurationDto = {
         creditsPerUsage: {
             type: 'number',
             description: 'The credit cost per usage',
-            example: 100
+            example: 5,
+            nullable: true
         },
         creditsPerMinute: {
             type: 'number',
             description: 'The credit cost per minute',
-            example: 100
+            example: 0.2,
+            nullable: true
         }
     }
+} as const;
+
+export const $SetSumUpApiKeyDto = {
+    type: 'object',
+    properties: {
+        apiKey: {
+            type: 'string',
+            description: 'The API key for the SumUp API',
+            example: '1234567890'
+        }
+    },
+    required: ['apiKey']
+} as const;
+
+export const $SetBillingConfigurationDto = {
+    type: 'object',
+    properties: {
+        currency: {
+            type: 'string',
+            description: 'The currency to use',
+            example: 'EUR',
+            enum: ['EUR']
+        }
+    },
+    required: ['currency']
+} as const;
+
+export const $BillingConfigurationDto = {
+    type: 'object',
+    properties: {
+        currency: {
+            type: 'string',
+            description: 'The currency to use',
+            example: 'EUR',
+            enum: ['EUR']
+        },
+        minorUnit: {
+            type: 'number',
+            description: 'The minor unit of the currency',
+            example: 2
+        }
+    },
+    required: ['currency', 'minorUnit']
+} as const;
+
+export const $SumUpConfigurationDto = {
+    type: 'object',
+    properties: {
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the SumUp configuration is enabled',
+            example: true
+        }
+    },
+    required: ['enabled']
+} as const;
+
+export const $SumUpReaderDevice = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string',
+            example: '1234567890'
+        },
+        model: {
+            type: 'string',
+            example: 'solo',
+            enum: ['solo', 'virtual-solo']
+        }
+    },
+    required: ['identifier', 'model']
+} as const;
+
+export const $SumUpReaderDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            example: '1234567890'
+        },
+        name: {
+            type: 'string',
+            example: 'Reader 1'
+        },
+        status: {
+            type: 'string',
+            example: 'active',
+            enum: ['unknown', 'processing', 'paired', 'expired']
+        },
+        device: {
+            example: 'device',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SumUpReaderDevice'
+                }
+            ]
+        },
+        meta: {
+            type: 'object',
+            example: {},
+            additionalProperties: true
+        },
+        created_at: {
+            type: 'string',
+            example: '2021-01-01T00:00:00.000Z',
+            format: 'date-time'
+        },
+        updated_at: {
+            type: 'string',
+            example: '2021-01-01T00:00:00.000Z',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'name', 'status', 'device', 'created_at', 'updated_at']
+} as const;
+
+export const $PairSumUpReaderDto = {
+    type: 'object',
+    properties: {
+        pairingCode: {
+            type: 'string',
+            example: '1234567890'
+        },
+        name: {
+            type: 'string',
+            example: 'Reader 1'
+        }
+    },
+    required: ['pairingCode', 'name']
+} as const;
+
+export const $SumupTopUpDto = {
+    type: 'object',
+    properties: {
+        amount: {
+            type: 'number',
+            example: 100,
+            minimum: 1
+        },
+        readerId: {
+            type: 'string',
+            example: '1234567890'
+        }
+    },
+    required: ['amount', 'readerId']
+} as const;
+
+export const $Payload = {
+    type: 'object',
+    properties: {
+        client_transaction_id: {
+            type: 'string',
+            description: 'The ID of the transaction',
+            example: '1234567890'
+        },
+        merchant_code: {
+            type: 'string',
+            description: 'The merchant code',
+            example: 'MPMGEBZF'
+        },
+        status: {
+            type: 'string',
+            description: 'The status of the transaction',
+            example: 'successful',
+            enum: ['successful', 'failed']
+        },
+        transaction_id: {
+            type: 'string',
+            description: 'The ID of the transaction',
+            example: '8f0973dc-60df-4a8c-80ee-a06103c1d10e'
+        }
+    },
+    required: ['client_transaction_id', 'merchant_code', 'status', 'transaction_id']
+} as const;
+
+export const $SumupTransactionCallbackDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            description: 'The ID of the transaction',
+            example: '1234567890'
+        },
+        event_type: {
+            type: 'string',
+            description: 'The type of the transaction',
+            example: 'solo.transaction.updated',
+            enum: ['solo.transaction.updated']
+        },
+        payload: {
+            description: 'The payload of the transaction',
+            example: {
+                client_transaction_id: '1234567890',
+                merchant_code: 'MPMGEBZF',
+                status: 'successful',
+                transaction_id: '8f0973dc-60df-4a8c-80ee-a06103c1d10e'
+            },
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Payload'
+                }
+            ]
+        },
+        timestamp: {
+            type: 'string',
+            description: 'The timestamp of the transaction',
+            example: '2025-09-13T21:31:56.984208Z',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'event_type', 'payload', 'timestamp']
 } as const;
 
 export const $ResourceFlowNodeSchemaDto = {

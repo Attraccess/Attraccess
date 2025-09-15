@@ -1,0 +1,18 @@
+{
+  "title": "Karten-Lesegeräte",
+  "subtitle": "Verwalten Sie die verbundenen Karten-Lesegeräte.",
+  "actions": {
+    "pairReader": "Karten-Lesegerät einrichten"
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "device": "Gerät",
+      "status": "Status",
+      "actions": "Aktionen"
+    },
+    "actions": {
+      "deleteReader": "Löschen"
+    }
+  }
+}

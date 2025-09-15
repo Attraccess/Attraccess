@@ -2,11 +2,11 @@
   "title": "Nutzungsbasierte Abrechnung",
   "inputs": {
     "creditsPerUsage": {
-      "label": "Credits pro Nutzung",
+      "label": "{{currency}} pro Nutzung",
       "description": "Dieser Betrag wird einmalig pro Nutzung abgezogen."
     },
     "creditsPerMinute": {
-      "label": "Credits pro Minute",
+      "label": "{{currency}} pro Minute",
       "description": "Dieser Betrag wird pro Minute der Sitzungsdauer abgezogen."
     }
   },

@@ -1,47 +1,59 @@
-import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react';
-import { ReactNode, useMemo } from 'react';
-import { ChevronDown } from 'lucide-react';
+import {
+  Select as HeroUiSelect,
+  SelectItem as HeroUiSelectItem,
+  SelectProps as HeroUiSelectProps,
+  SharedSelection,
+} from '@heroui/react';
+import { ReactNode, useCallback, useState } from 'react';
 
 interface SelectItem {
   key: string;
   label: ReactNode;
 }
 
-interface SelectProps {
-  label?: string;
+export type Props = Omit<
+  HeroUiSelectProps,
+  'items' | 'selectedKeys' | 'onChange' | 'children' | 'onSelectionChange'
+> & {
   selectedKey: string;
-  onSelectionChange: (key: string) => void;
+  onSelectionChange: (key: string) => unknown;
   items: SelectItem[];
-  id?: string;
-  name?: string;
-  isLoading?: boolean;
-}
+};
 
-export function Select(props: SelectProps) {
-  const { selectedKey, onSelectionChange, items, label, id, name, isLoading } = props;
+export function Select(props: Props) {
+  const { selectedKey, onSelectionChange, items, ...selectProps } = props;
 
-  const selectedItem = useMemo(() => {
-    return items.find((item) => item.key === selectedKey);
-  }, [items, selectedKey]);
+  const selectionToSet = useCallback((selection: Props['selectedKey']) => {
+    return new Set(selection ? [selection] : []);
+  }, []);
+
+  const [value, setValue] = useState(selectionToSet(selectedKey));
+
+  const handleSelectionChange = useCallback(
+    (keys: SharedSelection) => {
+      if (keys === 'all') {
+        return;
+      }
+
+      setValue(keys as Set<string>);
+      onSelectionChange(keys.values().next().value as string);
+    },
+    [onSelectionChange],
+  );
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <label className="text-gray-500 text-xs">{label}</label>
-      <input type="hidden" id={id} name={name} value={selectedKey} />
-      <Dropdown>
-        <DropdownTrigger>
-          <Button endContent={<ChevronDown size={16} />} data-cy="select-trigger-button" isLoading={isLoading}>
-            <span>{selectedItem?.label}</span>
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu aria-label="Static Actions">
-          {items.map((item) => (
-            <DropdownItem key={item.key} onPress={() => onSelectionChange(item.key)}>
-              {item.label}
-            </DropdownItem>
-          ))}
-        </DropdownMenu>
-      </Dropdown>
-    </div>
+    <HeroUiSelect
+      {...selectProps}
+      items={items}
+      label={props.label}
+      selectedKeys={value}
+      onSelectionChange={handleSelectionChange}
+    >
+      {items.map((item) => (
+        <HeroUiSelectItem key={item.key} data-cy={`select-item-${item.key}`}>
+          {item.label}
+        </HeroUiSelectItem>
+      ))}
+    </HeroUiSelect>
   );
 }

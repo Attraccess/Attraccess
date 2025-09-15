@@ -271,12 +271,28 @@ export const UseBillingServiceGetBillingTransactionsKeyFn = ({ limit, page, user
   page?: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionsKey, ...(queryKey ?? [{ limit, page, userId }])];
+export type BillingServiceGetResourceBillingConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getResourceBillingConfiguration>>;
+export type BillingServiceGetResourceBillingConfigurationQueryResult<TData = BillingServiceGetResourceBillingConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetResourceBillingConfigurationKey = "BillingServiceGetResourceBillingConfiguration";
+export const UseBillingServiceGetResourceBillingConfigurationKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useBillingServiceGetResourceBillingConfigurationKey, ...(queryKey ?? [{ resourceId }])];
 export type BillingServiceGetBillingConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingConfiguration>>;
 export type BillingServiceGetBillingConfigurationQueryResult<TData = BillingServiceGetBillingConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetBillingConfigurationKey = "BillingServiceGetBillingConfiguration";
-export const UseBillingServiceGetBillingConfigurationKeyFn = ({ resourceId }: {
-  resourceId: number;
-}, queryKey?: Array<unknown>) => [useBillingServiceGetBillingConfigurationKey, ...(queryKey ?? [{ resourceId }])];
+export const UseBillingServiceGetBillingConfigurationKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetBillingConfigurationKey, ...(queryKey ?? [])];
+export type BillingServiceGetSumUpConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getSumUpConfiguration>>;
+export type BillingServiceGetSumUpConfigurationQueryResult<TData = BillingServiceGetSumUpConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetSumUpConfigurationKey = "BillingServiceGetSumUpConfiguration";
+export const UseBillingServiceGetSumUpConfigurationKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetSumUpConfigurationKey, ...(queryKey ?? [])];
+export type BillingServiceGetSumUpReadersDefaultResponse = Awaited<ReturnType<typeof BillingService.getSumUpReaders>>;
+export type BillingServiceGetSumUpReadersQueryResult<TData = BillingServiceGetSumUpReadersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetSumUpReadersKey = "BillingServiceGetSumUpReaders";
+export const UseBillingServiceGetSumUpReadersKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceGetSumUpReadersKey, ...(queryKey ?? [])];
+export type BillingServiceBillingControllerStreamEventsDefaultResponse = Awaited<ReturnType<typeof BillingService.billingControllerStreamEvents>>;
+export type BillingServiceBillingControllerStreamEventsQueryResult<TData = BillingServiceBillingControllerStreamEventsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceBillingControllerStreamEventsKey = "BillingServiceBillingControllerStreamEvents";
+export const UseBillingServiceBillingControllerStreamEventsKeyFn = (queryKey?: Array<unknown>) => [useBillingServiceBillingControllerStreamEventsKey, ...(queryKey ?? [])];
 export type ResourceFlowsServiceGetNodeSchemasDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.getNodeSchemas>>;
 export type ResourceFlowsServiceGetNodeSchemasQueryResult<TData = ResourceFlowsServiceGetNodeSchemasDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceFlowsServiceGetNodeSchemasKey = "ResourceFlowsServiceGetNodeSchemas";
@@ -380,7 +396,12 @@ export type AccessControlServiceResourceIntroducersGrantMutationResult = Awaited
 export type AccessControlServiceResourceIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsGrant>>;
 export type ResourceMaintenancesServiceCreateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.createMaintenance>>;
 export type BillingServiceCreateManualTransactionMutationResult = Awaited<ReturnType<typeof BillingService.createManualTransaction>>;
-export type BillingServiceUpdateBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateBillingConfiguration>>;
+export type BillingServiceUpdateResourceBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.updateResourceBillingConfiguration>>;
+export type BillingServiceSetSumUpApiKeyMutationResult = Awaited<ReturnType<typeof BillingService.setSumUpApiKey>>;
+export type BillingServiceSetBillingConfigurationMutationResult = Awaited<ReturnType<typeof BillingService.setBillingConfiguration>>;
+export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
+export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
+export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
@@ -408,5 +429,6 @@ export type MqttServiceMqttServersDeleteOneMutationResult = Awaited<ReturnType<t
 export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroducersRevoke>>;
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.cancelMaintenance>>;
+export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

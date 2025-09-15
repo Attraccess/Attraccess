@@ -1,6 +1,5 @@
 import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
-import { Select, SelectItem, SelectProps } from '@heroui/react';
-import { useCallback, useState } from 'react';
+import { Select, Props as SelectProps } from '../select';
 
 interface Props {
   selectedId: number;
@@ -13,37 +12,22 @@ export function MqttServerSelect(
   props: Props &
     Omit<
       SelectProps,
-      'items' | 'label' | 'placeholder' | 'selectedKeys' | 'onSelectionChange' | 'data-cy' | 'isLoading' | 'children'
+      'items' | 'label' | 'placeholder' | 'selectedKey' | 'onSelectionChange' | 'data-cy' | 'isLoading' | 'children'
     >,
 ) {
   const { selectedId, onSelectionChange, label, placeholder, ...selectProps } = props;
   const { data: servers, isLoading } = useMqttServiceMqttServersGetAll();
 
-  const selectionToSet = useCallback((selection: Props['selectedId']) => {
-    return new Set(selection ? [selection] : []);
-  }, []);
-  const [value, setValue] = useState(selectionToSet(selectedId));
-
   return (
     <Select
-      items={servers ?? []}
+      items={(servers ?? []).map((server) => ({ key: server.id.toString(), label: server.name }))}
       label={label}
       placeholder={servers?.find((r) => r.id === selectedId)?.name ?? placeholder}
-      selectedKeys={value}
-      onSelectionChange={(keys) => setValue(keys as Set<number>)}
+      selectedKey={selectedId.toString()}
+      onSelectionChange={(key) => onSelectionChange(Number(key))}
       data-cy="mqtt-server-select"
       isLoading={isLoading}
       {...selectProps}
-    >
-      {(server) => (
-        <SelectItem
-          aria-label={server.name}
-          key={server.id}
-          data-cy={`mqtt-server-select-item-${server.id}`}
-          title={server.name}
-          description={server.host + ':' + server.port}
-        />
-      )}
-    </Select>
+    />
   );
 }

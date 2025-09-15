@@ -15,8 +15,6 @@ import {
   ModalFooter,
   ModalHeader,
   useDisclosure,
-  Select,
-  SelectItem,
   Divider,
   Dropdown,
   DropdownTrigger,
@@ -47,6 +45,7 @@ import de from './de.json';
 import { AuthentikDiscoveryDialog } from './discovery/authentik';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { KeycloakDiscoveryDialog } from './discovery/keycloak';
+import { Select } from '../../../components/select';
 
 const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
@@ -217,10 +216,10 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   };
 
-  const handleSelectChange = (value: string) => {
+  const handleSelectChange = (value: SSOProviderType) => {
     setFormValues((prev) => ({
       ...prev,
-      type: value as SSOProviderType,
+      type: value,
     }));
   };
 
@@ -347,16 +346,13 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                   />
 
                   <Select
+                    items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
                     label={t('type')}
-                    selectedKeys={[formValues.type]}
-                    onChange={(e) => handleSelectChange(e.target.value)}
+                    selectedKey={formValues.type}
+                    onSelectionChange={(key) => handleSelectChange(key as SSOProviderType)}
                     isRequired
                     data-cy="sso-provider-form-type-select"
-                  >
-                    <SelectItem key="OIDC" data-cy="sso-provider-form-type-oidc-select-item">
-                      {t('oidc')}
-                    </SelectItem>
-                  </Select>
+                  />
 
                   {formValues.type === 'OIDC' && (
                     <>

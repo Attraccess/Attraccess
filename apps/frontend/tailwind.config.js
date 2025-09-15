@@ -11,7 +11,19 @@ module.exports = {
     '../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        draw: {
+          to: {
+            'stroke-dashoffset': '0',
+            'stroke-dasharray': '0',
+          },
+        },
+      },
+      animation: {
+        draw: 'draw 2s ease-in-out forwards',
+      },
+    },
   },
   darkMode: 'class',
   plugins: [heroui(), require('@tailwindcss/typography')],

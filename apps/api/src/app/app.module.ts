@@ -21,6 +21,7 @@ import sessionConfig from '../config/session.config';
 import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { BillingModule } from '../billing/billing.module';
     EmailTemplateModule,
     LicenseModule,
     BillingModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

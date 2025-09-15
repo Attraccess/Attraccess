@@ -1,0 +1,28 @@
+{
+  "title": "Topup",
+  "subtitle": "Select a card reader and the amount you want to put into your account.",
+  "inputs": {
+    "reader": {
+      "label": "Card Reader"
+    },
+    "amount": {
+      "label": "Amount",
+      "description": "Select the amount you want to put into your account"
+    }
+  },
+  "actions": {
+    "topUp": "Topup {{amount}} {{currency}}"
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Topup was not successful",
+        "description": "Something went wrong"
+      }
+    }
+  },
+  "topUpInstructions": {
+    "title": "How to continue?",
+    "description": "After clicking \"Topup\", please go to the card reader and follow the instructions on the screen of the reader. \nOnce the transaction is complete, it may take up to 60 seconds \nuntil the balance appears on your account. \nYou can check the current status in the transaction history."
+  }
+}

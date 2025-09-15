@@ -2,7 +2,7 @@
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, ChangeUsernameDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetUserPasswordDto, StartUsageSessionDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangePasswordDto, ChangeUsernameDto, CreateMaintenanceDto, CreateMqttServerDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EndUsageSessionDto, EnrollNfcCardDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PreviewMjmlDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceFindMany = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
@@ -147,9 +147,13 @@ export const useBillingServiceGetBillingTransactions = <TData = Common.BillingSe
   page?: number;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }, queryKey), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) as TData, ...options });
-export const useBillingServiceGetBillingConfiguration = <TData = Common.BillingServiceGetBillingConfigurationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+export const useBillingServiceGetResourceBillingConfiguration = <TData = Common.BillingServiceGetResourceBillingConfigurationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
   resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn({ resourceId }, queryKey), queryFn: () => BillingService.getBillingConfiguration({ resourceId }) as TData, ...options });
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }, queryKey), queryFn: () => BillingService.getResourceBillingConfiguration({ resourceId }) as TData, ...options });
+export const useBillingServiceGetBillingConfiguration = <TData = Common.BillingServiceGetBillingConfigurationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingConfigurationKeyFn(queryKey), queryFn: () => BillingService.getBillingConfiguration() as TData, ...options });
+export const useBillingServiceGetSumUpConfiguration = <TData = Common.BillingServiceGetSumUpConfigurationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetSumUpConfigurationKeyFn(queryKey), queryFn: () => BillingService.getSumUpConfiguration() as TData, ...options });
+export const useBillingServiceGetSumUpReaders = <TData = Common.BillingServiceGetSumUpReadersDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetSumUpReadersKeyFn(queryKey), queryFn: () => BillingService.getSumUpReaders() as TData, ...options });
+export const useBillingServiceBillingControllerStreamEvents = <TData = Common.BillingServiceBillingControllerStreamEventsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceBillingControllerStreamEventsKeyFn(queryKey), queryFn: () => BillingService.billingControllerStreamEvents() as TData, ...options });
 export const useResourceFlowsServiceGetNodeSchemas = <TData = Common.ResourceFlowsServiceGetNodeSchemasDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceGetNodeSchemasKeyFn({ resourceId }, queryKey), queryFn: () => ResourceFlowsService.getNodeSchemas({ resourceId }) as TData, ...options });
@@ -352,13 +356,38 @@ export const useBillingServiceCreateManualTransaction = <TData = Common.BillingS
   requestBody: ModifyBalanceDto;
   userId: number;
 }, TContext>({ mutationFn: ({ requestBody, userId }) => BillingService.createManualTransaction({ requestBody, userId }) as unknown as Promise<TData>, ...options });
-export const useBillingServiceUpdateBillingConfiguration = <TData = Common.BillingServiceUpdateBillingConfigurationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+export const useBillingServiceUpdateResourceBillingConfiguration = <TData = Common.BillingServiceUpdateResourceBillingConfigurationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: UpdateResourceBillingConfigurationDto;
   resourceId: number;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: UpdateResourceBillingConfigurationDto;
   resourceId: number;
-}, TContext>({ mutationFn: ({ requestBody, resourceId }) => BillingService.updateBillingConfiguration({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => BillingService.updateResourceBillingConfiguration({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useBillingServiceSetSumUpApiKey = <TData = Common.BillingServiceSetSumUpApiKeyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: SetSumUpApiKeyDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: SetSumUpApiKeyDto;
+}, TContext>({ mutationFn: ({ requestBody }) => BillingService.setSumUpApiKey({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useBillingServiceSetBillingConfiguration = <TData = Common.BillingServiceSetBillingConfigurationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: SetBillingConfigurationDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: SetBillingConfigurationDto;
+}, TContext>({ mutationFn: ({ requestBody }) => BillingService.setBillingConfiguration({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useBillingServicePairSumUpReader = <TData = Common.BillingServicePairSumUpReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: PairSumUpReaderDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: PairSumUpReaderDto;
+}, TContext>({ mutationFn: ({ requestBody }) => BillingService.pairSumUpReader({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useBillingServiceTopUpWithSumUpReader = <TData = Common.BillingServiceTopUpWithSumUpReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: SumupTopUpDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: SumupTopUpDto;
+}, TContext>({ mutationFn: ({ requestBody }) => BillingService.topUpWithSumUpReader({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useBillingServiceSumUpTopUpCallback = <TData = Common.BillingServiceSumUpTopUpCallbackMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: SumupTransactionCallbackDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: SumupTransactionCallbackDto;
+}, TContext>({ mutationFn: ({ requestBody }) => BillingService.sumUpTopUpCallback({ requestBody }) as unknown as Promise<TData>, ...options });
 export const useResourceFlowsServicePressButton = <TData = Common.ResourceFlowsServicePressButtonMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   buttonId: string;
   resourceId: number;
@@ -528,6 +557,11 @@ export const useResourceMaintenancesServiceCancelMaintenance = <TData = Common.R
   maintenanceId: number;
   resourceId: number;
 }, TContext>({ mutationFn: ({ maintenanceId, resourceId }) => ResourceMaintenancesService.cancelMaintenance({ maintenanceId, resourceId }) as unknown as Promise<TData>, ...options });
+export const useBillingServiceRemoveSumUpReader = <TData = Common.BillingServiceRemoveSumUpReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  readerId: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  readerId: string;
+}, TContext>({ mutationFn: ({ readerId }) => BillingService.removeSumUpReader({ readerId }) as unknown as Promise<TData>, ...options });
 export const usePluginsServiceDeletePlugin = <TData = Common.PluginsServiceDeletePluginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   pluginId: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

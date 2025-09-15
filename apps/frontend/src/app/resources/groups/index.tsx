@@ -48,7 +48,7 @@ export function ManageResourceGroups({
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { data: groups, status: fetchStatus } = useResourcesServiceResourceGroupsGetMany();
+  const { data: groups, status: fetchStatus, isFetched: isFetchedGroups } = useResourcesServiceResourceGroupsGetMany();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
@@ -160,9 +160,9 @@ export function ManageResourceGroups({
           shadow="none"
           removeWrapper
           bottomContent={
-            <div className="flex w-full justify-center">
+            isFetchedGroups && (
               <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
-            </div>
+            )
           }
         >
           <TableHeader>

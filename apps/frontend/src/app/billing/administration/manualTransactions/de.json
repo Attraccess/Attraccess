@@ -1,13 +1,12 @@
 {
   "title": "Manuelle Transaktionen",
-  "subtitle": "Manuelles Hinzufügen oder Entfernen von Credits zu einem Benutzer.",
+  "subtitle": "Manuelles Hinzufügen oder Entfernen von Guthaben zu einem Benutzer.",
   "inputs": {
     "amount": "Betrag"
   },
   "actions": {
     "createTransaction": "Transaktion erstellen"
   },
-  "balance": "{{balance}} Credits",
   "toast": {
     "error": {
       "generic": {
@@ -16,7 +15,7 @@
       },
       "INSUFFICIENT_BALANCE": {
         "title": "Deckung nicht ausreichend",
-        "description": "Der Benutzer hat nicht genügend Credits."
+        "description": "Der Benutzer hat nicht genügend Guthaben."
       }
     },
     "success": {

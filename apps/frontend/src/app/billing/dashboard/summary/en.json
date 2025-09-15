@@ -1,11 +1,12 @@
 {
   "title": "Summary",
-  "balance": "{{balance}} Credits",
+  "balance": "{{balance}} {{currency}}",
   "transactions": {
     "table": {
       "columns": {
         "id": "ID",
         "dateTime": "Date",
+        "status": "Status",
         "details": "Details",
         "amount": "Amount"
       },
@@ -14,7 +15,13 @@
           "unknown": "Unknown transaction type",
           "refund": "Refund for {{originalDetails}} ({{originalId}})",
           "resourceUsage": "Usage of {{resourceUsage.resource.name}}",
-          "manual": "Manual transaction by {{initiator.username}}"
+          "manual": "Manual transaction by {{initiator.username}}",
+          "sumup:topup": "Top-up via SumUp"
+        },
+        "status": {
+          "pending": "Pending",
+          "completed": "Completed",
+          "failed": "Failed"
         }
       }
     }

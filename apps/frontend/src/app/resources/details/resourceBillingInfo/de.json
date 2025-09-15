@@ -2,18 +2,26 @@
   "title": "Abrechnung",
   "free": {
     "title": "Kostenlos",
-    "description": "Diese Ressource ist kostenlos nutzbar. Keine Credits erforderlich."
+    "description": "Diese Ressource ist kostenlos nutzbar."
+  },
+  "balance": {
+    "label": "Aktuelles Guthaben",
+    "value": "{{credits}} {{currency}}"
   },
   "perUse": {
     "label": "Pro Nutzung",
-    "value": "{{credits}} Credits"
+    "value": "{{credits}} {{currency}}"
   },
   "perMinute": {
     "label": "Pro Minute",
-    "value": "{{credits}} Credits"
+    "value": "{{credits}} {{currency}}"
   },
   "example": {
-    "label": "Beispielkosten (10 Min)",
-    "value": "{{credits}} Credits"
+    "label": "Beispielkosten ({{minutes}} Min)",
+    "value": "{{credits}} {{currency}}"
+  },
+  "exampleResultingBalance": {
+    "label": "Resultierendes Guthaben",
+    "value": "{{credits}} {{currency}}"
   }
 }

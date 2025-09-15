@@ -1,0 +1,16 @@
+{
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Löschen des Karten-Lesegeräts",
+        "description": "Karten-Lesegerät konnte nicht gelöscht werden"
+      }
+    }
+  },
+  "success": {
+    "toast": {
+      "title": "Karten-Lesegerät gelöscht",
+      "description": "Karten-Lesegerät wurde erfolgreich gelöscht"
+    }
+  }
+}

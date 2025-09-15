@@ -39,8 +39,9 @@ import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceUsageAction } from './entities/resourceUsage.type';
-import { BillingTransaction } from './entities/billing-transaction.entity';
+import { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
+import { Setting } from './entities/setting.entity';
 
 // Export all entities individually
 export {
@@ -87,6 +88,8 @@ export {
   IfNodeDataSchema,
   BillingTransaction,
   ResourceBillingConfiguration,
+  Setting,
+  BillingTransactionStatus,
 };
 
 // Export the entities object
@@ -113,4 +116,5 @@ export const entities = {
   ResourceMaintenance,
   BillingTransaction,
   ResourceBillingConfiguration,
+  Setting,
 };

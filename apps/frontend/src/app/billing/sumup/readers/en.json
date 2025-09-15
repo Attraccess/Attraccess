@@ -1,0 +1,18 @@
+{
+  "title": "Card Readers",
+  "subtitle": "Manage the connected card readers.",
+  "actions": {
+    "pairReader": "Pair Reader"
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "device": "Device",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "deleteReader": "Delete"
+    }
+  }
+}
