@@ -6,7 +6,8 @@ import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveTransactionUpdates } from '../../summary/live-updates';
-import { BillingTransaction } from '@attraccess/react-query-client';
+import { BillingTransaction, useBillingServiceGetBillingTransactions } from '@attraccess/react-query-client';
+import { useAuth } from '../../../../../hooks/useAuth';
 
 interface Props {
   transactionId?: number;
@@ -20,6 +21,18 @@ export function TransactionProcessingCard(props: Props) {
   const [status, setStatus] = useState<BillingTransaction['status']>('pending');
   const COUNTER_MAX_VALUE = 60;
   const [counter, setCounter] = useState<number>(COUNTER_MAX_VALUE);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const { user: currentUser } = useAuth();
+  const { data: transactions } = useBillingServiceGetBillingTransactions(
+    {
+      userId: currentUser?.id ?? 0,
+    },
+    undefined,
+    {
+      refetchInterval: 10000,
+    },
+  );
 
   const onUpdate = useCallback(
     (transaction: BillingTransaction) => {
@@ -27,6 +40,7 @@ export function TransactionProcessingCard(props: Props) {
         return;
       }
 
+      setLastUpdated(new Date());
       setStatus(transaction.status);
 
       if (transaction.status !== 'pending') {
@@ -49,6 +63,20 @@ export function TransactionProcessingCard(props: Props) {
       }, 1000);
     }
   }, [counter]);
+
+  useEffect(() => {
+    const matchingTransaction = transactions?.data.find((transaction) => transaction.id === transactionId);
+    if (!matchingTransaction) {
+      return;
+    }
+
+    const now = new Date();
+    if (now.getTime() < lastUpdated.getTime()) {
+      return;
+    }
+
+    onUpdate(matchingTransaction);
+  }, [transactions, transactionId, lastUpdated, onUpdate]);
 
   return (
     <Card>

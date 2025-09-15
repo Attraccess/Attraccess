@@ -189,7 +189,7 @@ export class SumUpService {
     });
 
     if (!transaction) {
-      this.logger.error('updateTransactionStatusBySumupServer: Sumup transaction not found', { sumupTransactionId });
+      this.logger.error(`updateTransactionStatusBySumupServer: Sumup transaction not found, ${sumupTransactionId}`);
       throw new BadRequestException('Sumup transaction not found');
     }
 
@@ -218,26 +218,21 @@ export class SumUpService {
         break;
 
       default:
-        this.logger.error('updateTransactionStatusBySumupServer: Unknown sumup transaction status', {
-          sumupTransactionId,
-          sumUpTransactionData,
-        });
+        this.logger.error(
+          `updateTransactionStatusBySumupServer: Unknown sumup transaction status, ${sumUpTransactionData.status} of ${sumupTransactionId}`,
+        );
         throw new BadRequestException('Unknown sumup transaction status');
     }
 
-    this.logger.debug('updateTransactionStatusBySumupServer: Updating transaction status', {
-      sumupTransactionId,
-      sumUpTransactionData,
-      transaction,
-    });
+    this.logger.debug(
+      `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
+    );
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
 
-    this.logger.debug('updateTransactionStatusBySumupServer: Transaction status updated', {
-      sumupTransactionId,
-      sumUpTransactionData,
-      transaction,
-    });
+    this.logger.debug(
+      `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${transaction.status}`,
+    );
   }
 
   @Cron(CronExpression.EVERY_30_SECONDS)
@@ -248,7 +243,7 @@ export class SumUpService {
       status: BillingTransactionStatus.Pending,
     });
 
-    this.logger.debug('processPendingTransactions: found ', transactions.length, ' pending transactions');
+    this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
 
     for (const transaction of transactions) {
       if (!transaction.externalReference.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
@@ -260,7 +255,7 @@ export class SumUpService {
 
       const transactionId = transaction.externalReference.split(':')[1];
       if (!transactionId) {
-        this.logger.error('Stored sumup transaction ID is invalid', { transactionId: transaction.externalReference });
+        this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
         transaction.status = BillingTransactionStatus.Failed;
         const updatedTransaction = await this.billingTransactionRepository.save(transaction);
         this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
