@@ -138,8 +138,6 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
       soloItems.push(item as SidebarItem);
     });
 
-    console.log(groups, soloItems);
-
     return { groups, soloItems };
   }, [sidebarEndItems]);
 
