@@ -244,7 +244,7 @@ export class ResourceUsageService {
       endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
     }
 
-    await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+    return await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       // Update session with end time and notes - using explicit update to avoid the generated column
       await transactionalEntityManager
         .createQueryBuilder()

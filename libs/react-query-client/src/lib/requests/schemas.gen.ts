@@ -2178,7 +2178,7 @@ export const $ResourceFlowNodeSchemaDto = {
         type: {
             type: 'string',
             description: 'The name of the node type',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.resource.billing.calculation.started', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
         },
         configSchema: {
             type: 'object',
@@ -2240,7 +2240,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.resource.billing.calculation.started', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
         },
         position: {
             description: 'The position of the node',

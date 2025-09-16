@@ -36,6 +36,12 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case 'input.resource.door.unlatched':
         return [];
 
+      case 'input.resource.billing.calculation.started':
+        return [];
+
+      case 'output.resource.billing.calculation.set-additional-items':
+        return [];
+
       case 'output.http.sendRequest':
         return [
           {

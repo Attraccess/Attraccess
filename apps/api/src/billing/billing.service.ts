@@ -214,6 +214,19 @@ export class BillingService {
     return await this.resourceBillingConfigurationRepository.save(configuration);
   }
 
+  private isBillingItem(
+    item: object,
+  ): item is Pick<BillingTransactionItem, 'name' | 'value' | 'description' | 'externalReference'> {
+    return (
+      item &&
+      typeof item === 'object' &&
+      'name' in item &&
+      'value' in item &&
+      'description' in item &&
+      'externalReference' in item
+    );
+  }
+
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {
     const existingTransaction = await transactionManager.findOneBy(BillingTransaction, { resourceUsageId: usage.id });
     if (existingTransaction) {
@@ -228,12 +241,22 @@ export class BillingService {
       let totalCredits = creditsForUsageDuration;
       totalCredits += creditsForSession;
 
-      const customBillingItems = await this.resourceFlowsExecutorService.runFlow(
+      const flowResults = await this.resourceFlowsExecutorService.runFlow(
         usage.resource.id,
         ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
         usage,
         manager,
       );
+
+      console.log('flowResults', flowResults);
+
+      const customBillingItems = flowResults.filter((result) => this.isBillingItem(result));
+
+      console.log('customBillingItems', customBillingItems);
+
+      for (const item of customBillingItems) {
+        totalCredits += item.value;
+      }
 
       if (totalCredits === 0) {
         return;
@@ -257,6 +280,16 @@ export class BillingService {
         name: 'PER_MINUTE',
         value: creditsForUsageDuration,
       });
+
+      for (const item of customBillingItems) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: transaction.id,
+          name: item.name,
+          value: item.value,
+          description: item.description,
+          externalReference: item.externalReference,
+        });
+      }
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
 

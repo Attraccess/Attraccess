@@ -68,6 +68,14 @@
               "output": "Output"
             }
           }
+        },
+        "billing": {
+          "calculation": {
+            "started": {
+              "title": "Billing calculation started",
+              "description": "This node is triggered when the billing calculation is started. It is mandatory to trigger the 'Add billing items' node afterwards."
+            }
+          }
         }
       }
     },
@@ -155,11 +163,21 @@
               "label": "URL"
             },
             "method": {
-              "label": "Method"
+              "label": "Method",
+              "enum": {
+                "GET": "GET",
+                "POST": "POST",
+                "PUT": "PUT",
+                "PATCH": "PATCH",
+                "DELETE": "DELETE",
+                "HEAD": "HEAD",
+                "OPTIONS": "OPTIONS"
+              }
             },
             "headers": {
               "label": "Headers",
-              "add": "Add header"
+              "add": "Add header",
+              "empty": "No headers"
             },
             "body": {
               "label": "Body"
@@ -189,6 +207,16 @@
             },
             "payload": {
               "label": "Payload"
+            }
+          }
+        }
+      },
+      "resource": {
+        "billing": {
+          "calculation": {
+            "set-additional-items": {
+              "title": "Add billing items",
+              "description": "This node can be used to add additional items to the billing."
             }
           }
         }

@@ -1,5 +1,7 @@
 import {
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -86,6 +88,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly configService: ConfigService,
     private readonly mqttClientService: MqttClientService,
+    @Inject(forwardRef(() => ResourceUsageService))
     private readonly resourceUsageService: ResourceUsageService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
@@ -109,11 +112,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.resourceFlowLogSubjects.forEach((subject) => subject.complete());
   }
 
-  private async createFlowLog(data: Omit<ResourceFlowLog, 'id' | 'createdAt' | 'resource'>): Promise<ResourceFlowLog> {
+  private async createFlowLog(
+    data: Omit<ResourceFlowLog, 'id' | 'createdAt' | 'resource'>,
+    transactionManager?: EntityManager,
+  ): Promise<ResourceFlowLog> {
     const logEntry = this.flowLogRepository.create(data);
 
+    const repository = transactionManager ? transactionManager.getRepository(ResourceFlowLog) : this.flowLogRepository;
+
     try {
-      const log = await this.flowLogRepository.save(logEntry);
+      const log = await repository.save(logEntry);
       if (!this.resourceFlowLogSubjects.has(log.resourceId)) {
         this.resourceFlowLogSubjects.set(log.resourceId, new Subject<ResourceFlowLogEvent>());
       }
@@ -382,23 +390,35 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-          responseOfNode = await this.processBillingSetAdditionalItemsNode(node, resultOfPreviousNode.payload);
+          responseOfNode = await this.processBillingSetAdditionalItemsNode(
+            node,
+            resultOfPreviousNode.payload,
+            transactionManager,
+          );
           break;
 
         case ResourceFlowNodeType.PROCESSING_WAIT:
-          responseOfNode = await this.processWaitNode(node, resultOfPreviousNode.payload);
+          responseOfNode = await this.processWaitNode(node, resultOfPreviousNode.payload, transactionManager);
           break;
 
         case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-          responseOfNode = await this.processHttpSendRequestNode(node, resultOfPreviousNode.payload);
+          responseOfNode = await this.processHttpSendRequestNode(
+            node,
+            resultOfPreviousNode.payload,
+            transactionManager,
+          );
           break;
 
         case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-          responseOfNode = await this.processMqttSendMessageNode(node, resultOfPreviousNode.payload);
+          responseOfNode = await this.processMqttSendMessageNode(
+            node,
+            resultOfPreviousNode.payload,
+            transactionManager,
+          );
           break;
 
         case ResourceFlowNodeType.PROCESSING_IF:
-          responseOfNode = await this.processIfNode(node, resultOfPreviousNode.payload);
+          responseOfNode = await this.processIfNode(node, resultOfPreviousNode.payload, transactionManager);
           break;
 
         default: {
@@ -410,15 +430,18 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       const processingTime = Date.now() - startTime;
       this.logger.debug(`Successfully processed flow node ID: ${node.id} (Type: ${node.type}) in ${processingTime}ms`);
 
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: node.id,
-        resourceId: node.resourceId,
-        type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
-        payload: JSON.stringify({ output: responseOfNode.payload }),
-      });
+      await this.createFlowLog(
+        {
+          flowRunId,
+          nodeId: node.id,
+          resourceId: node.resourceId,
+          type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
+          payload: JSON.stringify({ output: responseOfNode.payload }),
+        },
+        transactionManager,
+      );
 
-      return await this.executeNextNodes(flowRunId, node, responseOfNode);
+      return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager);
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.logger.error(
@@ -426,13 +449,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         error.stack,
       );
 
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: node.id,
-        resourceId: node.resourceId,
-        type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: JSON.stringify({ error }),
-      });
+      await this.createFlowLog(
+        {
+          flowRunId,
+          nodeId: node.id,
+          resourceId: node.resourceId,
+          type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
+          payload: JSON.stringify({ error }),
+        },
+        transactionManager,
+      );
       return [];
     }
   }
@@ -441,10 +467,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     flowRunId: string,
     node: ResourceFlowNode,
     resultOfPreviousNode: NodeProcessingResult,
+    transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
-    const edgesFromThisNode = await this.flowEdgeRepository.find({
+    const edgesRepository = transactionManager
+      ? transactionManager.getRepository(ResourceFlowEdge)
+      : this.flowEdgeRepository;
+
+    const edgesFromThisNode = await edgesRepository.find({
       where: {
         source: node.id,
         sourceHandle: resultOfPreviousNode.outputHandle,
@@ -462,9 +493,13 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`,
     );
 
+    const flowNodeRepository = transactionManager
+      ? transactionManager.getRepository(ResourceFlowNode)
+      : this.flowNodeRepository;
+
     // Execute each edge individually instead of deduplicating target nodes
     const edgePromises = edgesFromThisNode.map(async (edge) => {
-      const targetNode = await this.flowNodeRepository.findOne({
+      const targetNode = await flowNodeRepository.findOne({
         where: { id: edge.target },
       });
 
@@ -473,14 +508,18 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         return [] as NodeProcessingResult[];
       }
 
-      return this.processNode(flowRunId, targetNode, resultOfPreviousNode);
+      return this.processNode(flowRunId, targetNode, resultOfPreviousNode, transactionManager);
     });
 
     const results = await Promise.all(edgePromises);
     return results.flat();
   }
 
-  private async processWaitNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  private async processWaitNode(
+    node: ResourceFlowNode,
+    input: object,
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
     const { duration, unit } = node.data as ResourceFlowActionUtilWaitNodeData;
 
     let waitDurationMs = duration * 1000;
@@ -495,7 +534,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return { payload: input };
   }
 
-  private async processIfNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  private async processIfNode(
+    node: ResourceFlowNode,
+    input: object,
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
     const {
       path,
       comparisonOperator,
@@ -541,13 +584,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     };
   }
 
-  private async processHttpSendRequestNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  private async processHttpSendRequestNode(
+    node: ResourceFlowNode,
+    input: object,
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
     const data = node.data as ResourceFlowActionHttpSendRequestNodeData;
 
     const url = this.compileTemplate(data.url ?? '', input);
     const method = this.compileTemplate(data.method ?? '', input);
     const headers = Object.fromEntries(
-      Object.entries(data.headers).map(([key, value]) => [key, this.compileTemplate(value, input)]),
+      Object.entries(data.headers ?? {}).map(([key, value]) => [key, this.compileTemplate(value, input)]),
     );
     const body = this.compileTemplate(data.body ?? '', input);
 
@@ -563,7 +610,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     };
   }
 
-  private async processMqttSendMessageNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  private async processMqttSendMessageNode(
+    node: ResourceFlowNode,
+    input: object,
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
     const { serverId, ...data } = node.data as ResourceFlowActionMqttSendMessageNodeData;
 
     const topic = this.compileTemplate(data.topic ?? '', input);
@@ -611,6 +662,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processBillingSetAdditionalItemsNode(
     _node: ResourceFlowNode,
     input: object,
+    _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     const { billingItems } = input as {
       billingItems: Pick<BillingTransactionItem, 'name' | 'value' | 'description' | 'externalReference'>[];

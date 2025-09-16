@@ -105,7 +105,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'object':
       if (schema.additionalProperties) {
         let content = null;
-        if (Object.entries(value as Record<string, unknown>).length === 0) {
+        if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
             <Card>
               <CardBody>

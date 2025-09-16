@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ResourceUsageController } from './resourceUsage.controller';
 import { ResourceUsageService } from './resourceUsage.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -16,7 +16,7 @@ import { BillingModule } from '../../billing/billing.module';
     ResourceIntroductionsModule,
     ResourceGroupsModule,
     ResourceMaintenanceModule,
-    BillingModule,
+    forwardRef(() => BillingModule),
   ],
   controllers: [ResourceUsageController],
   providers: [ResourceUsageService],
