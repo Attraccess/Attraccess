@@ -183,7 +183,7 @@ describe('BillingService', () => {
 
       const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
 
-      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
 
       expect(getConfigSpy).not.toHaveBeenCalled();
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe('BillingService', () => {
 
       const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
 
-      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
 
       expect(getConfigSpy).not.toHaveBeenCalled();
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
@@ -221,7 +221,7 @@ describe('BillingService', () => {
         .spyOn(service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(101);
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
@@ -244,7 +244,7 @@ describe('BillingService', () => {
 
       billingTransactionRepository.save.mockResolvedValue({ id: 999 } as BillingTransaction);
 
-      await service.handleResourceUsageEvent(new ResourceUsageEvent(usage));
+      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102);
       expect(billingTransactionRepository.save).toHaveBeenCalledWith(

@@ -244,26 +244,32 @@ export class ResourceUsageService {
       endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
     }
 
-    // Update session with end time and notes - using explicit update to avoid the generated column
-    await this.resourceUsageRepository
-      .createQueryBuilder()
-      .update(ResourceUsage)
-      .set({
-        endTime,
-        endNotes,
-      })
-      .where('id = :id', { id: activeSession.id })
-      .execute();
+    await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+      // Update session with end time and notes - using explicit update to avoid the generated column
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .update(ResourceUsage)
+        .set({
+          endTime,
+          endNotes,
+        })
+        .where('id = :id', { id: activeSession.id })
+        .execute();
 
-    this.logger.debug(`Successfully ended session ${activeSession.id}`);
+      this.logger.debug(`Successfully ended session ${activeSession.id}`);
 
-    // Emit event after successful save
-    await this.emitUsageEvent(activeSession.id);
+      const updatedUsage = await this.resourceUsageRepository.findOne({
+        where: { id: activeSession.id },
+        relations: ['resource', 'user'],
+      });
 
-    // Fetch the updated record
-    return await this.resourceUsageRepository.findOne({
-      where: { id: activeSession.id },
-      relations: ['resource', 'user'],
+      await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
+
+      // Emit event after successful save
+      await this.emitUsageEvent(activeSession.id);
+
+      // Fetch the updated record
+      return updatedUsage;
     });
   }
 

@@ -59,7 +59,7 @@ export const IfNodeDataSchema = z.object({
 });
 
 // Helper function to get the appropriate schema for a node type
-export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
+export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
     case ResourceFlowNodeType.INPUT_BUTTON:
       return ButtonNodeDataSchema;
@@ -81,7 +81,8 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
     case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
     default:
-      throw new Error(`Unknown node type: ${nodeType}`);
+      const exhaustiveCheck: never = nodeType;
+      throw new Error(`Unknown node type: ${exhaustiveCheck}`);
   }
 }
 

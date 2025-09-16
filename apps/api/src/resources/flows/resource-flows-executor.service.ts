@@ -7,7 +7,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, EntityManager } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
@@ -17,6 +17,7 @@ import {
   Resource,
   ResourceUsageAction,
   ResourceUsage,
+  BillingTransactionItem,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../usage/events/resource-usage.events';
@@ -168,6 +169,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       case ResourceUsageAction.DoorUnlatch:
         await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
         break;
+
+      default:
+        const exhaustiveCheck: never = usage.usageAction;
+        throw new Error(`Unknown resource usage action: ${exhaustiveCheck}`);
     }
   }
 
@@ -265,7 +270,39 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     await this.startFlow(eventNodes, { payload: eventData });
   }
 
-  private async startFlow(node: ResourceFlowNode | ResourceFlowNode[], data: NodeProcessingResult) {
+  public async runFlow(
+    resourceId: number,
+    triggerNodeType: ResourceFlowNodeType,
+    initialData: object = {},
+    transactionManager?: EntityManager,
+  ): Promise<object[]> {
+    const repository = transactionManager
+      ? transactionManager.getRepository(ResourceFlowNode)
+      : this.flowNodeRepository;
+
+    const nodes = await repository.find({
+      where: {
+        resourceId,
+        type: triggerNodeType,
+      },
+    });
+
+    if (nodes.length === 0) {
+      this.logger.debug(
+        `No flow nodes found for trigger node type '${triggerNodeType}' and resource ID: ${resourceId}`,
+      );
+      return [];
+    }
+
+    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager);
+    return results.map((r) => r.payload);
+  }
+
+  private async startFlow(
+    node: ResourceFlowNode | ResourceFlowNode[],
+    data: NodeProcessingResult,
+    transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult[]> {
     const nodes = Array.isArray(node) ? node : [node];
 
     this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
@@ -279,27 +316,38 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       type: ResourceFlowLogType.FLOW_START,
     });
 
+    let leafResults: NodeProcessingResult[] = [];
     try {
-      await Promise.all(
+      const results = await Promise.all(
         nodes.map((node) => {
-          return this.processNode(flowRunId, node, data);
+          return this.processNode(flowRunId, node, data, transactionManager);
         }),
       );
+      leafResults = results.flat();
       this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
     } catch (error) {
       this.logger.error(`Failed to process flow nodes`, error.stack);
       throw error;
     } finally {
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: null,
-        resourceId: nodes[0].resourceId,
-        type: ResourceFlowLogType.FLOW_COMPLETED,
-      });
+      await this.createFlowLog(
+        {
+          flowRunId,
+          nodeId: null,
+          resourceId: nodes[0].resourceId,
+          type: ResourceFlowLogType.FLOW_COMPLETED,
+        },
+        transactionManager,
+      );
     }
+    return leafResults;
   }
 
-  private async processNode(flowRunId: string, node: ResourceFlowNode, resultOfPreviousNode: NodeProcessingResult) {
+  private async processNode(
+    flowRunId: string,
+    node: ResourceFlowNode,
+    resultOfPreviousNode: NodeProcessingResult,
+    transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
     const startTime = Date.now();
@@ -308,13 +356,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     try {
       // Log the start of node processing
-      await this.createFlowLog({
-        flowRunId,
-        nodeId: node.id,
-        resourceId: node.resourceId,
-        type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
-        payload: JSON.stringify({ input: resultOfPreviousNode.payload }),
-      });
+      await this.createFlowLog(
+        {
+          flowRunId,
+          nodeId: node.id,
+          resourceId: node.resourceId,
+          type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
+          payload: JSON.stringify({ input: resultOfPreviousNode.payload }),
+        },
+        transactionManager,
+      );
 
       switch (node.type) {
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
@@ -325,10 +376,13 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
         case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+          responseOfNode = await this.processBillingSetAdditionalItemsNode(node, resultOfPreviousNode.payload);
           break;
 
         case ResourceFlowNodeType.PROCESSING_WAIT:
@@ -348,15 +402,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           break;
 
         default: {
-          const message = `Unknown node type: ${node.type} for node ID: ${node.id}`;
-          await this.createFlowLog({
-            flowRunId,
-            nodeId: node.id,
-            resourceId: node.resourceId,
-            type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-            payload: JSON.stringify({ error: message }),
-          });
-          throw new Error(message);
+          const exhaustiveCheck: never = node.type;
+          throw new Error(`Unknown node type: ${exhaustiveCheck}`);
         }
       }
 
@@ -371,7 +418,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         payload: JSON.stringify({ output: responseOfNode.payload }),
       });
 
-      await this.executeNextNodes(flowRunId, node, responseOfNode);
+      return await this.executeNextNodes(flowRunId, node, responseOfNode);
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.logger.error(
@@ -386,6 +433,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
         payload: JSON.stringify({ error }),
       });
+      return [];
     }
   }
 
@@ -393,7 +441,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     flowRunId: string,
     node: ResourceFlowNode,
     resultOfPreviousNode: NodeProcessingResult,
-  ) {
+  ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
     const edgesFromThisNode = await this.flowEdgeRepository.find({
@@ -407,7 +455,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       this.logger.debug(
         `No outgoing edges found from node ID: ${node.id} (Type: ${node.type}) - flow execution stops here`,
       );
-      return;
+      return [resultOfPreviousNode];
     }
 
     this.logger.debug(
@@ -422,13 +470,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
       if (!targetNode) {
         this.logger.warn(`Target node ${edge.target} not found for edge from node ${node.id}`);
-        return;
+        return [] as NodeProcessingResult[];
       }
 
       return this.processNode(flowRunId, targetNode, resultOfPreviousNode);
     });
 
-    await Promise.all(edgePromises);
+    const results = await Promise.all(edgePromises);
+    return results.flat();
   }
 
   private async processWaitNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
@@ -482,7 +531,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         result = Number(comparisonValue) <= Number(sourceValue);
         break;
       default:
-        throw new Error(`Unknown comparison operator: ${comparisonOperator}`);
+        const exhaustiveCheck: never = comparisonOperator;
+        throw new Error(`Unknown comparison operator: ${exhaustiveCheck}`);
     }
 
     return {
@@ -556,5 +606,18 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     await this.startFlow(button, { payload: {} });
+  }
+
+  private async processBillingSetAdditionalItemsNode(
+    _node: ResourceFlowNode,
+    input: object,
+  ): Promise<NodeProcessingResult> {
+    const { billingItems } = input as {
+      billingItems: Pick<BillingTransactionItem, 'name' | 'value' | 'description' | 'externalReference'>[];
+    };
+
+    return {
+      payload: billingItems,
+    };
   }
 }

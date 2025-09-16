@@ -131,6 +131,10 @@ export function AttractapHardwareSetup(props: Props) {
       case 'configure':
         setState('init');
         break;
+
+      default:
+        const exhaustiveCheck: never = state;
+        throw new Error(`Unknown state: ${exhaustiveCheck}`);
     }
   }, [state, onOpenChange]);
 

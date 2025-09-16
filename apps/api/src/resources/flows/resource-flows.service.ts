@@ -72,11 +72,7 @@ export class ResourceFlowsService {
     return { nodes, edges };
   }
 
-  private validateNodeData(nodeData: {
-    id: string;
-    type: ResourceFlowNodeType | string;
-    data: unknown;
-  }): ValidationError[] {
+  private validateNodeData(nodeData: { id: string; type: ResourceFlowNodeType; data: unknown }): ValidationError[] {
     const errors: ValidationError[] = [];
 
     try {
@@ -256,6 +252,18 @@ export class ResourceFlowsService {
           schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Door;
+          break;
+
+        case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
 
         case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:

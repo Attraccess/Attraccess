@@ -77,7 +77,11 @@ export const HistoryTable = ({
 
   const filteredHistory = useMemo(() => {
     return (usageHistory?.data ?? []).filter((session) => {
-      switch (resource?.type) {
+      if (!resource) {
+        return false;
+      }
+
+      switch (resource.type) {
         case 'machine':
           return session.usageAction === 'usage';
         case 'door':
@@ -87,7 +91,8 @@ export const HistoryTable = ({
             session.usageAction === 'door.unlatch'
           );
         default:
-          return false;
+          const exhaustiveCheck: never = resource?.type;
+          throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
       }
     });
   }, [usageHistory?.data, resource?.type]);

@@ -73,13 +73,8 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
 
       default:
-        console.error('UNKNOWN NODE TYPE', schema);
-        return [
-          {
-            label: 'UNKNOWN NODE TYPE',
-            value: 'UNKNOWN NODE TYPE',
-          },
-        ];
+        const exhaustiveCheck: never = schema.type;
+        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
     }
   }, [schema, t, nodeData]);
 }
