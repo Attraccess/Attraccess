@@ -87,8 +87,20 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return [];
     }
 
-    return flow.nodes.filter((node) => node.type === 'output.resource.billing.calculation.set-additional-items');
-  }, [flow]);
+    if (!configuration) {
+      return [];
+    }
+
+    return flow.nodes
+      .filter((node) => node.type === 'output.resource.billing.calculation.set-additional-items')
+      .map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          unitPrice: apiCurrencyToFrontendCurrency(node.data.unitPrice as number, configuration.minorUnit),
+        },
+      }));
+  }, [flow, configuration]);
 
   const isFree = useMemo(() => {
     return creditsPerUsage === 0 && creditsPerMinute === 0 && customFlowBillingItems.length === 0;

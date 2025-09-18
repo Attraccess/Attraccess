@@ -60,7 +60,9 @@ export const IfNodeDataSchema = z.object({
 
 export const BillingTransactionItemCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  unitPrice: z.number(),
+  unitPrice: z.number().meta({
+    isCurrency: true,
+  }),
   quantity: z.number().int().positive().meta({
     overrideWithInput: 'quantity',
   }),
