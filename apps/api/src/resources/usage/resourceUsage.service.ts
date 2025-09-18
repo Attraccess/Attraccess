@@ -258,7 +258,7 @@ export class ResourceUsageService {
 
       this.logger.debug(`Successfully ended session ${activeSession.id}`);
 
-      const updatedUsage = await this.resourceUsageRepository.findOne({
+      const updatedUsage = await transactionalEntityManager.getRepository(ResourceUsage).findOne({
         where: { id: activeSession.id },
         relations: ['resource', 'user'],
       });

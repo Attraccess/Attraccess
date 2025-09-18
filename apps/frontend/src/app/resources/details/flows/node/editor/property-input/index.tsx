@@ -61,7 +61,6 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
   const setValue = useCallback(
     (newValue: TValue) => {
-      console.log('setValue', newValue, schema);
       if (schema.isCurrency) {
         if (!configuration) {
           return;

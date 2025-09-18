@@ -253,11 +253,7 @@ export class BillingService {
         manager,
       );
 
-      console.log('flowResults', flowResults.flat());
-
       const customBillingItems = flowResults.flat().filter((result) => this.isBillingItem(result));
-
-      console.log('customBillingItems', customBillingItems);
 
       for (const item of customBillingItems) {
         totalCredits += item.unitPrice * item.quantity;

@@ -191,7 +191,11 @@ describe('ResourceUsageService', () => {
         where: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({}),
       })),
-    } as unknown as { createQueryBuilder: jest.Mock };
+      // Ensure code paths that use getRepository(ResourceUsage).findOne work in tests
+      getRepository: jest.fn(() => ({
+        findOne: resourceUsageRepository.findOne,
+      })),
+    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {

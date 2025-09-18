@@ -9,7 +9,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, EntityManager } from 'typeorm';
+import { Repository, LessThan, EntityManager, EntityTarget } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
@@ -118,7 +118,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   ): Promise<ResourceFlowLog> {
     const logEntry = this.flowLogRepository.create(data);
 
-    const repository = transactionManager ? transactionManager.getRepository(ResourceFlowLog) : this.flowLogRepository;
+    const repository = this.getRepository(ResourceFlowLog, this.flowLogRepository, transactionManager);
 
     try {
       const log = await repository.save(logEntry);
@@ -133,6 +133,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       this.logger.error(`Failed to create flow log entry for node: ${logEntry.nodeId}`, error.stack);
       throw error;
     }
+  }
+
+  private getRepository<T>(
+    entity: EntityTarget<T>,
+    defaultRepository: Repository<T>,
+    transactionManager?: EntityManager,
+  ): Repository<T> {
+    return transactionManager ? transactionManager.getRepository<T>(entity) : defaultRepository;
   }
 
   @Cron('0 2 * * *') // Daily at 2 AM
@@ -285,9 +293,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     initialData: object = {},
     transactionManager?: EntityManager,
   ): Promise<object[]> {
-    const repository = transactionManager
-      ? transactionManager.getRepository(ResourceFlowNode)
-      : this.flowNodeRepository;
+    const repository = this.getRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
     const nodes = await repository.find({
       where: {
@@ -472,9 +478,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
-    const edgesRepository = transactionManager
-      ? transactionManager.getRepository(ResourceFlowEdge)
-      : this.flowEdgeRepository;
+    const edgesRepository = this.getRepository(ResourceFlowEdge, this.flowEdgeRepository, transactionManager);
 
     const edgesFromThisNode = await edgesRepository.find({
       where: {
@@ -494,9 +498,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`,
     );
 
-    const flowNodeRepository = transactionManager
-      ? transactionManager.getRepository(ResourceFlowNode)
-      : this.flowNodeRepository;
+    const flowNodeRepository = this.getRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
     // Execute each edge individually instead of deduplicating target nodes
     const edgePromises = edgesFromThisNode.map(async (edge) => {
@@ -671,7 +673,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    console.log('input', input);
     const data = node.data as z.infer<typeof BillingTransactionItemCreateSchema>;
 
     let externalReference = data.externalReference;
