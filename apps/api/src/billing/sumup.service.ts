@@ -217,9 +217,10 @@ export class SumUpService {
         transaction.status = BillingTransactionStatus.Completed;
         break;
 
-      default:
+      default: {
         const exhaustiveCheck: never = sumUpTransactionData.status;
         throw new Error(`Unknown sumup transaction status: ${exhaustiveCheck}`);
+      }
     }
 
     this.logger.debug(

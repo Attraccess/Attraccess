@@ -98,6 +98,10 @@ export class BillingTransaction {
   @OneToMany(() => BillingTransactionItems, (customItem) => customItem.billingTransaction, {
     onDelete: 'CASCADE',
   })
-  @ApiProperty({ description: 'The custom items of the billing transaction', type: () => BillingTransactionItems })
+  @ApiProperty({
+    description: 'The custom items of the billing transaction',
+    type: () => BillingTransactionItems,
+    isArray: true,
+  })
   items!: BillingTransactionItems[];
 }

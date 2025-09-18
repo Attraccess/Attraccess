@@ -4,9 +4,16 @@ import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { BillingModule } from './billing.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
-import { BillingTransaction, ResourceBillingConfiguration, Setting, User } from '@attraccess/database-entities';
+import {
+  BillingTransaction,
+  BillingTransactionItem,
+  ResourceBillingConfiguration,
+  Setting,
+  User,
+} from '@attraccess/database-entities';
 import { SumUpService } from './sumup.service';
 import { LiveNotificationsService } from './liveNotificationsService';
+import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 
 describe('BillingModule', () => {
   describe('metadata', () => {
@@ -46,6 +53,18 @@ describe('BillingModule', () => {
           {
             provide: getRepositoryToken(Setting),
             useValue: { findOneBy: jest.fn(), insert: jest.fn(), update: jest.fn() },
+          },
+          {
+            provide: getRepositoryToken(BillingTransactionItem),
+            useValue: {
+              manager: {
+                transaction: jest.fn(async (cb: (em: unknown) => Promise<unknown>) => cb({})),
+              },
+            },
+          },
+          {
+            provide: ResourceFlowsExecutorService,
+            useValue: { runFlow: jest.fn().mockResolvedValue([]) },
           },
         ],
       }).compile();

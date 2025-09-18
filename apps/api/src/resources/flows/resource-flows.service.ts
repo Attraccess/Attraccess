@@ -15,6 +15,7 @@ import {
   ResourceType,
   ButtonNodeDataSchema,
   IfNodeDataSchema,
+  BillingTransactionItemCreateSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -261,7 +262,7 @@ export class ResourceFlowsService {
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
           schema.inputs = ['input'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
@@ -296,9 +297,10 @@ export class ResourceFlowsService {
           schema.supportedByResource = true;
           break;
 
-        default:
+        default: {
           const exhaustiveCheck: never = type;
           throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+        }
       }
 
       return schema;

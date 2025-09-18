@@ -34,6 +34,7 @@ import {
   ResourceFlowActionIfNodeData,
   ButtonNodeDataSchema,
   IfNodeDataSchema,
+  BillingTransactionItemCreateSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -92,6 +93,7 @@ export {
   Setting,
   BillingTransactionStatus,
   BillingTransactionItem,
+  BillingTransactionItemCreateSchema,
 };
 
 // Export the entities object

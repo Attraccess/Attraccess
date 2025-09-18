@@ -90,12 +90,13 @@ export const HistoryTable = ({
             session.usageAction === 'door.unlock' ||
             session.usageAction === 'door.unlatch'
           );
-        default:
+        default: {
           const exhaustiveCheck: never = resource?.type;
           throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
+        }
       }
     });
-  }, [usageHistory?.data, resource?.type]);
+  }, [usageHistory?.data, resource]);
 
   if (error) {
     return <div className="text-center py-4 text-red-500">{t('errorLoadingHistory')}</div>;

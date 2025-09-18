@@ -1771,13 +1771,18 @@ export const $BillingTransactionItem = {
             example: '1234567890',
             nullable: true
         },
-        value: {
+        unitPrice: {
             type: 'number',
-            description: 'The value of the billing transaction item',
+            description: 'The unit price of the billing transaction item',
+            example: '100'
+        },
+        quantity: {
+            type: 'number',
+            description: 'The quantity of the billing transaction item',
             example: '100'
         }
     },
-    required: ['id', 'billingTransactionId', 'billingTransaction', 'name', 'description', 'externalReference', 'value']
+    required: ['id', 'billingTransactionId', 'billingTransaction', 'name', 'description', 'externalReference', 'unitPrice', 'quantity']
 } as const;
 
 export const $BillingTransaction = {
@@ -1862,11 +1867,10 @@ export const $BillingTransaction = {
         },
         items: {
             description: 'The custom items of the billing transaction',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/BillingTransactionItem'
-                }
-            ]
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/BillingTransactionItem'
+            }
         }
     },
     required: ['id', 'userId', 'user', 'createdAt', 'updatedAt', 'amount', 'initiatorId', 'initiator', 'resourceUsageId', 'resourceUsage', 'refundOfId', 'refundOf', 'externalReference', 'status', 'items']

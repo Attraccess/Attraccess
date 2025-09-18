@@ -40,7 +40,12 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         return [];
 
       case 'output.resource.billing.calculation.set-additional-items':
-        return [];
+        return [
+          {
+            label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
+            value: nodeData?.data.name as string,
+          },
+        ];
 
       case 'output.http.sendRequest':
         return [
@@ -78,9 +83,10 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      default:
+      default: {
         const exhaustiveCheck: never = schema.type;
         throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+      }
     }
   }, [schema, t, nodeData]);
 }

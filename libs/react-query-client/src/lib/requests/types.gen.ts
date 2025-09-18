@@ -1211,9 +1211,13 @@ export type BillingTransactionItem = {
      */
     externalReference: string | null;
     /**
-     * The value of the billing transaction item
+     * The unit price of the billing transaction item
      */
-    value: number;
+    unitPrice: number;
+    /**
+     * The quantity of the billing transaction item
+     */
+    quantity: number;
 };
 
 export type BillingTransaction = {
@@ -1276,7 +1280,7 @@ export type BillingTransaction = {
     /**
      * The custom items of the billing transaction
      */
-    items: BillingTransactionItem;
+    items: Array<BillingTransactionItem>;
 };
 
 /**
@@ -2766,6 +2770,12 @@ export type CreateManualTransactionData = {
 };
 
 export type CreateManualTransactionResponse = number;
+
+export type GetBillingTransactionData = {
+    transactionId: number;
+};
+
+export type GetBillingTransactionResponse = BillingTransaction;
 
 export type GetResourceBillingConfigurationData = {
     resourceId: number;
@@ -4477,6 +4487,21 @@ export type $OpenApiTs = {
                  * The billing balance for the user has been topped up.
                  */
                 200: number;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{userId}/billing/transactions/{transactionId}': {
+        get: {
+            req: GetBillingTransactionData;
+            res: {
+                /**
+                 * The billing transaction for the user.
+                 */
+                200: BillingTransaction;
                 /**
                  * Unauthorized
                  */

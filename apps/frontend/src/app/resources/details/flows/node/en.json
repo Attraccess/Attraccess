@@ -6,6 +6,9 @@
   },
   "nodes": {
     "unsupportedForResourceType": "not supported by this resource",
+    "genericConfig": {
+      "overridableByInput": "Overridable by input: {{fieldName}}"
+    },
     "input": {
       "button": {
         "title": "Button",
@@ -215,8 +218,31 @@
         "billing": {
           "calculation": {
             "set-additional-items": {
-              "title": "Add billing items",
-              "description": "This node can be used to add additional items to the billing."
+              "title": "Add billing item",
+              "description": "With this node you can add an additional item to the billing.",
+              "inputs": {
+                "input": "Input"
+              },
+              "preview": {
+                "position": "Position"
+              },
+              "config": {
+                "name": {
+                  "label": "Name"
+                },
+                "unitPrice": {
+                  "label": "Unit price"
+                },
+                "quantity": {
+                  "label": "Quantity"
+                },
+                "description": {
+                  "label": "Description"
+                },
+                "externalReference": {
+                  "label": "External reference"
+                }
+              }
             }
           }
         }

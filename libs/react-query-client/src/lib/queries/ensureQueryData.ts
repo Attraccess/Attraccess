@@ -146,6 +146,9 @@ export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: Q
   page?: number;
   userId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
+export const ensureUseBillingServiceGetBillingTransactionData = (queryClient: QueryClient, { transactionId }: {
+  transactionId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionKeyFn({ transactionId }), queryFn: () => BillingService.getBillingTransaction({ transactionId }) });
 export const ensureUseBillingServiceGetResourceBillingConfigurationData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getResourceBillingConfiguration({ resourceId }) });

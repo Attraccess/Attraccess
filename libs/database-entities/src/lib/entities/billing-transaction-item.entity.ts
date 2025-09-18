@@ -40,6 +40,10 @@ export class BillingTransactionItem {
   externalReference!: string | null;
 
   @Column({ type: 'integer' })
-  @ApiProperty({ description: 'The value of the billing transaction item', example: '100' })
-  value!: number;
+  @ApiProperty({ description: 'The unit price of the billing transaction item', example: '100' })
+  unitPrice!: number;
+
+  @Column({ type: 'integer' })
+  @ApiProperty({ description: 'The quantity of the billing transaction item', example: '100' })
+  quantity!: number;
 }

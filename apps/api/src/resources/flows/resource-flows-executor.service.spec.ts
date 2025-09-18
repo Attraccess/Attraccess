@@ -2,7 +2,15 @@ import { ResourceFlowsExecutorService } from './resource-flows-executor.service'
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { ResourceFlowNode, ResourceFlowNodeType, ResourceFlowLog } from '@attraccess/database-entities';
+import {
+  ResourceFlowNode,
+  ResourceFlowNodeType,
+  ResourceFlowLog,
+  ResourceFlowEdge,
+} from '@attraccess/database-entities';
+import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { FlowConfigType } from './flow.config';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -17,7 +25,7 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
     createdAt: new Date(),
     updatedAt: new Date(),
     resourceId: 1,
-    resource: undefined as any,
+    resource: undefined,
     ...partial,
   } as unknown as ResourceFlowNode;
 }
@@ -30,8 +38,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let flowEdgeRepository: Partial<Repository<Edge>>;
   let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
   let configService: Partial<ConfigService>;
-  let mqttClientService: any;
-  let resourceUsageService: any;
+  let mqttClientService: MqttClientService;
+  let resourceUsageService: ResourceUsageService;
 
   // Dynamic stores per test
   let nodesById: Record<string, ResourceFlowNode>;
@@ -42,44 +50,47 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined as any);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
     nodesById = {};
     initialNodes = [];
     edgesBySourceAndHandle = {};
 
     flowNodeRepository = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
         const { resourceId, type } = where || {};
         return initialNodes.filter((n) => n.resourceId === resourceId && n.type === type);
       }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       findOne: jest.fn(async ({ where }: any) => {
         return nodesById[where.id] ?? null;
       }),
     };
 
     flowEdgeRepository = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
         const key = `${where.source}|${where.sourceHandle ?? ''}`;
         return edgesBySourceAndHandle[key] ?? [];
       }),
-    } as any;
+    } as unknown as Repository<ResourceFlowEdge>;
 
     flowLogRepository = {
-      create: jest.fn((data: any) => ({ id: Math.random().toString(36), ...data })),
-      save: jest.fn(async (data: any) => data),
-    } as any;
+      create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
+      save: jest.fn(async (data) => data),
+    } as unknown as Repository<ResourceFlowLog>;
 
     configService = {
-      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as any),
-    } as any;
+      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
+    } as unknown as ConfigService;
 
-    mqttClientService = { publish: jest.fn(async () => undefined) };
-    resourceUsageService = {};
+    mqttClientService = { publish: jest.fn(async () => undefined) } as unknown as MqttClientService;
+    resourceUsageService = { logger: new Logger(ResourceUsageService.name) } as unknown as ResourceUsageService;
 
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
-      flowEdgeRepository as unknown as Repository<any>,
+      flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
       flowLogRepository as Repository<ResourceFlowLog>,
       configService as ConfigService,
       mqttClientService,
@@ -120,6 +131,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const billingNode = createNode({
       id: 'out-billing-1',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      data: {
+        name: 'kWh',
+        description: 'Energy',
+        externalReference: 'power',
+        unitPrice: 1,
+        quantity: 2.5,
+      },
     });
     nodesById[inputNode.id] = inputNode;
     nodesById[billingNode.id] = billingNode;
@@ -130,16 +148,22 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     // Billing is terminal
     edgesBySourceAndHandle[`${billingNode.id}|`] = [];
 
-    const initialData = {
-      billingItems: [{ name: 'kWh', value: 2.5, description: 'Energy', externalReference: 'power' }],
-    };
+    const initialData = {};
 
     const result = await service.runFlow(
       1,
       ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
       initialData,
     );
-    expect(result).toEqual([initialData.billingItems]);
+    expect(result).toEqual([
+      {
+        name: 'kWh',
+        description: 'Energy',
+        externalReference: 'power',
+        unitPrice: 1,
+        quantity: 2.5,
+      },
+    ]);
   });
 
   it('fan-outs when a node has multiple outgoing edges with the same handle and returns all leaf results', async () => {
@@ -153,14 +177,28 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         comparisonValue: 'yes',
         comparisonValueIsPath: false,
       },
-    } as any);
+    });
     const billingNodeA = createNode({
       id: 'out-a',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      data: {
+        name: 'session-fee',
+        description: 'Flat',
+        externalReference: 'flat',
+        unitPrice: 1,
+        quantity: 1,
+      },
     });
     const billingNodeB = createNode({
       id: 'out-b',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      data: {
+        name: 'session-fee',
+        description: 'Flat',
+        externalReference: 'flat',
+        unitPrice: 1,
+        quantity: 1,
+      },
     });
 
     [inputNode, ifNode, billingNodeA, billingNodeB].forEach((n) => (nodesById[n.id] = n));
@@ -179,7 +217,6 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     const initialData = {
       flag: 'yes',
-      billingItems: [{ name: 'session-fee', value: 1, description: 'Flat', externalReference: 'flat' }],
     };
 
     const result = await service.runFlow(
@@ -187,9 +224,21 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
       initialData,
     );
-    // Both leaves return the same billingItems payload in this setup
+    // Both leaves return the same additional item in this setup
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual(initialData.billingItems);
-    expect(result[1]).toEqual(initialData.billingItems);
+    expect(result[0]).toEqual({
+      name: 'session-fee',
+      description: 'Flat',
+      externalReference: 'flat',
+      unitPrice: 1,
+      quantity: 1,
+    });
+    expect(result[1]).toEqual({
+      name: 'session-fee',
+      description: 'Flat',
+      externalReference: 'flat',
+      unitPrice: 1,
+      quantity: 1,
+    });
   });
 });

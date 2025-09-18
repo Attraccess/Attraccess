@@ -6,6 +6,9 @@
   },
   "nodes": {
     "unsupportedForResourceType": "von dieser Ressource nicht unterstützt",
+    "genericConfig": {
+      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}"
+    },
     "input": {
       "button": {
         "title": "Taste",
@@ -215,8 +218,31 @@
         "billing": {
           "calculation": {
             "set-additional-items": {
-              "title": "Abrechnungs positionen hinzufügen",
-              "description": "Mit diesem Knoten können zusätzliche Positionen für die Abrechnung hinzugefügt werden."
+              "title": "Abrechnungs Position hinzufügen",
+              "description": "Mit diesem Knoten können Sie eine zusätzliche Position für die Abrechnung hinzufügen.",
+              "inputs": {
+                "input": "Eingabe"
+              },
+              "preview": {
+                "pois": "Position"
+              },
+              "config": {
+                "name": {
+                  "label": "Name"
+                },
+                "unitPrice": {
+                  "label": "Einheitspreis"
+                },
+                "quantity": {
+                  "label": "Menge"
+                },
+                "description": {
+                  "label": "Beschreibung"
+                },
+                "externalReference": {
+                  "label": "Externe Referenz"
+                }
+              }
             }
           }
         }

@@ -146,6 +146,9 @@ export const prefetchUseBillingServiceGetBillingTransactions = (queryClient: Que
   page?: number;
   userId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
+export const prefetchUseBillingServiceGetBillingTransaction = (queryClient: QueryClient, { transactionId }: {
+  transactionId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingTransactionKeyFn({ transactionId }), queryFn: () => BillingService.getBillingTransaction({ transactionId }) });
 export const prefetchUseBillingServiceGetResourceBillingConfiguration = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }), queryFn: () => BillingService.getResourceBillingConfiguration({ resourceId }) });

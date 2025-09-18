@@ -15,7 +15,7 @@ import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface Property<TValue> {
-  type: 'string' | 'integer' | 'object' | 'boolean';
+  type: 'string' | 'integer' | 'number' | 'object' | 'boolean';
   enum?: string[];
   default?: TValue;
   additionalProperties?: {
@@ -26,6 +26,7 @@ export interface Property<TValue> {
   maximum?: number;
   selectFromEntity?: 'mqttServer';
   selectFromEntityProperty?: string;
+  overrideWithInput?: string;
 }
 
 interface Props<TValue> {
@@ -41,6 +42,11 @@ interface Props<TValue> {
 export function PropertyInput<TValue>(props: Props<TValue>) {
   const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange } = props;
 
+  let description = undefined;
+  if (schema.overrideWithInput) {
+    description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
+  }
+
   if (schema.selectFromEntity === 'mqttServer') {
     return (
       <MqttServerSelect
@@ -48,6 +54,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         onSelectionChange={(value) => onChange(value as TValue)}
         label={t('nodes.' + nodeType + '.config.' + name + '.label')}
         isRequired={isRequired}
+        description={description}
       />
     );
   }
@@ -61,6 +68,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             defaultSelectedKey={String(value ?? schema.default ?? '')}
             onSelectionChange={(value) => onChange(value as TValue)}
             label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            description={description}
           >
             {schema.enum.map((enumValue) => (
               <AutocompleteItem key={enumValue}>
@@ -78,6 +86,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             label={t('nodes.' + nodeType + '.config.' + name + '.label')}
             value={String(value ?? schema.default ?? '')}
             onValueChange={(value) => onChange(value as TValue)}
+            description={description}
           />
         );
       }
@@ -89,9 +98,11 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           label={t('nodes.' + nodeType + '.config.' + name + '.label')}
           value={String(value ?? schema.default ?? '')}
           onValueChange={(value) => onChange(value as TValue)}
+          description={description}
         />
       );
     case 'integer':
+    case 'number':
       return (
         <NumberInput
           isRequired={isRequired}
@@ -100,8 +111,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           onValueChange={(value) => onChange(value as TValue)}
           minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
           maxValue={schema.maximum}
+          description={description}
         />
       );
+
     case 'object':
       if (schema.additionalProperties) {
         let content = null;

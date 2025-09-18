@@ -1,24 +1,21 @@
 {
   "title": "Billing",
+  "billingValue": "{{credits}} {{currency}}",
   "free": {
     "title": "Free",
     "description": "This resource is free to use."
   },
   "balance": {
-    "label": "Current balance",
-    "value": "{{credits}} {{currency}}"
+    "label": "Current balance"
   },
   "perUse": {
-    "label": "Per use",
-    "value": "{{credits}} {{currency}}"
+    "label": "Per use"
   },
   "perMinute": {
-    "label": "Per minute",
-    "value": "{{credits}} {{currency}}"
+    "label": "Per minute"
   },
   "example": {
-    "label": "Example cost ({{minutes}} min)",
-    "value": "{{credits}} {{currency}}"
+    "label": "Example cost ({{minutes}} min)"
   },
   "exampleResultingBalance": {
     "label": "Resulting balance",

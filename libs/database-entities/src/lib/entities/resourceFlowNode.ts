@@ -58,6 +58,20 @@ export const IfNodeDataSchema = z.object({
   comparisonValue: z.string().min(1, 'Comparison value is required'),
 });
 
+export const BillingTransactionItemCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  unitPrice: z.number(),
+  quantity: z.number().int().positive().meta({
+    overrideWithInput: 'quantity',
+  }),
+  description: z.string().optional().meta({
+    stringVariant: 'multiline',
+  }),
+  externalReference: z.string().optional().meta({
+    overrideWithInput: 'externalReference',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -70,8 +84,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
     case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return NodeWithoutDataSchema;
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+      return BillingTransactionItemCreateSchema;
     case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
     case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
@@ -80,9 +95,10 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
       return WaitNodeDataSchema;
     case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
-    default:
+    default: {
       const exhaustiveCheck: never = nodeType;
       throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+    }
   }
 }
 

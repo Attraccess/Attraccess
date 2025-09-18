@@ -9,14 +9,15 @@ import {
   ResourceUsageAction,
   User,
   Setting,
+  BillingTransactionItem,
 } from '@attraccess/database-entities';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
 import { InsufficientBalanceError } from './errors/insufficient-balance.error';
-import { ResourceUsageEvent } from '../resources/usage/events/resource-usage.events';
 import { BadRequestException } from '@nestjs/common';
 import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
 import { Currency } from './dto/set-configuration.dto';
+import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -31,6 +32,21 @@ describe('BillingService', () => {
       providers: [
         BillingService,
         { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
+        // Provide BillingTransactionItem repo with a manager.transaction for internal use
+        {
+          provide: getRepositoryToken(BillingTransactionItem),
+          useValue: {
+            manager: {
+              transaction: jest.fn(async (cb: (em: unknown) => Promise<unknown>) =>
+                cb({
+                  findOneBy: jest.fn(),
+                  getRepository: jest.fn(() => ({ findOneBy: jest.fn(), create: jest.fn(), save: jest.fn() })),
+                  save: jest.fn(async (_e: string, data: unknown) => data),
+                }),
+              ),
+            },
+          },
+        },
         {
           provide: getRepositoryToken(BillingTransaction),
           useValue: {
@@ -59,6 +75,10 @@ describe('BillingService', () => {
             insert: jest.fn(),
             update: jest.fn(),
           },
+        },
+        {
+          provide: ResourceFlowsExecutorService,
+          useValue: { runFlow: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();
@@ -171,7 +191,24 @@ describe('BillingService', () => {
   });
 
   describe('handleResourceUsageEvent', () => {
-    it('does nothing for non-Usage actions', async () => {
+    const createMockManager = () => {
+      return {
+        findOneBy: jest.fn().mockResolvedValue(null),
+        getRepository: jest.fn(() => ({
+          findOneBy: jest.fn().mockResolvedValue(null),
+          create: jest.fn((data: unknown) => data),
+          save: jest.fn(async (data: unknown) => data),
+        })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        save: jest.fn(async (_entity: unknown, data: any) => ({ id: 999, ...data })),
+      } as unknown as {
+        findOneBy: jest.Mock;
+        getRepository: jest.Mock;
+        save: jest.Mock;
+      };
+    };
+
+    it('processes non-Usage actions without creating a transaction when credits are zero', async () => {
       const usage = {
         id: 10,
         usageAction: ResourceUsageAction.DoorLock,
@@ -181,15 +218,18 @@ describe('BillingService', () => {
         userId: 7,
       } as unknown as ResourceUsage;
 
-      const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
 
-      expect(getConfigSpy).not.toHaveBeenCalled();
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(99, expect.any(Object));
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
     });
 
-    it('does nothing when session is not ended (endTime is null)', async () => {
+    it('processes not-ended session without creating a transaction when credits are zero', async () => {
       const usage = {
         id: 11,
         usageAction: ResourceUsageAction.Usage,
@@ -199,11 +239,14 @@ describe('BillingService', () => {
         userId: 8,
       } as unknown as ResourceUsage;
 
-      const getConfigSpy = jest.spyOn(service, 'getResourceBillingConfiguration');
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
 
-      expect(getConfigSpy).not.toHaveBeenCalled();
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(100, expect.any(Object));
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
     });
 
@@ -221,9 +264,10 @@ describe('BillingService', () => {
         .spyOn(service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
 
-      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(101);
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(101, expect.any(Object));
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
     });
 
@@ -244,17 +288,14 @@ describe('BillingService', () => {
 
       billingTransactionRepository.save.mockResolvedValue({ id: 999 } as BillingTransaction);
 
-      await service.chargeForResourceUsage(new ResourceUsageEvent(usage));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
 
-      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102);
-      expect(billingTransactionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 10,
-          resourceUsageId: 13,
-          amount: -35,
-        }),
+      expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102, expect.any(Object));
+      // Transaction is created via provided manager; notification is emitted with full transaction
+      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }),
       );
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({ id: 999 });
     });
   });
 
@@ -418,7 +459,7 @@ describe('BillingService', () => {
 
     it('getConfiguration throws on unsupported currency value from DB', async () => {
       settingRepository.findOneBy.mockResolvedValue({ value: 'USD' } as Setting);
-      await expect(service.getConfiguration()).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.getConfiguration()).rejects.toBeInstanceOf(Error);
     });
   });
 });

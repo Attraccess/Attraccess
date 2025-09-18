@@ -20,6 +20,11 @@ import {
   ResourceUsageAction,
   ResourceUsage,
   BillingTransactionItem,
+  ResourceFlowActionHttpSendRequestNodeData,
+  ResourceFlowActionMqttSendMessageNodeData,
+  ResourceFlowActionUtilWaitNodeData,
+  ResourceFlowActionIfNodeData,
+  BillingTransactionItemCreateSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../usage/events/resource-usage.events';
@@ -28,17 +33,12 @@ import { Cron } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
 import { nanoid } from 'nanoid';
-import {
-  ResourceFlowActionHttpSendRequestNodeData,
-  ResourceFlowActionMqttSendMessageNodeData,
-  ResourceFlowActionUtilWaitNodeData,
-  ResourceFlowActionIfNodeData,
-} from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import axios from 'axios';
 import Handlebars from 'handlebars';
 import { get } from 'lodash-es';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
+import z from 'zod';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
@@ -178,9 +178,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
         break;
 
-      default:
+      default: {
         const exhaustiveCheck: never = usage.usageAction;
         throw new Error(`Unknown resource usage action: ${exhaustiveCheck}`);
+      }
     }
   }
 
@@ -518,6 +519,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processWaitNode(
     node: ResourceFlowNode,
     input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     const { duration, unit } = node.data as ResourceFlowActionUtilWaitNodeData;
@@ -537,6 +539,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processIfNode(
     node: ResourceFlowNode,
     input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     const {
@@ -573,9 +576,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       case '<=':
         result = Number(comparisonValue) <= Number(sourceValue);
         break;
-      default:
+      default: {
         const exhaustiveCheck: never = comparisonOperator;
         throw new Error(`Unknown comparison operator: ${exhaustiveCheck}`);
+      }
     }
 
     return {
@@ -587,6 +591,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processHttpSendRequestNode(
     node: ResourceFlowNode,
     input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     const data = node.data as ResourceFlowActionHttpSendRequestNodeData;
@@ -613,6 +618,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processMqttSendMessageNode(
     node: ResourceFlowNode,
     input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
     const { serverId, ...data } = node.data as ResourceFlowActionMqttSendMessageNodeData;
@@ -660,16 +666,35 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   private async processBillingSetAdditionalItemsNode(
-    _node: ResourceFlowNode,
+    node: ResourceFlowNode,
     input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const { billingItems } = input as {
-      billingItems: Pick<BillingTransactionItem, 'name' | 'value' | 'description' | 'externalReference'>[];
-    };
+    console.log('input', input);
+    const data = node.data as z.infer<typeof BillingTransactionItemCreateSchema>;
+
+    let externalReference = data.externalReference;
+    if ('externalReference' in input && typeof input.externalReference === 'string') {
+      externalReference = input.externalReference;
+      if (data.externalReference) {
+        externalReference = this.compileTemplate(data.externalReference, input);
+      }
+    }
+
+    let quantity = data.quantity;
+    if ('quantity' in input && typeof input.quantity === 'number') {
+      quantity = input.quantity;
+    }
 
     return {
-      payload: billingItems,
+      payload: {
+        name: data.name,
+        description: data.description,
+        externalReference,
+        unitPrice: data.unitPrice,
+        quantity,
+      } as Omit<BillingTransactionItem, 'id' | 'billingTransactionId' | 'billingTransaction'>,
     };
   }
 }

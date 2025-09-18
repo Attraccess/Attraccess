@@ -13,9 +13,9 @@ export function BillingDashboardPage() {
     <div>
       <PageHeader title={t('title')} icon={<ChartNoAxesCombinedIcon />} />
 
-      <div className="flex flex-row flex-wrap gap-4 max-w-[1500px]">
-        <BillingDashboardTopupCard />
-        <SummaryCard transactionsPerPage={15} />
+      <div className="flex flex-row flex-wrap gap-4">
+        <BillingDashboardTopupCard className="flex-grow" />
+        <SummaryCard transactionsPerPage={15} className="flex-grow" />
       </div>
     </div>
   );

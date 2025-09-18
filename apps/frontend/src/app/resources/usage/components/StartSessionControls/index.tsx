@@ -78,11 +78,12 @@ export function StartSessionControls(
         });
         break;
 
-      default:
+      default: {
         const exhaustiveCheck: never = resource?.type;
         throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
+      }
     }
-  }, [resourceId, t, queryClient, toast, resource?.type]);
+  }, [resourceId, t, queryClient, toast, resource]);
 
   const onStartError = useCallback(
     (error: ApiError) => {

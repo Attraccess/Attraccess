@@ -7,6 +7,7 @@ import {
   BillingTransactionItem,
   ResourceUsage,
   ResourceFlowNodeType,
+  BillingTransactionItemCreateSchema,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -80,9 +81,10 @@ export class BillingService {
         minorUnit = 2;
         break;
 
-      default:
+      default: {
         const exhaustiveCheck: never = currencyValue;
         throw new Error(`Unsupported currency: ${exhaustiveCheck}`);
+      }
     }
 
     return {
@@ -100,6 +102,8 @@ export class BillingService {
     return user.creditBalance;
   }
 
+  private DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
+
   async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
     const { page, limit } = options;
 
@@ -107,7 +111,7 @@ export class BillingService {
       where: { userId },
       skip: (page - 1) * limit,
       take: limit,
-      relations: ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'],
+      relations: this.DEFAULT_RELATIONS,
       order: { createdAt: 'DESC', id: 'DESC' },
     });
 
@@ -117,6 +121,13 @@ export class BillingService {
       page,
       limit,
     };
+  }
+
+  async getTransaction(transactionId: number, userId: number): Promise<BillingTransaction> {
+    return await this.billingTransactionRepository.findOne({
+      where: { id: transactionId, userId },
+      relations: this.DEFAULT_RELATIONS,
+    });
   }
 
   async createManualTransaction(
@@ -216,15 +227,8 @@ export class BillingService {
 
   private isBillingItem(
     item: object,
-  ): item is Pick<BillingTransactionItem, 'name' | 'value' | 'description' | 'externalReference'> {
-    return (
-      item &&
-      typeof item === 'object' &&
-      'name' in item &&
-      'value' in item &&
-      'description' in item &&
-      'externalReference' in item
-    );
+  ): item is Pick<BillingTransactionItem, 'name' | 'quantity' | 'unitPrice' | 'description' | 'externalReference'> {
+    return BillingTransactionItemCreateSchema.safeParse(item).success;
   }
 
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {
@@ -236,7 +240,8 @@ export class BillingService {
     const doCalculation = async (manager: EntityManager) => {
       const configuration = await this.getResourceBillingConfiguration(usage.resource.id, manager);
 
-      const creditsForUsageDuration = configuration.creditsPerMinute * Math.ceil(usage.usageInMinutes);
+      const roundedMinutes = Math.ceil(usage.usageInMinutes);
+      const creditsForUsageDuration = configuration.creditsPerMinute * roundedMinutes;
       const creditsForSession = configuration.creditsPerUsage;
       let totalCredits = creditsForUsageDuration;
       totalCredits += creditsForSession;
@@ -248,14 +253,14 @@ export class BillingService {
         manager,
       );
 
-      console.log('flowResults', flowResults);
+      console.log('flowResults', flowResults.flat());
 
-      const customBillingItems = flowResults.filter((result) => this.isBillingItem(result));
+      const customBillingItems = flowResults.flat().filter((result) => this.isBillingItem(result));
 
       console.log('customBillingItems', customBillingItems);
 
       for (const item of customBillingItems) {
-        totalCredits += item.value;
+        totalCredits += item.unitPrice * item.quantity;
       }
 
       if (totalCredits === 0) {
@@ -272,22 +277,25 @@ export class BillingService {
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
         name: 'PER_SESSION',
-        value: creditsForSession,
+        unitPrice: configuration.creditsPerUsage,
+        quantity: 1,
       });
 
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
         name: 'PER_MINUTE',
-        value: creditsForUsageDuration,
+        unitPrice: configuration.creditsPerMinute,
+        quantity: roundedMinutes,
       });
 
       for (const item of customBillingItems) {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: item.name,
-          value: item.value,
           description: item.description,
           externalReference: item.externalReference,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
         });
       }
 
