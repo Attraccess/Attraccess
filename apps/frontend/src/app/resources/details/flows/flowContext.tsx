@@ -123,7 +123,6 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
 
   const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
   const flowNodeTypes = useMemo(() => {
-    console.log('rerender flowNodeTypes');
     if (!nodeSchemas) {
       return {};
     }

@@ -50,10 +50,6 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
   // Keep a stable reference to the provided translations so callers
   // can safely pass inline objects without causing re-renders.
   const translationsRef = useRef(translations);
-  if (translationsRef.current !== translations) {
-    // We intentionally ignore subsequent translation object identities
-    // assuming translation modules are static.
-  }
 
   const activeTranslations = useMemo(() => {
     return translationsRef.current[language];
