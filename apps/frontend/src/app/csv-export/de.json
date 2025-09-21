@@ -1,20 +1,24 @@
 {
-    "title": "CSV-Export",
-    "rangeCalendar": {
-        "label": "Zeitraum",
-        "selection": {
-            "label": "Ausgewählter Zeitraum",
-            "start": "Start: {{date}}",
-            "end": "Ende: {{date}}"
-        }
-    },
-    "exports": {
-        "modal": {
-            "subtitle": "vom {{start}} bis zum {{end}}"
-        },
-        "resourceUsageHours": {
-            "button": "Ressourcennutzung exportieren",
-            "title": "Ressourcennutzung"
-        }
+  "title": "CSV-Export",
+  "rangeCalendar": {
+    "label": "Zeitraum",
+    "selection": {
+      "label": "Ausgewählter Zeitraum",
+      "start": "Start: {{date}}",
+      "end": "Ende: {{date}}"
     }
+  },
+  "exports": {
+    "modal": {
+      "subtitle": "vom {{start}} bis zum {{end}}"
+    },
+    "resourceUsageHours": {
+      "button": "Ressourcennutzung exportieren",
+      "title": "Ressourcennutzung"
+    },
+    "billingTransactions": {
+      "button": "Zahlungen exportieren",
+      "title": "Zahlungen"
+    }
+  }
 }

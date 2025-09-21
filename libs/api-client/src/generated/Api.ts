@@ -1264,6 +1264,46 @@ export interface BalanceDto {
   value: number;
 }
 
+export interface BillingTransactionItem {
+  /**
+   * The unique identifier of the billing transaction item
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the billing transaction
+   * @example 1
+   */
+  billingTransactionId: number;
+  /** The billing transaction */
+  billingTransaction: BillingTransaction;
+  /**
+   * The name of the billing transaction item
+   * @example "Credit top-up"
+   */
+  name: string;
+  /**
+   * The description of the billing transaction item
+   * @example "Credit top-up for user 1"
+   */
+  description: string | null;
+  /**
+   * The external reference of the billing transaction item
+   * @example "1234567890"
+   */
+  externalReference: string | null;
+  /**
+   * The unit price of the billing transaction item
+   * @example "100"
+   */
+  unitPrice: number;
+  /**
+   * The quantity of the billing transaction item
+   * @example "100"
+   */
+  quantity: number;
+}
+
 export interface BillingTransaction {
   /**
    * The unique identifier of the billing transaction
@@ -1305,6 +1345,8 @@ export interface BillingTransaction {
   externalReference: string;
   /** The status of the billing transaction */
   status: "pending" | "completed" | "failed";
+  /** The custom items of the billing transaction */
+  items: BillingTransactionItem[];
 }
 
 export interface TransactionsDto {
@@ -1503,8 +1545,10 @@ export interface ResourceFlowNodeSchemaDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
+    | "input.resource.billing.calculation.started"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
+    | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
     | "processing.if";
   /** The schema for a node type */
@@ -1550,8 +1594,10 @@ export interface ResourceFlowNodeDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
+    | "input.resource.billing.calculation.started"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
+    | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
     | "processing.if";
   /**
@@ -2386,6 +2432,8 @@ export type GetBillingTransactionsData = TransactionsDto;
 
 export type CreateManualTransactionData = number;
 
+export type GetBillingTransactionData = BillingTransaction;
+
 export type GetResourceBillingConfigurationData = ResourceBillingConfiguration;
 
 export type UpdateResourceBillingConfigurationData =
@@ -2501,7 +2549,7 @@ export type GetFirmwaresData = AttractapFirmware[];
 
 export type GetFirmwareBinaryData = string;
 
-export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
+export interface GetResourceUsageHoursInDateRangeParams {
   /**
    * The start date of the range
    * @format date-time
@@ -2516,8 +2564,24 @@ export interface AnalyticsControllerGetResourceUsageHoursInDateRangeParams {
   end: string;
 }
 
-export type AnalyticsControllerGetResourceUsageHoursInDateRangeData =
-  ResourceUsage[];
+export type GetResourceUsageHoursInDateRangeData = ResourceUsage[];
+
+export interface GetBillingTransactionsInDateRangeParams {
+  /**
+   * The start date of the range
+   * @format date-time
+   * @example "2021-01-01"
+   */
+  start: string;
+  /**
+   * The end date of the range
+   * @format date-time
+   * @example "2021-01-01"
+   */
+  end: string;
+}
+
+export type GetBillingTransactionsInDateRangeData = any;
 
 export namespace System {
   /**
@@ -4236,6 +4300,25 @@ export namespace Billing {
   /**
    * No description
    * @tags Billing
+   * @name GetBillingTransaction
+   * @summary Get a billing transaction for a user
+   * @request GET:/api/users/{userId}/billing/transactions/{transactionId}
+   * @secure
+   */
+  export namespace GetBillingTransaction {
+    export type RequestParams = {
+      transactionId: number;
+      userId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingTransactionData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
    * @name GetResourceBillingConfiguration
    * @summary Get the billing configuration for a resource
    * @request GET:/api/resources/{resourceId}/billing/configuration
@@ -4866,11 +4949,12 @@ export namespace Analytics {
   /**
    * No description
    * @tags Analytics
-   * @name AnalyticsControllerGetResourceUsageHoursInDateRange
+   * @name GetResourceUsageHoursInDateRange
+   * @summary Get the resource usage hours in the date range
    * @request GET:/api/analytics/resource-usage-hours
    * @secure
    */
-  export namespace AnalyticsControllerGetResourceUsageHoursInDateRange {
+  export namespace GetResourceUsageHoursInDateRange {
     export type RequestParams = {};
     export type RequestQuery = {
       /**
@@ -4888,8 +4972,36 @@ export namespace Analytics {
     };
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody =
-      AnalyticsControllerGetResourceUsageHoursInDateRangeData;
+    export type ResponseBody = GetResourceUsageHoursInDateRangeData;
+  }
+
+  /**
+   * No description
+   * @tags Analytics
+   * @name GetBillingTransactionsInDateRange
+   * @summary Get the billing transactions in the date range
+   * @request GET:/api/analytics/billing-transactions
+   * @secure
+   */
+  export namespace GetBillingTransactionsInDateRange {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /**
+       * The start date of the range
+       * @format date-time
+       * @example "2021-01-01"
+       */
+      start: string;
+      /**
+       * The end date of the range
+       * @format date-time
+       * @example "2021-01-01"
+       */
+      end: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingTransactionsInDateRangeData;
   }
 }
 
@@ -6963,6 +7075,28 @@ export class Api<
      * No description
      *
      * @tags Billing
+     * @name GetBillingTransaction
+     * @summary Get a billing transaction for a user
+     * @request GET:/api/users/{userId}/billing/transactions/{transactionId}
+     * @secure
+     */
+    getBillingTransaction: (
+      transactionId: number,
+      userId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetBillingTransactionData, void>({
+        path: `/api/users/${userId}/billing/transactions/${transactionId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
      * @name GetResourceBillingConfiguration
      * @summary Get the billing configuration for a resource
      * @request GET:/api/resources/{resourceId}/billing/configuration
@@ -7633,23 +7767,42 @@ export class Api<
      * No description
      *
      * @tags Analytics
-     * @name AnalyticsControllerGetResourceUsageHoursInDateRange
+     * @name GetResourceUsageHoursInDateRange
+     * @summary Get the resource usage hours in the date range
      * @request GET:/api/analytics/resource-usage-hours
      * @secure
      */
-    analyticsControllerGetResourceUsageHoursInDateRange: (
-      query: AnalyticsControllerGetResourceUsageHoursInDateRangeParams,
+    getResourceUsageHoursInDateRange: (
+      query: GetResourceUsageHoursInDateRangeParams,
       params: RequestParams = {},
     ) =>
-      this.request<
-        AnalyticsControllerGetResourceUsageHoursInDateRangeData,
-        void
-      >({
+      this.request<GetResourceUsageHoursInDateRangeData, void>({
         path: `/api/analytics/resource-usage-hours`,
         method: "GET",
         query: query,
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Analytics
+     * @name GetBillingTransactionsInDateRange
+     * @summary Get the billing transactions in the date range
+     * @request GET:/api/analytics/billing-transactions
+     * @secure
+     */
+    getBillingTransactionsInDateRange: (
+      query: GetBillingTransactionsInDateRangeParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetBillingTransactionsInDateRangeData, void>({
+        path: `/api/analytics/billing-transactions`,
+        method: "GET",
+        query: query,
+        secure: true,
         ...params,
       }),
   };

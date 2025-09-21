@@ -368,13 +368,20 @@ export const UseAttractapServiceGetFirmwareBinaryKeyFn = ({ filename, firmwareNa
   firmwareName: string;
   variantName: string;
 }, queryKey?: Array<unknown>) => [useAttractapServiceGetFirmwareBinaryKey, ...(queryKey ?? [{ filename, firmwareName, variantName }])];
-export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse = Awaited<ReturnType<typeof AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange>>;
-export type AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeQueryResult<TData = AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKey = "AnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange";
-export const UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKeyFn = ({ end, start }: {
+export type AnalyticsServiceGetResourceUsageHoursInDateRangeDefaultResponse = Awaited<ReturnType<typeof AnalyticsService.getResourceUsageHoursInDateRange>>;
+export type AnalyticsServiceGetResourceUsageHoursInDateRangeQueryResult<TData = AnalyticsServiceGetResourceUsageHoursInDateRangeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAnalyticsServiceGetResourceUsageHoursInDateRangeKey = "AnalyticsServiceGetResourceUsageHoursInDateRange";
+export const UseAnalyticsServiceGetResourceUsageHoursInDateRangeKeyFn = ({ end, start }: {
   end: string;
   start: string;
-}, queryKey?: Array<unknown>) => [useAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+}, queryKey?: Array<unknown>) => [useAnalyticsServiceGetResourceUsageHoursInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type AnalyticsServiceGetBillingTransactionsInDateRangeDefaultResponse = Awaited<ReturnType<typeof AnalyticsService.getBillingTransactionsInDateRange>>;
+export type AnalyticsServiceGetBillingTransactionsInDateRangeQueryResult<TData = AnalyticsServiceGetBillingTransactionsInDateRangeDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAnalyticsServiceGetBillingTransactionsInDateRangeKey = "AnalyticsServiceGetBillingTransactionsInDateRange";
+export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end, start }: {
+  end: string;
+  start: string;
+}, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
 export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof UsersService.createOneUser>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;

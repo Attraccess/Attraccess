@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "columns": {
+      "label": "Spalten"
+    }
+  },
+  "actions": {
+    "refetch": "Aktualisieren",
+    "downloadCsv": "CSV herunterladen"
+  }
+}

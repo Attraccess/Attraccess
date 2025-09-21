@@ -189,7 +189,11 @@ export const prefetchUseAttractapServiceGetFirmwareBinary = (queryClient: QueryC
   firmwareName: string;
   variantName: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetFirmwareBinaryKeyFn({ filename, firmwareName, variantName }), queryFn: () => AttractapService.getFirmwareBinary({ filename, firmwareName, variantName }) });
-export const prefetchUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRange = (queryClient: QueryClient, { end, start }: {
+export const prefetchUseAnalyticsServiceGetResourceUsageHoursInDateRange = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange({ end, start }) });
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getResourceUsageHoursInDateRange({ end, start }) });
+export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (queryClient: QueryClient, { end, start }: {
+  end: string;
+  start: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });

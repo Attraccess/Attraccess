@@ -189,7 +189,11 @@ export const ensureUseAttractapServiceGetFirmwareBinaryData = (queryClient: Quer
   firmwareName: string;
   variantName: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetFirmwareBinaryKeyFn({ filename, firmwareName, variantName }), queryFn: () => AttractapService.getFirmwareBinary({ filename, firmwareName, variantName }) });
-export const ensureUseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeData = (queryClient: QueryClient, { end, start }: {
+export const ensureUseAnalyticsServiceGetResourceUsageHoursInDateRangeData = (queryClient: QueryClient, { end, start }: {
   end: string;
   start: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceAnalyticsControllerGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.analyticsControllerGetResourceUsageHoursInDateRange({ end, start }) });
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetResourceUsageHoursInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getResourceUsageHoursInDateRange({ end, start }) });
+export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (queryClient: QueryClient, { end, start }: {
+  end: string;
+  start: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });

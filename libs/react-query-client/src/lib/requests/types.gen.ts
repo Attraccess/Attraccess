@@ -2985,7 +2985,7 @@ export type GetFirmwareBinaryData = {
 
 export type GetFirmwareBinaryResponse = string;
 
-export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
+export type GetResourceUsageHoursInDateRangeData = {
     /**
      * The end date of the range
      */
@@ -2996,7 +2996,20 @@ export type AnalyticsControllerGetResourceUsageHoursInDateRangeData = {
     start: string;
 };
 
-export type AnalyticsControllerGetResourceUsageHoursInDateRangeResponse = Array<ResourceUsage>;
+export type GetResourceUsageHoursInDateRangeResponse = Array<ResourceUsage>;
+
+export type GetBillingTransactionsInDateRangeData = {
+    /**
+     * The end date of the range
+     */
+    end: string;
+    /**
+     * The start date of the range
+     */
+    start: string;
+};
+
+export type GetBillingTransactionsInDateRangeResponse = unknown;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -5033,12 +5046,27 @@ export type $OpenApiTs = {
     };
     '/api/analytics/resource-usage-hours': {
         get: {
-            req: AnalyticsControllerGetResourceUsageHoursInDateRangeData;
+            req: GetResourceUsageHoursInDateRangeData;
             res: {
                 /**
                  * The resource usage hours in the date range
                  */
                 200: Array<ResourceUsage>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/analytics/billing-transactions': {
+        get: {
+            req: GetBillingTransactionsInDateRangeData;
+            res: {
+                /**
+                 * The billing transactions in the date range
+                 */
+                200: unknown;
                 /**
                  * Unauthorized
                  */

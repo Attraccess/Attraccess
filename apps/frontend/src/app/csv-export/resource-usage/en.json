@@ -1,10 +1,19 @@
 {
-    "downloadCsv": "Download CSV",
-    "refreshData": "Refresh Data",
-    "options": {
-        "groupByUserAndResource": "Group by User and Resource"
-    },
-    "columns": {
-        "label": "Columns"
-    }
+  "options": {
+    "groupByUserAndResource": "Group by User and Resource"
+  },
+  "columns": {
+    "resourceId": "Resource ID",
+    "resourceName": "Resource Name",
+    "userId": "User ID",
+    "username": "User Name",
+    "startTimeISO": "Start Time (ISO)",
+    "startTime": "Start Time",
+    "endTimeISO": "End Time (ISO)",
+    "endTime": "End Time",
+    "usageInMinutes": "Usage in Minutes",
+    "usageInHours": "Usage in Hours",
+    "startNotes": "Start Notes",
+    "endNotes": "End Notes"
+  }
 }
