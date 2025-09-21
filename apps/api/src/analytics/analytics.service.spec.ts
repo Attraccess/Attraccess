@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransaction, ResourceUsage } from '@attraccess/database-entities';
 import { Between, Repository } from 'typeorm';
 import { DateRangeValue } from './dtos/dateRangeValue';
 
@@ -20,6 +20,10 @@ describe('AnalyticsService', () => {
         {
           provide: getRepositoryToken(ResourceUsage),
           useValue: mockRepository,
+        },
+        {
+          provide: getRepositoryToken(BillingTransaction),
+          useValue: {},
         },
       ],
     }).compile();
@@ -68,6 +72,11 @@ describe('AnalyticsService', () => {
         where: {
           startTime: Between(dateRange.start, dateRange.end),
         },
+        order: {
+          id: 'DESC',
+          userId: 'DESC',
+          startTime: 'DESC',
+        },
         relations: ['user', 'resource'],
       });
 
@@ -87,6 +96,11 @@ describe('AnalyticsService', () => {
       expect(repository.find).toHaveBeenCalledWith({
         where: {
           startTime: Between(dateRange.start, dateRange.end),
+        },
+        order: {
+          id: 'DESC',
+          userId: 'DESC',
+          startTime: 'DESC',
         },
         relations: ['user', 'resource'],
       });

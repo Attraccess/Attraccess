@@ -1,20 +1,24 @@
 {
-    "title": "CSV Export",
-    "rangeCalendar": {
-        "label": "Date Range",
-        "selection": {
-            "label": "Selected Date Range",
-            "start": "Start: {{date}}",
-            "end": "End: {{date}}"
-        }
-    },
-    "exports": {
-        "modal": {
-            "subtitle": "from {{start}} to {{end}}"
-        },
-        "resourceUsageHours": {
-            "button": "Export Resource Usage",
-            "title": "Resource Usage"
-        }
+  "title": "CSV Export",
+  "rangeCalendar": {
+    "label": "Date Range",
+    "selection": {
+      "label": "Selected Date Range",
+      "start": "Start: {{date}}",
+      "end": "End: {{date}}"
     }
+  },
+  "exports": {
+    "modal": {
+      "subtitle": "from {{start}} to {{end}}"
+    },
+    "resourceUsageHours": {
+      "button": "Export Resource Usage",
+      "title": "Resource Usage"
+    },
+    "billingTransactions": {
+      "button": "Export Billing Transactions",
+      "title": "Billing Transactions"
+    }
+  }
 }

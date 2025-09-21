@@ -14,10 +14,10 @@ import {
 } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { getLocalTimeZone } from '@internationalized/date';
-import { ResourceUsageExport } from './resource-usage/resourceUsageExport';
-import { useNow } from '../../hooks/useNow';
+import { ResourceUsageExport } from './resource-usage';
+import { BillingTransactionsExport } from './billing-transactions';
 
 export function CsvExport() {
   const { t } = useTranslations({
@@ -26,7 +26,7 @@ export function CsvExport() {
   });
 
   const [dateRange, setDateRange] = useState<RangeValue<DateValue>>();
-  const [activeExport, setActiveExport] = useState<string>('');
+  const [activeExportKey, setActiveExport] = useState<string>('');
   const [showExport, setShowExport] = useState(false);
 
   const formatDateTime = useDateTimeFormatter({ showTime: false });
@@ -46,7 +46,24 @@ export function CsvExport() {
     [formatDateTime, dateRange],
   );
 
-  const now = useNow();
+  const now = useRef(new Date());
+
+  const exportTypes = useMemo(() => {
+    return [
+      {
+        key: 'resourceUsageHours',
+        component: ResourceUsageExport,
+      },
+      {
+        key: 'billingTransactions',
+        component: BillingTransactionsExport,
+      },
+    ] as const;
+  }, []);
+
+  const activeExport = useMemo(() => {
+    return exportTypes.find((exportType) => exportType.key === activeExportKey);
+  }, [exportTypes, activeExportKey]);
 
   return (
     <>
@@ -73,15 +90,18 @@ export function CsvExport() {
           </div>
         </CardBody>
         <CardFooter>
-          <Button
-            isDisabled={!dateRange}
-            onPress={() => {
-              openExport('resourceUsageHours');
-            }}
-            data-cy="csv-export-resource-usage-hours-button"
-          >
-            {t('exports.resourceUsageHours.button')}
-          </Button>
+          {exportTypes.map((exportType) => (
+            <Button
+              key={exportType.key}
+              isDisabled={!dateRange}
+              onPress={() => {
+                openExport(exportType.key);
+              }}
+              data-cy={`csv-export-${exportType.key}-button`}
+            >
+              {t(`exports.${exportType.key}.button`)}
+            </Button>
+          ))}
         </CardFooter>
       </Card>
 
@@ -95,18 +115,18 @@ export function CsvExport() {
         <ModalContent>
           <ModalHeader>
             <div>
-              {t(`exports.${activeExport}.title`)}
+              {t(`exports.${activeExportKey}.title`)}
               <br />
               <small>
-                {t(t('exports.modal.subtitle', { start: dateRangeStartFormatted, end: dateRangeEndFormatted }))}
+                {t('exports.modal.subtitle', { start: dateRangeStartFormatted, end: dateRangeEndFormatted })}
               </small>
             </div>
           </ModalHeader>
 
-          {activeExport === 'resourceUsageHours' && (
-            <ResourceUsageExport
-              start={dateRange?.start?.toDate(getLocalTimeZone()) ?? now}
-              end={dateRange?.end?.toDate(getLocalTimeZone()) ?? now}
+          {activeExport && (
+            <activeExport.component
+              start={dateRange?.start?.toDate(getLocalTimeZone()) ?? now.current}
+              end={dateRange?.end?.toDate(getLocalTimeZone()) ?? now.current}
             />
           )}
         </ModalContent>

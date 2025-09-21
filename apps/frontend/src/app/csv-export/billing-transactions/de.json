@@ -1,0 +1,14 @@
+{
+  "columns": {
+    "id": "ID",
+    "user": "Benutzer",
+    "createdAt": "Erstellt am",
+    "amount": "Betrag",
+    "initiator": "Ausgelöst von",
+    "resourceUsage": "Ressource / Nutzung",
+    "refundOf": "Erstattung von",
+    "externalReference": "Externe Referenz",
+    "status": "Status",
+    "items": "Positionen"
+  }
+}

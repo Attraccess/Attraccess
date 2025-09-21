@@ -1,0 +1,14 @@
+{
+  "columns": {
+    "id": "ID",
+    "user": "User",
+    "createdAt": "Created at",
+    "amount": "Amount",
+    "initiator": "Initiator",
+    "resourceUsage": "Resource / Usage",
+    "refundOf": "Refund of",
+    "externalReference": "External reference",
+    "status": "Status",
+    "items": "Items"
+  }
+}

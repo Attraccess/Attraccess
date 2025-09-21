@@ -1,0 +1,11 @@
+{
+  "inputs": {
+    "columns": {
+      "label": "Columns"
+    }
+  },
+  "actions": {
+    "refetch": "Refresh",
+    "downloadCsv": "Download CSV"
+  }
+}

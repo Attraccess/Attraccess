@@ -1,10 +1,19 @@
 {
-    "downloadCsv": "CSV herunterladen",
-    "refreshData": "Daten aktualisieren",
-    "options": {
-        "groupByUserAndResource": "Nutzung nach Benutzer und Ressource gruppieren"
-    },
-    "columns": {
-        "label": "Spalten"
-    }
+  "options": {
+    "groupByUserAndResource": "Nutzung nach Benutzer und Ressource gruppieren"
+  },
+  "columns": {
+    "resourceId": "Ressourcen-ID",
+    "resourceName": "Ressourcen-Name",
+    "userId": "Benutzer-ID",
+    "username": "Benutzer-Name",
+    "startTimeISO": "Startzeit (ISO)",
+    "startTime": "Startzeit",
+    "endTimeISO": "Endzeit (ISO)",
+    "endTime": "Endzeit",
+    "usageInMinutes": "Nutzung in Minuten",
+    "usageInHours": "Nutzung in Stunden",
+    "startNotes": "Start-Notizen",
+    "endNotes": "End-Notizen"
+  }
 }

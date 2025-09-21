@@ -10,7 +10,7 @@ import { PluginsList } from '../plugins/PluginsList';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
 import { AttractapList } from '../attractap/AttractapList';
 import { NfcCardList } from '../attractap/NfcCardList';
-import { CsvExport } from '../csv-export/csv-export';
+import { CsvExport } from '../csv-export';
 import { DocumentationEditor, DocumentationView } from '../resources/documentation';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import { EditEmailTemplatePage } from '../email-templates/edit';
