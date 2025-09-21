@@ -195,8 +195,6 @@ export const VERIFY_EMAIL_MJML_TEMPLATE = `
 export class SeedEmailTemplates1748886859854 implements MigrationInterface {
   name = 'SeedEmailTemplates1748886859854';
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('Running migration: Seeding default email templates');
-
     const defaultTemplates = [
       {
         type: 'verify-email',
@@ -216,15 +214,10 @@ export class SeedEmailTemplates1748886859854 implements MigrationInterface {
         templateData.subject,
         templateData.body,
       ]);
-
-      console.log(`Default template "${templateData.type}" seeded successfully.`);
     }
-
-    console.log('Email templates migration completed successfully');
   }
 
   public async down(): Promise<void> {
     // No need to remove essential system templates
-    console.log('Email templates seed migration rollback: No action needed');
   }
 }

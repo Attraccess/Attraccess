@@ -34,6 +34,7 @@ module.exports = [
         },
       ],
       'no-warning-comments': 'off',
+      'no-console': 'error',
     },
   },
   // Add special configuration for CI environment that converts warnings to errors

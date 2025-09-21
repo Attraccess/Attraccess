@@ -28,7 +28,6 @@ interface TranslationState {
 export const useTranslationState = create<TranslationState>((set) => ({
   language: 'en',
   setLanguage: (language) => {
-    console.log('setLanguage', language);
     set({ language });
     localStorage.setItem(I18N_LANGUAGE_STORAGE_KEY, language);
   },

@@ -7,8 +7,10 @@ module.exports = [
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     ignores: ['**/*.json'],
-    
+
     // Override or add rules here
-    rules: {},
+    rules: {
+      'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug', 'trace'] }],
+    },
   },
 ];

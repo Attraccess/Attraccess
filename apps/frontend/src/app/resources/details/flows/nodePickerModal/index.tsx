@@ -71,7 +71,7 @@ export function NodePickerModal(props: Props) {
         return;
       }
 
-      const isOutput = schema.inputs.length === 0 && schema.outputs.length > 0;
+      const isOutput = schema.inputs.length > 0 && schema.outputs.length === 0;
       if (isOutput) {
         outputsGroup.nodes.push(schema);
         return;

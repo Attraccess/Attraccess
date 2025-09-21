@@ -23,7 +23,7 @@ const AppEnvSchema = z
           val
             .split(',')
             .map((s) => s.trim().toLowerCase())
-            .filter(Boolean) as LogLevel[]
+            .filter(Boolean) as LogLevel[],
       )
       .refine((levels) => levels.every((l) => ['log', 'error', 'warn', 'debug', 'verbose'].includes(l)), {
         message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
@@ -58,7 +58,7 @@ const AppEnvSchema = z
 
       return true;
     },
-    { message: 'Invalid SSL configuration' }
+    { message: 'Invalid SSL configuration' },
   );
 
 export type AppConfigType = z.infer<typeof AppEnvSchema> & {
@@ -97,7 +97,9 @@ const appConfigFactory = (): AppConfigType => {
             return path ? `${path}: ${err?.message}` : `${err?.message}`;
           })
           .join('; ')
-      : e?.message ?? String(e);
+      : (e?.message ?? String(e));
+
+    // eslint-disable-next-line no-console
     console.error('Failed to parse App Environment Variables:', zodErrors);
     throw new Error(zodErrors);
   }

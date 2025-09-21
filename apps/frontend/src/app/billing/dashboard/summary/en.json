@@ -8,7 +8,8 @@
         "dateTime": "Date",
         "status": "Status",
         "details": "Details",
-        "amount": "Amount"
+        "amount": "Amount",
+        "actions": "Actions"
       },
       "cells": {
         "details": {

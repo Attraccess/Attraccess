@@ -1,6 +1,8 @@
 import { join } from 'path';
 import { writeFileSync } from 'fs';
 
+/* eslint-disable no-console */
+
 async function main() {
   console.log('Exporting swagger');
 

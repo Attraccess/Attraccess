@@ -1,5 +1,6 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  Button,
   Card,
   CardBody,
   CardHeader,
@@ -26,9 +27,10 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
-import { CreditCardIcon } from 'lucide-react';
+import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
+import { TransactionDetailsModal } from './transactionDetailsModal';
 
 interface Props {
   transactionsPerPage?: number;
@@ -163,6 +165,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
               {t('transactions.table.columns.details')}
             </TableColumn>
             <TableColumn align="end">{t('transactions.table.columns.amount')}</TableColumn>
+            <TableColumn align="end">{t('transactions.table.columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (
@@ -180,6 +183,11 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                 <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                   {transaction.amount > 0 && '+'}
                   {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration.minorUnit))}
+                </TableCell>
+                <TableCell>
+                  <TransactionDetailsModal transactionId={transaction.id}>
+                    {(onOpen) => <Button isIconOnly startContent={<ReceiptTextIcon />} onPress={onOpen} />}
+                  </TransactionDetailsModal>
                 </TableCell>
               </TableRow>
             )}

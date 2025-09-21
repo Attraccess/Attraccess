@@ -1,4 +1,4 @@
-import { ResourceFlowNodeDto } from '@attraccess/react-query-client';
+import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
 import {
   Autocomplete,
   AutocompleteItem,
@@ -13,9 +13,11 @@ import {
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { useCallback, useMemo } from 'react';
+import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../../../../utils/currency';
 
 export interface Property<TValue> {
-  type: 'string' | 'integer' | 'object' | 'boolean';
+  type: 'string' | 'integer' | 'number' | 'object' | 'boolean';
   enum?: string[];
   default?: TValue;
   additionalProperties?: {
@@ -26,6 +28,8 @@ export interface Property<TValue> {
   maximum?: number;
   selectFromEntity?: 'mqttServer';
   selectFromEntityProperty?: string;
+  overrideWithInput?: string;
+  isCurrency?: boolean;
 }
 
 interface Props<TValue> {
@@ -41,13 +45,54 @@ interface Props<TValue> {
 export function PropertyInput<TValue>(props: Props<TValue>) {
   const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange } = props;
 
+  let description = undefined;
+  if (schema.overrideWithInput) {
+    description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
+  }
+
+  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+
+  const parsedValue = useMemo(() => {
+    if (schema.isCurrency) {
+      return apiCurrencyToFrontendCurrency(value as number, configuration?.minorUnit ?? 2);
+    }
+    return value;
+  }, [value, schema.isCurrency, configuration]);
+
+  const setValue = useCallback(
+    (newValue: TValue) => {
+      if (schema.isCurrency) {
+        if (!configuration) {
+          return;
+        }
+        onChange(frontendCurrencyToApiCurrency(newValue as number, configuration.minorUnit) as TValue);
+      } else {
+        onChange(newValue);
+      }
+    },
+    [onChange, schema, configuration],
+  );
+
+  if (!configuration && schema.isCurrency) {
+    return (
+      <Input
+        type="text"
+        isDisabled
+        label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+        description={description}
+        isRequired={isRequired}
+      />
+    );
+  }
+
   if (schema.selectFromEntity === 'mqttServer') {
     return (
       <MqttServerSelect
         selectedId={value as number}
-        onSelectionChange={(value) => onChange(value as TValue)}
+        onSelectionChange={(newValue) => onChange(newValue as TValue)}
         label={t('nodes.' + nodeType + '.config.' + name + '.label')}
         isRequired={isRequired}
+        description={description}
       />
     );
   }
@@ -59,8 +104,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <Autocomplete
             isRequired={isRequired}
             defaultSelectedKey={String(value ?? schema.default ?? '')}
-            onSelectionChange={(value) => onChange(value as TValue)}
+            onSelectionChange={(newValue) => onChange(newValue as TValue)}
             label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            description={description}
           >
             {schema.enum.map((enumValue) => (
               <AutocompleteItem key={enumValue}>
@@ -76,8 +122,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <Textarea
             isRequired={isRequired}
             label={t('nodes.' + nodeType + '.config.' + name + '.label')}
-            value={String(value ?? schema.default ?? '')}
-            onValueChange={(value) => onChange(value as TValue)}
+            value={value ? String(value) : undefined}
+            defaultValue={schema.default ? String(schema.default) : undefined}
+            onValueChange={(newValue) => onChange(newValue as TValue)}
+            description={description}
           />
         );
       }
@@ -87,25 +135,31 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           type="text"
           isRequired={isRequired}
           label={t('nodes.' + nodeType + '.config.' + name + '.label')}
-          value={String(value ?? schema.default ?? '')}
-          onValueChange={(value) => onChange(value as TValue)}
+          value={value ? String(value) : undefined}
+          defaultValue={schema.default ? String(schema.default) : undefined}
+          onValueChange={(newValue) => onChange(newValue as TValue)}
+          description={description}
         />
       );
     case 'integer':
+    case 'number':
       return (
         <NumberInput
           isRequired={isRequired}
           label={t('nodes.' + nodeType + '.config.' + name + '.label')}
-          value={Number(value ?? schema.default)}
-          onValueChange={(value) => onChange(value as TValue)}
+          value={Number(parsedValue)}
+          defaultValue={schema.default ? Number(schema.default) : undefined}
+          onValueChange={(newValue) => setValue(newValue as TValue)}
           minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
           maxValue={schema.maximum}
+          description={description}
         />
       );
+
     case 'object':
       if (schema.additionalProperties) {
         let content = null;
-        if (Object.entries(value as Record<string, unknown>).length === 0) {
+        if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
             <Card>
               <CardBody>
@@ -174,7 +228,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
     case 'boolean':
       return (
-        <Switch isSelected={value as boolean} onValueChange={(value) => onChange(value as TValue)}>
+        <Switch isSelected={value as boolean} onValueChange={(newValue) => onChange(newValue as TValue)}>
           {t('nodes.' + nodeType + '.config.' + name + '.label')}
         </Switch>
       );

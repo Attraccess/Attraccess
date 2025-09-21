@@ -1,0 +1,43 @@
+{
+  "title": "Transaktionsdetails",
+  "loading": "Transaktion wird geladen…",
+  "status": {
+    "pending": "Ausstehend",
+    "completed": "Abgeschlossen",
+    "failed": "Fehlgeschlagen"
+  },
+  "meta": {
+    "id": "Transaktions-ID",
+    "date": "Datum",
+    "status": "Status",
+    "amount": "Betrag",
+    "initiator": "Ausgelöst von",
+    "resourceUsage": "Ressource / Nutzung",
+    "refundOf": "Erstattung von",
+    "externalReference": "Externe Referenz",
+    "type": "Art"
+  },
+  "type": {
+    "refund": "Erstattung",
+    "resourceUsage": "Ressourcen-Nutzung",
+    "manual": "Manuelle Transaktion",
+    "sumupTopup": "SumUp-Aufladung",
+    "unknown": "Unbekannt"
+  },
+  "items": {
+    "title": "Positionen",
+    "columns": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "quantity": "Menge",
+      "unitPrice": "Einzelpreis",
+      "subtotal": "Zwischensumme"
+    },
+    "system": {
+      "PER_SESSION": "Pro Sitzung",
+      "PER_MINUTE": "Pro Minute"
+    },
+    "empty": "Keine Positionen",
+    "total": "Summe Positionen"
+  }
+}

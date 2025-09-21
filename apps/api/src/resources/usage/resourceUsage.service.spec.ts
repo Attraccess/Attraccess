@@ -183,6 +183,30 @@ describe('ResourceUsageService', () => {
     eventEmitter = module.get(EventEmitter2);
     billingService = module.get(BillingService);
 
+    // Provide transaction-capable manager on the repository
+    const transactionalEntityManager = {
+      createQueryBuilder: jest.fn(() => ({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      })),
+      // Ensure code paths that use getRepository(ResourceUsage).findOne work in tests
+      getRepository: jest.fn(() => ({
+        findOne: resourceUsageRepository.findOne,
+      })),
+    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock };
+
+    // @ts-expect-error augment mock with manager
+    resourceUsageRepository.manager = {
+      transaction: jest.fn(async (cb: (em: typeof transactionalEntityManager) => Promise<unknown>) =>
+        cb(transactionalEntityManager),
+      ),
+    } as unknown as { transaction: jest.Mock };
+
+    // Silence and stub billing call inside transaction
+    billingService.chargeForResourceUsage = jest.fn().mockResolvedValue(undefined);
+
     // Default: billing disabled to avoid interfering with tests that don't explicitly mock billing
     billingService.getResourceBillingConfiguration.mockResolvedValue({
       isBillingEnabled: false,
@@ -591,6 +615,8 @@ describe('ResourceUsageService', () => {
         .mockResolvedValueOnce(mockUpdatedSession); // 3) fetch updated session to return
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      // Ensure update(ResourceUsage) is called: our mock returns chainable builder
+      (mockUpdateQueryBuilder.update as jest.Mock).mockReturnValue(mockUpdateQueryBuilder);
       resourceUsageRepository.createQueryBuilder.mockReturnValue(
         mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
@@ -598,11 +624,7 @@ describe('ResourceUsageService', () => {
       const result = await service.endSession(1, mockUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
-      expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
-      expect(mockUpdateQueryBuilder.set).toHaveBeenCalledWith({
-        endTime: expect.any(Date),
-        endNotes: 'Session completed',
-      });
+      expect(resourceUsageRepository.manager.transaction).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
       const emitted = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);

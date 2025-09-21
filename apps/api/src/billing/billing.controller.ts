@@ -85,6 +85,17 @@ export class BillingController {
     return await this.billingService.getHistory(userId, query);
   }
 
+  @Get('/users/:userId/billing/transactions/:transactionId')
+  @Auth()
+  @ApiOperation({ summary: 'Get a billing transaction for a user', operationId: 'getBillingTransaction' })
+  @ApiResponse({ status: 200, description: 'The billing transaction for the user.', type: BillingTransaction })
+  async getBillingTransaction(
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BillingTransaction> {
+    return await this.billingService.getTransaction(transactionId, request.user.id);
+  }
+
   @Post('/users/:userId/billing/transactions')
   @ApiOperation({ summary: 'Top up or charge the billing balance for a user', operationId: 'createManualTransaction' })
   @ApiResponse({ status: 200, description: 'The billing balance for the user has been topped up.', type: Number })

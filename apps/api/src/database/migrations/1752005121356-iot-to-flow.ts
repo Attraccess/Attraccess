@@ -98,7 +98,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         basePosition.y + nodeSpacing * 2,
         JSON.stringify({}),
         resourceId,
-      ]
+      ],
     );
 
     // Insert MQTT action nodes
@@ -128,7 +128,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
           payload: this.transformTemplate(config.notInUseMessage),
         }),
         resourceId,
-      ]
+      ],
     );
 
     // Insert takeover action node if takeover messages are configured
@@ -148,7 +148,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
             payload: this.transformTemplate(config.takeoverMessage),
           }),
           resourceId,
-        ]
+        ],
       );
     }
 
@@ -169,7 +169,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         stopEventNodeId,
         notInUseActionNodeId,
         resourceId,
-      ]
+      ],
     );
 
     // Handle takeover event connections
@@ -179,7 +179,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId],
       );
     }
 
@@ -190,7 +190,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId],
       );
     }
 
@@ -200,7 +200,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId],
       );
     }
   }
@@ -217,7 +217,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       SELECT id, type FROM resource_flow_node 
       WHERE resourceId = $1 AND type IN ('event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover')
     `,
-      [resourceId]
+      [resourceId],
     );
 
     let startEventNodeId: string;
@@ -238,7 +238,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
         VALUES ($1, 'event.resource.usage.started', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [startEventNodeId, basePosition.x, basePosition.y, JSON.stringify({}), resourceId]
+        [startEventNodeId, basePosition.x, basePosition.y, JSON.stringify({}), resourceId],
       );
     }
 
@@ -251,7 +251,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
         VALUES ($1, 'event.resource.usage.stopped', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [stopEventNodeId, basePosition.x, basePosition.y + nodeSpacing, JSON.stringify({}), resourceId]
+        [stopEventNodeId, basePosition.x, basePosition.y + nodeSpacing, JSON.stringify({}), resourceId],
       );
     }
 
@@ -264,7 +264,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
         VALUES ($1, 'event.resource.usage.takeover', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [takeoverEventNodeId, basePosition.x, basePosition.y + nodeSpacing * 2, JSON.stringify({}), resourceId]
+        [takeoverEventNodeId, basePosition.x, basePosition.y + nodeSpacing * 2, JSON.stringify({}), resourceId],
       );
     }
 
@@ -279,6 +279,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       try {
         headers = JSON.parse(config.headers);
       } catch {
+        // eslint-disable-next-line no-console
         console.warn(`Invalid headers JSON for webhook config ${config.id}: ${config.headers}`);
       }
     }
@@ -312,7 +313,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
           body: this.transformTemplate(config.notInUseTemplate),
         }),
         resourceId,
-      ]
+      ],
     );
 
     // Insert takeover action node if takeover template is configured
@@ -333,7 +334,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
             body: this.transformTemplate(config.takeoverTemplate),
           }),
           resourceId,
-        ]
+        ],
       );
     }
 
@@ -354,7 +355,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         stopEventNodeId,
         notInUseActionNodeId,
         resourceId,
-      ]
+      ],
     );
 
     // Handle takeover event connections
@@ -364,7 +365,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId],
       );
     }
 
@@ -375,7 +376,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId],
       );
     }
 
@@ -385,7 +386,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId]
+        [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId],
       );
     }
   }
