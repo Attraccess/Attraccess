@@ -9,6 +9,7 @@ import * as migrations from './migrations';
 const storageEnv = loadEnv((z) => ({ STORAGE_ROOT: z.string().default(join(process.cwd(), 'storage')) }));
 const dbFile = resolve(join(storageEnv.STORAGE_ROOT, 'attraccess.sqlite'));
 
+// eslint-disable-next-line no-console
 console.log('dbFile', dbFile);
 
 const dbConfig: Partial<DataSourceOptions> = {

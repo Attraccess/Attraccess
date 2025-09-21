@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-console */
+
 const fs = require('fs');
 const path = require('path');
 
@@ -38,10 +40,10 @@ async function processDependency(name, version) {
           ? latestInfo.author
           : latestInfo.author.name || 'Unknown'
         : npmInfo.author
-        ? typeof npmInfo.author === 'string'
-          ? npmInfo.author
-          : npmInfo.author.name || 'Unknown'
-        : 'Unknown',
+          ? typeof npmInfo.author === 'string'
+            ? npmInfo.author
+            : npmInfo.author.name || 'Unknown'
+          : 'Unknown',
       license: latestInfo.license || npmInfo.license || 'Unknown',
       url:
         latestInfo.homepage ||
@@ -93,7 +95,7 @@ async function processDependenciesInBatches(dependencies, batchSize = 15) {
     console.log(
       `Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(entries.length / batchSize)} (${
         batch.length
-      } items)...`
+      } items)...`,
     );
 
     // Process current batch in parallel

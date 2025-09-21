@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+/* eslint-disable no-console */
+
 const assetsDir = path.resolve(__dirname, 'src/assets/attractap-firmwares');
 const origins = [
   { name: 'attractap', path: path.resolve(__dirname, '../attractap-firmware/firmware_output') },

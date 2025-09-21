@@ -28,7 +28,6 @@ interface TranslationState {
 export const useTranslationState = create<TranslationState>((set) => ({
   language: 'en',
   setLanguage: (language) => {
-    console.log('setLanguage', language);
     set({ language });
     localStorage.setItem(I18N_LANGUAGE_STORAGE_KEY, language);
   },
@@ -80,17 +79,11 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
       const translationTemplate = getTranslationTemplate(key);
       if (translationTemplate === undefined) {
-        console.log('translationTemplate is undefined', {
-          key,
-          activeTranslations,
-          fallbackTranslations,
-          translations,
-        });
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
       return translationTemplate(data);
     },
-    [getTranslationTemplate, activeTranslations, fallbackTranslations, translations],
+    [getTranslationTemplate],
   );
 
   const tExists = useCallback(
