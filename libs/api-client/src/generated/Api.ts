@@ -1353,12 +1353,12 @@ export interface ResourceBillingConfiguration {
 export interface UpdateResourceBillingConfigurationDto {
   /**
    * The credit cost per usage
-   * @example 100
+   * @example 5
    */
   creditsPerUsage?: number | null;
   /**
    * The credit cost per minute
-   * @example 100
+   * @example 0.2
    */
   creditsPerMinute?: number | null;
 }
@@ -1371,22 +1371,25 @@ export interface SetSumUpApiKeyDto {
   apiKey: string;
 }
 
-export interface SetSumUpConfigurationDto {
+export interface SetBillingConfigurationDto {
   /**
-   * The currency for the SumUp configuration
+   * The currency to use
+   * @example "EUR"
+   */
+  currency: "EUR";
+}
+
+export interface BillingConfigurationDto {
+  /**
+   * The currency to use
    * @example "EUR"
    */
   currency: "EUR";
   /**
-   * The currency to credits rate for the SumUp configuration, e.g. 100 means 100 credits for 1 (currency) unit
-   * @example 100
+   * The minor unit of the currency
+   * @example 2
    */
-  currencyToCreditsRate: number;
-  /**
-   * Whether to adjust existing balances
-   * @example true
-   */
-  adjustExistingBalances?: boolean;
+  minorUnit: number;
 }
 
 export interface SumUpConfigurationDto {
@@ -1395,16 +1398,6 @@ export interface SumUpConfigurationDto {
    * @example true
    */
   enabled: boolean;
-  /**
-   * The currency for the SumUp configuration
-   * @example "EUR"
-   */
-  currency: "EUR";
-  /**
-   * The currency to credits rate for the SumUp configuration
-   * @example 100
-   */
-  currencyToCreditsRate: number;
 }
 
 export interface SumUpReaderDevice {
@@ -1421,7 +1414,6 @@ export interface SumUpReaderDto {
   name: string;
   /** @example "active" */
   status: "unknown" | "processing" | "paired" | "expired";
-  /** @example "device" */
   device: SumUpReaderDevice;
   /** @example {} */
   meta?: Record<string, any>;
@@ -1445,8 +1437,11 @@ export interface PairSumUpReaderDto {
 }
 
 export interface SumupTopUpDto {
-  /** @example 100 */
-  tokenCount: number;
+  /**
+   * @min 1
+   * @example 100
+   */
+  amount: number;
   /** @example "1234567890" */
   readerId: string;
 }
@@ -2391,20 +2386,24 @@ export type GetBillingTransactionsData = TransactionsDto;
 
 export type CreateManualTransactionData = number;
 
-export type GetBillingConfigurationData = ResourceBillingConfiguration;
+export type GetResourceBillingConfigurationData = ResourceBillingConfiguration;
 
 export type UpdateResourceBillingConfigurationData =
   ResourceBillingConfiguration;
 
 export type SetSumUpApiKeyData = string;
 
-export type SetSumUpConfigurationData = SumUpConfigurationDto;
+export type SetBillingConfigurationData = BillingConfigurationDto;
+
+export type GetBillingConfigurationData = BillingConfigurationDto;
 
 export type GetSumUpConfigurationData = SumUpConfigurationDto;
 
 export type GetSumUpReadersData = SumUpReaderDto[];
 
 export type PairSumUpReaderData = SumUpReaderDto;
+
+export type TopUpWithSumUpReaderData = BillingTransaction;
 
 export type SumUpTopUpCallbackData = any;
 
@@ -4237,19 +4236,19 @@ export namespace Billing {
   /**
    * No description
    * @tags Billing
-   * @name GetBillingConfiguration
+   * @name GetResourceBillingConfiguration
    * @summary Get the billing configuration for a resource
    * @request GET:/api/resources/{resourceId}/billing/configuration
    * @secure
    */
-  export namespace GetBillingConfiguration {
+  export namespace GetResourceBillingConfiguration {
     export type RequestParams = {
       resourceId: number;
     };
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = GetBillingConfigurationData;
+    export type ResponseBody = GetResourceBillingConfigurationData;
   }
 
   /**
@@ -4289,17 +4288,33 @@ export namespace Billing {
   /**
    * No description
    * @tags Billing
-   * @name SetSumUpConfiguration
-   * @summary Set the SumUp configuration
-   * @request POST:/api/billing/sumup/configuration
+   * @name SetBillingConfiguration
+   * @summary Set the billing configuration
+   * @request POST:/api/billing/configuration
    * @secure
    */
-  export namespace SetSumUpConfiguration {
+  export namespace SetBillingConfiguration {
     export type RequestParams = {};
     export type RequestQuery = {};
-    export type RequestBody = SetSumUpConfigurationDto;
+    export type RequestBody = SetBillingConfigurationDto;
     export type RequestHeaders = {};
-    export type ResponseBody = SetSumUpConfigurationData;
+    export type ResponseBody = SetBillingConfigurationData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name GetBillingConfiguration
+   * @summary Get the billing configuration
+   * @request GET:/api/billing/configuration
+   * @secure
+   */
+  export namespace GetBillingConfiguration {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetBillingConfigurationData;
   }
 
   /**
@@ -4373,7 +4388,7 @@ export namespace Billing {
    * @tags Billing
    * @name TopUpWithSumUpReader
    * @summary Top up using a SumUp reader
-   * @request POST:/api/billing/sumup/top-up
+   * @request POST:/api/billing/top-up/sumup
    * @secure
    */
   export namespace TopUpWithSumUpReader {
@@ -4381,7 +4396,7 @@ export namespace Billing {
     export type RequestQuery = {};
     export type RequestBody = SumupTopUpDto;
     export type RequestHeaders = {};
-    export type ResponseBody = any;
+    export type ResponseBody = TopUpWithSumUpReaderData;
   }
 
   /**
@@ -4389,8 +4404,7 @@ export namespace Billing {
    * @tags Billing
    * @name SumUpTopUpCallback
    * @summary Callback from SumUp
-   * @request GET:/api/billing/sumup/top-up/callback
-   * @secure
+   * @request POST:/api/billing/top-up/sumup/callback
    */
   export namespace SumUpTopUpCallback {
     export type RequestParams = {};
@@ -4398,6 +4412,21 @@ export namespace Billing {
     export type RequestBody = SumupTransactionCallbackDto;
     export type RequestHeaders = {};
     export type ResponseBody = SumUpTopUpCallbackData;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name BillingControllerStreamEvents
+   * @request GET:/api/billing/transactions/live
+   * @secure
+   */
+  export namespace BillingControllerStreamEvents {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = any;
   }
 }
 
@@ -6934,13 +6963,16 @@ export class Api<
      * No description
      *
      * @tags Billing
-     * @name GetBillingConfiguration
+     * @name GetResourceBillingConfiguration
      * @summary Get the billing configuration for a resource
      * @request GET:/api/resources/{resourceId}/billing/configuration
      * @secure
      */
-    getBillingConfiguration: (resourceId: number, params: RequestParams = {}) =>
-      this.request<GetBillingConfigurationData, void>({
+    getResourceBillingConfiguration: (
+      resourceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetResourceBillingConfigurationData, void>({
         path: `/api/resources/${resourceId}/billing/configuration`,
         method: "GET",
         secure: true,
@@ -6996,21 +7028,39 @@ export class Api<
      * No description
      *
      * @tags Billing
-     * @name SetSumUpConfiguration
-     * @summary Set the SumUp configuration
-     * @request POST:/api/billing/sumup/configuration
+     * @name SetBillingConfiguration
+     * @summary Set the billing configuration
+     * @request POST:/api/billing/configuration
      * @secure
      */
-    setSumUpConfiguration: (
-      data: SetSumUpConfigurationDto,
+    setBillingConfiguration: (
+      data: SetBillingConfigurationDto,
       params: RequestParams = {},
     ) =>
-      this.request<SetSumUpConfigurationData, void>({
-        path: `/api/billing/sumup/configuration`,
+      this.request<SetBillingConfigurationData, void>({
+        path: `/api/billing/configuration`,
         method: "POST",
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name GetBillingConfiguration
+     * @summary Get the billing configuration
+     * @request GET:/api/billing/configuration
+     * @secure
+     */
+    getBillingConfiguration: (params: RequestParams = {}) =>
+      this.request<GetBillingConfigurationData, void>({
+        path: `/api/billing/configuration`,
+        method: "GET",
+        secure: true,
         format: "json",
         ...params,
       }),
@@ -7094,16 +7144,17 @@ export class Api<
      * @tags Billing
      * @name TopUpWithSumUpReader
      * @summary Top up using a SumUp reader
-     * @request POST:/api/billing/sumup/top-up
+     * @request POST:/api/billing/top-up/sumup
      * @secure
      */
     topUpWithSumUpReader: (data: SumupTopUpDto, params: RequestParams = {}) =>
-      this.request<any, void>({
-        path: `/api/billing/sumup/top-up`,
+      this.request<TopUpWithSumUpReaderData, void>({
+        path: `/api/billing/top-up/sumup`,
         method: "POST",
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
         ...params,
       }),
 
@@ -7113,19 +7164,33 @@ export class Api<
      * @tags Billing
      * @name SumUpTopUpCallback
      * @summary Callback from SumUp
-     * @request GET:/api/billing/sumup/top-up/callback
-     * @secure
+     * @request POST:/api/billing/top-up/sumup/callback
      */
     sumUpTopUpCallback: (
       data: SumupTransactionCallbackDto,
       params: RequestParams = {},
     ) =>
-      this.request<SumUpTopUpCallbackData, void>({
-        path: `/api/billing/sumup/top-up/callback`,
-        method: "GET",
+      this.request<SumUpTopUpCallbackData, any>({
+        path: `/api/billing/top-up/sumup/callback`,
+        method: "POST",
         body: data,
-        secure: true,
         type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name BillingControllerStreamEvents
+     * @request GET:/api/billing/transactions/live
+     * @secure
+     */
+    billingControllerStreamEvents: (params: RequestParams = {}) =>
+      this.request<any, void>({
+        path: `/api/billing/transactions/live`,
+        method: "GET",
+        secure: true,
         ...params,
       }),
   };

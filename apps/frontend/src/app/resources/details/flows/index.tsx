@@ -1,24 +1,12 @@
 import { PageHeader } from '../../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  ReactFlow,
-  Node,
-  Panel,
-  Edge,
-  useReactFlow,
-  NodeTypes,
-  NodeProps,
-} from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ResourceFlowEdgeDto,
   ResourceFlowLog,
   ResourceFlowNodeDto,
-  useResourceFlowsServiceGetNodeSchemas,
   useResourceFlowsServiceGetResourceFlow,
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
@@ -39,7 +27,6 @@ import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
 import de from './de.json';
 import en from './en.json';
-import { AttraccessNode } from './node';
 import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
 
@@ -140,6 +127,7 @@ function FlowsPageInner() {
     addNode,
     addLiveLogReceiver,
     removeLiveLogReceiver,
+    flowNodeTypes,
   } = useFlowContext();
 
   useEffect(() => {
@@ -222,22 +210,6 @@ function FlowsPageInner() {
     },
     [addNode],
   );
-
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: Number(resourceId) });
-  const flowNodeTypes = useMemo(() => {
-    if (!nodeSchemas) {
-      return {};
-    }
-
-    const types: NodeTypes = {};
-    nodeSchemas.forEach((nodeSchema) => {
-      types[nodeSchema.type] = (props: NodeProps) => (
-        <AttraccessNode tNodeTranslations={tNodeTranslations} schema={nodeSchema} node={props} />
-      );
-    });
-
-    return types;
-  }, [nodeSchemas, tNodeTranslations]);
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);
   const [, setFlowExecutionHadError] = useState(false);

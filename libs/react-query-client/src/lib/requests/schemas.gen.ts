@@ -1999,12 +1999,7 @@ export const $SumUpReaderDto = {
             enum: ['unknown', 'processing', 'paired', 'expired']
         },
         device: {
-            example: 'device',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumUpReaderDevice'
-                }
-            ]
+            '$ref': '#/components/schemas/SumUpReaderDevice'
         },
         meta: {
             type: 'object',

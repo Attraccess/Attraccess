@@ -37,11 +37,11 @@ export function LogViewer(props: Props) {
   const { t } = useTranslations({
     de: {
       ...de,
-      nodes: nodeTranslationsDe,
+      nodes: nodeTranslationsDe.nodes,
     },
     en: {
       ...en,
-      nodes: nodeTranslationsEn,
+      nodes: nodeTranslationsEn.nodes,
     },
   });
 
