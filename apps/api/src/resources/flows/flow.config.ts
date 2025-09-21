@@ -11,6 +11,7 @@ const flowConfigFactory = (): FlowConfigType => {
   try {
     return FlowEnvSchema.parse(process.env);
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.error('Failed to parse Flow Environment Variables:', e.errors);
     throw new Error('Invalid flow environment configuration.');
   }

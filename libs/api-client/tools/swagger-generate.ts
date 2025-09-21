@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 import { generateApi } from 'swagger-typescript-api';
 import * as path from 'path';
 import { readFileSync } from 'fs';

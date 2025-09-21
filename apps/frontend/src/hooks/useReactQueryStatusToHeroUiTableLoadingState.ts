@@ -2,7 +2,7 @@ import { TableBodyProps } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 
 export function useReactQueryStatusToHeroUiTableLoadingState(
-  status: QueryStatus
+  status: QueryStatus,
 ): TableBodyProps<unknown>['loadingState'] {
   switch (status) {
     case 'pending':

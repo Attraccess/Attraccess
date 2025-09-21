@@ -217,11 +217,10 @@ export class SumUpService {
         transaction.status = BillingTransactionStatus.Completed;
         break;
 
-      default:
-        this.logger.error(
-          `updateTransactionStatusBySumupServer: Unknown sumup transaction status, ${sumUpTransactionData.status} of ${sumupTransactionId}`,
-        );
-        throw new BadRequestException('Unknown sumup transaction status');
+      default: {
+        const exhaustiveCheck: never = sumUpTransactionData.status;
+        throw new Error(`Unknown sumup transaction status: ${exhaustiveCheck}`);
+      }
     }
 
     this.logger.debug(

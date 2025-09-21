@@ -6,6 +6,9 @@
   },
   "nodes": {
     "unsupportedForResourceType": "von dieser Ressource nicht unterstützt",
+    "genericConfig": {
+      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}"
+    },
     "input": {
       "button": {
         "title": "Taste",
@@ -66,6 +69,14 @@
             "description": "Dieser Knoten wird ausgelöst, wenn die Tür-Falle geöffnet wird.",
             "outputs": {
               "output": "Ausgabe"
+            }
+          }
+        },
+        "billing": {
+          "calculation": {
+            "started": {
+              "title": "Abrechnungsberechnung gestartet",
+              "description": "Dieser Knoten wird ausgelöst, wenn die berechnung der Kosten für die Nutzung dieser Resource gestartet wird. Es ist zwingend erforderlich, dass im Anschluss (als letzter Knoten) der Knoten 'Abrechnung positionen hinzufügen' ausgelöst wird."
             }
           }
         }
@@ -155,11 +166,21 @@
               "label": "URL"
             },
             "method": {
-              "label": "Methode"
+              "label": "Methode",
+              "enum": {
+                "GET": "GET",
+                "POST": "POST",
+                "PUT": "PUT",
+                "PATCH": "PATCH",
+                "DELETE": "DELETE",
+                "HEAD": "HEAD",
+                "OPTIONS": "OPTIONS"
+              }
             },
             "headers": {
               "label": "Headers",
-              "add": "Header hinzufügen"
+              "add": "Header hinzufügen",
+              "empty": "Keine Header"
             },
             "body": {
               "label": "Body"
@@ -189,6 +210,39 @@
             },
             "payload": {
               "label": "Nutzlast"
+            }
+          }
+        }
+      },
+      "resource": {
+        "billing": {
+          "calculation": {
+            "set-additional-items": {
+              "title": "Abrechnungs Position hinzufügen",
+              "description": "Mit diesem Knoten können Sie eine zusätzliche Position für die Abrechnung hinzufügen.",
+              "inputs": {
+                "input": "Eingabe"
+              },
+              "preview": {
+                "pois": "Position"
+              },
+              "config": {
+                "name": {
+                  "label": "Name"
+                },
+                "unitPrice": {
+                  "label": "Einheitspreis"
+                },
+                "quantity": {
+                  "label": "Menge"
+                },
+                "description": {
+                  "label": "Beschreibung"
+                },
+                "externalReference": {
+                  "label": "Externe Referenz"
+                }
+              }
             }
           }
         }

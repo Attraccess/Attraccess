@@ -11,14 +11,16 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+  INPUT_RESOURCE_BILLING_CALCULATION_STARTED = 'input.resource.billing.calculation.started',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+  OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
 }
 
 // Zod schemas for node data validation
-export const EventNodeDataSchema = z.object({}).optional();
+export const NodeWithoutDataSchema = z.object({}).optional();
 
 export const ButtonNodeDataSchema = z.object({
   label: z.string().min(1, 'Label is required'),
@@ -56,8 +58,24 @@ export const IfNodeDataSchema = z.object({
   comparisonValue: z.string().min(1, 'Comparison value is required'),
 });
 
+export const BillingTransactionItemCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  unitPrice: z.number().meta({
+    isCurrency: true,
+  }),
+  quantity: z.number().int().positive().meta({
+    overrideWithInput: 'quantity',
+  }),
+  description: z.string().optional().meta({
+    stringVariant: 'multiline',
+  }),
+  externalReference: z.string().optional().meta({
+    overrideWithInput: 'externalReference',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
-export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
+export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
     case ResourceFlowNodeType.INPUT_BUTTON:
       return ButtonNodeDataSchema;
@@ -67,7 +85,10 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-      return EventNodeDataSchema;
+    case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
+      return NodeWithoutDataSchema;
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+      return BillingTransactionItemCreateSchema;
     case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
     case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
@@ -76,13 +97,15 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType | string) {
       return WaitNodeDataSchema;
     case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
-    default:
-      throw new Error(`Unknown node type: ${nodeType}`);
+    default: {
+      const exhaustiveCheck: never = nodeType;
+      throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+    }
   }
 }
 
 // Type definitions for node data
-export type ResourceFlowEventNodeData = z.infer<typeof EventNodeDataSchema>;
+export type ResourceFlowEventNodeData = z.infer<typeof NodeWithoutDataSchema>;
 export type ResourceFlowActionHttpSendRequestNodeData = z.infer<typeof HttpRequestNodeDataSchema>;
 export type ResourceFlowActionMqttSendMessageNodeData = z.infer<typeof MqttSendMessageNodeDataSchema>;
 export type ResourceFlowActionUtilWaitNodeData = z.infer<typeof WaitNodeDataSchema>;

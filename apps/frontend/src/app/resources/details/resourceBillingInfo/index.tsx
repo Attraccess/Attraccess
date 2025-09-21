@@ -18,10 +18,12 @@ import {
 } from '@heroui/react';
 import { CreditCard, Edit2Icon, Info } from 'lucide-react';
 import {
+  ResourceFlowNodeDto,
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
+  useResourceFlowsServiceGetResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -54,6 +56,8 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     refetchInterval: 5000,
   });
 
+  const { data: flow } = useResourceFlowsServiceGetResourceFlow({ resourceId });
+
   const adjustedBalance = useMemo(() => {
     if (!configuration) {
       return 0;
@@ -78,16 +82,40 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration.minorUnit);
   }, [resourceBillingConfiguration, configuration]);
 
+  const customFlowBillingItems = useMemo((): ResourceFlowNodeDto[] => {
+    if (!flow) {
+      return [];
+    }
+
+    if (!configuration) {
+      return [];
+    }
+
+    return flow.nodes
+      .filter((node) => node.type === 'output.resource.billing.calculation.set-additional-items')
+      .map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          unitPrice: apiCurrencyToFrontendCurrency(node.data.unitPrice as number, configuration.minorUnit),
+        },
+      }));
+  }, [flow, configuration]);
+
   const isFree = useMemo(() => {
-    return creditsPerUsage === 0 && creditsPerMinute === 0;
-  }, [creditsPerUsage, creditsPerMinute]);
+    return creditsPerUsage === 0 && creditsPerMinute === 0 && customFlowBillingItems.length === 0;
+  }, [creditsPerUsage, creditsPerMinute, customFlowBillingItems]);
 
   const [exampleMinutes, setExampleMinutes] = useState(10);
 
-  const exampleCost = useMemo(
-    () => creditsPerUsage + creditsPerMinute * exampleMinutes,
-    [creditsPerUsage, creditsPerMinute, exampleMinutes],
-  );
+  const exampleCost = useMemo(() => {
+    const customFlowBillingItemsCost = customFlowBillingItems.reduce((acc, node) => {
+      const data = node.data as { unitPrice: number; quantity: number };
+      return acc + data.unitPrice * data.quantity;
+    }, 0);
+
+    return creditsPerUsage + creditsPerMinute * exampleMinutes + customFlowBillingItemsCost;
+  }, [creditsPerUsage, creditsPerMinute, exampleMinutes, customFlowBillingItems]);
 
   const exampleResultingBalance = useMemo(() => {
     return adjustedBalance - exampleCost;
@@ -169,7 +197,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                 <TableRow>
                   <TableCell>{t('balance.label')}</TableCell>
                   <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
-                    {t('balance.value', {
+                    {t('billingValue', {
                       credits: formatNumber(adjustedBalance),
                       currency: configuration.currency,
                     })}
@@ -178,18 +206,34 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                 <TableRow>
                   <TableCell>{t('perUse.label')}</TableCell>
                   <TableCell className="text-warning">
-                    {t('perUse.value', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
+                    {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
                   </TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>{t('perMinute.label')}</TableCell>
                   <TableCell className="text-warning">
-                    {t('perMinute.value', {
+                    {t('billingValue', {
                       credits: formatNumber(creditsPerMinute),
                       currency: configuration.currency,
                     })}
                   </TableCell>
                 </TableRow>
+                {
+                  customFlowBillingItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.data.name as string}</TableCell>
+                      <TableCell className="text-warning">
+                        {t('billingValue', {
+                          credits: formatNumber(
+                            ((item.data.unitPrice as number) ?? 0) * ((item.data.quantity as number) ?? 0),
+                          ),
+                          currency: configuration.currency,
+                        })}
+                      </TableCell>
+                    </TableRow>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  )) as any
+                }
                 <TableRow className="border-b border-divider border-t">
                   <TableCell>
                     <NumberInput
@@ -202,7 +246,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                     />
                   </TableCell>
                   <TableCell>
-                    {t('example.value', {
+                    {t('billingValue', {
                       credits: formatNumber(exampleCost),
                       currency: configuration.currency,
                       minutes: exampleMinutes,
@@ -212,7 +256,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                 <TableRow>
                   <TableCell>{t('exampleResultingBalance.label')}</TableCell>
                   <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
-                    {t('exampleResultingBalance.value', {
+                    {t('billingValue', {
                       credits: formatNumber(exampleResultingBalance),
                       currency: configuration.currency,
                     })}

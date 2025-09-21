@@ -271,6 +271,12 @@ export const UseBillingServiceGetBillingTransactionsKeyFn = ({ limit, page, user
   page?: number;
   userId: number;
 }, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionsKey, ...(queryKey ?? [{ limit, page, userId }])];
+export type BillingServiceGetBillingTransactionDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingTransaction>>;
+export type BillingServiceGetBillingTransactionQueryResult<TData = BillingServiceGetBillingTransactionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useBillingServiceGetBillingTransactionKey = "BillingServiceGetBillingTransaction";
+export const UseBillingServiceGetBillingTransactionKeyFn = ({ transactionId }: {
+  transactionId: number;
+}, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionKey, ...(queryKey ?? [{ transactionId }])];
 export type BillingServiceGetResourceBillingConfigurationDefaultResponse = Awaited<ReturnType<typeof BillingService.getResourceBillingConfiguration>>;
 export type BillingServiceGetResourceBillingConfigurationQueryResult<TData = BillingServiceGetResourceBillingConfigurationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetResourceBillingConfigurationKey = "BillingServiceGetResourceBillingConfiguration";

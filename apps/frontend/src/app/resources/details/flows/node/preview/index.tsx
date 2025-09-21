@@ -36,6 +36,17 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case 'input.resource.door.unlatched':
         return [];
 
+      case 'input.resource.billing.calculation.started':
+        return [];
+
+      case 'output.resource.billing.calculation.set-additional-items':
+        return [
+          {
+            label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
+            value: nodeData?.data.name as string,
+          },
+        ];
+
       case 'output.http.sendRequest':
         return [
           {
@@ -72,14 +83,10 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      default:
-        console.error('UNKNOWN NODE TYPE', schema);
-        return [
-          {
-            label: 'UNKNOWN NODE TYPE',
-            value: 'UNKNOWN NODE TYPE',
-          },
-        ];
+      default: {
+        const exhaustiveCheck: never = schema.type;
+        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+      }
     }
   }, [schema, t, nodeData]);
 }

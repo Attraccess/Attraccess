@@ -77,7 +77,11 @@ export const HistoryTable = ({
 
   const filteredHistory = useMemo(() => {
     return (usageHistory?.data ?? []).filter((session) => {
-      switch (resource?.type) {
+      if (!resource) {
+        return false;
+      }
+
+      switch (resource.type) {
         case 'machine':
           return session.usageAction === 'usage';
         case 'door':
@@ -86,11 +90,13 @@ export const HistoryTable = ({
             session.usageAction === 'door.unlock' ||
             session.usageAction === 'door.unlatch'
           );
-        default:
-          return false;
+        default: {
+          const exhaustiveCheck: never = resource?.type;
+          throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
+        }
       }
     });
-  }, [usageHistory?.data, resource?.type]);
+  }, [usageHistory?.data, resource]);
 
   if (error) {
     return <div className="text-center py-4 text-red-500">{t('errorLoadingHistory')}</div>;

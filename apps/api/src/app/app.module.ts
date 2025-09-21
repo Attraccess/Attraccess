@@ -41,11 +41,15 @@ import { EncryptionModule } from '../encryption/encryption.module';
       useFactory: (configService: ConfigService) => {
         const appConfig = configService.get<AppConfigType>('app');
         if (!appConfig || !appConfig.STATIC_DOCS_FILE_PATH) {
+          // eslint-disable-next-line no-console
           console.error('STATIC_DOCS_FILE_PATH not configured. Docs will not be served.');
           return [];
         }
         const resolvedDocsPath = resolve(appConfig.STATIC_DOCS_FILE_PATH);
+
+        // eslint-disable-next-line no-console
         console.log('Serving docs from (via config): ', resolvedDocsPath);
+
         return [
           {
             rootPath: resolvedDocsPath,
@@ -60,11 +64,13 @@ import { EncryptionModule } from '../encryption/encryption.module';
       useFactory: (configService: ConfigService) => {
         const storageConfig = configService.get<StorageConfigType>('storage');
         if (!storageConfig || !storageConfig.cdn.root) {
+          // eslint-disable-next-line no-console
           console.error('CDN_ROOT not configured. CDN will not be served.');
           return [];
         }
 
         const cdnRoot = resolve(storageConfig.cdn.root);
+        // eslint-disable-next-line no-console
         console.log('Serving cdn files from (via config): ', cdnRoot);
         return [
           {
@@ -80,10 +86,12 @@ import { EncryptionModule } from '../encryption/encryption.module';
       useFactory: (configService: ConfigService) => {
         const appConfig = configService.get<AppConfigType>('app');
         if (!appConfig || !appConfig.STATIC_FRONTEND_FILE_PATH) {
+          // eslint-disable-next-line no-console
           console.error('STATIC_FRONTEND_FILE_PATH not configured. Frontend will not be served.');
           return [];
         }
         const resolvedFrontendPath = resolve(appConfig.STATIC_FRONTEND_FILE_PATH);
+        // eslint-disable-next-line no-console
         console.log('Serving frontend from (via config): ', resolvedFrontendPath);
         return [
           {
@@ -111,6 +119,7 @@ export class AppModule implements OnModuleInit {
     try {
       await this.licenseService.verifyLicense();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error(error);
       process.exit(1);
     }

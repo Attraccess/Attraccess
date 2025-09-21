@@ -1185,6 +1185,41 @@ export type BalanceDto = {
     value: number;
 };
 
+export type BillingTransactionItem = {
+    /**
+     * The unique identifier of the billing transaction item
+     */
+    id: number;
+    /**
+     * The ID of the billing transaction
+     */
+    billingTransactionId: number;
+    /**
+     * The billing transaction
+     */
+    billingTransaction: BillingTransaction;
+    /**
+     * The name of the billing transaction item
+     */
+    name: string;
+    /**
+     * The description of the billing transaction item
+     */
+    description: string | null;
+    /**
+     * The external reference of the billing transaction item
+     */
+    externalReference: string | null;
+    /**
+     * The unit price of the billing transaction item
+     */
+    unitPrice: number;
+    /**
+     * The quantity of the billing transaction item
+     */
+    quantity: number;
+};
+
 export type BillingTransaction = {
     /**
      * The unique identifier of the billing transaction
@@ -1242,6 +1277,10 @@ export type BillingTransaction = {
      * The status of the billing transaction
      */
     status: 'pending' | 'completed' | 'failed';
+    /**
+     * The custom items of the billing transaction
+     */
+    items: Array<BillingTransactionItem>;
 };
 
 /**
@@ -1450,7 +1489,7 @@ export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.resource.billing.calculation.started' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
     /**
      * The schema for a node type
      */
@@ -1486,8 +1525,10 @@ export enum type3 {
     INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+    INPUT_RESOURCE_BILLING_CALCULATION_STARTED = 'input.resource.billing.calculation.started',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
+    OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     PROCESSING_WAIT = 'processing.wait',
     PROCESSING_IF = 'processing.if'
 }
@@ -1511,7 +1552,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.resource.billing.calculation.started' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
     /**
      * The position of the node
      */
@@ -2729,6 +2770,12 @@ export type CreateManualTransactionData = {
 };
 
 export type CreateManualTransactionResponse = number;
+
+export type GetBillingTransactionData = {
+    transactionId: number;
+};
+
+export type GetBillingTransactionResponse = BillingTransaction;
 
 export type GetResourceBillingConfigurationData = {
     resourceId: number;
@@ -4440,6 +4487,21 @@ export type $OpenApiTs = {
                  * The billing balance for the user has been topped up.
                  */
                 200: number;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{userId}/billing/transactions/{transactionId}': {
+        get: {
+            req: GetBillingTransactionData;
+            res: {
+                /**
+                 * The billing transaction for the user.
+                 */
+                200: BillingTransaction;
                 /**
                  * Unauthorized
                  */

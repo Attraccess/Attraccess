@@ -59,7 +59,11 @@ export function StartSessionControls(
       },
     });
 
-    switch (resource?.type) {
+    if (!resource) {
+      return;
+    }
+
+    switch (resource.type) {
       case 'machine':
         toast.success({
           title: t('machine.sessionStarted'),
@@ -73,8 +77,13 @@ export function StartSessionControls(
           description: t('door.success.description'),
         });
         break;
+
+      default: {
+        const exhaustiveCheck: never = resource?.type;
+        throw new Error(`Unknown resource type: ${exhaustiveCheck}`);
+      }
     }
-  }, [resourceId, t, queryClient, toast, resource?.type]);
+  }, [resourceId, t, queryClient, toast, resource]);
 
   const onStartError = useCallback(
     (error: ApiError) => {

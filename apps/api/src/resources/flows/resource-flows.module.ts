@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ResourceFlowNode, ResourceFlowEdge, Resource, ResourceFlowLog } from '@attraccess/database-entities';
 import { ResourceFlowsController } from './resource-flows.controller';
@@ -14,10 +14,10 @@ import { ResourceUsageModule } from '../usage/resourceUsage.module';
     TypeOrmModule.forFeature([ResourceFlowNode, ResourceFlowEdge, Resource, ResourceFlowLog]),
     ConfigModule.forFeature(flowConfig),
     MqttModule,
-    ResourceUsageModule,
+    forwardRef(() => ResourceUsageModule),
   ],
   controllers: [ResourceFlowsController],
   providers: [ResourceFlowsService, ResourceFlowsExecutorService],
-  exports: [ResourceFlowsService],
+  exports: [ResourceFlowsService, ResourceFlowsExecutorService],
 })
 export class ResourceFlowsModule {}

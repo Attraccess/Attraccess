@@ -23,7 +23,7 @@ import {
   ResourceFlowNode,
   ResourceFlowNodeType,
   getNodeDataSchema,
-  EventNodeDataSchema,
+  NodeWithoutDataSchema,
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
@@ -34,6 +34,7 @@ import {
   ResourceFlowActionIfNodeData,
   ButtonNodeDataSchema,
   IfNodeDataSchema,
+  BillingTransactionItemCreateSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -42,6 +43,7 @@ import { ResourceUsageAction } from './entities/resourceUsage.type';
 import { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
 import { Setting } from './entities/setting.entity';
+import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
 
 // Export all entities individually
 export {
@@ -69,7 +71,7 @@ export {
   ResourceFlowNodeType,
   ResourceFlowEdge,
   getNodeDataSchema,
-  EventNodeDataSchema,
+  NodeWithoutDataSchema as EventNodeDataSchema,
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
@@ -90,6 +92,8 @@ export {
   ResourceBillingConfiguration,
   Setting,
   BillingTransactionStatus,
+  BillingTransactionItem,
+  BillingTransactionItemCreateSchema,
 };
 
 // Export the entities object
@@ -117,4 +121,5 @@ export const entities = {
   BillingTransaction,
   ResourceBillingConfiguration,
   Setting,
+  BillingTransactionItem,
 };
