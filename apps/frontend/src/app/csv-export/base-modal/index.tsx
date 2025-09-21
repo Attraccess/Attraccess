@@ -102,7 +102,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
   }, [items, selectedColumns]);
 
   const downloadCsv = useCallback(() => {
-    const headerRow = selectedColumns.map((column) => column.key);
+    const headerRow = selectedColumns.map((column) => column.label);
 
     const csv = [headerRow.join(';'), ...itemRows.map((row) => row.columns.map((col) => col.value).join(';'))].join(
       '\n',
@@ -142,7 +142,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           >
             {(column) => (
               <ListboxItem key={column.key} textValue={column.label}>
-                {column.key}
+                {column.label}
               </ListboxItem>
             )}
           </Listbox>

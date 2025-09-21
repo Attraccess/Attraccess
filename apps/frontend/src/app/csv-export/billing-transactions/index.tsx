@@ -24,7 +24,8 @@ export function BillingTransactionsExport(props: ExporterProps) {
     end: end.toISOString(),
   });
 
-  const { data: billingConfiguration } = useBillingServiceGetBillingConfiguration();
+  const { data: billingConfiguration, status: billingConfigurationFetchStatus } =
+    useBillingServiceGetBillingConfiguration();
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
 
@@ -78,7 +79,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
 
   return (
     <BaseCsvExportModal
-      queryStatus={fetchStatus}
+      queryStatus={billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus}
       items={(billingTransactions ?? []) as BillingTransaction[]}
       columns={columns}
       filename="billing-transactions.csv"

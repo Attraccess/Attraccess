@@ -3009,7 +3009,7 @@ export type GetBillingTransactionsInDateRangeData = {
     start: string;
 };
 
-export type GetBillingTransactionsInDateRangeResponse = unknown;
+export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -5066,7 +5066,7 @@ export type $OpenApiTs = {
                 /**
                  * The billing transactions in the date range
                  */
-                200: unknown;
+                200: Array<BillingTransaction>;
                 /**
                  * Unauthorized
                  */

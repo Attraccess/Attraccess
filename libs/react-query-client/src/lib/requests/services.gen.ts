@@ -2643,7 +2643,7 @@ export class AnalyticsService {
      * @param data The data for the request.
      * @param data.start The start date of the range
      * @param data.end The end date of the range
-     * @returns unknown The billing transactions in the date range
+     * @returns BillingTransaction The billing transactions in the date range
      * @throws ApiError
      */
     public static getBillingTransactionsInDateRange(data: GetBillingTransactionsInDateRangeData): CancelablePromise<GetBillingTransactionsInDateRangeResponse> {

@@ -92,6 +92,7 @@ export function CsvExport() {
         <CardFooter>
           {exportTypes.map((exportType) => (
             <Button
+              key={exportType.key}
               isDisabled={!dateRange}
               onPress={() => {
                 openExport(exportType.key);

@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { DateRangeValue } from './dtos/dateRangeValue';
 import { AnalyticsService } from './analytics.service';
-import { Auth, ResourceUsage } from '@attraccess/plugins-backend-sdk';
+import { Auth, BillingTransaction, ResourceUsage } from '@attraccess/plugins-backend-sdk';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Analytics')
@@ -29,6 +29,7 @@ export class AnalyticsController {
   @ApiResponse({
     status: 200,
     description: 'The billing transactions in the date range',
+    type: [BillingTransaction],
   })
   @ApiOperation({
     summary: 'Get the billing transactions in the date range',
