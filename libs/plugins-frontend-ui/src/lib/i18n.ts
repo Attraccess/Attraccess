@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { create } from 'zustand';
 import { get } from 'lodash-es';
 import * as Handlebars from 'handlebars';
@@ -46,13 +46,17 @@ interface UseTranslationsResponse {
 export function useTranslations(translations: TranslationModules): UseTranslationsResponse {
   const { language, setLanguage } = useTranslationState();
 
+  // Keep a stable reference to the provided translations so callers
+  // can safely pass inline objects without causing re-renders.
+  const translationsRef = useRef(translations);
+
   const activeTranslations = useMemo(() => {
-    return translations[language];
-  }, [language, translations]);
+    return translationsRef.current[language];
+  }, [language]);
 
   const fallbackTranslations = useMemo(() => {
-    return translations['en'];
-  }, [translations]);
+    return translationsRef.current['en'];
+  }, []);
 
   const getTranslationRaw = useCallback(
     (key: string) => {

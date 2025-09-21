@@ -10,10 +10,16 @@ import {
   NodeChange,
   applyNodeChanges,
   applyEdgeChanges,
+  NodeTypes,
+  NodeProps,
 } from '@xyflow/react';
-import { ResourceFlowLog } from '@attraccess/react-query-client';
+import { ResourceFlowLog, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from './liveLogs';
+import { AttraccessNode } from './node';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import nodesDeTranslations from './node/de.json';
+import nodesEnTranslations from './node/en.json';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
 
@@ -35,6 +41,7 @@ interface FlowContextType {
   liveLogs: ResourceFlowLog[];
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
+  flowNodeTypes: NodeTypes;
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -48,6 +55,11 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+
+  const { t: tNodeTranslations } = useTranslations({
+    de: nodesDeTranslations,
+    en: nodesEnTranslations,
+  });
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nodes) => applyNodeChanges(changes, nodes));
@@ -109,6 +121,22 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     onUpdate: publishLiveLog,
   });
 
+  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+  const flowNodeTypes = useMemo(() => {
+    if (!nodeSchemas) {
+      return {};
+    }
+
+    const types: NodeTypes = {};
+    nodeSchemas.forEach((nodeSchema) => {
+      types[nodeSchema.type] = (props: NodeProps) => (
+        <AttraccessNode tNodeTranslations={tNodeTranslations} schema={nodeSchema} node={props} />
+      );
+    });
+
+    return types;
+  }, [nodeSchemas, tNodeTranslations]);
+
   const value: FlowContextType = useMemo(
     () => ({
       nodes,
@@ -128,6 +156,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       liveLogs: liveLogs ?? [],
       addLiveLogReceiver,
       removeLiveLogReceiver,
+      flowNodeTypes,
     }),
     [
       nodes,
@@ -147,6 +176,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       liveLogs,
       addLiveLogReceiver,
       removeLiveLogReceiver,
+      flowNodeTypes,
     ],
   );
 
