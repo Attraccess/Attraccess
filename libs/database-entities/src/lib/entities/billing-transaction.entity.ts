@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
@@ -69,7 +70,7 @@ export class BillingTransaction {
   @ApiProperty({ description: 'The resource usage ID of the resource usage that caused the billing transaction' })
   resourceUsageId!: number | null;
 
-  @ManyToOne(() => ResourceUsage, (resourceUsage) => resourceUsage.billingTransactions, {
+  @OneToOne(() => ResourceUsage, (resourceUsage) => resourceUsage.billingTransaction, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'resourceUsageId' })

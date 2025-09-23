@@ -39,6 +39,12 @@ describe('ResourceUsageService', () => {
   let resourceMaintenanceService: jest.Mocked<ResourceMaintenanceService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
   let billingService: jest.Mocked<BillingService>;
+  // Expose transactional entity manager for assertions
+  let transactionalEntityManager: {
+    createQueryBuilder: jest.Mock;
+    getRepository: jest.Mock;
+    findOne: jest.Mock;
+  };
 
   const mockRepository = () => ({
     find: jest.fn(),
@@ -94,6 +100,8 @@ describe('ResourceUsageService', () => {
   const mockBillingService = {
     getResourceBillingConfiguration: jest.fn(),
     getBalance: jest.fn(),
+    handleResourceUsageStart: jest.fn(),
+    chargeForResourceUsage: jest.fn(),
   } as unknown as jest.Mocked<BillingService>;
 
   type MockQueryBuilder = {
@@ -168,6 +176,12 @@ describe('ResourceUsageService', () => {
           provide: BillingService,
           useValue: mockBillingService,
         },
+        {
+          provide: require('../flows/resource-flows-executor.service').ResourceFlowsExecutorService,
+          useValue: {
+            runFlow: jest.fn().mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
 
@@ -184,18 +198,37 @@ describe('ResourceUsageService', () => {
     billingService = module.get(BillingService);
 
     // Provide transaction-capable manager on the repository
-    const transactionalEntityManager = {
+    transactionalEntityManager = {
       createQueryBuilder: jest.fn(() => ({
         update: jest.fn().mockReturnThis(),
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({}),
       })),
-      // Ensure code paths that use getRepository(ResourceUsage).findOne work in tests
-      getRepository: jest.fn(() => ({
-        findOne: resourceUsageRepository.findOne,
-      })),
-    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock };
+      // Ensure code paths that use getRepository(Entity).findOne work in tests
+      getRepository: jest.fn((entity) => {
+        if (entity === Resource) {
+          return { findOne: resourceRepository.findOne } as unknown as Repository<Resource>;
+        }
+        if (entity === ResourceUsage) {
+          return { findOne: resourceUsageRepository.findOne } as unknown as Repository<ResourceUsage>;
+        }
+        return { findOne: jest.fn() } as unknown as Repository<unknown>;
+      }),
+      // direct calls used in service
+      findOne: jest.fn((entity, opts) => {
+        if (entity === ResourceUsage) {
+          return resourceUsageRepository.findOne(opts as never);
+        }
+        if (entity === Resource) {
+          return resourceRepository.findOne(opts as never);
+        }
+        return null;
+      }),
+    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {
@@ -205,11 +238,15 @@ describe('ResourceUsageService', () => {
     } as unknown as { transaction: jest.Mock };
 
     // Silence and stub billing call inside transaction
-    billingService.chargeForResourceUsage = jest.fn().mockResolvedValue(undefined);
+    billingService.chargeForResourceUsage.mockResolvedValue(undefined);
 
     // Default: billing disabled to avoid interfering with tests that don't explicitly mock billing
     billingService.getResourceBillingConfiguration.mockResolvedValue({
-      isBillingEnabled: false,
+      id: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      resourceId: 1,
+      resource: undefined as unknown as never,
       creditsPerUsage: 0,
       creditsPerMinute: 0,
     } as ResourceBillingConfiguration);
@@ -265,7 +302,8 @@ describe('ResourceUsageService', () => {
         } as ResourceUsage); // 3) emitUsageEvent fetch by id
 
       const mockQueryBuilder = createMockQueryBuilder(null);
-      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+      // Service uses transactionalEntityManager.createQueryBuilder, not repo
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
@@ -278,6 +316,7 @@ describe('ResourceUsageService', () => {
         usageAction: ResourceUsageAction.Usage,
         endTime: null,
       });
+      expect(transactionalEntityManager.createQueryBuilder).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(ResourceUsage);
       expect(mockQueryBuilder.values).toHaveBeenCalledWith({
@@ -326,7 +365,7 @@ describe('ResourceUsageService', () => {
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(BadRequestException);
-      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(1, 1);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(1, 1, expect.anything());
     });
 
     it('should throw error when active session exists and no takeover requested', async () => {
@@ -401,7 +440,8 @@ describe('ResourceUsageService', () => {
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       const mockInsertQueryBuilder = createMockQueryBuilder(null);
 
-      resourceUsageRepository.createQueryBuilder
+      // Service uses transactionalEntityManager.createQueryBuilder
+      (transactionalEntityManager.createQueryBuilder as jest.Mock)
         .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>) // For ending session
         .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>); // For creating new session
 
@@ -449,8 +489,8 @@ describe('ResourceUsageService', () => {
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
         ResourceUsageImpossibleMaintenanceInProgressException,
       );
-      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
-      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
+      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
     });
 
     it('should allow usage when resource is under maintenance but user can manage maintenance', async () => {
@@ -476,15 +516,15 @@ describe('ResourceUsageService', () => {
         .mockResolvedValueOnce({ id: 1, resourceId: 1, userId: 1 } as ResourceUsage); // For finding new session
 
       const mockQueryBuilder = createMockQueryBuilder(null);
-      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
       const result = await service.startSession(1, mockUser, dto);
 
       expect(result).toEqual({ id: 1, resourceId: 1, userId: 1 });
-      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1);
-      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1);
+      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
     });
 
     it('should reject start when billing is enabled and balance is insufficient', async () => {
@@ -503,19 +543,22 @@ describe('ResourceUsageService', () => {
       resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
-      billingService.getResourceBillingConfiguration.mockResolvedValue({
-        isBillingEnabled: true,
-        creditsPerUsage: 5,
-        creditsPerMinute: 10,
-      } as ResourceBillingConfiguration);
-      billingService.getBalance.mockResolvedValue(10); // 10 < 5 + 10 -> insufficient
+      billingService.handleResourceUsageStart.mockRejectedValue(new InsufficientBalanceError());
+
+      // getActiveSession -> null, then fetch newly created session
+      resourceUsageRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+        user: { id: 1 } as User,
+        resource: { id: 1 } as Resource,
+      } as ResourceUsage);
 
       await expect(service.startSession(1, { id: 1 } as User, dto)).rejects.toBeInstanceOf(InsufficientBalanceError);
 
-      expect(billingService.getResourceBillingConfiguration).toHaveBeenCalledWith(1);
-      expect(billingService.getBalance).toHaveBeenCalledWith(1);
-      expect(resourceUsageRepository.createQueryBuilder).not.toHaveBeenCalled();
-      expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
     });
 
     it('should start when billing is enabled and balance is sufficient', async () => {
@@ -536,12 +579,7 @@ describe('ResourceUsageService', () => {
       resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
-      billingService.getResourceBillingConfiguration.mockResolvedValue({
-        isBillingEnabled: true,
-        creditsPerUsage: 5,
-        creditsPerMinute: 10,
-      } as ResourceBillingConfiguration);
-      billingService.getBalance.mockResolvedValue(20); // 20 >= 15 -> sufficient
+      billingService.handleResourceUsageStart.mockResolvedValue(undefined);
 
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(null) // For getActiveSession
@@ -554,15 +592,14 @@ describe('ResourceUsageService', () => {
         } as ResourceUsage); // For finding new session
 
       const mockQueryBuilder = createMockQueryBuilder(null);
-      resourceUsageRepository.createQueryBuilder.mockReturnValue(
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
       const result = await service.startSession(1, { id: 1 } as User, dto);
 
       expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null });
-      expect(billingService.getResourceBillingConfiguration).toHaveBeenCalledWith(1);
-      expect(billingService.getBalance).toHaveBeenCalledWith(1);
+      expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
     });
@@ -581,7 +618,7 @@ describe('ResourceUsageService', () => {
           resourceId: 1,
           endTime: IsNull(),
         },
-        relations: ['user', 'resource'],
+        relations: ['user', 'resource', 'billingTransaction'],
       });
     });
 

@@ -1337,8 +1337,34 @@ export type ResourceBillingConfiguration = {
      * The credit cost per minute
      */
     creditsPerMinute: number;
+};
+
+export type ResourceBillingConfigurationItemDto = {
     /**
-     * Whether billing is enabled
+     * the name of the item
+     */
+    name: string;
+    /**
+     * the unit price of the item
+     */
+    unitPrice: number;
+    /**
+     * the quantity of the item
+     */
+    quantity: number;
+};
+
+export type ResourceBillingConfigurationDto = {
+    /**
+     * the configuration
+     */
+    configuration: ResourceBillingConfiguration;
+    /**
+     * the additional items
+     */
+    additionalItems: Array<ResourceBillingConfigurationItemDto>;
+    /**
+     * whether billing is enabled
      */
     isBillingEnabled: boolean;
 };
@@ -1489,7 +1515,7 @@ export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.resource.billing.calculation.started' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
     /**
      * The schema for a node type
      */
@@ -1525,7 +1551,6 @@ export enum type3 {
     INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
-    INPUT_RESOURCE_BILLING_CALCULATION_STARTED = 'input.resource.billing.calculation.started',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
@@ -1552,7 +1577,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.resource.billing.calculation.started' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
     /**
      * The position of the node
      */
@@ -2781,7 +2806,7 @@ export type GetResourceBillingConfigurationData = {
     resourceId: number;
 };
 
-export type GetResourceBillingConfigurationResponse = ResourceBillingConfiguration;
+export type GetResourceBillingConfigurationResponse = ResourceBillingConfigurationDto;
 
 export type UpdateResourceBillingConfigurationData = {
     requestBody: UpdateResourceBillingConfigurationDto;
@@ -4529,7 +4554,7 @@ export type $OpenApiTs = {
                 /**
                  * The billing configuration for the resource.
                  */
-                200: ResourceBillingConfiguration;
+                200: ResourceBillingConfigurationDto;
                 /**
                  * Unauthorized
                  */

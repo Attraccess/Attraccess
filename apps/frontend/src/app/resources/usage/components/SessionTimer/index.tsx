@@ -41,14 +41,14 @@ export function SessionTimer({ startTime }: SessionTimerProps) {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('sessionStarted')}:</p>
-        <p className="font-medium text-gray-900 dark:text-white">
+        <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('sessionStarted')}:</p>
+        <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
           <DateTimeDisplay date={startTime} />
         </p>
       </div>
       <div className="text-right">
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('elapsedTime')}:</p>
-        <p className="font-medium text-xl text-gray-900 dark:text-white">{elapsedTime}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('elapsedTime')}:</p>
+        <p className="font-medium text-xl text-gray-900 dark:text-white whitespace-nowrap">{elapsedTime}</p>
       </div>
     </div>
   );

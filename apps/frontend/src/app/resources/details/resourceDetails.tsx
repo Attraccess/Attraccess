@@ -192,12 +192,12 @@ function ResourceDetailsComponent() {
             resourceId={resourceId}
             resource={resource}
             data-cy="resource-usage-session"
-            className="sm:flex-1 flex-grow"
+            className="flex-grow"
             insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
           />
           <ResourceBillingInfo
             resourceId={resourceId}
-            className="sm:flex-none flex-grow"
+            className="flex-grow"
             onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
           />
         </div>

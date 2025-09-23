@@ -18,6 +18,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ResourceBillingConfigurationNotFoundException } from './errors/resource-billing-configuration-not-found.error';
 import { Currency } from './dto/set-configuration.dto';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -79,6 +80,10 @@ describe('BillingService', () => {
         {
           provide: ResourceFlowsExecutorService,
           useValue: { runFlow: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: ResourceFlowsService,
+          useValue: { getNodes: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();
@@ -194,6 +199,7 @@ describe('BillingService', () => {
     const createMockManager = () => {
       return {
         findOneBy: jest.fn().mockResolvedValue(null),
+        findOne: jest.fn(async () => null),
         getRepository: jest.fn(() => ({
           findOneBy: jest.fn().mockResolvedValue(null),
           create: jest.fn((data: unknown) => data),
@@ -201,10 +207,14 @@ describe('BillingService', () => {
         })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         save: jest.fn(async (_entity: unknown, data: any) => ({ id: 999, ...data })),
+        update: jest.fn(async () => undefined),
       } as unknown as {
         findOneBy: jest.Mock;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        findOne: jest.Mock<any, any>;
         getRepository: jest.Mock;
         save: jest.Mock;
+        update: jest.Mock;
       };
     };
 

@@ -3,11 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable } from '@nestjs/common';
 import {
   IntroductionHistoryAction,
-  ResourceGroup,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
 @Injectable()
@@ -17,14 +16,17 @@ export class ResourceGroupsIntroductionsService {
     private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @InjectRepository(ResourceIntroductionHistoryItem)
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
-    @InjectRepository(ResourceGroup)
-    private readonly resourceGroupRepository: Repository<ResourceGroup>
   ) {}
 
   private async getLastHistoryItemOfIntroduction(
-    introductionId: number
+    introductionId: number,
+    transactionalEntityManager?: EntityManager,
   ): Promise<ResourceIntroductionHistoryItem | null> {
-    return await this.resourceIntroductionHistoryItemRepository.findOne({
+    const resourceIntroductionHistoryItemRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceIntroductionHistoryItem)
+      : this.resourceIntroductionHistoryItemRepository;
+
+    return await resourceIntroductionHistoryItemRepository.findOne({
       where: {
         introduction: {
           id: introductionId,
@@ -49,7 +51,7 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     nextStatus: IntroductionHistoryAction,
-    data?: UpdateResourceGroupIntroductionDto
+    data?: UpdateResourceGroupIntroductionDto,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
@@ -83,7 +85,7 @@ export class ResourceGroupsIntroductionsService {
   public async grant(
     groupId: number,
     userId: number,
-    data?: UpdateResourceGroupIntroductionDto
+    data?: UpdateResourceGroupIntroductionDto,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(groupId, userId, IntroductionHistoryAction.GRANT, data);
   }
@@ -91,22 +93,29 @@ export class ResourceGroupsIntroductionsService {
   public async revoke(
     groupId: number,
     userId: number,
-    data?: UpdateResourceGroupIntroductionDto
+    data?: UpdateResourceGroupIntroductionDto,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(groupId, userId, IntroductionHistoryAction.REVOKE, data);
   }
 
   public async getHistoryByGroupIdAndUserId(
     groupId: number,
-    userId: number
+    userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     return await this.resourceIntroductionHistoryItemRepository.find({
       where: { introduction: { resourceGroup: { id: groupId }, receiverUser: { id: userId } } },
     });
   }
 
-  public async hasValidIntroduction({ groupId, userId }: { groupId: number; userId: number }): Promise<boolean> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
+  public async hasValidIntroduction(
+    { groupId, userId }: { groupId: number; userId: number },
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
+    const resourceIntroductionRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceIntroduction)
+      : this.resourceIntroductionRepository;
+
+    const introduction = await resourceIntroductionRepository.findOne({
       where: {
         resourceGroup: {
           id: groupId,
@@ -121,7 +130,7 @@ export class ResourceGroupsIntroductionsService {
       return false;
     }
 
-    const lastHistoryItem = await this.getLastHistoryItemOfIntroduction(introduction.id);
+    const lastHistoryItem = await this.getLastHistoryItemOfIntroduction(introduction.id, transactionalEntityManager);
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }
 }

@@ -62,10 +62,16 @@ export function ResourceBillingInfoEditor(props: Props) {
   });
 
   const [creditsPerUsage, setCreditsPerUsage] = useState(
-    apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration?.minorUnit ?? 1),
+    apiCurrencyToFrontendCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
+      configuration?.minorUnit ?? 1,
+    ),
   );
   const [creditsPerMinute, setCreditsPerMinute] = useState(
-    apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration?.minorUnit ?? 1),
+    apiCurrencyToFrontendCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
+      configuration?.minorUnit ?? 1,
+    ),
   );
 
   useEffect(() => {
@@ -74,10 +80,16 @@ export function ResourceBillingInfoEditor(props: Props) {
     }
 
     setCreditsPerUsage(
-      apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration.minorUnit),
+      apiCurrencyToFrontendCurrency(
+        resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
+        configuration.minorUnit,
+      ),
     );
     setCreditsPerMinute(
-      apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration.minorUnit),
+      apiCurrencyToFrontendCurrency(
+        resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
+        configuration.minorUnit,
+      ),
     );
   }, [resourceBillingConfiguration, configuration]);
 

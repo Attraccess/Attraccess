@@ -3,6 +3,7 @@ import {
   AuthenticatedRequest,
   BillingTransaction,
   ResourceBillingConfiguration,
+  ResourceFlowNodeType,
 } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
@@ -37,6 +38,8 @@ import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callb
 import { Observable } from 'rxjs';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
+import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
 @ApiTags('Billing')
 @Controller()
@@ -47,6 +50,7 @@ export class BillingController {
     private readonly billingService: BillingService,
     private readonly sumUpService: SumUpService,
     private readonly liveNotificationsService: LiveNotificationsService,
+    private readonly flowsService: ResourceFlowsService,
   ) {}
 
   @Get('/users/:userId/billing/balance')
@@ -117,12 +121,27 @@ export class BillingController {
   @ApiResponse({
     status: 200,
     description: 'The billing configuration for the resource.',
-    type: ResourceBillingConfiguration,
+    type: ResourceBillingConfigurationDto,
   })
   async getResourceBillingConfiguration(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-  ): Promise<ResourceBillingConfiguration> {
-    return await this.billingService.getResourceBillingConfiguration(resourceId);
+  ): Promise<ResourceBillingConfigurationDto> {
+    const config = await this.billingService.getResourceBillingConfiguration(resourceId);
+
+    const additionalItemsFlowNodes = await this.flowsService.getNodes(
+      resourceId,
+      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+    );
+
+    return {
+      configuration: config,
+      additionalItems: additionalItemsFlowNodes.map((node) => ({
+        name: (node.data.name ?? '') as string,
+        unitPrice: (node.data.unitPrice ?? 0) as number,
+        quantity: (node.data.quantity ?? 0) as number,
+      })),
+      isBillingEnabled: await this.billingService.isBillingEnabled(resourceId),
+    };
   }
 
   @Post('/resources/:resourceId/billing/configuration')

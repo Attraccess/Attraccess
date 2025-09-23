@@ -1,6 +1,7 @@
 {
   "title": "Billing",
   "billingValue": "{{credits}} {{currency}}",
+  "perUnit": "per unit",
   "free": {
     "title": "Free",
     "description": "This resource is free to use."

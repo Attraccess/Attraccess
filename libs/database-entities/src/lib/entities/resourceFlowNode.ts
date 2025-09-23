@@ -11,7 +11,6 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
-  INPUT_RESOURCE_BILLING_CALCULATION_STARTED = 'input.resource.billing.calculation.started',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
@@ -85,8 +84,6 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-    case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
-      return NodeWithoutDataSchema;
     case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
     case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:

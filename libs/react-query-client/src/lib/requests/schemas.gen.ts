@@ -1943,13 +1943,54 @@ export const $ResourceBillingConfiguration = {
         creditsPerMinute: {
             type: 'number',
             description: 'The credit cost per minute'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'creditsPerUsage', 'creditsPerMinute']
+} as const;
+
+export const $ResourceBillingConfigurationItemDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'the name of the item'
+        },
+        unitPrice: {
+            type: 'number',
+            description: 'the unit price of the item'
+        },
+        quantity: {
+            type: 'number',
+            description: 'the quantity of the item'
+        }
+    },
+    required: ['name', 'unitPrice', 'quantity']
+} as const;
+
+export const $ResourceBillingConfigurationDto = {
+    type: 'object',
+    properties: {
+        configuration: {
+            description: 'the configuration',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceBillingConfiguration'
+                }
+            ]
+        },
+        additionalItems: {
+            description: 'the additional items',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceBillingConfigurationItemDto'
+            }
         },
         isBillingEnabled: {
             type: 'boolean',
-            description: 'Whether billing is enabled'
+            description: 'whether billing is enabled'
         }
     },
-    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'creditsPerUsage', 'creditsPerMinute', 'isBillingEnabled']
+    required: ['configuration', 'additionalItems', 'isBillingEnabled']
 } as const;
 
 export const $UpdateResourceBillingConfigurationDto = {
@@ -2182,7 +2223,7 @@ export const $ResourceFlowNodeSchemaDto = {
         type: {
             type: 'string',
             description: 'The name of the node type',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.resource.billing.calculation.started', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
         },
         configSchema: {
             type: 'object',
@@ -2244,7 +2285,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.resource.billing.calculation.started', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
         },
         position: {
             description: 'The position of the node',

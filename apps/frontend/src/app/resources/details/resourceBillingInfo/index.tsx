@@ -18,12 +18,10 @@ import {
 } from '@heroui/react';
 import { CreditCard, Edit2Icon, Info } from 'lucide-react';
 import {
-  ResourceFlowNodeDto,
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   useLicenseServiceGetLicenseInformation,
-  useResourceFlowsServiceGetResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -56,8 +54,6 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     refetchInterval: 5000,
   });
 
-  const { data: flow } = useResourceFlowsServiceGetResourceFlow({ resourceId });
-
   const adjustedBalance = useMemo(() => {
     if (!configuration) {
       return 0;
@@ -71,7 +67,10 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    return apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerUsage ?? 0, configuration.minorUnit);
+    return apiCurrencyToFrontendCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
+      configuration.minorUnit,
+    );
   }, [resourceBillingConfiguration, configuration]);
 
   const creditsPerMinute = useMemo(() => {
@@ -79,43 +78,34 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    return apiCurrencyToFrontendCurrency(resourceBillingConfiguration?.creditsPerMinute ?? 0, configuration.minorUnit);
+    return apiCurrencyToFrontendCurrency(
+      resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
+      configuration.minorUnit,
+    );
   }, [resourceBillingConfiguration, configuration]);
 
-  const customFlowBillingItems = useMemo((): ResourceFlowNodeDto[] => {
-    if (!flow) {
-      return [];
-    }
-
-    if (!configuration) {
-      return [];
-    }
-
-    return flow.nodes
-      .filter((node) => node.type === 'output.resource.billing.calculation.set-additional-items')
-      .map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          unitPrice: apiCurrencyToFrontendCurrency(node.data.unitPrice as number, configuration.minorUnit),
-        },
-      }));
-  }, [flow, configuration]);
-
   const isFree = useMemo(() => {
-    return creditsPerUsage === 0 && creditsPerMinute === 0 && customFlowBillingItems.length === 0;
-  }, [creditsPerUsage, creditsPerMinute, customFlowBillingItems]);
+    return (
+      creditsPerUsage === 0 && creditsPerMinute === 0 && resourceBillingConfiguration?.additionalItems.length === 0
+    );
+  }, [creditsPerUsage, creditsPerMinute, resourceBillingConfiguration]);
 
   const [exampleMinutes, setExampleMinutes] = useState(10);
 
   const exampleCost = useMemo(() => {
-    const customFlowBillingItemsCost = customFlowBillingItems.reduce((acc, node) => {
-      const data = node.data as { unitPrice: number; quantity: number };
-      return acc + data.unitPrice * data.quantity;
-    }, 0);
+    if (!resourceBillingConfiguration || !configuration) {
+      return 0;
+    }
+
+    const customFlowBillingItemsCost = apiCurrencyToFrontendCurrency(
+      resourceBillingConfiguration.additionalItems.reduce((acc, item) => {
+        return acc + item.unitPrice * item.quantity;
+      }, 0),
+      configuration.minorUnit,
+    );
 
     return creditsPerUsage + creditsPerMinute * exampleMinutes + customFlowBillingItemsCost;
-  }, [creditsPerUsage, creditsPerMinute, exampleMinutes, customFlowBillingItems]);
+  }, [creditsPerUsage, creditsPerMinute, exampleMinutes, resourceBillingConfiguration, configuration]);
 
   const exampleResultingBalance = useMemo(() => {
     return adjustedBalance - exampleCost;
@@ -185,87 +175,86 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           </CardBody>
         </>
       ) : (
-        <>
-          <Divider />
-          <CardBody>
-            <Table removeWrapper hideHeader>
-              <TableHeader>
-                <TableColumn> </TableColumn>
-                <TableColumn align="end"> </TableColumn>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>{t('balance.label')}</TableCell>
-                  <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
-                    {t('billingValue', {
-                      credits: formatNumber(adjustedBalance),
-                      currency: configuration.currency,
-                    })}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>{t('perUse.label')}</TableCell>
-                  <TableCell className="text-warning">
-                    {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>{t('perMinute.label')}</TableCell>
-                  <TableCell className="text-warning">
-                    {t('billingValue', {
-                      credits: formatNumber(creditsPerMinute),
-                      currency: configuration.currency,
-                    })}
-                  </TableCell>
-                </TableRow>
-                {
-                  customFlowBillingItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.data.name as string}</TableCell>
-                      <TableCell className="text-warning">
-                        {t('billingValue', {
-                          credits: formatNumber(
-                            ((item.data.unitPrice as number) ?? 0) * ((item.data.quantity as number) ?? 0),
-                          ),
-                          currency: configuration.currency,
-                        })}
-                      </TableCell>
-                    </TableRow>
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  )) as any
-                }
-                <TableRow className="border-b border-divider border-t">
-                  <TableCell>
-                    <NumberInput
-                      size="sm"
-                      value={exampleMinutes}
-                      onValueChange={(value) => setExampleMinutes(value)}
-                      label={t('example.label', { minutes: exampleMinutes })}
-                      minValue={0}
-                      defaultValue={10}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {t('billingValue', {
-                      credits: formatNumber(exampleCost),
-                      currency: configuration.currency,
-                      minutes: exampleMinutes,
-                    })}
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>{t('exampleResultingBalance.label')}</TableCell>
-                  <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
-                    {t('billingValue', {
-                      credits: formatNumber(exampleResultingBalance),
-                      currency: configuration.currency,
-                    })}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardBody>
-        </>
+        <CardBody>
+          <Table hideHeader removeWrapper>
+            <TableHeader>
+              <TableColumn> </TableColumn>
+              <TableColumn align="end"> </TableColumn>
+            </TableHeader>
+            <TableBody>
+              <TableRow className="border-b-4 border-divider">
+                <TableCell>{t('balance.label')}</TableCell>
+                <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+                  {t('billingValue', {
+                    credits: formatNumber(adjustedBalance),
+                    currency: configuration.currency,
+                  })}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t('perUse.label')}</TableCell>
+                <TableCell className="text-warning">
+                  {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t('perMinute.label')}</TableCell>
+                <TableCell className="text-warning">
+                  {t('billingValue', {
+                    credits: formatNumber(creditsPerMinute),
+                    currency: configuration.currency,
+                  })}
+                </TableCell>
+              </TableRow>
+              {
+                resourceBillingConfiguration.additionalItems.map((item) => (
+                  <TableRow key={JSON.stringify(item)}>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell className="text-warning">
+                      {t('billingValue', {
+                        credits: formatNumber(
+                          apiCurrencyToFrontendCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
+                        ),
+                        currency: configuration.currency,
+                      })}
+                      <br />
+                      <small>{t('perUnit')}</small>
+                    </TableCell>
+                  </TableRow>
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                )) as any
+              }
+              <TableRow className="border-t border-b-4 border-divider">
+                <TableCell>
+                  <NumberInput
+                    size="sm"
+                    value={exampleMinutes}
+                    onValueChange={(value) => setExampleMinutes(value)}
+                    label={t('example.label', { minutes: exampleMinutes })}
+                    minValue={0}
+                    defaultValue={10}
+                  />
+                </TableCell>
+                <TableCell>
+                  {t('billingValue', {
+                    credits: formatNumber(exampleCost),
+                    currency: configuration.currency,
+                    minutes: exampleMinutes,
+                  })}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t('exampleResultingBalance.label')}</TableCell>
+                <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+                  {t('billingValue', {
+                    credits: formatNumber(exampleResultingBalance),
+                    currency: configuration.currency,
+                  })}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardBody>
       )}
     </Card>
   );

@@ -1,7 +1,14 @@
 import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, FindOneOptions } from 'typeorm';
-import { Resource, ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
+import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
+import {
+  Resource,
+  ResourceFlowNodeType,
+  ResourceType,
+  ResourceUsage,
+  ResourceUsageAction,
+  User,
+} from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
@@ -14,7 +21,7 @@ import { ResourceGroupsIntroductionsService } from '../groups/introductions/reso
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { BillingService } from '../../billing/billing.service';
-import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
+import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 
 @Injectable()
 export class ResourceUsageService {
@@ -32,9 +39,14 @@ export class ResourceUsageService {
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
+    private readonly flowExecutorService: ResourceFlowsExecutorService,
   ) {}
 
-  public async canControllResource(resourceId: number, user: User): Promise<boolean> {
+  public async canControllResource(
+    resourceId: number,
+    user: User,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
     this.logger.debug(`Checking if user ${user.id} can control resource ${resourceId}`);
 
     if (user.systemPermissions?.canManageResources) {
@@ -42,19 +54,27 @@ export class ResourceUsageService {
       return true;
     }
 
-    if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id)) {
+    if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id, transactionalEntityManager)) {
       this.logger.debug(`User ${user.id} has valid introduction for resource ${resourceId}`);
       return true;
     }
 
-    if (await this.resourceIntroducersService.isIntroducer(resourceId, user.id, true)) {
+    if (await this.resourceIntroducersService.isIntroducer(resourceId, user.id, true, transactionalEntityManager)) {
       this.logger.debug(`User ${user.id} is an introducer for resource ${resourceId}`);
       return true;
     }
 
-    const groupsOfResource = await this.resourceGroupsService.getGroupsOfResource(resourceId);
+    const groupsOfResource = await this.resourceGroupsService.getGroupsOfResource(
+      resourceId,
+      transactionalEntityManager,
+    );
     for (const group of groupsOfResource) {
-      if (await this.resourceGroupsIntroductionsService.hasValidIntroduction({ groupId: group.id, userId: user.id })) {
+      if (
+        await this.resourceGroupsIntroductionsService.hasValidIntroduction(
+          { groupId: group.id, userId: user.id },
+          transactionalEntityManager,
+        )
+      ) {
         this.logger.debug(`User ${user.id} has valid group introduction for resource ${resourceId}`);
         return true;
       }
@@ -68,10 +88,15 @@ export class ResourceUsageService {
     resourceId: number,
     user: User,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
+    transactionalEntityManager?: EntityManager,
   ): Promise<Resource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resourceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(Resource)
+      : this.resourceRepository;
+
+    const resource = await resourceRepository.findOne({ where: { id: resourceId } });
     if (!resource) {
       this.logger.warn(`Resource ${resourceId} not found`);
       throw new ResourceNotFoundException(resourceId);
@@ -80,10 +105,17 @@ export class ResourceUsageService {
 
     if (checkMaintenance) {
       // Check if there's an active maintenance window
-      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId);
+      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(
+        resourceId,
+        transactionalEntityManager,
+      );
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
-        const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(user, resourceId);
+        const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
+          user,
+          resourceId,
+          transactionalEntityManager,
+        );
 
         if (!canManageMaintenance) {
           this.logger.warn(
@@ -97,7 +129,7 @@ export class ResourceUsageService {
     }
 
     if (checkControlPermission) {
-      const canStartSession = await this.canControllResource(resourceId, user);
+      const canStartSession = await this.canControllResource(resourceId, user, transactionalEntityManager);
 
       if (!canStartSession) {
         this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
@@ -111,107 +143,125 @@ export class ResourceUsageService {
   async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
 
-    const resource = await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: true });
-
-    if (resource.type !== ResourceType.Machine) {
-      throw new BadRequestException('Resource is not a machine');
-    }
-
-    const resourceBillingConfiguration = await this.billingService.getResourceBillingConfiguration(resourceId);
-    if (resourceBillingConfiguration.isBillingEnabled) {
-      const balance = await this.billingService.getBalance(user.id);
-      if (balance < resourceBillingConfiguration.creditsPerUsage + resourceBillingConfiguration.creditsPerMinute) {
-        throw new InsufficientBalanceError();
-      }
-    }
-
-    const existingActiveSession = await this.getActiveSession(resourceId);
-    if (existingActiveSession) {
-      this.logger.debug(
-        `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
+    return await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+      const resource = await this.getResource(
+        resourceId,
+        user,
+        {
+          checkMaintenance: true,
+          checkControlPermission: true,
+        },
+        transactionalEntityManager,
       );
 
-      // If there's an active session, check if takeover is allowed
-      if (dto.forceTakeOver && resource.allowTakeOver) {
+      if (resource.type !== ResourceType.Machine) {
+        throw new BadRequestException('Resource is not a machine');
+      }
+
+      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
+      if (existingActiveSession) {
         this.logger.debug(
-          `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`,
+          `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
         );
 
-        const takeoverEndTime = new Date();
+        // If there's an active session, check if takeover is allowed
+        if (dto.forceTakeOver && resource.allowTakeOver) {
+          this.logger.debug(
+            `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`,
+          );
 
-        // End the existing session with a note about takeover
-        await this.resourceUsageRepository
-          .createQueryBuilder()
-          .update(ResourceUsage)
-          .set({
-            endTime: takeoverEndTime,
-            endNotes: `Session ended due to takeover by user ${user.id}`,
-          })
-          .where('id = :id', { id: existingActiveSession.id })
-          .execute();
+          const takeoverEndTime = new Date();
 
-        const updatedSession = await this.resourceUsageRepository.findOne({
-          where: { id: existingActiveSession.id },
-          relations: ['user', 'resource'],
-        });
+          // End the existing session with a note about takeover
+          await transactionalEntityManager
+            .createQueryBuilder()
+            .update(ResourceUsage)
+            .set({
+              endTime: takeoverEndTime,
+              endNotes: `Session ended due to takeover by user ${user.id}`,
+            })
+            .where('id = :id', { id: existingActiveSession.id })
+            .execute();
 
-        // Emit event for the ended session
-        await this.emitUsageEvent(updatedSession.id);
-      } else if (dto.forceTakeOver && !resource.allowTakeOver) {
-        this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
-        throw new BadRequestException('This resource does not allow overtaking');
-      } else {
-        this.logger.warn(`Resource ${resourceId} is currently in use by user ${existingActiveSession.user.id}`);
-        throw new BadRequestException('Resource is currently in use by another user');
+          const updatedSession = await transactionalEntityManager.findOne(ResourceUsage, {
+            where: { id: existingActiveSession.id },
+            relations: ['user', 'resource'],
+          });
+
+          // Emit event for the ended session
+          await this.emitUsageEvent(updatedSession.id, transactionalEntityManager);
+        } else if (dto.forceTakeOver && !resource.allowTakeOver) {
+          this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
+          throw new BadRequestException('This resource does not allow overtaking');
+        } else {
+          this.logger.warn(`Resource ${resourceId} is currently in use by user ${existingActiveSession.user.id}`);
+          throw new BadRequestException('Resource is currently in use by another user');
+        }
       }
-    }
 
-    const usageData = {
-      resourceId,
-      usageAction: ResourceUsageAction.Usage,
-      userId: user.id,
-      startTime: new Date(),
-      startNotes: dto.notes,
-      endTime: null,
-      endNotes: null,
-    };
-
-    this.logger.debug(`Creating new usage session for resource ${resourceId}`, { usageData });
-
-    await this.resourceUsageRepository.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
-
-    const newSession = await this.resourceUsageRepository.findOne({
-      where: {
+      const usageData = {
         resourceId,
+        usageAction: ResourceUsageAction.Usage,
         userId: user.id,
-        endTime: IsNull(),
-      },
-      order: {
-        startTime: 'DESC',
-      },
-      relations: ['resource', 'user'],
-    });
+        startTime: new Date(),
+        startNotes: dto.notes,
+        endTime: null,
+        endNotes: null,
+      };
 
-    if (!newSession) {
-      this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
-      throw new Error('Failed to retrieve the newly created session.');
-    }
+      this.logger.debug(`Creating new usage session for resource ${resourceId}`, { usageData });
 
-    this.logger.debug(`Successfully created session ${newSession.id} for resource ${resourceId} by user ${user.id}`);
+      await transactionalEntityManager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 
-    if (existingActiveSession) {
-      const now = new Date();
-      // Emit event for the takeover
-      this.eventEmitter.emit(
-        ResourceUsageTakenOverEvent.EVENT_NAME,
-        new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
+      const newSession = await transactionalEntityManager.findOne(ResourceUsage, {
+        where: {
+          resourceId,
+          userId: user.id,
+          endTime: IsNull(),
+        },
+        order: {
+          startTime: 'DESC',
+        },
+        relations: ['resource', 'user'],
+      });
+
+      if (!newSession) {
+        this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
+        throw new Error('Failed to retrieve the newly created session.');
+      }
+
+      this.logger.debug(`Successfully created session ${newSession.id} for resource ${resourceId} by user ${user.id}`);
+      await this.billingService.handleResourceUsageStart(resourceId, newSession, user, transactionalEntityManager);
+
+      if (existingActiveSession) {
+        const now = new Date();
+
+        await this.flowExecutorService.runFlow(
+          existingActiveSession.resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+          { ...existingActiveSession, takeOverTime: now, newUser: user, oldUser: existingActiveSession.user },
+          transactionalEntityManager,
+        );
+
+        // Emit event for the takeover
+        this.eventEmitter.emit(
+          ResourceUsageTakenOverEvent.EVENT_NAME,
+          new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
+        );
+      } else {
+        // Emit event after successful save
+        this.emitUsageEvent(newSession.id, transactionalEntityManager);
+      }
+
+      await this.flowExecutorService.runFlow(
+        newSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        newSession,
+        transactionalEntityManager,
       );
-    } else {
-      // Emit event after successful save
-      this.emitUsageEvent(newSession.id);
-    }
 
-    return newSession;
+      return newSession;
+    });
   }
 
   async endSession(resourceId: number, user: User, dto: EndUsageSessionDto): Promise<ResourceUsage> {
@@ -245,14 +295,26 @@ export class ResourceUsageService {
     }
 
     return await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+      const updateData = {
+        endTime,
+        endNotes,
+      };
+
+      await this.flowExecutorService.runFlow(
+        activeSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        {
+          ...activeSession,
+          ...updateData,
+        },
+        transactionalEntityManager,
+      );
+
       // Update session with end time and notes - using explicit update to avoid the generated column
       await transactionalEntityManager
         .createQueryBuilder()
         .update(ResourceUsage)
-        .set({
-          endTime,
-          endNotes,
-        })
+        .set(updateData)
         .where('id = :id', { id: activeSession.id })
         .execute();
 
@@ -273,8 +335,12 @@ export class ResourceUsageService {
     });
   }
 
-  private async emitUsageEvent(usageId: number): Promise<void> {
-    const usage = await this.resourceUsageRepository.findOne({
+  private async emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void> {
+    const resourceUsageRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceUsage)
+      : this.resourceUsageRepository;
+
+    const usage = await resourceUsageRepository.findOne({
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
@@ -338,13 +404,20 @@ export class ResourceUsageService {
     return await this.handleDoorAction(resourceId, user, ResourceUsageAction.DoorUnlatch);
   }
 
-  async getActiveSession(resourceId: number): Promise<ResourceUsage | null> {
-    return await this.resourceUsageRepository.findOne({
+  async getActiveSession(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceUsage | null> {
+    const resourceUsageRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceUsage)
+      : this.resourceUsageRepository;
+
+    return await resourceUsageRepository.findOne({
       where: {
         resourceId,
         endTime: IsNull(),
       },
-      relations: ['user', 'resource'],
+      relations: ['user', 'resource', 'billingTransaction'],
     });
   }
 

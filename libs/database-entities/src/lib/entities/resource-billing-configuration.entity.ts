@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
-import { Expose } from 'class-transformer';
 
 @Entity()
 export class ResourceBillingConfiguration {
@@ -35,10 +34,4 @@ export class ResourceBillingConfiguration {
   @Column({ type: 'integer' })
   @ApiProperty({ description: 'The credit cost per minute' })
   creditsPerMinute!: number;
-
-  @Expose()
-  @ApiProperty({ description: 'Whether billing is enabled' })
-  public get isBillingEnabled(): boolean {
-    return this.creditsPerUsage > 0 || this.creditsPerMinute > 0;
-  }
 }
