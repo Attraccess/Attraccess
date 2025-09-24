@@ -178,12 +178,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           // handled by the resource usage service
           break;
         case ResourceUsageAction.DoorLock:
+          // TODO: directly trigger the flow instead of relying on the event emitter
           await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED);
           break;
         case ResourceUsageAction.DoorUnlock:
+          // TODO: directly trigger the flow instead of relying on the event emitter
           await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED);
           break;
         case ResourceUsageAction.DoorUnlatch:
+          // TODO: directly trigger the flow instead of relying on the event emitter
           await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
           break;
 
@@ -194,7 +197,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       }
     } catch (error) {
       this.logger.error(`Failed to handle resource usage event`, error.stack);
-      // TODO: directly trigger the flow instead of relying on the event emitter
     }
   }
 
