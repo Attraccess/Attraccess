@@ -255,12 +255,6 @@ export class ResourceFlowsService {
           schema.supportedByResource = resource.type === ResourceType.Door;
           break;
 
-        case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
-          schema.outputs = ['output'];
-          schema.supportedByResource = resource.type === ResourceType.Machine;
-          break;
-
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
           schema.inputs = ['input'];

@@ -245,7 +245,7 @@ export class SumUpService {
     this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
 
     for (const transaction of transactions) {
-      if (!transaction.externalReference.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
+      if (!transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
         this.logger.debug('processPendingTransactions: skipping non-sumup transaction', {
           transactionId: transaction.externalReference,
         });

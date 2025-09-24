@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, EntityManager } from 'typeorm';
 import { ResourceMaintenance, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 import { UpdateMaintenanceDto } from './dtos/updateMaintenance.dto';
@@ -17,7 +17,7 @@ export class ResourceMaintenanceService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>
+    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
   ) {}
 
   /**
@@ -163,13 +163,13 @@ export class ResourceMaintenanceService {
 
       if (includeActive) {
         conditions.push(
-          '(maintenance.startTime <= :now AND (maintenance.endTime IS NULL OR maintenance.endTime > :now))'
+          '(maintenance.startTime <= :now AND (maintenance.endTime IS NULL OR maintenance.endTime > :now))',
         );
       }
 
       if (includePast) {
         conditions.push(
-          '(maintenance.startTime <= :now AND (maintenance.endTime IS NOT NULL AND maintenance.endTime < :now))'
+          '(maintenance.startTime <= :now AND (maintenance.endTime IS NOT NULL AND maintenance.endTime < :now))',
         );
       }
 
@@ -213,10 +213,14 @@ export class ResourceMaintenanceService {
   /**
    * Check if there's an active maintenance window for a resource
    */
-  async hasActiveMaintenance(resourceId: number): Promise<boolean> {
+  async hasActiveMaintenance(resourceId: number, transactionalEntityManager?: EntityManager): Promise<boolean> {
     const now = new Date();
 
-    const activeMaintenance = await this.maintenanceRepository
+    const maintenanceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceMaintenance)
+      : this.maintenanceRepository;
+
+    const activeMaintenance = await maintenanceRepository
       .createQueryBuilder('maintenance')
       .where('maintenance.resourceId = :resourceId', { resourceId })
       .andWhere('maintenance.startTime <= :now', { now })
@@ -229,15 +233,23 @@ export class ResourceMaintenanceService {
   /**
    * Check if a user can manage maintenance for a specific resource
    */
-  async canManageMaintenance(user: User, resourceId: number): Promise<boolean> {
+  async canManageMaintenance(
+    user: User,
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
     // Check if the user has system permissions to manage all resources
     if (user.systemPermissions && user.systemPermissions.canManageResources === true) {
       return true;
     }
 
     try {
+      const resourceIntroducerRepository = transactionalEntityManager
+        ? transactionalEntityManager.getRepository(ResourceIntroducer)
+        : this.resourceIntroducerRepository;
+
       // First, check if the user is an introducer for this specific resource
-      const resourceIntroducer = await this.resourceIntroducerRepository.findOne({
+      const resourceIntroducer = await resourceIntroducerRepository.findOne({
         where: {
           user: {
             id: user.id,
@@ -252,8 +264,12 @@ export class ResourceMaintenanceService {
         return true;
       }
 
+      const resourceRepository = transactionalEntityManager
+        ? transactionalEntityManager.getRepository(Resource)
+        : this.resourceRepository;
+
       // If not a direct resource introducer, check if the user is an introducer for any group the resource belongs to
-      const resource = await this.resourceRepository.findOne({
+      const resource = await resourceRepository.findOne({
         where: { id: resourceId },
         relations: ['groups'],
       });
@@ -264,7 +280,7 @@ export class ResourceMaintenanceService {
       }
 
       // Check if user is introducer for any of the resource's groups
-      const groupIntroducer = await this.resourceIntroducerRepository.findOne({
+      const groupIntroducer = await resourceIntroducerRepository.findOne({
         where: {
           user: {
             id: user.id,

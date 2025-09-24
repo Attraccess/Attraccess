@@ -1949,7 +1949,7 @@ export class BillingService {
      * Get the billing configuration for a resource
      * @param data The data for the request.
      * @param data.resourceId
-     * @returns ResourceBillingConfiguration The billing configuration for the resource.
+     * @returns ResourceBillingConfigurationDto The billing configuration for the resource.
      * @throws ApiError
      */
     public static getResourceBillingConfiguration(data: GetResourceBillingConfigurationData): CancelablePromise<GetResourceBillingConfigurationResponse> {

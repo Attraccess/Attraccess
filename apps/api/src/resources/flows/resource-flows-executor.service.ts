@@ -25,9 +25,10 @@ import {
   ResourceFlowActionUtilWaitNodeData,
   ResourceFlowActionIfNodeData,
   BillingTransactionItemCreateSchema,
+  BillingTransaction,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../usage/events/resource-usage.events';
+import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
@@ -39,6 +40,7 @@ import Handlebars from 'handlebars';
 import { get } from 'lodash-es';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
+import { NoUsageSessionError } from './errors/no-usage-session.error';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
@@ -90,6 +92,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
     private readonly resourceUsageService: ResourceUsageService,
+    @InjectRepository(BillingTransactionItem)
+    private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -145,13 +149,13 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @Cron('0 2 * * *') // Daily at 2 AM
   async cleanupOldFlowLogs() {
-    const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
-
-    this.logger.log(
-      `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
-    );
-
     try {
+      const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
+
+      this.logger.log(
+        `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
+      );
+
       const result = await this.flowLogRepository.delete({
         createdAt: LessThan(cutoffDate),
       });
@@ -166,30 +170,33 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
   async handleResourceUsageEvent(event: ResourceUsageEvent) {
-    const { usage } = event;
+    try {
+      const { usage } = event;
 
-    switch (usage.usageAction) {
-      case ResourceUsageAction.Usage:
-        if (usage.endTime) {
-          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED);
-        } else {
-          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED);
+      switch (usage.usageAction) {
+        case ResourceUsageAction.Usage:
+          // handled by the resource usage service
+          break;
+        case ResourceUsageAction.DoorLock:
+          // TODO: directly trigger the flow instead of relying on the event emitter
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED);
+          break;
+        case ResourceUsageAction.DoorUnlock:
+          // TODO: directly trigger the flow instead of relying on the event emitter
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED);
+          break;
+        case ResourceUsageAction.DoorUnlatch:
+          // TODO: directly trigger the flow instead of relying on the event emitter
+          await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
+          break;
+
+        default: {
+          const exhaustiveCheck: never = usage.usageAction;
+          throw new Error(`Unknown resource usage action: ${exhaustiveCheck}`);
         }
-        break;
-      case ResourceUsageAction.DoorLock:
-        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED);
-        break;
-      case ResourceUsageAction.DoorUnlock:
-        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED);
-        break;
-      case ResourceUsageAction.DoorUnlatch:
-        await this.handleResourceUsage(usage, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED);
-        break;
-
-      default: {
-        const exhaustiveCheck: never = usage.usageAction;
-        throw new Error(`Unknown resource usage action: ${exhaustiveCheck}`);
       }
+    } catch (error) {
+      this.logger.error(`Failed to handle resource usage event`, error.stack);
     }
   }
 
@@ -220,43 +227,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       this.logger.log(`Successfully processed resource usage event for resource ID: ${resource.id}`);
     } catch (error) {
       this.logger.error(`Failed to handle resource usage event for resource ID: ${resource.id}`, error.stack);
-      throw error;
-    }
-  }
-
-  @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
-  async handleResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
-    const { resource } = event;
-
-    this.logger.log(`Handling resource usage takeover event for resource ID: ${resource.id}`);
-
-    try {
-      await this.triggerResourceUsageNode(resource.id, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, {
-        event: {
-          timestamp: event.takeoverTime.toISOString(),
-        },
-        usage: {
-          start: event.takeoverTime.toISOString(),
-          end: null,
-        },
-        user: {
-          id: event.newUser.id,
-          username: event.newUser.username,
-          externalIdentifier: event.newUser.externalIdentifier,
-        },
-        previousUser: {
-          id: event.previousUser.id,
-          username: event.previousUser.username,
-          externalIdentifier: event.previousUser.externalIdentifier,
-        },
-        resource: {
-          id: event.resource.id,
-          name: event.resource.name,
-        },
-      });
-      this.logger.log(`Successfully processed resource usage takeover event for resource ID: ${resource.id}`);
-    } catch (error) {
-      this.logger.error(`Failed to handle resource usage takeover event for resource ID: ${resource.id}`, error.stack);
       throw error;
     }
   }
@@ -309,6 +279,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       return [];
     }
 
+    // TODO: propagate errors so when calling runFlow you can react to them and they dont get ignored
     const results = await this.startFlow(nodes, { payload: initialData }, transactionManager);
     return results.map((r) => r.payload);
   }
@@ -390,7 +361,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
-        case ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
@@ -466,7 +436,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         },
         transactionManager,
       );
-      return [];
+
+      throw error;
     }
   }
 
@@ -670,9 +641,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private async processBillingSetAdditionalItemsNode(
     node: ResourceFlowNode,
     input: object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _transactionManager?: EntityManager,
+    transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
+    const activeUsageSession = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+
+    if (!activeUsageSession) {
+      throw new NoUsageSessionError();
+    }
+
     const data = node.data as z.infer<typeof BillingTransactionItemCreateSchema>;
 
     let externalReference = data.externalReference;
@@ -686,6 +662,37 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     let quantity = data.quantity;
     if ('quantity' in input && typeof input.quantity === 'number') {
       quantity = input.quantity;
+    }
+
+    const manager = transactionManager ?? this.billingTransactionItemRepository.manager;
+
+    const billingTransaction = await manager.findOne(BillingTransaction, {
+      where: {
+        resourceUsageId: activeUsageSession.id,
+      },
+    });
+
+    const dedupData = {
+      billingTransactionId: billingTransaction.id,
+      name: data.name,
+      description: data.description,
+      externalReference,
+      unitPrice: data.unitPrice,
+    };
+
+    const existingItem = await manager.findOne(BillingTransactionItem, {
+      where: dedupData,
+    });
+
+    if (existingItem) {
+      await manager.update(BillingTransactionItem, existingItem.id, {
+        quantity: existingItem.quantity + quantity,
+      });
+    } else {
+      await manager.save(BillingTransactionItem, {
+        ...dedupData,
+        quantity,
+      });
     }
 
     return {

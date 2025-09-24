@@ -7,6 +7,7 @@ import {
   ResourceFlowNodeType,
   ResourceFlowLog,
   ResourceFlowEdge,
+  BillingTransactionItem,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
@@ -86,7 +87,19 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     } as unknown as ConfigService;
 
     mqttClientService = { publish: jest.fn(async () => undefined) } as unknown as MqttClientService;
-    resourceUsageService = { logger: new Logger(ResourceUsageService.name) } as unknown as ResourceUsageService;
+    resourceUsageService = {
+      logger: new Logger(ResourceUsageService.name),
+      getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+    } as unknown as ResourceUsageService;
+
+    const billingItemRepoMock = {
+      manager: {
+        findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
+        findOneBy: jest.fn(),
+        save: jest.fn(async (_e: unknown, data: unknown) => data),
+        update: jest.fn(),
+      },
+    } as unknown as Repository<BillingTransactionItem>;
 
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
@@ -95,11 +108,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       configService as ConfigService,
       mqttClientService,
       resourceUsageService,
+      billingItemRepoMock,
     );
   });
 
   it('returns empty array when no trigger nodes are found', async () => {
-    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED, {
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {
       any: 'data',
     });
     expect(result).toEqual([]);
@@ -109,7 +123,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   it('returns initial data when a single input node has no outgoing edges (terminal)', async () => {
     const inputNode = createNode({
       id: 'in-1',
-      type: ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
+      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
       resourceId: 1,
     });
     nodesById[inputNode.id] = inputNode;
@@ -118,16 +132,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${inputNode.id}|`] = [];
 
     const initialData = { a: 1 };
-    const result = await service.runFlow(
-      1,
-      ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
-      initialData,
-    );
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
     expect(result).toEqual([initialData]);
   });
 
   it('handles a simple linear path and returns the last node payload', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
     const billingNode = createNode({
       id: 'out-billing-1',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
@@ -150,11 +160,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     const initialData = {};
 
-    const result = await service.runFlow(
-      1,
-      ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
-      initialData,
-    );
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
     expect(result).toEqual([
       {
         name: 'kWh',
@@ -167,7 +173,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('fan-outs when a node has multiple outgoing edges with the same handle and returns all leaf results', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED });
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
     const ifNode = createNode({
       id: 'if-1',
       type: ResourceFlowNodeType.PROCESSING_IF,
@@ -219,11 +225,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       flag: 'yes',
     };
 
-    const result = await service.runFlow(
-      1,
-      ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
-      initialData,
-    );
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
     // Both leaves return the same additional item in this setup
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({

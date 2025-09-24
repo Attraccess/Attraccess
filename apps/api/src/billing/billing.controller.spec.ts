@@ -13,6 +13,7 @@ import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
@@ -35,6 +36,7 @@ describe('BillingController', () => {
     updateResourceBillingConfiguration: jest.Mock;
     setConfiguration: jest.Mock;
     getConfiguration: jest.Mock;
+    isBillingEnabled?: jest.Mock;
   };
   let sumUp: {
     setApiKey: jest.Mock;
@@ -58,6 +60,7 @@ describe('BillingController', () => {
       updateResourceBillingConfiguration: jest.fn(),
       setConfiguration: jest.fn(),
       getConfiguration: jest.fn(),
+      isBillingEnabled: jest.fn().mockResolvedValue(false),
     };
     sumUp = {
       setApiKey: jest.fn(),
@@ -86,6 +89,10 @@ describe('BillingController', () => {
         {
           provide: LiveNotificationsService,
           useValue: live,
+        },
+        {
+          provide: ResourceFlowsService,
+          useValue: { getNodes: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();
@@ -158,7 +165,7 @@ describe('BillingController', () => {
       service.getResourceBillingConfiguration.mockResolvedValue(cfg);
       const res = await controller.getResourceBillingConfiguration(42);
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(42);
-      expect(res).toBe(cfg);
+      expect(res).toEqual({ configuration: cfg, additionalItems: [], isBillingEnabled: false });
     });
   });
 

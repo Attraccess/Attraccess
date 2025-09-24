@@ -7,7 +7,6 @@ import {
   BillingTransactionItem,
   ResourceUsage,
   ResourceFlowNodeType,
-  BillingTransactionItemCreateSchema,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -21,7 +20,7 @@ import { UpdateResourceBillingConfigurationDto } from './dto/update-resource-bil
 import { LiveNotificationsService } from './liveNotificationsService';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { BillingConfigurationDto } from './dto/configuration.dto';
-import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
 @Injectable()
 export class BillingService {
@@ -37,7 +36,7 @@ export class BillingService {
     private readonly settingRepository: Repository<Setting>,
     @InjectRepository(BillingTransactionItem)
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
-    private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService,
+    private readonly resourceFlowsService: ResourceFlowsService,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -93,8 +92,12 @@ export class BillingService {
     };
   }
 
-  async getBalance(userId: number): Promise<number> {
-    const user = await this.userRepository.findOneBy({ id: userId });
+  async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {
+    const userRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(User)
+      : this.userRepository;
+
+    const user = await userRepository.findOneBy({ id: userId });
     if (!user) {
       throw new UserNotFoundException(userId);
     }
@@ -225,14 +228,11 @@ export class BillingService {
     return await this.resourceBillingConfigurationRepository.save(configuration);
   }
 
-  private isBillingItem(
-    item: object,
-  ): item is Pick<BillingTransactionItem, 'name' | 'quantity' | 'unitPrice' | 'description' | 'externalReference'> {
-    return BillingTransactionItemCreateSchema.safeParse(item).success;
-  }
-
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {
-    const existingTransaction = await transactionManager.findOneBy(BillingTransaction, { resourceUsageId: usage.id });
+    const existingTransaction = await transactionManager.findOneBy(BillingTransaction, {
+      resourceUsageId: usage.id,
+      status: BillingTransactionStatus.Completed,
+    });
     if (existingTransaction) {
       throw new BadRequestException('Billing transaction already exists for this resource usage');
     }
@@ -246,29 +246,37 @@ export class BillingService {
       let totalCredits = creditsForUsageDuration;
       totalCredits += creditsForSession;
 
-      const flowResults = await this.resourceFlowsExecutorService.runFlow(
-        usage.resource.id,
-        ResourceFlowNodeType.INPUT_RESOURCE_BILLING_CALCULATION_STARTED,
-        usage,
-        manager,
-      );
+      let transaction = await manager.findOne(BillingTransaction, {
+        where: {
+          resourceUsageId: usage.id,
+        },
+        relations: ['items'],
+      });
 
-      const customBillingItems = flowResults.flat().filter((result) => this.isBillingItem(result));
-
-      for (const item of customBillingItems) {
-        totalCredits += item.unitPrice * item.quantity;
-      }
-
-      if (totalCredits === 0) {
+      if (totalCredits === 0 && !transaction) {
         return;
       }
 
-      const transaction = await manager.save(BillingTransaction, {
-        userId: usage.userId,
-        resourceUsageId: usage.id,
-        amount: -totalCredits,
-        status: BillingTransactionStatus.Completed,
-      } as Partial<BillingTransaction>);
+      (transaction?.items ?? []).forEach((item) => {
+        totalCredits += item.unitPrice * item.quantity;
+      });
+
+      if (transaction) {
+        await manager.update(BillingTransaction, transaction.id, {
+          amount: -totalCredits,
+          status: BillingTransactionStatus.Completed,
+        });
+
+        transaction.amount = -totalCredits;
+        transaction.status = BillingTransactionStatus.Completed;
+      } else {
+        transaction = await manager.save(BillingTransaction, {
+          userId: usage.userId,
+          resourceUsageId: usage.id,
+          amount: -totalCredits,
+          status: BillingTransactionStatus.Completed,
+        } as Partial<BillingTransaction>);
+      }
 
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
@@ -284,17 +292,6 @@ export class BillingService {
         quantity: roundedMinutes,
       });
 
-      for (const item of customBillingItems) {
-        await manager.save(BillingTransactionItem, {
-          billingTransactionId: transaction.id,
-          name: item.name,
-          description: item.description,
-          externalReference: item.externalReference,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-        });
-      }
-
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
 
       return transaction;
@@ -307,5 +304,52 @@ export class BillingService {
     return await this.billingTransactionItemRepository.manager.transaction(async (transactionalEntityManager) => {
       return await doCalculation(transactionalEntityManager);
     });
+  }
+
+  public async handleResourceUsageStart(
+    resourceId: number,
+    usage: ResourceUsage,
+    user: User,
+    transactionalEntityManager?: EntityManager,
+  ) {
+    const resourceBillingConfiguration = await this.getResourceBillingConfiguration(
+      resourceId,
+      transactionalEntityManager,
+    );
+
+    if (await this.isBillingEnabled(resourceId, transactionalEntityManager)) {
+      const balance = await this.getBalance(user.id, transactionalEntityManager);
+      if (balance < resourceBillingConfiguration.creditsPerUsage + resourceBillingConfiguration.creditsPerMinute) {
+        throw new InsufficientBalanceError();
+      }
+    }
+
+    const transactionRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(BillingTransaction)
+      : this.billingTransactionRepository;
+
+    await transactionRepository.save({
+      userId: user.id,
+      resourceUsageId: usage.id,
+      amount: 0,
+      status: BillingTransactionStatus.Pending,
+    });
+  }
+
+  public async isBillingEnabled(resourceId: number, transactionalEntityManager?: EntityManager) {
+    const configuration = await this.getResourceBillingConfiguration(resourceId, transactionalEntityManager);
+    if (configuration.creditsPerUsage > 0 || configuration.creditsPerMinute > 0) {
+      return true;
+    }
+
+    const setAdditionalItemsFlowNodes = await this.resourceFlowsService.getNodes(
+      resourceId,
+      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+    );
+    if (setAdditionalItemsFlowNodes.length > 0) {
+      return true;
+    }
+
+    return false;
   }
 }

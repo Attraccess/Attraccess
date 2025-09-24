@@ -14,6 +14,7 @@ import {
 import { SumUpService } from './sumup.service';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 
 describe('BillingModule', () => {
   describe('metadata', () => {
@@ -65,6 +66,10 @@ describe('BillingModule', () => {
           {
             provide: ResourceFlowsExecutorService,
             useValue: { runFlow: jest.fn().mockResolvedValue([]) },
+          },
+          {
+            provide: ResourceFlowsService,
+            useValue: { getNodes: jest.fn().mockResolvedValue([]) },
           },
         ],
       }).compile();

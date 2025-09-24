@@ -1,7 +1,7 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable } from '@nestjs/common';
 import { Resource, ResourceGroup } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
 import { ResourceGroupNotFoundException } from './errors/groupNotFound.error';
@@ -17,7 +17,7 @@ export class ResourceGroupsService {
     @InjectRepository(ResourceGroup)
     private readonly resourceGroupRepository: Repository<ResourceGroup>,
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>
+    private readonly resourceRepository: Repository<Resource>,
   ) {}
 
   public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
@@ -100,8 +100,15 @@ export class ResourceGroupsService {
     }
   }
 
-  public async getGroupsOfResource(resourceId: number): Promise<ResourceGroup[]> {
-    return await this.resourceGroupRepository.find({
+  public async getGroupsOfResource(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceGroup[]> {
+    const resourceGroupRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceGroup)
+      : this.resourceGroupRepository;
+
+    return await resourceGroupRepository.find({
       where: {
         resources: {
           id: resourceId,

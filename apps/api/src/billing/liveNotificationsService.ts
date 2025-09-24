@@ -25,7 +25,10 @@ export class LiveNotificationsService {
   public async notifyTransactionUpdate(transactionOrId: BillingTransaction | number): Promise<void> {
     const transactionId = typeof transactionOrId === 'number' ? transactionOrId : transactionOrId.id;
 
-    const transaction = await this.billingTransactionRepository.findOneBy({ id: transactionId });
+    const transaction = await this.billingTransactionRepository.findOne({
+      where: { id: transactionId },
+      relations: ['items'],
+    });
     if (!transaction) {
       throw new BadRequestException('Transaction not found');
     }

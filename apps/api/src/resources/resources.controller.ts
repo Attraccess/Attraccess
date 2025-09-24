@@ -30,7 +30,7 @@ import { ResourceImageService } from './resourceImage.service';
 export class ResourcesController {
   constructor(
     private readonly resourcesService: ResourcesService,
-    private readonly resourceImageService: ResourceImageService
+    private readonly resourceImageService: ResourceImageService,
   ) {}
 
   private transformResource(resource: Resource): Resource {
@@ -71,7 +71,7 @@ export class ResourcesController {
   })
   async getAll(
     @Query() query: ListResourcesDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<PaginatedResponse<Resource>> {
     let onlyWithPermissionForUserId: number | undefined;
 
@@ -89,8 +89,6 @@ export class ResourcesController {
       onlyInUseByUserId: query.onlyInUseByMe ? req.user.id : undefined,
       onlyWithPermissionForUserId,
     });
-
-    // TODO: hide empty resource group cards
 
     resources.data = resources.data.map((resource) => {
       return this.transformResource(resource);
@@ -147,7 +145,7 @@ export class ResourcesController {
   async updateOne(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateResourceDto,
-    @UploadedFile() image?: FileUpload
+    @UploadedFile() image?: FileUpload,
   ): Promise<Resource> {
     const resource = await this.resourcesService.updateResource(id, updateDto, image);
     return this.transformResource(resource);
