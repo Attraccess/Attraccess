@@ -20,12 +20,12 @@ import {
   ResourceUsageAction,
   ResourceUsage,
   BillingTransactionItem,
-  ResourceFlowActionHttpSendRequestNodeData,
-  ResourceFlowActionMqttSendMessageNodeData,
-  ResourceFlowActionUtilWaitNodeData,
-  ResourceFlowActionIfNodeData,
   BillingTransactionItemCreateSchema,
   BillingTransaction,
+  IfNodeDataSchema,
+  WaitNodeDataSchema,
+  HttpRequestNodeDataSchema,
+  MqttSendMessageNodeDataSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
@@ -41,6 +41,8 @@ import { get } from 'lodash-es';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
+import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
+import { MqttMessageReceivedNodeDataSchema } from 'libs/database-entities/src/lib/entities/resourceFlowNode';
 
 export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
@@ -99,13 +101,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     // Send keep-alive messages every 30 seconds to prevent connection timeouts
     this.keepAliveInterval = setInterval(() => {
       this.resourceFlowLogSubjects.forEach((subject) => {
         subject.next({ data: { keepalive: true } });
       });
     }, 10000);
+
+    await this.subscribeToMqttTopics();
   }
 
   onModuleDestroy() {
@@ -114,6 +118,19 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     this.resourceFlowLogSubjects.forEach((subject) => subject.complete());
+  }
+
+  private async subscribeToMqttTopics() {
+    const mqttMessageReceivedNodes = await this.flowNodeRepository.find({
+      where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+    });
+
+    for (const node of mqttMessageReceivedNodes) {
+      const { topic, serverId } = node.data as z.infer<typeof MqttMessageReceivedNodeDataSchema>;
+      await this.mqttClientService.subscribe(serverId, topic).catch((error) => {
+        this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
+      });
+    }
   }
 
   private async createFlowLog(
@@ -198,6 +215,29 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     } catch (error) {
       this.logger.error(`Failed to handle resource usage event`, error.stack);
     }
+  }
+
+  @OnEvent(MqttMessageReceivedEvent.EVENT_NAME)
+  async handleMqttMessageReceivedEvent(event: MqttMessageReceivedEvent) {
+    const { topic, payload } = event;
+
+    const messageRecivedNodes = await this.flowNodeRepository.find({
+      where: {
+        type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+        data: {
+          topic,
+        },
+      },
+    });
+
+    if (messageRecivedNodes.length === 0) {
+      this.logger.debug(`No flow nodes found for topic: ${topic}`);
+      return;
+    }
+
+    this.logger.log(`Found ${messageRecivedNodes.length} flow node(s) for topic: ${topic}`);
+
+    await this.startFlow(messageRecivedNodes, { payload: { payload } });
   }
 
   private async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {
@@ -361,6 +401,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
+        case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
@@ -495,7 +536,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const { duration, unit } = node.data as ResourceFlowActionUtilWaitNodeData;
+    const { duration, unit } = node.data as z.infer<typeof WaitNodeDataSchema>;
 
     let waitDurationMs = duration * 1000;
     if (unit === 'minutes') {
@@ -520,7 +561,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       comparisonOperator,
       comparisonValue: comparisonValueTemplate,
       comparisonValueIsPath,
-    } = node.data as ResourceFlowActionIfNodeData;
+    } = node.data as z.infer<typeof IfNodeDataSchema>;
 
     const sourceValue = get(input, path, '');
     let comparisonValue = comparisonValueTemplate;
@@ -567,7 +608,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const data = node.data as ResourceFlowActionHttpSendRequestNodeData;
+    const data = node.data as z.infer<typeof HttpRequestNodeDataSchema>;
 
     const url = this.compileTemplate(data.url ?? '', input);
     const method = this.compileTemplate(data.method ?? '', input);
@@ -594,7 +635,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const { serverId, ...data } = node.data as ResourceFlowActionMqttSendMessageNodeData;
+    const { serverId, ...data } = node.data as z.infer<typeof MqttSendMessageNodeDataSchema>;
 
     const topic = this.compileTemplate(data.topic ?? '', input);
     const payload = this.compileTemplate(data.payload ?? '', input);

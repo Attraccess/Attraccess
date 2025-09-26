@@ -2,6 +2,7 @@ import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn,
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
 import { Resource } from './resource.entity';
+import { EventNodeDataSchema } from '../entities-index';
 
 export enum ResourceFlowNodeType {
   INPUT_BUTTON = 'input.button',
@@ -11,6 +12,7 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+  INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
@@ -73,47 +75,52 @@ export const BillingTransactionItemCreateSchema = z.object({
   }),
 });
 
+export const MqttMessageReceivedNodeDataSchema = z.object({
+  topic: z.string().min(1, 'Topic is required'),
+  serverId: z.number().int().positive().meta({
+    selectFromEntity: 'mqttServer',
+    entityProperty: 'id',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
     case ResourceFlowNodeType.INPUT_BUTTON:
       return ButtonNodeDataSchema;
+
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
     case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
     case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+      return EventNodeDataSchema;
+
+    case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+      return MqttMessageReceivedNodeDataSchema;
+
     case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
+
     case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
       return HttpRequestNodeDataSchema;
+
     case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
       return MqttSendMessageNodeDataSchema;
+
     case ResourceFlowNodeType.PROCESSING_WAIT:
       return WaitNodeDataSchema;
+
     case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
+
     default: {
       const exhaustiveCheck: never = nodeType;
       throw new Error(`Unknown node type: ${exhaustiveCheck}`);
     }
   }
 }
-
-// Type definitions for node data
-export type ResourceFlowEventNodeData = z.infer<typeof NodeWithoutDataSchema>;
-export type ResourceFlowActionHttpSendRequestNodeData = z.infer<typeof HttpRequestNodeDataSchema>;
-export type ResourceFlowActionMqttSendMessageNodeData = z.infer<typeof MqttSendMessageNodeDataSchema>;
-export type ResourceFlowActionUtilWaitNodeData = z.infer<typeof WaitNodeDataSchema>;
-export type ResourceFlowActionIfNodeData = z.infer<typeof IfNodeDataSchema>;
-
-export type ResourceFlowNodeData =
-  | ResourceFlowEventNodeData
-  | ResourceFlowActionHttpSendRequestNodeData
-  | ResourceFlowActionMqttSendMessageNodeData
-  | ResourceFlowActionUtilWaitNodeData
-  | ResourceFlowActionIfNodeData;
 
 export class ResourceFlowNodePosition {
   @Column({ type: 'integer' })

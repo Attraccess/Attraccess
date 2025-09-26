@@ -16,7 +16,7 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
-    private readonly monitoringService: MqttMonitoringService
+    private readonly monitoringService: MqttMonitoringService,
   ) {}
 
   async onModuleInit() {
@@ -94,6 +94,10 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
       }
 
       const client = mqtt.connect(url, options);
+
+      client.on('message', (event) => {
+        console.log('mqtt message', event);
+      });
 
       client.on('connect', () => {
         this.logger.log(`Connected to MQTT server ${server.name} (${url})`);
@@ -213,5 +217,15 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     }
 
     return result;
+  }
+
+  async subscribe(serverId: number, topic: string): Promise<void> {
+    const client = await this.getOrCreateClient(serverId);
+    client.subscribe(topic);
+  }
+
+  async unsubscribe(serverId: number, topic: string): Promise<void> {
+    const client = await this.getOrCreateClient(serverId);
+    client.unsubscribe(topic);
   }
 }

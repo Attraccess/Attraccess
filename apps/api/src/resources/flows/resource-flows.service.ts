@@ -22,6 +22,8 @@ import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
 import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { z } from 'zod';
+import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import { MqttMessageReceivedNodeDataSchema } from 'libs/database-entities/src/lib/entities/resourceFlowNode';
 
 export interface ValidationError {
   nodeId: string;
@@ -48,6 +50,7 @@ export class ResourceFlowsService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
+    private readonly mqttClientService: MqttClientService,
   ) {}
 
   async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
@@ -126,6 +129,24 @@ export class ResourceFlowsService {
 
     // Start transaction to ensure data consistency
     const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
+      const oldMqttMessageReceivedNodes = await transactionalEntityManager.find(ResourceFlowNode, {
+        where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+      });
+
+      const newOrChangedMqttMessageReceivedNodes = [];
+      for (const nodeData of flowData.nodes) {
+        const existingNode = oldMqttMessageReceivedNodes.find((oldNode) => oldNode.id === nodeData.id);
+        if (!existingNode) {
+          newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          continue;
+        }
+
+        if (existingNode.data.topic !== nodeData.data.topic || existingNode.data.serverId !== nodeData.data.serverId) {
+          newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          continue;
+        }
+      }
+
       // Delete existing nodes and edges (cascading will handle relationships)
       await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
       await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
@@ -161,6 +182,10 @@ export class ResourceFlowsService {
         transactionalEntityManager.save(ResourceFlowNode, newNodes),
         transactionalEntityManager.save(ResourceFlowEdge, newEdges),
       ]);
+
+      for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
+        await this.mqttClientService.subscribe(nodeData.data.serverId, nodeData.data.topic);
+      }
 
       return { nodes: savedNodes, edges: savedEdges };
     });
@@ -253,6 +278,12 @@ export class ResourceFlowsService {
           schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Door;
+          break;
+
+        case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+          schema.configSchema = z.toJSONSchema(MqttMessageReceivedNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
