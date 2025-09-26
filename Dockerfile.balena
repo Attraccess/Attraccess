@@ -1,0 +1,71 @@
+ARG NODE_VERSION=22.18.0
+FROM node:${NODE_VERSION}-alpine AS builder
+
+# System deps for Node builds + Python tooling
+RUN apk add --no-cache \
+      python3 py3-pip \
+      git curl bash \
+      build-base \
+      ca-certificates
+
+WORKDIR /app
+
+# Enable pnpm via corepack (respects "packageManager" in package.json)
+RUN corepack enable
+
+# Copy only manifests first for better layer caching
+COPY package.json pnpm-lock.yaml ./
+
+# Install JS deps exactly like CI
+RUN pnpm install --frozen-lockfile
+
+# --- Python: isolated venv to avoid PEP 668 issues ---
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv "$VIRTUAL_ENV" && \
+    "$VIRTUAL_ENV/bin/python" -m ensurepip --upgrade || true
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install PlatformIO + esptool in the venv
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir platformio esptool
+
+# Bring in the rest and build
+COPY . .
+ENV NODE_ENV=production
+RUN pnpm nx run-many --target=build --exclude=attractap-firmware,attractap-touch-firmware
+
+# ------------------------------------------------------------
+# Runtime: same layout as your original Dockerfile
+# ------------------------------------------------------------
+FROM node:${NODE_VERSION}-alpine AS runtime
+
+WORKDIR /app
+
+# Copy pre-built artifacts from builder
+COPY --from=builder /app/dist/apps/api      ./dist/apps/api
+COPY --from=builder /app/dist/apps/frontend ./dist/apps/frontend
+COPY --from=builder /app/docs               ./docs
+
+# Root manifests so pnpm install inside api can work
+COPY --from=builder /app/package.json   package.json
+COPY --from=builder /app/pnpm-lock.yaml pnpm-lock.yaml
+
+# Tell API where to find static assets
+ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
+ENV STATIC_DOCS_FILE_PATH=/app/docs
+
+# Plugin storage
+RUN mkdir -p /app/storage/plugins
+ENV STORAGE_ROOT=/app/storage
+ENV PLUGIN_DIR=/app/storage/plugins
+
+# Install API runtime deps from its own package.json
+WORKDIR /app/dist/apps/api
+RUN corepack enable && pnpm install --prod
+# (intentionally not using --frozen-lockfile)
+
+# Back to root for consistency
+WORKDIR /app
+
+EXPOSE 3000
+CMD ["node", "dist/apps/api/main.js"]

@@ -1,0 +1,44 @@
+version: '2.1'
+
+name: 'attraccess'
+
+services:
+  attraccess:
+    build:
+      context: .
+      dockerfile: Dockerfile.balena
+    restart: unless-stopped
+    ports:
+      - '80:3000'
+    # Keep using your env file (or set vars in the Balena dashboard)
+    env_file:
+      - ./.env.example.docker-compose
+    # Use a named volume for persistence on balenaOS
+    volumes:
+      - attraccess_storage:/app/storage
+    depends_on:
+      - bunkerm
+
+  bunkerm:
+    # BunkerM is an MQTT Broker
+    image: bunkeriot/bunkerm:latest
+    restart: unless-stopped
+    ports:
+      - '1883:1883' # MQTT broker port
+      - '9001:9001' # WebSocket port (if needed)
+      - '2000:2000' # Web UI
+      - '1900:1900' # Internal admin API
+    environment:
+      - HOST_ADDRESS=mqtt.attraccess.demo
+      - FRONTEND_URL=http://mqtt.attraccess.demo
+      - ALLOWED_ORIGINS=http://mqtt.attraccess.demo
+    volumes:
+      - bunkerm_mosquitto_data:/var/lib/mosquitto
+      - bunkerm_mosquitto_conf:/etc/mosquitto
+      - bunkerm_auth_data:/data
+
+volumes:
+  attraccess_storage:
+  bunkerm_mosquitto_data:
+  bunkerm_mosquitto_conf:
+  bunkerm_auth_data:

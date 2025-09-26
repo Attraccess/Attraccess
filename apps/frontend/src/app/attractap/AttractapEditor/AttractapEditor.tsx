@@ -2,7 +2,7 @@ import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import { Button, Form, ModalBody, Modal, ModalContent, ModalHeader, ModalFooter, Divider } from '@heroui/react';
-import { Input } from '@heroui/input';
+import { Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {

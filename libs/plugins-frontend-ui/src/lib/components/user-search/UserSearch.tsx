@@ -1,5 +1,5 @@
 import { HTMLAttributes, useEffect, useMemo, useState } from 'react';
-import { Autocomplete, AutocompleteItem, AutocompleteProps } from '@heroui/autocomplete';
+import { Autocomplete, AutocompleteItem, AutocompleteProps } from '@heroui/react';
 import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 import { User, useUsersServiceFindMany, useUsersServiceGetOneUserById } from '@attraccess/react-query-client';

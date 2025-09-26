@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { Input } from '@heroui/input';
-import { Button } from '@heroui/button';
-import { Alert } from '@heroui/alert';
+import { Input } from '@heroui/react';
+import { Button } from '@heroui/react';
+import { Alert } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { useLogin } from '../../hooks/useAuth';

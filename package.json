@@ -116,7 +116,8 @@
     "workbox-window": "^7.3.0",
     "ws": "^8.18.2",
     "zod": "^4.1.5",
-    "zustand": "^5.0.4"
+    "zustand": "^5.0.4",
+    "husky": "^9.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.27.1",
@@ -181,7 +182,6 @@
     "eslint-plugin-react": "7.35.0",
     "eslint-plugin-react-hooks": "5.0.0",
     "happy-dom": "^18.0.1",
-    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-environment-node": "^29.7.0",

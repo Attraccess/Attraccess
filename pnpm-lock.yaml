@@ -182,6 +182,9 @@ importers:
       handlebars:
         specifier: ^4.7.8
         version: 4.7.8
+      husky:
+        specifier: ^9.1.7
+        version: 9.1.7
       identity-obj-proxy:
         specifier: ^3.0.0
         version: 3.0.0
@@ -516,9 +519,6 @@ importers:
       happy-dom:
         specifier: ^18.0.1
         version: 18.0.1
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.17.43)(babel-plugin-macros@3.1.0)(ts-node@10.9.1(@swc/core@1.5.29(@swc/helpers@0.5.17))(@types/node@20.17.43)(typescript@5.8.3))
