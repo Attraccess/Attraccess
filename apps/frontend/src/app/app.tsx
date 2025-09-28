@@ -8,7 +8,7 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verifyEmail';
 import { ToastProvider } from '../components/toastProvider';
 import { HeroUIProvider, Spinner } from '@heroui/react';
-import { SystemPermissions, useSystemServiceInfo } from '@attraccess/react-query-client';
+import { OpenAPI, SystemPermissions, useSystemServiceInfo } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
+import { getBaseUrl } from '../api';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -154,6 +155,10 @@ export function App() {
 
     metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
   }, [setTheme]);
+
+  useEffect(() => {
+    OpenAPI.BASE = getBaseUrl();
+  }, []);
 
   return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
 }

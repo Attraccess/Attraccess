@@ -3,32 +3,39 @@ name: 'attraccess'
 services:
   attraccess:
     restart: unless-stopped
-    image: attraccess/attraccess:${ATTRACCESS_TAG:-nightly-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - '80:3000'
-    COMMENT_ENV: 'Please take care of backing up the env file'
-    env_file:
-      - ./.env.example.docker-compose
-    COMMENT_VOLUMES: 'Please take care of backing up the storage directory'
     volumes:
-      - ./storage/attraccess:/app/storage
+      - attraccess-storage:/app/storage
     depends_on:
       - bunkerm
+    env_file:
+      - .env.example.docker-compose
 
-  bunkerm:
-    comment: 'BunkerM is an MQTT Broker'
+  bunkerm: #BunkerM is an MQTT Broker
     image: bunkeriot/bunkerm:latest
     restart: unless-stopped
+    deploy:
+      replicas: ${REPLICAS_BUNKERM:-1}
     ports:
       - '1883:1883' # MQTT broker port
       - '9001:9001' # WebSocket port (if needed)
       - '2000:2000' # Web UI
       - '1900:1900' # Internal admin API
-    environment:
-      - HOST_ADDRESS=mqtt.attraccess.demo
-      - FRONTEND_URL=http://mqtt.attraccess.demo
-      - ALLOWED_ORIGINS=http://mqtt.attraccess.demo
+    #environment:
+    #  - HOST_ADDRESS=mqtt.attraccess.demo
+    #  - FRONTEND_URL=http://mqtt.attraccess.demo
+    #  - ALLOWED_ORIGINS=http://mqtt.attraccess.demo
     volumes:
       - bunkerm_mosquitto_data:/var/lib/mosquitto
       - bunkerm_mosquitto_conf:/etc/mosquitto
       - bunkerm_auth_data:/data
+
+volumes:
+  attraccess-storage:
+  bunkerm_mosquitto_data:
+  bunkerm_mosquitto_conf:
+  bunkerm_auth_data:

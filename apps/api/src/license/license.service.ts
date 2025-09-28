@@ -53,24 +53,32 @@ export class LicenseService {
     }
 
     // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
-    const { verifyLicense } = await import('@licenso/client');
-    const licenseData = await verifyLicense(
-      appConfig.LICENSE_KEY,
-      appConfig.LICENSO_PUBLIC_KEY,
-      appConfig.LICENSO_DEVICE_ID,
-    );
+    try {
+      const { verifyLicense } = await import('@licenso/client');
+      const licenseData = await verifyLicense(
+        appConfig.LICENSE_KEY,
+        appConfig.LICENSO_PUBLIC_KEY,
+        appConfig.LICENSO_DEVICE_ID,
+      );
 
-    const dto: LicenseDataDto = {
-      valid: licenseData.valid,
-      reason: licenseData.reason,
-      modules: Object.entries(licenseData.payload.cfg.modules)
-        .filter(([, value]) => value === true)
-        .map(([key]) => key),
-      usageLimits: licenseData.payload.cfg.usageLimits ?? {},
-      isNonProfit: false,
-    };
+      const dto: LicenseDataDto = {
+        valid: licenseData.valid,
+        reason: licenseData.reason,
+        modules: Object.entries(licenseData.payload.cfg.modules)
+          .filter(([, value]) => value === true)
+          .map(([key]) => key),
+        usageLimits: licenseData.payload.cfg.usageLimits ?? {},
+        isNonProfit: false,
+      };
 
-    return dto;
+      return dto;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(error);
+      throw new LicenseError(
+        'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
+      );
+    }
   }
 
   async verifyLicense(requirements?: LicenseRequirements): Promise<LicenseDataDto> {

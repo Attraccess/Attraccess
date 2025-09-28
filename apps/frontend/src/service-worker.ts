@@ -30,7 +30,7 @@ registerRoute(
         purgeOnQuotaError: true,
       }),
     ],
-  })
+  }),
 );
 
 // Only handle navigation requests that aren't for API routes
@@ -45,5 +45,5 @@ registerRoute(
       /^\/_attractap_assets\/.*$/,
       /^\/_attractap_assets$/,
     ],
-  })
+  }),
 );
