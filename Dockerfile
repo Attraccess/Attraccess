@@ -1,23 +1,32 @@
-# Multi-stage Dockerfile for Nx monorepo
-# This Dockerfile is intended to be built using the build.sh script 
-# which will read Node version from .nvmrc
+ARG NODE_VERSION=22.17.1
 
-# Define ARG before FROM so it can be used in FROM
-ARG NODE_VERSION=20.10.0
+FROM node:${NODE_VERSION}-alpine AS builder
 
-# Single-stage Dockerfile that only copies pre-built artifacts
+WORKDIR /app
+
+# Copy package.json and pnpm-lock.yaml first for better layer caching
+COPY package.json pnpm-lock.yaml .npmrc ./
+
+# Install dependencies
+RUN corepack enable && corepack prepare && \
+    pnpm install --frozen-lockfile
+
+# Copy the rest of the application
+COPY . .
+
+# Build the application
+RUN pnpm nx run-many -t build --projects=api,frontend
+
+
 FROM node:${NODE_VERSION}-alpine
 
 # Set working directory
 WORKDIR /app
 
 # Copy the pre-built application (these will be built in the CI pipeline)
-COPY ./dist/apps/api ./dist/apps/api
-COPY ./dist/apps/frontend ./dist/apps/frontend
-COPY ./docs ./docs
-
-COPY package.json package.json
-COPY pnpm-lock.yaml pnpm-lock.yaml
+COPY --from=builder /app/dist/apps/api dist/apps/api
+COPY --from=builder /app/dist/apps/frontend dist/apps/frontend
+COPY --from=builder /app/docs docs
 
 # Set environment variable to tell API about frontend location
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
@@ -37,6 +46,8 @@ RUN corepack enable && corepack prepare && \
 
 # Back to app root for consistent starting dir
 WORKDIR /app
+
+COPY package.json package.json
 
 # Expose the API port
 EXPOSE 3000

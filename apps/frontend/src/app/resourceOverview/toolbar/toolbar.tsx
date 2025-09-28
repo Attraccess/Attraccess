@@ -1,5 +1,5 @@
-import { Button } from '@heroui/button';
-import { Input } from '@heroui/input';
+import { Button } from '@heroui/react';
+import { Input } from '@heroui/react';
 import { SearchIcon, PlusIcon, ScanQrCodeIcon, ListFilterIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

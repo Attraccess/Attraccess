@@ -1388,7 +1388,23 @@ export interface ResourceBillingConfiguration {
   creditsPerUsage: number;
   /** The credit cost per minute */
   creditsPerMinute: number;
-  /** Whether billing is enabled */
+}
+
+export interface ResourceBillingConfigurationItemDto {
+  /** the name of the item */
+  name: string;
+  /** the unit price of the item */
+  unitPrice: number;
+  /** the quantity of the item */
+  quantity: number;
+}
+
+export interface ResourceBillingConfigurationDto {
+  /** the configuration */
+  configuration: ResourceBillingConfiguration;
+  /** the additional items */
+  additionalItems: ResourceBillingConfigurationItemDto[];
+  /** whether billing is enabled */
   isBillingEnabled: boolean;
 }
 
@@ -1545,7 +1561,6 @@ export interface ResourceFlowNodeSchemaDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
-    | "input.resource.billing.calculation.started"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
@@ -1594,7 +1609,6 @@ export interface ResourceFlowNodeDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
-    | "input.resource.billing.calculation.started"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
@@ -2434,7 +2448,8 @@ export type CreateManualTransactionData = number;
 
 export type GetBillingTransactionData = BillingTransaction;
 
-export type GetResourceBillingConfigurationData = ResourceBillingConfiguration;
+export type GetResourceBillingConfigurationData =
+  ResourceBillingConfigurationDto;
 
 export type UpdateResourceBillingConfigurationData =
   ResourceBillingConfiguration;
@@ -2581,7 +2596,7 @@ export interface GetBillingTransactionsInDateRangeParams {
   end: string;
 }
 
-export type GetBillingTransactionsInDateRangeData = any;
+export type GetBillingTransactionsInDateRangeData = BillingTransaction[];
 
 export namespace System {
   /**
@@ -7803,6 +7818,7 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
         ...params,
       }),
   };

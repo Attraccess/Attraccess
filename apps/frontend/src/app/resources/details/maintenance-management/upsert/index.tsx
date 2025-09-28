@@ -50,7 +50,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const now = useNow();
 
   const timezoneOfBrowser = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const [startTime, setStartTime] = useState<ZonedDateTime>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
+  const [startTime, setStartTime] = useState<ZonedDateTime | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
   const [endTime, setEndTime] = useState<ZonedDateTime | null>(null);
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
@@ -166,7 +166,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 value={startTime}
                 isRequired
                 hideTimeZone
-                onChange={(value) => setStartTime(value as ZonedDateTime)}
+                onChange={(value) => setStartTime(value)}
               />
 
               <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
@@ -178,7 +178,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                   value={endTime}
                   isRequired
                   hideTimeZone
-                  onChange={(value) => setEndTime(value as ZonedDateTime)}
+                  onChange={(value) => setEndTime(value)}
                 />
               )}
 
