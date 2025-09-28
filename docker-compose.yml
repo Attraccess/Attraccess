@@ -1,4 +1,4 @@
-name: 'attraccess'
+version: '2.4'
 
 services:
   attraccess:
@@ -12,14 +12,28 @@ services:
       - attraccess-storage:/app/storage
     depends_on:
       - bunkerm
-    env_file:
-      - .env.example.docker-compose
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - '8025:8025'
+      - '1025:1025'
+
+  webhook-site:
+    image: tarampampam/webhook-tester:latest
+    restart: unless-stopped
+    environment:
+      - STORAGE_DRIVER=fs
+      - FS_STORAGE_DIR=/storage
+    ports:
+      - '8084:8080'
+    volumes:
+      - webhook-site:/storage
 
   bunkerm: #BunkerM is an MQTT Broker
     image: bunkeriot/bunkerm:latest
     restart: unless-stopped
-    deploy:
-      replicas: ${REPLICAS_BUNKERM:-1}
     ports:
       - '1883:1883' # MQTT broker port
       - '9001:9001' # WebSocket port (if needed)

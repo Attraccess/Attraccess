@@ -5,7 +5,7 @@ FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 
 # Copy package.json and pnpm-lock.yaml first for better layer caching
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 
 # Install dependencies
 RUN corepack enable && corepack prepare && \

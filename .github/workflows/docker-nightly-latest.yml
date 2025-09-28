@@ -64,7 +64,7 @@ jobs:
             dist/
 
   # Build and push Docker container
-  build-push-container:
+  containerize:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -131,3 +131,29 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  balena:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Add step to get short SHA
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      # set balena.yml version to nightly-${{ steps.vars.outputs.SHORT_SHA }}
+      - name: Set balena.yml version
+        run: |
+          sed -i "s/version: .*/version: nightly-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
+
+      - uses: balena-io/deploy-to-balena-action@master
+        id: build
+        with:
+          balena_token: ${{ secrets.BALENA_TOKEN }}
+          fleet: ${{ secrets.BALENA_FLEET }}
+
+      - name: Log release ID built
+        run: echo "Built release ID ${{ steps.build.outputs.release_id }}"

@@ -1,10 +1,11 @@
-function normalizeUrl(url: string) {
-  if (!url) {
-    return undefined;
+function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
+  if (typeof url !== 'string') {
+    return undefined as TUrl;
   }
 
-  if (!url.startsWith('http')) {
-    url = `http://${url}`;
+  let normalizedUrl: string = url;
+  if (!normalizedUrl.startsWith('http')) {
+    normalizedUrl = `http://${normalizedUrl}`;
   }
 
   const parsedUrl = new URL(url);
@@ -18,13 +19,7 @@ function normalizeUrl(url: string) {
     port = `:${parsedUrl.port}`;
   }
 
-  console.log('url', {
-    protocol: parsedUrl.protocol,
-    hostname: parsedUrl.hostname,
-    port,
-  });
-
-  return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}`;
+  return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}` as TUrl;
 }
 
 function getInferredApiUrl() {
@@ -36,7 +31,7 @@ function getEnvApiUrl() {
     return undefined;
   }
 
-  return normalizeUrl(import.meta.env.ATTRACCESS_URL);
+  return normalizeUrl(import.meta.env.ATTRACCESS_URL as string | undefined);
 }
 
 export function getBaseUrl() {

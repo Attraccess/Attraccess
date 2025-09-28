@@ -148,3 +148,40 @@ jobs:
 
             Image Digest: \`${{ steps.build-and-push.outputs.digest }}\``
             })
+
+  balena:
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Add step to get short SHA
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      # set balena.yml version to pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
+      - name: Set balena.yml version
+        run: |
+          sed -i "s/version: .*/version: pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
+
+      - uses: balena-io/deploy-to-balena-action@master
+        id: build
+        with:
+          balena_token: ${{ secrets.BALENA_TOKEN }}
+          fleet: ${{ secrets.BALENA_FLEET }}
+
+      - name: Log release ID built
+        run: echo "Built release ID ${{ steps.build.outputs.release_id }}"
+
+      - name: Post balena URL comment to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🐳 Balena image built and pushed: ${{ steps.build.outputs.release_id }} (pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }})`
+            })

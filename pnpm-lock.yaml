@@ -384,6 +384,9 @@ importers:
       '@rollup/plugin-url':
         specifier: ^8.0.2
         version: 8.0.2(rollup@4.40.2)
+      '@surma/rollup-plugin-off-main-thread':
+        specifier: ^2.2.3
+        version: 2.2.3
       '@svgr/rollup':
         specifier: ^8.1.0
         version: 8.1.0(rollup@4.40.2)(typescript@5.8.3)
@@ -23918,7 +23921,7 @@ snapshots:
 
   '@vitest/snapshot@1.6.1':
     dependencies:
-      magic-string: 0.30.12
+      magic-string: 0.30.17
       pathe: 1.1.2
       pretty-format: 29.7.0
 
