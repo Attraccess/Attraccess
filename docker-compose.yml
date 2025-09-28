@@ -53,3 +53,4 @@ volumes:
   bunkerm_mosquitto_data:
   bunkerm_mosquitto_conf:
   bunkerm_auth_data:
+  webhook-site:
