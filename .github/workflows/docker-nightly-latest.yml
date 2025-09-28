@@ -147,7 +147,7 @@ jobs:
       # set balena.yml version to nightly-${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
-          sed -i '' 's/^version: .*/version: nightly-${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
+          sed -i 's/^version: .*/version: nightly-${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
 
       - uses: balena-io/deploy-to-balena-action@master
         id: build
