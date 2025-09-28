@@ -26,6 +26,7 @@ coverage
 **/*.test.js
 **/cypress
 **/e2e
+**/.pio
 
 # IDE
 .vscode
@@ -46,6 +47,14 @@ yarn-error.log*
 pnpm-debug.log*
 storage
 secrets
+docker/
+secrets/
+tmp/
+log/
+dist/
+data/
+.nx/
+
 
 # Keep necessary files
 !.npmrc

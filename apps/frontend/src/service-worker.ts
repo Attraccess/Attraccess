@@ -30,7 +30,7 @@ registerRoute(
         purgeOnQuotaError: true,
       }),
     ],
-  })
+  }),
 );
 
 // Only handle navigation requests that aren't for API routes
@@ -39,11 +39,13 @@ registerRoute(
     denylist: [
       /^\/api\/.*$/,
       /^\/api$/,
+      /^\/api-json\/.*$/,
+      /^\/api-json$/,
       /^\/docs\/.*$/,
       /^\/docs$/,
       /^\/cdn\/.*$/,
       /^\/_attractap_assets\/.*$/,
       /^\/_attractap_assets$/,
     ],
-  })
+  }),
 );

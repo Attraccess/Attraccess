@@ -4,15 +4,18 @@ services:
   attraccess:
     build:
       context: .
-      dockerfile: Dockerfile.balena
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - '80:3000'
+      #- '80:3000'
+      - '3000:3000'
     # Use a named volume for persistence on balenaOS
     volumes:
       - attraccess_storage:/app/storage
     depends_on:
       - bunkerm
+    env_file:
+      - .env.local
 
   bunkerm:
     # BunkerM is an MQTT Broker

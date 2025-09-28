@@ -2,10 +2,10 @@
 
 import { UseQueryResult } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
-export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSystemServiceInfoKey = "SystemServiceInfo";
-export const UseSystemServiceInfoKeyFn = (queryKey?: Array<unknown>) => [useSystemServiceInfoKey, ...(queryKey ?? [])];
+export type SystemServiceGetSystemInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.getSystemInfo>>;
+export type SystemServiceGetSystemInfoQueryResult<TData = SystemServiceGetSystemInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemServiceGetSystemInfoKey = "SystemServiceGetSystemInfo";
+export const UseSystemServiceGetSystemInfoKeyFn = (queryKey?: Array<unknown>) => [useSystemServiceGetSystemInfoKey, ...(queryKey ?? [])];
 export type UsersServiceFindManyDefaultResponse = Awaited<ReturnType<typeof UsersService.findMany>>;
 export type UsersServiceFindManyQueryResult<TData = UsersServiceFindManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceFindManyKey = "UsersServiceFindMany";

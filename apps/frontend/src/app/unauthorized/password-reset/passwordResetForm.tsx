@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { Button } from '@heroui/react';
+import { Button, Input } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useUsersServiceRequestPasswordReset } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { Input } from '@heroui/react';
 
 interface PasswordResetFormProps {
   onGoBack: () => void;

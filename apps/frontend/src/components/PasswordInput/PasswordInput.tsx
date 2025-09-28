@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { Input, InputProps } from '@heroui/react';
-import { Button } from '@heroui/react';
-import { Tooltip } from '@heroui/react';
+import { Input, InputProps, Tooltip, Button } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './PasswordInput.en.json';

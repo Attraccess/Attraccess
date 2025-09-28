@@ -8,7 +8,7 @@ import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verifyEmail';
 import { ToastProvider } from '../components/toastProvider';
 import { HeroUIProvider, Spinner } from '@heroui/react';
-import { SystemPermissions, useSystemServiceInfo } from '@attraccess/react-query-client';
+import { SystemPermissions, useSystemServiceGetSystemInfo } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
@@ -80,7 +80,7 @@ function AppLayout(props: PropsWithChildren) {
 
   const { pullToRefreshIsEnabled } = usePtrStore();
 
-  const { isError: serverIsNotAvailable } = useSystemServiceInfo(undefined, {
+  const { isError: serverIsNotAvailable } = useSystemServiceGetSystemInfo(undefined, {
     refetchInterval: 5000,
     retry: false,
   });

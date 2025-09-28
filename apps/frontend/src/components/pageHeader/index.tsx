@@ -1,8 +1,7 @@
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '@heroui/react';
-import { cn, Image } from '@heroui/react';
+import { Button, cn, Image } from '@heroui/react';
 
 interface PageHeaderProps {
   title: string | ReactNode;

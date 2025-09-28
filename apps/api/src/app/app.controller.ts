@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { InfoResponseDto } from './dto/info-response.dto';
 
 @ApiTags('System')
 @Controller()
@@ -8,19 +9,9 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('/info')
-  @ApiOperation({ summary: 'Return API information', operationId: 'info' })
-  @ApiResponse({
-    status: 200,
-    description: 'API information',
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', example: 'Attraccess API' },
-        status: { type: 'string', example: 'ok' },
-      },
-    },
-  })
-  getInfo() {
+  @ApiOperation({ summary: 'Return API information', operationId: 'getSystemInfo' })
+  @ApiOkResponse({ description: 'API information', type: InfoResponseDto })
+  getInfo(): InfoResponseDto {
     return this.appService.getInfo();
   }
 }

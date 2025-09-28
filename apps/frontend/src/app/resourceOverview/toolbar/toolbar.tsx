@@ -1,5 +1,4 @@
-import { Button } from '@heroui/react';
-import { Input } from '@heroui/react';
+import { Button, Input, cn } from '@heroui/react';
 import { SearchIcon, PlusIcon, ScanQrCodeIcon, ListFilterIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -10,7 +9,6 @@ import de from './toolbar.de.json';
 import { ResourceScanner } from './scanner';
 import { ResourceFilter } from './filter';
 import { FilterProps } from '../filterProps';
-import { cn } from '@heroui/react';
 
 interface ToolbarProps {
   searchIsLoading?: boolean;
