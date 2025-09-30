@@ -48,9 +48,20 @@ services:
       - bunkerm_mosquitto_conf:/etc/mosquitto
       - bunkerm_auth_data:/data
 
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    volumes:
+      - zigbee2mqtt:/app/data
+    #environment:
+    #  - TZ=Europe/Amsterdam
+
 volumes:
   attraccess-storage:
   bunkerm_mosquitto_data:
   bunkerm_mosquitto_conf:
   bunkerm_auth_data:
   webhook-site:
+  zigbee2mqtt:
