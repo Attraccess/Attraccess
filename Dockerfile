@@ -15,7 +15,7 @@ RUN corepack enable && corepack prepare && \
 COPY . .
 
 # Build the application
-RUN pnpm nx run-many -t build --projects=api,frontend
+RUN pnpm nx run-many -t build --projects=api,frontend --verbose
 
 
 FROM node:${NODE_VERSION}-alpine
