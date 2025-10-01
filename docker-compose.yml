@@ -61,8 +61,6 @@ services:
       - '5672' # RabbitMQ AMQP
       - '1883' # MQTT
       - '15675' # MQTT WebSocket
-    ports:
-      - '1883:1883'
     environment:
       RABBITMQ_HOST: '%'
       RABBITMQ_DEFAULT_USER: attraccess
@@ -88,6 +86,26 @@ services:
       - zigbee2mqtt:/app/data
     env_file:
       - .env.docker-compose
+
+  hetzner-dns-updater:
+    build:
+      context: ./tools/hetzner-dns-updater
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Note: host networking is required to reliably read the machine's LAN IP on Linux hosts
+    # Docker Desktop for Mac does not support host networking; if running on macOS, consider
+    # passing the LAN IP via env var HETZNER_FORCE_IP or running this on a Linux host.
+    network_mode: host
+    environment:
+      - HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
+      - HETZNER_API_TOKEN=${HETZNER_API_TOKEN}
+      - HETZNER_ZONE_ID=${HETZNER_ZONE_ID}
+      - HETZNER_RECORD_NAME=${HETZNER_RECORD_NAME}
+      - HETZNER_TTL=${HETZNER_TTL:-300}
+      - HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
+    env_file:
+      - .env.docker-compose
+    command: []
 
 volumes:
   attraccess-storage:
