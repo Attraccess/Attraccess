@@ -156,9 +156,7 @@ export function App() {
     metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
   }, [setTheme]);
 
-  useEffect(() => {
-    OpenAPI.BASE = getBaseUrl();
-  }, []);
+  OpenAPI.BASE = getBaseUrl();
 
   return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
 }

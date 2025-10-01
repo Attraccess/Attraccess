@@ -1,24 +1,34 @@
 version: '2.4'
 
 services:
+  proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+      - '1900:1900'
+    volumes:
+      - proxy-data:/data
+      - proxy-letsencrypt:/etc/letsencrypt
+    environment:
+      - INITIAL_ADMIN_EMAIL=admin@attraccess.org
+      - INITIAL_ADMIN_PASSWORD=password
+
   attraccess:
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - '80:3000'
     volumes:
       - attraccess-storage:/app/storage
-    depends_on:
-      - bunkerm
+    env_file:
+      - .env.local
 
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
-    ports:
-      - '8025:8025'
-      - '1025:1025'
 
   webhook-site:
     image: tarampampam/webhook-tester:latest
@@ -26,19 +36,12 @@ services:
     environment:
       - STORAGE_DRIVER=fs
       - FS_STORAGE_DIR=/storage
-    ports:
-      - '8084:8080'
     volumes:
       - webhook-site:/storage
 
   bunkerm: #BunkerM is an MQTT Broker
     image: bunkeriot/bunkerm:latest
     restart: unless-stopped
-    ports:
-      - '1883:1883' # MQTT broker port
-      - '9001:9001' # WebSocket port (if needed)
-      - '2000:2000' # Web UI
-      - '1900:1900' # Internal admin API
     #environment:
     #  - HOST_ADDRESS=mqtt.attraccess.demo
     #  - FRONTEND_URL=http://mqtt.attraccess.demo
@@ -51,8 +54,6 @@ services:
   zigbee2mqtt:
     image: ghcr.io/koenkk/zigbee2mqtt
     restart: unless-stopped
-    ports:
-      - '8080:8080'
     volumes:
       - zigbee2mqtt:/app/data
     #environment:
@@ -65,3 +66,5 @@ volumes:
   bunkerm_auth_data:
   webhook-site:
   zigbee2mqtt:
+  proxy-data:
+  proxy-letsencrypt:
