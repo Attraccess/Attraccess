@@ -11,9 +11,6 @@ tmp
 node_modules
 **/node_modules
 
-# Build outputs
-build
-**/build
 
 # Testing
 coverage
@@ -44,10 +41,33 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-storage
-secrets
 
-# Keep necessary files
+# Project Specific
 !.npmrc
-
-*.sqlite
+.cursor
+.github
+.husky
+.nx
+.openhands
+.vscode
+data
+dist
+docker
+log
+node_modules
+secrets
+storage
+tmp
+.dockerignore
+.editorconfig
+.env
+.env.*
+.gitignore
+.gitmodules
+balena.yml
+CODEOWNERS
+docker-compose.yml
+Dockerfile
+LICENSE-fabinfra.md
+LICENSE.md
+services.docker-compose.yml

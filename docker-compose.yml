@@ -1,52 +1,112 @@
 version: '2.4'
 
 services:
+  proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80' # HTTP
+      - '81:81' # Proxy Manager Admin
+      - '443:443' # HTTPS
+      - '1900:1900' # MQTT
+    volumes:
+      - proxy-data:/data
+      - proxy-letsencrypt:/etc/letsencrypt
+    environment:
+      - INITIAL_ADMIN_EMAIL=admin@attraccess.org
+      - INITIAL_ADMIN_PASSWORD=password
+    env_file:
+      - .env.docker-compose
+
   attraccess:
     restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - '80:3000'
+    expose:
+      - '3000'
     volumes:
       - attraccess-storage:/app/storage
-    depends_on:
-      - bunkerm
+    env_file:
+      - .env.docker-compose
 
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
-    ports:
-      - '8025:8025'
-      - '1025:1025'
+    expose:
+      - '8025'
+      - '1025'
+    env_file:
+      - .env.docker-compose
 
   webhook-site:
     image: tarampampam/webhook-tester:latest
     restart: unless-stopped
+    expose:
+      - '80'
     environment:
       - STORAGE_DRIVER=fs
       - FS_STORAGE_DIR=/storage
-    ports:
-      - '8084:8080'
     volumes:
       - webhook-site:/storage
+    env_file:
+      - .env.docker-compose
 
-  bunkerm: #BunkerM is an MQTT Broker
-    image: bunkeriot/bunkerm:latest
+  rabbitmq:
+    image: rabbitmq:4-management
     restart: unless-stopped
-    ports:
-      - '1883:1883' # MQTT broker port
-      - '9001:9001' # WebSocket port (if needed)
-      - '2000:2000' # Web UI
-      - '1900:1900' # Internal admin API
-    #environment:
-    #  - HOST_ADDRESS=mqtt.attraccess.demo
-    #  - FRONTEND_URL=http://mqtt.attraccess.demo
-    #  - ALLOWED_ORIGINS=http://mqtt.attraccess.demo
+    command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
+    expose:
+      - '15672' # RabbitMQ Management UI
+      - '5672' # RabbitMQ AMQP
+      - '1883' # MQTT
+      - '15675' # MQTT WebSocket
+    environment:
+      RABBITMQ_HOST: '%'
+      RABBITMQ_DEFAULT_USER: attraccess
+      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_NODENAME: rabbitmq
+      #RABBITMQ_ERLANG_COOKIE: 'please change on production'
     volumes:
-      - bunkerm_mosquitto_data:/var/lib/mosquitto
-      - bunkerm_mosquitto_conf:/etc/mosquitto
-      - bunkerm_auth_data:/data
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - '-q'
+        - ping
+      retries: 3
+      timeout: 5s
+      interval: 30s
+
+  zigbee2mqtt:
+    image: ghcr.io/koenkk/zigbee2mqtt
+    restart: unless-stopped
+    expose:
+      - '8080'
+    volumes:
+      - zigbee2mqtt:/app/data
+    env_file:
+      - .env.docker-compose
+
+  hetzner-dns-updater:
+    build:
+      context: ./tools/hetzner-dns-updater
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Note: host networking is required to reliably read the machine's LAN IP on Linux hosts
+    # Docker Desktop for Mac does not support host networking; if running on macOS, consider
+    # passing the LAN IP via env var HETZNER_FORCE_IP or running this on a Linux host.
+    network_mode: host
+    #environment:
+    #- HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
+    #- HETZNER_API_TOKEN=${HETZNER_API_TOKEN}
+    #- HETZNER_ZONE_ID=${HETZNER_ZONE_ID}
+    #- HETZNER_RECORD_NAME=${HETZNER_RECORD_NAME}
+    #- HETZNER_TTL=${HETZNER_TTL:-300}
+    #- HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
+    env_file:
+      - .env.docker-compose
 
 volumes:
   attraccess-storage:
@@ -54,3 +114,7 @@ volumes:
   bunkerm_mosquitto_conf:
   bunkerm_auth_data:
   webhook-site:
+  zigbee2mqtt:
+  proxy-data:
+  proxy-letsencrypt:
+  rabbitmq_data:
