@@ -105,7 +105,6 @@ services:
       - HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
     env_file:
       - .env.docker-compose
-    command: []
 
 volumes:
   attraccess-storage:
