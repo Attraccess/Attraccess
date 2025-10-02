@@ -14,6 +14,8 @@ BASE_URL="https://dns.hetzner.com/api/v1"
 RECORD_NAME="${HETZNER_RECORD_NAME:-@}"
 TTL="${HETZNER_TTL:-300}"
 INTERVAL="${HETZNER_INTERVAL_SECONDS:-900}"
+# execute "ip -4 route show default" and set this to the index of the IP to use
+IP_INDEX_TO_USE="${HETZNER_IP_INDEX_TO_USE:-9}"
 
 log() {
   printf '%s %s\n' "[hetzner]" "$*"
@@ -25,16 +27,7 @@ get_lan_ip() {
     return 0
   fi
 
-  # Prefer the source IP of an outbound route
-  IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++){if($i=="src"){print $(i+1); exit}}}') || IP=""
-  if [ "${IP}" = "" ]; then
-    # Fallback: first IPv4 from hostname -I
-    IP=$(hostname -I 2>/dev/null | awk '{for(i=1;i<=NF;i++){if($i ~ /\./){print $i; exit}}}') || IP=""
-  fi
-  if [ "${IP}" = "" ]; then
-    # Fallback: first IPv4 from ip addr
-    IP=$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -n1) || IP=""
-  fi
+  IP=$(ip -4 route show default | cut -d" " -f"${IP_INDEX_TO_USE}") || IP=""
   echo "${IP}"
 }
 
