@@ -21,9 +21,22 @@ log() {
   printf '%s %s\n' "[hetzner]" "$*"
 }
 
+# Expand simple env var references in a value (e.g. "${OTHER_VAR}" or "$OTHER_VAR")
+# Safeguard: do not execute command substitutions like $(...) or backticks
+expand_env_refs() {
+  INPUT="$1"
+  case "$INPUT" in
+    *'$('*) printf '%s' "$INPUT"; return 0 ;;
+    *'`'*) printf '%s' "$INPUT"; return 0 ;;
+  esac
+  # Use eval with printf to expand only env references inside the quoted string
+  eval "printf '%s' \"$INPUT\""
+}
+
 get_lan_ip() {
   if [ "${HETZNER_FORCE_IP:-}" != "" ]; then
-    echo "${HETZNER_FORCE_IP}"
+    FORCE_IP=$(expand_env_refs "${HETZNER_FORCE_IP}")
+    echo "${FORCE_IP}"
     return 0
   fi
 
