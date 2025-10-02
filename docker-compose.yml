@@ -98,13 +98,13 @@ services:
     # Docker Desktop for Mac does not support host networking; if running on macOS, consider
     # passing the LAN IP via env var HETZNER_FORCE_IP or running this on a Linux host.
     network_mode: host
-    environment:
-      - HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
-      - HETZNER_API_TOKEN=${HETZNER_API_TOKEN}
-      - HETZNER_ZONE_ID=${HETZNER_ZONE_ID}
-      - HETZNER_RECORD_NAME=${HETZNER_RECORD_NAME}
-      - HETZNER_TTL=${HETZNER_TTL:-300}
-      - HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
+    #environment:
+    #- HETZNER_DNS_UPDATER_ENABLED=${HETZNER_DNS_UPDATER_ENABLED}
+    #- HETZNER_API_TOKEN=${HETZNER_API_TOKEN}
+    #- HETZNER_ZONE_ID=${HETZNER_ZONE_ID}
+    #- HETZNER_RECORD_NAME=${HETZNER_RECORD_NAME}
+    #- HETZNER_TTL=${HETZNER_TTL:-300}
+    #- HETZNER_FORCE_IP=${HETZNER_FORCE_IP}
     env_file:
       - .env.docker-compose
 
