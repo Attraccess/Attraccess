@@ -69,7 +69,7 @@ require_env() {
 if [ "${HETZNER_DNS_UPDATER_ENABLED:-}" != "true" ] && [ "${HETZNER_DNS_UPDATER_ENABLED:-}" != "1" ]; then
   log "disabled; set HETZNER_DNS_UPDATER_ENABLED=true to enable"
   # Idle instead of exiting to avoid restart loops with restart: unless-stopped
-  tail -f /dev/null
+  exit 0
 fi
 
 require_env HETZNER_API_TOKEN
