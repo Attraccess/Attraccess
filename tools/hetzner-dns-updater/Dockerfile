@@ -1,15 +1,14 @@
-FROM alpine:3.20
-
-RUN apk add --no-cache curl jq iproute2
+FROM node:20-alpine
 
 WORKDIR /app
-COPY update-hetzner.sh /usr/local/bin/update-hetzner
-RUN chmod +x /usr/local/bin/update-hetzner
+
+# Copy script only (no dependencies needed beyond Node 20+ which has fetch)
+COPY update-hetzner.js /usr/local/bin/update-hetzner.js
 
 ENV HETZNER_RECORD_NAME="@" \
     HETZNER_TTL="300" \
     HETZNER_INTERVAL_SECONDS="900"
 
-CMD ["/usr/local/bin/update-hetzner"]
+CMD ["node", "/usr/local/bin/update-hetzner.js"]
 
 
