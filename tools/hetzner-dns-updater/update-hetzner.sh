@@ -106,7 +106,9 @@ upsert_a_record() {
 
 require_env() {
   VAR_NAME="$1"
-  if [ "${!VAR_NAME:-}" = "" ]; then
+  # POSIX sh does not support indirect expansion (${!var}); use eval safely
+  eval "__VAL=\${$VAR_NAME-}"
+  if [ "${__VAL}" = "" ]; then
     log "missing required env var: ${VAR_NAME}"
     exit 1
   fi
