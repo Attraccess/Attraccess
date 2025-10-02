@@ -39,22 +39,69 @@ get_lan_ip() {
 }
 
 get_record() {
+  NAME="$1"
   curl -s -H "Auth-API-Token: ${HETZNER_API_TOKEN}" \
-    "${BASE_URL}/records?zone_id=${HETZNER_ZONE_ID}&name=${RECORD_NAME}&type=A"
+    "${BASE_URL}/records?zone_id=${HETZNER_ZONE_ID}&name=${NAME}&type=A"
 }
 
 create_record() {
-  VALUE="$1"
+  NAME="$1"; VALUE="$2"
   curl -s -X POST -H "Auth-API-Token: ${HETZNER_API_TOKEN}" -H "Content-Type: application/json" \
     "${BASE_URL}/records" \
-    -d "{\"value\":\"${VALUE}\",\"ttl\":${TTL},\"type\":\"A\",\"name\":\"${RECORD_NAME}\",\"zone_id\":\"${HETZNER_ZONE_ID}\"}"
+    -d "{\"value\":\"${VALUE}\",\"ttl\":${TTL},\"type\":\"A\",\"name\":\"${NAME}\",\"zone_id\":\"${HETZNER_ZONE_ID}\"}"
 }
 
 update_record() {
-  RECORD_ID="$1"; VALUE="$2"
+  RECORD_ID="$1"; NAME="$2"; VALUE="$3"
   curl -s -X PUT -H "Auth-API-Token: ${HETZNER_API_TOKEN}" -H "Content-Type: application/json" \
     "${BASE_URL}/records/${RECORD_ID}" \
-    -d "{\"value\":\"${VALUE}\",\"ttl\":${TTL},\"type\":\"A\",\"name\":\"${RECORD_NAME}\",\"zone_id\":\"${HETZNER_ZONE_ID}\"}"
+    -d "{\"value\":\"${VALUE}\",\"ttl\":${TTL},\"type\":\"A\",\"name\":\"${NAME}\",\"zone_id\":\"${HETZNER_ZONE_ID}\"}"
+}
+
+# Fetch the zone name (e.g., example.com) for the given zone ID
+get_zone_name() {
+  curl -s -H "Auth-API-Token: ${HETZNER_API_TOKEN}" \
+    "${BASE_URL}/zones/${HETZNER_ZONE_ID}" | jq -r '.zone.name // ""'
+}
+
+# Normalize a provided name to be relative to the zone
+# Examples:
+#  normalize_name "@" "example.com" -> @
+#  normalize_name "example.com" "example.com" -> @
+#  normalize_name "host.example.com" "example.com" -> host
+#  normalize_name "*.host.example.com" "example.com" -> *.host
+normalize_name() {
+  RAW_NAME="$1"; ZONE_NAME="$2"
+  if [ "${RAW_NAME}" = "@" ] || [ "${RAW_NAME}" = "" ]; then
+    echo "@"; return 0
+  fi
+  if [ "${RAW_NAME}" = "${ZONE_NAME}" ]; then
+    echo "@"; return 0
+  fi
+  CASE_SUFFIX=".${ZONE_NAME}"
+  case "${RAW_NAME}" in
+    *"${CASE_SUFFIX}") echo "${RAW_NAME%${CASE_SUFFIX}}" ;;
+    *) echo "${RAW_NAME}" ;;
+  esac
+}
+
+# Upsert (create or update) A record for a given name -> value
+upsert_a_record() {
+  NAME="$1"; VALUE="$2"
+  RESP=$(get_record "${NAME}")
+  RECORD_ID=$(echo "${RESP}" | jq -r '.records[0].id // ""')
+  CURRENT_VALUE=$(echo "${RESP}" | jq -r '.records[0].value // ""')
+  if [ "${RECORD_ID}" = "" ] || [ "${RECORD_ID}" = "null" ]; then
+    log "creating A record ${NAME} -> ${VALUE}"
+    create_record "${NAME}" "${VALUE}" >/dev/null || log "create failed for ${NAME}"
+  else
+    if [ "${CURRENT_VALUE}" != "${VALUE}" ]; then
+      log "updating A record ${NAME}: ${CURRENT_VALUE} -> ${VALUE}"
+      update_record "${RECORD_ID}" "${NAME}" "${VALUE}" >/dev/null || log "update failed for ${NAME}"
+    else
+      log "no change (${NAME} is ${VALUE})"
+    fi
+  fi
 }
 
 require_env() {
@@ -75,6 +122,26 @@ fi
 require_env HETZNER_API_TOKEN
 require_env HETZNER_ZONE_ID
 
+# Determine zone name and derive record names to manage
+ZONE_NAME=$(get_zone_name)
+if [ "${ZONE_NAME}" = "" ] || [ "${ZONE_NAME}" = "null" ]; then
+  log "failed to determine zone name for id ${HETZNER_ZONE_ID}"
+  exit 1
+fi
+
+# Derive the base name (relative to zone) and its wildcard counterpart
+BASE_NAME=$(normalize_name "${RECORD_NAME}" "${ZONE_NAME}")
+# If the provided base is already a wildcard (e.g., *.host), strip the prefix to get the plain label
+PLAIN_LABEL="${BASE_NAME}"
+case "${BASE_NAME}" in
+  \*.*) PLAIN_LABEL="${BASE_NAME#*.}" ;;
+esac
+if [ "${PLAIN_LABEL}" = "@" ]; then
+  WILDCARD_NAME="*"
+else
+  WILDCARD_NAME="*.${PLAIN_LABEL}"
+fi
+
 while true; do
   IP=$(get_lan_ip)
   if [ "${IP}" = "" ]; then
@@ -83,21 +150,9 @@ while true; do
     continue
   fi
 
-  RESP=$(get_record)
-  RECORD_ID=$(echo "${RESP}" | jq -r '.records[0].id // ""')
-  CURRENT_VALUE=$(echo "${RESP}" | jq -r '.records[0].value // ""')
-
-  if [ "${RECORD_ID}" = "" ] || [ "${RECORD_ID}" = "null" ]; then
-    log "creating A record ${RECORD_NAME} -> ${IP}"
-    create_record "${IP}" >/dev/null || log "create failed"
-  else
-    if [ "${CURRENT_VALUE}" != "${IP}" ]; then
-      log "updating A record ${RECORD_NAME}: ${CURRENT_VALUE} -> ${IP}"
-      update_record "${RECORD_ID}" "${IP}" >/dev/null || log "update failed"
-    else
-      log "no change (${RECORD_NAME} is ${IP})"
-    fi
-  fi
+  # Upsert for the base label and its wildcard variant
+  upsert_a_record "${PLAIN_LABEL}" "${IP}"
+  upsert_a_record "${WILDCARD_NAME}" "${IP}"
 
   sleep "${INTERVAL}"
 done
