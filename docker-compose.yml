@@ -65,6 +65,7 @@ services:
       RABBITMQ_HOST: '%'
       RABBITMQ_DEFAULT_USER: attraccess
       RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_NODENAME: rabbitmq
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
