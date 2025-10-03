@@ -169,7 +169,7 @@ jobs:
 
       - name: Balena Release
         run: |
-          BALENA_CLI_VERSION=v22.0.6
+          BALENA_CLI_VERSION=v22.4.9
           # Install balena-cli via standlone zip to save install time
           wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
           balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
