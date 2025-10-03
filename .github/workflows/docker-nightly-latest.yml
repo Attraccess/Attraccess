@@ -156,4 +156,4 @@ jobs:
           # Install balena-cli via standlone zip to save install time
           wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
           balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
-          balena/bin/balena push ${{ secrets.BALENA_FLEET }} --note 'Nightly @ ${{ steps.vars.outputs.SHORT_SHA }}'
+          balena/bin/balena push ${{ secrets.BALENA_FLEET }} --draft --note 'Nightly @ ${{ steps.vars.outputs.SHORT_SHA }}'
