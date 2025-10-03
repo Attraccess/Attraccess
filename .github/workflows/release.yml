@@ -177,7 +177,7 @@ jobs:
       # set balena.yml version to semver with build metadata: ${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
-          sed -i 's/^version: .*/version: ${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
+          sed -i 's/^version: .*/version: ${{ env.RELEASE_VERSION }}/' balena.yml
           cat balena.yml
 
       - name: Balena Release

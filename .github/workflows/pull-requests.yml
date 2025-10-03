@@ -164,7 +164,7 @@ jobs:
       # set balena.yml version to pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
-          sed -i 's/^version: .*/version: 0.0.0-pr-${{ github.event.number }}+${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
+          sed -i 's/^version: .*/version: 0.0.0-pr${{ github.event.number }}/' balena.yml
           cat balena.yml
 
       - name: Balena Release
@@ -183,5 +183,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🐳 Balena image built and pushed: 0.0.0-pr-${{ github.event.number }}+${{ steps.vars.outputs.SHORT_SHA }}`
+              body: `🐳 Balena image built and pushed: 0.0.0-pr${{ github.event.number }}`
             })
