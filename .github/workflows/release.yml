@@ -178,6 +178,7 @@ jobs:
       - name: Set balena.yml version
         run: |
           sed -i 's/^version: .*/version: "${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}"/' balena.yml
+          cat balena.yml
 
       - name: Balena Release
         run: |
