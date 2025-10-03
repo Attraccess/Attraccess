@@ -166,24 +166,13 @@ jobs:
         run: |
           sed -i 's/^version: .*/version: "0.0.0-PR${{ github.event.number }}.${{ steps.vars.outputs.SHORT_SHA }}"/' balena.yml
 
-      - uses: balena-io/deploy-to-balena-action@f7d434197ec7d57218da93bf9c720e4c14c6b197
-        id: build
+      - uses: balena-io-experimental/community-cli-action@c1bbd47d8baf4e8591517434b7cc76b2d22c5a3c
+        name: Balena Release
         with:
-          balena_token: ${{ secrets.BALENA_TOKEN }}
-          fleet: ${{ secrets.BALENA_FLEET }}
-          note: 'PR #${{ github.event.number }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
-
-      - name: Finalize balena release
-        if: steps.build.outputs.release_id != ''
-        run: |
-          curl -sSf -X PATCH \
-            -H "Authorization: Bearer ${{ secrets.BALENA_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            --data '{"is_final": true}' \
-            "https://api.balena-cloud.com/v6/release(${{ steps.build.outputs.release_id }})"
-
-      - name: Log release ID built
-        run: echo "Built release ID ${{ steps.build.outputs.release_id }}"
+          balena_token: ${{secrets.BALENA_TOKEN}}
+          balena_cli_commands: >
+            push ${{ secrets.BALENA_FLEET }} --note 'PR #${{ github.event.number }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
+          balena_cli_version: 13.7.1
 
       - name: Post balena URL comment to PR
         uses: actions/github-script@v6
@@ -193,5 +182,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🐳 Balena image built and pushed: ${{ steps.build.outputs.release_id }} (0.0.0-PR${{ github.event.number }}.${{ steps.vars.outputs.SHORT_SHA }})`
+              body: `🐳 Balena image built and pushed: 0.0.0-PR${{ github.event.number }}.${{ steps.vars.outputs.SHORT_SHA }}`
             })
