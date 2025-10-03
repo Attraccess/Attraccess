@@ -149,10 +149,10 @@ jobs:
         run: |
           sed -i 's/^version: .*/version: "0.0.0-nightly.${{ steps.vars.outputs.SHORT_SHA }}"/' balena.yml
 
-      - uses: balena-io-experimental/community-cli-action@c1bbd47d8baf4e8591517434b7cc76b2d22c5a3c
-        name: Balena Release
-        with:
-          balena_token: ${{secrets.BALENA_TOKEN}}
-          balena_cli_commands: >
-            push ${{ secrets.BALENA_FLEET }} --note 'Nightly @ ${{ steps.vars.outputs.SHORT_SHA }}'
-          balena_cli_version: 13.7.1
+      - name: Balena Release
+        run: |
+          BALENA_CLI_VERSION=v22.0.6
+          # Install balena-cli via standlone zip to save install time
+          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+          balena login --token "${{ secrets.BALENA_TOKEN }}"
+          balena push ${{ secrets.BALENA_FLEET }} --note 'Nightly @ ${{ steps.vars.outputs.SHORT_SHA }}'
