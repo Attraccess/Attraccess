@@ -147,7 +147,7 @@ jobs:
       # set balena.yml version to semver with prerelease and build metadata
       - name: Set balena.yml version
         run: |
-          sed -i 's/^version: .*/version: '0.0.0-nightly'/' balena.yml
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/0.0.0-nightly-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
           cat balena.yml
 
       - name: Balena Release

@@ -162,10 +162,10 @@ jobs:
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
       # set balena.yml version to pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
-      #- name: Set balena.yml version
-      #  run: |
-      #    sed -i "s/{{VERSION_TO_BE_REPLACED}}/1.1.1/" balena.yml
-      #    cat balena.yml
+      - name: Set balena.yml version
+        run: |
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/0.0.0+pr+${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
+          cat balena.yml
 
       - name: Balena Release
         run: |
