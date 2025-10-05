@@ -239,7 +239,7 @@ function DocumentationEditorComponent() {
           {documentationType === DocumentationType.MARKDOWN && (
             <Tabs
               selectedKey={selectedTab}
-              onSelectionChange={(key) => setSelectedTab(key.toString())}
+              onSelectionChange={(key) => setSelectedTab((key ?? '').toString())}
               data-cy="documentation-editor-markdown-tabs"
             >
               <Tab key="edit" title={t('edit')} data-cy="documentation-editor-markdown-edit-tab">

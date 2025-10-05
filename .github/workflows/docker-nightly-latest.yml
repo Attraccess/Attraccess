@@ -64,7 +64,7 @@ jobs:
             dist/
 
   # Build and push Docker container
-  build-push-container:
+  containerize:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -131,3 +131,29 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  balena:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Add step to get short SHA
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      # set balena.yml version to semver with prerelease and build metadata
+      - name: Set balena.yml version
+        run: |
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/0.0.0-nightly-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
+          cat balena.yml
+
+      - name: Balena Release
+        run: |
+          BALENA_CLI_VERSION=v22.4.9
+          # Install balena-cli via standlone zip to save install time
+          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+          balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
+          balena/bin/balena push ${{ secrets.BALENA_FLEET }} --draft --note 'Nightly @ ${{ steps.vars.outputs.SHORT_SHA }}'

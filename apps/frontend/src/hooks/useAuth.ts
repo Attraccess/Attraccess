@@ -8,7 +8,6 @@ import {
   UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
-import { getBaseUrl } from '../api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface LoginCredentials {
@@ -48,7 +47,6 @@ export function useAuth() {
   // Initialize API base URL and configure for cookie-based authentication
   useEffect(() => {
     const initializeAuth = () => {
-      OpenAPI.BASE = getBaseUrl();
       // Remove manual token setting - cookies will be handled automatically
       OpenAPI.TOKEN = '';
       // Enable credentials to include cookies in requests
