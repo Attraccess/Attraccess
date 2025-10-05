@@ -18,7 +18,7 @@ storage-docker/
 .env.*
 !.env.example
 !.env.serve
-!.env.example.docker-compose
+!.env.docker-compose
 
 data/
 log/
