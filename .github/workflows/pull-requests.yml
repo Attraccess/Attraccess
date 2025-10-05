@@ -164,17 +164,16 @@ jobs:
       # set balena.yml version to pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
-          sed -i 's/^version: .*/version: 0.0.0-pr-${{ github.event.number }}+${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/0.0.0-pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}/" balena.yml
+          cat balena.yml
 
-      - uses: balena-io/deploy-to-balena-action@f7d434197ec7d57218da93bf9c720e4c14c6b197
-        id: build
-        with:
-          balena_token: ${{ secrets.BALENA_TOKEN }}
-          fleet: ${{ secrets.BALENA_FLEET }}
-          note: 'PR #${{ github.event.number }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
-
-      - name: Log release ID built
-        run: echo "Built release ID ${{ steps.build.outputs.release_id }}"
+      - name: Balena Release
+        run: |
+          BALENA_CLI_VERSION=v22.4.9
+          # Install balena-cli via standlone zip to save install time
+          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+          balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
+          balena/bin/balena push ${{ secrets.BALENA_FLEET }} --draft --note 'PR #${{ github.event.number }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
 
       - name: Post balena URL comment to PR
         uses: actions/github-script@v6
@@ -184,5 +183,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🐳 Balena image built and pushed: ${{ steps.build.outputs.release_id }} (pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }})`
+              body: `🐳 Balena image built and pushed: 0.0.0-pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}`
             })
