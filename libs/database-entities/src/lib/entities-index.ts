@@ -30,6 +30,8 @@ import {
   ButtonNodeDataSchema,
   IfNodeDataSchema,
   BillingTransactionItemCreateSchema,
+  SetPayloadNodeDataSchema,
+  MqttMessageReceivedNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -78,12 +80,14 @@ export {
   ResourceUsageAction,
   ButtonNodeDataSchema,
   IfNodeDataSchema,
+  SetPayloadNodeDataSchema,
   BillingTransaction,
   ResourceBillingConfiguration,
   Setting,
   BillingTransactionStatus,
   BillingTransactionItem,
   BillingTransactionItemCreateSchema,
+  MqttMessageReceivedNodeDataSchema,
 };
 
 // Export the entities object

@@ -47,7 +47,7 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>
             <PageHeader

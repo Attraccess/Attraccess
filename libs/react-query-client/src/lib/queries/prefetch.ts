@@ -90,10 +90,6 @@ export const prefetchUseMqttServiceMqttServersGetAll = (queryClient: QueryClient
 export const prefetchUseMqttServiceMqttServersGetOneById = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }), queryFn: () => MqttService.mqttServersGetOneById({ id }) });
-export const prefetchUseMqttServiceMqttServersGetStatusOfOne = (queryClient: QueryClient, { id }: {
-  id: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfOneKeyFn({ id }), queryFn: () => MqttService.mqttServersGetStatusOfOne({ id }) });
-export const prefetchUseMqttServiceMqttServersGetStatusOfAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfAllKeyFn(), queryFn: () => MqttService.mqttServersGetStatusOfAll() });
 export const prefetchUseAccessControlServiceResourceGroupIntroductionsGetMany = (queryClient: QueryClient, { groupId }: {
   groupId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) });

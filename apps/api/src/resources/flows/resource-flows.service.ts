@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -16,6 +16,8 @@ import {
   ButtonNodeDataSchema,
   IfNodeDataSchema,
   BillingTransactionItemCreateSchema,
+  SetPayloadNodeDataSchema,
+  MqttMessageReceivedNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -23,7 +25,6 @@ import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import { MqttMessageReceivedNodeDataSchema } from 'libs/database-entities/src/lib/entities/resourceFlowNode';
 
 export interface ValidationError {
   nodeId: string;
@@ -41,6 +42,8 @@ export interface ResourceFlowResponse {
 
 @Injectable()
 export class ResourceFlowsService {
+  private readonly logger = new Logger(ResourceFlowsService.name);
+
   constructor(
     @InjectRepository(ResourceFlowNode)
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
@@ -184,7 +187,18 @@ export class ResourceFlowsService {
       ]);
 
       for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
-        await this.mqttClientService.subscribe(nodeData.data.serverId, nodeData.data.topic);
+        if (!nodeData.data.serverId || !nodeData.data.topic) {
+          this.logger.warn(
+            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
+          );
+          continue;
+        }
+        this.mqttClientService.subscribe(nodeData.data.serverId, nodeData.data.topic).catch((error) => {
+          this.logger.error(
+            `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+            error.stack,
+          );
+        });
       }
 
       return { nodes: savedNodes, edges: savedEdges };
@@ -319,6 +333,13 @@ export class ResourceFlowsService {
           schema.configSchema = z.toJSONSchema(IfNodeDataSchema);
           schema.inputs = ['input'];
           schema.outputs = ['output-true', 'output-false'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+          schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 

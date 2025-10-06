@@ -18,6 +18,7 @@ export enum ResourceFlowNodeType {
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
+  PROCESSING_SET_PAYLOAD = 'processing.set-payload',
 }
 
 // Zod schemas for node data validation
@@ -83,6 +84,19 @@ export const MqttMessageReceivedNodeDataSchema = z.object({
   }),
 });
 
+export const SetPayloadNodeDataSchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        key: z.string().min(1, 'Key is required'),
+        value: z.string().optional().default('').meta({
+          stringVariant: 'multiline',
+        }),
+      }),
+    )
+    .default([]),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -114,6 +128,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.PROCESSING_IF:
       return IfNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+      return SetPayloadNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

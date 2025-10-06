@@ -5,7 +5,7 @@ import { MqttServer } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
-import { MqttMonitoringService } from './mqtt-monitoring.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
@@ -50,7 +50,6 @@ describe('MqttClientService', () => {
   let service: MqttClientService;
   let moduleRef: TestingModule;
   let mockRepository: Partial<Repository<MqttServer>>;
-  let mockMonitoringService: Partial<MqttMonitoringService>;
 
   const mockServer = {
     id: 1,
@@ -63,36 +62,16 @@ describe('MqttClientService', () => {
     useTls: false,
   };
 
+  let mockEventEmitter: Partial<EventEmitter2>;
+
   beforeEach(async () => {
     mockRepository = {
       findOne: jest.fn(),
       findOneBy: jest.fn().mockResolvedValue(mockServer),
     };
 
-    mockMonitoringService = {
-      registerServer: jest.fn(),
-      onConnectAttempt: jest.fn(),
-      onConnectSuccess: jest.fn(),
-      onConnectFailure: jest.fn(),
-      onDisconnect: jest.fn(),
-      onPublishSuccess: jest.fn(),
-      onPublishFailure: jest.fn(),
-      getConnectionStats: jest.fn().mockReturnValue({
-        connected: true,
-        connectionAttempts: 1,
-        connectionFailures: 0,
-        connectionSuccesses: 1,
-      }),
-      getMessageStats: jest.fn().mockReturnValue({
-        published: 1,
-        failed: 0,
-      }),
-      getAllServerStats: jest.fn().mockReturnValue({}),
-      getConnectionHealthStatus: jest.fn().mockReturnValue({
-        healthy: true,
-        details: 'Connection is healthy',
-      }),
-      clearServerStats: jest.fn(),
+    mockEventEmitter = {
+      emit: jest.fn(),
     };
 
     moduleRef = await Test.createTestingModule({
@@ -103,8 +82,8 @@ describe('MqttClientService', () => {
           useValue: mockRepository,
         },
         {
-          provide: MqttMonitoringService,
-          useValue: mockMonitoringService,
+          provide: EventEmitter2,
+          useValue: mockEventEmitter,
         },
       ],
     }).compile();
@@ -145,11 +124,6 @@ describe('MqttClientService', () => {
       expect(mockClient.publish).toHaveBeenCalled();
     }, 10000);
 
-    // Skip problematic tests
-    it.skip('should throw an error if the server is not found', async () => {
-      // This test is skipped because it's causing issues with the mock setup
-    });
-
     it('should throw an error if publishing fails', async () => {
       // Arrange - mock the client to throw an error on publish
       const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
@@ -172,29 +146,6 @@ describe('MqttClientService', () => {
     });
   });
 
-  describe('testConnection', () => {
-    it('should return success if connection is successful', async () => {
-      // Arrange - mock the internal methods
-      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
-      const mockClient = mqtt.connect({});
-      getOrCreateClientSpy.mockResolvedValue(mockClient);
-
-      // Act
-      const result = await service.testConnection(1);
-
-      // Assert
-      expect(result).toEqual({
-        success: true,
-        message: expect.stringContaining('Connection successful'),
-      });
-    }, 10000);
-
-    // Skip problematic tests
-    it.skip('should return failure if server not found', async () => {
-      // This test is skipped because it's causing issues with the mock setup
-    });
-  });
-
   describe('onModuleDestroy', () => {
     it('should disconnect all clients', async () => {
       // Arrange - mock the clients map to have a client
@@ -206,7 +157,6 @@ describe('MqttClientService', () => {
 
       // Assert
       expect(mockClient.end).toHaveBeenCalled();
-      expect(mockMonitoringService.onDisconnect).toHaveBeenCalledWith(1);
     }, 10000);
   });
 });

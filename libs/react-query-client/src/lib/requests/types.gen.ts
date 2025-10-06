@@ -738,105 +738,6 @@ export type UpdateMqttServerDto = {
     useTls?: boolean;
 };
 
-export type TestConnectionResponseDto = {
-    /**
-     * Whether the connection test was successful
-     */
-    success: boolean;
-    /**
-     * Message describing the test result
-     */
-    message: string;
-};
-
-export type MqttHealthStatusDto = {
-    /**
-     * Whether the connection is healthy
-     */
-    healthy: boolean;
-    /**
-     * Detailed health status message
-     */
-    details: string;
-};
-
-export type MqttConnectionStatsDto = {
-    /**
-     * Number of connection attempts
-     */
-    connectionAttempts: number;
-    /**
-     * Number of failed connections
-     */
-    connectionFailures: number;
-    /**
-     * Number of successful connections
-     */
-    connectionSuccesses: number;
-    /**
-     * Timestamp of last successful connection
-     */
-    lastConnectTime?: string;
-    /**
-     * Timestamp of last disconnection
-     */
-    lastDisconnectTime?: string;
-};
-
-export type MqttMessageStatsDto = {
-    /**
-     * Number of successfully published messages
-     */
-    published: number;
-    /**
-     * Number of failed message publications
-     */
-    failed: number;
-    /**
-     * Timestamp of last successful message publication
-     */
-    lastPublishTime?: string;
-    /**
-     * Timestamp of last failed message publication
-     */
-    lastFailureTime?: string;
-};
-
-export type MqttServerStatsDto = {
-    /**
-     * Connection statistics
-     */
-    connection: MqttConnectionStatsDto;
-    /**
-     * Message statistics
-     */
-    messages: MqttMessageStatsDto;
-};
-
-export type MqttServerStatusDto = {
-    /**
-     * Whether the server is currently connected
-     */
-    connected: boolean;
-    /**
-     * Health status of the connection
-     */
-    healthStatus: MqttHealthStatusDto;
-    /**
-     * Detailed statistics
-     */
-    stats: MqttServerStatsDto;
-};
-
-export type AllMqttServerStatusesDto = {
-    /**
-     * Map of server IDs to their statuses
-     */
-    servers: {
-        [key: string]: MqttServerStatusDto;
-    };
-};
-
 export type CreateResourceGroupDto = {
     /**
      * The name of the resource group
@@ -1515,7 +1416,7 @@ export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
     /**
      * The schema for a node type
      */
@@ -1551,11 +1452,13 @@ export enum type3 {
     INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+    INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     PROCESSING_WAIT = 'processing.wait',
-    PROCESSING_IF = 'processing.if'
+    PROCESSING_IF = 'processing.if',
+    PROCESSING_SET_PAYLOAD = 'processing.set-payload'
 }
 
 export type ResourceFlowNodePositionDto = {
@@ -1577,7 +1480,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
     /**
      * The position of the node
      */
@@ -2505,20 +2408,6 @@ export type MqttServersDeleteOneData = {
 };
 
 export type MqttServersDeleteOneResponse = unknown;
-
-export type MqttServersTestConnectionData = {
-    id: number;
-};
-
-export type MqttServersTestConnectionResponse = TestConnectionResponseDto;
-
-export type MqttServersGetStatusOfOneData = {
-    id: number;
-};
-
-export type MqttServersGetStatusOfOneResponse = MqttServerStatusDto;
-
-export type MqttServersGetStatusOfAllResponse = AllMqttServerStatusesDto;
 
 export type ResourceGroupIntroductionsGetManyData = {
     /**
@@ -4054,58 +3943,6 @@ export type $OpenApiTs = {
                  * MQTT server not found
                  */
                 404: unknown;
-            };
-        };
-    };
-    '/api/mqtt/servers/{id}/test': {
-        post: {
-            req: MqttServersTestConnectionData;
-            res: {
-                /**
-                 * Connection test result
-                 */
-                200: TestConnectionResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * MQTT server not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/mqtt/servers/{id}/status': {
-        get: {
-            req: MqttServersGetStatusOfOneData;
-            res: {
-                /**
-                 * MQTT server connection status and statistics
-                 */
-                200: MqttServerStatusDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * MQTT server not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/mqtt/servers/status': {
-        get: {
-            res: {
-                /**
-                 * All MQTT server connection statuses and statistics
-                 */
-                200: AllMqttServerStatusesDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
             };
         };
     };
