@@ -7,6 +7,10 @@ export class MqttReceiveInputFlowNode1759691989179 implements MigrationInterface
     await queryRunner.query(
       `CREATE TABLE "temporary_resource_flow_node" ("id" text PRIMARY KEY NOT NULL, "type" varchar CHECK( "type" IN ('input.button','input.resource.usage.started','input.resource.usage.stopped','input.resource.usage.takeover','input.resource.door.unlocked','input.resource.door.locked','input.resource.door.unlatched','input.mqtt.message.received','output.http.sendRequest','output.mqtt.sendMessage','output.resource.billing.calculation.set-additional-items','processing.wait','processing.if') ) NOT NULL, "data" json, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "resourceId" integer NOT NULL, "positionX" integer NOT NULL, "positionY" integer NOT NULL, CONSTRAINT "FK_ca3080b2dbc9c7c88a4a64c469d" FOREIGN KEY ("resourceId") REFERENCES "resource" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`,
     );
+    // Remove nodes with unsupported type before copying into the new constrained table
+    await queryRunner.query(
+      `DELETE FROM "resource_flow_node" WHERE "type" = 'input.resource.billing.calculation.started'`,
+    );
     await queryRunner.query(
       `INSERT INTO "temporary_resource_flow_node"("id", "type", "data", "createdAt", "updatedAt", "resourceId", "positionX", "positionY") SELECT "id", "type", "data", "createdAt", "updatedAt", "resourceId", "positionX", "positionY" FROM "resource_flow_node"`,
     );
