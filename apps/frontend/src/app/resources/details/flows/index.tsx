@@ -4,6 +4,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
+  ApiError,
   ResourceFlowEdgeDto,
   ResourceFlowLog,
   ResourceFlowNodeDto,
@@ -29,6 +30,7 @@ import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
+import { useToastMessage } from '../../../../components/toastProvider';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -80,7 +82,7 @@ function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
-  const { t } = useTranslations({ de, en });
+  const { t, tExists } = useTranslations({ de, en });
   const { t: tNodeTranslations } = useTranslations({
     de: nodesDeTranslations,
     en: nodesEnTranslations,
@@ -103,14 +105,26 @@ function FlowsPageInner() {
     },
   );
 
+  const toast = useToastMessage();
+
   const {
     mutate: saveFlow,
     isSuccess: saveSucceeded,
+    isError: saveFailed,
     isPending: isSaving,
   } = useResourceFlowsServiceSaveResourceFlow({
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId: Number(resourceId) }),
+      });
+    },
+    onError: (error) => {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'notifications.saveError',
+        fallbackKey: 'generic',
       });
     },
   });
@@ -297,6 +311,7 @@ function FlowsPageInner() {
               startContent={saveSucceeded && !flowHasChanged ? <CheckIcon /> : <SaveIcon />}
               onPress={save}
               isDisabled={!flowHasChanged}
+              color={saveFailed ? 'danger' : flowHasChanged ? 'primary' : 'default'}
             />
             <LogViewer resourceId={Number(resourceId)}>
               {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}

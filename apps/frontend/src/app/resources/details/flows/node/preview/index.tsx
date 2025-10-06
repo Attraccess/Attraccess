@@ -36,6 +36,14 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case 'input.resource.door.unlatched':
         return [];
 
+      case 'input.mqtt.message.received':
+        return [
+          {
+            label: t('nodes.input.mqtt.message.received.preview.topic'),
+            value: nodeData?.data.topic as string,
+          },
+        ];
+
       case 'output.resource.billing.calculation.set-additional-items':
         return [
           {
@@ -79,6 +87,20 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
             value: `${nodeData?.data.path ?? '-'} ${nodeData?.data.comparisonOperator} ${nodeData?.data.comparisonValue ?? '-'}`,
           },
         ];
+
+      case 'processing.set-payload': {
+        const entries = (nodeData?.data.entries as Array<{ key: string; value: string }>) ?? [];
+        const preview = entries
+          .slice(0, 3)
+          .map((e) => `${e?.key ?? ''} = ${e?.value ?? ''}`)
+          .join(', ');
+        return [
+          {
+            label: t('nodes.processing.set-payload.preview.mappings'),
+            value: preview,
+          },
+        ];
+      }
 
       default: {
         const exhaustiveCheck: never = schema.type;

@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardProps,
   Image,
-  Link,
   Pagination,
   Skeleton,
   Table,
@@ -25,6 +24,7 @@ import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { filenameToUrl } from '../../../api';
 import { StatusChip } from './statusChip';
 import { ChevronRightIcon, Settings2Icon } from 'lucide-react';
@@ -52,6 +52,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   const debouncedSearchValue = useDebounce(filter?.search, 250);
   const perPage = 10;
   const [page, setPage] = useState(1);
+  const navigate = useNavigate();
 
   const { data: group, status: fetchStatusGroup } = useResourcesServiceResourceGroupsGetOne(
     { id: groupId as number },
@@ -135,12 +136,17 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
         )}
 
         {groupId !== 'none' && hasAccessToGroupSettings && (
-          <Button as={Link} href={`/resource-groups/${groupId}`} isIconOnly startContent={<Settings2Icon />} />
+          <Button onPress={() => navigate(`/resource-groups/${groupId}`)} isIconOnly startContent={<Settings2Icon />} />
         )}
       </CardHeader>
 
       <CardBody>
-        <Table shadow="none" removeWrapper aria-label={title ?? 'Resource Group Table'}>
+        <Table
+          shadow="none"
+          removeWrapper
+          aria-label={title ?? 'Resource Group Table'}
+          onRowAction={(key) => navigate(`/resources/${key}`)}
+        >
           <TableHeader>
             <TableColumn width="48">{t('columns.image')}</TableColumn>
             <TableColumn>{t('columns.name')}</TableColumn>
@@ -156,12 +162,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             emptyContent={<EmptyState />}
           >
             {(resource) => (
-              <TableRow
-                key={resource.id}
-                as={Link}
-                href={`/resources/${resource.id}`}
-                className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-              >
+              <TableRow key={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
                 <TableCell>
                   <Image
                     height={48}
@@ -179,13 +180,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
                   <StatusChip resourceId={resource.id} />
                 </TableCell>
                 <TableCell>
-                  <Button
-                    className="md:inline hidden"
-                    as={Link}
-                    href={`/resources/${resource.id}`}
-                    isIconOnly
-                    startContent={<ChevronRightIcon />}
-                  />
+                  <ChevronRightIcon />
                 </TableCell>
               </TableRow>
             )}

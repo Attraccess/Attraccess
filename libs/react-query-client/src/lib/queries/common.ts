@@ -170,16 +170,6 @@ export const useMqttServiceMqttServersGetOneByIdKey = "MqttServiceMqttServersGet
 export const UseMqttServiceMqttServersGetOneByIdKeyFn = ({ id }: {
   id: number;
 }, queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetOneByIdKey, ...(queryKey ?? [{ id }])];
-export type MqttServiceMqttServersGetStatusOfOneDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetStatusOfOne>>;
-export type MqttServiceMqttServersGetStatusOfOneQueryResult<TData = MqttServiceMqttServersGetStatusOfOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttServersGetStatusOfOneKey = "MqttServiceMqttServersGetStatusOfOne";
-export const UseMqttServiceMqttServersGetStatusOfOneKeyFn = ({ id }: {
-  id: number;
-}, queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetStatusOfOneKey, ...(queryKey ?? [{ id }])];
-export type MqttServiceMqttServersGetStatusOfAllDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetStatusOfAll>>;
-export type MqttServiceMqttServersGetStatusOfAllQueryResult<TData = MqttServiceMqttServersGetStatusOfAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttServersGetStatusOfAllKey = "MqttServiceMqttServersGetStatusOfAll";
-export const UseMqttServiceMqttServersGetStatusOfAllKeyFn = (queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetStatusOfAllKey, ...(queryKey ?? [])];
 export type AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGetMany>>;
 export type AccessControlServiceResourceGroupIntroductionsGetManyQueryResult<TData = AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAccessControlServiceResourceGroupIntroductionsGetManyKey = "AccessControlServiceResourceGroupIntroductionsGetMany";
@@ -400,7 +390,6 @@ export type ResourcesServiceLockDoorMutationResult = Awaited<ReturnType<typeof R
 export type ResourcesServiceUnlockDoorMutationResult = Awaited<ReturnType<typeof ResourcesService.unlockDoor>>;
 export type ResourcesServiceUnlatchDoorMutationResult = Awaited<ReturnType<typeof ResourcesService.unlatchDoor>>;
 export type MqttServiceMqttServersCreateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersCreateOne>>;
-export type MqttServiceMqttServersTestConnectionMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersTestConnection>>;
 export type AccessControlServiceResourceGroupIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGrant>>;
 export type AccessControlServiceResourceGroupIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsRevoke>>;
 export type AccessControlServiceResourceGroupIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroducersGrant>>;

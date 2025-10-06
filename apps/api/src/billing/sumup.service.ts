@@ -19,6 +19,7 @@ export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 export class SumUpService {
   private readonly logger = new Logger(SumUpService.name);
   private readonly appConfig: AppConfigType;
+  private hasPendingTransactions = true;
 
   constructor(
     @InjectRepository(Setting)
@@ -155,6 +156,7 @@ export class SumUpService {
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
         status: BillingTransactionStatus.Pending,
       });
+      this.hasPendingTransactions = true;
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
 
@@ -227,6 +229,7 @@ export class SumUpService {
       `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
     );
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+    this.hasPendingTransactions = true;
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
 
     this.logger.debug(
@@ -236,6 +239,10 @@ export class SumUpService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async processPendingTransactions(): Promise<void> {
+    if (!this.hasPendingTransactions) {
+      return;
+    }
+
     this.logger.debug('processPendingTransactions: starting');
 
     const transactions = await this.billingTransactionRepository.findBy({
@@ -244,14 +251,13 @@ export class SumUpService {
 
     this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
 
-    for (const transaction of transactions) {
-      if (!transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX)) {
-        this.logger.debug('processPendingTransactions: skipping non-sumup transaction', {
-          transactionId: transaction.externalReference,
-        });
-        continue;
-      }
+    const consideredTransactions = transactions.filter((transaction) =>
+      transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
+    );
 
+    this.hasPendingTransactions = consideredTransactions.length > 0;
+
+    for (const transaction of consideredTransactions) {
       const transactionId = transaction.externalReference.split(':')[1];
       if (!transactionId) {
         this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);

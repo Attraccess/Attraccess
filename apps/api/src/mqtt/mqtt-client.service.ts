@@ -1,14 +1,15 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import * as mqtt from 'mqtt';
 import { MqttClient } from 'mqtt';
-import { MqttMonitoringService } from './mqtt-monitoring.service';
-import { TestConnectionResponseDto, MqttServerStatusDto } from './servers/dtos/mqtt-server.dto';
+import { MqttConnectionError } from './errors/mqtt-connection.error';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MqttMessageEvent } from './mqtt-message.event';
 
 @Injectable()
-export class MqttClientService implements OnModuleInit, OnModuleDestroy {
+export class MqttClientService implements OnModuleDestroy {
   private clients: Map<number, MqttClient> = new Map();
   private connectionPromises: Map<number, Promise<MqttClient>> = new Map();
   private readonly logger = new Logger(MqttClientService.name);
@@ -16,13 +17,8 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
-    private readonly monitoringService: MqttMonitoringService
+    private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  async onModuleInit() {
-    // Lazy initialization - don't connect to any servers at startup
-    this.logger.log('MQTT Client Service initialized');
-  }
 
   async onModuleDestroy() {
     // Disconnect all clients on shutdown
@@ -30,11 +26,10 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     for (const [id, client] of this.clients.entries()) {
       client.end(true);
       this.clients.delete(id);
-      this.monitoringService.onDisconnect(id);
     }
   }
 
-  private async getOrCreateClient(serverId: number): Promise<MqttClient> {
+  private async getOrCreateClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     // If there's an existing connection being established, wait for it
     if (this.connectionPromises.has(serverId)) {
       const connectionPromise = this.connectionPromises.get(serverId);
@@ -52,7 +47,7 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Otherwise, create a new connection promise
-    const connectionPromise = this.createClient(serverId);
+    const connectionPromise = this.createClient(serverId, keepTryingToConnect);
     this.connectionPromises.set(serverId, connectionPromise);
 
     try {
@@ -64,23 +59,18 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async createClient(serverId: number): Promise<MqttClient> {
+  private async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     const server = await this.mqttServerRepository.findOneBy({ id: serverId });
 
     if (!server) {
       throw new Error(`MQTT server with ID ${serverId} not found`);
     }
 
-    // Register server with monitoring service
-    this.monitoringService.registerServer(serverId);
-    // Record connection attempt
-    this.monitoringService.onConnectAttempt(serverId);
-
     return new Promise((resolve, reject) => {
       const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${server.port}`;
 
       const options: mqtt.IClientOptions = {
-        clientId: server.clientId || `attraccess-api-${Math.random().toString(16).slice(2, 10)}`,
+        clientId: server.clientId || `attraccess-client`,
         clean: true,
         reconnectPeriod: 5000,
       };
@@ -95,41 +85,49 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
 
       const client = mqtt.connect(url, options);
 
+      client.on('message', (topic, payloadBuffer) => {
+        const payloadString = payloadBuffer.toString();
+        let payload = payloadString;
+        try {
+          payload = JSON.parse(payloadString);
+        } catch {
+          // propably not json, just ignore it
+        }
+        this.logger.debug('mqtt message', topic, payload);
+
+        this.eventEmitter.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(serverId, topic, payload));
+      });
+
       client.on('connect', () => {
         this.logger.log(`Connected to MQTT server ${server.name} (${url})`);
-        this.monitoringService.onConnectSuccess(serverId);
         resolve(client);
       });
 
       client.on('error', (error) => {
         this.logger.error(`MQTT connection error for server ${server.name}: ${error.message}`);
         this.logger.error(error);
-        this.monitoringService.onConnectFailure(serverId, error.message);
-        // Don't reject as the client will try to reconnect
       });
 
       client.on('reconnect', () => {
         this.logger.log(`Reconnecting to MQTT server ${server.name}`);
-        this.monitoringService.onConnectAttempt(serverId);
       });
 
       client.on('disconnect', () => {
         this.logger.log(`Disconnected from MQTT server ${server.name}`);
-        this.monitoringService.onDisconnect(serverId);
       });
 
       client.on('offline', () => {
         this.logger.log(`MQTT client for server ${server.name} is offline`);
-        this.monitoringService.onDisconnect(serverId);
       });
 
       // Reject after 10 seconds if connection hasn't been established
       const timeout = setTimeout(() => {
         if (!client.connected) {
           const errorMsg = `Timeout connecting to MQTT server ${server.name}`;
-          this.monitoringService.onConnectFailure(serverId, errorMsg);
           reject(new Error(errorMsg));
-          client.end(true);
+          if (!keepTryingToConnect) {
+            client.end(true);
+          }
         }
       }, 10000);
 
@@ -147,71 +145,26 @@ export class MqttClientService implements OnModuleInit, OnModuleDestroy {
         client.publish(topic, message, { qos: 2, retain: true }, (error) => {
           if (error) {
             this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
-            this.monitoringService.onPublishFailure(serverId, error.message);
             reject(error);
           } else {
             this.logger.debug(`Published to topic ${topic}: ${message}`);
-            this.monitoringService.onPublishSuccess(serverId);
             resolve();
           }
         });
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to publish to MQTT server ${serverId}`, error);
-      this.monitoringService.onPublishFailure(serverId, errorMsg);
       throw error;
     }
   }
 
-  async testConnection(serverId: number): Promise<TestConnectionResponseDto> {
+  async subscribe(serverId: number, topic: string): Promise<void> {
     try {
-      await this.getOrCreateClient(serverId);
-      const healthStatus = this.monitoringService.getConnectionHealthStatus(serverId);
-      return {
-        success: true,
-        message: `Connection successful. ${healthStatus.details}`,
-      };
+      const client = await this.getOrCreateClient(serverId, true);
+      client.subscribe(topic);
     } catch (error) {
-      return {
-        success: false,
-        message: `Connection failed: ${error instanceof Error ? error.message : String(error)}`,
-      };
+      this.logger.error(`Failed to subscribe to topic ${topic} for server ${serverId}`, error);
+      throw new MqttConnectionError(error.message);
     }
-  }
-
-  async getStatusOfOne(serverId: number): Promise<MqttServerStatusDto> {
-    const client = this.clients.get(serverId);
-    const connected = client?.connected || false;
-    const healthStatus = this.monitoringService.getConnectionHealthStatus(serverId);
-
-    return {
-      connected,
-      healthStatus,
-      stats: {
-        connection: this.monitoringService.getConnectionStats(serverId),
-        messages: this.monitoringService.getMessageStats(serverId),
-      },
-    };
-  }
-
-  async getStatusOfAll(): Promise<Record<string, MqttServerStatusDto>> {
-    const result: Record<string, MqttServerStatusDto> = {};
-    const allStats = this.monitoringService.getAllServerStats();
-
-    for (const [serverId, stats] of Object.entries(allStats)) {
-      const id = Number(serverId);
-      const client = this.clients.get(id);
-      const connected = client?.connected || false;
-      const healthStatus = this.monitoringService.getConnectionHealthStatus(id);
-
-      result[serverId] = {
-        connected,
-        healthStatus,
-        stats,
-      };
-    }
-
-    return result;
   }
 }
