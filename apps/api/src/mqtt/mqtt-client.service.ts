@@ -29,7 +29,7 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  private async getOrCreateClient(serverId: number, keepTryingToConenct = false): Promise<MqttClient> {
+  private async getOrCreateClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     // If there's an existing connection being established, wait for it
     if (this.connectionPromises.has(serverId)) {
       const connectionPromise = this.connectionPromises.get(serverId);
@@ -47,7 +47,7 @@ export class MqttClientService implements OnModuleDestroy {
     }
 
     // Otherwise, create a new connection promise
-    const connectionPromise = this.createClient(serverId, keepTryingToConenct);
+    const connectionPromise = this.createClient(serverId, keepTryingToConnect);
     this.connectionPromises.set(serverId, connectionPromise);
 
     try {
@@ -59,7 +59,7 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  private async createClient(serverId: number, keepTryingToConenct = false): Promise<MqttClient> {
+  private async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     const server = await this.mqttServerRepository.findOneBy({ id: serverId });
 
     if (!server) {
@@ -125,7 +125,7 @@ export class MqttClientService implements OnModuleDestroy {
         if (!client.connected) {
           const errorMsg = `Timeout connecting to MQTT server ${server.name}`;
           reject(new Error(errorMsg));
-          if (!keepTryingToConenct) {
+          if (!keepTryingToConnect) {
             client.end(true);
           }
         }

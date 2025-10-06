@@ -236,25 +236,25 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   async handleMqttMessageReceivedEvent(event: MqttMessageReceivedEvent) {
     const { topic, payload, serverId } = event;
 
-    const messageRecivedNodes = await this.flowNodeRepository.find({
+    const messageReceivedNodes = await this.flowNodeRepository.find({
       where: {
         type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
       },
     });
 
-    const filteredMessageRecivedNodes = messageRecivedNodes.filter((node) => {
+    const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
       const { serverId: nodeServerId, topic: nodeTopic } = MqttMessageReceivedNodeDataSchema.parse(node.data);
       return nodeServerId === serverId && nodeTopic === topic;
     });
 
-    if (filteredMessageRecivedNodes.length === 0) {
+    if (filteredMessageReceivedNodes.length === 0) {
       this.logger.debug(`No flow nodes found for server ID: ${serverId} and topic: ${topic}`);
       return;
     }
 
-    this.logger.log(`Found ${messageRecivedNodes.length} flow node(s) for topic: ${topic}`);
+    this.logger.log(`Found ${filteredMessageReceivedNodes.length} flow node(s) for topic: ${topic}`);
 
-    await this.startFlow(messageRecivedNodes, { payload: { serverId, topic, payload } });
+    await this.startFlow(filteredMessageReceivedNodes, { payload: { serverId, topic, payload } });
   }
 
   private async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {
