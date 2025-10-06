@@ -2,7 +2,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
-import { Image } from '@heroui/react';
+import { Alert } from '@heroui/react';
 
 export function ServerNotAvailable() {
   const { t } = useTranslations({
@@ -11,10 +11,10 @@ export function ServerNotAvailable() {
   });
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
-      <Image src="/logo.png" alt="Logo" height={100} className="mb-8" />
-      <h1 className="text-4xl font-bold">{t('title')}</h1>
-      <p className="text-lg">{t('description')}</p>
+    <div className="mb-3 sticky top-0 z-50">
+      <Alert color="danger" title={t('title')} variant="faded">
+        {t('description')}
+      </Alert>
     </div>
   );
 }
