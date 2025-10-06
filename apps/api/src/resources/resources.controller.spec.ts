@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
 import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
+import { createMockResource } from '../test-utils/resource.fixtures';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { NotFoundException } from '@nestjs/common';
@@ -12,7 +13,6 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 describe('ResourcesController', () => {
   let controller: ResourcesController;
   let service: ResourcesService;
-  // ResourceImageService is injected but not directly used in tests
 
   beforeEach(async () => {
     const mockResourcesService = {
@@ -54,30 +54,12 @@ describe('ResourcesController', () => {
   describe('getAll', () => {
     it('should return paginated resources', async () => {
       const resources: Resource[] = [
-        {
+        createMockResource({
           id: 1,
           name: 'Test Resource',
           description: 'Test Description',
-          type: ResourceType.Machine,
-          separateUnlockAndUnlatch: false,
           imageFilename: 'test.jpg',
-          documentationType: DocumentationType.MARKDOWN,
-          documentationMarkdown: '# Test Documentation\n\nThis is a test documentation.',
-          documentationUrl: null,
-          allowTakeOver: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          introductions: [],
-          usages: [],
-          introducers: [],
-          groups: [],
-          flowNodes: [],
-          flowEdges: [],
-          flowLogs: [],
-          attractapReaders: [],
-          maintenances: [],
-          billingConfigurations: [],
-        },
+        }),
       ];
 
       const paginatedResponse: PaginatedResponse<Resource> = {
@@ -108,30 +90,12 @@ describe('ResourcesController', () => {
 
   describe('getOneById', () => {
     it('should return a resource by id', async () => {
-      const resource: Resource = {
+      const resource: Resource = createMockResource({
         id: 1,
         name: 'Test Resource',
         description: 'Test Description',
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
         imageFilename: 'test.jpg',
-        documentationType: DocumentationType.MARKDOWN,
-        documentationMarkdown: '# Test Documentation\n\nThis is a test documentation.',
-        documentationUrl: null,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+      });
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
 
@@ -162,30 +126,15 @@ describe('ResourcesController', () => {
         documentationMarkdown: null,
       };
 
-      const newResource: Resource = {
+      const newResource: Resource = createMockResource({
         id: 1,
         name: createDto.name,
         description: createDto.description,
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
         documentationType: createDto.documentationType,
         documentationMarkdown: createDto.documentationMarkdown,
         documentationUrl: createDto.documentationUrl,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+        imageFilename: null,
+      });
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
 
@@ -207,30 +156,16 @@ describe('ResourcesController', () => {
         documentationUrl: null,
       };
 
-      const updatedResource: Resource = {
+      const updatedResource: Resource = createMockResource({
         id: 1,
         name: updateDto.name as string,
         description: updateDto.description as string,
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
         documentationType: updateDto.documentationType as DocumentationType,
         documentationMarkdown: updateDto.documentationMarkdown,
         documentationUrl: updateDto.documentationUrl,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+        imageFilename: null,
+        deletedAt: null as unknown as Date,
+      });
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);
 
