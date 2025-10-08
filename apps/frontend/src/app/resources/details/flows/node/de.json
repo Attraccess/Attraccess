@@ -270,7 +270,7 @@
                 "input": "Eingabe"
               },
               "preview": {
-                "pois": "Position"
+                "position": "Position"
               },
               "config": {
                 "name": {

@@ -236,7 +236,7 @@
       },
       "mqtt": {
         "sendMessage": {
-          "title": "MQTT message send",
+          "title": "Send MQTT message",
           "description": "This node sends a MQTT message.",
           "inputs": {
             "input": "Input"
