@@ -98,31 +98,31 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
     [getTranslationRaw],
   );
 
+  const nestedObjectToDotNotatedKeys = (obj: Record<string, unknown>): string[] => {
+    const keys: string[] = [];
+
+    const walk = (current: Record<string, unknown>, prefix: string) => {
+      Object.entries(current).forEach(([key, value]) => {
+        const path = prefix ? `${prefix}.${key}` : key;
+
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+          // Recurse into nested objects; arrays are treated as leaves to avoid index-based keys
+          walk(value as Record<string, unknown>, path);
+        } else {
+          keys.push(path);
+        }
+      });
+    };
+
+    walk(obj, '');
+    return keys;
+  };
+
   // log missing translation keys when in development mode
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') {
       return;
     }
-
-    const nestedObjectToDotNotatedKeys = (obj: Record<string, unknown>): string[] => {
-      const keys: string[] = [];
-
-      const walk = (current: Record<string, unknown>, prefix: string) => {
-        Object.entries(current).forEach(([key, value]) => {
-          const path = prefix ? `${prefix}.${key}` : key;
-
-          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-            // Recurse into nested objects; arrays are treated as leaves to avoid index-based keys
-            walk(value as Record<string, unknown>, path);
-          } else {
-            keys.push(path);
-          }
-        });
-      };
-
-      walk(obj, '');
-      return keys;
-    };
 
     const keyLangMap = new Map<string, Set<string>>();
     Object.entries(translationsRef.current).forEach(([lang, translations]) => {
