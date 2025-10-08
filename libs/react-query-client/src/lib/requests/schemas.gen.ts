@@ -105,9 +105,14 @@ export const $User = {
         creditBalance: {
             type: 'number',
             description: 'The credit balance of the user'
+        },
+        billingFactor: {
+            type: 'number',
+            description: 'The percentage rate the user to actually pay for activities that cost credits',
+            example: 100
         }
     },
-    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance']
+    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
 } as const;
 
 export const $VerifyEmailDto = {
@@ -258,6 +263,18 @@ export const $SetUserPasswordDto = {
         }
     },
     required: ['password']
+} as const;
+
+export const $ChangeBillingFactorDto = {
+    type: 'object',
+    properties: {
+        billingFactor: {
+            type: 'number',
+            description: 'The new billing factor',
+            example: 50
+        }
+    },
+    required: ['billingFactor']
 } as const;
 
 export const $CreateSessionResponse = {
@@ -820,6 +837,12 @@ This is a markdown documentation for the resource.`
             type: 'string',
             description: 'When the resource was last updated'
         },
+        deletedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the resource was deleted',
+            nullable: true
+        },
         groups: {
             description: 'The groups the resource belongs to',
             type: 'array',
@@ -828,7 +851,7 @@ This is a markdown documentation for the resource.`
             }
         }
     },
-    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'groups']
+    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'deletedAt', 'groups']
 } as const;
 
 export const $PaginatedResourceResponseDto = {

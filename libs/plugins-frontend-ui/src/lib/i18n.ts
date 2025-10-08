@@ -83,6 +83,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
       const translationTemplate = getTranslationTemplate(key);
       if (translationTemplate === undefined) {
+        console.error(`Missing translation for key: ${key}`);
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
       return translationTemplate(data);

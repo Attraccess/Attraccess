@@ -300,6 +300,7 @@ export class ResourceUsageService {
         endNotes,
       };
 
+      this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
       await this.flowExecutorService.runFlow(
         activeSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
@@ -309,6 +310,8 @@ export class ResourceUsageService {
         },
         transactionalEntityManager,
       );
+
+      this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
 
       // Update session with end time and notes - using explicit update to avoid the generated column
       await transactionalEntityManager

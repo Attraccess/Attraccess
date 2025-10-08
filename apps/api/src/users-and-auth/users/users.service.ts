@@ -339,4 +339,18 @@ export class UsersService {
       limit: paginationOptions.limit,
     };
   }
+
+  async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
+    const targetUser = await this.findOne({ id: targetUserId });
+    if (!targetUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    if (newBillingFactor < 0) {
+      throw new BadRequestException('Billing factor must be at least 0');
+    }
+
+    const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
+    return updated;
+  }
 }

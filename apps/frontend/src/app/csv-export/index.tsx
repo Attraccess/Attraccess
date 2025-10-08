@@ -115,7 +115,7 @@ export function CsvExport() {
         <ModalContent>
           <ModalHeader>
             <div>
-              {t(`exports.${activeExportKey}.title`)}
+              {activeExportKey && t(`exports.${activeExportKey}.title`)}
               <br />
               <small>
                 {t('exports.modal.subtitle', { start: dateRangeStartFormatted, end: dateRangeEndFormatted })}

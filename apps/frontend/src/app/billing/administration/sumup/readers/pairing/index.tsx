@@ -12,11 +12,11 @@ import {
   ModalHeader,
   useDisclosure,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
-import { PasswordInput } from '../../../../../components/PasswordInput';
+import { PageHeader } from '../../../../../../components/pageHeader';
+import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
 import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';
-import { useToastMessage } from '../../../../../components/toastProvider';
+import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface Props {

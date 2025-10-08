@@ -1,13 +1,15 @@
 import { PageHeader } from '../../../components/pageHeader';
-import { BanknoteIcon } from 'lucide-react';
 import { UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
-import { Card, CardBody, CardHeader } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Link } from '@heroui/react';
 import { SummaryCard } from '../dashboard/summary';
+import { SumUpIcon } from '../../../components/icons/sumup.icon';
+import { BanknoteIcon } from 'lucide-react';
+import { ManageBillingFactorCard } from './billingFactor';
 
 export function BillingAdministrationPage() {
   const { t } = useTranslations({ en, de });
@@ -16,20 +18,34 @@ export function BillingAdministrationPage() {
 
   return (
     <>
-      <PageHeader title={t('title')} icon={<BanknoteIcon />} />
-
-      <Card className="w-full mb-4">
-        <CardHeader>
-          <PageHeader title={t('inputs.user')} noMargin />
-        </CardHeader>
-        <CardBody>
-          <UserSearch onSelectionChange={setUser} label={t('inputs.user')} />
-        </CardBody>
-      </Card>
+      <PageHeader
+        title={t('title')}
+        icon={<BanknoteIcon />}
+        actions={
+          <Button as={Link} href="/billing/administration/sumup" startContent={<SumUpIcon />} variant="light">
+            {t('actions.sumupSettings')}
+          </Button>
+        }
+        backTo="/billing"
+      />
 
       <div className="flex flex-row flex-wrap gap-4">
-        <ManualTransactionsCard userId={user?.id as number} className="flex-grow" />
-        <SummaryCard userId={user?.id as number} isDisabled={!user} className="flex-grow" />
+        <Card className="flex-grow">
+          <CardHeader>
+            <PageHeader title={t('inputs.user')} noMargin />
+          </CardHeader>
+          <CardBody>
+            <UserSearch onSelectionChange={setUser} label={t('inputs.user')} />
+          </CardBody>
+        </Card>
+
+        {user && (
+          <>
+            <ManageBillingFactorCard userId={user?.id as number} className="flex-grow" />
+            <ManualTransactionsCard userId={user?.id as number} className="flex-grow" />
+            <SummaryCard userId={user?.id as number} isDisabled={!user} className="w-full" />
+          </>
+        )}
       </div>
     </>
   );

@@ -62,6 +62,7 @@ export function NodeEditor(props: Props) {
               {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
                 ([propertyName, property]) => (
                   <PropertyInput
+                    key={propertyName}
                     isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
                     nodeType={schema.type}
                     tNodeTranslations={t}

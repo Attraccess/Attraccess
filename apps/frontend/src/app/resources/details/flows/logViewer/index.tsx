@@ -58,12 +58,14 @@ export function LogViewer(props: Props) {
 
     return allLogs.map((log) => {
       const nodeOfLog = flowData?.nodes.find((node) => node.id === log.nodeId);
+
       return {
         ...log,
         node: nodeOfLog,
+        title: `${t('nodes.' + (nodeOfLog?.type ?? 'flow') + '.title')} -> ${log.type}`,
       };
     });
-  }, [flowData, logs, sseLogs]);
+  }, [flowData, logs, sseLogs, t]);
 
   const logsOrdered = useMemo(() => {
     return logsWithNodes.sort((a, b) => a.id - b.id);
@@ -75,7 +77,7 @@ export function LogViewer(props: Props) {
         acc[log.flowRunId] = [...(acc[log.flowRunId] ?? []), log];
         return acc;
       },
-      {} as Record<string, (ResourceFlowLog & { node: ResourceFlowNodeDto | undefined })[]>,
+      {} as Record<string, (ResourceFlowLog & { node: ResourceFlowNodeDto | undefined; title: string })[]>,
     );
   }, [logsOrdered]);
 
@@ -106,17 +108,14 @@ export function LogViewer(props: Props) {
                 <div key={`${runId}-logs`}>
                   <div>
                     <PageHeader
-                      title={t('nodes.' + firstNodeOfRun(runId)?.node?.type + '.title')}
+                      title={t('nodes.' + (firstNodeOfRun(runId)?.node?.type ?? 'flow') + '.title')}
                       subtitle={formatDateTime(firstNodeOfRun(runId)?.createdAt)}
                       noMargin
                     />
 
                     <Accordion className="mt-2">
                       {logsOfRun.map((log) => (
-                        <AccordionItem
-                          key={`${runId}-${log.id}`}
-                          title={`${t('nodes.' + log.node?.type + '.title')} -> ${log.type}`}
-                        >
+                        <AccordionItem key={`${runId}-${log.id}`} title={log.title}>
                           {log.payload && (
                             <Textarea isReadOnly value={JSON.stringify(JSON.parse(log.payload), null, 2)} />
                           )}

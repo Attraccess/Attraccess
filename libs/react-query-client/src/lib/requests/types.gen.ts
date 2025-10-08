@@ -79,6 +79,10 @@ export type User = {
      * The credit balance of the user
      */
     creditBalance: number;
+    /**
+     * The percentage rate the user to actually pay for activities that cost credits
+     */
+    billingFactor: number;
 };
 
 export type VerifyEmailDto = {
@@ -163,6 +167,13 @@ export type SetUserPasswordDto = {
      * The new password for the user
      */
     password: string;
+};
+
+export type ChangeBillingFactorDto = {
+    /**
+     * The new billing factor
+     */
+    billingFactor: number;
 };
 
 export type CreateSessionResponse = {
@@ -577,6 +588,10 @@ export type Resource = {
      * When the resource was last updated
      */
     updatedAt: string;
+    /**
+     * When the resource was deleted
+     */
+    deletedAt: string | null;
     /**
      * The groups the resource belongs to
      */
@@ -2043,6 +2058,13 @@ export type ChangeUserUsernameData = {
 
 export type ChangeUserUsernameResponse = User;
 
+export type ChangeUserBillingFactorData = {
+    id: number;
+    requestBody: ChangeBillingFactorDto;
+};
+
+export type ChangeUserBillingFactorResponse = User;
+
 export type CreateSessionData = {
     requestBody: {
         username?: string;
@@ -3195,6 +3217,21 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/billing-factor': {
+        patch: {
+            req: ChangeUserBillingFactorData;
+            res: {
+                /**
+                 * Billing factor changed.
                  */
                 200: User;
                 /**
