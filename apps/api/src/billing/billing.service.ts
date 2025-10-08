@@ -261,7 +261,7 @@ export class BillingService {
         totalCredits += item.unitPrice * item.quantity;
       });
 
-      const billingFactorDiscountAmount = totalCredits - totalCredits * (usage.user.billingFactor / 100);
+      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (usage.user.billingFactor / 100));
       totalCredits = totalCredits - billingFactorDiscountAmount;
 
       if (transaction) {
