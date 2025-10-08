@@ -7,6 +7,7 @@ import {
   OneToMany,
   ManyToMany,
   JoinTable,
+  DeleteDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
@@ -114,6 +115,12 @@ export class Resource {
     description: 'When the resource was last updated',
   })
   updatedAt!: Date;
+
+  @DeleteDateColumn()
+  @ApiProperty({
+    description: 'When the resource was deleted',
+  })
+  deletedAt!: Date | null;
 
   @OneToMany(() => ResourceIntroduction, (introduction) => introduction.resource)
   introductions!: ResourceIntroduction[];
