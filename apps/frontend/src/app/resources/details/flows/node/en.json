@@ -5,6 +5,9 @@
     }
   },
   "nodes": {
+    "flow": {
+      "title": "Flow"
+    },
     "unsupportedForResourceType": "not supported by this resource",
     "genericConfig": {
       "overridableByInput": "Overridable by input: {{fieldName}}"

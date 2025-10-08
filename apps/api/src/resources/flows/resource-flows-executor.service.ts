@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   forwardRef,
   Inject,
@@ -479,8 +478,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         },
         transactionManager,
       );
-
-      return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager);
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.logger.error(
@@ -501,6 +498,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
       throw error;
     }
+
+    return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager);
   }
 
   private async executeNextNodes(
@@ -733,7 +732,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       throw new NoUsageSessionError();
     }
 
-    const data = node.data as z.infer<typeof BillingTransactionItemCreateSchema>;
+    const data = BillingTransactionItemCreateSchema.parse(node.data);
 
     this.logger.debug(
       `Processing billing set additional items node with data: ${JSON.stringify({ data, input }, null, 2)}`,
@@ -744,17 +743,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       externalReference = input.externalReference;
       if (data.externalReference) {
         this.logger.debug(`Compiling external reference template: ${data.externalReference}`);
-        externalReference = this.compileTemplate(data.externalReference, input);
+        externalReference = this.compileTemplate(
+          BillingTransactionItemCreateSchema.shape.externalReference.parse(data.externalReference),
+          input,
+        );
       }
     }
 
     let quantity = data.quantity;
     if ('quantity' in input) {
       this.logger.debug(`Compiling quantity template: ${input.quantity}`);
-      const numberQuantity = Number(input.quantity);
-      if (Number.isNaN(numberQuantity)) {
-        throw new BadRequestException('Quantity is not a number');
-      }
+      const numberQuantity = BillingTransactionItemCreateSchema.shape.quantity.parse(input.quantity);
       quantity = numberQuantity;
     }
 

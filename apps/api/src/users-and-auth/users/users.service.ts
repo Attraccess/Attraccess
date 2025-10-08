@@ -347,7 +347,7 @@ export class UsersService {
     }
 
     if (newBillingFactor < 0) {
-      throw new BadRequestException('Billing factor must be greater than 0');
+      throw new BadRequestException('Billing factor must be at least 0');
     }
 
     const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
