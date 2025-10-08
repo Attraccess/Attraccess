@@ -31,7 +31,7 @@ import { PageHeader } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
-import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
 interface Props {
   resourceId: number;
@@ -59,7 +59,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    return apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit);
+    return dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit);
   }, [balance, configuration]);
 
   const creditsPerUsage = useMemo(() => {
@@ -67,7 +67,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    return apiCurrencyToFrontendCurrency(
+    return dbCurrencyToUserCurrency(
       resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
       configuration.minorUnit,
     );
@@ -78,7 +78,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    return apiCurrencyToFrontendCurrency(
+    return dbCurrencyToUserCurrency(
       resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
       configuration.minorUnit,
     );
@@ -97,7 +97,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       return 0;
     }
 
-    const customFlowBillingItemsCost = apiCurrencyToFrontendCurrency(
+    const customFlowBillingItemsCost = dbCurrencyToUserCurrency(
       resourceBillingConfiguration.additionalItems.reduce((acc, item) => {
         return acc + item.unitPrice * item.quantity;
       }, 0),
@@ -213,7 +213,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
                     <TableCell className="text-warning">
                       {t('billingValue', {
                         credits: formatNumber(
-                          apiCurrencyToFrontendCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
+                          dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
                         ),
                         currency: configuration.currency,
                       })}

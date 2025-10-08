@@ -21,6 +21,7 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class BillingService {
@@ -37,6 +38,7 @@ export class BillingService {
     @InjectRepository(BillingTransactionItem)
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly resourceFlowsService: ResourceFlowsService,
+    private readonly emailService: EmailService,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -229,10 +231,18 @@ export class BillingService {
   }
 
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {
-    const existingTransaction = await transactionManager.findOneBy(BillingTransaction, {
-      resourceUsageId: usage.id,
-      status: BillingTransactionStatus.Completed,
-    });
+    let existingTransaction: BillingTransaction | null;
+    if (transactionManager) {
+      existingTransaction = await transactionManager.findOneBy(BillingTransaction, {
+        resourceUsageId: usage.id,
+        status: BillingTransactionStatus.Completed,
+      });
+    } else {
+      existingTransaction = await this.billingTransactionRepository.findOneBy({
+        resourceUsageId: usage.id,
+        status: BillingTransactionStatus.Completed,
+      });
+    }
     if (existingTransaction) {
       throw new BadRequestException('Billing transaction already exists for this resource usage');
     }
@@ -305,6 +315,27 @@ export class BillingService {
       }
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
+
+      const freshUser = await manager.findOne(User, { where: { id: transaction.userId } });
+      if (freshUser?.email) {
+        try {
+          // load items relation if not present
+          // Ensure items relation is loaded
+          transaction = await manager.findOne(BillingTransaction, {
+            where: { id: transaction.id },
+            relations: ['items'],
+          });
+          const billingConfiguration = await this.getConfiguration();
+          await this.emailService.sendResourceUsageBillingSummaryEmail(
+            freshUser,
+            transaction,
+            usage,
+            billingConfiguration.minorUnit,
+          );
+        } catch {
+          // ignore email failures to not break billing
+        }
+      }
 
       return transaction;
     };

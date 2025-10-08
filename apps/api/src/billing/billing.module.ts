@@ -12,11 +12,13 @@ import { BillingService } from './billing.service';
 import { SumUpService } from './sumup.service';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([BillingTransaction, User, ResourceBillingConfiguration, Setting, BillingTransactionItem]),
     forwardRef(() => ResourceFlowsModule),
+    EmailModule,
   ],
   controllers: [BillingController],
   providers: [BillingService, SumUpService, LiveNotificationsService],

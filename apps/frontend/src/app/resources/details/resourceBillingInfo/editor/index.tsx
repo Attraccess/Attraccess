@@ -23,7 +23,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../../utils/currency';
+import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 
 interface Props {
   resourceId: number;
@@ -62,13 +62,13 @@ export function ResourceBillingInfoEditor(props: Props) {
   });
 
   const [creditsPerUsage, setCreditsPerUsage] = useState(
-    apiCurrencyToFrontendCurrency(
+    dbCurrencyToUserCurrency(
       resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
       configuration?.minorUnit ?? 1,
     ),
   );
   const [creditsPerMinute, setCreditsPerMinute] = useState(
-    apiCurrencyToFrontendCurrency(
+    dbCurrencyToUserCurrency(
       resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
       configuration?.minorUnit ?? 1,
     ),
@@ -80,13 +80,13 @@ export function ResourceBillingInfoEditor(props: Props) {
     }
 
     setCreditsPerUsage(
-      apiCurrencyToFrontendCurrency(
+      dbCurrencyToUserCurrency(
         resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
         configuration.minorUnit,
       ),
     );
     setCreditsPerMinute(
-      apiCurrencyToFrontendCurrency(
+      dbCurrencyToUserCurrency(
         resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
         configuration.minorUnit,
       ),
@@ -101,8 +101,8 @@ export function ResourceBillingInfoEditor(props: Props) {
     updateConfiguration({
       resourceId,
       requestBody: {
-        creditsPerUsage: frontendCurrencyToApiCurrency(creditsPerUsage, configuration.minorUnit),
-        creditsPerMinute: frontendCurrencyToApiCurrency(creditsPerMinute, configuration.minorUnit),
+        creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
+        creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
       },
     });
   }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, configuration]);

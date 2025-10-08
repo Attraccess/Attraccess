@@ -15,6 +15,7 @@ import { SumUpService } from './sumup.service';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { EmailService } from '../email/email.service';
 
 describe('BillingModule', () => {
   describe('metadata', () => {
@@ -45,6 +46,7 @@ describe('BillingModule', () => {
           BillingService,
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           { provide: SumUpService, useValue: {} },
+          { provide: EmailService, useValue: { sendResourceUsageBillingSummaryEmail: jest.fn() } },
           { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: jest.fn(), save: jest.fn() } },
           { provide: getRepositoryToken(User), useValue: { findOneBy: jest.fn() } },
           {

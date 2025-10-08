@@ -29,7 +29,7 @@ import {
 } from '@attraccess/react-query-client';
 import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 
 interface Props {
@@ -136,7 +136,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           ) : (
             <p className="text-2xl font-bold">
               {t('balance', {
-                balance: formatNumber(apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit)),
+                balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
                 currency: configuration.currency,
               })}
             </p>
@@ -182,7 +182,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                 <TableCell>{getDetailsCellContent(transaction)}</TableCell>
                 <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                   {transaction.amount > 0 && '+'}
-                  {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration.minorUnit))}
+                  {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
                   <TransactionDetailsModal transactionId={transaction.id}>
