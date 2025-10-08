@@ -6,10 +6,10 @@ import {
   useBillingServiceRemoveSumUpReader,
 } from '@attraccess/react-query-client';
 import { useDisclosure } from '@heroui/react';
-import { useToastMessage } from '../../../../../components/toastProvider';
+import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal';
+import { DeleteConfirmationModal } from '../../../../../../components/deleteConfirmationModal';
 
 interface Props {
   readerId: string;

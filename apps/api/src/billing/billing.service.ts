@@ -261,6 +261,9 @@ export class BillingService {
         totalCredits += item.unitPrice * item.quantity;
       });
 
+      const billingFactorDiscountAmount = totalCredits - totalCredits * (usage.user.billingFactor / 100);
+      totalCredits = totalCredits - billingFactorDiscountAmount;
+
       if (transaction) {
         await manager.update(BillingTransaction, transaction.id, {
           amount: -totalCredits,
@@ -291,6 +294,15 @@ export class BillingService {
         unitPrice: configuration.creditsPerMinute,
         quantity: roundedMinutes,
       });
+
+      if (billingFactorDiscountAmount !== 0) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: transaction.id,
+          name: 'BILLING_FACTOR',
+          unitPrice: -billingFactorDiscountAmount,
+          quantity: 1,
+        });
+      }
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
 

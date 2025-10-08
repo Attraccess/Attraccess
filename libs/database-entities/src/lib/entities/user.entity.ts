@@ -170,4 +170,11 @@ export class User {
   @Column({ type: 'integer', default: 0 })
   @ApiProperty({ description: 'The credit balance of the user' })
   creditBalance!: number;
+
+  @Column({ type: 'integer', default: 100 })
+  @ApiProperty({
+    description: 'The percentage rate the user to actually pay for activities that cost credits',
+    example: 100,
+  })
+  billingFactor!: number;
 }

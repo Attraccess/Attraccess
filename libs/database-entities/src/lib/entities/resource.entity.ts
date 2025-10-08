@@ -119,6 +119,7 @@ export class Resource {
   @DeleteDateColumn()
   @ApiProperty({
     description: 'When the resource was deleted',
+    nullable: true,
   })
   deletedAt!: Date | null;
 

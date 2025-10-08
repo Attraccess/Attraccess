@@ -8,10 +8,10 @@ import {
   useBillingServiceSetSumUpApiKey,
 } from '@attraccess/react-query-client';
 import { Button, Card, CardBody, CardHeader, Form, Chip, Spinner, Link, CardFooter, CardProps } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
-import { PasswordInput } from '../../../../../components/PasswordInput';
+import { PageHeader } from '../../../../../../components/pageHeader';
+import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
-import { useToastMessage } from '../../../../../components/toastProvider';
+import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, WebhookIcon, XIcon } from 'lucide-react';
 

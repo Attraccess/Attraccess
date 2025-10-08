@@ -104,8 +104,7 @@ export class MqttClientService implements OnModuleDestroy {
       });
 
       client.on('error', (error) => {
-        this.logger.error(`MQTT connection error for server ${server.name}: ${error.message}`);
-        this.logger.error(error);
+        this.logger.error(`MQTT connection error for server ${server.name} (${url}): ${error.message}`);
       });
 
       client.on('reconnect', () => {

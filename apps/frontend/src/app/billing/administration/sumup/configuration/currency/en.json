@@ -16,6 +16,10 @@
     "apiKey": {
       "label": "API Key",
       "description": "You can find your API key in the SumUp console."
+    },
+    "currency": {
+      "label": "Currency",
+      "description": "Select the currency for payments"
     }
   },
   "actions": {

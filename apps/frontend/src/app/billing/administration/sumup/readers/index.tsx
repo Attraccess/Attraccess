@@ -14,14 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader } from '../../../../../components/pageHeader';
 import { SmartphoneNfcIcon, Trash2Icon } from 'lucide-react';
 import {
   useBillingServiceGetSumUpConfiguration,
   useBillingServiceGetSumUpReaders,
 } from '@attraccess/react-query-client';
-import { TableDataLoadingIndicator } from '../../../../components/tableComponents';
-import { EmptyState } from '../../../../components/emptyState';
+import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
+import { EmptyState } from '../../../../../components/emptyState';
 import { SumUpReadersPairing } from './pairing';
 import { SumUpReaderDeleteModal } from './remove';
 

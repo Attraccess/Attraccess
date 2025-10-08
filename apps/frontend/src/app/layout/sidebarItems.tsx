@@ -1,13 +1,11 @@
 import {
-  BanknoteIcon,
   BookOpenIcon,
   BugIcon,
-  ChartNoAxesCombinedIcon,
   CogIcon,
   ComputerIcon,
   CreditCardIcon,
   DatabaseIcon,
-  FileChartColumnIncreasingIcon,
+  FileIcon,
   GiftIcon,
   KeyIcon,
   LightbulbIcon,
@@ -27,7 +25,6 @@ import { useMemo } from 'react';
 import de from './sidebarItems.de.json';
 import en from './sidebarItems.en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { SumUpIcon } from '../../components/icons/sumup.icon';
 
 export type SidebarItem = {
   path: string;
@@ -49,7 +46,7 @@ export type SidebarItemGroup = {
 export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
   const { data: license } = useLicenseServiceGetLicenseInformation();
 
-  return useMemo(() => {
+  const allItems = useMemo(() => {
     // Resources group
     const items: (SidebarItem | SidebarItemGroup)[] = [
       {
@@ -59,57 +56,31 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       },
     ];
 
-    if (license?.modules.includes('attractap')) {
-      items.push({
-        translationKey: 'attractap',
-        isGroup: true,
-        icon: ComputerIcon,
-        licenseModule: 'attractap',
-        items: [
-          {
-            path: '/nfc-cards',
-            translationKey: 'nfcCards',
-            icon: NfcIcon,
-          },
-          {
-            path: '/attractap',
-            translationKey: 'readers',
-            icon: ComputerIcon,
-          },
-        ],
-      });
-    }
+    items.push({
+      translationKey: 'attractap',
+      isGroup: true,
+      icon: ComputerIcon,
+      licenseModule: 'attractap',
+      items: [
+        {
+          path: '/nfc-cards',
+          translationKey: 'nfcCards',
+          icon: NfcIcon,
+        },
+        {
+          path: '/attractap',
+          translationKey: 'readers',
+          icon: ComputerIcon,
+        },
+      ],
+    });
 
-    if (license?.modules.includes('billing')) {
-      items.push({
-        translationKey: 'billing',
-        isGroup: true,
-        icon: CreditCardIcon,
-        licenseModule: 'billing',
-        items: [
-          {
-            path: '/billing',
-            translationKey: 'dashboard',
-            icon: ChartNoAxesCombinedIcon,
-          },
-          {
-            path: '/billing/administration',
-            translationKey: 'administration',
-            icon: BanknoteIcon,
-          },
-          {
-            path: '/billing/sumup',
-            translationKey: 'sumup',
-            icon: (props) => <SumUpIcon width={16} height={16} {...props} />,
-          },
-          {
-            path: '/billing/csv-export',
-            translationKey: 'csvExport',
-            icon: FileChartColumnIncreasingIcon,
-          },
-        ],
-      });
-    }
+    items.push({
+      path: '/billing',
+      translationKey: 'billing',
+      icon: CreditCardIcon,
+      licenseModule: 'billing',
+    });
 
     // Auth group
     const authGroup: SidebarItemGroup = {
@@ -125,14 +96,12 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       ],
     };
 
-    if (license?.modules.includes('sso')) {
-      authGroup.items.unshift({
-        path: '/sso/providers',
-        translationKey: 'ssoProviders',
-        icon: KeyIcon,
-        licenseModule: 'sso',
-      });
-    }
+    authGroup.items.unshift({
+      path: '/sso/providers',
+      translationKey: 'ssoProviders',
+      icon: KeyIcon,
+      licenseModule: 'sso',
+    });
 
     items.push(authGroup);
 
@@ -157,11 +126,54 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           translationKey: 'emailTemplates',
           icon: MailIcon,
         },
+        {
+          path: '/csv-export',
+          translationKey: 'csvExport',
+          icon: FileIcon,
+        },
       ],
     });
 
     return items;
-  }, [license]);
+  }, []);
+
+  return useMemo(() => {
+    if (!license) {
+      return [];
+    }
+
+    const itemsMatchingLicense = [] as typeof allItems;
+
+    allItems.forEach((item) => {
+      if (item.licenseModule && !license?.modules.includes(item.licenseModule)) {
+        return;
+      }
+
+      if (!item.isGroup) {
+        itemsMatchingLicense.push(item);
+        return;
+      }
+
+      const itemChildrenMatchingLicense = (item as SidebarItemGroup).items.filter((item) => {
+        if (item.licenseModule && !license?.modules.includes(item.licenseModule)) {
+          return false;
+        }
+
+        return true;
+      });
+
+      if (itemChildrenMatchingLicense.length === 0) {
+        return;
+      }
+
+      itemsMatchingLicense.push({
+        ...item,
+        items: itemChildrenMatchingLicense,
+      });
+    });
+
+    return itemsMatchingLicense;
+  }, [allItems, license]);
 }
 
 export const useSidebarEndItems = () => {

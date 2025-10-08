@@ -1,0 +1,24 @@
+{
+  "title": "Zahlungsfaktor",
+  "subtitle": "Faktor um welchen der Abrechnungsbetrag für einen Nutzer skaliert wird",
+  "inputs": {
+    "amount": "Betrag"
+  },
+  "actions": {
+    "update": "Aktualisieren"
+  },
+  "success": {
+    "toast": {
+      "title": "Zahlungsfaktor aktualisiert",
+      "description": "Zahlungsfaktor wurde erfolgreich aktualisiert"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler beim Aktualisieren des Zahlungsfaktors",
+        "description": "Zahlungsfaktor konnte nicht aktualisiert werden"
+      }
+    }
+  }
+}

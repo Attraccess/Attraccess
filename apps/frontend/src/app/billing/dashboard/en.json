@@ -1,3 +1,6 @@
 {
-  "title": "Billing"
+  "title": "Billing",
+  "actions": {
+    "administration": "Administration"
+  }
 }

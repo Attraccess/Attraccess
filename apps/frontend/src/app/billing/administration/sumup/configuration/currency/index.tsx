@@ -8,12 +8,12 @@ import {
   useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { Button, Card, CardBody, CardHeader, Form, CardProps, CardFooter } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
+import { PageHeader } from '../../../../../../components/pageHeader';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useToastMessage } from '../../../../../components/toastProvider';
+import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { EuroIcon } from 'lucide-react';
-import { Select } from '../../../../../components/select';
+import { Select } from '../../../../../../components/select';
 
 export function CurrencyCard(props: Omit<CardProps, 'children'>) {
   const { t, tExists } = useTranslations({ en, de });
