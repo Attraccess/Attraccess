@@ -2,7 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
-import { User, EmailTemplateType, EmailTemplate } from '@attraccess/database-entities';
+import {
+  User,
+  EmailTemplateType,
+  EmailTemplate,
+  BillingTransaction,
+  ResourceUsage,
+} from '@attraccess/database-entities';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { AppConfigType } from '../config/app.config';
@@ -17,7 +24,7 @@ export class EmailService {
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
     private readonly emailTemplateService: EmailTemplateService,
-    private readonly mjmlService: MjmlService
+    private readonly mjmlService: MjmlService,
   ) {
     this.logger.debug('Initializing EmailService');
 
@@ -50,7 +57,7 @@ export class EmailService {
       const { subject, body } = this.convertTemplate(dbTemplate, context);
 
       this.logger.debug(
-        `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`
+        `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
       await this.mailerService.sendMail({
         to: user.email,
@@ -81,7 +88,7 @@ export class EmailService {
 
   async sendVerificationEmail(user: User, verificationToken: string) {
     const verificationUrl = `${this.frontendUrl}/verify-email?email=${encodeURIComponent(
-      user.email
+      user.email,
     )}&token=${verificationToken}`;
 
     const context = {
@@ -125,5 +132,48 @@ export class EmailService {
   async sendPasswordChangedEmail(user: User) {
     const context = this.getBaseContext(user);
     await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
+  }
+
+  async sendResourceUsageBillingSummaryEmail(
+    user: User,
+    transaction: BillingTransaction,
+    usage: ResourceUsage,
+    currencyMinorUnit: number,
+  ) {
+    if (!user?.email) {
+      return;
+    }
+
+    const roundedMinutes = Math.ceil(usage.usageInMinutes ?? 0);
+
+    const items = (transaction.items ?? []).map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
+      total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
+    }));
+
+    const totalFromItems = items.reduce((sum, it) => sum + it.total, 0);
+    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit); // transaction.amount is negative when charging user
+    const discount = totalFromItems - totalCredits;
+
+    const context = {
+      ...this.getBaseContext(user),
+      resource: {
+        id: usage.resource.id,
+        name: usage.resource.name,
+      },
+      usage: {
+        startTime: usage.startTime?.toISOString?.() ?? usage.startTime,
+        endTime: usage.endTime?.toISOString?.() ?? usage.endTime,
+        roundedMinutes,
+      },
+      items,
+      discount,
+      totalCredits,
+      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit), // already updated by DB triggers for completed tx
+    };
+
+    await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
   }
 }

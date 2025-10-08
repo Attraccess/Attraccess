@@ -1,6 +1,13 @@
 import { MailerService } from '@nestjs-modules/mailer';
 import { EmailService } from './email.service';
-import { EmailTemplateType, User } from '@attraccess/database-entities';
+import {
+  EmailTemplateType,
+  User,
+  BillingTransaction,
+  BillingTransactionItem,
+  ResourceUsage,
+  Resource,
+} from '@attraccess/database-entities';
 import { ConfigService } from '@nestjs/config';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MjmlService } from '../email-template/mjml.service';
@@ -23,7 +30,7 @@ describe('EmailService', () => {
       nfcKeySeedToken: null,
       lastUsernameChangeAt: null,
       ...overrides,
-    } as unknown as User);
+    }) as unknown as User;
 
   const setup = () => {
     const mailerService = { sendMail: jest.fn().mockResolvedValue(undefined) };
@@ -61,6 +68,13 @@ describe('EmailService', () => {
             body: '<mjml><mj-body><mj-section><mj-column><mj-text>Reset: {{url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
+        if (type === EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY) {
+          return Promise.resolve({
+            type,
+            subject: 'Your usage receipt for {{resource.name}}',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-text>{{user.username}}</mj-text><mj-text>{{resource.name}}</mj-text><mj-text>{{usage.roundedMinutes}}</mj-text><mj-text>{{totalCredits}}</mj-text><mj-text>{{newBalance}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+          });
+        }
         throw new Error('Unexpected template type');
       }),
     };
@@ -76,7 +90,7 @@ describe('EmailService', () => {
       mailerService as unknown as MailerService,
       configService as unknown as ConfigService,
       emailTemplateService as unknown as EmailTemplateService,
-      mjmlService as unknown as MjmlService
+      mjmlService as unknown as MjmlService,
     );
 
     return { service, mailerService, configService, emailTemplateService, mjmlService };
@@ -111,7 +125,7 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('bob@example.com');
     expect(callArg.subject).toContain('Verify bob@example.com');
     expect(callArg.html).toMatch(
-      /https:\/\/frontend\.example\/verify-email\?email(?:=|&#x3D;)bob%40example\.com(?:&|&amp;)token(?:=|&#x3D;)verify-token-123/
+      /https:\/\/frontend\.example\/verify-email\?email(?:=|&#x3D;)bob%40example\.com(?:&|&amp;)token(?:=|&#x3D;)verify-token-123/,
     );
   });
 
@@ -127,7 +141,7 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('charlie@example.com');
     expect(callArg.subject).toContain('Reset password for charlie@example.com');
     expect(callArg.html).toMatch(
-      /https:\/\/frontend\.example\/reset-password\?userId(?:=|&#x3D;)42(?:&|&amp;)token(?:=|&#x3D;)reset-token-XYZ/
+      /https:\/\/frontend\.example\/reset-password\?userId(?:=|&#x3D;)42(?:&|&amp;)token(?:=|&#x3D;)reset-token-XYZ/,
     );
   });
 
@@ -137,5 +151,47 @@ describe('EmailService', () => {
     const user = makeUser();
 
     await expect(service.sendVerificationEmail(user, 'tok')).rejects.toThrow('SMTP down');
+  });
+
+  it('sends billing transaction summary email with expected context', async () => {
+    const { service, mailerService } = setup();
+    const user = makeUser({ id: 7, username: 'dana', email: 'dana@example.com', creditBalance: 1234 });
+
+    const transaction: Partial<BillingTransaction> = {
+      id: 99,
+      userId: 7,
+      amount: -345, // charged 345 credits
+      items: [
+        { name: 'PER_SESSION', unitPrice: 100, quantity: 1 },
+        { name: 'PER_MINUTE', unitPrice: 5, quantity: 70 },
+        { name: 'BILLING_FACTOR', unitPrice: -55, quantity: 1 },
+      ] as unknown as BillingTransactionItem[],
+    };
+
+    const usage: Partial<ResourceUsage> = {
+      startTime: new Date('2024-01-01T10:00:00Z'),
+      endTime: new Date('2024-01-01T11:10:00Z'),
+      usageInMinutes: 70,
+      resource: { id: 3, name: 'Laser Cutter' } as Resource,
+      user,
+    };
+
+    await service.sendResourceUsageBillingSummaryEmail(
+      user,
+      transaction as BillingTransaction,
+      usage as ResourceUsage,
+      2,
+    );
+
+    expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (mailerService.sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.to).toBe('dana@example.com');
+    expect(callArg.subject).toContain('Laser Cutter');
+    expect(callArg.html).toContain('dana');
+    expect(callArg.html).toContain('Laser Cutter');
+    expect(callArg.html).toContain('70');
+    // With minor unit 2, amounts are converted to user currency strings
+    expect(callArg.html).toContain('3.45');
+    expect(callArg.html).toContain('12.34');
   });
 });

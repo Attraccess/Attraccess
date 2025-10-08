@@ -16,6 +16,7 @@ export enum EmailTemplateType {
   ResetPassword = "reset-password",
   UsernameChanged = "username-changed",
   PasswordChanged = "password-changed",
+  ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
 }
 
 /** The type of the provider */
@@ -107,6 +108,11 @@ export interface User {
   externalIdentifier?: string | null;
   /** The credit balance of the user */
   creditBalance: number;
+  /**
+   * The percentage rate the user to actually pay for activities that cost credits
+   * @example 100
+   */
+  billingFactor: number;
 }
 
 export interface VerifyEmailDto {
@@ -196,6 +202,14 @@ export interface SetUserPasswordDto {
    * @example "newSecurePassword123"
    */
   password: string;
+}
+
+export interface ChangeBillingFactorDto {
+  /**
+   * The new billing factor
+   * @example 50
+   */
+  billingFactor: number;
 }
 
 export interface CreateSessionResponse {
@@ -630,6 +644,11 @@ export interface Resource {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * When the resource was deleted
+   * @format date-time
+   */
+  deletedAt: string | null;
   /** The groups the resource belongs to */
   groups: ResourceGroup[];
 }
@@ -794,111 +813,6 @@ export interface UpdateMqttServerDto {
    * @default false
    */
   useTls?: boolean;
-}
-
-export interface TestConnectionResponseDto {
-  /**
-   * Whether the connection test was successful
-   * @example true
-   */
-  success: boolean;
-  /**
-   * Message describing the test result
-   * @example "Connection successful"
-   */
-  message: string;
-}
-
-export interface MqttHealthStatusDto {
-  /**
-   * Whether the connection is healthy
-   * @example true
-   */
-  healthy: boolean;
-  /**
-   * Detailed health status message
-   * @example "Connected: true, Failures: 0/3, Messages: 10 sent, 0 failed"
-   */
-  details: string;
-}
-
-export interface MqttConnectionStatsDto {
-  /**
-   * Number of connection attempts
-   * @example 5
-   */
-  connectionAttempts: number;
-  /**
-   * Number of failed connections
-   * @example 1
-   */
-  connectionFailures: number;
-  /**
-   * Number of successful connections
-   * @example 4
-   */
-  connectionSuccesses: number;
-  /**
-   * Timestamp of last successful connection
-   * @format date-time
-   * @example "2023-01-01T12:00:00.000Z"
-   */
-  lastConnectTime?: string;
-  /**
-   * Timestamp of last disconnection
-   * @format date-time
-   * @example "2023-01-01T12:30:00.000Z"
-   */
-  lastDisconnectTime?: string;
-}
-
-export interface MqttMessageStatsDto {
-  /**
-   * Number of successfully published messages
-   * @example 42
-   */
-  published: number;
-  /**
-   * Number of failed message publications
-   * @example 3
-   */
-  failed: number;
-  /**
-   * Timestamp of last successful message publication
-   * @format date-time
-   * @example "2023-01-01T12:15:00.000Z"
-   */
-  lastPublishTime?: string;
-  /**
-   * Timestamp of last failed message publication
-   * @format date-time
-   * @example "2023-01-01T12:10:00.000Z"
-   */
-  lastFailureTime?: string;
-}
-
-export interface MqttServerStatsDto {
-  /** Connection statistics */
-  connection: MqttConnectionStatsDto;
-  /** Message statistics */
-  messages: MqttMessageStatsDto;
-}
-
-export interface MqttServerStatusDto {
-  /**
-   * Whether the server is currently connected
-   * @example true
-   */
-  connected: boolean;
-  /** Health status of the connection */
-  healthStatus: MqttHealthStatusDto;
-  /** Detailed statistics */
-  stats: MqttServerStatsDto;
-}
-
-export interface AllMqttServerStatusesDto {
-  /** Map of server IDs to their statuses */
-  servers: Record<string, MqttServerStatusDto>;
 }
 
 export interface CreateResourceGroupDto {
@@ -1561,11 +1475,13 @@ export interface ResourceFlowNodeSchemaDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
+    | "input.mqtt.message.received"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
-    | "processing.if";
+    | "processing.if"
+    | "processing.set-payload";
   /** The schema for a node type */
   configSchema: Record<string, any>;
   /** The inputs for a node type */
@@ -1609,11 +1525,13 @@ export interface ResourceFlowNodeDto {
     | "input.resource.door.unlocked"
     | "input.resource.door.locked"
     | "input.resource.door.unlatched"
+    | "input.mqtt.message.received"
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
-    | "processing.if";
+    | "processing.if"
+    | "processing.set-payload";
   /**
    * The position of the node
    * @example {"x":100,"y":200}
@@ -2151,6 +2069,8 @@ export interface SetUserPasswordData {
 
 export type ChangeUserUsernameData = User;
 
+export type ChangeUserBillingFactorData = User;
+
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
@@ -2277,12 +2197,6 @@ export type MqttServersGetOneByIdData = MqttServer;
 export type MqttServersUpdateOneData = MqttServer;
 
 export type MqttServersDeleteOneData = any;
-
-export type MqttServersTestConnectionData = TestConnectionResponseDto;
-
-export type MqttServersGetStatusOfOneData = MqttServerStatusDto;
-
-export type MqttServersGetStatusOfAllData = AllMqttServerStatusesDto;
 
 export type SseControllerStreamEventsData = any;
 
@@ -2866,6 +2780,24 @@ export namespace Users {
     export type RequestHeaders = {};
     export type ResponseBody = ChangeUserUsernameData;
   }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ChangeUserBillingFactor
+   * @summary Change a user's billing factor
+   * @request PATCH:/api/users/{id}/billing-factor
+   * @secure
+   */
+  export namespace ChangeUserBillingFactor {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ChangeBillingFactorDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeUserBillingFactorData;
+  }
 }
 
 export namespace Authentication {
@@ -3157,7 +3089,8 @@ export namespace EmailTemplates {
         | "verify-email"
         | "reset-password"
         | "username-changed"
-        | "password-changed";
+        | "password-changed"
+        | "resource-usage-billing-transaction-summary";
     };
     export type RequestQuery = {};
     export type RequestBody = never;
@@ -3180,7 +3113,8 @@ export namespace EmailTemplates {
         | "verify-email"
         | "reset-password"
         | "username-changed"
-        | "password-changed";
+        | "password-changed"
+        | "resource-usage-billing-transaction-summary";
     };
     export type RequestQuery = {};
     export type RequestBody = UpdateEmailTemplateDto;
@@ -3723,58 +3657,6 @@ export namespace Mqtt {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = MqttServersDeleteOneData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttServersTestConnection
-   * @summary Test MQTT server connection
-   * @request POST:/api/mqtt/servers/{id}/test
-   * @secure
-   */
-  export namespace MqttServersTestConnection {
-    export type RequestParams = {
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttServersTestConnectionData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttServersGetStatusOfOne
-   * @summary Get MQTT server connection status and statistics
-   * @request GET:/api/mqtt/servers/{id}/status
-   * @secure
-   */
-  export namespace MqttServersGetStatusOfOne {
-    export type RequestParams = {
-      id: number;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttServersGetStatusOfOneData;
-  }
-
-  /**
-   * No description
-   * @tags MQTT
-   * @name MqttServersGetStatusOfAll
-   * @summary Get all MQTT server connection statuses and statistics
-   * @request GET:/api/mqtt/servers/status
-   * @secure
-   */
-  export namespace MqttServersGetStatusOfAll {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = MqttServersGetStatusOfAllData;
   }
 }
 
@@ -5578,6 +5460,30 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ChangeUserBillingFactor
+     * @summary Change a user's billing factor
+     * @request PATCH:/api/users/{id}/billing-factor
+     * @secure
+     */
+    changeUserBillingFactor: (
+      id: number,
+      data: ChangeBillingFactorDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ChangeUserBillingFactorData, void>({
+        path: `/api/users/${id}/billing-factor`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
   };
   authentication = {
     /**
@@ -5891,7 +5797,8 @@ export class Api<
         | "verify-email"
         | "reset-password"
         | "username-changed"
-        | "password-changed",
+        | "password-changed"
+        | "resource-usage-billing-transaction-summary",
       params: RequestParams = {},
     ) =>
       this.request<EmailTemplateControllerFindOneData, void>({
@@ -5916,7 +5823,8 @@ export class Api<
         | "verify-email"
         | "reset-password"
         | "username-changed"
-        | "password-changed",
+        | "password-changed"
+        | "resource-usage-billing-transaction-summary",
       data: UpdateEmailTemplateDto,
       params: RequestParams = {},
     ) =>
@@ -6483,60 +6391,6 @@ export class Api<
         path: `/api/mqtt/servers/${id}`,
         method: "DELETE",
         secure: true,
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttServersTestConnection
-     * @summary Test MQTT server connection
-     * @request POST:/api/mqtt/servers/{id}/test
-     * @secure
-     */
-    mqttServersTestConnection: (id: number, params: RequestParams = {}) =>
-      this.request<MqttServersTestConnectionData, void>({
-        path: `/api/mqtt/servers/${id}/test`,
-        method: "POST",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttServersGetStatusOfOne
-     * @summary Get MQTT server connection status and statistics
-     * @request GET:/api/mqtt/servers/{id}/status
-     * @secure
-     */
-    mqttServersGetStatusOfOne: (id: number, params: RequestParams = {}) =>
-      this.request<MqttServersGetStatusOfOneData, void>({
-        path: `/api/mqtt/servers/${id}/status`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags MQTT
-     * @name MqttServersGetStatusOfAll
-     * @summary Get all MQTT server connection statuses and statistics
-     * @request GET:/api/mqtt/servers/status
-     * @secure
-     */
-    mqttServersGetStatusOfAll: (params: RequestParams = {}) =>
-      this.request<MqttServersGetStatusOfAllData, void>({
-        path: `/api/mqtt/servers/status`,
-        method: "GET",
-        secure: true,
-        format: "json",
         ...params,
       }),
   };

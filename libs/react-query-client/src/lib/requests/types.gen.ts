@@ -395,7 +395,8 @@ export enum EmailTemplateType {
     VERIFY_EMAIL = 'verify-email',
     RESET_PASSWORD = 'reset-password',
     USERNAME_CHANGED = 'username-changed',
-    PASSWORD_CHANGED = 'password-changed'
+    PASSWORD_CHANGED = 'password-changed',
+    RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary'
 }
 
 export type EmailTemplate = {
@@ -2197,7 +2198,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -2207,7 +2208,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;

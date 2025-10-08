@@ -13,7 +13,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { frontendCurrencyToApiCurrency } from '../../../../utils/currency';
+import { userCurrencyToDbCurrency } from '@attraccess/shared';
 
 interface Props {
   userId?: number;
@@ -63,7 +63,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
       return;
     }
 
-    const adjustedAmount = frontendCurrencyToApiCurrency(amount, configuration.minorUnit);
+    const adjustedAmount = userCurrencyToDbCurrency(amount, configuration.minorUnit);
 
     createManualTransaction({ userId: userId, requestBody: { amount: adjustedAmount } });
   }, [userId, amount, createManualTransaction, configuration]);

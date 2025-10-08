@@ -12,6 +12,8 @@
   "templateTypes": {
     "verify-email": "Email Verification",
     "reset-password": "Password Reset",
-    "username-changed": "Username Changed"
+    "username-changed": "Username Changed",
+    "password-changed": "Password Changed",
+    "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary"
   }
 }

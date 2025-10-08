@@ -10,6 +10,8 @@ import {
   User,
   Setting,
   BillingTransactionItem,
+  Resource,
+  BillingTransactionStatus,
 } from '@attraccess/database-entities';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
@@ -19,6 +21,7 @@ import { ResourceBillingConfigurationNotFoundException } from './errors/resource
 import { Currency } from './dto/set-configuration.dto';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { EmailService } from '../email/email.service';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -27,6 +30,8 @@ describe('BillingService', () => {
   let settingRepository: jest.Mocked<Repository<Setting>>;
   let resourceBillingConfigurationRepository: jest.Mocked<Repository<ResourceBillingConfiguration>>;
   let liveNotificationsService: { notifyTransactionUpdate: jest.Mock };
+  let emailService: jest.Mocked<EmailService>;
+  let billingTransactionItemRepository: jest.Mocked<Repository<BillingTransactionItem>>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -52,6 +57,7 @@ describe('BillingService', () => {
           provide: getRepositoryToken(BillingTransaction),
           useValue: {
             findAndCount: jest.fn(),
+            findOneBy: jest.fn(),
             save: jest.fn(),
           },
         },
@@ -85,6 +91,10 @@ describe('BillingService', () => {
           provide: ResourceFlowsService,
           useValue: { getNodes: jest.fn().mockResolvedValue([]) },
         },
+        {
+          provide: EmailService,
+          useValue: { sendBillingTransactionEmail: jest.fn(), sendResourceUsageBillingSummaryEmail: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -98,6 +108,10 @@ describe('BillingService', () => {
       getRepositoryToken(ResourceBillingConfiguration),
     ) as jest.Mocked<Repository<ResourceBillingConfiguration>>;
     liveNotificationsService = module.get(LiveNotificationsService);
+    emailService = module.get(EmailService);
+    billingTransactionItemRepository = module.get(getRepositoryToken(BillingTransactionItem)) as jest.Mocked<
+      Repository<BillingTransactionItem>
+    >;
   });
 
   it('should be defined', () => {
@@ -755,6 +769,69 @@ describe('BillingService', () => {
     it('getConfiguration throws on unsupported currency value from DB', async () => {
       settingRepository.findOneBy.mockResolvedValue({ value: 'USD' } as Setting);
       await expect(service.getConfiguration()).rejects.toBeInstanceOf(Error);
+    });
+  });
+
+  describe('BillingService chargeForResourceUsage', () => {
+    it('sends email after completing usage transaction', async () => {
+      const usage: Partial<ResourceUsage> = {
+        id: 5,
+        usageInMinutes: 10,
+        resource: { id: 1, name: 'CNC' } as Resource,
+        user: { id: 10, billingFactor: 100 } as User,
+      };
+
+      // emulate manager path inside transaction()
+      const manager = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        findOne: jest.fn().mockImplementation((entity: any, opts: any) => {
+          if (entity === BillingTransaction) {
+            if (opts?.where?.resourceUsageId === usage.id) return null; // no existing
+            if (opts?.where?.id)
+              return {
+                id: opts.where.id,
+                userId: 10,
+                amount: -150,
+                status: BillingTransactionStatus.Completed,
+                items: [],
+              };
+          }
+          if (entity === User) {
+            return { id: 10, email: 'u@example.com', creditBalance: 1000 };
+          }
+          return null;
+        }),
+        getRepository: jest.fn(() => ({
+          findOneBy: jest.fn().mockResolvedValue(null),
+          create: jest.fn((data: unknown) => data),
+          save: jest.fn(async (data: unknown) => data),
+        })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        save: jest.fn().mockImplementation((entity: any, payload: any) => {
+          if (entity === BillingTransaction) {
+            return { id: 123, ...payload };
+          }
+          return payload;
+        }),
+        update: jest.fn(),
+      };
+
+      // override transaction wrapper to call doCalculation directly
+      (billingTransactionItemRepository.manager.transaction as unknown as jest.Mock).mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (fn: any) => fn(manager),
+      );
+
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 5 } as ResourceBillingConfiguration);
+
+      await service.chargeForResourceUsage(usage as ResourceUsage);
+
+      expect(emailService.sendResourceUsageBillingSummaryEmail).toHaveBeenCalledTimes(1);
+      const args = (emailService.sendResourceUsageBillingSummaryEmail as jest.Mock).mock.calls[0];
+      expect(args[0]).toMatchObject({ id: 10, email: 'u@example.com' });
+      expect(args[2]).toMatchObject({ resource: { name: 'CNC' } });
     });
   });
 });

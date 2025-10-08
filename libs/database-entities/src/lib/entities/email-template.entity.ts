@@ -7,6 +7,7 @@ export enum EmailTemplateType {
   RESET_PASSWORD = 'reset-password',
   USERNAME_CHANGED = 'username-changed',
   PASSWORD_CHANGED = 'password-changed',
+  RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
 }
 
 @Entity('email_templates')

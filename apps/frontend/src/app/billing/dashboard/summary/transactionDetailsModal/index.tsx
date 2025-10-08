@@ -23,7 +23,7 @@ import {
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
 import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
-import { apiCurrencyToFrontendCurrency } from '../../../../../utils/currency';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { useMemo } from 'react';
 
 interface Props {
@@ -112,7 +112,7 @@ export function TransactionDetailsModal(props: Props) {
                       className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
                     >
                       {transaction.amount > 0 && '+'}
-                      {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
+                      {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
                     </div>
                   </div>
                   {transaction.initiator && (
@@ -171,14 +171,11 @@ export function TransactionDetailsModal(props: Props) {
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
-                            {formatNumber(apiCurrencyToFrontendCurrency(item.unitPrice, configuration?.minorUnit ?? 2))}
+                            {formatNumber(dbCurrencyToUserCurrency(item.unitPrice, configuration?.minorUnit ?? 2))}
                           </TableCell>
                           <TableCell className="text-right">
                             {formatNumber(
-                              apiCurrencyToFrontendCurrency(
-                                item.unitPrice * item.quantity,
-                                configuration?.minorUnit ?? 2,
-                              ),
+                              dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration?.minorUnit ?? 2),
                             )}
                           </TableCell>
                         </TableRow>
@@ -189,7 +186,7 @@ export function TransactionDetailsModal(props: Props) {
                     <div>
                       {t('items.total')}:{' '}
                       <span className="font-semibold text-foreground">
-                        {formatNumber(apiCurrencyToFrontendCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
+                        {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
                       </span>
                     </div>
                   </div>

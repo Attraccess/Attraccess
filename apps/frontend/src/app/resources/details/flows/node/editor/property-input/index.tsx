@@ -14,7 +14,7 @@ import { MqttServerSelect } from '../../../../../../../components/mqttServerSele
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo } from 'react';
-import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../../../../utils/currency';
+import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
@@ -59,7 +59,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
   const parsedValue = useMemo(() => {
     if (schema.isCurrency) {
-      return apiCurrencyToFrontendCurrency(value as number, configuration?.minorUnit ?? 2);
+      return dbCurrencyToUserCurrency(value as number, configuration?.minorUnit ?? 2);
     }
     return value;
   }, [value, schema.isCurrency, configuration]);
@@ -70,7 +70,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         if (!configuration) {
           return;
         }
-        onChange(frontendCurrencyToApiCurrency(newValue as number, configuration.minorUnit) as TValue);
+        onChange(userCurrencyToDbCurrency(newValue as number, configuration.minorUnit) as TValue);
       } else {
         onChange(newValue);
       }
