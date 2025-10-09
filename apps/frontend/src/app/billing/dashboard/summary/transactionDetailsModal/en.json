@@ -40,5 +40,8 @@
     },
     "empty": "No items",
     "total": "Items total"
+  },
+  "actions": {
+    "refund": "Refund"
   }
 }

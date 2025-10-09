@@ -1,4 +1,5 @@
 import {
+  Button,
   Chip,
   Divider,
   Modal,
@@ -24,19 +25,34 @@ import {
 } from '@attraccess/react-query-client';
 import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { RefundModal } from './refund';
 
 interface Props {
-  children: (onOpen: () => void) => React.ReactNode;
+  children?: (onOpen: () => void) => React.ReactNode;
   transactionId: number;
+  isOpen?: boolean;
+  onClose?: () => unknown;
 }
 
 export function TransactionDetailsModal(props: Props) {
-  const { children, transactionId } = props;
+  const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
 
   const { t, tExists } = useTranslations({ en, de });
 
-  const { onOpen, isOpen, onOpenChange } = useDisclosure();
+  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure({ onClose: onCloseProp });
+
+  useEffect(() => {
+    if (isOpenProp === undefined) {
+      return;
+    }
+
+    if (isOpenProp) {
+      onOpen();
+    } else {
+      onClose();
+    }
+  }, [isOpenProp, onOpen, onClose]);
 
   const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -64,11 +80,23 @@ export function TransactionDetailsModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
+      {children && children(onOpen)}
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
+            <PageHeader
+              title={t('title')}
+              noMargin
+              actions={
+                <RefundModal transactionId={transactionId}>
+                  {(onOpen) => (
+                    <Button color="danger" variant="light" onPress={onOpen}>
+                      {t('actions.refund')}
+                    </Button>
+                  )}
+                </RefundModal>
+              }
+            />
           </ModalHeader>
           <ModalBody>
             {!transaction ? (

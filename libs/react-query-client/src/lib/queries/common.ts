@@ -404,6 +404,7 @@ export type BillingServiceSetBillingConfigurationMutationResult = Awaited<Return
 export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
 export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
 export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
+export type BillingServiceRefundTransactionMutationResult = Awaited<ReturnType<typeof BillingService.refundTransaction>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;

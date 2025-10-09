@@ -2077,6 +2077,17 @@ export const $SumupTransactionCallbackDto = {
     required: ['id', 'event_type', 'payload', 'timestamp']
 } as const;
 
+export const $RefundTransactionDto = {
+    type: 'object',
+    properties: {
+        amount: {
+            type: 'number',
+            example: 100
+        }
+    },
+    required: ['amount']
+} as const;
+
 export const $ResourceFlowNodeSchemaDto = {
     type: 'object',
     properties: {

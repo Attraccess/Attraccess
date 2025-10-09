@@ -40,5 +40,8 @@
     },
     "empty": "Keine Positionen",
     "total": "Summe Positionen"
+  },
+  "actions": {
+    "refund": "Erstattung"
   }
 }
