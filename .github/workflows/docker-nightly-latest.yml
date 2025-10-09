@@ -19,7 +19,7 @@ permissions:
   # pull-requests: write is not needed for main branch builds
 
 jobs:
-  build:
+  compile:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -53,7 +53,7 @@ jobs:
       - name: Run build steps (adjust target as needed)
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=build --exclude=attractap-firmware,attractap-touch-firmware
+        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build --exclude=attractap-firmware,attractap-touch-firmware
 
       # Upload build artifacts to be used in Docker build
       - name: Upload build artifacts
@@ -65,7 +65,7 @@ jobs:
 
   # Build and push Docker container
   containerize:
-    needs: build
+    needs: compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -77,14 +77,6 @@ jobs:
         with:
           name: build-artifacts-${{ github.run_id }} # Match the upload name
           path: dist
-
-      # Debug: List directory contents after download (optional, can be removed)
-      - name: List files after download
-        run: ls -la
-
-      # Set up Docker Buildx for GHA cache support
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry
@@ -125,15 +117,9 @@ jobs:
             ${{ env.DOCKERHUB_IMAGE_NAME }}:nightly-${{ steps.vars.outputs.SHORT_SHA }}
           build-args: |
             NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
-          labels: |
-            # Add relevant labels for main branch builds
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   balena:
-    needs: build
+    needs: compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
