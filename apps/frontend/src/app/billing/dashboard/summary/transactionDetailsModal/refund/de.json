@@ -1,0 +1,28 @@
+{
+  "title": "Erstattung",
+  "inputs": {
+    "amount": "Betrag",
+    "reason": "Grund"
+  },
+  "actions": {
+    "refund": "Erstattung"
+  },
+  "success": {
+    "toast": {
+      "title": "Erstattung erfolgreich",
+      "description": "Erstattung wurde erfolgreich durchgeführt"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Fehler",
+        "description": "Es ist ein Fehler aufgetreten: {{error}}"
+      },
+      "REFUND_AMOUNT_HIGHER_THAN_TRANSACTION_AMOUNT_EXCEPTION": {
+        "title": "Betrag höher als Transaktionsbetrag",
+        "description": "Der Betrag ist höher als der Transaktionsbetrag"
+      }
+    }
+  }
+}

@@ -40,6 +40,7 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { SumUpConfigurationDto } from './dto/sumup/sumup-configuration.dto';
 import { ResourceBillingConfigurationDto } from './dto/resource-billing-configuration.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { RefundTransactionDto } from './dto/refund-transaction.dto';
 
 @ApiTags('Billing')
 @Controller()
@@ -279,5 +280,20 @@ export class BillingController {
 
     // Create an observable from the subject
     return subject.asObservable();
+  }
+
+  @Post('/billing/transactions/:transactionId/refund')
+  @Auth('canManageBilling')
+  @ApiOperation({
+    summary: 'Refund a billing transaction',
+    operationId: 'refundTransaction',
+  })
+  @ApiResponse({ status: 200, description: 'The billing transaction has been refunded.', type: BillingTransaction })
+  async refundTransaction(
+    @Request() request: AuthenticatedRequest,
+    @Param('transactionId', ParseIntPipe) transactionId: number,
+    @Body() data: RefundTransactionDto,
+  ) {
+    return await this.billingService.refundTransaction(request.user.id, transactionId, data);
   }
 }

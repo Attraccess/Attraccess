@@ -1428,6 +1428,11 @@ export enum event_type {
     SOLO_TRANSACTION_UPDATED = 'solo.transaction.updated'
 }
 
+export type RefundTransactionDto = {
+    amount: number;
+    reason: string | null;
+};
+
 export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
@@ -2766,6 +2771,13 @@ export type SumUpTopUpCallbackData = {
 };
 
 export type SumUpTopUpCallbackResponse = unknown;
+
+export type RefundTransactionData = {
+    requestBody: RefundTransactionDto;
+    transactionId: number;
+};
+
+export type RefundTransactionResponse = BillingTransaction;
 
 export type GetNodeSchemasData = {
     resourceId: number;
@@ -4572,6 +4584,21 @@ export type $OpenApiTs = {
     '/api/billing/transactions/live': {
         get: {
             res: {
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/billing/transactions/{transactionId}/refund': {
+        post: {
+            req: RefundTransactionData;
+            res: {
+                /**
+                 * The billing transaction has been refunded.
+                 */
+                200: BillingTransaction;
                 /**
                  * Unauthorized
                  */

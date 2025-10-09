@@ -1,0 +1,10 @@
+{
+  "title": "Refund",
+  "inputs": {
+    "amount": "Amount",
+    "reason": "Reason"
+  },
+  "actions": {
+    "refund": "Refund"
+  }
+}

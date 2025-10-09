@@ -22,6 +22,9 @@ import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dt
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { EmailService } from '../email/email.service';
+import { BillingTransactionNotFoundException } from './errors/billing-transaction-not-found.error';
+import { RefundAmountHigherThanTransactionAmountException } from './errors/refund-amount-higher-than-transaction-amount.error';
+import { RefundTransactionDto } from './dto/refund-transaction.dto';
 
 @Injectable()
 export class BillingService {
@@ -128,7 +131,7 @@ export class BillingService {
     };
   }
 
-  async getTransaction(transactionId: number, userId: number): Promise<BillingTransaction> {
+  async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
     return await this.billingTransactionRepository.findOne({
       where: { id: transactionId, userId },
       relations: this.DEFAULT_RELATIONS,
@@ -309,6 +312,7 @@ export class BillingService {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: 'BILLING_FACTOR',
+          description: `${usage.user.billingFactor}%`,
           unitPrice: -billingFactorDiscountAmount,
           quantity: 1,
         });
@@ -394,5 +398,36 @@ export class BillingService {
     }
 
     return false;
+  }
+
+  public async refundTransaction(executingUserId: number, transactionId: number, data: RefundTransactionDto) {
+    const transaction = await this.getTransaction(transactionId);
+
+    if (!transaction) {
+      throw new BillingTransactionNotFoundException();
+    }
+
+    if (data.amount <= 0) {
+      throw new BadRequestException('Amount must be greater than 0');
+    }
+
+    if (data.amount > Math.abs(transaction.amount)) {
+      throw new RefundAmountHigherThanTransactionAmountException();
+    }
+
+    const refundAmount = transaction.amount > 0 ? -data.amount : data.amount;
+
+    const refundTransaction = await this.billingTransactionRepository.save({
+      userId: transaction.userId,
+      initiatorId: executingUserId,
+      amount: refundAmount,
+      reason: data.reason ?? null,
+      status: BillingTransactionStatus.Completed,
+      refundOfId: transaction.id,
+    });
+
+    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+
+    return await this.getTransaction(refundTransaction.id);
   }
 }
