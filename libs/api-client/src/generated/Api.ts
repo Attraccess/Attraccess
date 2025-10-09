@@ -1465,6 +1465,11 @@ export interface SumupTransactionCallbackDto {
   timestamp: string;
 }
 
+export interface RefundTransactionDto {
+  /** @example 100 */
+  amount: number;
+}
+
 export interface ResourceFlowNodeSchemaDto {
   /** The name of the node type */
   type:
@@ -2383,6 +2388,8 @@ export type PairSumUpReaderData = SumUpReaderDto;
 export type TopUpWithSumUpReaderData = BillingTransaction;
 
 export type SumUpTopUpCallbackData = any;
+
+export type RefundTransactionData = BillingTransaction;
 
 export type GetNodeSchemasData = ResourceFlowNodeSchemaDto[];
 
@@ -4407,6 +4414,24 @@ export namespace Billing {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = any;
+  }
+
+  /**
+   * No description
+   * @tags Billing
+   * @name RefundTransaction
+   * @summary Refund a billing transaction
+   * @request POST:/api/billing/transactions/{transactionId}/refund
+   * @secure
+   */
+  export namespace RefundTransaction {
+    export type RequestParams = {
+      transactionId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = RefundTransactionDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = RefundTransactionData;
   }
 }
 
@@ -7194,6 +7219,30 @@ export class Api<
         path: `/api/billing/transactions/live`,
         method: "GET",
         secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Billing
+     * @name RefundTransaction
+     * @summary Refund a billing transaction
+     * @request POST:/api/billing/transactions/{transactionId}/refund
+     * @secure
+     */
+    refundTransaction: (
+      transactionId: number,
+      data: RefundTransactionDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<RefundTransactionData, void>({
+        path: `/api/billing/transactions/${transactionId}/refund`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
         ...params,
       }),
   };
