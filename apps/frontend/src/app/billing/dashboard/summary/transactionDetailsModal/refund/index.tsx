@@ -108,7 +108,12 @@ export function RefundModal(props: Props) {
                 minValue={0}
                 maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
               />
-              <Textarea label={t('inputs.reason')} value={reason} onValueChange={(value) => setReason(value)} />
+              <Textarea
+                maxLength={255}
+                label={t('inputs.reason')}
+                value={reason}
+                onValueChange={(value) => setReason(value)}
+              />
               <input type="submit" hidden />
             </Form>
           </ModalBody>
