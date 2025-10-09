@@ -3,6 +3,8 @@ import * as os from 'os';
 import * as path from 'path';
 import type { DataSource } from 'typeorm';
 
+jest.setTimeout(60_000);
+
 describe('Billing balance triggers (e2e)', () => {
   let dataSource: DataSource;
 
@@ -34,7 +36,6 @@ describe('Billing balance triggers (e2e)', () => {
   };
 
   beforeAll(async () => {
-    jest.setTimeout(60_000);
     const tmpRoot = await createTempStorageRoot();
     process.env.STORAGE_ROOT = tmpRoot;
 
