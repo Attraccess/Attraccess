@@ -1,8 +1,7 @@
 {
   "title": "Erstattung",
   "inputs": {
-    "amount": "Betrag",
-    "reason": "Grund"
+    "amount": "Betrag"
   },
   "actions": {
     "refund": "Erstattung"

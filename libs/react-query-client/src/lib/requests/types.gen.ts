@@ -1430,7 +1430,6 @@ export enum event_type {
 
 export type RefundTransactionDto = {
     amount: number;
-    reason: string | null;
 };
 
 export type ResourceFlowNodeSchemaDto = {

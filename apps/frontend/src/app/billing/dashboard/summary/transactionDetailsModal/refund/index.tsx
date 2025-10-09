@@ -8,7 +8,6 @@ import {
   ModalFooter,
   ModalHeader,
   NumberInput,
-  Textarea,
   useDisclosure,
 } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
@@ -45,7 +44,6 @@ export function RefundModal(props: Props) {
   const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
 
   const [amount, setAmount] = useState(0);
-  const [reason, setReason] = useState('');
 
   const { hasPermission } = useAuth();
 
@@ -77,8 +75,8 @@ export function RefundModal(props: Props) {
   });
 
   const onSubmit = useCallback(() => {
-    refundTransaction({ requestBody: { amount, reason }, transactionId });
-  }, [refundTransaction, amount, reason, transactionId]);
+    refundTransaction({ requestBody: { amount }, transactionId });
+  }, [refundTransaction, amount, transactionId]);
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
 
@@ -107,12 +105,6 @@ export function RefundModal(props: Props) {
                 onValueChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
                 minValue={0}
                 maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-              />
-              <Textarea
-                maxLength={255}
-                label={t('inputs.reason')}
-                value={reason}
-                onValueChange={(value) => setReason(value)}
               />
               <input type="submit" hidden />
             </Form>

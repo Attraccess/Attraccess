@@ -415,20 +415,15 @@ export class BillingService {
       throw new RefundAmountHigherThanTransactionAmountException();
     }
 
-    if ((data.reason?.length ?? 0) > 255) {
-      throw new BadRequestException('Reason must be less than 255 characters');
-    }
-
     const refundAmount = transaction.amount > 0 ? -data.amount : data.amount;
 
     const refundTransaction = await this.billingTransactionRepository.save({
       userId: transaction.userId,
       initiatorId: executingUserId,
       amount: refundAmount,
-      reason: data.reason ?? null,
       status: BillingTransactionStatus.Completed,
       refundOfId: transaction.id,
-    });
+    } as Partial<BillingTransaction>);
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
 

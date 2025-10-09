@@ -1,8 +1,7 @@
 {
   "title": "Refund",
   "inputs": {
-    "amount": "Amount",
-    "reason": "Reason"
+    "amount": "Amount"
   },
   "actions": {
     "refund": "Refund"

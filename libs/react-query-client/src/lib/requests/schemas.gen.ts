@@ -2083,14 +2083,9 @@ export const $RefundTransactionDto = {
         amount: {
             type: 'number',
             example: 100
-        },
-        reason: {
-            type: 'string',
-            example: 'Reason for refund',
-            nullable: true
         }
     },
-    required: ['amount', 'reason']
+    required: ['amount']
 } as const;
 
 export const $ResourceFlowNodeSchemaDto = {
