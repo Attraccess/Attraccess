@@ -1,37 +1,3 @@
-## 1.1.0 (2025-10-09)
-
-### 🚀 Features
-
-- restructure sidebar to include feedback group with report bug a… ([#173](https://github.com/Attraccess/Attraccess/pull/173))
-- enhance billing information updates and user context in layout and resource billing components ([#174](https://github.com/Attraccess/Attraccess/pull/174))
-- **ATT-108:** payment transactions csv export ([#185](https://github.com/Attraccess/Attraccess/pull/185))
-- **ATT-110:** refactor billing items logic so we can use it before e… ([#189](https://github.com/Attraccess/Attraccess/pull/189))
-- **ATT-113:** added billing factor, restructured billing navigation ([#221](https://github.com/Attraccess/Attraccess/pull/221))
-- **ATT-119:** added duplicati to balena compose ([#213](https://github.com/Attraccess/Attraccess/pull/213))
-- **ATT-120:** add zigbee2mqtt to compose ([#206](https://github.com/Attraccess/Attraccess/pull/206))
-- **ATT-122:** implement reliable server availability hook and update server not available component ([#215](https://github.com/Attraccess/Attraccess/pull/215))
-- **ATT-129:** refund billing transactions ([#225](https://github.com/Attraccess/Attraccess/pull/225))
-- **ATT-68:** flow nodes are 100% defined in backend, frontend builds… ([#147](https://github.com/Attraccess/Attraccess/pull/147))
-- **ATT-76:** allow introducers and managers to stop usage sessions of other users ([#144](https://github.com/Attraccess/Attraccess/pull/144))
-- **ATT-87:** resource usage billing transaction summary email ([#224](https://github.com/Attraccess/Attraccess/pull/224))
-- **ATT-93:** support sumup payment terminals for credit topups ([#165](https://github.com/Attraccess/Attraccess/pull/165))
-
-### 🩹 Fixes
-
-- ci release wrong links ([#114](https://github.com/Attraccess/Attraccess/pull/114))
-- replaced i18next with custom translation hooks and components ([#156](https://github.com/Attraccess/Attraccess/pull/156))
-- mqtt flow node editor broke because of undefined default server key ([#172](https://github.com/Attraccess/Attraccess/pull/172))
-- balena versioning using semver compliant versions ([#212](https://github.com/Attraccess/Attraccess/pull/212))
-- **ATT-101:** ensure translations do not cause unnecessary rerender ([#183](https://github.com/Attraccess/Attraccess/pull/183))
-- **ATT-71:** mqtt edit page works again, removed no longer existing r… ([#133](https://github.com/Attraccess/Attraccess/pull/133))
-- **ATT-72:** use select component correctly and use correct translation keys ([#143](https://github.com/Attraccess/Attraccess/pull/143))
-- **ATT-74:** introducers of a group can introduce to single resources of that group ([#127](https://github.com/Attraccess/Attraccess/pull/127))
-- **ATT-98:** use soft-delete for resources ([#217](https://github.com/Attraccess/Attraccess/pull/217))
-
-### ❤️ Thank You
-
-- Jan Jaap @jappyjan
-
 # 1.0.0 (2025-08-17)
 
 ### 🚀 Features
