@@ -5,7 +5,7 @@
 #define STRINGIFY(x) STRINGIFY_HELPER(x)
 #endif
 
-LogLevel Logger::level = LOG_LEVEL_INFO;
+LogLevel Logger::level = LOG_LEVEL_DEBUG;
 
 Logger::Logger(const char *name) : name(name)
 {
