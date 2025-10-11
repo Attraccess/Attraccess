@@ -5,23 +5,11 @@ uint8_t NFC::NEW_KEY[16] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01
 
 void NFC::setup()
 {
-    // Wire.begin(18, 17);
+    this->logger.info("Initializing PN532");
     this->pn532.begin();
 
-    uint32_t versiondata = this->pn532.getFirmwareVersion();
-    if (!versiondata)
-    {
-        this->logger.error("Didn't find PN53x board");
-        while (1)
-        {
-            delay(1000);
-            // TODO: reset pn532 and try again
-        }
-    }
-    // Got ok data, print it out!
-    this->logger.info("Found chip PN53x");
-    this->logger.info((String((versiondata >> 24) & 0xFF) + " HEX").c_str());
-    this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
+    this->logger.info("Checking hardware");
+    this->checkHardware(true);
 
     // configure board to read RFID tags
     bool samConfigSuccess = this->pn532.SAMConfig();
@@ -30,8 +18,54 @@ void NFC::setup()
         this->logger.error("SAMConfig failed");
         return;
     }
+}
 
-    this->logger.info("Waiting for an ISO14443A Card ...");
+void NFC::enableCardDetection(std::function<void()> callback)
+{
+    if (this->cardDetectionCallback != nullptr)
+    {
+        this->logger.error("Card detection already enabled");
+        return;
+    }
+
+    this->cardDetectionCallback = callback;
+
+    pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
+    auto irqHandler = [this]
+    {
+        detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
+        this->onCardDetectedInterruptHandler();
+    };
+    attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
+    this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+}
+
+void NFC::disableCardDetection()
+{
+    detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
+    this->cardDetected = false;
+    this->cardDetectionCallback = nullptr;
+}
+
+void NFC::loop()
+{
+    this->checkHardware();
+    this->handleCardDetection();
+}
+
+void NFC::handleCardDetection()
+{
+    if (!this->cardDetected)
+    {
+        return;
+    }
+
+    if (this->cardDetectionCallback == nullptr)
+    {
+        return;
+    }
+
+    this->cardDetectionCallback();
 }
 
 void NFC::demo()
@@ -148,6 +182,8 @@ bool NFC::waitForCard(uint32_t timeoutMs)
         return false;
     }
 
+    this->logger.info("Tag detected");
+    this->pn532.PrintHex(uid, uidLength);
     return true;
 }
 
@@ -211,4 +247,41 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 
     this->logger.info("authenticate successful");
     return true;
+}
+
+void NFC::onCardDetectedInterruptHandler()
+{
+    this->cardDetected = true;
+}
+
+void NFC::checkHardware(bool logHardwareInfo)
+{
+    uint32_t now = millis();
+    if (now - this->lastHardwareCheckMs < NFC::hardwareCheckIntervalMs)
+    {
+        return;
+    }
+    this->lastHardwareCheckMs = now;
+
+    uint32_t versiondata = this->pn532.getFirmwareVersion();
+    if (!versiondata)
+    {
+        this->logger.error("Didn't find PN53x board");
+        while (1)
+        {
+            this->logger.error("PN53x board not found, restarting in 5 seconds");
+            delay(5000);
+            ESP.restart();
+        }
+    }
+
+    if (!logHardwareInfo)
+    {
+        return;
+    }
+
+    // Got ok data, print it out!
+    this->logger.info("Found chip PN53x");
+    this->logger.info((String((versiondata >> 24) & 0xFF) + " HEX").c_str());
+    this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
 }

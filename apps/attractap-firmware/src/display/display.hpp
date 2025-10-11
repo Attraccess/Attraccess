@@ -10,16 +10,30 @@
 #include "TouchDrvGT911.hpp"
 #include <Wire.h>
 #include <SPI.h>
-#include "../nfc/nfc.hpp"
+#include "screens/lockscreen/lockscreen.hpp"
+#include "screens/IScreen.hpp"
+#include "screens/init/initscreen.hpp"
+#include "screens/boot/bootscreen.hpp"
+#include "screens/setPin/setPinScreen.hpp"
+#include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
+#include "../state/state.hpp"
 
 class Display
 {
 public:
-    static void setup(NFC *nfc);
+    static void setup();
     static void loop();
 
+    static void transitionToScreen(IScreen *screen);
+
+    static InitScreen initScreen;
+    static Lockscreen lockscreen;
+    static BootScreen bootScreen;
+    static SetPinScreen setPinScreen;
+    static ConnectionConfigurationScreen connectionConfigurationScreen;
+
 private:
-    static NFC *nfc;
+    static IScreen *activeScreen;
     static Logger logger;
     static Arduino_DataBus *bus;
     static Arduino_ESP32RGBPanel *rgbpanel;
@@ -37,14 +51,6 @@ private:
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);
     static uint32_t tick_cb();
-
-    static void authenticateFactoryButton_event_cb(lv_event_t *event);
-    static void changeKeyButton_event_cb(lv_event_t *event);
-    static void authenticateButton_event_cb(lv_event_t *event);
-    static void changeKeyBackButton_event_cb(lv_event_t *event);
-
-    static lv_obj_t *demo_spinner;
-    static lv_obj_t *nfc_status_label;
 
 #if LV_USE_LOG != 0
     /* Serial debugging */
