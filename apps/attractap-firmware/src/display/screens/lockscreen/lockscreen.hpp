@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <lvgl.h>
-#include "lockscreen_background_image.cpp"
+#include "../../images/lockscreen_background_image.cpp"
 #include "../IScreen.hpp"
 
 class Lockscreen : public IScreen

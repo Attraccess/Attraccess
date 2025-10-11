@@ -3,6 +3,7 @@
 void Application::setup()
 {
     Settings::setup();
+    Network::setup();
     Display::setup();
     this->nfc.setup();
     SerialSetup::setup(&this->cliService);
@@ -16,6 +17,7 @@ void Application::loop()
     Display::loop();
     nfc.loop();
     cliService.loop();
+    Network::loop();
 
     this->processState();
 }

@@ -15,6 +15,7 @@ class Network
 public:
     // Main interface
     static void setup();
+    static void loop();
 
 private:
     static void initSharedComponents();

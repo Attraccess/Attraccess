@@ -37,16 +37,8 @@ public:
     };
     static ApiState getApiState();
 
-    static uint32_t getLastStateChangeTime();
-
 private:
     State() = delete;
-
-    static void onStateChanged();
-    static uint32_t _lastStateChangeTime;
-
-    static portMUX_TYPE stateMutex;
-    static portMUX_TYPE apiEventMutex;
 
     static esp_ip4_addr_t wifi_ip;
     static bool wifi_connected;

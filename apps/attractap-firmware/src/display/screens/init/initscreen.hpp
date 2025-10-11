@@ -1,10 +1,11 @@
 #pragma once
 
 #include <lvgl.h>
-#include "logo_400w_png.cpp"
+#include "../../images/logo_400w_png.cpp"
 #include "../IScreen.hpp"
 #include <Arduino.h>
 #include <functional>
+#include "../../../state/state.hpp"
 
 class InitScreen : public IScreen
 {

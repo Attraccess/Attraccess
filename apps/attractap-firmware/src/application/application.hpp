@@ -7,6 +7,7 @@
 #include "settings/settings.hpp"
 #include "../cli/CLIService.hpp"
 #include "../serial-setup/serial-setup.hpp"
+#include "../network/network.hpp"
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
 

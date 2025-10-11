@@ -7,10 +7,12 @@
 #include "../../settings/settings.hpp"
 #include "../../state/state.hpp"
 #include "../../logger/logger.hpp"
+#include "esp_heap_caps.h"
 
 class Wifi
 {
 public:
+    static void loop();
     static const uint8_t MAX_KNOWN_WIFI_NETWORKS = 20;
     struct WifiCredentials
     {
@@ -50,9 +52,6 @@ public:
     static bool isConnected();
 
 private:
-    static void taskFn(void *parameter);
-    static void loop();
-
     static WifiState _state;
     static bool is_setup;
     static bool is_scanning;

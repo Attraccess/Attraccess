@@ -71,21 +71,21 @@ void InitScreen::init()
    lv_obj_set_style_pad_row(wifiContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(wifiContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *wifiSpinner = lv_spinner_create(wifiContainer);
-   lv_obj_set_width(wifiSpinner, 26);
-   lv_obj_set_height(wifiSpinner, 26);
-   lv_obj_set_align(wifiSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(wifiSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(wifiSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->wifiSpinner = lv_spinner_create(wifiContainer);
+   lv_obj_set_width(this->wifiSpinner, 26);
+   lv_obj_set_height(this->wifiSpinner, 26);
+   lv_obj_set_align(this->wifiSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->wifiSpinner, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_set_style_arc_width(this->wifiSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_arc_width(wifiSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(this->wifiSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   lv_obj_t *wifiLabel = lv_label_create(wifiContainer);
-   lv_obj_set_width(wifiLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(wifiLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(wifiLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(wifiLabel, "verbinde WLAN");
-   lv_obj_set_style_text_font(wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->wifiLabel = lv_label_create(wifiContainer);
+   lv_obj_set_width(this->wifiLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->wifiLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->wifiLabel, "verbinde WLAN");
+   lv_obj_set_style_text_font(this->wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *ethernetContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(ethernetContainer);
@@ -99,21 +99,21 @@ void InitScreen::init()
    lv_obj_set_style_pad_row(ethernetContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(ethernetContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *ethernetSpinner = lv_spinner_create(ethernetContainer);
-   lv_obj_set_width(ethernetSpinner, 26);
-   lv_obj_set_height(ethernetSpinner, 26);
-   lv_obj_set_align(ethernetSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(ethernetSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(ethernetSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->ethernetSpinner = lv_spinner_create(ethernetContainer);
+   lv_obj_set_width(this->ethernetSpinner, 26);
+   lv_obj_set_height(this->ethernetSpinner, 26);
+   lv_obj_set_align(this->ethernetSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->ethernetSpinner, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_set_style_arc_width(this->ethernetSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_arc_width(ethernetSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(this->ethernetSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   lv_obj_t *ethernetLabel = lv_label_create(ethernetContainer);
-   lv_obj_set_width(ethernetLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(ethernetLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(ethernetLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(ethernetLabel, "verbinde Ethernet");
-   lv_obj_set_style_text_font(ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->ethernetLabel = lv_label_create(ethernetContainer);
+   lv_obj_set_width(this->ethernetLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->ethernetLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->ethernetLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
+   lv_obj_set_style_text_font(this->ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *apiConnectionContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiConnectionContainer);
@@ -127,21 +127,21 @@ void InitScreen::init()
    lv_obj_set_style_pad_row(apiConnectionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(apiConnectionContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *apiConnectionSpinner = lv_spinner_create(apiConnectionContainer);
-   lv_obj_set_width(apiConnectionSpinner, 26);
-   lv_obj_set_height(apiConnectionSpinner, 26);
-   lv_obj_set_align(apiConnectionSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(apiConnectionSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(apiConnectionSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->apiConnectionSpinner = lv_spinner_create(apiConnectionContainer);
+   lv_obj_set_width(this->apiConnectionSpinner, 26);
+   lv_obj_set_height(this->apiConnectionSpinner, 26);
+   lv_obj_set_align(this->apiConnectionSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->apiConnectionSpinner, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_set_style_arc_width(this->apiConnectionSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_arc_width(apiConnectionSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(this->apiConnectionSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   lv_obj_t *apiConnectionLabel = lv_label_create(apiConnectionContainer);
-   lv_obj_set_width(apiConnectionLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(apiConnectionLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(apiConnectionLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(apiConnectionLabel, "verbinde API");
-   lv_obj_set_style_text_font(apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->apiConnectionLabel = lv_label_create(apiConnectionContainer);
+   lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->apiConnectionLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->apiConnectionLabel, "verbinde API");
+   lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *apiAuthenticationContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiAuthenticationContainer);
@@ -155,21 +155,21 @@ void InitScreen::init()
    lv_obj_set_style_pad_row(apiAuthenticationContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(apiAuthenticationContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *apiAuthenticationSpinner = lv_spinner_create(apiAuthenticationContainer);
-   lv_obj_set_width(apiAuthenticationSpinner, 26);
-   lv_obj_set_height(apiAuthenticationSpinner, 26);
-   lv_obj_set_align(apiAuthenticationSpinner, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(apiAuthenticationSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->apiAuthenticationSpinner = lv_spinner_create(apiAuthenticationContainer);
+   lv_obj_set_width(this->apiAuthenticationSpinner, 26);
+   lv_obj_set_height(this->apiAuthenticationSpinner, 26);
+   lv_obj_set_align(this->apiAuthenticationSpinner, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_set_style_arc_width(this->apiAuthenticationSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_arc_width(apiAuthenticationSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(this->apiAuthenticationSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   lv_obj_t *apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
-   lv_obj_set_width(apiAuthenticationLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(apiAuthenticationLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(apiAuthenticationLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(apiAuthenticationLabel, "authentifiziere an API");
-   lv_obj_set_style_text_font(apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
+   lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
+   lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
    lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
@@ -245,6 +245,29 @@ void InitScreen::markApiAuthenticationStateAsError()
 
 void InitScreen::loop()
 {
+   State::NetworkState networkState = State::getNetworkState();
+   // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
+   if (networkState.wifi_connected)
+   {
+      this->markWifiStateAsSuccess();
+   }
+
+   if (networkState.ethernet_connected)
+   {
+      this->markEthernetStateAsSuccess();
+   }
+
+   State::WebsocketState websocketState = State::getWebsocketState();
+   if (websocketState.connected)
+   {
+      this->markApiConnectionStateAsSuccess();
+   }
+
+   State::ApiState apiState = State::getApiState();
+   if (apiState.authenticated)
+   {
+      this->markApiAuthenticationStateAsSuccess();
+   }
 }
 
 void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback)

@@ -57,3 +57,9 @@ void Network::initSharedComponents()
     _sharedComponentsInitialized = true;
     logger.info("Shared networking components initialized");
 }
+
+void Network::loop()
+{
+    Wifi::loop();
+    Ethernet::loop();
+}

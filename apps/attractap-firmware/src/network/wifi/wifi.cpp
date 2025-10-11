@@ -132,19 +132,21 @@ void Wifi::setup()
     // Configure WiFi memory settings for lower RAM usage
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
-    // Reduce memory allocations
-    cfg.static_rx_buf_num = 4;  // Default is 10
-    cfg.dynamic_rx_buf_num = 8; // Default is 32
-    cfg.static_tx_buf_num = 4;  // Default is 6
-    cfg.dynamic_tx_buf_num = 8; // Default is 32
-    cfg.rx_ba_win = 4;          // Default is 6
-    cfg.ampdu_rx_enable = 0;    // Disable AMPDU RX
-    cfg.ampdu_tx_enable = 0;    // Disable AMPDU TX
+    // Reduce memory allocations to fit available internal RAM
+    /*    cfg.static_rx_buf_num = 4;  // Default is 10
+        cfg.dynamic_rx_buf_num = 8; // Default is 32
+        cfg.static_tx_buf_num = 4;  // Default is 6
+        cfg.dynamic_tx_buf_num = 8; // Default is 32
+        cfg.rx_ba_win = 4;          // Default is 6
+        cfg.ampdu_rx_enable = 0;    // Disable AMPDU RX
+        cfg.ampdu_tx_enable = 0;    // Disable AMPDU TX*/
 
     esp_err_t wifi_init_result = esp_wifi_init(&cfg);
     if (wifi_init_result != ESP_OK)
     {
         logger.error((String("Failed to initialize WiFi: ") + esp_err_to_name(wifi_init_result)).c_str());
+
+        logger.infof("Free internal heap before WiFi: %u", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
         return;
     }
 
@@ -178,21 +180,6 @@ void Wifi::setup()
         return;
     }
 
-    BaseType_t taskResult = xTaskCreate(
-        taskFn,
-        "Wifi",
-        8192,
-        NULL,
-        tskIDLE_PRIORITY,
-        NULL);
-
-    if (taskResult != pdPASS)
-    {
-        logger.error(("Failed to create WiFi task: " + String(taskResult)).c_str());
-        return;
-    }
-
-    logger.debug("WiFi task created successfully");
     is_setup = true;
 }
 
@@ -263,16 +250,6 @@ void Wifi::setState(WifiState state)
     }
 }
 
-void Wifi::taskFn(void *parameter)
-{
-    logger.debug("WiFi task started");
-
-    while (true)
-    {
-        Wifi::loop();
-        vTaskDelay(pdMS_TO_TICKS(100)); // Use FreeRTOS delay instead of Arduino delay
-    }
-}
 void Wifi::loop()
 {
     // Yield to other tasks at the start of each loop iteration
