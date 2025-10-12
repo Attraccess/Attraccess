@@ -150,13 +150,42 @@ void ConnectionConfigurationScreen::init()
    }
    lv_textarea_set_text(this->serverHostname, fullHostname.c_str());
 
+   lv_obj_t *useSSLContainer = lv_obj_create(apiTab);
+   lv_obj_remove_style_all(useSSLContainer);
+   lv_obj_set_width(useSSLContainer, lv_pct(100));
+   lv_obj_set_height(useSSLContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(useSSLContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(useSSLContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(useSSLContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(useSSLContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(useSSLContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(useSSLContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(useSSLContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->useSSLSwitch = lv_switch_create(useSSLContainer);
+   lv_obj_set_width(this->useSSLSwitch, 50);
+   lv_obj_set_height(this->useSSLSwitch, 25);
+   lv_obj_set_x(this->useSSLSwitch, -181);
+   lv_obj_set_y(this->useSSLSwitch, -31);
+   lv_obj_set_align(this->useSSLSwitch, LV_ALIGN_CENTER);
+   lv_obj_set_state(this->useSSLSwitch, LV_STATE_CHECKED, apiConfig.useSSL);
+
+   lv_obj_t *labelForUseSSLSwitch = lv_label_create(useSSLContainer);
+   lv_obj_set_width(labelForUseSSLSwitch, LV_SIZE_CONTENT);
+   lv_obj_set_height(labelForUseSSLSwitch, LV_SIZE_CONTENT);
+   lv_obj_set_x(labelForUseSSLSwitch, -205);
+   lv_obj_set_y(labelForUseSSLSwitch, 20);
+   lv_obj_set_align(labelForUseSSLSwitch, LV_ALIGN_CENTER);
+   lv_label_set_text(labelForUseSSLSwitch, "SSL verwenden");
+   lv_obj_set_style_text_color(labelForUseSSLSwitch, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
    lv_obj_t *sslInfoLabel = lv_label_create(apiTab);
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_x(sslInfoLabel, -111);
    lv_obj_set_y(sslInfoLabel, 101);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(sslInfoLabel, "Attractap NFC Leser funktionieren AUSCHLIESSLICH mit einer SSL Verbindung (https).");
+   lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstützt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = lv_obj_create(apiTab);
@@ -325,9 +354,6 @@ static bool hostnameLooksValid(const char *text)
 {
    if (!text || text[0] == '\0')
       return false;
-   // Must NOT start with http://; https:// will be handled by stripping elsewhere
-   if (strncmp(text, "http://", 7) == 0)
-      return false;
    return true;
 }
 
@@ -347,13 +373,20 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
 
    bool ssidValid = !isEmpty(ssidText);
    bool passwordValid = !isEmpty(passwordText);
-   // Accept https:// by stripping it; reject http:// and empty
+
    String hostValue = String(hostText ? hostText : "");
    if (hostValue.startsWith("https://"))
    {
       hostValue.remove(0, 8);
       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
    }
+
+   if (hostValue.startsWith("http://"))
+   {
+      hostValue.remove(0, 7);
+      lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+   }
+
    bool hostValid = !hostValue.isEmpty() && hostnameLooksValid(hostValue.c_str());
 
    // Update label colors
@@ -409,6 +442,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       cfg.ssid = String(ssidText);
       cfg.password = String(passwordText);
       cfg.host = hostValue;
+      cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);
    }
 }

@@ -19,7 +19,8 @@ public:
 
     bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey);
     bool authenticate(uint8_t keyNumber, uint8_t *key);
-    void enableCardDetection(std::function<void()> callback);
+    void enableCardDetection();
+    void setCardDetectionCallback(std::function<void()> callback);
     void disableCardDetection();
 
     static uint8_t FACTORY_KEY[16];

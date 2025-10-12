@@ -7,6 +7,7 @@ void Application::setup()
     Display::setup();
     this->nfc.setup();
     SerialSetup::setup(&this->cliService);
+    this->api.setup();
 
     this->bootDone = false;
     this->bootTime = millis();
@@ -18,6 +19,7 @@ void Application::loop()
     nfc.loop();
     cliService.loop();
     Network::loop();
+    this->api.loop();
 
     this->processState();
 }
@@ -103,14 +105,44 @@ void Application::processState()
         return;
     }
 
-    if (this->state == APPLICATION_STATE_LOCKED)
+    if (!this->unlocked)
+    {
+        if (this->state == APPLICATION_STATE_LOCKED)
+        {
+            return;
+        }
+
+        this->state = APPLICATION_STATE_LOCKED;
+        Display::transitionToScreen(&Display::lockscreen);
+        auto cardDetectionCallback = [this]()
+        {
+            bool authenticated = this->nfc.authenticate(1, NFC::FACTORY_KEY);
+            if (authenticated)
+            {
+                this->logger.info("Authentication successful");
+                this->unlocked = true;
+            }
+            else
+            {
+                this->logger.info("Authentication failed, retrying in 3 seconds");
+                delay(3000);
+                this->state = APPLICATION_STATE_LOCKED;
+                this->unlocked = false;
+                this->nfc.enableCardDetection();
+            }
+        };
+        this->nfc.setCardDetectionCallback(cardDetectionCallback);
+        this->nfc.enableCardDetection();
+        return;
+    }
+
+    if (this->state == APPLICATION_STATE_UNLOCKED)
     {
         return;
     }
 
-    this->state = APPLICATION_STATE_LOCKED;
-    Display::transitionToScreen(&Display::lockscreen);
-    return;
+    this->state = APPLICATION_STATE_UNLOCKED;
+    Display::transitionToScreen(&Display::unlockedScreen);
 }
 
 void Application::handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg)
@@ -124,5 +156,5 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
         port = cfg.host.substring(cfg.host.indexOf(":") + 1);
     }
     Settings::saveNetworkConfig(cfg.ssid, cfg.password);
-    Settings::saveAttraccessApiConfig(hostname, port.toInt(), true);
+    Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
 };

@@ -17,6 +17,7 @@ public:
         String ssid;
         String password;
         String host;
+        bool useSSL;
     };
 
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
@@ -45,6 +46,9 @@ private:
     lv_color_t labelForWifiSSIDDefaultColor;
     lv_color_t labelForWifiPasswordDefaultColor;
     lv_color_t labelForServerHostnameDefaultColor;
+    lv_obj_t *useSSLSwitch;
+    lv_obj_t *labelForUseSSLSwitch;
+    lv_color_t labelForUseSSLSwitchDefaultColor;
 
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);

@@ -1,0 +1,53 @@
+#pragma once
+
+#include <Arduino.h>
+#include "esp_websocket_client.h"
+#include "../settings/settings.hpp"
+#include <functional>
+#include "../state/state.hpp"
+#include "../logger/logger.hpp"
+#include "certManager/AdaptiveCertManager.hpp"
+
+class Websocket
+{
+public:
+    Websocket() : logger("Websocket") {}
+
+    enum ConnectionState
+    {
+        INIT,
+        CONNECTING,
+        CONNECTED,
+    };
+    void setup();
+    void loop();
+    void sendMessage(const String &message);
+    void setMessageCallback(std::function<void(String)> callback);
+    void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
+
+private:
+    std::function<void(String)> messageCallback;
+    std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
+
+    AdaptiveCertManager _certManager;
+
+    void updateInfoFromAppState();
+    void connectWebSocket();
+    bool shouldReconnect();
+    uint32_t lastReconnectAttemptTime;
+    const uint32_t RECONNECT_INTERVAL_MS = 10000;
+
+    bool network_is_connected = false;
+
+    AttraccessApiConfig _lastApiConfig;
+
+    ConnectionState _state = INIT;
+    void setState(ConnectionState state);
+
+    esp_websocket_client_handle_t ws_client;
+
+    static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
+    void processWebSocketEvent(esp_event_base_t base, int32_t event_id, void *event_data);
+
+    Logger logger;
+};

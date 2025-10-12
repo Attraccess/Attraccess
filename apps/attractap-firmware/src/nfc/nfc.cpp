@@ -20,16 +20,9 @@ void NFC::setup()
     }
 }
 
-void NFC::enableCardDetection(std::function<void()> callback)
+void NFC::enableCardDetection()
 {
-    if (this->cardDetectionCallback != nullptr)
-    {
-        this->logger.error("Card detection already enabled");
-        return;
-    }
-
-    this->cardDetectionCallback = callback;
-
+    this->logger.info("Enabling card detection");
     pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
     auto irqHandler = [this]
     {
@@ -40,11 +33,16 @@ void NFC::enableCardDetection(std::function<void()> callback)
     this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
 }
 
+void NFC::setCardDetectionCallback(std::function<void()> callback)
+{
+    this->cardDetectionCallback = callback;
+}
+
 void NFC::disableCardDetection()
 {
+    this->logger.info("Disabling card detection");
     detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
     this->cardDetected = false;
-    this->cardDetectionCallback = nullptr;
 }
 
 void NFC::loop()
@@ -62,10 +60,13 @@ void NFC::handleCardDetection()
 
     if (this->cardDetectionCallback == nullptr)
     {
+        this->logger.error("Card detection callback is null");
         return;
     }
 
+    this->logger.info("Calling card detection callback");
     this->cardDetectionCallback();
+    this->disableCardDetection();
 }
 
 void NFC::demo()
@@ -251,6 +252,7 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 
 void NFC::onCardDetectedInterruptHandler()
 {
+    this->logger.info("Card detected interrupt handler");
     this->cardDetected = true;
 }
 

@@ -15,6 +15,7 @@
 #include "screens/init/initscreen.hpp"
 #include "screens/boot/bootscreen.hpp"
 #include "screens/setPin/setPinScreen.hpp"
+#include "screens/unlocked/unlocked.hpp"
 #include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
 #include "../state/state.hpp"
 
@@ -31,6 +32,7 @@ public:
     static BootScreen bootScreen;
     static SetPinScreen setPinScreen;
     static ConnectionConfigurationScreen connectionConfigurationScreen;
+    static Unlockedscreen unlockedScreen;
 
 private:
     static IScreen *activeScreen;

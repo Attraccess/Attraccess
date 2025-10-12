@@ -6,7 +6,7 @@
 #include "../../images/logo_400w_png.hpp"
 #include "../IScreen.hpp"
 
-class Lockscreen : public IScreen
+class Unlockedscreen : public IScreen
 {
 public:
     void init();

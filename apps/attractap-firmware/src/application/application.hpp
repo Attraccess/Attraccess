@@ -8,13 +8,14 @@
 #include "../cli/CLIService.hpp"
 #include "../serial-setup/serial-setup.hpp"
 #include "../network/network.hpp"
+#include "../api/api.hpp"
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
 
 class Application
 {
 public:
-    Application() : logger("Application") {}
+    Application() : logger("Application"), api(), unlocked(false) {}
 
     void setup();
     void loop();
@@ -23,12 +24,14 @@ private:
     NFC nfc;
     Logger logger;
     CLIService cliService;
+    API api;
 
     void processState();
     void handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg);
 
     uint32_t bootTime;
     bool bootDone;
+    bool unlocked;
 
     enum applicationState_t
     {
@@ -37,7 +40,8 @@ private:
         APPLICATION_STATE_CONFIGURATION_REQUIRED,
         APPLICATION_STATE_INIT,
         APPLICATION_STATE_CUSTOM,
-        APPLICATION_STATE_LOCKED
+        APPLICATION_STATE_LOCKED,
+        APPLICATION_STATE_UNLOCKED
     };
     applicationState_t state;
 };

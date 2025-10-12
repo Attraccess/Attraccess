@@ -1,7 +1,7 @@
 #pragma once
 
 #include <lvgl.h>
-#include "../../images/logo_400w_png.cpp"
+#include "../../images/logo_400w_png.hpp"
 #include "../IScreen.hpp"
 #include <Arduino.h>
 #include <functional>

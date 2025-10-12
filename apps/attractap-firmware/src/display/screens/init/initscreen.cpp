@@ -86,6 +86,7 @@ void InitScreen::init()
    lv_obj_set_align(this->wifiLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->wifiLabel, "verbinde WLAN");
    lv_obj_set_style_text_font(this->wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->wifiLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *ethernetContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(ethernetContainer);
@@ -98,6 +99,11 @@ void InitScreen::init()
    lv_obj_remove_flag(ethernetContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_pad_row(ethernetContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(ethernetContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   if (PIN_ETH_SPI_CS >= 0)
+   {
+      lv_obj_add_flag(ethernetContainer, LV_OBJ_FLAG_HIDDEN);
+   }
 
    this->ethernetSpinner = lv_spinner_create(ethernetContainer);
    lv_obj_set_width(this->ethernetSpinner, 26);
@@ -114,6 +120,7 @@ void InitScreen::init()
    lv_obj_set_align(this->ethernetLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
    lv_obj_set_style_text_font(this->ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->ethernetLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *apiConnectionContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiConnectionContainer);
@@ -142,6 +149,7 @@ void InitScreen::init()
    lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->apiConnectionLabel, "verbinde API");
    lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->apiConnectionLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *apiAuthenticationContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiAuthenticationContainer);
@@ -170,6 +178,7 @@ void InitScreen::init()
    lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
    lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->apiAuthenticationLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
    lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);

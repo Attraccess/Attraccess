@@ -15,6 +15,7 @@ InitScreen Display::initScreen;
 BootScreen Display::bootScreen;
 SetPinScreen Display::setPinScreen;
 ConnectionConfigurationScreen Display::connectionConfigurationScreen;
+Unlockedscreen Display::unlockedScreen;
 
 Arduino_DataBus *Display::bus = NULL;
 
@@ -205,6 +206,7 @@ void Display::setup()
     Display::bootScreen.init();
     Display::setPinScreen.init();
     Display::connectionConfigurationScreen.init();
+    Display::unlockedScreen.init();
 
     Display::transitionToScreen(&Display::bootScreen);
 
