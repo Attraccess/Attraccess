@@ -1,5 +1,14 @@
 #include "application.hpp"
 
+void Application::networkTask(void *parameter)
+{
+    while (true)
+    {
+        Network::loop();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
 void Application::setup()
 {
     Settings::setup();
@@ -9,7 +18,11 @@ void Application::setup()
     SerialSetup::setup(&this->cliService);
     this->api.setup();
 
-    this->bootDone = false;
+    this->api.setResourceListUpdateCallback([this](JsonArray resourceList)
+                                            { this->handleResourceListUpdate(resourceList); });
+
+    xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr, tskIDLE_PRIORITY, nullptr);
+
     this->bootTime = millis();
 }
 
@@ -18,7 +31,6 @@ void Application::loop()
     Display::loop();
     nfc.loop();
     cliService.loop();
-    Network::loop();
     this->api.loop();
 
     this->processState();
@@ -105,15 +117,49 @@ void Application::processState()
         return;
     }
 
+    if (this->resourceCount == 0)
+    {
+        if (this->state == APPLICATION_STATE_NO_RESOURCES)
+        {
+            return;
+        }
+
+        this->state = APPLICATION_STATE_NO_RESOURCES;
+        Display::transitionToScreen(&Display::noResourcesScreen);
+        return;
+    }
+
+    if (this->resourceCount > 0 && !this->resourceIsSelected)
+    {
+        if (this->state == APPLICATION_STATE_RESOURCE_LIST)
+        {
+            return;
+        }
+
+        this->state = APPLICATION_STATE_RESOURCE_LIST;
+        Display::resourceListScreen.setResourceSelectionCallback([this](JsonObject resource)
+                                                                 { this->selectedResource = resource;
+                                                                   this->resourceIsSelected = true;
+                                                                   this->logger.infof("Resource selected: %s", resource["name"].as<String>().c_str()); });
+        Display::transitionToScreen(&Display::resourceListScreen);
+        return;
+    }
+
     if (!this->unlocked)
     {
+        if (this->state == APPLICATION_STATE_UNLOCKED)
+        {
+            return;
+        }
+
         if (this->state == APPLICATION_STATE_LOCKED)
         {
             return;
         }
 
         this->state = APPLICATION_STATE_LOCKED;
-        Display::transitionToScreen(&Display::lockscreen);
+        Display::transitionToScreen(&Display::lockscreen, [this]()
+                                    { this->nfc.enableCardDetection(); });
         auto cardDetectionCallback = [this]()
         {
             bool authenticated = this->nfc.authenticate(1, NFC::FACTORY_KEY);
@@ -126,13 +172,11 @@ void Application::processState()
             {
                 this->logger.info("Authentication failed, retrying in 3 seconds");
                 delay(3000);
-                this->state = APPLICATION_STATE_LOCKED;
                 this->unlocked = false;
                 this->nfc.enableCardDetection();
             }
         };
         this->nfc.setCardDetectionCallback(cardDetectionCallback);
-        this->nfc.enableCardDetection();
         return;
     }
 
@@ -157,4 +201,19 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
     }
     Settings::saveNetworkConfig(cfg.ssid, cfg.password);
     Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
+    if (cfg.devicePin.length() > 0)
+    {
+        Settings::saveDeviceConfig(cfg.devicePin);
+    }
 };
+
+void Application::handleResourceListUpdate(JsonArray resourceList)
+{
+    this->resourceCount = resourceList.size();
+    Display::resourceListScreen.setResourceList(resourceList);
+    if (this->resourceCount == 1)
+    {
+        this->selectedResource = resourceList[0].as<JsonObject>();
+        this->resourceIsSelected = true;
+    }
+}

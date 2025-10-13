@@ -57,18 +57,13 @@ void API::processIncomingMessages(String message)
     }
     else if (eventType == "READER_REQUEST_AUTHENTICATION")
     {
-        this->onRequestAuthentication();
+        this->sendAuthenticationRequest();
+    }
+    else if (eventType == "RESOURCE_LIST")
+    {
+        this->onResourceList(data);
     }
 
-    else if (eventType == "READER_FIRMWARE_INFO")
-    {
-        this->onFirmwareInfo(data);
-    }
-    else if (eventType == "READER_FIRMWARE_UPDATE_REQUIRED")
-    {
-        // TODO: handle firmware update
-        // State::setApiEventData(State::ApiEventState::API_EVENT_STATE_FIRMWARE_UPDATE, payload);
-    }
     else
     {
         logger.error(("Unknown event type: " + eventType).c_str());
@@ -110,7 +105,7 @@ void API::onUnauthorized(JsonObject data)
     logger.error(("UNAUTHORIZED: " + message).c_str());
     Settings::clearAttraccessAuthConfig();
 
-    this->sendMessage(false, "READER_REGISTER", JsonObject());
+    this->sendMessage("READER_REGISTER", JsonObject());
 }
 
 bool API::isRegistered()
@@ -120,27 +115,20 @@ bool API::isRegistered()
 
 void API::sendAck(const char *type)
 {
-    this->sendMessage(true, ("ACK_" + String(type)).c_str());
+    this->sendMessage(("ACK_" + String(type)).c_str());
 }
 
-void API::sendMessage(bool is_response, const char *type)
+void API::sendMessage(const char *type)
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
-    this->sendMessage(is_response, type, payload);
+    this->sendMessage(type, payload);
 }
 
-void API::sendMessage(bool is_response, const char *type, JsonObject payload)
+void API::sendMessage(const char *type, JsonObject payload)
 {
     JsonDocument event;
-    if (is_response)
-    {
-        event["event"] = "RESPONSE";
-    }
-    else
-    {
-        event["event"] = "EVENT";
-    }
+    event["event"] = "EVENT";
     event["data"]["type"] = type;
 
     // Create a copy of the payload in the destination document
@@ -152,7 +140,7 @@ void API::sendMessage(bool is_response, const char *type, JsonObject payload)
 
     String payloadString = event["data"]["payload"].as<String>();
 
-    logger.debug(("Sending " + String(is_response ? "response" : "event") + " of type " + String(type) + " with payload " + payloadString).c_str());
+    logger.debug(("Sending event of type " + String(type) + " with payload " + payloadString).c_str());
 
     String json;
     serializeJson(event, json);
@@ -161,12 +149,12 @@ void API::sendMessage(bool is_response, const char *type, JsonObject payload)
     this->websocket.sendMessage(json);
 }
 
-void API::onRequestAuthentication()
+void API::sendAuthenticationRequest()
 {
     if (!this->isRegistered())
     {
         logger.info("Not registered, sending registration request");
-        this->sendMessage(true, "READER_REGISTER");
+        this->sendMessage("READER_REGISTER");
         return;
     }
 
@@ -175,7 +163,7 @@ void API::onRequestAuthentication()
     JsonObject payload = doc.to<JsonObject>();
     payload["id"] = Settings::getAttraccessAuthConfig().readerId;
     payload["token"] = Settings::getAttraccessAuthConfig().apiKey;
-    this->sendMessage(true, "READER_REQUEST_AUTHENTICATION", payload);
+    this->sendMessage("READER_AUTHENTICATE", payload);
 }
 
 void API::sendHeartbeat()
@@ -198,16 +186,16 @@ void API::sendHeartbeat()
     this->heartbeat_sent_at = millis();
 }
 
-void API::onFirmwareInfo(JsonObject data)
+void API::sendFirmwareInfo()
 {
-    logger.info("Requested firmware info");
+    this->logger.info("Requested firmware info");
 
     JsonDocument doc;
     JsonObject response = doc.to<JsonObject>();
     response["name"] = FIRMWARE_NAME;
     response["variant"] = FIRMWARE_VARIANT;
     response["version"] = FIRMWARE_VERSION;
-    this->sendMessage(true, "READER_FIRMWARE_INFO", response);
+    this->sendMessage("READER_FIRMWARE_INFO", response);
 }
 
 void API::onReaderAuthenticated(JsonObject data)
@@ -219,4 +207,22 @@ void API::onReaderAuthenticated(JsonObject data)
     State::setApiState(true, deviceName);
 
     logger.info("Reader Authentication successful.");
+
+    this->sendFirmwareInfo();
+}
+
+void API::onResourceList(JsonObject data)
+{
+    this->logger.info("Received resource list");
+    if (this->resourceListUpdateCallback == nullptr)
+    {
+        this->logger.error("Resource list update callback is not set");
+        return;
+    }
+    this->resourceListUpdateCallback(data["payload"]["resources"].as<JsonArray>());
+}
+
+void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
+{
+    this->resourceListUpdateCallback = callback;
 }

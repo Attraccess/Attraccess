@@ -1,6 +1,7 @@
 #include "display.hpp"
 
 // Static member definitions
+Logger Display::logger("Display");
 uint32_t Display::screenWidth = 0;
 uint32_t Display::screenHeight = 0;
 TouchDrvGT911 Display::GT911;
@@ -9,20 +10,23 @@ int16_t Display::y[5] = {0};
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
 IScreen *Display::activeScreen = NULL;
+uint32_t Display::transitionStartTime = 0;
+bool Display::transitionComplete = true;
+std::function<void()> Display::onTransitionComplete = nullptr;
 
-Lockscreen Display::lockscreen;
-InitScreen Display::initScreen;
 BootScreen Display::bootScreen;
 SetPinScreen Display::setPinScreen;
 ConnectionConfigurationScreen Display::connectionConfigurationScreen;
+InitScreen Display::initScreen;
+Lockscreen Display::lockscreen;
+NoResourcesScreen Display::noResourcesScreen;
+ResourceListScreen Display::resourceListScreen;
 Unlockedscreen Display::unlockedScreen;
 
 Arduino_DataBus *Display::bus = NULL;
 
 Arduino_ESP32RGBPanel *Display::rgbpanel = NULL;
 Arduino_RGB_Display *Display::gfx = NULL;
-
-Logger Display::logger("Display");
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -201,11 +205,13 @@ void Display::setup()
     lv_obj_add_style(scr, &global_bg_style, 0);
     lv_display_set_theme(disp, base_theme);
 
-    Display::lockscreen.init();
-    Display::initScreen.init();
     Display::bootScreen.init();
     Display::setPinScreen.init();
     Display::connectionConfigurationScreen.init();
+    Display::initScreen.init();
+    Display::lockscreen.init();
+    Display::noResourcesScreen.init();
+    Display::resourceListScreen.init();
     Display::unlockedScreen.init();
 
     Display::transitionToScreen(&Display::bootScreen);
@@ -217,10 +223,41 @@ void Display::loop()
 {
     lv_timer_handler(); /* let the GUI do its work */
     Display::activeScreen->loop();
+
+    if (!Display::transitionComplete)
+    {
+        uint32_t currentTime = millis();
+        if (Display::transitionStartTime + Display::TRANSITION_DURATION + 300 < currentTime)
+        {
+            Display::transitionComplete = true;
+            if (Display::onTransitionComplete)
+            {
+                Display::onTransitionComplete();
+                Display::onTransitionComplete = nullptr;
+            }
+        }
+    }
 }
 
 void Display::transitionToScreen(IScreen *screen)
 {
+    Display::transitionToScreen(screen, nullptr);
+}
+
+void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete)
+{
+    Display::logger.info("Transitioning to screen");
     Display::activeScreen = screen;
-    lv_screen_load_anim(Display::activeScreen->getScreen(), LV_SCR_LOAD_ANIM_FADE_IN, 400, 0, false);
+    lv_screen_load_anim(Display::activeScreen->getScreen(), Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
+    Display::transitionStartTime = millis();
+    Display::transitionComplete = false;
+
+    if (onTransitionComplete)
+    {
+        Display::onTransitionComplete = onTransitionComplete;
+    }
+    else
+    {
+        Display::onTransitionComplete = nullptr;
+    }
 }

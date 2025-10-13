@@ -10,33 +10,16 @@ import {
 import { Server } from 'ws';
 import { Inject, Logger } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import { InitialReaderState } from './reader-states/initial.state';
-import { EnrollNTAG424State } from './reader-states/enroll-ntag424.state';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { nanoid } from 'nanoid';
-import { ResetNTAG424State } from './reader-states/reset-ntag424.state';
-import { ReaderState } from './reader-states/reader-state.interface';
 import { UsersService } from '../../users-and-auth/users/users.service';
-import { ResourcesService } from '../../resources/resources.service';
-import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
-import { WaitForResourceSelectionState } from './reader-states/wait-for-resource-selection.state';
-import { WaitForNFCTapState, WaitForNFCTapStateStep } from './reader-states/wait-for-nfc-tap.state';
 import { AttractapFirmwareService } from '../firmware.service';
-import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { Mutex } from 'async-mutex';
 import { LicenseModuleType, LicenseService } from '../../license/license.service';
-
-export interface GatewayServices {
-  websocketService: WebsocketService;
-  attractapService: AttractapService;
-  resourcesService: ResourcesService;
-  resourceUsageService: ResourceUsageService;
-  usersService: UsersService;
-  firmwareService: AttractapFirmwareService;
-  gateway: AttractapGateway;
-  resourceMaintenanceService: ResourceMaintenanceService;
-}
+import { AttractapFirmware } from '../dtos/firmware.dto';
+import { verifyToken } from './websocket.utils';
+import { Resource, ResourceBillingConfiguration, ResourceIntroducer, User } from '@attraccess/database-entities';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -55,20 +38,75 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(UsersService)
   private usersService: UsersService;
 
-  @Inject(ResourcesService)
-  private resourcesService: ResourcesService;
-
-  @Inject(ResourceUsageService)
-  private resourceUsageService: ResourceUsageService;
-
   @Inject(AttractapFirmwareService)
   private firmwareService: AttractapFirmwareService;
 
-  @Inject(ResourceMaintenanceService)
-  private resourceMaintenanceService: ResourceMaintenanceService;
-
   @Inject(LicenseService)
   private licenseService: LicenseService;
+
+  private makeStringLVGLReady(input: string): string {
+    if (!input) return input;
+
+    // Step 1: Explicit language-aware replacements (keep before diacritic removal)
+    const explicitReplacements: Array<[RegExp, string]> = [
+      // German umlauts and sharp s
+      [/ä/g, 'ae'],
+      [/ö/g, 'oe'],
+      [/ü/g, 'ue'],
+      [/Ä/g, 'Ae'],
+      [/Ö/g, 'Oe'],
+      [/Ü/g, 'Ue'],
+      [/ß/g, 'ss'],
+
+      // Common symbols and punctuation
+      [/\u00A0/g, ' '], // NBSP -> space
+      [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
+      [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
+      [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
+      [/\u2026/g, '...'], // ellipsis
+      [/\u2022/g, '-'], // bullet -> hyphen
+      [/\u00B0/g, 'deg'], // degree
+      [/\u2122/g, 'TM'], // trademark
+      [/\u00AE/g, '(R)'], // registered
+    ];
+
+    let output = input;
+    for (const [pattern, replacement] of explicitReplacements) {
+      output = output.replace(pattern, replacement);
+    }
+
+    // Step 2: Remove remaining diacritics (NFD decomposition)
+    output = output.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Step 3: Replace any remaining non-ASCII characters with '?'
+    // Allow printable ASCII range only (space 0x20 to tilde 0x7E)
+    output = output.replace(/[^\x20-\x7E]/g, '?');
+
+    return output;
+  }
+
+  private sanitizeForLVGL<T>(value: T): T {
+    const seen = new WeakSet<object>();
+
+    const sanitize = (v: unknown): unknown => {
+      if (typeof v === 'string') return this.makeStringLVGLReady(v);
+      if (v === null || v === undefined) return v;
+      if (Array.isArray(v)) return v.map((item) => sanitize(item));
+      if (typeof v === 'object') {
+        const obj = v as Record<string, unknown>;
+        if (seen.has(obj)) return obj;
+        seen.add(obj);
+        const out: Record<string, unknown> = {};
+        for (const [k, val] of Object.entries(obj)) {
+          out[k] = sanitize(val);
+        }
+        return out;
+      }
+      return v;
+    };
+
+    return sanitize(value) as T;
+  }
 
   public async handleConnection(client: AuthenticatedWebSocket) {
     this.logger.log('Client connected via WebSocket');
@@ -86,37 +124,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     client.id = nanoid(5);
 
-    client.transitionToState = async (state: ReaderState) => {
-      if (!state) {
-        throw new Error('State is undefined');
-      }
-
-      if (client.state) {
-        try {
-          await client.state.onStateExit();
-        } catch (error) {
-          this.logger.error('Error exiting state', error);
-          client.close();
-          this.handleDisconnect(client);
-          const stackTrace = new Error().stack;
-          this.logger.error(stackTrace);
-          return;
-        }
-      }
-
-      client.state = state;
-      try {
-        await client.state.onStateEnter();
-      } catch (error) {
-        this.logger.error('Error entering state', error);
-        client.close();
-        this.handleDisconnect(client);
-        const stackTrace = new Error().stack;
-        this.logger.error(stackTrace);
-        return;
-      }
-    };
-
     client.sendMessage = async (message: AttractapMessage) => {
       const RETRY_COUNT = 3;
 
@@ -125,12 +132,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       for (let i = 0; i < RETRY_COUNT; i++) {
         this.logger.debug(
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload
+          message.data.payload,
         );
-        (client as unknown as WebSocket).send(JSON.stringify(message));
+        const sanitized = this.sanitizeForLVGL(message);
+        const stringifiedMessage = JSON.stringify(sanitized);
+        (client as unknown as WebSocket).send(stringifiedMessage);
 
         this.logger.debug(
-          `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`
+          `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
         );
         try {
           await this.waitForClientResponse(client, message.data.type);
@@ -144,7 +153,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       if (lastError) {
         this.logger.error(
-          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`
+          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`,
         );
         throw lastError;
       }
@@ -159,19 +168,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(client);
 
-    this.logger.debug('Transitioning to initial state');
-    await client.transitionToState(
-      new InitialReaderState(client, {
-        websocketService: this.websocketService,
-        attractapService: this.attractapService,
-        usersService: this.usersService,
-        resourceUsageService: this.resourceUsageService,
-        resourcesService: this.resourcesService,
-        firmwareService: this.firmwareService,
-        gateway: this,
-        resourceMaintenanceService: this.resourceMaintenanceService,
-      })
-    );
+    this.logger.debug('Sending authentication request');
+    await client.sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
   }
 
   private clientResponseAwaiters: Array<{
@@ -186,9 +184,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const id = nanoid(5);
 
     const removeAwaiter = async () => {
-      await this.clientResponseAwaitersMutex.runExclusive(async () => {
-        this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.id !== id);
-      });
+      await this.clientResponseAwaitersMutex
+        .runExclusive(async () => {
+          this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.id !== id);
+        })
+        .catch((error) => {
+          this.logger.error(`Error removing awaiter: ${error}`);
+        });
     };
 
     // TODO: refactor wait for response to rely on ACK messages instead of response mesaages
@@ -211,11 +213,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   private async resolveClientResponseAwaiters(client: AuthenticatedWebSocket, type: AttractapEventType) {
     await this.clientResponseAwaitersMutex.runExclusive(async () => {
       const matchingAwaiters = this.clientResponseAwaiters.filter(
-        (awaiter) => awaiter.clientId === client.id && awaiter.type === type
+        (awaiter) => awaiter.clientId === client.id && awaiter.type === type,
       );
 
       this.logger.debug(
-        `Found ${matchingAwaiters.length} awaiters for client ${client.id} for event ${type} to resolve`
+        `Found ${matchingAwaiters.length} awaiters for client ${client.id} for event ${type} to resolve`,
       );
 
       matchingAwaiters.forEach((awaiter) => {
@@ -226,85 +228,203 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
     });
   }
-
-  public async handleDisconnect(client: AuthenticatedWebSocket) {
-    this.logger.debug(`Client ${client.id} disconnected.`);
+  public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    this.logger.debug(`Client ${socket.id} disconnected.`);
 
     await this.clientResponseAwaitersMutex.runExclusive(async () => {
-      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
+      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== socket.id);
     });
 
-    const readerId = client.reader?.id;
+    const readerId = socket.readerId;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
     } else {
       this.logger.log('An unidentified client disconnected.');
     }
 
-    this.websocketService.sockets.delete(client.id);
+    this.websocketService.sockets.delete(socket.id);
   }
 
-  private async clientWasActive(client: AuthenticatedWebSocket) {
-    if (client.reader) {
-      await this.attractapService.updateLastReaderConnection(client.reader.id);
+  private async clientWasActive(socket: AuthenticatedWebSocket) {
+    if (socket.readerId) {
+      await this.attractapService.updateLastReaderConnection(socket.readerId);
     }
   }
 
   @SubscribeMessage('HEARTBEAT')
-  public async onHeartbeat(@ConnectedSocket() client: AuthenticatedWebSocket) {
-    this.logger.debug(`Heartbeat from client ${client.id}.`);
+  public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
+    this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
-    await this.clientWasActive(client);
+    await this.clientWasActive(socket);
   }
 
   @SubscribeMessage('EVENT')
   public async onClientEvent(
     @MessageBody() eventData: AttractapEvent['data'],
-    @ConnectedSocket() client: AuthenticatedWebSocket
+    @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
-    if (!client.state) {
-      this.logger.error('Client has no state attached. Closing connection.');
+    if (eventData.type.startsWith('ACK_')) {
+      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(eventData)}`);
+
+      this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
     }
 
-    await this.clientWasActive(client);
-
-    this.logger.debug(`Received event from client ${client.id}: ${JSON.stringify(eventData)}`);
-
-    if (eventData.type === AttractapEventType.NFC_TAP) {
-      this.logger.debug(`Updating last seen for NFC card ${eventData.payload.cardUID}`);
-      await this.attractapService.updateNFCCardLastSeen(eventData.payload.cardUID);
+    if (
+      !socket.readerId &&
+      ![AttractapEventType.READER_AUTHENTICATE, AttractapEventType.READER_REGISTER].includes(eventData.type)
+    ) {
+      this.logger.error('Client has no reader attached. ignoring event.');
+      return;
     }
 
-    await client.state.onEvent(eventData);
+    await this.clientWasActive(socket);
 
-    return undefined;
+    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+
+    switch (eventData.type) {
+      case AttractapEventType.READER_REGISTER:
+        await this.handleReaderRegister(socket, eventData);
+        break;
+      case AttractapEventType.READER_AUTHENTICATE:
+        await this.handleAuthentication(socket, eventData);
+        break;
+      case AttractapEventType.READER_FIRMWARE_INFO:
+        await this.handleFirmwareInfo(socket, eventData);
+        break;
+      case AttractapEventType.READER_AUTHENTICATED:
+      case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
+      case AttractapEventType.READER_FIRMWARE_STREAM_CHUNK:
+        // TODO: implement firmware updates
+        break;
+      case AttractapEventType.RESOURCE_LIST:
+      case AttractapEventType.READER_UNAUTHORIZED:
+      case AttractapEventType.READER_REQUEST_AUTHENTICATION:
+        this.logger.error(
+          `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
+        );
+        throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
+      default: {
+        const exhaustiveCheck: never = eventData.type;
+        throw new Error(`Unknown event type: ${exhaustiveCheck}`);
+      }
+    }
   }
 
-  @SubscribeMessage('RESPONSE')
-  public async onResponse(
-    @MessageBody() responseData: AttractapEvent['data'],
-    @ConnectedSocket() client: AuthenticatedWebSocket
-  ) {
-    if (!client.state) {
-      this.logger.error('Client has no state attached. Closing connection.');
+  private async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    await this.attractapService.updateReaderFirmware(socket.readerId, data.payload);
+
+    const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
+    if (!firmwareIsUpToDate) {
+      this.logger.debug('Firmware is not up to date, moving reader to WaitForFirmwareUpdateState');
+      // TODO: send info about firmware update
       return;
     }
+  }
 
-    await this.clientWasActive(client);
+  private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {
+    const firmwareDefinition = await this.firmwareService.getFirmwareDefinition(firmware.name, firmware.variant);
 
-    if (responseData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${client.id}: ${JSON.stringify(responseData)}`);
-
-      this.resolveClientResponseAwaiters(client, responseData.type.replace('ACK_', '') as AttractapEventType);
-      return;
+    if (!firmwareDefinition) {
+      return true;
     }
 
-    this.logger.debug(`Received response from client ${client.id}: ${JSON.stringify(responseData)}`);
+    return String(firmwareDefinition.version) === String(firmware.version);
+  }
 
-    await client.state.onResponse(responseData);
+  private async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    this.logger.debug('Received REGISTER event');
+    const response = await this.attractapService.createNewReader(data.payload.firmware);
 
-    return undefined;
+    this.logger.debug(
+      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
+    );
+
+    await socket.sendMessage(
+      new AttractapEvent(AttractapEventType.READER_REGISTER, {
+        id: response.reader.id,
+        token: response.token,
+      }),
+    );
+  }
+
+  private async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    this.logger.debug('processing READER_AUTHENTICATE event', data);
+
+    const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
+      message: 'PLEASE_REREGISTER',
+    });
+
+    this.logger.debug('Checking if reader exists');
+    const reader = await this.attractapService.findReaderById(data.payload.id);
+    if (!reader) {
+      this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
+      return await socket.sendMessage(unauthorizedResponse);
+    }
+
+    this.logger.debug('Checking if token is valid');
+    const isValidToken = await verifyToken(data.payload.token, reader.apiTokenHash);
+    if (!isValidToken) {
+      this.logger.error('Invalid token, sending UNAUTHORIZED response to client');
+      return await socket.sendMessage(unauthorizedResponse);
+    }
+
+    socket.readerId = reader.id;
+
+    const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
+      name: reader.name,
+    });
+    await socket.sendMessage(authenticatedResponse);
+
+    await this.sendResourceList(socket);
+  }
+
+  private async sendResourceList(socket: AuthenticatedWebSocket, onlyIfResourceMatches?: { resourceId?: number }) {
+    const reader = await this.attractapService.findReaderById(socket.readerId);
+    if (!reader) {
+      throw new Error(`Reader not found: ${socket.readerId}`);
+    }
+
+    const resources = reader.resources;
+    if (onlyIfResourceMatches?.resourceId) {
+      if (!resources.some((resource) => resource.id === onlyIfResourceMatches.resourceId)) {
+        return;
+      }
+    }
+
+    const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+      resources: resources.map(
+        (resource) =>
+          ({
+            id: resource.id,
+            name: resource.name,
+            type: resource.type,
+            separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+            description: resource.description,
+            imageFilename: resource.imageFilename,
+            allowTakeOver: resource.allowTakeOver,
+            introducers: resource.introducers.map(
+              (introducer) =>
+                ({
+                  id: introducer.id,
+                  user: {
+                    id: introducer.user.id,
+                    username: introducer.user.username,
+                  } as Partial<User>,
+                }) as Partial<ResourceIntroducer>,
+            ),
+            billingConfigurations: resource.billingConfigurations.map(
+              (billingConfiguration) =>
+                ({
+                  id: billingConfiguration.id,
+                  creditsPerUsage: billingConfiguration.creditsPerUsage,
+                  creditsPerMinute: billingConfiguration.creditsPerMinute,
+                }) as Partial<ResourceBillingConfiguration>,
+            ),
+          }) as Partial<Resource>,
+      ),
+    });
+    await socket.sendMessage(resourceListResponse);
   }
 
   public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
@@ -321,29 +441,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     const socket = Array.from(this.websocketService.sockets.values()).find(
-      (socket) => socket.reader?.id === data.readerId
+      (socket) => socket.readerId === data.readerId,
     );
 
     if (!socket) {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
 
-    const nextState = new EnrollNTAG424State(
-      socket,
-      {
-        websocketService: this.websocketService,
-        attractapService: this.attractapService,
-        usersService: this.usersService,
-        resourceUsageService: this.resourceUsageService,
-        resourcesService: this.resourcesService,
-        firmwareService: this.firmwareService,
-        gateway: this,
-        resourceMaintenanceService: this.resourceMaintenanceService,
-      },
-      user
-    );
-
-    await socket.transitionToState(nextState);
+    // TODO: implement this
   }
 
   public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
@@ -360,7 +465,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     const socket = Array.from(this.websocketService.sockets.values()).find(
-      (socket) => socket.reader?.id === data.readerId
+      (socket) => socket.readerId === data.readerId,
     );
 
     if (!socket) {
@@ -373,78 +478,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       throw new Error(`NFC card not found: ${data.cardId}`);
     }
 
-    const nextState = new ResetNTAG424State(
-      socket,
-      {
-        websocketService: this.websocketService,
-        attractapService: this.attractapService,
-        usersService: this.usersService,
-        resourceUsageService: this.resourceUsageService,
-        resourcesService: this.resourcesService,
-        firmwareService: this.firmwareService,
-        gateway: this,
-        resourceMaintenanceService: this.resourceMaintenanceService,
-      },
-      nfcCard.id
-    );
-    await socket.transitionToState(nextState);
-  }
-
-  public async restartReader(readerId: number) {
-    this.logger.debug(`Restarting reader ${readerId}.`);
-    const sockets = Array.from(this.websocketService.sockets.values()).filter(
-      (socket) => socket.reader?.id === readerId
-    );
-
-    await Promise.all(
-      sockets.map(async (socket) => {
-        this.logger.debug(`Resetting client ${socket.id} for reader ${readerId}.`);
-
-        const nextState = new InitialReaderState(socket, {
-          websocketService: this.websocketService,
-          attractapService: this.attractapService,
-          usersService: this.usersService,
-          resourceUsageService: this.resourceUsageService,
-          resourcesService: this.resourcesService,
-          firmwareService: this.firmwareService,
-          gateway: this,
-          resourceMaintenanceService: this.resourceMaintenanceService,
-        });
-
-        await socket.transitionToState(nextState);
-      })
-    );
+    // TODO: implement this
   }
 
   public async onResourceUsageChanged(resourceId: number) {
-    const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) =>
-      socket.reader?.resources.some((r) => r.id === resourceId)
-    );
-
     await Promise.all(
-      sockets.map(async (socket) => {
-        if (socket.state instanceof WaitForNFCTapState || socket.state instanceof WaitForResourceSelectionState) {
-          if (
-            ![WaitForNFCTapStateStep.IDLE, WaitForNFCTapStateStep.WAIT_FOR_TAP].includes(
-              (socket.state as WaitForNFCTapState).state
-            )
-          ) {
-            return;
-          }
-          await socket.transitionToState(
-            new InitialReaderState(socket, {
-              websocketService: this.websocketService,
-              attractapService: this.attractapService,
-              usersService: this.usersService,
-              resourceUsageService: this.resourceUsageService,
-              resourcesService: this.resourcesService,
-              firmwareService: this.firmwareService,
-              gateway: this,
-              resourceMaintenanceService: this.resourceMaintenanceService,
-            })
-          );
-        }
-      })
+      Array.from(this.websocketService.sockets.values()).map(async (socket) => {
+        await this.sendResourceList(socket, { resourceId });
+      }),
     );
   }
 }

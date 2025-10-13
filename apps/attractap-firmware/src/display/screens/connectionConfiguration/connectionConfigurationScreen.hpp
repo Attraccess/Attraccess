@@ -18,6 +18,7 @@ public:
         String password;
         String host;
         bool useSSL;
+        String devicePin;
     };
 
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
@@ -52,8 +53,14 @@ private:
 
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);
-    static void onContinueButtonEvent(lv_event_t *e);
     static void onSaveButtonEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();
+
+    lv_obj_t *devicePin;
+    lv_obj_t *labelForDevicePin;
+    lv_color_t labelForDevicePinDefaultColor;
+
+    lv_obj_t *createSaveButton(lv_obj_t *parent);
+    lv_obj_t *createSaveContainer(lv_obj_t *parent);
 };

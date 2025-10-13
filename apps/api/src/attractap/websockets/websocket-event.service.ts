@@ -14,13 +14,15 @@ export class WebSocketEventService {
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event', event);
-    await this.attractapGateway.restartReader(event.reader.id);
+    throw new Error('not implemented');
+    // TODO: restart reader/inform reader
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
   public async onReaderDeleted(event: ReaderDeletedEvent) {
     this.logger.debug('Got reader deleted event', event);
-    await this.attractapGateway.restartReader(event.readerId);
+    throw new Error('not implemented');
+    // TODO: restart reader/inform reader
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
@@ -34,4 +36,6 @@ export class WebSocketEventService {
     this.logger.debug('Got resource usage ended event', event);
     this.attractapGateway.onResourceUsageChanged(event.resource.id);
   }
+
+  // TODO: add events for resource changes (resource itself, maintenances, billing configurations, introducers)
 }

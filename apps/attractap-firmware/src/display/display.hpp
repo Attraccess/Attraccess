@@ -10,14 +10,17 @@
 #include "TouchDrvGT911.hpp"
 #include <Wire.h>
 #include <SPI.h>
-#include "screens/lockscreen/lockscreen.hpp"
+#include "../logger/logger.hpp"
+#include "../state/state.hpp"
 #include "screens/IScreen.hpp"
-#include "screens/init/initscreen.hpp"
 #include "screens/boot/bootscreen.hpp"
 #include "screens/setPin/setPinScreen.hpp"
-#include "screens/unlocked/unlocked.hpp"
 #include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
-#include "../state/state.hpp"
+#include "screens/init/initscreen.hpp"
+#include "screens/lockscreen/lockscreen.hpp"
+#include "screens/noResources/noResourcesScreen.hpp"
+#include "screens/resourceList/resourceListScreen.hpp"
+#include "screens/unlocked/unlocked.hpp"
 
 class Display
 {
@@ -26,15 +29,23 @@ public:
     static void loop();
 
     static void transitionToScreen(IScreen *screen);
+    static void transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete);
 
-    static InitScreen initScreen;
-    static Lockscreen lockscreen;
     static BootScreen bootScreen;
     static SetPinScreen setPinScreen;
     static ConnectionConfigurationScreen connectionConfigurationScreen;
+    static InitScreen initScreen;
+    static Lockscreen lockscreen;
+    static NoResourcesScreen noResourcesScreen;
+    static ResourceListScreen resourceListScreen;
     static Unlockedscreen unlockedScreen;
 
 private:
+    static const int TRANSITION_DURATION = 400;
+    static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_FADE_IN;
+    static uint32_t transitionStartTime;
+    static bool transitionComplete;
+    static std::function<void()> onTransitionComplete;
     static IScreen *activeScreen;
     static Logger logger;
     static Arduino_DataBus *bus;

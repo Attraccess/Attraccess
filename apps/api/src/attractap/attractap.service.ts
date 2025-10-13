@@ -23,7 +23,7 @@ export class AttractapService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>
+    private readonly userRepository: Repository<User>,
   ) {}
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
@@ -43,7 +43,15 @@ export class AttractapService {
   }
 
   public async findReaderById(id: number): Promise<Attractap | undefined> {
-    return await this.readerRepository.findOne({ where: { id }, relations: ['resources'] });
+    return await this.readerRepository.findOne({
+      where: { id },
+      relations: [
+        'resources',
+        'resources.billingConfigurations',
+        'resources.introducers',
+        'resources.introducers.user',
+      ],
+    });
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
@@ -52,7 +60,7 @@ export class AttractapService {
 
   public async createNFCCard(
     user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>
+    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
   ): Promise<NFCCard> {
     return await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
@@ -136,7 +144,7 @@ export class AttractapService {
   public async updateReader(
     id: number,
     updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion },
-    emitEvent = true
+    emitEvent = true,
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
 

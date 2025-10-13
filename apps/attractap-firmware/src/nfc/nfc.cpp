@@ -26,7 +26,6 @@ void NFC::enableCardDetection()
     pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
     auto irqHandler = [this]
     {
-        detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
         this->onCardDetectedInterruptHandler();
     };
     attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
@@ -64,9 +63,11 @@ void NFC::handleCardDetection()
         return;
     }
 
+    // Ensure single-shot invocation: clear the flag before calling the callback
+    // so it does not trigger repeatedly in the main loop until explicitly re-enabled.
+    this->cardDetected = false;
     this->logger.info("Calling card detection callback");
     this->cardDetectionCallback();
-    this->disableCardDetection();
 }
 
 void NFC::demo()
@@ -253,6 +254,8 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 void NFC::onCardDetectedInterruptHandler()
 {
     this->logger.info("Card detected interrupt handler");
+    detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
+    this->disableCardDetection();
     this->cardDetected = true;
 }
 

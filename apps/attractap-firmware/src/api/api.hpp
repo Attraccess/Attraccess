@@ -14,6 +14,7 @@ public:
     void setup();
     void loop();
     void processIncomingMessages(String message);
+    void setResourceListUpdateCallback(std::function<void(JsonArray)> callback);
 
 private:
     Logger logger;
@@ -26,19 +27,17 @@ private:
     unsigned long heartbeat_sent_at = 0;
     bool isRegistered();
 
-    String select_item_current_value = "";
-    bool is_in_select_item_mode = false;
-    String select_item_type = "";
-    JsonArray select_item_options = JsonArray();
+    std::function<void(JsonArray)> resourceListUpdateCallback;
 
     void sendAck(const char *type);
-    void sendMessage(bool is_response, const char *type);
-    void sendMessage(bool is_response, const char *type, JsonObject payload);
+    void sendMessage(const char *type);
+    void sendMessage(const char *type, JsonObject payload);
     void sendHeartbeat();
 
     void onRegistrationData(JsonObject data);
     void onUnauthorized(JsonObject data);
-    void onRequestAuthentication();
+    void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
-    void onFirmwareInfo(JsonObject data);
+    void sendFirmwareInfo();
+    void onResourceList(JsonObject data);
 };

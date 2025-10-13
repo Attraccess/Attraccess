@@ -5,6 +5,7 @@ void ConnectionConfigurationScreen::init()
 {
    NetworkConfig networkConfig = Settings::getNetworkConfig();
    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+   DeviceConfig deviceConfig = Settings::getDeviceConfig();
 
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -15,8 +16,6 @@ void ConnectionConfigurationScreen::init()
    lv_tabview_set_tab_bar_size(this->tabs, 50);
    lv_obj_set_width(this->tabs, lv_pct(100));
    lv_obj_set_height(this->tabs, lv_pct(100));
-   lv_obj_set_x(this->tabs, 11);
-   lv_obj_set_y(this->tabs, -119);
    lv_obj_set_align(this->tabs, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->tabs, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(this->tabs, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -33,8 +32,6 @@ void ConnectionConfigurationScreen::init()
    lv_obj_t *labelForWifiSelectNetwork = lv_label_create(wifiTab);
    lv_obj_set_width(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_x(labelForWifiSelectNetwork, -117);
-   lv_obj_set_y(labelForWifiSelectNetwork, 47);
    lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
    lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
    lv_obj_set_style_text_color(labelForWifiSelectNetwork, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -45,16 +42,12 @@ void ConnectionConfigurationScreen::init()
    lv_dropdown_set_options(wifiSelectNetwork, "Option 1\nOption 2\nOption 3");
    lv_obj_set_width(wifiSelectNetwork, lv_pct(100));
    lv_obj_set_height(wifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_x(wifiSelectNetwork, -113);
-   lv_obj_set_y(wifiSelectNetwork, -182);
    lv_obj_set_align(wifiSelectNetwork, LV_ALIGN_CENTER);
    lv_obj_add_flag(wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
 
    this->labelForWifiSSID = lv_label_create(wifiTab);
    lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->labelForWifiSSID, -121);
-   lv_obj_set_y(this->labelForWifiSSID, 82);
    lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForWifiSSID, "SSID*");
    lv_obj_set_style_text_color(this->labelForWifiSSID, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -63,8 +56,6 @@ void ConnectionConfigurationScreen::init()
    this->wifiSSID = lv_textarea_create(wifiTab);
    lv_obj_set_width(this->wifiSSID, lv_pct(100));
    lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->wifiSSID, -111);
-   lv_obj_set_y(this->wifiSSID, -83);
    lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
    lv_textarea_set_placeholder_text(this->wifiSSID, "SSID");
    lv_textarea_set_one_line(this->wifiSSID, true);
@@ -74,8 +65,6 @@ void ConnectionConfigurationScreen::init()
    this->labelForWifiPassword = lv_label_create(wifiTab);
    lv_obj_set_width(this->labelForWifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->labelForWifiPassword, 116);
-   lv_obj_set_y(this->labelForWifiPassword, 101);
    lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForWifiPassword, "Passwort*");
    lv_obj_set_style_text_color(this->labelForWifiPassword, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -84,8 +73,6 @@ void ConnectionConfigurationScreen::init()
    this->wifiPassword = lv_textarea_create(wifiTab);
    lv_obj_set_width(this->wifiPassword, lv_pct(100));
    lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->wifiPassword, -111);
-   lv_obj_set_y(this->wifiPassword, -83);
    lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
    lv_textarea_set_placeholder_text(this->wifiPassword, "Password");
    lv_textarea_set_one_line(this->wifiPassword, true);
@@ -93,31 +80,8 @@ void ConnectionConfigurationScreen::init()
    lv_obj_add_event_cb(this->wifiPassword, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
    lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
 
-   lv_obj_t *containerForContinueButton = lv_obj_create(wifiTab);
-   lv_obj_remove_style_all(containerForContinueButton);
-   lv_obj_set_width(containerForContinueButton, lv_pct(100));
-   lv_obj_set_height(containerForContinueButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(containerForContinueButton, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(containerForContinueButton, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(containerForContinueButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END);
-   lv_obj_remove_flag(containerForContinueButton, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(containerForContinueButton, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *continueButton = lv_button_create(containerForContinueButton);
-   lv_obj_set_width(continueButton, 100);
-   lv_obj_set_height(continueButton, 50);
-   lv_obj_set_x(continueButton, 193);
-   lv_obj_set_y(continueButton, -34);
-   lv_obj_set_align(continueButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(continueButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(continueButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_add_event_cb(continueButton, &ConnectionConfigurationScreen::onContinueButtonEvent, LV_EVENT_CLICKED, this);
-
-   lv_obj_t *labelForContinueButton = lv_label_create(continueButton);
-   lv_obj_set_width(labelForContinueButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForContinueButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForContinueButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForContinueButton, "Weiter");
+   lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
+   this->createSaveButton(containerForSaveButtonWifi);
 
    lv_obj_t *apiTab = lv_tabview_add_tab(this->tabs, "API");
    lv_obj_set_flex_flow(apiTab, LV_FLEX_FLOW_COLUMN);
@@ -126,8 +90,6 @@ void ConnectionConfigurationScreen::init()
    this->labelForServerHostname = lv_label_create(apiTab);
    lv_obj_set_width(this->labelForServerHostname, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForServerHostname, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->labelForServerHostname, -55);
-   lv_obj_set_y(this->labelForServerHostname, 164);
    lv_obj_set_align(this->labelForServerHostname, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForServerHostname, "Attraccess API URL");
    lv_obj_set_style_text_color(this->labelForServerHostname, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -136,8 +98,6 @@ void ConnectionConfigurationScreen::init()
    this->serverHostname = lv_textarea_create(apiTab);
    lv_obj_set_width(this->serverHostname, lv_pct(100));
    lv_obj_set_height(this->serverHostname, LV_SIZE_CONTENT);
-   lv_obj_set_x(this->serverHostname, -111);
-   lv_obj_set_y(this->serverHostname, -83);
    lv_obj_set_align(this->serverHostname, LV_ALIGN_CENTER);
    lv_textarea_set_placeholder_text(this->serverHostname, "bsp.: deine-domain.de oder 192.168.1.100:3000");
    lv_textarea_set_one_line(this->serverHostname, true);
@@ -165,16 +125,12 @@ void ConnectionConfigurationScreen::init()
    this->useSSLSwitch = lv_switch_create(useSSLContainer);
    lv_obj_set_width(this->useSSLSwitch, 50);
    lv_obj_set_height(this->useSSLSwitch, 25);
-   lv_obj_set_x(this->useSSLSwitch, -181);
-   lv_obj_set_y(this->useSSLSwitch, -31);
    lv_obj_set_align(this->useSSLSwitch, LV_ALIGN_CENTER);
    lv_obj_set_state(this->useSSLSwitch, LV_STATE_CHECKED, apiConfig.useSSL);
 
    lv_obj_t *labelForUseSSLSwitch = lv_label_create(useSSLContainer);
    lv_obj_set_width(labelForUseSSLSwitch, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForUseSSLSwitch, LV_SIZE_CONTENT);
-   lv_obj_set_x(labelForUseSSLSwitch, -205);
-   lv_obj_set_y(labelForUseSSLSwitch, 20);
    lv_obj_set_align(labelForUseSSLSwitch, LV_ALIGN_CENTER);
    lv_label_set_text(labelForUseSSLSwitch, "SSL verwenden");
    lv_obj_set_style_text_color(labelForUseSSLSwitch, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -182,49 +138,44 @@ void ConnectionConfigurationScreen::init()
    lv_obj_t *sslInfoLabel = lv_label_create(apiTab);
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
-   lv_obj_set_x(sslInfoLabel, -111);
-   lv_obj_set_y(sslInfoLabel, 101);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstützt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *containerForSaveButton = lv_obj_create(apiTab);
-   lv_obj_remove_style_all(containerForSaveButton);
-   lv_obj_set_height(containerForSaveButton, 50);
-   lv_obj_set_width(containerForSaveButton, lv_pct(100));
-   lv_obj_set_x(containerForSaveButton, 34);
-   lv_obj_set_y(containerForSaveButton, 170);
-   lv_obj_set_align(containerForSaveButton, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(containerForSaveButton, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(containerForSaveButton, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(containerForSaveButton, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(containerForSaveButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
+   this->createSaveButton(containerForSaveButton);
 
-   lv_obj_t *save = lv_button_create(containerForSaveButton);
-   lv_obj_set_width(save, 100);
-   lv_obj_set_height(save, 50);
-   lv_obj_set_x(save, 89);
-   lv_obj_set_y(save, 143);
-   lv_obj_set_align(save, LV_ALIGN_CENTER);
-   lv_obj_add_flag(save, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(save, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(save, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(save, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(save, &ConnectionConfigurationScreen::onSaveButtonEvent, LV_EVENT_CLICKED, this);
+   // Also add a save button to the API tab header/footer container for consistency
+   // (re-use existing containerForSaveButton)
 
-   lv_obj_t *labelForSaveButton = lv_label_create(save);
-   lv_obj_set_width(labelForSaveButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForSaveButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForSaveButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForSaveButton, "Speichern");
-   lv_obj_set_style_text_color(labelForSaveButton, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(labelForSaveButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Device tab
+   lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, "Geraet");
+   lv_obj_set_flex_flow(deviceTab, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(deviceTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+   this->labelForDevicePin = lv_label_create(deviceTab);
+   lv_obj_set_width(this->labelForDevicePin, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
+   lv_label_set_text(this->labelForDevicePin, "Geraete PIN*");
+   lv_obj_set_style_text_color(this->labelForDevicePin, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForDevicePinDefaultColor = lv_obj_get_style_text_color(this->labelForDevicePin, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->devicePin = lv_textarea_create(deviceTab);
+   lv_obj_set_width(this->devicePin, lv_pct(100));
+   lv_obj_set_height(this->devicePin, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->devicePin, LV_ALIGN_CENTER);
+   lv_textarea_set_placeholder_text(this->devicePin, "Mind. 4 Ziffern");
+   lv_textarea_set_one_line(this->devicePin, true);
+   lv_obj_add_event_cb(this->devicePin, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
+   lv_textarea_set_text(this->devicePin, deviceConfig.passCode.c_str());
+
+   lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
+   this->createSaveButton(containerForSaveButtonDevice);
 
    this->keyboard = lv_keyboard_create(this->screen);
    lv_obj_set_width(this->keyboard, lv_pct(100));
    lv_obj_set_height(this->keyboard, lv_pct(48));
-   lv_obj_set_x(this->keyboard, -124);
-   lv_obj_set_y(this->keyboard, 171);
    lv_obj_set_align(this->keyboard, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->keyboard, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->keyboard, &ConnectionConfigurationScreen::onKeyboardEvent, LV_EVENT_ALL, this);
@@ -306,44 +257,7 @@ void ConnectionConfigurationScreen::onKeyboardEvent(lv_event_t *e)
    }
 }
 
-void ConnectionConfigurationScreen::onContinueButtonEvent(lv_event_t *e)
-{
-   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
-   if (!self)
-      return;
-
-   lv_event_code_t code = lv_event_get_code(e);
-   if (code == LV_EVENT_CLICKED)
-   {
-      // Validate inputs
-      bool ssidValid = false;
-      bool passwordValid = false;
-
-      const char *ssidText = lv_textarea_get_text(self->wifiSSID);
-      const char *passwordText = lv_textarea_get_text(self->wifiPassword);
-
-      ssidValid = (ssidText && ssidText[0] != '\0');
-      passwordValid = (passwordText && passwordText[0] != '\0');
-
-      // Update label colors
-      if (self->labelForWifiSSID)
-      {
-         lv_color_t color = ssidValid ? self->labelForWifiSSIDDefaultColor : lv_color_hex(0xFF0000);
-         lv_obj_set_style_text_color(self->labelForWifiSSID, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-      }
-      if (self->labelForWifiPassword)
-      {
-         lv_color_t color = passwordValid ? self->labelForWifiPasswordDefaultColor : lv_color_hex(0xFF0000);
-         lv_obj_set_style_text_color(self->labelForWifiPassword, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-      }
-
-      if (ssidValid && passwordValid)
-      {
-         // API tab is the second tab (index 1)
-         lv_tabview_set_act(self->tabs, 1, LV_ANIM_ON);
-      }
-   }
-}
+// removed continue button handler (replaced by Save buttons on each tab)
 
 static bool isEmpty(const char *text)
 {
@@ -354,6 +268,21 @@ static bool hostnameLooksValid(const char *text)
 {
    if (!text || text[0] == '\0')
       return false;
+   return true;
+}
+
+static bool pinLooksValid(const char *text)
+{
+   if (!text)
+      return false;
+   size_t len = strlen(text);
+   if (len < 4)
+      return false;
+   for (size_t i = 0; i < len; ++i)
+   {
+      if (text[i] < '0' || text[i] > '9')
+         return false;
+   }
    return true;
 }
 
@@ -370,6 +299,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    const char *ssidText = lv_textarea_get_text(self->wifiSSID);
    const char *passwordText = lv_textarea_get_text(self->wifiPassword);
    const char *hostText = lv_textarea_get_text(self->serverHostname);
+   const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
 
    bool ssidValid = !isEmpty(ssidText);
    bool passwordValid = !isEmpty(passwordText);
@@ -388,6 +318,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    }
 
    bool hostValid = !hostValue.isEmpty() && hostnameLooksValid(hostValue.c_str());
+   bool devicePinValid = pinLooksValid(devicePinText);
 
    // Update label colors
    if (self->labelForWifiSSID)
@@ -406,6 +337,12 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    {
       lv_obj_set_style_text_color(self->labelForServerHostname,
                                   hostValid ? self->labelForServerHostnameDefaultColor : lv_color_hex(0xFF0000),
+                                  LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
+   if (self->labelForDevicePin)
+   {
+      lv_obj_set_style_text_color(self->labelForDevicePin,
+                                  devicePinValid ? self->labelForDevicePinDefaultColor : lv_color_hex(0xFF0000),
                                   LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
@@ -434,6 +371,15 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       lv_obj_scroll_to_view_recursive(self->serverHostname, LV_ANIM_ON);
       return;
    }
+   if (!devicePinValid)
+   {
+      if (self->tabs)
+         lv_tabview_set_act(self->tabs, 2, LV_ANIM_ON);
+      lv_keyboard_set_textarea(self->keyboard, self->devicePin);
+      self->showKeyboardFor(self->devicePin);
+      lv_obj_scroll_to_view_recursive(self->devicePin, LV_ANIM_ON);
+      return;
+   }
 
    // All valid -> call callback if provided
    if (self->onSaveCallback)
@@ -443,6 +389,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       cfg.password = String(passwordText);
       cfg.host = hostValue;
       cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
+      cfg.devicePin = String(devicePinText);
       self->onSaveCallback(cfg);
    }
 }
@@ -468,6 +415,10 @@ void ConnectionConfigurationScreen::showKeyboardFor(lv_obj_t *targetTextArea)
    {
       lv_keyboard_set_mode(this->keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
    }
+   else if (targetTextArea == this->devicePin)
+   {
+      lv_keyboard_set_mode(this->keyboard, LV_KEYBOARD_MODE_NUMBER);
+   }
 
    // Show keyboard and shrink tabs
    lv_obj_clear_flag(this->keyboard, LV_OBJ_FLAG_HIDDEN);
@@ -488,6 +439,43 @@ void ConnectionConfigurationScreen::hideKeyboardIfNoFocus()
    {
       lv_obj_set_height(this->tabs, lv_pct(100));
    }
+}
+
+lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
+{
+   lv_obj_t *save = lv_button_create(parent);
+   lv_obj_set_width(save, 100);
+   lv_obj_set_height(save, 50);
+   lv_obj_set_align(save, LV_ALIGN_CENTER);
+   lv_obj_add_flag(save, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(save, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(save, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(save, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(save, &ConnectionConfigurationScreen::onSaveButtonEvent, LV_EVENT_CLICKED, this);
+
+   lv_obj_t *label = lv_label_create(save);
+   lv_obj_set_width(label, LV_SIZE_CONTENT);
+   lv_obj_set_height(label, LV_SIZE_CONTENT);
+   lv_obj_set_align(label, LV_ALIGN_CENTER);
+   lv_label_set_text(label, "Speichern");
+   lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   return save;
+}
+
+lv_obj_t *ConnectionConfigurationScreen::createSaveContainer(lv_obj_t *parent)
+{
+   lv_obj_t *container = lv_obj_create(parent);
+   lv_obj_remove_style_all(container);
+   lv_obj_set_width(container, lv_pct(100));
+   lv_obj_set_height(container, LV_SIZE_CONTENT);
+   lv_obj_set_align(container, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(container, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+   return container;
 }
 
 void ConnectionConfigurationScreen::setOnSaveCallback(std::function<void(const ConnectionConfigurationScreen::ConnectionConfig &)> onSaveCallback)
