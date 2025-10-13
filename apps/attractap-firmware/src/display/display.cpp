@@ -241,13 +241,22 @@ void Display::loop()
 
 void Display::transitionToScreen(IScreen *screen)
 {
-    Display::transitionToScreen(screen, nullptr);
+    Display::transitionToScreen(screen, false, nullptr);
 }
 
-void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete)
+void Display::transitionToScreen(IScreen *screen, bool reInit)
+{
+    Display::transitionToScreen(screen, reInit, nullptr);
+}
+
+void Display::transitionToScreen(IScreen *screen, bool reInit, std::function<void()> onTransitionComplete)
 {
     Display::logger.info("Transitioning to screen");
     Display::activeScreen = screen;
+    if (reInit)
+    {
+        Display::activeScreen->init();
+    }
     lv_screen_load_anim(Display::activeScreen->getScreen(), Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();
     Display::transitionComplete = false;

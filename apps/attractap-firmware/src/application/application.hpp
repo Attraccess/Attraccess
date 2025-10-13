@@ -15,7 +15,7 @@
 class Application
 {
 public:
-    Application() : logger("Application"), api(), unlocked(false), resourceCount(0), resourceIsSelected(false), bootDone(false), unlockTime(0) {}
+    Application() : logger("Application"), api(), unlocked(false), resourceCount(0), resourceIsSelected(false), bootDone(false) {}
 
     void setup();
     void loop();

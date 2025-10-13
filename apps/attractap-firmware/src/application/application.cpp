@@ -113,7 +113,8 @@ void Application::processState()
                                                                                                                     Display::transitionToScreen(&Display::initScreen);
                                                                                                                     this->state = APPLICATION_STATE_INIT; });
                                                         Display::transitionToScreen(&Display::connectionConfigurationScreen); });
-        Display::transitionToScreen(&Display::initScreen);
+
+        Display::transitionToScreen(&Display::initScreen, true);
         return;
     }
 
@@ -158,7 +159,7 @@ void Application::processState()
         }
 
         this->state = APPLICATION_STATE_LOCKED;
-        Display::transitionToScreen(&Display::lockscreen, [this]()
+        Display::transitionToScreen(&Display::lockscreen, false, [this]()
                                     { this->nfc.enableCardDetection(); });
         auto cardDetectionCallback = [this]()
         {

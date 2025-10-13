@@ -29,7 +29,8 @@ public:
     static void loop();
 
     static void transitionToScreen(IScreen *screen);
-    static void transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete);
+    static void transitionToScreen(IScreen *screen, bool reInit);
+    static void transitionToScreen(IScreen *screen, bool reInit, std::function<void()> onTransitionComplete);
 
     static BootScreen bootScreen;
     static SetPinScreen setPinScreen;

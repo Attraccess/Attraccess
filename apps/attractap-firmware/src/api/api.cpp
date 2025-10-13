@@ -4,8 +4,14 @@ void API::updateSateInfo()
 {
     auto websocketState = State::getWebsocketState();
     auto networkState = State::getNetworkState();
+    auto apiState = State::getApiState();
 
     this->loopIsEnabled = websocketState.connected && (networkState.wifi_connected || networkState.ethernet_connected);
+
+    if (!this->loopIsEnabled && apiState.authenticated)
+    {
+        State::setApiState(false, "");
+    }
 }
 
 void API::setup()

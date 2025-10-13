@@ -155,7 +155,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         this.logger.error(
           `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`,
         );
-        throw lastError;
+        try {
+          client.close();
+        } catch {
+          // ignore error
+        }
+        return;
       }
     };
 
@@ -169,7 +174,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.clientWasActive(client);
 
     this.logger.debug('Sending authentication request');
-    await client.sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
+    try {
+      await client.sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
+    } catch (error) {
+      this.logger.error(`Initial authentication request failed for client ${client.id}. Closing connection.`);
+      this.logger.error(error as Error);
+      try {
+        client.close();
+      } catch {
+        // ignore error
+      }
+      return;
+    }
   }
 
   private clientResponseAwaiters: Array<{
