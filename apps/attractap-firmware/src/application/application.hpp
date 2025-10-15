@@ -5,10 +5,10 @@
 #include "../display/display.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
-#include "../cli/CLIService.hpp"
-#include "../serial-setup/serial-setup.hpp"
 #include "../network/network.hpp"
 #include "../api/api.hpp"
+#include "../ioexpander/ioexpander.hpp"
+#include "../utils.hpp"
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
 
@@ -23,8 +23,8 @@ public:
 private:
     NFC nfc;
     Logger logger;
-    CLIService cliService;
     API api;
+    IOExpander ioExpander;
 
     static void networkTask(void *parameter);
 
@@ -34,9 +34,12 @@ private:
     uint32_t bootTime;
     bool bootDone;
     bool unlocked;
+    uint32_t timeOfUnlockedMs;
+    const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
     uint8_t resourceCount;
     bool resourceIsSelected;
-    JsonObject selectedResource;
+
+    void selectResource(JsonObject resource);
 
     enum applicationState_t
     {
@@ -53,4 +56,5 @@ private:
     applicationState_t state;
 
     void handleResourceListUpdate(JsonArray resourceList);
+    void handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error);
 };

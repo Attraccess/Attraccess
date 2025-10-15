@@ -21,7 +21,7 @@ InitScreen Display::initScreen;
 Lockscreen Display::lockscreen;
 NoResourcesScreen Display::noResourcesScreen;
 ResourceListScreen Display::resourceListScreen;
-Unlockedscreen Display::unlockedScreen;
+ResourceDetailsScreen Display::resourceDetailsScreen;
 
 Arduino_DataBus *Display::bus = NULL;
 
@@ -70,7 +70,6 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
         return;
     }
 
-    Display::logger.debug((String(millis()) + "ms ").c_str());
     for (int i = 0; i < touched; ++i)
     {
         int16_t touchX = Display::x[i];
@@ -97,11 +96,6 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
         /*Set the coordinates*/
         data->point.x = touchX;
         data->point.y = touchY;
-
-        Display::logger.debug((String(touchX) + "Data x ").c_str());
-        Display::logger.debug((String(touchY) + "Data y ").c_str());
-
-        // gfx->fillCircle(touchX, touchY, 5, BLUE);
     }
 }
 
@@ -212,7 +206,7 @@ void Display::setup()
     Display::lockscreen.init();
     Display::noResourcesScreen.init();
     Display::resourceListScreen.init();
-    Display::unlockedScreen.init();
+    Display::resourceDetailsScreen.init();
 
     Display::transitionToScreen(&Display::bootScreen);
 

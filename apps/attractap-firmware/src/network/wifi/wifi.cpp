@@ -133,13 +133,13 @@ void Wifi::setup()
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
     // Reduce memory allocations to fit available internal RAM
-    /*    cfg.static_rx_buf_num = 4;  // Default is 10
-        cfg.dynamic_rx_buf_num = 8; // Default is 32
-        cfg.static_tx_buf_num = 4;  // Default is 6
-        cfg.dynamic_tx_buf_num = 8; // Default is 32
-        cfg.rx_ba_win = 4;          // Default is 6
-        cfg.ampdu_rx_enable = 0;    // Disable AMPDU RX
-        cfg.ampdu_tx_enable = 0;    // Disable AMPDU TX*/
+    cfg.static_rx_buf_num = 4;  // Default is 10
+    cfg.dynamic_rx_buf_num = 8; // Default is 32
+    cfg.static_tx_buf_num = 4;  // Default is 6
+    cfg.dynamic_tx_buf_num = 8; // Default is 32
+    cfg.rx_ba_win = 4;          // Default is 6
+    cfg.ampdu_rx_enable = 0;    // Disable AMPDU RX
+    cfg.ampdu_tx_enable = 0;    // Disable AMPDU TX
 
     esp_err_t wifi_init_result = esp_wifi_init(&cfg);
     if (wifi_init_result != ESP_OK)

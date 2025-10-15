@@ -69,6 +69,10 @@ void API::processIncomingMessages(String message)
     {
         this->onResourceList(data);
     }
+    else if (eventType == "CARD_AUTHENTICATION_DATA")
+    {
+        this->onCardAuthenticationDetailsResponse(data);
+    }
 
     else
     {
@@ -231,4 +235,53 @@ void API::onResourceList(JsonObject data)
 void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
 {
     this->resourceListUpdateCallback = callback;
+}
+
+void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
+{
+    this->logger.info("Requesting card authentication data");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["uid"] = hexToString(uid, uidLength);
+    this->sendMessage("REQUEST_CARD_AUTHENTICATION_DATA", payload);
+}
+
+void API::onCardAuthenticationDetailsResponse(JsonObject data)
+{
+    this->logger.info("Received card authentication details response");
+    if (this->cardAuthenticationDetailsResponseCallback == nullptr)
+    {
+        this->logger.error("Card authentication details response callback is not set");
+        return;
+    }
+    // Extract fields safely and emit typed values
+    JsonObject payload = data["payload"].as<JsonObject>();
+    String error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    uint8_t keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
+    String keyHex = payload["key"].is<String>() ? payload["key"].as<String>() : String("");
+
+    uint8_t keyBytes[16];
+    uint8_t keyLen = 0;
+    if (keyHex.length() == 32)
+    {
+        if (stringToHexArray(keyHex, keyBytes, 16))
+        {
+            keyLen = 16;
+        }
+        else
+        {
+            error = "Invalid hex key";
+        }
+    }
+    else if (keyHex.length() > 0)
+    {
+        error = "Invalid key length";
+    }
+
+    this->cardAuthenticationDetailsResponseCallback(keyNo, keyLen == 16 ? keyBytes : nullptr, keyLen, error);
+}
+
+void API::setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String)> callback)
+{
+    this->cardAuthenticationDetailsResponseCallback = callback;
 }

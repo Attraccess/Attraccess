@@ -18,11 +18,14 @@ void NFC::setup()
         this->logger.error("SAMConfig failed");
         return;
     }
+
+    this->logger.infof("Factory key is: %s", hexToString(NFC::FACTORY_KEY, 16).c_str());
 }
 
 void NFC::enableCardDetection()
 {
     this->logger.info("Enabling card detection");
+    this->checkHardware();
     pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
     auto irqHandler = [this]
     {
@@ -30,9 +33,11 @@ void NFC::enableCardDetection()
     };
     attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
     this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+    this->timeOfCardDetectionEnabledMs = millis();
+    this->cardDetectionEnabled = true;
 }
 
-void NFC::setCardDetectionCallback(std::function<void()> callback)
+void NFC::setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback)
 {
     this->cardDetectionCallback = callback;
 }
@@ -41,21 +46,44 @@ void NFC::disableCardDetection()
 {
     this->logger.info("Disabling card detection");
     detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
-    this->cardDetected = false;
+    this->pn532IrqPending = false;
+    this->cardDetectionEnabled = false;
+    this->timeOfCardDetectionEnabledMs = 0;
 }
 
 void NFC::loop()
 {
     this->checkHardware();
     this->handleCardDetection();
+
+    uint32_t now = millis();
+    if (this->cardDetectionEnabled && now - this->timeOfCardDetectionEnabledMs > this->CARD_DETECTION_RESTART_TIMEOUT_MS)
+    {
+        this->logger.info("Card detection timeout, restarting");
+        this->disableCardDetection();
+        this->enableCardDetection();
+    }
 }
 
 void NFC::handleCardDetection()
 {
-    if (!this->cardDetected)
+    // If IRQ fired, handle the I2C read here (not in ISR)
+    if (!this->pn532IrqPending)
     {
         return;
     }
+
+    uint8_t cardDetectedUid[7] = {0};
+    uint8_t cardDetectedUidLength = 0;
+    bool foundCard = this->pn532.readDetectedPassiveTargetID(cardDetectedUid, &cardDetectedUidLength);
+    if (!foundCard)
+    {
+        this->logger.error("Card detection handler, but no card found");
+        this->pn532IrqPending = false;
+        return;
+    }
+
+    this->disableCardDetection();
 
     if (this->cardDetectionCallback == nullptr)
     {
@@ -63,11 +91,9 @@ void NFC::handleCardDetection()
         return;
     }
 
-    // Ensure single-shot invocation: clear the flag before calling the callback
-    // so it does not trigger repeatedly in the main loop until explicitly re-enabled.
-    this->cardDetected = false;
     this->logger.info("Calling card detection callback");
-    this->cardDetectionCallback();
+    this->cardDetectionCallback(cardDetectedUid, cardDetectedUidLength);
+    this->logger.info("Card detection callback returned");
 }
 
 void NFC::demo()
@@ -180,7 +206,7 @@ bool NFC::waitForCard(uint32_t timeoutMs)
 
     if (!uidDetected)
     {
-        this->logger.error("No tag detected");
+        this->logger.error("No tag detected within timeout");
         return false;
     }
 
@@ -253,10 +279,8 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 
 void NFC::onCardDetectedInterruptHandler()
 {
-    this->logger.info("Card detected interrupt handler");
-    detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
-    this->disableCardDetection();
-    this->cardDetected = true;
+    // ISR context: set flag only; avoid I2C and logging here
+    this->pn532IrqPending = true;
 }
 
 void NFC::checkHardware(bool logHardwareInfo)

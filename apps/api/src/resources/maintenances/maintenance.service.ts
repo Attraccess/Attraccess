@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
 import { ResourceMaintenance, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
@@ -6,6 +6,8 @@ import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 import { UpdateMaintenanceDto } from './dtos/updateMaintenance.dto';
 import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 
 @Injectable()
 export class ResourceMaintenanceService {
@@ -18,6 +20,8 @@ export class ResourceMaintenanceService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -50,7 +54,12 @@ export class ResourceMaintenanceService {
       reason: dto.reason || null,
     });
 
-    return await this.maintenanceRepository.save(maintenance);
+    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
+    );
+    return savedMaintenance;
   }
 
   /**
@@ -70,7 +79,12 @@ export class ResourceMaintenanceService {
     }
 
     maintenance.endTime = new Date();
-    return await this.maintenanceRepository.save(maintenance);
+    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),
+    );
+    return savedMaintenance;
   }
 
   /**
@@ -107,7 +121,12 @@ export class ResourceMaintenanceService {
       throw new BadRequestException('End time must be after start time');
     }
 
-    return await this.maintenanceRepository.save(maintenance);
+    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),
+    );
+    return savedMaintenance;
   }
 
   /**
@@ -123,6 +142,10 @@ export class ResourceMaintenanceService {
     }
 
     await this.maintenanceRepository.remove(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(maintenance.resourceId, maintenance.id),
+    );
   }
 
   /**

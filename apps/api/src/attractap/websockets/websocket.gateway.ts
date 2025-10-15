@@ -244,6 +244,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
     });
   }
+
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
     this.logger.debug(`Client ${socket.id} disconnected.`);
 
@@ -308,6 +309,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_FIRMWARE_INFO:
         await this.handleFirmwareInfo(socket, eventData);
         break;
+      case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
+        await this.handleCardAuthenticationRequest(socket, eventData);
+        break;
       case AttractapEventType.READER_AUTHENTICATED:
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
       case AttractapEventType.READER_FIRMWARE_STREAM_CHUNK:
@@ -316,6 +320,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.RESOURCE_LIST:
       case AttractapEventType.READER_UNAUTHORIZED:
       case AttractapEventType.READER_REQUEST_AUTHENTICATION:
+      case AttractapEventType.CARD_AUTHENTICATION_DATA:
         this.logger.error(
           `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
         );
@@ -501,6 +506,37 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(
       Array.from(this.websocketService.sockets.values()).map(async (socket) => {
         await this.sendResourceList(socket, { resourceId });
+      }),
+    );
+  }
+
+  private async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { uid } = data.payload as { uid: string };
+
+    if (!uid || typeof uid !== 'string') {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'INVALID_UID',
+        }),
+      );
+      return;
+    }
+
+    const nfcCard = await this.attractapService.getNFCCardByUID(uid);
+
+    if (!nfcCard) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'CARD_NOT_FOUND',
+        }),
+      );
+      return;
+    }
+
+    await socket.sendMessage(
+      new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+        keyNo: nfcCard.keyNo,
+        key: nfcCard.key,
       }),
     );
   }

@@ -20,7 +20,7 @@
 #include "screens/lockscreen/lockscreen.hpp"
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
-#include "screens/unlocked/unlocked.hpp"
+#include "screens/resourceDetails/resourceDetailsScreen.hpp"
 
 class Display
 {
@@ -39,7 +39,7 @@ public:
     static Lockscreen lockscreen;
     static NoResourcesScreen noResourcesScreen;
     static ResourceListScreen resourceListScreen;
-    static Unlockedscreen unlockedScreen;
+    static ResourceDetailsScreen resourceDetailsScreen;
 
 private:
     static const int TRANSITION_DURATION = 400;

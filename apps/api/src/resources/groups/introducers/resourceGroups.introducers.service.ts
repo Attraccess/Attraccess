@@ -1,13 +1,17 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ResourceIntroducer } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
 
 @Injectable()
 export class ResourceGroupsIntroducersService {
   constructor(
     @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>
+    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   public async getMany(groupId: number): Promise<ResourceIntroducer[]> {
@@ -28,7 +32,12 @@ export class ResourceGroupsIntroducersService {
       return existingIntroducer;
     }
 
-    return await this.createOne(groupId, userId);
+    const savedIntroducer = await this.createOne(groupId, userId);
+    this.eventEmitter.emit(
+      ResourceGroupIntroducerChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroducerChangedEvent(groupId),
+    );
+    return savedIntroducer;
   }
 
   private async createOne(groupId: number, userId: number): Promise<ResourceIntroducer> {
@@ -47,7 +56,12 @@ export class ResourceGroupsIntroducersService {
       return;
     }
 
-    return await this.resourceIntroducerRepository.remove(introducer);
+    const savedIntroducer = await this.resourceIntroducerRepository.remove(introducer);
+    this.eventEmitter.emit(
+      ResourceGroupIntroducerChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroducerChangedEvent(groupId),
+    );
+    return savedIntroducer;
   }
 
   public async getByResourceGroupIdAndUserId(groupId: number, userId: number): Promise<ResourceIntroducer | null> {

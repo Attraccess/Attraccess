@@ -16,11 +16,11 @@ void ResourceListScreen::init()
 void ResourceListScreen::setResourceList(JsonArray resourceList)
 {
    // first, remove all existing resource list items
-   lv_obj_t *resourceContainer = lv_obj_get_child(this->screen, NULL);
+   lv_obj_t *resourceContainer = lv_obj_get_child(this->screen, 0);
    while (resourceContainer)
    {
       lv_obj_del(resourceContainer);
-      resourceContainer = lv_obj_get_child(this->screen, NULL);
+      resourceContainer = lv_obj_get_child(this->screen, 0);
    }
 
    for (JsonObject resource : resourceList)

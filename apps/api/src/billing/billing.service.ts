@@ -8,7 +8,7 @@ import {
   ResourceUsage,
   ResourceFlowNodeType,
 } from '@attraccess/database-entities';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
@@ -25,6 +25,8 @@ import { EmailService } from '../email/email.service';
 import { BillingTransactionNotFoundException } from './errors/billing-transaction-not-found.error';
 import { RefundAmountHigherThanTransactionAmountException } from './errors/refund-amount-higher-than-transaction-amount.error';
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 
 @Injectable()
 export class BillingService {
@@ -42,6 +44,8 @@ export class BillingService {
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly resourceFlowsService: ResourceFlowsService,
     private readonly emailService: EmailService,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -230,7 +234,12 @@ export class BillingService {
       throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
     }
 
-    return await this.resourceBillingConfigurationRepository.save(configuration);
+    const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
+    this.eventEmitter.emit(
+      ResourceBillingConfigurationChangedEvent.EVENT_NAME,
+      new ResourceBillingConfigurationChangedEvent(resourceId),
+    );
+    return savedConfiguration;
   }
 
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {

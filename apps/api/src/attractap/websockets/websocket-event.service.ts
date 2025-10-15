@@ -3,6 +3,13 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
+import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
+import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
+import { ResourceGroupIntroductionChangedEvent } from '../../resources/groups/introductions/events/resource-group-introduction-changed.event';
+import { ResourceGroupIntroducerChangedEvent } from '../../resources/groups/introducers/events/resource-group-introducer-changed.event';
+import { ResourceIntroductionChangedEvent } from '../../resources/introductions/events/resource-introduction-changed.event';
+import { ResourceBillingConfigurationChangedEvent } from '../../billing/events/resource-billing-configuration-changed.event';
+import { ResourceIntroducerChangedEvent } from '../../resources/introducers/events/resource-introducer-changed.event';
 
 @Injectable()
 export class WebSocketEventService {
@@ -14,8 +21,7 @@ export class WebSocketEventService {
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event', event);
-    throw new Error('not implemented');
-    // TODO: restart reader/inform reader
+    // TODO: inform reader
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
@@ -37,5 +43,38 @@ export class WebSocketEventService {
     this.attractapGateway.onResourceUsageChanged(event.resource.id);
   }
 
-  // TODO: add events for resource changes (resource itself, maintenances, billing configurations, introducers)
+  @OnEvent(ResourceChangedEvent.EVENT_NAME)
+  public async onResourceChanged(event: ResourceChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
+  public async onResourceMaintenanceChanged(event: ResourceMaintenanceChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
+  public async onResourceGroupIntroductionChanged(event: ResourceGroupIntroductionChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceGroupIntroducerChangedEvent.EVENT_NAME)
+  public async onResourceGroupIntroducerChanged(event: ResourceGroupIntroducerChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceIntroductionChangedEvent.EVENT_NAME)
+  public async onResourceIntroductionChanged(event: ResourceIntroductionChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceBillingConfigurationChangedEvent.EVENT_NAME)
+  public async onResourceBillingConfigurationChanged(event: ResourceBillingConfigurationChangedEvent) {
+    // TODO: implement
+  }
+
+  @OnEvent(ResourceIntroducerChangedEvent.EVENT_NAME)
+  public async onResourceIntroducerChanged(event: ResourceIntroducerChangedEvent) {
+    // TODO: implement
+  }
 }

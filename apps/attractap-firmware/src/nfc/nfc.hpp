@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include "../state/state.hpp"
 #include "FunctionalInterrupt.h"
+#include "../utils.hpp"
 
 class NFC
 {
@@ -20,7 +21,7 @@ public:
     bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey);
     bool authenticate(uint8_t keyNumber, uint8_t *key);
     void enableCardDetection();
-    void setCardDetectionCallback(std::function<void()> callback);
+    void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback);
     void disableCardDetection();
 
     static uint8_t FACTORY_KEY[16];
@@ -35,9 +36,12 @@ private:
     // TODO: remove this
     void demo();
 
+    uint32_t timeOfCardDetectionEnabledMs = 0;
+    bool cardDetectionEnabled = false;
+    const uint32_t CARD_DETECTION_RESTART_TIMEOUT_MS = 5000;
     void onCardDetectedInterruptHandler();
-    bool cardDetected = false;
-    std::function<void()> cardDetectionCallback;
+    volatile bool pn532IrqPending = false;
+    std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;
     void handleCardDetection();
 
     uint32_t lastHardwareCheckMs = 0;
