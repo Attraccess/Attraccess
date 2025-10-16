@@ -19,7 +19,9 @@ class IOExpander
 {
 public:
     void setup();
-    void beep();
+    void successBeep();
+    void errorBeep();
+    void singleBeep();
     void setDisplayBacklight(bool on);
 
 private:

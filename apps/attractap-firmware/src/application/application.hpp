@@ -30,14 +30,20 @@ private:
 
     void processState();
     void handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg);
+    void handleTouch(int16_t x, int16_t y);
 
     uint32_t bootTime;
     bool bootDone;
+
     bool unlocked;
     uint32_t timeOfUnlockedMs;
     const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
+    void restartSessionTimeout();
+
     uint8_t resourceCount;
     bool resourceIsSelected;
+    uint32_t selectedResourceId;
+    JsonArray resourceList;
 
     void selectResource(JsonObject resource);
 
@@ -51,10 +57,13 @@ private:
         APPLICATION_STATE_LOCKED,
         APPLICATION_STATE_NO_RESOURCES,
         APPLICATION_STATE_RESOURCE_LIST,
-        APPLICATION_STATE_UNLOCKED
+        APPLICATION_STATE_UNLOCKED,
+        APPLICATION_STATE_ENROLLMENT
     };
     applicationState_t state;
 
     void handleResourceListUpdate(JsonArray resourceList);
     void handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error);
+
+    void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);
 };

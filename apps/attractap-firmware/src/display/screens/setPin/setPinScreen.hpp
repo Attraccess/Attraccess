@@ -12,9 +12,11 @@ class SetPinScreen : public IScreen
 public:
     SetPinScreen() : logger("SetPinScreen") {}
     void init();
-    void setOnPinConfirmedCallback(std::function<void(String)> onPinConfirmed);
     lv_obj_t *getScreen() override;
     void loop() override;
+    String getName() override;
+
+    void setOnPinConfirmedCallback(std::function<void(String)> onPinConfirmed);
 
 private:
     Logger logger;

@@ -20,6 +20,25 @@ export enum AttractapEventType {
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
+  REQUEST_RESOURCE_THUMBNAIL = 'REQUEST_RESOURCE_THUMBNAIL',
+  RESOURCE_THUMBNAIL_DATA = 'RESOURCE_THUMBNAIL_DATA',
+  START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
+  STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  LOCK_DOOR = 'LOCK_DOOR',
+  UNLOCK_DOOR = 'UNLOCK_DOOR',
+  UNLATCH_DOOR = 'UNLATCH_DOOR',
+  ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO = 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
+  ENROLL_NEW_CARD_REQUEST_NFC_KEY = 'ENROLL_NEW_CARD_REQUEST_NFC_KEY',
+  ENROLL_NEW_CARD = 'ENROLL_NEW_CARD',
+}
+
+export interface ResourceThumbnailDescriptorPayload {
+  transferId: string;
+  resourceId: number;
+  width: number;
+  height: number;
+  format: 'PNG';
+  contentLength: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,9 +61,17 @@ export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPaylo
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   id: string;
-  readerId: Attractap['id'];
+  readerId: Attractap['id'] | null;
   sendMessage: (message: AttractapMessage) => Promise<void>;
   sendBinaryData: (data: Buffer) => void;
+  state: {
+    lastAuthenticatedUserId: number | null;
+    enrollNewCardData: {
+      key: string;
+      keyNo: number;
+      cardUID: string;
+    } | null;
+  };
 }
 
 // Firmware update related types

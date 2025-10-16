@@ -21,10 +21,46 @@ void Application::setup()
     this->api.setResourceListUpdateCallback([this](JsonArray resourceList)
                                             { this->handleResourceListUpdate(resourceList); });
 
+    /*this->api.setResourceThumbnailCallback([this](uint32_t resourceId, uint16_t w, uint16_t h, const uint8_t *data, size_t len)
+                                           { Display::resourceListScreen.setResourceImage(resourceId, w, h, data, len); });
+*/
     this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error)
                                                            { this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
 
+    Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
+                                                          { this->handleResourceDetailsButtonClick(evt); });
+
+    this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
+                                                        { 
+                                                            Display::enrollmentScreen.setUserName(username);
+                                                            Display::enrollmentScreen.setEnrollmentTimeoutTime(millis() + 30000);
+                                                            Display::transitionToScreen(&Display::enrollmentScreen);
+                                                            this->state = APPLICATION_STATE_ENROLLMENT;
+                                                            return this->nfc.getAvailableKeyNo(uid, uidLength, keyNo); });
+
+    this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key)
+                                       {
+                                         uint8_t keyBytes[16] = {0};
+                                         stringToHexArray(key, keyBytes, 16);
+                                         bool success = this->nfc.changeKey(keyNo, this->nfc.FACTORY_KEY, this->nfc.FACTORY_KEY, keyBytes);
+                                         if (success)
+                                         {
+                                            this->ioExpander.successBeep();
+                                             // TODO: show a short success message before leaving enrollment
+                                         } else {
+                                            this->ioExpander.errorBeep();
+                                         }
+
+                                         // TODO: why is a nfc card entry created before this succeeds?
+
+                                         this->state = APPLICATION_STATE_RESOURCE_LIST;
+                                         Display::transitionToScreen(&Display::resourceListScreen);
+                                         return success; });
+
     xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr, tskIDLE_PRIORITY, nullptr);
+
+    Display::setTouchCallback([this](int16_t x, int16_t y)
+                              { this->handleTouch(x, y); });
 
     this->bootTime = millis();
 }
@@ -47,6 +83,7 @@ void Application::processState()
 
     if (!this->bootDone && millis() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION)
     {
+        this->logger.debug("Boot screen duration reached, hiding boot screen");
         this->bootDone = true;
     }
 
@@ -63,6 +100,7 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("PIN is not set, showing pin screen");
         this->state = APPLICATION_STATE_PIN_NOT_SET;
         Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
                                                         { Settings::saveDeviceConfig(pin); });
@@ -82,6 +120,7 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("Connection is not configured, showing connection configuration screen");
         this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
         Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
                                                                  { this->handleConnectionConfigurationSave(cfg); });
@@ -100,6 +139,7 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("API state is not authenticated, network state is not connected, websocket state is not connected, showing init screen");
         this->state = APPLICATION_STATE_INIT;
         Display::initScreen.setOnOpenSettingsCallback([this]()
                                                       {
@@ -116,7 +156,7 @@ void Application::processState()
                                                                                                                     this->state = APPLICATION_STATE_INIT; });
                                                         Display::transitionToScreen(&Display::connectionConfigurationScreen); });
 
-        Display::transitionToScreen(&Display::initScreen, true);
+        Display::transitionToScreen(&Display::initScreen);
         return;
     }
 
@@ -127,8 +167,16 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("Resource count is 0, showing no resources screen");
         this->state = APPLICATION_STATE_NO_RESOURCES;
         Display::transitionToScreen(&Display::noResourcesScreen);
+        return;
+    }
+
+    if (this->resourceCount == 1 && !this->resourceIsSelected)
+    {
+        this->logger.debug("Resource count is 1 and resource is not selected, selecting resource");
+        this->selectResource(resourceList[0].as<JsonObject>());
         return;
     }
 
@@ -139,6 +187,7 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("Resource count is greater than 0 and resource is not selected, showing resource list");
         this->state = APPLICATION_STATE_RESOURCE_LIST;
         Display::resourceListScreen.setResourceSelectionCallback([this](JsonObject resource)
                                                                  { this->selectResource(resource); });
@@ -153,9 +202,8 @@ void Application::processState()
             return;
         }
 
+        this->logger.debug("Card is not detected, showing lockscreen");
         this->state = APPLICATION_STATE_LOCKED;
-        Display::transitionToScreen(&Display::lockscreen, false, [this]()
-                                    { this->nfc.enableCardDetection(); });
 
         auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
         {
@@ -167,6 +215,10 @@ void Application::processState()
             this->api.requestCardAuthenticationData(uid, uidLength);
         };
         this->nfc.setCardDetectionCallback(cardDetectionCallback);
+        Display::transitionToScreen(&Display::lockscreen, [this]()
+                                    { 
+                                        this->logger.debug("Lockscreen transition complete, enabling card detection");
+                                        this->nfc.enableCardDetection(); });
         return;
     }
 
@@ -175,16 +227,17 @@ void Application::processState()
     {
         if (now - this->timeOfUnlockedMs > this->UNLOCKED_TIMEOUT_MS)
         {
+            this->logger.debug("Unlocked timeout reached, locking");
             this->unlocked = false;
-            this->state = APPLICATION_STATE_INIT;
+            this->resourceIsSelected = this->resourceCount == 1;
         }
         return;
     }
 
+    this->logger.debug("Resource is unlocked, showing resource details screen");
     this->state = APPLICATION_STATE_UNLOCKED;
-    Display::resourceDetailsScreen.setSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
+    this->restartSessionTimeout();
     Display::transitionToScreen(&Display::resourceDetailsScreen);
-    this->timeOfUnlockedMs = now;
 }
 
 void Application::handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg)
@@ -207,11 +260,25 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
 
 void Application::handleResourceListUpdate(JsonArray resourceList)
 {
+    this->logger.infof("Resource list updated: %d resources", resourceList.size());
     this->resourceCount = resourceList.size();
+    this->resourceList = resourceList;
     Display::resourceListScreen.setResourceList(resourceList);
-    if (this->resourceCount == 1)
+
+    // If a resource is already selected, try to find it in the new list and refresh the details screen.
+    if (this->resourceIsSelected)
     {
-        this->selectResource(resourceList[0].as<JsonObject>());
+        this->logger.info("Resource is selected, trying to find it in the new list");
+        for (JsonVariant v : resourceList)
+        {
+            JsonObject obj = v.as<JsonObject>();
+            if (obj["id"].is<uint32_t>() && obj["id"].as<uint32_t>() == this->selectedResourceId)
+            {
+                this->logger.infof("Resource found in the new list, refreshing the details screen: %s", obj["name"].as<String>().c_str());
+                this->selectResource(obj);
+                break;
+            }
+        }
     }
 }
 
@@ -222,6 +289,7 @@ void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *
     if (this->state != APPLICATION_STATE_LOCKED)
     {
         this->logger.error("Card authentication details received in state other than APPLICATION_STATE_LOCKED");
+        this->ioExpander.errorBeep();
         return;
     }
 
@@ -229,6 +297,7 @@ void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *
     {
         // TODO: indicate to user that authentication failed
         this->logger.errorf("Authentication failed: %s", error.c_str());
+        this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
         return;
     }
@@ -236,25 +305,23 @@ void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *
     if (keyBytes == nullptr || keyLen != 16)
     {
         this->logger.error("Invalid key bytes provided");
+        this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
         return;
     }
 
     this->logger.infof("Trying to authenticate with keyNo: %u", keyNo);
     bool authenticated = this->nfc.authenticate(keyNo, const_cast<uint8_t *>(keyBytes));
-    this->ioExpander.beep();
 
     if (!authenticated)
     {
         this->logger.error("Authentication failed");
-        delay(100);
-        this->ioExpander.beep();
-        delay(100);
-        this->ioExpander.beep();
+        this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
         return;
     }
 
+    this->ioExpander.successBeep();
     this->logger.info("Authentication successful");
     this->unlocked = true;
 }
@@ -263,18 +330,77 @@ void Application::selectResource(JsonObject resource)
 {
     this->logger.infof("Resource selected: %s", resource["name"].as<String>().c_str());
     this->resourceIsSelected = true;
+    this->selectedResourceId = resource["id"].as<uint32_t>();
 
-    uint32_t id = resource["id"].as<uint32_t>();
-    String name = resource["name"].as<String>();
-    String description = resource["description"].as<String>();
     String type = resource["type"].as<String>();
-    String thumbnail = resource["imageFilename"].as<String>();
-
     ResourceDetailsScreen::resource_type_t resourceType = ResourceDetailsScreen::RESOURCE_TYPE_MACHINE;
     if (type == "door")
     {
         resourceType = ResourceDetailsScreen::RESOURCE_TYPE_DOOR;
     }
 
-    Display::resourceDetailsScreen.setInfo(resourceType, name, description);
+    String name = resource["name"].as<String>();
+    String description = resource["description"].as<String>();
+
+    bool hasActiveUsageSession = resource["activeUsageSession"]["user"]["id"].is<uint32_t>() && resource["activeUsageSession"]["user"]["id"].as<uint32_t>() > 0;
+    if (!hasActiveUsageSession)
+    {
+        Display::resourceDetailsScreen.setInfo(resourceType, name, description);
+    }
+    else
+    {
+        String currentUser = resource["activeUsageSession"]["user"]["username"].as<String>();
+        String sessionStartTimeStr = resource["activeUsageSession"]["startTime"].as<String>();
+        time_t sessionStartTime = parseIso8601ToTimeT(sessionStartTimeStr);
+
+        Display::resourceDetailsScreen.setInfo(resourceType, name, description, sessionStartTime, currentUser);
+    }
+}
+
+void Application::handleTouch(int16_t x, int16_t y)
+{
+    if (this->state == APPLICATION_STATE_UNLOCKED)
+    {
+        this->restartSessionTimeout();
+    }
+}
+
+void Application::restartSessionTimeout()
+{
+    uint32_t now = millis();
+    Display::resourceDetailsScreen.setSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
+    this->timeOfUnlockedMs = now;
+}
+
+void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt)
+{
+    this->logger.infof("Resource details button clicked: %d", evt.buttonClickType);
+
+    if (this->state != APPLICATION_STATE_UNLOCKED)
+    {
+        return;
+    }
+
+    switch (evt.buttonClickType)
+    {
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+        this->api.startResourceUsageSession(this->selectedResourceId);
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+        this->api.stopResourceUsageSession(this->selectedResourceId);
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+        this->api.lockDoor(this->selectedResourceId);
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+        this->api.unlockDoor(this->selectedResourceId);
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+        this->api.unlatchDoor(this->selectedResourceId);
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+        // this->api.triggerFlowButton();
+        // TODO: implement flow button
+        break;
+    }
 }

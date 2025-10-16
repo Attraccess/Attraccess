@@ -21,3 +21,8 @@ lv_obj_t *SetPinScreen::getScreen()
 {
    return this->screen;
 }
+
+String SetPinScreen::getName()
+{
+   return "SetPinScreen";
+}

@@ -37,3 +37,8 @@ lv_obj_t *Lockscreen::getScreen()
 void Lockscreen::loop()
 {
 }
+
+String Lockscreen::getName()
+{
+    return "Lockscreen";
+}

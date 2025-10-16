@@ -16,8 +16,21 @@ public:
     void loop();
     void processIncomingMessages(String message);
     void setResourceListUpdateCallback(std::function<void(JsonArray)> callback);
+    // void setResourceThumbnailCallback(std::function<void(uint32_t, uint16_t, uint16_t, const uint8_t *, size_t)> callback);
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength);
     void setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String)> callback);
+
+    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> callback);
+    void setEnrollNewCardCallback(std::function<bool(uint8_t keyNo, String key)> callback);
+
+    void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
+    void sendEnrollNewCard(bool success);
+
+    void startResourceUsageSession(uint32_t resourceId);
+    void stopResourceUsageSession(uint32_t resourceId);
+    void lockDoor(uint32_t resourceId);
+    void unlockDoor(uint32_t resourceId);
+    void unlatchDoor(uint32_t resourceId);
 
 private:
     Logger logger;
@@ -31,6 +44,7 @@ private:
     bool isRegistered();
 
     std::function<void(JsonArray)> resourceListUpdateCallback;
+    // std::function<void(uint32_t, uint16_t, uint16_t, const uint8_t *, size_t)> resourceThumbnailCallback;
     // (keyNo, keyBytes, keyLen, error). error is empty when no error
     std::function<void(uint8_t, const uint8_t *, uint8_t, String)> cardAuthenticationDetailsResponseCallback;
 
@@ -45,5 +59,22 @@ private:
     void onReaderAuthenticated(JsonObject data);
     void sendFirmwareInfo();
     void onResourceList(JsonObject data);
+    // void requestResourceThumbnail(uint32_t resourceId, uint16_t width, uint16_t height);
+    // void onResourceThumbnailDescriptor(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
+
+    // Pending thumbnail transfer state
+    // uint32_t pendingThumbnailResourceId = 0;
+    // uint16_t pendingThumbnailW = 0;
+    // uint16_t pendingThumbnailH = 0;
+    // size_t pendingThumbnailExpectedBytes = 0;
+    // size_t pendingThumbnailReceivedBytes = 0;
+    // uint8_t *pendingThumbnailBuffer = nullptr;
+    // bool pendingThumbnailWaiting = false;
+
+    std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<bool(uint8_t keyNo, String key)> enrollNewCardCallback;
+
+    void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
+    void onEnrollNewCard(JsonObject data);
 };

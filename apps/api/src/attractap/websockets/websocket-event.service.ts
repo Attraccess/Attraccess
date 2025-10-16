@@ -21,31 +21,31 @@ export class WebSocketEventService {
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event', event);
-    // TODO: inform reader
+    // TODO: inform reader about name change etc
+    this.attractapGateway.sendResourceList(event.reader.id);
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
   public async onReaderDeleted(event: ReaderDeletedEvent) {
     this.logger.debug('Got reader deleted event', event);
-    throw new Error('not implemented');
-    // TODO: restart reader/inform reader
+    this.attractapGateway.disconnectReader(event.readerId);
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
   public async onResourceUsage(event: ResourceUsageEvent) {
     this.logger.debug('Got resource usage started event', event);
-    this.attractapGateway.onResourceUsageChanged(event.usage.resource.id);
+    this.attractapGateway.sendResourceListToReadersWithResource(event.usage.resource.id);
   }
 
   @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
   public async onResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
     this.logger.debug('Got resource usage ended event', event);
-    this.attractapGateway.onResourceUsageChanged(event.resource.id);
+    this.attractapGateway.sendResourceListToReadersWithResource(event.resource.id);
   }
 
   @OnEvent(ResourceChangedEvent.EVENT_NAME)
   public async onResourceChanged(event: ResourceChangedEvent) {
-    // TODO: implement
+    this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
   }
 
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)

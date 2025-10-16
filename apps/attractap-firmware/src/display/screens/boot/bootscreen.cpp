@@ -36,3 +36,8 @@ lv_obj_t *BootScreen::getScreen()
 void BootScreen::loop()
 {
 }
+
+String BootScreen::getName()
+{
+    return "BootScreen";
+}

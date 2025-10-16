@@ -21,6 +21,7 @@
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
+#include "screens/enrollment/enrollmentScreen.hpp"
 
 class Display
 {
@@ -29,8 +30,7 @@ public:
     static void loop();
 
     static void transitionToScreen(IScreen *screen);
-    static void transitionToScreen(IScreen *screen, bool reInit);
-    static void transitionToScreen(IScreen *screen, bool reInit, std::function<void()> onTransitionComplete);
+    static void transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete);
 
     static BootScreen bootScreen;
     static SetPinScreen setPinScreen;
@@ -40,9 +40,14 @@ public:
     static NoResourcesScreen noResourcesScreen;
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
+    static EnrollmentScreen enrollmentScreen;
+
+    static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
 
 private:
-    static const int TRANSITION_DURATION = 400;
+    static std::function<void(int16_t, int16_t)> touchCallback;
+    static const int TRANSITION_DURATION = 500;
+    // static const int TRANSITION_DURATION = 50;
     static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_FADE_IN;
     static uint32_t transitionStartTime;
     static bool transitionComplete;

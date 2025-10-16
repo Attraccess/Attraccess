@@ -9,6 +9,7 @@ public:
     void init();
     void loop() override;
     lv_obj_t *getScreen() override;
+    String getName() override;
 
 private:
     lv_obj_t *screen;

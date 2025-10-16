@@ -18,3 +18,16 @@ String millisToTimeString(double millis);
  * @return The time string
  */
 String timeToTimeString(time_t time);
+
+/**
+ * @brief Parse an ISO8601 datetime string (e.g. "2025-10-16T12:34:56Z" or with offset) to time_t (UTC)
+ *
+ * Supported examples:
+ * - "YYYY-MM-DDTHH:MM:SSZ"
+ * - "YYYY-MM-DDTHH:MM:SS.sssZ"
+ * - "YYYY-MM-DDTHH:MM:SS+HH:MM" / "YYYY-MM-DDTHH:MM:SS-HH:MM"
+ * - Same with optional fractional seconds
+ *
+ * Returns (time_t)-1 on parse failure.
+ */
+time_t parseIso8601ToTimeT(const String &iso8601);

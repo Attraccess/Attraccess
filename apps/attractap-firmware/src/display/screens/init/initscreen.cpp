@@ -283,3 +283,8 @@ void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsC
 {
    this->onOpenSettingsCallback = onOpenSettingsCallback;
 }
+
+String InitScreen::getName()
+{
+   return "InitScreen";
+}

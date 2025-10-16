@@ -22,6 +22,9 @@ Lockscreen Display::lockscreen;
 NoResourcesScreen Display::noResourcesScreen;
 ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
+EnrollmentScreen Display::enrollmentScreen;
+
+std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 
 Arduino_DataBus *Display::bus = NULL;
 
@@ -96,6 +99,11 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
         /*Set the coordinates*/
         data->point.x = touchX;
         data->point.y = touchY;
+
+        if (Display::touchCallback)
+        {
+            Display::touchCallback(touchX, touchY);
+        }
     }
 }
 
@@ -157,10 +165,6 @@ void Display::setup()
     uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
     uint8_t *buf2 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
 
-#if LV_USE_LOG != 0
-    lv_log_register_print_cb(Display::debug_print); /* register print function for debugging */
-#endif
-
     /* Create display and set buffers/callbacks (v9) */
     Display::disp = lv_display_create((int32_t)Display::screenWidth, (int32_t)Display::screenHeight);
     lv_display_set_flush_cb(Display::disp, Display::flush);
@@ -207,6 +211,7 @@ void Display::setup()
     Display::noResourcesScreen.init();
     Display::resourceListScreen.init();
     Display::resourceDetailsScreen.init();
+    Display::enrollmentScreen.init();
 
     Display::transitionToScreen(&Display::bootScreen);
 
@@ -221,7 +226,7 @@ void Display::loop()
     if (!Display::transitionComplete)
     {
         uint32_t currentTime = millis();
-        if (Display::transitionStartTime + Display::TRANSITION_DURATION + 300 < currentTime)
+        if (Display::transitionStartTime + Display::TRANSITION_DURATION + 500 < currentTime)
         {
             Display::transitionComplete = true;
             if (Display::onTransitionComplete)
@@ -235,22 +240,18 @@ void Display::loop()
 
 void Display::transitionToScreen(IScreen *screen)
 {
-    Display::transitionToScreen(screen, false, nullptr);
+    Display::transitionToScreen(screen, nullptr);
 }
 
-void Display::transitionToScreen(IScreen *screen, bool reInit)
+void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete)
 {
-    Display::transitionToScreen(screen, reInit, nullptr);
-}
-
-void Display::transitionToScreen(IScreen *screen, bool reInit, std::function<void()> onTransitionComplete)
-{
-    Display::logger.info("Transitioning to screen");
+    Display::logger.infof("Transitioning to screen: %s", screen->getName().c_str());
     Display::activeScreen = screen;
-    if (reInit)
-    {
-        Display::activeScreen->init();
-    }
+
+    // TODO: reInit the screen
+    // Display::activeScreen->destroy();
+    // Display::activeScreen->init();
+
     lv_screen_load_anim(Display::activeScreen->getScreen(), Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();
     Display::transitionComplete = false;
@@ -263,4 +264,9 @@ void Display::transitionToScreen(IScreen *screen, bool reInit, std::function<voi
     {
         Display::onTransitionComplete = nullptr;
     }
+}
+
+void Display::setTouchCallback(std::function<void(int16_t, int16_t)> callback)
+{
+    Display::touchCallback = callback;
 }

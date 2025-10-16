@@ -19,6 +19,54 @@ void API::setup()
     this->websocket.setup();
     this->websocket.setMessageCallback([this](String message)
                                        { this->processIncomingMessages(message); });
+
+    /*
+this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
+       {
+// Handle fragmented frames: accumulate until expected size is reached
+if (!this->pendingThumbnailWaiting)
+{
+return;
+}
+
+const uint8_t *chunk = (const uint8_t *)data.data_ptr;
+size_t chunkLen = (size_t)data.data_len;
+
+if (this->pendingThumbnailBuffer == nullptr)
+{
+this->pendingThumbnailBuffer = (uint8_t *)malloc(this->pendingThumbnailExpectedBytes);
+this->pendingThumbnailReceivedBytes = 0;
+if (!this->pendingThumbnailBuffer)
+{
+this->logger.error("Failed to allocate thumbnail buffer");
+this->pendingThumbnailWaiting = false;
+return;
+}
+}
+
+size_t remaining = this->pendingThumbnailExpectedBytes - this->pendingThumbnailReceivedBytes;
+size_t toCopy = chunkLen > remaining ? remaining : chunkLen;
+memcpy(this->pendingThumbnailBuffer + this->pendingThumbnailReceivedBytes, chunk, toCopy);
+this->pendingThumbnailReceivedBytes += toCopy;
+
+if (this->pendingThumbnailReceivedBytes >= this->pendingThumbnailExpectedBytes)
+{
+this->logger.infof("Thumbnail received: resourceId=%u, size=%ux%u (%u bytes)", this->pendingThumbnailResourceId, this->pendingThumbnailW, this->pendingThumbnailH, (unsigned int)this->pendingThumbnailExpectedBytes);
+if (this->resourceThumbnailCallback)
+{
+this->resourceThumbnailCallback(this->pendingThumbnailResourceId, this->pendingThumbnailW, this->pendingThumbnailH, this->pendingThumbnailBuffer, this->pendingThumbnailExpectedBytes);
+}
+
+free(this->pendingThumbnailBuffer);
+this->pendingThumbnailBuffer = nullptr;
+this->pendingThumbnailResourceId = 0;
+this->pendingThumbnailW = 0;
+this->pendingThumbnailH = 0;
+this->pendingThumbnailExpectedBytes = 0;
+this->pendingThumbnailReceivedBytes = 0;
+this->pendingThumbnailWaiting = false;
+} });
+*/
 }
 
 void API::loop()
@@ -69,11 +117,22 @@ void API::processIncomingMessages(String message)
     {
         this->onResourceList(data);
     }
+    /*else if (eventType == "RESOURCE_THUMBNAIL_DATA")
+    {
+        this->onResourceThumbnailDescriptor(data);
+    }*/
     else if (eventType == "CARD_AUTHENTICATION_DATA")
     {
         this->onCardAuthenticationDetailsResponse(data);
     }
-
+    else if (eventType == "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO")
+    {
+        this->onEnrollNewCardGetAvailableKeyNo(data);
+    }
+    else if (eventType == "ENROLL_NEW_CARD")
+    {
+        this->onEnrollNewCard(data);
+    }
     else
     {
         logger.error(("Unknown event type: " + eventType).c_str());
@@ -96,6 +155,8 @@ void API::onRegistrationData(JsonObject data)
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
 
             this->logger.infof("Reader registered with ID: %d and token: %s", readerId, apiKey.c_str());
+
+            this->sendAuthenticationRequest();
         }
     }
 }
@@ -230,12 +291,39 @@ void API::onResourceList(JsonObject data)
         return;
     }
     this->resourceListUpdateCallback(data["payload"]["resources"].as<JsonArray>());
+
+    /*
+    // Request thumbnails sequentially to avoid overlapping buffers
+    JsonArray resources = data["payload"]["resources"].as<JsonArray>();
+    for (JsonObject res : resources)
+    {
+        if (res["imageFilename"].is<String>() && res["imageFilename"].as<String>().length() > 0)
+        {
+            uint32_t rid = res["id"].as<uint32_t>();
+            this->requestResourceThumbnail(rid, 48, 48);
+            // wait until previous transfer completes
+            unsigned long start = millis();
+            while (this->pendingThumbnailWaiting && (millis() - start) < 3000)
+            {
+                // allow websocket loop to run
+                this->websocket.loop();
+                delay(5);
+            }
+        }
+    }*/
 }
 
 void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
 {
     this->resourceListUpdateCallback = callback;
 }
+
+/*
+void API::setResourceThumbnailCallback(std::function<void(uint32_t, uint16_t, uint16_t, const uint8_t *, size_t)> callback)
+{
+    this->resourceThumbnailCallback = callback;
+}
+    */
 
 void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
 {
@@ -246,6 +334,43 @@ void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
     this->sendMessage("REQUEST_CARD_AUTHENTICATION_DATA", payload);
 }
 
+/*
+void API::requestResourceThumbnail(uint32_t resourceId, uint16_t width, uint16_t height)
+{
+    this->logger.infof("Requesting resource thumbnail for %u (%ux%u)", resourceId, width, height);
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    payload["width"] = width;
+    payload["height"] = height;
+    payload["format"] = "RGB565LE";
+    this->sendMessage("REQUEST_RESOURCE_THUMBNAIL", payload);
+}
+
+void API::onResourceThumbnailDescriptor(JsonObject data)
+{
+    // Record expected size; upcoming binary frames will be accumulated until complete
+    JsonObject payload = data["payload"].as<JsonObject>();
+    uint32_t rid = payload["resourceId"].as<uint32_t>();
+    uint16_t w = payload["width"].as<uint16_t>();
+    uint16_t h = payload["height"].as<uint16_t>();
+    size_t contentLength = payload["contentLength"].as<size_t>();
+    this->pendingThumbnailResourceId = rid;
+    this->pendingThumbnailW = w;
+    this->pendingThumbnailH = h;
+    this->pendingThumbnailExpectedBytes = contentLength;
+    this->pendingThumbnailReceivedBytes = 0;
+    if (this->pendingThumbnailBuffer)
+    {
+        free(this->pendingThumbnailBuffer);
+        this->pendingThumbnailBuffer = nullptr;
+    }
+    this->pendingThumbnailWaiting = true;
+
+    // ACK descriptor so server continues its flow
+    this->sendAck("RESOURCE_THUMBNAIL_DATA");
+}
+*/
 void API::onCardAuthenticationDetailsResponse(JsonObject data)
 {
     this->logger.info("Received card authentication details response");
@@ -284,4 +409,134 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
 void API::setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String)> callback)
 {
     this->cardAuthenticationDetailsResponseCallback = callback;
+}
+
+void API::startResourceUsageSession(uint32_t resourceId)
+{
+    this->logger.info("Starting resource usage session");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("START_RESOURCE_USAGE_SESSION", payload);
+}
+
+void API::stopResourceUsageSession(uint32_t resourceId)
+{
+    this->logger.info("Stopping resource usage session");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("STOP_RESOURCE_USAGE_SESSION", payload);
+}
+
+void API::lockDoor(uint32_t resourceId)
+{
+    this->logger.info("Locking door");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("LOCK_DOOR", payload);
+}
+
+void API::unlockDoor(uint32_t resourceId)
+{
+    this->logger.info("Unlocking door");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("UNLOCK_DOOR", payload);
+}
+
+void API::unlatchDoor(uint32_t resourceId)
+{
+    this->logger.info("Unlatching door");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("UNLATCH_DOOR", payload);
+}
+
+void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> callback)
+{
+    this->enrollNewCardGetAvailableKeyNoCallback = callback;
+}
+
+void API::setEnrollNewCardCallback(std::function<bool(uint8_t, String)> callback)
+{
+    this->enrollNewCardCallback = callback;
+}
+
+void API::sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["keyNo"] = keyNo;
+    payload["uid"] = hexToString(uid, uidLength);
+    // Respond with the client-to-server request event so the server can generate the key
+    this->sendMessage("ENROLL_NEW_CARD_REQUEST_NFC_KEY", payload);
+}
+
+void API::sendEnrollNewCard(bool success)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["success"] = success;
+    this->sendMessage("ENROLL_NEW_CARD", payload);
+}
+
+void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
+{
+    this->logger.info("Received enroll new card available key no");
+    if (this->enrollNewCardGetAvailableKeyNoCallback == nullptr)
+    {
+        this->logger.error("Enroll new card available key no callback is not set");
+        return;
+    }
+
+    String username = data["payload"]["username"].as<String>();
+
+    uint8_t cardDetectedUid[7] = {0};
+    uint8_t cardDetectedUidLength = 0;
+    uint8_t keyNo = 0;
+    bool success = this->enrollNewCardGetAvailableKeyNoCallback(username, cardDetectedUid, &cardDetectedUidLength, &keyNo);
+
+    if (!success)
+    {
+        return;
+    }
+
+    this->sendEnrollNewCardAvailableKeyNo(cardDetectedUid, cardDetectedUidLength, keyNo);
+}
+
+void API::onEnrollNewCard(JsonObject data)
+{
+    this->logger.info("Received enroll new card");
+    if (this->enrollNewCardCallback == nullptr)
+    {
+        this->logger.error("Enroll new card callback is not set");
+        return;
+    }
+
+    JsonObject payload = data["payload"].as<JsonObject>();
+    if (payload["error"].is<String>() && payload["error"].as<String>().length() > 0)
+    {
+        // TODO: handle enrollment errors (surface to UI, retry flow, etc.)
+        this->logger.error(("Enroll new card error from server: " + payload["error"].as<String>()).c_str());
+        return;
+    }
+
+    // Only proceed when command payload contains the key material
+    if (!(payload["key"].is<String>() && payload["key"].as<String>().length() == 32 && payload["keyNo"].is<uint8_t>()))
+    {
+        // TODO: handle server-side completion notifications (payload.success) if needed
+        this->logger.info("Enroll new card payload does not contain key material; ignoring.");
+        return;
+    }
+
+    uint8_t keyNo = payload["keyNo"].as<uint8_t>();
+    String key = payload["key"].as<String>();
+
+    bool success = this->enrollNewCardCallback(keyNo, key);
+
+    this->sendEnrollNewCard(success);
 }

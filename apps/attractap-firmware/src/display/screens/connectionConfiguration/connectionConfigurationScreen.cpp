@@ -139,7 +139,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstützt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
+   lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstuetzt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
@@ -516,4 +516,9 @@ bool ConnectionConfigurationScreen::onPinLockConfirmCallback(String pin)
 void ConnectionConfigurationScreen::setOnCancelPinLockCallback(std::function<void()> onCancelPinLockCallback)
 {
    this->onCancelPinLockCallback = onCancelPinLockCallback;
+}
+
+String ConnectionConfigurationScreen::getName()
+{
+   return "ConnectionConfigurationScreen";
 }

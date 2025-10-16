@@ -2,7 +2,6 @@
 
 void IOExpander::setup()
 {
-    return;
     // Configure TCA9554: set desired pins as outputs, others as inputs
     // Read current configuration
     uint8_t cfg = 0xFF; // default all inputs
@@ -24,9 +23,22 @@ void IOExpander::setup()
     initialized = true;
 }
 
-void IOExpander::beep()
+void IOExpander::errorBeep()
 {
-    return;
+    this->singleBeep();
+    delay(100);
+    this->singleBeep();
+    delay(100);
+    this->singleBeep();
+}
+
+void IOExpander::successBeep()
+{
+    this->singleBeep();
+}
+
+void IOExpander::singleBeep()
+{
     if (!initialized)
     {
         return;

@@ -230,7 +230,7 @@
  *-----------*/
 
 /*Enable the log module*/
-#define LV_USE_LOG 0
+#define LV_USE_LOG 1
 #if LV_USE_LOG
 
     /*How important log should be added:
@@ -648,6 +648,7 @@
 
 /*PNG decoder library*/
 #define LV_USE_PNG 0
+#define LV_USE_LODEPNG 0
 
 /*BMP decoder library*/
 #define LV_USE_BMP 0

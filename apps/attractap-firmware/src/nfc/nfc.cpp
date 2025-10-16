@@ -26,14 +26,14 @@ void NFC::enableCardDetection()
 {
     this->logger.info("Enabling card detection");
     this->checkHardware();
-    pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
+    /*pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
     auto irqHandler = [this]
     {
         this->onCardDetectedInterruptHandler();
     };
     attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
     this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
-    this->timeOfCardDetectionEnabledMs = millis();
+    this->timeOfCardDetectionEnabledMs = millis();*/
     this->cardDetectionEnabled = true;
 }
 
@@ -45,10 +45,10 @@ void NFC::setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callb
 void NFC::disableCardDetection()
 {
     this->logger.info("Disabling card detection");
-    detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
-    this->pn532IrqPending = false;
+    /*detachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ));
+    this->pn532IrqPending = false;*/
     this->cardDetectionEnabled = false;
-    this->timeOfCardDetectionEnabledMs = 0;
+    // this->timeOfCardDetectionEnabledMs = 0;
 }
 
 void NFC::loop()
@@ -56,30 +56,36 @@ void NFC::loop()
     this->checkHardware();
     this->handleCardDetection();
 
-    uint32_t now = millis();
+    /*uint32_t now = millis();
     if (this->cardDetectionEnabled && now - this->timeOfCardDetectionEnabledMs > this->CARD_DETECTION_RESTART_TIMEOUT_MS)
     {
         this->logger.info("Card detection timeout, restarting");
         this->disableCardDetection();
         this->enableCardDetection();
-    }
+    }*/
 }
 
 void NFC::handleCardDetection()
 {
+    if (!this->cardDetectionEnabled)
+    {
+        return;
+    }
+    /*
     // If IRQ fired, handle the I2C read here (not in ISR)
     if (!this->pn532IrqPending)
     {
         return;
-    }
+    }*/
 
     uint8_t cardDetectedUid[7] = {0};
     uint8_t cardDetectedUidLength = 0;
-    bool foundCard = this->pn532.readDetectedPassiveTargetID(cardDetectedUid, &cardDetectedUidLength);
+    // bool foundCard = this->pn532.readDetectedPassiveTargetID(cardDetectedUid, &cardDetectedUidLength);
+    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 5000);
     if (!foundCard)
     {
         this->logger.error("Card detection handler, but no card found");
-        this->pn532IrqPending = false;
+        // this->pn532IrqPending = false;
         return;
     }
 
@@ -219,13 +225,6 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
 {
     this->logger.info("changeKey started");
 
-    // Step 0: Wait for card
-    if (!this->waitForCard())
-    {
-        this->logger.error("changeKey failed, no card detected");
-        return false;
-    }
-
     // Step 1: Authenticate with master key
     bool authenticateOldKeySuccess = this->pn532.ntag424_Authenticate(masterKey, 0, 0x71);
     if (!authenticateOldKeySuccess)
@@ -258,13 +257,6 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
 {
     this->logger.info("authenticate started");
 
-    // Step 0: Wait for card
-    if (!this->waitForCard())
-    {
-        this->logger.error("authenticate failed, no card detected");
-        return false;
-    }
-
     // Step 1: Authenticate with key
     bool authenticateSuccess = this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
     if (!authenticateSuccess)
@@ -277,11 +269,11 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
     return true;
 }
 
-void NFC::onCardDetectedInterruptHandler()
+/*void NFC::onCardDetectedInterruptHandler()
 {
     // ISR context: set flag only; avoid I2C and logging here
     this->pn532IrqPending = true;
-}
+}*/
 
 void NFC::checkHardware(bool logHardwareInfo)
 {
@@ -313,4 +305,35 @@ void NFC::checkHardware(bool logHardwareInfo)
     this->logger.info("Found chip PN53x");
     this->logger.info((String((versiondata >> 24) & 0xFF) + " HEX").c_str());
     this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
+}
+
+bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
+{
+    this->logger.info("getAvailableKeyNo started");
+
+    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 30000);
+    if (!foundCard)
+    {
+        this->logger.error("getAvailableKeyNo failed, no card detected");
+        return false;
+    }
+
+    this->logger.debug("getAvailableKeyNo, card detected");
+
+    // check key 1 to 5, the first one that we can authenticate using factory key is an available key
+    for (uint8_t i = 1; i <= 5; i++)
+    {
+        bool authenticateSuccess = this->authenticate(i, NFC::FACTORY_KEY);
+        if (authenticateSuccess)
+        {
+            this->logger.debugf("getAvailableKeyNo, key %d authenticated", i);
+            *keyNo = i;
+            return true;
+        }
+
+        this->logger.debugf("getAvailableKeyNo, key %d not authenticated", i);
+    }
+
+    this->logger.error("getAvailableKeyNo failed, no available key found");
+    return false;
 }

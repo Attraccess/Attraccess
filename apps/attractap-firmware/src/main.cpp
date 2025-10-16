@@ -17,6 +17,8 @@ void setup()
     mainLogger.info("Serial initialized");
 
     Wire.begin(15, 7);
+    // Prevent potential I2C stalls on touch controller reads
+    Wire.setTimeOut(50);
 
     mainLogger.info("Attractap starting...");
     application.setup();
@@ -25,4 +27,6 @@ void setup()
 void loop()
 {
     application.loop();
+    // Cooperatively yield to other tasks and drivers
+    delay(1);
 }

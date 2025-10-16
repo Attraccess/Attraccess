@@ -24,6 +24,8 @@ public:
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback);
     void disableCardDetection();
 
+    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
+
     static uint8_t FACTORY_KEY[16];
     // TODO: remove this, should come from API
     static uint8_t NEW_KEY[16];
@@ -36,11 +38,11 @@ private:
     // TODO: remove this
     void demo();
 
-    uint32_t timeOfCardDetectionEnabledMs = 0;
+    // uint32_t timeOfCardDetectionEnabledMs = 0;
     bool cardDetectionEnabled = false;
-    const uint32_t CARD_DETECTION_RESTART_TIMEOUT_MS = 5000;
-    void onCardDetectedInterruptHandler();
-    volatile bool pn532IrqPending = false;
+    // const uint32_t CARD_DETECTION_RESTART_TIMEOUT_MS = 5000;
+    // void onCardDetectedInterruptHandler();
+    // volatile bool pn532IrqPending = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;
     void handleCardDetection();
 

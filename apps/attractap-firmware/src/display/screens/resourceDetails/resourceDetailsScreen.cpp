@@ -53,12 +53,14 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->resourceName, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceName, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_font(this->resourceName, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->resourceName, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resourceDescription = lv_label_create(resouceDetails);
    lv_obj_set_height(this->resourceDescription, 28);
    lv_obj_set_width(this->resourceDescription, LV_SIZE_CONTENT);
    lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->thumbnail = lv_image_create(header);
    lv_obj_set_width(this->thumbnail, 48);
@@ -101,6 +103,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->sessionStartTimeLabel, "15.10. 16:45");
    lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->sessionStartTimeLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *currentUserContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(currentUserContainer);
@@ -128,6 +131,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
    lv_label_set_text(this->currentUser, "JappyJan");
    lv_obj_set_style_text_font(this->currentUser, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->currentUser, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(elapsedTimeContainer);
@@ -143,7 +147,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForElapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForElapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForElapsedTime, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForElapsedTime, "Verstrichene Zeit");
+   lv_label_set_text(labelForElapsedTime, "Dauer");
    lv_obj_set_style_text_color(labelForElapsedTime, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForElapsedTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -153,6 +157,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->elapsedTime, LV_ALIGN_CENTER);
    lv_label_set_text(this->elapsedTime, "00:23:46");
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->elapsedTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->startSessionButton = lv_button_create(this->screen);
    lv_obj_set_height(this->startSessionButton, 50);
@@ -161,6 +166,7 @@ void ResourceDetailsScreen::init()
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION});
 
    lv_obj_t *labelForSessionToggleButton = lv_label_create(this->startSessionButton);
    lv_obj_set_width(labelForSessionToggleButton, LV_SIZE_CONTENT);
@@ -177,6 +183,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_bg_color(this->stopSessionButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->stopSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION});
 
    lv_obj_t *labelForStopSessionButton = lv_label_create(this->stopSessionButton);
    lv_obj_set_width(labelForStopSessionButton, LV_SIZE_CONTENT);
@@ -203,6 +210,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(lockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(lockDoorButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(lockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(lockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOCK_DOOR});
 
    lv_obj_t *labelForLockDoorButton = lv_label_create(lockDoorButton);
    lv_obj_set_width(labelForLockDoorButton, LV_SIZE_CONTENT);
@@ -216,6 +224,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR});
 
    lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
    lv_obj_set_width(labelForUnlockDoorButton, LV_SIZE_CONTENT);
@@ -231,6 +240,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(unlatchDoorButton, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(unlatchDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR});
 
    lv_obj_t *labelForUnlatchDoorButton = lv_label_create(unlatchDoorButton);
    lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
@@ -258,6 +268,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON});
 
    lv_obj_t *labelForFlowButton = lv_label_create(flowButton);
    lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
@@ -295,6 +306,11 @@ void ResourceDetailsScreen::setInfo(
     time_t sessionStartTime,
     String currentUser)
 {
+   // Persist the session start time so periodic updates can compute elapsed time correctly
+   this->sessionStartTime = sessionStartTime;
+   // Always refresh the static labels as well
+   lv_label_set_text(this->resourceName, resourceName.c_str());
+   lv_label_set_text(this->resourceDescription, resourceDescription.c_str());
    lv_label_set_text(this->sessionStartTimeLabel, timeToTimeString(sessionStartTime).c_str());
    lv_label_set_text(this->currentUser, currentUser.c_str());
 
@@ -318,9 +334,16 @@ void ResourceDetailsScreen::setInfo(
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {
+   // If session details are hidden, skip updating elapsed time to avoid using an undefined start time
+   if (lv_obj_has_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN))
+   {
+      return;
+   }
    time_t currentTime = time(nullptr);
-   double elapsedTimeMs = difftime(currentTime, this->sessionStartTime);
-   lv_label_set_text(this->elapsedTime, millisToTimeString(elapsedTimeMs).c_str());
+   // difftime returns seconds; convert to milliseconds for formatter
+   double elapsedSeconds = difftime(currentTime, this->sessionStartTime);
+   double elapsedMillis = elapsedSeconds * 1000.0;
+   lv_label_set_text(this->elapsedTime, millisToTimeString(elapsedMillis).c_str());
 }
 
 void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t sessionTimeoutTime)
@@ -331,9 +354,15 @@ void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t sessionTimeoutTime)
 
 void ResourceDetailsScreen::updateSessionTimeoutIndicator()
 {
-   double remainingMillis = this->sessionTimeoutTime - millis();
+   // add 1 second to the remaining time to prevent overflow if the transition takes a bit
+   double remainingMillis = this->sessionTimeoutTime - millis() + 1000;
    long remainingSeconds = remainingMillis / 1000;
-   lv_bar_set_start_value(this->sessionTimeoutIndicator, remainingSeconds, LV_ANIM_ON);
+   // Clamp to bar range [0,30]
+   if (remainingSeconds < 0)
+      remainingSeconds = 0;
+   if (remainingSeconds > 30)
+      remainingSeconds = 30;
+   lv_bar_set_value(this->sessionTimeoutIndicator, remainingSeconds, LV_ANIM_ON);
 }
 
 void ResourceDetailsScreen::loop()
@@ -345,4 +374,26 @@ void ResourceDetailsScreen::loop()
 lv_obj_t *ResourceDetailsScreen::getScreen()
 {
    return this->screen;
+}
+
+void ResourceDetailsScreen::setButtonClickCallback(std::function<void(ButtonClickEventData)> callback)
+{
+   this->buttonClickCallback = callback;
+}
+
+void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
+{
+   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (!evt->self)
+      return;
+
+   if (!evt->self->buttonClickCallback)
+      return;
+
+   evt->self->buttonClickCallback(*evt);
+}
+
+String ResourceDetailsScreen::getName()
+{
+   return "ResourceDetailsScreen";
 }

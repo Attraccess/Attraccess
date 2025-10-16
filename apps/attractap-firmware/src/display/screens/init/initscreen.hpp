@@ -13,6 +13,8 @@ public:
     void init();
     lv_obj_t *getScreen() override;
     void loop() override;
+    String getName() override;
+
     void setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback);
 
 private:
