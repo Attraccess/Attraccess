@@ -38,11 +38,7 @@ private:
     // TODO: remove this
     void demo();
 
-    // uint32_t timeOfCardDetectionEnabledMs = 0;
     bool cardDetectionEnabled = false;
-    // const uint32_t CARD_DETECTION_RESTART_TIMEOUT_MS = 5000;
-    // void onCardDetectedInterruptHandler();
-    // volatile bool pn532IrqPending = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;
     void handleCardDetection();
 

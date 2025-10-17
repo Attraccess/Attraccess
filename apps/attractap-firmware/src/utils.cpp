@@ -61,24 +61,46 @@ bool stringToHexArray(String hexString, uint8_t *array, uint8_t arrayLength)
     return true;
 }
 
+String padWithZero(int value, int length)
+{
+    String s = String(value);
+    while (s.length() < length)
+    {
+        s = "0" + s;
+    }
+    return s;
+}
+
 String millisToTimeString(double millis)
 {
     long hours = millis / 3600000;
     long minutes = (static_cast<long>(millis) % 3600000) / 60000;
     long seconds = (static_cast<long>(millis) % 60000) / 1000;
-    return String(hours) + ":" + String(minutes) + ":" + String(seconds);
+
+    String minutesString = padWithZero(minutes, 2);
+    String secondsString = padWithZero(seconds, 2);
+
+    if (hours == 0)
+    {
+        return minutesString + ":" + secondsString;
+    }
+
+    String hoursString = padWithZero(hours, 2);
+    return hoursString + ":" + minutesString + ":" + secondsString;
 }
 
 String timeToTimeString(time_t time)
 {
     struct tm *tm = localtime(&time);
-    int year = tm->tm_year + 1900;
     int month = tm->tm_mon + 1;
     int day = tm->tm_mday;
-    int hour = tm->tm_hour;
-    int minute = tm->tm_min;
-    int second = tm->tm_sec;
-    return String(year) + "." + String(month) + "." + String(day) + " " + String(hour) + ":" + String(minute);
+    int hours = tm->tm_hour;
+    int minutes = tm->tm_min;
+
+    String hoursString = padWithZero(hours, 2);
+    String minutesString = padWithZero(minutes, 2);
+
+    return String(day) + "." + String(month) + ". " + hoursString + ":" + minutesString;
 }
 
 static bool parseTwoDigits(const String &s, int startIndex, int &out)

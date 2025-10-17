@@ -18,12 +18,12 @@ void Application::setup()
     this->nfc.setup();
     this->api.setup();
 
+    this->api.onDeviceName([this](String deviceName)
+                           { Display::setDeviceName(deviceName); });
+
     this->api.setResourceListUpdateCallback([this](JsonArray resourceList)
                                             { this->handleResourceListUpdate(resourceList); });
 
-    /*this->api.setResourceThumbnailCallback([this](uint32_t resourceId, uint16_t w, uint16_t h, const uint8_t *data, size_t len)
-                                           { Display::resourceListScreen.setResourceImage(resourceId, w, h, data, len); });
-*/
     this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error)
                                                            { this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
 
@@ -195,10 +195,17 @@ void Application::processState()
         return;
     }
 
+    uint32_t now = millis();
     if (!this->unlocked)
     {
         if (this->state == APPLICATION_STATE_LOCKED)
         {
+
+            if (now - this->timeOfResourceSelectionMs > this->RESOURCE_SELECTION_TIMEOUT_MS)
+            {
+                this->logger.debug("Resource selection timeout reached, showing resource list");
+                this->resourceIsSelected = false;
+            }
             return;
         }
 
@@ -222,7 +229,6 @@ void Application::processState()
         return;
     }
 
-    uint32_t now = millis();
     if (this->state == APPLICATION_STATE_UNLOCKED)
     {
         if (now - this->timeOfUnlockedMs > this->UNLOCKED_TIMEOUT_MS)
@@ -262,14 +268,24 @@ void Application::handleResourceListUpdate(JsonArray resourceList)
 {
     this->logger.infof("Resource list updated: %d resources", resourceList.size());
     this->resourceCount = resourceList.size();
-    this->resourceList = resourceList;
+
+    // Create a persistent deep copy of the resource list so we can safely access it later
+    this->resourceListDoc.clear();
+    JsonArray dest = this->resourceListDoc.to<JsonArray>();
+    for (JsonVariant v : resourceList)
+    {
+        dest.add(v); // deep copy each element
+    }
+    this->resourceList = dest;
+
+    // Update UI with the original incoming list (safe during this call)
     Display::resourceListScreen.setResourceList(resourceList);
 
     // If a resource is already selected, try to find it in the new list and refresh the details screen.
     if (this->resourceIsSelected)
     {
         this->logger.info("Resource is selected, trying to find it in the new list");
-        for (JsonVariant v : resourceList)
+        for (JsonVariant v : this->resourceList)
         {
             JsonObject obj = v.as<JsonObject>();
             if (obj["id"].is<uint32_t>() && obj["id"].as<uint32_t>() == this->selectedResourceId)
@@ -331,6 +347,7 @@ void Application::selectResource(JsonObject resource)
     this->logger.infof("Resource selected: %s", resource["name"].as<String>().c_str());
     this->resourceIsSelected = true;
     this->selectedResourceId = resource["id"].as<uint32_t>();
+    this->restartResourceSelectionTimeout();
 
     String type = resource["type"].as<String>();
     ResourceDetailsScreen::resource_type_t resourceType = ResourceDetailsScreen::RESOURCE_TYPE_MACHINE;
@@ -403,4 +420,10 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
         // TODO: implement flow button
         break;
     }
+}
+
+void Application::restartResourceSelectionTimeout()
+{
+    uint32_t now = millis();
+    this->timeOfResourceSelectionMs = now;
 }

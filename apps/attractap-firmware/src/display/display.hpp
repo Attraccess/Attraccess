@@ -43,6 +43,7 @@ public:
     static EnrollmentScreen enrollmentScreen;
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
+    static void setDeviceName(String deviceName);
 
 private:
     static std::function<void(int16_t, int16_t)> touchCallback;
@@ -70,6 +71,10 @@ private:
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);
     static uint32_t tick_cb();
+
+    static void initDeviceOverlay();
+    static lv_obj_t *deviceNameLabel;
+    static String deviceNameInitValue;
 
 #if LV_USE_LOG != 0
     /* Serial debugging */

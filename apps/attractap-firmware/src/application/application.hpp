@@ -40,9 +40,15 @@ private:
     const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
     void restartSessionTimeout();
 
+    uint32_t timeOfResourceSelectionMs;
+    const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
+    void restartResourceSelectionTimeout();
+
     uint8_t resourceCount;
     bool resourceIsSelected;
     uint32_t selectedResourceId;
+    // Own a persistent copy of the latest resource list to avoid dangling references
+    JsonDocument resourceListDoc;
     JsonArray resourceList;
 
     void selectResource(JsonObject resource);

@@ -19,54 +19,6 @@ void API::setup()
     this->websocket.setup();
     this->websocket.setMessageCallback([this](String message)
                                        { this->processIncomingMessages(message); });
-
-    /*
-this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
-       {
-// Handle fragmented frames: accumulate until expected size is reached
-if (!this->pendingThumbnailWaiting)
-{
-return;
-}
-
-const uint8_t *chunk = (const uint8_t *)data.data_ptr;
-size_t chunkLen = (size_t)data.data_len;
-
-if (this->pendingThumbnailBuffer == nullptr)
-{
-this->pendingThumbnailBuffer = (uint8_t *)malloc(this->pendingThumbnailExpectedBytes);
-this->pendingThumbnailReceivedBytes = 0;
-if (!this->pendingThumbnailBuffer)
-{
-this->logger.error("Failed to allocate thumbnail buffer");
-this->pendingThumbnailWaiting = false;
-return;
-}
-}
-
-size_t remaining = this->pendingThumbnailExpectedBytes - this->pendingThumbnailReceivedBytes;
-size_t toCopy = chunkLen > remaining ? remaining : chunkLen;
-memcpy(this->pendingThumbnailBuffer + this->pendingThumbnailReceivedBytes, chunk, toCopy);
-this->pendingThumbnailReceivedBytes += toCopy;
-
-if (this->pendingThumbnailReceivedBytes >= this->pendingThumbnailExpectedBytes)
-{
-this->logger.infof("Thumbnail received: resourceId=%u, size=%ux%u (%u bytes)", this->pendingThumbnailResourceId, this->pendingThumbnailW, this->pendingThumbnailH, (unsigned int)this->pendingThumbnailExpectedBytes);
-if (this->resourceThumbnailCallback)
-{
-this->resourceThumbnailCallback(this->pendingThumbnailResourceId, this->pendingThumbnailW, this->pendingThumbnailH, this->pendingThumbnailBuffer, this->pendingThumbnailExpectedBytes);
-}
-
-free(this->pendingThumbnailBuffer);
-this->pendingThumbnailBuffer = nullptr;
-this->pendingThumbnailResourceId = 0;
-this->pendingThumbnailW = 0;
-this->pendingThumbnailH = 0;
-this->pendingThumbnailExpectedBytes = 0;
-this->pendingThumbnailReceivedBytes = 0;
-this->pendingThumbnailWaiting = false;
-} });
-*/
 }
 
 void API::loop()
@@ -117,10 +69,6 @@ void API::processIncomingMessages(String message)
     {
         this->onResourceList(data);
     }
-    /*else if (eventType == "RESOURCE_THUMBNAIL_DATA")
-    {
-        this->onResourceThumbnailDescriptor(data);
-    }*/
     else if (eventType == "CARD_AUTHENTICATION_DATA")
     {
         this->onCardAuthenticationDetailsResponse(data);
@@ -277,6 +225,11 @@ void API::onReaderAuthenticated(JsonObject data)
 
     State::setApiState(true, deviceName);
 
+    if (this->deviceNameCallback != nullptr)
+    {
+        this->deviceNameCallback(deviceName);
+    }
+
     logger.info("Reader Authentication successful.");
 
     this->sendFirmwareInfo();
@@ -291,39 +244,12 @@ void API::onResourceList(JsonObject data)
         return;
     }
     this->resourceListUpdateCallback(data["payload"]["resources"].as<JsonArray>());
-
-    /*
-    // Request thumbnails sequentially to avoid overlapping buffers
-    JsonArray resources = data["payload"]["resources"].as<JsonArray>();
-    for (JsonObject res : resources)
-    {
-        if (res["imageFilename"].is<String>() && res["imageFilename"].as<String>().length() > 0)
-        {
-            uint32_t rid = res["id"].as<uint32_t>();
-            this->requestResourceThumbnail(rid, 48, 48);
-            // wait until previous transfer completes
-            unsigned long start = millis();
-            while (this->pendingThumbnailWaiting && (millis() - start) < 3000)
-            {
-                // allow websocket loop to run
-                this->websocket.loop();
-                delay(5);
-            }
-        }
-    }*/
 }
 
 void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
 {
     this->resourceListUpdateCallback = callback;
 }
-
-/*
-void API::setResourceThumbnailCallback(std::function<void(uint32_t, uint16_t, uint16_t, const uint8_t *, size_t)> callback)
-{
-    this->resourceThumbnailCallback = callback;
-}
-    */
 
 void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
 {
@@ -334,43 +260,6 @@ void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
     this->sendMessage("REQUEST_CARD_AUTHENTICATION_DATA", payload);
 }
 
-/*
-void API::requestResourceThumbnail(uint32_t resourceId, uint16_t width, uint16_t height)
-{
-    this->logger.infof("Requesting resource thumbnail for %u (%ux%u)", resourceId, width, height);
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["resourceId"] = resourceId;
-    payload["width"] = width;
-    payload["height"] = height;
-    payload["format"] = "RGB565LE";
-    this->sendMessage("REQUEST_RESOURCE_THUMBNAIL", payload);
-}
-
-void API::onResourceThumbnailDescriptor(JsonObject data)
-{
-    // Record expected size; upcoming binary frames will be accumulated until complete
-    JsonObject payload = data["payload"].as<JsonObject>();
-    uint32_t rid = payload["resourceId"].as<uint32_t>();
-    uint16_t w = payload["width"].as<uint16_t>();
-    uint16_t h = payload["height"].as<uint16_t>();
-    size_t contentLength = payload["contentLength"].as<size_t>();
-    this->pendingThumbnailResourceId = rid;
-    this->pendingThumbnailW = w;
-    this->pendingThumbnailH = h;
-    this->pendingThumbnailExpectedBytes = contentLength;
-    this->pendingThumbnailReceivedBytes = 0;
-    if (this->pendingThumbnailBuffer)
-    {
-        free(this->pendingThumbnailBuffer);
-        this->pendingThumbnailBuffer = nullptr;
-    }
-    this->pendingThumbnailWaiting = true;
-
-    // ACK descriptor so server continues its flow
-    this->sendAck("RESOURCE_THUMBNAIL_DATA");
-}
-*/
 void API::onCardAuthenticationDetailsResponse(JsonObject data)
 {
     this->logger.info("Received card authentication details response");
@@ -539,4 +428,9 @@ void API::onEnrollNewCard(JsonObject data)
     bool success = this->enrollNewCardCallback(keyNo, key);
 
     this->sendEnrollNewCard(success);
+}
+
+void API::onDeviceName(std::function<void(String)> callback)
+{
+    this->deviceNameCallback = callback;
 }

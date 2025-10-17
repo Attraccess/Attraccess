@@ -52,7 +52,6 @@ private:
     lv_obj_t *resourceDescription;
     lv_obj_t *sessionStartTimeLabel;
     lv_obj_t *currentUser;
-    lv_obj_t *thumbnail;
 
     lv_obj_t *startSessionButton;
     lv_obj_t *stopSessionButton;

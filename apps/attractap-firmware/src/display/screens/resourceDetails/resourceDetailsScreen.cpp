@@ -62,13 +62,6 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->thumbnail = lv_image_create(header);
-   lv_obj_set_width(this->thumbnail, 48);
-   lv_obj_set_height(this->thumbnail, 48);
-   lv_obj_set_align(this->thumbnail, LV_ALIGN_CENTER);
-   lv_obj_add_flag(this->thumbnail, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->thumbnail, LV_OBJ_FLAG_SCROLLABLE);
-
    this->sessionDetailsContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
    lv_obj_set_width(this->sessionDetailsContainer, lv_pct(100));
@@ -93,7 +86,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForSessionStartTime, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForSessionStartTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForSessionStartTime, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForSessionStartTime, "Sitzung gestartet");
+   lv_label_set_text(labelForSessionStartTime, "Startzeit");
    lv_obj_set_style_text_color(labelForSessionStartTime, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForSessionStartTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -101,7 +94,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->sessionStartTimeLabel, "15.10. 16:45");
+   lv_label_set_text(this->sessionStartTimeLabel, "??.??. ??:??");
    lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->sessionStartTimeLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
