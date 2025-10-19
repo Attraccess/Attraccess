@@ -52,6 +52,11 @@ public:
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
 
+    // UI helpers for async actions
+    void showActionProgress(const char *text);
+    void hideActionProgress();
+    void showSuccessToast(const char *text, uint16_t ms = 1200);
+
 private:
     Logger logger;
     lv_obj_t *screen;
@@ -85,7 +90,14 @@ private:
     std::function<void(ButtonClickEventData)> buttonClickCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
+    static void onToastDelete(lv_event_t *e);
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;
+
+    // overlay/toast state
+    lv_obj_t *actionOverlay = nullptr;
+    lv_obj_t *actionOverlayLabel = nullptr;
+    lv_obj_t *successToast = nullptr;
+    lv_timer_t *successToastTimer = nullptr;
 };

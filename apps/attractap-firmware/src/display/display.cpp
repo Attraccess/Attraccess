@@ -27,6 +27,7 @@ ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
+lv_obj_t *Display::activePopup = nullptr;
 
 Arduino_DataBus *Display::bus = NULL;
 
@@ -291,6 +292,85 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     else
     {
         Display::onTransitionComplete = nullptr;
+    }
+}
+
+void Display::showErrorPopup(const String &title, const String &message)
+{
+    // Close existing popup if any
+    Display::hidePopup();
+
+    lv_obj_t *top = lv_layer_top();
+    lv_obj_t *overlay = lv_obj_create(top);
+    lv_obj_remove_style_all(overlay);
+    lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
+    lv_obj_set_align(overlay, LV_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(overlay, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(overlay, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Dialog container
+    lv_obj_t *dialog = lv_obj_create(overlay);
+    lv_obj_remove_style_all(dialog);
+    lv_obj_set_width(dialog, lv_pct(80));
+    lv_obj_set_height(dialog, LV_SIZE_CONTENT);
+    lv_obj_set_align(dialog, LV_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(dialog, lv_color_hex(0x2A2A2A), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(dialog, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(dialog, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_left(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(dialog, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+
+    // Title
+    lv_obj_t *titleLbl = lv_label_create(dialog);
+    lv_label_set_text(titleLbl, title.c_str());
+    lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Message
+    lv_obj_t *msgLbl = lv_label_create(dialog);
+    lv_label_set_text(msgLbl, message.c_str());
+    lv_obj_set_style_text_color(msgLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_width(msgLbl, lv_pct(100));
+
+    // Footer with OK button
+    lv_obj_t *footer = lv_obj_create(dialog);
+    lv_obj_remove_style_all(footer);
+    lv_obj_set_width(footer, lv_pct(100));
+    lv_obj_set_height(footer, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+
+    lv_obj_t *okBtn = lv_button_create(footer);
+    lv_obj_set_height(okBtn, LV_SIZE_CONTENT);
+    lv_obj_set_width(okBtn, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(okBtn, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(okBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_t *okLbl = lv_label_create(okBtn);
+    lv_label_set_text(okLbl, "OK");
+
+    lv_obj_add_event_cb(okBtn, [](lv_event_t *e)
+                        {
+        if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+        {
+            Display::hidePopup();
+        } }, LV_EVENT_CLICKED, NULL);
+
+    Display::activePopup = overlay;
+}
+
+void Display::hidePopup()
+{
+    if (Display::activePopup)
+    {
+        lv_obj_del(Display::activePopup);
+        Display::activePopup = nullptr;
     }
 }
 

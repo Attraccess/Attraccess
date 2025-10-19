@@ -46,6 +46,10 @@ public:
     static void setDeviceName(String deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
+    // Global error popup helpers
+    static void showErrorPopup(const String &title, const String &message);
+    static void hidePopup();
+
 private:
     static std::function<void(int16_t, int16_t)> touchCallback;
     static const int TRANSITION_DURATION = 500;
@@ -76,4 +80,6 @@ private:
     static void initDeviceOverlay();
     static lv_obj_t *deviceNameLabel;
     static String deviceNameInitValue;
+
+    static lv_obj_t *activePopup;
 };

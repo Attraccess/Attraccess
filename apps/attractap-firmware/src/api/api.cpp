@@ -51,6 +51,26 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    // Early error handling: if payload.error is present and non-empty, raise error callback and stop
+    if (inboundDoc["data"]["payload"].is<JsonObject>())
+    {
+        JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
+        if (payload["error"].is<String>())
+        {
+            String err = payload["error"].as<String>();
+            if (err.length() > 0)
+            {
+                if (this->errorCallback)
+                {
+                    this->errorCallback("Fehler", err.c_str());
+                }
+                // Do not process further
+                this->sendAck(eventType);
+                return;
+            }
+        }
+    }
+
     this->sendAck(eventType);
 
     if (strcmp(eventType, "READER_REGISTER") == 0)
@@ -85,10 +105,43 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
     }
+    else if (
+        strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "UNLOCK_DOOR") == 0 ||
+        strcmp(eventType, "UNLATCH_DOOR") == 0 ||
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0)
+    {
+        // Generic action result handling
+        bool success = false;
+        if (inboundDoc["data"]["payload"].is<JsonObject>())
+        {
+            JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
+            if (payload["success"].is<bool>())
+            {
+                success = payload["success"].as<bool>();
+            }
+        }
+        if (this->actionResultCallback)
+        {
+            this->actionResultCallback(eventType, success);
+        }
+    }
     else
     {
         logger.error((String("Unknown event type: ") + eventType).c_str());
     }
+}
+
+void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
+{
+    this->errorCallback = callback;
+}
+
+void API::setActionResultCallback(std::function<void(const char *type, bool success)> callback)
+{
+    this->actionResultCallback = callback;
 }
 
 void API::onRegistrationData(JsonObject data)
@@ -261,6 +314,25 @@ void API::onReaderAuthenticated(JsonObject data)
 
 void API::onResourceList(JsonObject data)
 {
+    uint32_t messageCounter = data["payload"]["messageId"].is<uint32_t>() ? data["payload"]["messageId"].as<uint32_t>() : 0;
+    if (messageCounter <= this->resourceListMessageCounter && this->resourceListMessageCounter != 0)
+    {
+        this->logger.info("Received resource list with older message ID; ignoring");
+        return;
+    }
+    this->resourceListMessageCounter = messageCounter;
+
+    if (data["payload"]["readerName"].is<String>())
+    {
+        this->logger.info("Received updated reader name");
+        String readerName = data["payload"]["readerName"].as<String>();
+
+        if (this->deviceNameCallback != nullptr)
+        {
+            this->deviceNameCallback(readerName);
+        }
+    }
+
     this->logger.info("Received resource list");
     if (this->resourceListUpdateCallback == nullptr)
     {

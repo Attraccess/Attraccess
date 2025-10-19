@@ -5,6 +5,7 @@ interface AttractapMessageBaseData<TPayload = unknown> {
     id: number;
     token: string;
   };
+  messageId?: number;
   payload: TPayload;
 }
 
@@ -61,6 +62,7 @@ export class AttractapEvent<TPayload = any | undefined> {
 export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPayload>;
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
+  messageCount: number;
   id: string;
   readerId: Attractap['id'] | null;
   sendMessage: (message: AttractapMessage) => Promise<void>;

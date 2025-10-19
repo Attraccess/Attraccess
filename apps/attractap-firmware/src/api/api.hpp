@@ -83,6 +83,11 @@ public:
     void disableConnectionAttempts();
     void enableConnectionAttempts();
 
+    // Error callback for server responses carrying an error field
+    void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
+    // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
+    void setActionResultCallback(std::function<void(const char *type, bool success)> callback);
+
 private:
     Logger logger;
     Websocket websocket;
@@ -106,6 +111,8 @@ private:
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
 
+    uint32_t resourceListMessageCounter = 0;
+
     // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
     ResourceList resourceListScratch;
     // Persistent inbound JSON document to avoid large stack usage in websocket task
@@ -125,4 +132,7 @@ private:
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
+
+    std::function<void(const char *title, const char *message)> errorCallback;
+    std::function<void(const char *type, bool success)> actionResultCallback;
 };

@@ -32,7 +32,7 @@ void Application::setup()
                                                     API::ResourceList list;
                                                 };
 
-                                                ResourceListAsyncPayload *payload = (ResourceListAsyncPayload *)malloc(sizeof(ResourceListAsyncPayload));
+                                                ResourceListAsyncPayload *payload = new ResourceListAsyncPayload();
                                                 if (!payload)
                                                 {
                                                     this->logger.error("Failed to allocate async payload for resource list");
@@ -49,7 +49,7 @@ void Application::setup()
                                                         {
                                                             pl->self->handleResourceListUpdate(pl->list);
                                                         }
-                                                        free(pl);
+                                                        delete pl;
                                                     },
                                                     payload); });
 
@@ -62,7 +62,7 @@ void Application::setup()
                                                                    uint8_t keyBytesCopy[16];
                                                                };
 
-                                                               CardDetailsAsyncPayload *payload = (CardDetailsAsyncPayload *)malloc(sizeof(CardDetailsAsyncPayload));
+                                                               CardDetailsAsyncPayload *payload = new CardDetailsAsyncPayload();
                                                                if (!payload)
                                                                {
                                                                    this->logger.error("Failed to allocate async payload for card auth details");
@@ -98,9 +98,42 @@ void Application::setup()
                                                                                    .isIntroducer = pl->resp.isIntroducer});
                                                                            pl->self->handleCardAuthenticationDetails(pl->resp);
                                                                        }
-                                                                       free(pl);
+                                                                       delete pl;
                                                                    },
                                                                    payload); });
+
+    // Wire global API error -> central popup and stop any ongoing action overlay
+    this->api.setErrorCallback([this](const char *title, const char *message)
+                               {
+                                   // Ensure UI operations on LVGL thread
+                                   struct ErrPayload { String t; String m; };
+                                   ErrPayload *p = new ErrPayload();
+                                   if (!p) return;
+                                   p->t = String(title); p->m = String(message);
+                                   lv_async_call([](void *u){
+                                       auto *pl = (ErrPayload *)u;
+                                       Display::resourceDetailsScreen.hideActionProgress();
+                                       Display::showErrorPopup(pl->t, pl->m);
+                                       delete pl;
+                                   }, p); });
+
+    // Generic action result handling: stop overlay and show success toast
+    this->api.setActionResultCallback([this](const char *type, bool success)
+                                      {
+                                          (void)type;
+                                          struct ActionResultPayload { bool ok; };
+                                          ActionResultPayload *p = new ActionResultPayload();
+                                          if (!p) return;
+                                          p->ok = success;
+                                          lv_async_call([](void *u){
+                                              ActionResultPayload *pl = (ActionResultPayload*)u;
+                                              Display::resourceDetailsScreen.hideActionProgress();
+                                              if (pl && pl->ok)
+                                              {
+                                                  Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
+                                              }
+                                              if (pl) delete pl;
+                                          }, p); });
 
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
@@ -111,7 +144,7 @@ void Application::setup()
                                                             {
                                                                 String username;
                                                             };
-                                                            EnrollmentUiAsyncPayload *payload = (EnrollmentUiAsyncPayload *)malloc(sizeof(EnrollmentUiAsyncPayload));
+                                                            EnrollmentUiAsyncPayload *payload = new EnrollmentUiAsyncPayload();
                                                             if (payload)
                                                             {
                                                                 payload->username = username;
@@ -125,7 +158,7 @@ void Application::setup()
                                                                             Display::enrollmentScreen.setEnrollmentTimeoutTime(millis() + 30000);
                                                                             Display::transitionToScreen(&Display::enrollmentScreen);
                                                                         }
-                                                                        free(pl);
+                                                                        delete pl;
                                                                     },
                                                                     payload);
                                                             }
@@ -480,21 +513,27 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
     switch (evt.buttonClickType)
     {
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+        Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
         this->api.startResourceUsageSession(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+        Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
         this->api.stopResourceUsageSession(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+        Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
         this->api.lockDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+        Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
         this->api.unlockDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+        Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
         this->api.unlatchDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+        Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
         this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:

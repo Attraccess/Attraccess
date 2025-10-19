@@ -19,13 +19,6 @@ import { Mutex } from 'async-mutex';
 import { LicenseModuleType, LicenseService } from '../../license/license.service';
 import { AttractapFirmware } from '../dtos/firmware.dto';
 import { verifyToken } from './websocket.utils';
-import {
-  Resource,
-  ResourceBillingConfiguration,
-  ResourceFlowNodeType,
-  ResourceIntroducer,
-  User,
-} from '@attraccess/database-entities';
 import { ResourceImageService } from '../../resources/resourceImage.service';
 import sharp from 'sharp';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
@@ -33,6 +26,8 @@ import { ResourceIntroductionsService } from '../../resources/introductions/reso
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
+import { ResourceInUseError } from '../../resources/usage/errors/resource-in-use.error';
+import { ResourceFlowNodeType } from '@attraccess/database-entities';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -154,8 +149,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     const id = nanoid(5);
+    let messageCount = 0;
 
     const sendMessage = async (message: AttractapMessage) => {
+      messageCount++;
+      message.data.messageId = messageCount;
+
       const RETRY_COUNT = 3;
 
       let lastError: Error | undefined;
@@ -202,6 +201,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     Object.assign(client, {
       id,
+      messageCount,
       readerId: null,
       sendMessage,
       sendBinaryData,
@@ -616,6 +616,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     );
 
     const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+      readerName: reader.name,
       resources: resourcesWithFlowButtons.map((resource) => ({
         id: resource.id,
         name: resource.name,
@@ -886,6 +887,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await this.resourceUsageService.startSession(resourceId, user, {});
       await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
+      if (error instanceof ResourceInUseError) {
+        setTimeout(async () => {
+          await this.sendResourceListToSocket(socket, { resourceId });
+        }, 1000);
+        return;
+      }
       this.logger.error(`Failed to start resource usage session: ${error.message}`);
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message }),

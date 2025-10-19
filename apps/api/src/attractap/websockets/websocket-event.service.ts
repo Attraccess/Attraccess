@@ -21,7 +21,6 @@ export class WebSocketEventService {
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event', event);
-    // TODO: inform reader about name change etc
     this.attractapGateway.sendResourceList(event.reader.id);
   }
 
