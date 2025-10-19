@@ -19,12 +19,20 @@ import { Mutex } from 'async-mutex';
 import { LicenseModuleType, LicenseService } from '../../license/license.service';
 import { AttractapFirmware } from '../dtos/firmware.dto';
 import { verifyToken } from './websocket.utils';
-import { Resource, ResourceBillingConfiguration, ResourceIntroducer, User } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceBillingConfiguration,
+  ResourceFlowNodeType,
+  ResourceIntroducer,
+  User,
+} from '@attraccess/database-entities';
 import { ResourceImageService } from '../../resources/resourceImage.service';
 import sharp from 'sharp';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
+import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
+import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -60,6 +68,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceIntroducersService)
   private resourceIntroducersService: ResourceIntroducersService;
+
+  @Inject(ResourceFlowsService)
+  private resourceFlowsService: ResourceFlowsService;
+
+  @Inject(ResourceFlowsExecutorService)
+  private resourceFlowsExecutorService: ResourceFlowsExecutorService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -357,6 +371,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.UNLATCH_DOOR:
         await this.handleUnlatchDoor(socket, eventData);
         break;
+      case AttractapEventType.TRIGGER_FLOW_BUTTON:
+        await this.handleTriggerFlowButton(socket, eventData);
+        break;
       case AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY:
         await this.onEnrollNewCardRequestNFCKey(socket, eventData);
         break;
@@ -583,35 +600,39 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       })),
     );
 
+    const getFlowButtons = async (resourceId: number) => {
+      const nodes = await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
+      return nodes.map((node) => ({
+        id: node.id,
+        label: node.data.label || node.id,
+      }));
+    };
+
+    const resourcesWithFlowButtons = await Promise.all(
+      resourcesWithUsageSession.map(async (resource) => ({
+        ...resource,
+        flowButtons: await getFlowButtons(resource.id),
+      })),
+    );
+
     const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
-      resources: resourcesWithUsageSession.map((resource) => ({
+      resources: resourcesWithFlowButtons.map((resource) => ({
         id: resource.id,
         name: resource.name,
         type: resource.type,
         separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
         description: resource.description,
-        imageFilename: resource.imageFilename,
         allowTakeOver: resource.allowTakeOver,
-        introducers: resource.introducers.map((introducer) => ({
-          username: introducer.user.username,
-        })),
-        billingConfigurations: resource.billingConfigurations.map(
-          (billingConfiguration) =>
-            ({
-              id: billingConfiguration.id,
-              creditsPerUsage: billingConfiguration.creditsPerUsage,
-              creditsPerMinute: billingConfiguration.creditsPerMinute,
-            }) as Partial<ResourceBillingConfiguration>,
-        ),
+        introducers: resource.introducers.map((introducer) => introducer.user.username),
         activeUsageSession: resource.activeUsageSession
           ? {
               user: {
-                id: resource.activeUsageSession.user.id,
                 username: resource.activeUsageSession.user.username,
               },
               startTime: resource.activeUsageSession.startTime.toISOString(),
             }
           : null,
+        flowButtons: resource.flowButtons,
       })),
     });
     this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
@@ -861,7 +882,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await this.resourceUsageService.startSession(resourceId, user, {});
+    try {
+      await this.resourceUsageService.startSession(resourceId, user, {});
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to start resource usage session: ${error.message}`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message }),
+      );
+    }
   }
 
   private async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
@@ -879,7 +908,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await this.resourceUsageService.endSession(resourceId, user, {});
+    try {
+      await this.resourceUsageService.endSession(resourceId, user, {});
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to stop resource usage session: ${error.message}`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message }),
+      );
+    }
   }
 
   private async handleLockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
@@ -897,7 +934,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await this.resourceUsageService.lockDoor(resourceId, user);
+    try {
+      await this.resourceUsageService.lockDoor(resourceId, user);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to lock door: ${error.message}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { error: error.message }));
+    }
   }
 
   private async handleUnlockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
@@ -915,7 +958,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await this.resourceUsageService.unlockDoor(resourceId, user);
+    try {
+      await this.resourceUsageService.unlockDoor(resourceId, user);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to unlock door: ${error.message}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { error: error.message }));
+    }
   }
 
   private async handleUnlatchDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
@@ -933,6 +982,28 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await this.resourceUsageService.unlatchDoor(resourceId, user);
+    try {
+      await this.resourceUsageService.unlatchDoor(resourceId, user);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to unlatch door: ${error.message}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { error: error.message }));
+    }
+  }
+
+  private async handleTriggerFlowButton(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { resourceId, buttonId } = data.payload as { resourceId: number; buttonId: string };
+
+    if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.TRIGGER_FLOW_BUTTON))) {
+      return;
+    }
+
+    try {
+      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.lastAuthenticatedUserId);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true }));
+    } catch (error) {
+      this.logger.error(`Failed to trigger flow button: ${error.message}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { error: error.message }));
+    }
   }
 }

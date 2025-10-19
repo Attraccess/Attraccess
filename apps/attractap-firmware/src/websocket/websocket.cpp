@@ -223,12 +223,9 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_DATA:
         if (data->op_code == 0x01)
         { // Text frame
-            String message = String((char *)data->data_ptr, data->data_len);
-            logger.debug(("Pushing incoming message to queue: " + message).c_str());
-
-            if (this->messageCallback)
+            if (this->messageCallbackRaw)
             {
-                this->messageCallback(message);
+                this->messageCallbackRaw((const char *)data->data_ptr, (size_t)data->data_len);
             }
         }
         else if (data->op_code == 0x02)
@@ -264,6 +261,20 @@ void Websocket::sendMessage(const String &message)
     }
 }
 
+void Websocket::sendMessage(const char *message, size_t length)
+{
+    if (!ws_client)
+    {
+        logger.error("sendMessage(raw): ws_client not initialized");
+        return;
+    }
+    int ret = esp_websocket_client_send_text(ws_client, message, static_cast<int>(length), pdMS_TO_TICKS(5000));
+    if (ret == -1)
+    {
+        logger.error("sendMessage(raw): failed");
+    }
+}
+
 void Websocket::setState(ConnectionState state)
 {
     _state = state;
@@ -271,9 +282,9 @@ void Websocket::setState(ConnectionState state)
     State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
 }
 
-void Websocket::setMessageCallback(std::function<void(String)> callback)
+void Websocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> callback)
 {
-    this->messageCallback = callback;
+    this->messageCallbackRaw = callback;
 }
 
 void Websocket::setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback)

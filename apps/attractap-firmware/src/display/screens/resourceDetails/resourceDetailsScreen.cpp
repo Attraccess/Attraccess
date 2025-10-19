@@ -308,7 +308,7 @@ void ResourceDetailsScreen::init()
 
    this->flowButtonsContainer = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->flowButtonsContainer);
-   lv_obj_set_height(this->flowButtonsContainer, 50);
+   lv_obj_set_height(this->flowButtonsContainer, LV_SIZE_CONTENT);
    lv_obj_set_width(this->flowButtonsContainer, lv_pct(100));
    lv_obj_set_align(this->flowButtonsContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(this->flowButtonsContainer, LV_FLEX_FLOW_COLUMN);
@@ -360,61 +360,87 @@ void ResourceDetailsScreen::init()
    lv_label_set_text(this->introducersListLabel, "???");
 }
 
-void ResourceDetailsScreen::setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription)
+void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
-   lv_label_set_text(this->resourceName, resourceName.c_str());
-   lv_label_set_text(this->resourceDescription, resourceDescription.c_str());
+   lv_label_set_text(this->resourceName, resource.name);
+   lv_label_set_text(this->resourceDescription, resource.description);
 
-   lv_obj_add_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
-
-   switch (resourceType)
+   // Update introducers panel list
+   if (this->introducersListLabel)
    {
-   case RESOURCE_TYPE_MACHINE:
-      lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
-      break;
-   case RESOURCE_TYPE_DOOR:
-      lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
-      break;
+      String list;
+      for (uint8_t i = 0; i < resource.introducerCount; ++i)
+      {
+         if (i > 0)
+         {
+            list += "\n";
+         }
+         list += resource.introducers[i];
+      }
+      if (list.length() == 0)
+      {
+         list = "-- kein Einweiser verfuegbar --";
+      }
+      lv_label_set_text(this->introducersListLabel, list.c_str());
    }
-}
 
-// TODO: show errors that happen when executing buttons (add a reusable popup dialog for this)
+   // Toggle sections based on type and usage
+   resource_type_t resourceType = (resource.type == 1) ? RESOURCE_TYPE_DOOR : RESOURCE_TYPE_MACHINE;
 
-void ResourceDetailsScreen::setResourceAndUsageDetails(
-    resource_type_t resourceType,
-    String resourceName,
-    String resourceDescription,
-    time_t sessionStartTime,
-    String currentUser)
-{
-   // Persist the session start time so periodic updates can compute elapsed time correctly
-   this->sessionStartTime = sessionStartTime;
-   // Always refresh the static labels as well
-   lv_label_set_text(this->resourceName, resourceName.c_str());
-   lv_label_set_text(this->resourceDescription, resourceDescription.c_str());
-   lv_label_set_text(this->sessionStartTimeLabel, timeToTimeString(sessionStartTime).c_str());
-   lv_label_set_text(this->currentUser, currentUser.c_str());
+   if (resource.hasActiveUsage)
+   {
+      // Persist the session start time so periodic updates can compute elapsed time correctly
+      this->sessionStartTime = (time_t)resource.activeStartEpoch;
+      lv_label_set_text(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime).c_str());
+      lv_label_set_text(this->currentUser, resource.activeUser);
+   }
 
-   lv_obj_remove_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+   lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
 
    switch (resourceType)
    {
    case RESOURCE_TYPE_MACHINE:
-      lv_obj_remove_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_set_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN, resource.hasActiveUsage);
+      lv_obj_set_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
       lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
       break;
    case RESOURCE_TYPE_DOOR:
+      lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
       break;
    }
 
+   // Rebuild flow buttons
+   lv_obj_clean(this->flowButtonsContainer);
+   for (uint8_t i = 0; i < resource.flowButtonCount; ++i)
+   {
+      const API::FlowButton &fb = resource.flowButtons[i];
+      lv_obj_t *flowButton = lv_button_create(this->flowButtonsContainer);
+      lv_obj_set_height(flowButton, 50);
+      lv_obj_set_width(flowButton, lv_pct(100));
+      lv_obj_set_align(flowButton, LV_ALIGN_CENTER);
+      lv_obj_add_flag(flowButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+      lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON, fb.id};
+      lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
+      lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
+
+      lv_obj_t *labelForFlowButton = lv_label_create(flowButton);
+      lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
+      lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
+      lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
+      lv_label_set_text(labelForFlowButton, fb.label);
+   }
+
    this->updateElapsedTimeDisplay();
 }
+
+// TODO: show errors that happen when executing buttons (add a reusable popup dialog for this)
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {
@@ -475,6 +501,15 @@ void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
       return;
 
    evt->self->buttonClickCallback(*evt);
+}
+
+void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
+{
+   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (evt)
+   {
+      delete evt;
+   }
 }
 
 String ResourceDetailsScreen::getName()

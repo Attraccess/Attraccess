@@ -44,6 +44,7 @@ public:
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(String deviceName);
+    static void logFromLvgl(lv_log_level_t level, const char *buf);
 
 private:
     static std::function<void(int16_t, int16_t)> touchCallback;
@@ -75,9 +76,4 @@ private:
     static void initDeviceOverlay();
     static lv_obj_t *deviceNameLabel;
     static String deviceNameInitValue;
-
-#if LV_USE_LOG != 0
-    /* Serial debugging */
-    static void debug_print(const char *buf);
-#endif
 };

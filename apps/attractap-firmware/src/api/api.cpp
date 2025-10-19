@@ -17,8 +17,8 @@ void API::updateSateInfo()
 void API::setup()
 {
     this->websocket.setup();
-    this->websocket.setMessageCallback([this](String message)
-                                       { this->processIncomingMessages(message); });
+    this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
+                                          { this->processIncomingMessage(buf, len); });
 }
 
 void API::loop()
@@ -33,58 +33,61 @@ void API::loop()
     }
 }
 
-void API::processIncomingMessages(String message)
+void API::processIncomingMessage(const char *buf, size_t len)
 {
-    JsonDocument doc;
-    deserializeJson(doc, message);
-
-    auto data = doc["data"].as<JsonObject>();
-    String eventType = data["type"].as<String>();
-    auto payload = data["payload"].as<JsonObject>();
-
-    String payloadString;
-    serializeJson(payload, payloadString);
-
-    logger.info(("Received message of type " + eventType + " with payload " + payloadString).c_str());
-    logger.info(("Sending ACK for event " + eventType).c_str());
-    this->sendAck(eventType.c_str());
-
-    if (eventType == "READER_REGISTER")
+    // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
+    inboundDoc.clear();
+    auto err = deserializeJson(inboundDoc, buf, len);
+    if (err)
     {
-        this->onRegistrationData(data);
+        logger.error((String("JSON parse error: ") + err.c_str()).c_str());
+        return;
     }
-    else if (eventType == "READER_UNAUTHORIZED")
+
+    const char *eventType = inboundDoc["data"]["type"].as<const char *>();
+    if (!eventType)
     {
-        this->onUnauthorized(data);
+        logger.error("Missing event type");
+        return;
     }
-    else if (eventType == "READER_AUTHENTICATED")
+
+    this->sendAck(eventType);
+
+    if (strcmp(eventType, "READER_REGISTER") == 0)
     {
-        this->onReaderAuthenticated(data);
+        this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
     }
-    else if (eventType == "READER_REQUEST_AUTHENTICATION")
+    else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
+    {
+        this->onUnauthorized(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
+    {
+        this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {
         this->sendAuthenticationRequest();
     }
-    else if (eventType == "RESOURCE_LIST")
+    else if (strcmp(eventType, "RESOURCE_LIST") == 0)
     {
-        this->onResourceList(data);
+        this->onResourceList(inboundDoc["data"].as<JsonObject>());
     }
-    else if (eventType == "CARD_AUTHENTICATION_DATA")
+    else if (strcmp(eventType, "CARD_AUTHENTICATION_DATA") == 0)
     {
-        this->onCardAuthenticationDetailsResponse(data);
+        this->onCardAuthenticationDetailsResponse(inboundDoc["data"].as<JsonObject>());
     }
-    else if (eventType == "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO")
+    else if (strcmp(eventType, "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO") == 0)
     {
-        this->onEnrollNewCardGetAvailableKeyNo(data);
+        this->onEnrollNewCardGetAvailableKeyNo(inboundDoc["data"].as<JsonObject>());
     }
-    else if (eventType == "ENROLL_NEW_CARD")
+    else if (strcmp(eventType, "ENROLL_NEW_CARD") == 0)
     {
-        this->onEnrollNewCard(data);
+        this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
     }
     else
     {
-        logger.error(("Unknown event type: " + eventType).c_str());
-        logger.error(payloadString.c_str());
+        logger.error((String("Unknown event type: ") + eventType).c_str());
     }
 }
 
@@ -157,15 +160,15 @@ void API::sendMessage(const char *type, JsonObject payload)
         eventPayload[p.key()] = p.value();
     }
 
-    String payloadString = event["data"]["payload"].as<String>();
-
-    logger.debug(("Sending event of type " + String(type) + " with payload " + payloadString).c_str());
-
-    String json;
-    serializeJson(event, json);
-
-    this->logger.info(("pushing message to queue: " + json).c_str());
-    this->websocket.sendMessage(json);
+    char json[JSON_OUTBUF_SMALL];
+    size_t n = serializeJson(event, json, sizeof(json));
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize event to buffer (small)");
+        return;
+    }
+    this->logger.info((String("pushing message to queue: ") + String(json)).c_str());
+    this->websocket.sendMessage(json, n);
 }
 
 void API::sendAuthenticationRequest()
@@ -178,11 +181,20 @@ void API::sendAuthenticationRequest()
     }
 
     logger.info("Sending authentication request");
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["id"] = Settings::getAttraccessAuthConfig().readerId;
-    payload["token"] = Settings::getAttraccessAuthConfig().apiKey;
-    this->sendMessage("READER_AUTHENTICATE", payload);
+    JsonDocument event;
+    event["event"] = "EVENT";
+    event["data"]["type"] = "READER_AUTHENTICATE";
+    event["data"]["payload"]["id"] = Settings::getAttraccessAuthConfig().readerId;
+    event["data"]["payload"]["token"] = Settings::getAttraccessAuthConfig().apiKey;
+    char json[JSON_OUTBUF_AUTH];
+    size_t n = serializeJson(event, json, sizeof(json));
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize authenticate event to buffer");
+        return;
+    }
+    this->logger.info((String("pushing message to queue: ") + String(json)).c_str());
+    this->websocket.sendMessage(json, n);
 }
 
 void API::sendHeartbeat()
@@ -196,11 +208,15 @@ void API::sendHeartbeat()
     JsonDocument event;
     event["event"] = "HEARTBEAT";
 
-    String json;
-    serializeJson(event, json);
-
-    this->logger.info(("pushing heartbeat to websocket queue: " + json).c_str());
-    this->websocket.sendMessage(json);
+    char json[JSON_OUTBUF_SMALL];
+    size_t n = serializeJson(event, json, sizeof(json));
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize heartbeat");
+        return;
+    }
+    this->logger.info((String("pushing heartbeat to websocket queue: ") + String(json)).c_str());
+    this->websocket.sendMessage(json, n);
 
     this->heartbeat_sent_at = millis();
 }
@@ -209,12 +225,20 @@ void API::sendFirmwareInfo()
 {
     this->logger.info("Requested firmware info");
 
-    JsonDocument doc;
-    JsonObject response = doc.to<JsonObject>();
-    response["name"] = FIRMWARE_NAME;
-    response["variant"] = FIRMWARE_VARIANT;
-    response["version"] = FIRMWARE_VERSION;
-    this->sendMessage("READER_FIRMWARE_INFO", response);
+    JsonDocument event;
+    event["event"] = "EVENT";
+    event["data"]["type"] = "READER_FIRMWARE_INFO";
+    event["data"]["payload"]["name"] = FIRMWARE_NAME;
+    event["data"]["payload"]["variant"] = FIRMWARE_VARIANT;
+    event["data"]["payload"]["version"] = FIRMWARE_VERSION;
+    char json[JSON_OUTBUF_SMALL];
+    size_t n = serializeJson(event, json, sizeof(json));
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize firmware info");
+        return;
+    }
+    this->websocket.sendMessage(json, n);
 }
 
 void API::onReaderAuthenticated(JsonObject data)
@@ -243,10 +267,136 @@ void API::onResourceList(JsonObject data)
         this->logger.error("Resource list update callback is not set");
         return;
     }
-    this->resourceListUpdateCallback(data["payload"]["resources"].as<JsonArray>());
+
+    ResourceList &result = this->resourceListScratch;
+    memset(&result, 0, sizeof(ResourceList));
+    JsonArray arr = data["payload"]["resources"].as<JsonArray>();
+    if (arr.isNull())
+    {
+        this->resourceListUpdateCallback(result);
+        return;
+    }
+
+    uint16_t count = 0;
+    for (JsonObject resource : arr)
+    {
+        if (count >= MAX_RESOURCES)
+        {
+            break;
+        }
+
+        ResourceBrief &dst = result.items[count];
+        dst.id = resource["id"].is<uint32_t>() ? resource["id"].as<uint32_t>() : 0;
+        const char *typeStr = resource["type"].as<const char *>();
+        dst.type = (typeStr && strcmp(typeStr, "door") == 0) ? 1 : 0;
+        dst.separateUnlockAndUnlatch = resource["separateUnlockAndUnlatch"].is<bool>() ? resource["separateUnlockAndUnlatch"].as<bool>() : false;
+        dst.allowTakeOver = resource["allowTakeOver"].is<bool>() ? resource["allowTakeOver"].as<bool>() : false;
+
+        const char *name = resource["name"].as<const char *>();
+        const char *desc = resource["description"].as<const char *>();
+        if (name)
+        {
+            strlcpy(dst.name, name, sizeof(dst.name));
+        }
+        else
+        {
+            dst.name[0] = '\0';
+        }
+        if (desc)
+        {
+            strlcpy(dst.description, desc, sizeof(dst.description));
+        }
+        else
+        {
+            dst.description[0] = '\0';
+        }
+
+        JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
+        if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
+        {
+            dst.hasActiveUsage = true;
+            const char *username = aus["user"]["username"].as<const char *>();
+            strlcpy(dst.activeUser, username ? username : "", sizeof(dst.activeUser));
+            const char *startIso = aus["startTime"].as<const char *>();
+            dst.activeStartEpoch = parseIso8601ToTimeT(startIso);
+        }
+        else
+        {
+            dst.hasActiveUsage = false;
+            dst.activeUser[0] = '\0';
+            dst.activeStartEpoch = 0;
+        }
+
+        // Parse introducers: array of strings (usernames)
+        dst.introducerCount = 0;
+        JsonArray introducers = resource["introducers"].as<JsonArray>();
+        if (!introducers.isNull())
+        {
+            uint8_t idx = 0;
+            for (JsonVariant v : introducers)
+            {
+                if (idx >= MAX_INTRODUCERS)
+                {
+                    break;
+                }
+                const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
+                if (introName && introName[0] != '\0')
+                {
+                    strlcpy(dst.introducers[idx], introName, sizeof(dst.introducers[idx]));
+                    idx++;
+                }
+            }
+            dst.introducerCount = idx;
+        }
+
+        // Parse flowButtons: array of { id, label }
+        dst.flowButtonCount = 0;
+        JsonArray flowButtons = resource["flowButtons"].as<JsonArray>();
+        if (!flowButtons.isNull())
+        {
+            uint8_t fbIdx = 0;
+            for (JsonObject btn : flowButtons)
+            {
+                if (fbIdx >= MAX_FLOW_BUTTONS)
+                {
+                    break;
+                }
+                API::FlowButton &fb = dst.flowButtons[fbIdx];
+                const char *idStr = btn["id"].as<const char *>();
+                if (!idStr)
+                {
+                    idStr = "";
+                }
+                strlcpy(fb.id, idStr, sizeof(fb.id));
+                const char *lbl = btn["label"].as<const char *>();
+                if (!lbl)
+                {
+                    lbl = "";
+                }
+                strlcpy(fb.label, lbl, sizeof(fb.label));
+                fbIdx++;
+            }
+            dst.flowButtonCount = fbIdx;
+        }
+
+        count++;
+    }
+
+    result.count = count;
+    this->resourceListUpdateCallback(result);
 }
 
-void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
+void API::triggerFlowButton(uint32_t resourceId, const char *buttonId)
+{
+    this->logger.info("Triggering flow button");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    payload["buttonId"] = buttonId ? buttonId : "";
+    this->sendMessage("TRIGGER_FLOW_BUTTON", payload);
+}
+
+void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback)
 {
     this->resourceListUpdateCallback = callback;
 }

@@ -22,14 +22,15 @@ public:
     void setup();
     void loop();
     void sendMessage(const String &message);
-    void setMessageCallback(std::function<void(String)> callback);
+    void sendMessage(const char *message, size_t length);
+    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
     void enableConnectionAttempts();
     void disableConnectionAttempts();
 
 private:
-    std::function<void(String)> messageCallback;
+    std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
 
     AdaptiveCertManager _certManager;

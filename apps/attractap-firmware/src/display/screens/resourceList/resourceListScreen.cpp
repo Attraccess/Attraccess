@@ -13,30 +13,29 @@ void ResourceListScreen::init()
    lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *logo = lv_image_create(this->screen);
-   lv_image_set_src(logo, &logo_400w_png);
-   lv_obj_set_height(logo, 68);
+   lv_image_set_src(logo, &logo_40h);
+   lv_obj_set_height(logo, 40);
    lv_obj_set_width(logo, lv_pct(100));
-   lv_obj_set_x(logo, -124);
-   lv_obj_set_y(logo, -15);
    lv_obj_set_align(logo, LV_ALIGN_CENTER);
    lv_obj_add_flag(logo, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(logo, LV_OBJ_FLAG_SCROLLABLE);
-   lv_image_set_scale(logo, 128);
 
    this->resourceContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(resourceContainer);
    lv_obj_set_width(resourceContainer, lv_pct(100));
-   lv_obj_set_height(resourceContainer, LV_SIZE_CONTENT);
-   lv_obj_set_x(resourceContainer, 32);
-   lv_obj_set_y(resourceContainer, 63);
+   lv_obj_set_height(resourceContainer, 380);
    lv_obj_set_align(resourceContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(resourceContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_flow(resourceContainer, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(resourceContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(resourceContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(resourceContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_flex_grow(resourceContainer, 1);
+   lv_obj_add_flag(resourceContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(resourceContainer, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(resourceContainer, LV_SCROLLBAR_MODE_AUTO);
+   lv_obj_set_style_pad_row(resourceContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-void ResourceListScreen::setResourceList(JsonArray resourceList)
+void ResourceListScreen::setResourceList(const API::ResourceList &resourceList)
 {
    // Clear only the resource items while keeping static UI (logo, container) intact
    if (this->resourceContainer)
@@ -44,13 +43,13 @@ void ResourceListScreen::setResourceList(JsonArray resourceList)
       lv_obj_clean(this->resourceContainer);
    }
 
-   for (JsonObject resource : resourceList)
+   for (uint16_t i = 0; i < resourceList.count; ++i)
    {
-      this->addResourceListItem(resource);
+      this->addResourceListItem(resourceList.items[i]);
    }
 }
 
-void ResourceListScreen::addResourceListItem(JsonObject resource)
+void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
 {
    lv_obj_t *resourceButton = lv_button_create(this->resourceContainer);
    lv_obj_set_width(resourceButton, lv_pct(100));
@@ -67,7 +66,7 @@ void ResourceListScreen::addResourceListItem(JsonObject resource)
    lv_obj_set_width(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceNameLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(resourceNameLabel, resource["name"].as<String>().c_str());
+   lv_label_set_text(resourceNameLabel, resource.name);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_MOMENTUM);
@@ -75,12 +74,13 @@ void ResourceListScreen::addResourceListItem(JsonObject resource)
    lv_obj_set_style_text_font(resourceNameLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceNameLabel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceNameLabel, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
    lv_obj_t *resourceDescriptionContainer = lv_label_create(resourceButton);
    lv_obj_set_height(resourceDescriptionContainer, 14);
    lv_obj_set_width(resourceDescriptionContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceDescriptionContainer, LV_ALIGN_CENTER);
-   lv_label_set_text(resourceDescriptionContainer, resource["description"].as<String>().c_str());
+   lv_label_set_text(resourceDescriptionContainer, resource.description);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_MOMENTUM);
@@ -88,12 +88,10 @@ void ResourceListScreen::addResourceListItem(JsonObject resource)
    lv_obj_set_style_text_font(resourceDescriptionContainer, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceDescriptionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceDescriptionContainer, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(resourceDescriptionContainer, LV_LABEL_LONG_DOT);
 
-   // Prepare event data with a persistent copy of the resource
-   // Copy resource into an independent JsonDocument to persist with the LVGL object
-   JsonDocument *doc = new JsonDocument();
-   doc->to<JsonObject>().set(resource);
-   ResourceEventData *evt = new ResourceEventData{this, resourceButton, doc};
+   // Prepare event data with a copy of the resource brief (small fixed struct)
+   ResourceEventData *evt = new ResourceEventData{this, resourceButton, resource};
    lv_obj_add_event_cb(resourceButton, &ResourceListScreen::onResourceClicked, LV_EVENT_CLICKED, evt);
    lv_obj_add_event_cb(resourceButton, &ResourceListScreen::onContainerDelete, LV_EVENT_DELETE, evt);
 }
@@ -119,7 +117,7 @@ void ResourceListScreen::loop()
    // nothing to do
 }
 
-void ResourceListScreen::setResourceSelectionCallback(std::function<void(JsonObject)> callback)
+void ResourceListScreen::setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback)
 {
    this->resourceSelectionCallback = callback;
 }
@@ -133,14 +131,13 @@ void ResourceListScreen::onResourceClicked(lv_event_t *e)
 
    if (code == LV_EVENT_CLICKED)
    {
-      if (!evt->self || !evt->doc)
+      if (!evt->self)
          return;
 
       if (evt->self->resourceSelectionCallback)
       {
-         JsonObject res = evt->doc->as<JsonObject>();
-         evt->self->logger.infof("Resource selected: %s", res["name"].as<String>().c_str());
-         evt->self->resourceSelectionCallback(res);
+         evt->self->logger.infof("Resource selected: %s", evt->resource.name);
+         evt->self->resourceSelectionCallback(evt->resource);
       }
    }
 }
@@ -151,11 +148,6 @@ void ResourceListScreen::onContainerDelete(lv_event_t *e)
    if (!evt)
       return;
 
-   if (evt->doc)
-   {
-      delete evt->doc;
-      evt->doc = nullptr;
-   }
    delete evt;
 }
 

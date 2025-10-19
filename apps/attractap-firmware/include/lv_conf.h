@@ -49,7 +49,7 @@
 #define LV_MEM_CUSTOM 0
 #if LV_MEM_CUSTOM == 0
     /*Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/
-    #define LV_MEM_SIZE (48U * 1024U)          /*[bytes]*/
+    #define LV_MEM_SIZE (96U * 1024U)          /*[bytes]*/
 
     /*Set an address for the memory pool instead of allocating it as a normal array. Can be in external SRAM too.*/
     #define LV_MEM_ADR 0     /*0: unused*/
@@ -136,7 +136,7 @@
  * "Transformed layers" (where transform_angle/zoom properties are used) use larger buffers
  * and can't be drawn in chunks. So these settings affects only widgets with opacity.
  */
-#define LV_LAYER_SIMPLE_BUF_SIZE          (24 * 1024)
+#define LV_LAYER_SIMPLE_BUF_SIZE          (12 * 1024)
 #define LV_LAYER_SIMPLE_FALLBACK_BUF_SIZE (3 * 1024)
 
 /*Default image cache size. Image caching keeps the images opened.
@@ -489,8 +489,8 @@
 
 #define LV_USE_LABEL      1
 #if LV_USE_LABEL
-    #define LV_LABEL_TEXT_SELECTION 1 /*Enable selecting text of the label*/
-    #define LV_LABEL_LONG_TXT_HINT 1  /*Store some extra info in labels to speed up drawing of very long texts*/
+    #define LV_LABEL_TEXT_SELECTION 0 /*Disable to save RAM*/
+    #define LV_LABEL_LONG_TXT_HINT 0  /*Disable to save RAM*/
 #endif
 
 #define LV_USE_LINE       1

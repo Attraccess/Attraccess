@@ -48,10 +48,9 @@ private:
     bool resourceIsSelected;
     uint32_t selectedResourceId;
     // Own a persistent copy of the latest resource list to avoid dangling references
-    JsonDocument resourceListDoc;
-    JsonArray resourceList;
+    API::ResourceList resourceList;
 
-    void selectResource(JsonObject resource);
+    void selectResource(const API::ResourceBrief &resource);
 
     enum applicationState_t
     {
@@ -68,7 +67,7 @@ private:
     };
     applicationState_t state;
 
-    void handleResourceListUpdate(JsonArray resourceList);
+    void handleResourceListUpdate(const API::ResourceList &resourceList);
     void handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response);
 
     void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);

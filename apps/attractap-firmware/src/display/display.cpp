@@ -35,9 +35,28 @@ Arduino_RGB_Display *Display::gfx = NULL;
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
-void Display::debug_print(const char *buf)
+void Display::logFromLvgl(lv_log_level_t level, const char *buf)
 {
-    Display::logger.debug(buf);
+    switch (level)
+    {
+    case LV_LOG_LEVEL_ERROR:
+        Display::logger.error(buf);
+        break;
+    case LV_LOG_LEVEL_WARN:
+        Display::logger.info(buf); // map warn to info
+        break;
+    case LV_LOG_LEVEL_INFO:
+        Display::logger.info(buf);
+        break;
+    case LV_LOG_LEVEL_TRACE:
+    default:
+        Display::logger.debug(buf);
+        break;
+    }
+}
+static void lvgl_log_cb(lv_log_level_t level, const char *buf)
+{
+    Display::logFromLvgl(level, buf);
 }
 #endif
 
@@ -158,14 +177,19 @@ void Display::setup()
 
     lv_init();
 
+#if LV_USE_LOG != 0
+    /* Route LVGL logs to our logger */
+    lv_log_register_print_cb(lvgl_log_cb);
+#endif
+
     /* Set LVGL tick source (v9) */
     lv_tick_set_cb(Display::tick_cb);
 
     /* Allocate draw buffers in bytes for LVGL v9 */
-    const uint32_t buf_pixels = Display::screenWidth * Display::screenHeight / 4; /* quarter screen */
+    const uint32_t buf_pixels = Display::screenWidth * Display::screenHeight / 8; /* eighth of screen to save RAM */
     const uint32_t buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
     uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
-    uint8_t *buf2 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
+    uint8_t *buf2 = NULL; /* single buffering to further reduce RAM usage */
 
     /* Create display and set buffers/callbacks (v9) */
     Display::disp = lv_display_create((int32_t)Display::screenWidth, (int32_t)Display::screenHeight);

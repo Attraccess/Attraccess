@@ -14,8 +14,42 @@ public:
 
     void setup();
     void loop();
-    void processIncomingMessages(String message);
-    void setResourceListUpdateCallback(std::function<void(JsonArray)> callback);
+    void processIncomingMessage(const char *buf, size_t len);
+    static constexpr size_t MAX_RESOURCES = 20;
+    static constexpr size_t MAX_NAME_LEN = 64;
+    static constexpr size_t MAX_DESC_LEN = 128;
+    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_INTRODUCERS = 15;
+    static constexpr size_t MAX_FLOW_BUTTONS = 10;
+    static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
+    static constexpr size_t MAX_FLOW_BUTTON_ID_LEN = 48;
+    struct FlowButton
+    {
+        char id[MAX_FLOW_BUTTON_ID_LEN];
+        char label[MAX_FLOW_BUTTON_LABEL_LEN];
+    };
+    struct ResourceBrief
+    {
+        uint32_t id;
+        uint8_t type; // 0: machine, 1: door (encode from API strings)
+        bool separateUnlockAndUnlatch;
+        bool allowTakeOver;
+        char name[MAX_NAME_LEN];
+        char description[MAX_DESC_LEN];
+        bool hasActiveUsage;
+        char activeUser[MAX_USERNAME_LEN];
+        uint32_t activeStartEpoch; // seconds since epoch
+        uint8_t introducerCount;
+        char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
+        uint8_t flowButtonCount;
+        FlowButton flowButtons[MAX_FLOW_BUTTONS];
+    };
+    struct ResourceList
+    {
+        uint16_t count;
+        ResourceBrief items[MAX_RESOURCES];
+    };
+    void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 
     struct CardAuthenticationDetailsResponse
@@ -42,6 +76,7 @@ public:
     void lockDoor(uint32_t resourceId);
     void unlockDoor(uint32_t resourceId);
     void unlatchDoor(uint32_t resourceId);
+    void triggerFlowButton(uint32_t resourceId, const char *buttonId);
 
     void onDeviceName(std::function<void(String)> callback);
 
@@ -59,7 +94,7 @@ private:
     unsigned long heartbeat_sent_at = 0;
     bool isRegistered();
 
-    std::function<void(JsonArray)> resourceListUpdateCallback;
+    std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
 
     std::function<void(String)> deviceNameCallback;
@@ -67,6 +102,14 @@ private:
     void sendAck(const char *type);
     void sendMessage(const char *type);
     void sendMessage(const char *type, JsonObject payload);
+    static constexpr size_t JSON_INBUF = 4608;
+    static constexpr size_t JSON_OUTBUF_SMALL = 256;
+    static constexpr size_t JSON_OUTBUF_AUTH = 1024;
+
+    // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
+    ResourceList resourceListScratch;
+    // Persistent inbound JSON document to avoid large stack usage in websocket task
+    StaticJsonDocument<6144> inboundDoc;
     void sendHeartbeat();
 
     void onRegistrationData(JsonObject data);

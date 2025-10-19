@@ -4,6 +4,7 @@
 #include "../../../logger/logger.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../../utils.hpp"
+#include "../../../api/api.hpp"
 
 class ResourceDetailsScreen : public IScreen
 {
@@ -31,8 +32,7 @@ public:
     lv_obj_t *getScreen() override;
     String getName() override;
 
-    void setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription);
-    void setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription, time_t sessionStartTime, String currentUser);
+    void setResourceAndUsageDetails(const API::ResourceBrief &resource);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
 
     struct UserDetails
@@ -48,6 +48,7 @@ public:
     {
         ResourceDetailsScreen *self;
         button_click_type_t buttonClickType;
+        const char *flowButtonId; // valid when buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
 
@@ -83,6 +84,7 @@ private:
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
     static void onButtonClick(lv_event_t *e);
+    static void onContainerDelete(lv_event_t *e);
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;

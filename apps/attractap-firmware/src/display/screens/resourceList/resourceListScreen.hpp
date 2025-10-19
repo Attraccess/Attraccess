@@ -5,8 +5,9 @@
 #include <ArduinoJson.h>
 #include <functional>
 #include "../../../logger/logger.hpp"
-#include "../../images/logo_400w_png.hpp"
+#include "../../images/logo_40h.hpp"
 #include <map>
+#include "../../../api/api.hpp"
 
 class ResourceListScreen : public IScreen
 {
@@ -17,23 +18,23 @@ public:
     lv_obj_t *getScreen() override;
     String getName() override;
 
-    void setResourceList(JsonArray resourceList);
-    void setResourceSelectionCallback(std::function<void(JsonObject)> callback);
+    void setResourceList(const API::ResourceList &resourceList);
+    void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback);
 
 private:
     Logger logger;
     lv_obj_t *screen;
     lv_obj_t *resourceContainer;
 
-    std::function<void(JsonObject)> resourceSelectionCallback;
-    void addResourceListItem(JsonObject resource);
+    std::function<void(const API::ResourceBrief &)> resourceSelectionCallback;
+    void addResourceListItem(const API::ResourceBrief &resource);
     void setNoResourcesMessage();
     static void onResourceClicked(lv_event_t *e);
     struct ResourceEventData
     {
         ResourceListScreen *self;
         lv_obj_t *container;
-        JsonDocument *doc;
+        API::ResourceBrief resource;
     };
     static void onContainerDelete(lv_event_t *e);
 };
