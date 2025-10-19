@@ -34,6 +34,8 @@ public:
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
+    void setSessionTimeoutPaused(bool paused);
+    void extendSessionTimeoutBy(uint32_t ms);
 
     struct UserDetails
     {
@@ -84,6 +86,8 @@ private:
     lv_obj_t *elapsedTime;
 
     uint32_t sessionTimeoutTime;
+    bool sessionTimeoutPaused = false;
+    uint32_t pauseFrozenAtMs = 0;
     lv_obj_t *sessionTimeoutIndicator;
     void updateSessionTimeoutIndicator();
 

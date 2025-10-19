@@ -39,6 +39,7 @@ private:
     uint32_t timeOfUnlockedMs;
     const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
     void restartSessionTimeout();
+    void resetPauseAccounting();
 
     uint32_t timeOfResourceSelectionMs;
     const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
@@ -71,4 +72,12 @@ private:
     void handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response);
 
     void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);
+
+    // Action pause tracking (while server actions are running)
+    void beginActionPause();
+    void endActionPause();
+
+    uint32_t pauseStartMs = 0;
+    uint32_t accumulatedPauseMs = 0;
+    uint16_t actionInProgressCount = 0;
 };

@@ -466,10 +466,37 @@ void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t sessionTimeoutTime)
    this->updateSessionTimeoutIndicator();
 }
 
+void ResourceDetailsScreen::setSessionTimeoutPaused(bool paused)
+{
+   if (paused == this->sessionTimeoutPaused)
+   {
+      return;
+   }
+   this->sessionTimeoutPaused = paused;
+   if (paused)
+   {
+      // Capture freeze timestamp so the indicator can stay stable
+      this->pauseFrozenAtMs = millis();
+   }
+   else
+   {
+      // On resume, refresh indicator immediately
+      this->updateSessionTimeoutIndicator();
+   }
+}
+
+void ResourceDetailsScreen::extendSessionTimeoutBy(uint32_t ms)
+{
+   this->sessionTimeoutTime += ms;
+   this->updateSessionTimeoutIndicator();
+}
+
 void ResourceDetailsScreen::updateSessionTimeoutIndicator()
 {
+   // If paused, freeze the bar at the last computed value
+   uint32_t now = this->sessionTimeoutPaused ? this->pauseFrozenAtMs : millis();
    // add 1 second to the remaining time to prevent overflow if the transition takes a bit
-   double remainingMillis = this->sessionTimeoutTime - millis() + 1000;
+   double remainingMillis = this->sessionTimeoutTime - now + 1000;
    long remainingSeconds = remainingMillis / 1000;
    // Clamp to bar range [0,30]
    if (remainingSeconds < 0)

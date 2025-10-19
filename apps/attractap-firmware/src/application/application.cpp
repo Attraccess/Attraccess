@@ -106,12 +106,15 @@ void Application::setup()
     this->api.setErrorCallback([this](const char *title, const char *message)
                                {
                                    // Ensure UI operations on LVGL thread
-                                   struct ErrPayload { String t; String m; };
+                                   struct ErrPayload { Application *self; String t; String m; };
                                    ErrPayload *p = new ErrPayload();
                                    if (!p) return;
-                                   p->t = String(title); p->m = String(message);
+                                   p->self = this; p->t = String(title); p->m = String(message);
                                    lv_async_call([](void *u){
                                        auto *pl = (ErrPayload *)u;
+                                       if (pl && pl->self) {
+                                           pl->self->endActionPause();
+                                       }
                                        Display::resourceDetailsScreen.hideActionProgress();
                                        Display::showErrorPopup(pl->t, pl->m);
                                        delete pl;
@@ -121,12 +124,15 @@ void Application::setup()
     this->api.setActionResultCallback([this](const char *type, bool success)
                                       {
                                           (void)type;
-                                          struct ActionResultPayload { bool ok; };
+                                          struct ActionResultPayload { Application *self; bool ok; };
                                           ActionResultPayload *p = new ActionResultPayload();
                                           if (!p) return;
-                                          p->ok = success;
+                                          p->self = this; p->ok = success;
                                           lv_async_call([](void *u){
                                               ActionResultPayload *pl = (ActionResultPayload*)u;
+                                              if (pl && pl->self) {
+                                                  pl->self->endActionPause();
+                                              }
                                               Display::resourceDetailsScreen.hideActionProgress();
                                               if (pl && pl->ok)
                                               {
@@ -367,7 +373,17 @@ void Application::processState()
 
     if (this->state == APPLICATION_STATE_UNLOCKED)
     {
-        if (now - this->timeOfUnlockedMs > this->UNLOCKED_TIMEOUT_MS)
+        // Subtract any accumulated pause time while actions were in-progress
+        uint32_t effectiveElapsed = now - this->timeOfUnlockedMs;
+        if (effectiveElapsed > this->accumulatedPauseMs)
+        {
+            effectiveElapsed -= this->accumulatedPauseMs;
+        }
+        else
+        {
+            effectiveElapsed = 0;
+        }
+        if (effectiveElapsed > this->UNLOCKED_TIMEOUT_MS)
         {
             this->logger.debug("Unlocked timeout reached, locking");
             this->unlocked = false;
@@ -499,6 +515,7 @@ void Application::restartSessionTimeout()
     uint32_t now = millis();
     Display::resourceDetailsScreen.setSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
     this->timeOfUnlockedMs = now;
+    this->resetPauseAccounting();
 }
 
 void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt)
@@ -514,26 +531,32 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
     {
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+        this->beginActionPause();
         this->api.startResourceUsageSession(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
+        this->beginActionPause();
         this->api.stopResourceUsageSession(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
         Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
+        this->beginActionPause();
         this->api.lockDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
         Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
+        this->beginActionPause();
         this->api.unlockDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
         Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
+        this->beginActionPause();
         this->api.unlatchDoor(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
         Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
+        this->beginActionPause();
         this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
@@ -550,4 +573,42 @@ void Application::restartResourceSelectionTimeout()
 {
     uint32_t now = millis();
     this->timeOfResourceSelectionMs = now;
+}
+
+void Application::beginActionPause()
+{
+    this->actionInProgressCount++;
+    if (this->actionInProgressCount == 1)
+    {
+        this->pauseStartMs = millis();
+        // Freeze the UI indicator
+        Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
+    }
+}
+
+void Application::endActionPause()
+{
+    if (this->actionInProgressCount == 0)
+    {
+        return;
+    }
+    this->actionInProgressCount--;
+    if (this->actionInProgressCount == 0)
+    {
+        uint32_t now = millis();
+        uint32_t delta = (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
+        this->accumulatedPauseMs += delta;
+        // Extend the UI deadline by the same delta and unfreeze
+        Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
+        Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+    }
+}
+
+void Application::resetPauseAccounting()
+{
+    this->pauseStartMs = 0;
+    this->accumulatedPauseMs = 0;
+    this->actionInProgressCount = 0;
+    // Ensure not paused visually
+    Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
 }
