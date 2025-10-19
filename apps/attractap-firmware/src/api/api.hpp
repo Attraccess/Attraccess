@@ -16,8 +16,20 @@ public:
     void loop();
     void processIncomingMessages(String message);
     void setResourceListUpdateCallback(std::function<void(JsonArray)> callback);
-    void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength);
-    void setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String, String)> callback);
+    void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+
+    struct CardAuthenticationDetailsResponse
+    {
+        uint8_t keyNo;
+        const uint8_t *keyBytes;
+        uint8_t keyLen;
+        String error;
+        String username;
+        bool canManageResource;
+        bool hasIntroduction;
+        bool isIntroducer;
+    };
+    void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
 
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> callback);
     void setEnrollNewCardCallback(std::function<bool(uint8_t keyNo, String key)> callback);
@@ -48,8 +60,7 @@ private:
     bool isRegistered();
 
     std::function<void(JsonArray)> resourceListUpdateCallback;
-    // (keyNo, keyBytes, keyLen, error, username). error is empty when no error; username may be empty
-    std::function<void(uint8_t, const uint8_t *, uint8_t, String, String)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
 
     std::function<void(String)> deviceNameCallback;
 

@@ -31,10 +31,18 @@ public:
     lv_obj_t *getScreen() override;
     String getName() override;
 
-    void setInfo(resource_type_t resourceType, String resourceName, String resourceDescription);
-    void setInfo(resource_type_t resourceType, String resourceName, String resourceDescription, time_t sessionStartTime, String currentUser);
+    void setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription);
+    void setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription, time_t sessionStartTime, String currentUser);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
-    void setSignedInUsername(String username);
+
+    struct UserDetails
+    {
+        String username;
+        bool canManageResource;
+        bool hasIntroduction;
+        bool isIntroducer;
+    };
+    void setUserDetails(UserDetails userDetails);
 
     struct ButtonClickEventData
     {
@@ -58,6 +66,8 @@ private:
     lv_obj_t *sessionStartTimeLabel;
     lv_obj_t *currentUser;
 
+    lv_obj_t *sessionControls;
+
     lv_obj_t *startSessionButton;
     lv_obj_t *stopSessionButton;
     lv_obj_t *doorControls;
@@ -73,4 +83,7 @@ private:
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
     static void onButtonClick(lv_event_t *e);
+
+    lv_obj_t *noIntroductionPanel;
+    lv_obj_t *introducersListLabel;
 };

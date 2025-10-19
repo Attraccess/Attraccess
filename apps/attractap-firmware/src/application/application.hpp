@@ -69,7 +69,7 @@ private:
     applicationState_t state;
 
     void handleResourceListUpdate(JsonArray resourceList);
-    void handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error);
+    void handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response);
 
     void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);
 };

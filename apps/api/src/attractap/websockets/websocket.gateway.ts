@@ -23,7 +23,8 @@ import { Resource, ResourceBillingConfiguration, ResourceIntroducer, User } from
 import { ResourceImageService } from '../../resources/resourceImage.service';
 import sharp from 'sharp';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
-import { ResourcesService } from '../../resources/resources.service';
+import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
+import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -53,6 +54,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceUsageService)
   private resourceUsageService: ResourceUsageService;
+
+  @Inject(ResourceIntroductionsService)
+  private resourceIntroductionService: ResourceIntroductionsService;
+
+  @Inject(ResourceIntroducersService)
+  private resourceIntroducersService: ResourceIntroducersService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -577,45 +584,35 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     );
 
     const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
-      resources: resourcesWithUsageSession.map(
-        (resource) =>
-          ({
-            id: resource.id,
-            name: resource.name,
-            type: resource.type,
-            separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
-            description: resource.description,
-            imageFilename: resource.imageFilename,
-            allowTakeOver: resource.allowTakeOver,
-            introducers: resource.introducers.map(
-              (introducer) =>
-                ({
-                  id: introducer.id,
-                  user: {
-                    id: introducer.user.id,
-                    username: introducer.user.username,
-                  } as Partial<User>,
-                }) as Partial<ResourceIntroducer>,
-            ),
-            billingConfigurations: resource.billingConfigurations.map(
-              (billingConfiguration) =>
-                ({
-                  id: billingConfiguration.id,
-                  creditsPerUsage: billingConfiguration.creditsPerUsage,
-                  creditsPerMinute: billingConfiguration.creditsPerMinute,
-                }) as Partial<ResourceBillingConfiguration>,
-            ),
-            activeUsageSession: resource.activeUsageSession
-              ? {
-                  user: {
-                    id: resource.activeUsageSession.user.id,
-                    username: resource.activeUsageSession.user.username,
-                  },
-                  startTime: resource.activeUsageSession.startTime.toISOString(),
-                }
-              : null,
-          }) as Partial<Resource>,
-      ),
+      resources: resourcesWithUsageSession.map((resource) => ({
+        id: resource.id,
+        name: resource.name,
+        type: resource.type,
+        separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+        description: resource.description,
+        imageFilename: resource.imageFilename,
+        allowTakeOver: resource.allowTakeOver,
+        introducers: resource.introducers.map((introducer) => ({
+          username: introducer.user.username,
+        })),
+        billingConfigurations: resource.billingConfigurations.map(
+          (billingConfiguration) =>
+            ({
+              id: billingConfiguration.id,
+              creditsPerUsage: billingConfiguration.creditsPerUsage,
+              creditsPerMinute: billingConfiguration.creditsPerMinute,
+            }) as Partial<ResourceBillingConfiguration>,
+        ),
+        activeUsageSession: resource.activeUsageSession
+          ? {
+              user: {
+                id: resource.activeUsageSession.user.id,
+                username: resource.activeUsageSession.user.username,
+              },
+              startTime: resource.activeUsageSession.startTime.toISOString(),
+            }
+          : null,
+      })),
     });
     this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
     await socket.sendMessage(resourceListResponse);
@@ -773,7 +770,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { uid } = data.payload as { uid: string };
+    const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
 
     if (!uid || typeof uid !== 'string') {
       await socket.sendMessage(
@@ -796,11 +793,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     socket.state.lastAuthenticatedUserId = nfcCard.user.id;
+
+    const hasIntroduction = await this.resourceIntroductionService.hasValidIntroduction(resourceId, nfcCard.user.id);
+    const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
+
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
+        canManageResource: nfcCard.user.systemPermissions.canManageResources,
+        hasIntroduction,
+        isIntroducer,
       }),
     );
   }

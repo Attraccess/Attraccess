@@ -251,12 +251,13 @@ void API::setResourceListUpdateCallback(std::function<void(JsonArray)> callback)
     this->resourceListUpdateCallback = callback;
 }
 
-void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength)
+void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId)
 {
     this->logger.info("Requesting card authentication data");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["uid"] = hexToString(uid, uidLength);
+    payload["resourceId"] = resourceId;
     this->sendMessage("REQUEST_CARD_AUTHENTICATION_DATA", payload);
 }
 
@@ -293,10 +294,19 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
         error = "Invalid key length";
     }
 
-    this->cardAuthenticationDetailsResponseCallback(keyNo, keyLen == 16 ? keyBytes : nullptr, keyLen, error, username);
+    CardAuthenticationDetailsResponse response;
+    response.keyNo = keyNo;
+    response.keyBytes = keyBytes;
+    response.keyLen = keyLen;
+    response.error = error;
+    response.username = username;
+    response.canManageResource = payload["canManageResource"].is<bool>() ? payload["canManageResource"].as<bool>() : false;
+    response.hasIntroduction = payload["hasIntroduction"].is<bool>() ? payload["hasIntroduction"].as<bool>() : false;
+    response.isIntroducer = payload["isIntroducer"].is<bool>() ? payload["isIntroducer"].as<bool>() : false;
+    this->cardAuthenticationDetailsResponseCallback(response);
 }
 
-void API::setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String, String)> callback)
+void API::setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback)
 {
     this->cardAuthenticationDetailsResponseCallback = callback;
 }

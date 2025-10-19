@@ -205,7 +205,19 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->elapsedTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->startSessionButton = lv_button_create(this->screen);
+   this->sessionControls = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(this->sessionControls);
+   lv_obj_set_width(this->sessionControls, lv_pct(100));
+   lv_obj_set_height(this->sessionControls, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->sessionControls, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(this->sessionControls, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->sessionControls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->sessionControls, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(this->sessionControls, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(this->sessionControls, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(this->sessionControls, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->startSessionButton = lv_button_create(this->sessionControls);
    lv_obj_set_height(this->startSessionButton, 50);
    lv_obj_set_width(this->startSessionButton, lv_pct(100));
    lv_obj_set_align(this->startSessionButton, LV_ALIGN_CENTER);
@@ -220,7 +232,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForSessionToggleButton, LV_ALIGN_CENTER);
    lv_label_set_text(labelForSessionToggleButton, "Ressource verwenden");
 
-   this->stopSessionButton = lv_button_create(this->screen);
+   this->stopSessionButton = lv_button_create(this->sessionControls);
    lv_obj_set_height(this->stopSessionButton, 50);
    lv_obj_set_width(this->stopSessionButton, lv_pct(100));
    lv_obj_set_align(this->stopSessionButton, LV_ALIGN_CENTER);
@@ -237,7 +249,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForStopSessionButton, LV_ALIGN_CENTER);
    lv_label_set_text(labelForStopSessionButton, "Sitzung beenden");
 
-   this->doorControls = lv_obj_create(this->screen);
+   this->doorControls = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->doorControls);
    lv_obj_set_height(this->doorControls, 50);
    lv_obj_set_width(this->doorControls, lv_pct(100));
@@ -294,7 +306,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForUnlatchDoorButton, LV_ALIGN_CENTER);
    lv_label_set_text(labelForUnlatchDoorButton, "Falle oeffnen");
 
-   this->flowButtonsContainer = lv_obj_create(this->screen);
+   this->flowButtonsContainer = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->flowButtonsContainer);
    lv_obj_set_height(this->flowButtonsContainer, 50);
    lv_obj_set_width(this->flowButtonsContainer, lv_pct(100));
@@ -322,9 +334,33 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
    lv_label_set_text(labelForFlowButton, "Trigger a Flow");
    */
+
+   this->noIntroductionPanel = lv_obj_create(this->screen);
+   lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
+   lv_obj_set_height(this->noIntroductionPanel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->noIntroductionPanel, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(this->noIntroductionPanel, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->noIntroductionPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->noIntroductionPanel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->noIntroductionPanel, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->noIntroductionPanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *noIntroductionInfoLabel = lv_label_create(this->noIntroductionPanel);
+   lv_obj_set_width(noIntroductionInfoLabel, lv_pct(100));
+   lv_obj_set_height(noIntroductionInfoLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(noIntroductionInfoLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(noIntroductionInfoLabel, "Sie benoetigen eine Einweisung, bevor Sie diese Ressource nutzen koennen. Bitte wenden Sie sich an einen der unten aufgefuehrten Einweiser.");
+   lv_obj_set_style_text_color(noIntroductionInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
+   lv_obj_set_width(this->introducersListLabel, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->introducersListLabel, "???");
 }
 
-void ResourceDetailsScreen::setInfo(resource_type_t resourceType, String resourceName, String resourceDescription)
+void ResourceDetailsScreen::setResourceAndUsageDetails(resource_type_t resourceType, String resourceName, String resourceDescription)
 {
    lv_label_set_text(this->resourceName, resourceName.c_str());
    lv_label_set_text(this->resourceDescription, resourceDescription.c_str());
@@ -345,18 +381,9 @@ void ResourceDetailsScreen::setInfo(resource_type_t resourceType, String resourc
    }
 }
 
-// TODO: only active user and maintainers can stop the current session
-// If active user it not the current user but a maintainer, show a warning additionally
-
-// TODO: is user does not have permission to start resource, show info about available introducers
-
-// TODO: show username of currently signed in user
-
-// TODO: add back button to resource details screen
-
 // TODO: show errors that happen when executing buttons (add a reusable popup dialog for this)
 
-void ResourceDetailsScreen::setInfo(
+void ResourceDetailsScreen::setResourceAndUsageDetails(
     resource_type_t resourceType,
     String resourceName,
     String resourceDescription,
@@ -455,10 +482,10 @@ String ResourceDetailsScreen::getName()
    return "ResourceDetailsScreen";
 }
 
-void ResourceDetailsScreen::setSignedInUsername(String username)
+void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 {
-   this->logger.debugf("Setting signed in username: %s", username.c_str());
-   this->loginUsernameCache = username;
+   this->logger.debugf("Setting signed in username: %s", userDetails.username.c_str());
+   this->loginUsernameCache = userDetails.username;
 
    if (this->loginUserLabel == nullptr)
    {
@@ -466,13 +493,19 @@ void ResourceDetailsScreen::setSignedInUsername(String username)
       return;
    }
 
-   if (username.length() == 0)
+   if (userDetails.username.length() == 0)
    {
       this->logger.debug("No login user label found");
       lv_label_set_text(this->loginUserLabel, "???");
       return;
    }
 
-   this->logger.debugf("Setting login user label text: %s", username.c_str());
-   lv_label_set_text(this->loginUserLabel, username.c_str());
+   this->logger.debugf("Setting login user label text: %s", userDetails.username.c_str());
+   lv_label_set_text(this->loginUserLabel, userDetails.username.c_str());
+
+   // show introduction panel only if user does not have introduction
+   lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, userDetails.hasIntroduction);
+
+   // show session controls only if the user hasIntroduction, isIntroducer or canManageResource
+   lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !userDetails.hasIntroduction && !userDetails.isIntroducer && !userDetails.canManageResource);
 }

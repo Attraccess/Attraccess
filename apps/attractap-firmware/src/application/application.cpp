@@ -24,11 +24,17 @@ void Application::setup()
     this->api.setResourceListUpdateCallback([this](JsonArray resourceList)
                                             { this->handleResourceListUpdate(resourceList); });
 
-    this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error, String username)
+    this->api.setCardAuthenticationDetailsResponseCallback([this](API::CardAuthenticationDetailsResponse response)
                                                            { 
-                                                            this->logger.debugf("Card authentication details: Username: %s", username.c_str());
-                                                             Display::resourceDetailsScreen.setSignedInUsername(username);
-                                                             this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
+                                                            this->logger.debugf("Card authentication details: Username: %s", response.username.c_str());
+                                                             Display::resourceDetailsScreen.setUserDetails(
+                                                                ResourceDetailsScreen::UserDetails{
+                                                                    .username = response.username,
+                                                                    .canManageResource = response.canManageResource,
+                                                                    .hasIntroduction = response.hasIntroduction,
+                                                                    .isIntroducer = response.isIntroducer
+                                                                });
+                                                             this->handleCardAuthenticationDetails(response); });
 
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
@@ -88,7 +94,7 @@ void Application::setup()
     {
         this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
 
-        this->api.requestCardAuthenticationData(uid, uidLength);
+        this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
     };
     this->nfc.setCardDetectionCallback(cardDetectionCallback);
 
@@ -302,9 +308,9 @@ void Application::handleResourceListUpdate(JsonArray resourceList)
     }
 }
 
-void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error)
+void Application::handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response)
 {
-    this->logger.infof("Card authentication details: KeyNo: %u", keyNo);
+    this->logger.infof("Card authentication details: KeyNo: %u", response.keyNo);
 
     if (this->state != APPLICATION_STATE_LOCKED)
     {
@@ -313,16 +319,16 @@ void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *
         return;
     }
 
-    if (error.length() > 0)
+    if (response.error.length() > 0)
     {
         // TODO: indicate to user that authentication failed
-        this->logger.errorf("Authentication failed: %s", error.c_str());
+        this->logger.errorf("Authentication failed: %s", response.error.c_str());
         this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
         return;
     }
 
-    if (keyBytes == nullptr || keyLen != 16)
+    if (response.keyBytes == nullptr || response.keyLen != 16)
     {
         this->logger.error("Invalid key bytes provided");
         this->ioExpander.errorBeep();
@@ -330,8 +336,8 @@ void Application::handleCardAuthenticationDetails(uint8_t keyNo, const uint8_t *
         return;
     }
 
-    this->logger.infof("Trying to authenticate with keyNo: %u", keyNo);
-    bool authenticated = this->nfc.authenticate(keyNo, const_cast<uint8_t *>(keyBytes));
+    this->logger.infof("Trying to authenticate with keyNo: %u", response.keyNo);
+    bool authenticated = this->nfc.authenticate(response.keyNo, const_cast<uint8_t *>(response.keyBytes));
 
     if (!authenticated)
     {
@@ -366,7 +372,7 @@ void Application::selectResource(JsonObject resource)
     bool hasActiveUsageSession = resource["activeUsageSession"]["user"]["id"].is<uint32_t>() && resource["activeUsageSession"]["user"]["id"].as<uint32_t>() > 0;
     if (!hasActiveUsageSession)
     {
-        Display::resourceDetailsScreen.setInfo(resourceType, name, description);
+        Display::resourceDetailsScreen.setResourceAndUsageDetails(resourceType, name, description);
     }
     else
     {
@@ -374,7 +380,7 @@ void Application::selectResource(JsonObject resource)
         String sessionStartTimeStr = resource["activeUsageSession"]["startTime"].as<String>();
         time_t sessionStartTime = parseIso8601ToTimeT(sessionStartTimeStr);
 
-        Display::resourceDetailsScreen.setInfo(resourceType, name, description, sessionStartTime, currentUser);
+        Display::resourceDetailsScreen.setResourceAndUsageDetails(resourceType, name, description, sessionStartTime, currentUser);
     }
 }
 
