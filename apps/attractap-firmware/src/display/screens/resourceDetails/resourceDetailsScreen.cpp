@@ -12,10 +12,63 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->sessionTimeoutIndicator = lv_bar_create(this->screen);
-   lv_bar_set_range(sessionTimeoutIndicator, 0, 30);
-   // TODO: animate with current timeout
-   lv_bar_set_start_value(this->sessionTimeoutIndicator, 30, LV_ANIM_ON);
+   lv_obj_t *loginContainer = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(loginContainer);
+   lv_obj_set_width(loginContainer, lv_pct(100));
+   lv_obj_set_height(loginContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(loginContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(loginContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(loginContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(loginContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(loginContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *logoutButton = lv_button_create(loginContainer);
+   lv_obj_set_width(logoutButton, 70);
+   lv_obj_set_height(logoutButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(logoutButton, LV_ALIGN_CENTER);
+   lv_obj_add_flag(logoutButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(logoutButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(logoutButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT});
+
+   lv_obj_t *labelForLogoutButton = lv_label_create(logoutButton);
+   lv_obj_set_width(labelForLogoutButton, LV_SIZE_CONTENT);
+   lv_obj_set_height(labelForLogoutButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(labelForLogoutButton, LV_ALIGN_CENTER);
+   lv_label_set_text(labelForLogoutButton, "Abmelden");
+   lv_obj_set_style_text_align(labelForLogoutButton, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(labelForLogoutButton, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *userAndTimeoutContainer = lv_obj_create(loginContainer);
+   lv_obj_remove_style_all(userAndTimeoutContainer);
+   lv_obj_set_width(userAndTimeoutContainer, 340);
+   lv_obj_set_height(userAndTimeoutContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(userAndTimeoutContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(userAndTimeoutContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(userAndTimeoutContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(userAndTimeoutContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(userAndTimeoutContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->loginUserLabel = lv_label_create(userAndTimeoutContainer);
+   lv_obj_set_width(this->loginUserLabel, lv_pct(100));
+   lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
+   lv_obj_set_style_text_font(this->loginUserLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Ensure the username is visible on the background image
+   lv_obj_set_style_text_color(this->loginUserLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->sessionTimeoutIndicator = lv_bar_create(userAndTimeoutContainer);
+   lv_bar_set_mode(this->sessionTimeoutIndicator, LV_BAR_MODE_SYMMETRICAL);
+   lv_bar_set_range(this->sessionTimeoutIndicator, 0, 30);
+   lv_bar_set_value(this->sessionTimeoutIndicator, 25, LV_ANIM_OFF);
+   lv_bar_set_start_value(this->sessionTimeoutIndicator, 30, LV_ANIM_OFF);
    lv_obj_set_height(this->sessionTimeoutIndicator, 10);
    lv_obj_set_width(this->sessionTimeoutIndicator, lv_pct(100));
    lv_obj_set_align(this->sessionTimeoutIndicator, LV_ALIGN_CENTER);
@@ -61,15 +114,6 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   // Signed-in username label (current NFC-authenticated user)
-   this->signedInUsernameLabel = lv_label_create(resouceDetails);
-   lv_obj_set_height(this->signedInUsernameLabel, LV_SIZE_CONTENT);
-   lv_obj_set_width(this->signedInUsernameLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->signedInUsernameLabel, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->signedInUsernameLabel, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_color(this->signedInUsernameLabel, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_text(this->signedInUsernameLabel, "");
 
    this->sessionDetailsContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
@@ -413,15 +457,22 @@ String ResourceDetailsScreen::getName()
 
 void ResourceDetailsScreen::setSignedInUsername(String username)
 {
-   if (this->signedInUsernameLabel == nullptr)
+   this->logger.debugf("Setting signed in username: %s", username.c_str());
+   this->loginUsernameCache = username;
+
+   if (this->loginUserLabel == nullptr)
    {
+      this->logger.debug("No login user label found");
       return;
    }
+
    if (username.length() == 0)
    {
-      lv_label_set_text(this->signedInUsernameLabel, "");
+      this->logger.debug("No login user label found");
+      lv_label_set_text(this->loginUserLabel, "???");
       return;
    }
-   String text = "Angemeldet: " + username;
-   lv_label_set_text(this->signedInUsernameLabel, text.c_str());
+
+   this->logger.debugf("Setting login user label text: %s", username.c_str());
+   lv_label_set_text(this->loginUserLabel, username.c_str());
 }

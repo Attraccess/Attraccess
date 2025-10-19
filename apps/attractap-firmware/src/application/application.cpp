@@ -26,6 +26,7 @@ void Application::setup()
 
     this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error, String username)
                                                            { 
+                                                            this->logger.debugf("Card authentication details: Username: %s", username.c_str());
                                                              Display::resourceDetailsScreen.setSignedInUsername(username);
                                                              this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
 
@@ -421,6 +422,13 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
         // this->api.triggerFlowButton();
         // TODO: implement flow button
+        break;
+    case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+        if (this->resourceCount > 1)
+        {
+            this->resourceIsSelected = false;
+        }
+        this->unlocked = false;
         break;
     }
 }

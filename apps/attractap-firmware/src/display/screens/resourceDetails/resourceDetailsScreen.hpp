@@ -22,9 +22,10 @@ public:
         BUTTON_CLICK_TYPE_UNLOCK_DOOR,
         BUTTON_CLICK_TYPE_UNLATCH_DOOR,
         BUTTON_CLICK_TYPE_FLOW_BUTTON,
+        BUTTON_CLICK_TYPE_LOGOUT,
     };
 
-    ResourceDetailsScreen() : logger("ResourceDetailsScreen") {}
+    ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE") {}
     void init();
     void loop() override;
     lv_obj_t *getScreen() override;
@@ -46,12 +47,14 @@ private:
     Logger logger;
     lv_obj_t *screen;
 
+    String loginUsernameCache;
+    lv_obj_t *loginUserLabel = nullptr;
+
     lv_obj_t *sessionDetailsContainer;
     time_t sessionStartTime;
 
     lv_obj_t *resourceName;
     lv_obj_t *resourceDescription;
-    lv_obj_t *signedInUsernameLabel;
     lv_obj_t *sessionStartTimeLabel;
     lv_obj_t *currentUser;
 
