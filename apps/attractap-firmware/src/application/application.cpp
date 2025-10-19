@@ -24,8 +24,10 @@ void Application::setup()
     this->api.setResourceListUpdateCallback([this](JsonArray resourceList)
                                             { this->handleResourceListUpdate(resourceList); });
 
-    this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error)
-                                                           { this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
+    this->api.setCardAuthenticationDetailsResponseCallback([this](uint8_t keyNo, const uint8_t *keyBytes, uint8_t keyLen, String error, String username)
+                                                           { 
+                                                             Display::resourceDetailsScreen.setSignedInUsername(username);
+                                                             this->handleCardAuthenticationDetails(keyNo, keyBytes, keyLen, error); });
 
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
@@ -57,6 +59,38 @@ void Application::setup()
                                          Display::transitionToScreen(&Display::resourceListScreen);
                                          return success; });
 
+    Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
+                                                    { Settings::saveDeviceConfig(pin); });
+
+    Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]()
+                                                                      { 
+                                           Display::transitionToScreen(&Display::initScreen);
+                                           this->state = APPLICATION_STATE_BOOT;
+                                           this->api.enableConnectionAttempts(); });
+
+    Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
+                                                             { this->handleConnectionConfigurationSave(cfg);
+                                                       this->state = APPLICATION_STATE_BOOT;
+                                                       this->api.enableConnectionAttempts(); });
+
+    Display::initScreen.setOnOpenSettingsCallback([this]()
+                                                  {
+                                           this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+                                           this->api.disableConnectionAttempts();
+                                           Display::connectionConfigurationScreen.enablePinLock();
+                                           Display::transitionToScreen(&Display::connectionConfigurationScreen); });
+
+    Display::resourceListScreen.setResourceSelectionCallback([this](JsonObject resource)
+                                                             { this->selectResource(resource); });
+
+    auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
+    {
+        this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
+
+        this->api.requestCardAuthenticationData(uid, uidLength);
+    };
+    this->nfc.setCardDetectionCallback(cardDetectionCallback);
+
     xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr, tskIDLE_PRIORITY, nullptr);
 
     Display::setTouchCallback([this](int16_t x, int16_t y)
@@ -76,7 +110,7 @@ void Application::loop()
 
 void Application::processState()
 {
-    if (this->state == APPLICATION_STATE_CUSTOM)
+    if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
         return;
     }
@@ -102,8 +136,6 @@ void Application::processState()
 
         this->logger.debug("PIN is not set, showing pin screen");
         this->state = APPLICATION_STATE_PIN_NOT_SET;
-        Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
-                                                        { Settings::saveDeviceConfig(pin); });
 
         Display::transitionToScreen(&Display::setPinScreen);
         return;
@@ -122,8 +154,6 @@ void Application::processState()
 
         this->logger.debug("Connection is not configured, showing connection configuration screen");
         this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-        Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
-                                                                 { this->handleConnectionConfigurationSave(cfg); });
         Display::connectionConfigurationScreen.disablePinLock();
         Display::transitionToScreen(&Display::connectionConfigurationScreen);
         return;
@@ -141,20 +171,6 @@ void Application::processState()
 
         this->logger.debug("API state is not authenticated, network state is not connected, websocket state is not connected, showing init screen");
         this->state = APPLICATION_STATE_INIT;
-        Display::initScreen.setOnOpenSettingsCallback([this]()
-                                                      {
-                                                        this->state = APPLICATION_STATE_CUSTOM;
-                                                        Display::connectionConfigurationScreen.enablePinLock();
-                                                        Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
-                                                                 { this->handleConnectionConfigurationSave(cfg);
-                                                                    Display::transitionToScreen(&Display::initScreen);
-                                                                    this->state = APPLICATION_STATE_INIT;
-                                                                 });
-                                                        Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]()
-                                                                                                                  { 
-                                                                                                                    Display::transitionToScreen(&Display::initScreen);
-                                                                                                                    this->state = APPLICATION_STATE_INIT; });
-                                                        Display::transitionToScreen(&Display::connectionConfigurationScreen); });
 
         Display::transitionToScreen(&Display::initScreen);
         return;
@@ -189,8 +205,6 @@ void Application::processState()
 
         this->logger.debug("Resource count is greater than 0 and resource is not selected, showing resource list");
         this->state = APPLICATION_STATE_RESOURCE_LIST;
-        Display::resourceListScreen.setResourceSelectionCallback([this](JsonObject resource)
-                                                                 { this->selectResource(resource); });
         Display::transitionToScreen(&Display::resourceListScreen);
         return;
     }
@@ -211,17 +225,6 @@ void Application::processState()
 
         this->logger.debug("Card is not detected, showing lockscreen");
         this->state = APPLICATION_STATE_LOCKED;
-
-        auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
-        {
-            this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
-
-            // TODO: ask server for key of this card
-            // TODO: use key of card to authenticate
-
-            this->api.requestCardAuthenticationData(uid, uidLength);
-        };
-        this->nfc.setCardDetectionCallback(cardDetectionCallback);
         Display::transitionToScreen(&Display::lockscreen, [this]()
                                     { 
                                         this->logger.debug("Lockscreen transition complete, enabling card detection");

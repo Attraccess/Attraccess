@@ -319,16 +319,6 @@ void Display::initDeviceOverlay()
     lv_obj_set_style_text_color(firmwareLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *timeLabel = lv_label_create(deviceInfoContainer);
-    lv_obj_set_width(timeLabel, LV_SIZE_CONTENT);
-    lv_obj_set_height(timeLabel, LV_SIZE_CONTENT);
-    lv_obj_set_align(timeLabel, LV_ALIGN_CENTER);
-    // TODO: in the future, display the current time
-    lv_label_set_text(timeLabel, "");
-    lv_obj_set_style_text_color(timeLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(timeLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(timeLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 void Display::setDeviceName(String deviceName)

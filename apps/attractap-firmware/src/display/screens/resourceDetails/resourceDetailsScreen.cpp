@@ -62,6 +62,15 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   // Signed-in username label (current NFC-authenticated user)
+   this->signedInUsernameLabel = lv_label_create(resouceDetails);
+   lv_obj_set_height(this->signedInUsernameLabel, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->signedInUsernameLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->signedInUsernameLabel, LV_ALIGN_CENTER);
+   lv_obj_remove_flag(this->signedInUsernameLabel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_text_color(this->signedInUsernameLabel, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_text(this->signedInUsernameLabel, "");
+
    this->sessionDetailsContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
    lv_obj_set_width(this->sessionDetailsContainer, lv_pct(100));
@@ -292,6 +301,17 @@ void ResourceDetailsScreen::setInfo(resource_type_t resourceType, String resourc
    }
 }
 
+// TODO: only active user and maintainers can stop the current session
+// If active user it not the current user but a maintainer, show a warning additionally
+
+// TODO: is user does not have permission to start resource, show info about available introducers
+
+// TODO: show username of currently signed in user
+
+// TODO: add back button to resource details screen
+
+// TODO: show errors that happen when executing buttons (add a reusable popup dialog for this)
+
 void ResourceDetailsScreen::setInfo(
     resource_type_t resourceType,
     String resourceName,
@@ -389,4 +409,19 @@ void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
 String ResourceDetailsScreen::getName()
 {
    return "ResourceDetailsScreen";
+}
+
+void ResourceDetailsScreen::setSignedInUsername(String username)
+{
+   if (this->signedInUsernameLabel == nullptr)
+   {
+      return;
+   }
+   if (username.length() == 0)
+   {
+      lv_label_set_text(this->signedInUsernameLabel, "");
+      return;
+   }
+   String text = "Angemeldet: " + username;
+   lv_label_set_text(this->signedInUsernameLabel, text.c_str());
 }

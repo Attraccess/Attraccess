@@ -800,6 +800,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
+        username: nfcCard.user.username,
       }),
     );
   }

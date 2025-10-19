@@ -25,11 +25,16 @@ public:
     void setMessageCallback(std::function<void(String)> callback);
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
+    void enableConnectionAttempts();
+    void disableConnectionAttempts();
+
 private:
     std::function<void(String)> messageCallback;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
 
     AdaptiveCertManager _certManager;
+
+    bool connectionAttemptsEnabled = true;
 
     void updateInfoFromAppState();
     void connectWebSocket();

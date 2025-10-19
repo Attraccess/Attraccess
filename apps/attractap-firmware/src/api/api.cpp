@@ -271,6 +271,7 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     // Extract fields safely and emit typed values
     JsonObject payload = data["payload"].as<JsonObject>();
     String error = payload["error"].is<String>() ? payload["error"].as<String>() : String("");
+    String username = payload["username"].is<String>() ? payload["username"].as<String>() : String("");
     uint8_t keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
     String keyHex = payload["key"].is<String>() ? payload["key"].as<String>() : String("");
 
@@ -292,10 +293,10 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
         error = "Invalid key length";
     }
 
-    this->cardAuthenticationDetailsResponseCallback(keyNo, keyLen == 16 ? keyBytes : nullptr, keyLen, error);
+    this->cardAuthenticationDetailsResponseCallback(keyNo, keyLen == 16 ? keyBytes : nullptr, keyLen, error, username);
 }
 
-void API::setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String)> callback)
+void API::setCardAuthenticationDetailsResponseCallback(std::function<void(uint8_t, const uint8_t *, uint8_t, String, String)> callback)
 {
     this->cardAuthenticationDetailsResponseCallback = callback;
 }
@@ -433,4 +434,15 @@ void API::onEnrollNewCard(JsonObject data)
 void API::onDeviceName(std::function<void(String)> callback)
 {
     this->deviceNameCallback = callback;
+}
+
+void API::disableConnectionAttempts()
+{
+    this->websocket.disableConnectionAttempts();
+    this->loopIsEnabled = false;
+}
+
+void API::enableConnectionAttempts()
+{
+    this->websocket.enableConnectionAttempts();
 }

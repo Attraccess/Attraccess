@@ -33,6 +33,7 @@ public:
     void setInfo(resource_type_t resourceType, String resourceName, String resourceDescription);
     void setInfo(resource_type_t resourceType, String resourceName, String resourceDescription, time_t sessionStartTime, String currentUser);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
+    void setSignedInUsername(String username);
 
     struct ButtonClickEventData
     {
@@ -50,6 +51,7 @@ private:
 
     lv_obj_t *resourceName;
     lv_obj_t *resourceDescription;
+    lv_obj_t *signedInUsernameLabel;
     lv_obj_t *sessionStartTimeLabel;
     lv_obj_t *currentUser;
 

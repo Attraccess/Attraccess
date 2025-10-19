@@ -29,6 +29,11 @@ void Websocket::setup()
 
 void Websocket::loop()
 {
+    if (!connectionAttemptsEnabled)
+    {
+        return;
+    }
+
     this->updateInfoFromAppState();
 
     if (!network_is_connected)
@@ -64,6 +69,11 @@ void Websocket::updateInfoFromAppState()
 
 void Websocket::connectWebSocket()
 {
+    if (!connectionAttemptsEnabled)
+    {
+        return;
+    }
+
     if (!ensureTimeSynced(logger))
     {
         setState(INIT);
@@ -269,4 +279,22 @@ void Websocket::setMessageCallback(std::function<void(String)> callback)
 void Websocket::setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback)
 {
     this->binaryDataCallback = callback;
+}
+
+void Websocket::enableConnectionAttempts()
+{
+    this->connectionAttemptsEnabled = true;
+}
+
+void Websocket::disableConnectionAttempts()
+{
+    this->connectionAttemptsEnabled = false;
+
+    if (ws_client)
+    {
+        esp_websocket_client_destroy(ws_client);
+        ws_client = nullptr;
+    }
+
+    setState(INIT);
 }
