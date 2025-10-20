@@ -9,6 +9,7 @@ import { ResourceNotFoundException } from '../exceptions/resource.notFound.excep
 import { ResourceImageService } from './resourceImage.service';
 import { LicenseService } from '../license/license.service';
 import { createMockResource } from '../test-utils/resource.fixtures';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
@@ -61,6 +62,10 @@ describe('ResourcesService', () => {
           useValue: {
             verifyLicense: jest.fn().mockResolvedValue({ valid: true, payload: { cfg: {} } }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();

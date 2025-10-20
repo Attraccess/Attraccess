@@ -19,8 +19,6 @@ import { Mutex } from 'async-mutex';
 import { LicenseModuleType, LicenseService } from '../../license/license.service';
 import { AttractapFirmware } from '../dtos/firmware.dto';
 import { verifyToken } from './websocket.utils';
-import { ResourceImageService } from '../../resources/resourceImage.service';
-import sharp from 'sharp';
 import { ResourceUsageService } from '../../resources/usage/resourceUsage.service';
 import { ResourceIntroductionsService } from '../../resources/introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
@@ -51,9 +49,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(LicenseService)
   private licenseService: LicenseService;
-
-  @Inject(ResourceImageService)
-  private resourceImageService: ResourceImageService;
 
   @Inject(ResourceUsageService)
   private resourceUsageService: ResourceUsageService;
@@ -350,9 +345,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_FIRMWARE_INFO:
         await this.handleFirmwareInfo(socket, eventData);
         break;
-      case AttractapEventType.REQUEST_RESOURCE_THUMBNAIL:
-        await this.handleResourceThumbnailRequest(socket, eventData);
-        break;
       case AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA:
         await this.handleCardAuthenticationRequest(socket, eventData);
         break;
@@ -391,7 +383,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_REQUEST_AUTHENTICATION:
       case AttractapEventType.READER_AUTHENTICATED:
       case AttractapEventType.CARD_AUTHENTICATION_DATA:
-      case AttractapEventType.RESOURCE_THUMBNAIL_DATA:
       case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
         this.logger.error(
           `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
@@ -401,96 +392,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         const exhaustiveCheck: never = eventData.type;
         throw new Error(`Unknown event type: ${exhaustiveCheck}`);
       }
-    }
-  }
-
-  private clampSize(value: number, min: number, max: number) {
-    if (!Number.isFinite(value)) return min;
-    return Math.max(min, Math.min(max, Math.floor(value)));
-  }
-
-  private async handleResourceThumbnailRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const reader = await this.attractapService.findReaderById(socket.readerId);
-    if (!reader) {
-      throw new Error(`Reader not found: ${socket.readerId}`);
-    }
-
-    const { resourceId, width, height, format } = data.payload as {
-      resourceId: number;
-      width: number;
-      height: number;
-      format?: 'RGB565LE';
-    };
-
-    if (!resourceId || !width || !height) {
-      this.logger.warn('Invalid thumbnail request payload');
-      return;
-    }
-
-    // Verify that the resource belongs to the reader
-    const resource = reader.resources.find((resource) => resource.id === resourceId);
-    if (!resource) {
-      this.logger.warn(`Reader ${reader.id} requested thumbnail for non-associated resource ${resourceId}`);
-      return;
-    }
-
-    if (!resource) {
-      this.logger.warn(`Resource ${resourceId} has no image`);
-      return;
-    }
-
-    const w = this.clampSize(width, 8, 128);
-    const h = this.clampSize(height, 8, 128);
-
-    try {
-      const imagePath = await this.resourceImageService.getImagePath(resource.id, resource.imageFilename);
-
-      const { data: rawBuffer, info } = await sharp(imagePath)
-        .resize({ width: w, height: h, fit: 'cover', position: 'centre' })
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      // Convert RGB to RGB565LE format for LVGL compatibility
-      const rgb565Buffer = Buffer.alloc(info.width * info.height * 2);
-      let bufferIndex = 0;
-
-      for (let i = 0; i < rawBuffer.length; i += 3) {
-        const r = rawBuffer[i];
-        const g = rawBuffer[i + 1];
-        const b = rawBuffer[i + 2];
-
-        // Convert 8-bit RGB to 5-6-5 format
-        const r5 = (r >> 3) & 0x1f;
-        const g6 = (g >> 2) & 0x3f;
-        const b5 = (b >> 3) & 0x1f;
-
-        // Pack into 16-bit value (RGB565)
-        const rgb565 = (r5 << 11) | (g6 << 5) | b5;
-
-        // Write as little-endian
-        rgb565Buffer[bufferIndex++] = rgb565 & 0xff;
-        rgb565Buffer[bufferIndex++] = (rgb565 >> 8) & 0xff;
-      }
-
-      const transferId = nanoid(6);
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.RESOURCE_THUMBNAIL_DATA, {
-          transferId,
-          resourceId,
-          width: info.width,
-          height: info.height,
-          format: 'RGB565LE',
-          contentLength: rgb565Buffer.length,
-        }),
-      );
-
-      // log buffer for debug
-      this.logger.debug(`Sending ${rgb565Buffer.length} bytes of RGB565LE data`);
-      this.logger.debug(rgb565Buffer.toString('hex'));
-
-      socket.sendBinaryData(rgb565Buffer);
-    } catch (error) {
-      this.logger.error(`Error preparing thumbnail for resource ${resourceId}: ${String(error)}`);
     }
   }
 

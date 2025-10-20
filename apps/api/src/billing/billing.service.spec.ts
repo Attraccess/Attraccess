@@ -22,6 +22,7 @@ import { Currency } from './dto/set-configuration.dto';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { EmailService } from '../email/email.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -38,6 +39,7 @@ describe('BillingService', () => {
       providers: [
         BillingService,
         { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         // Provide BillingTransactionItem repo with a manager.transaction for internal use
         {
           provide: getRepositoryToken(BillingTransactionItem),
