@@ -48,6 +48,7 @@ void Logger::logf(const char *message, ...)
     va_end(args);
 }
 
+#if LOGGER_LEVEL_NUM >= 1
 void Logger::info(const char *message)
 {
     log(message, LOG_LEVEL_INFO);
@@ -60,6 +61,7 @@ void Logger::infof(const char *message, ...)
     logf(message, LOG_LEVEL_INFO, args);
     va_end(args);
 }
+#endif
 
 void Logger::error(const char *message)
 {
@@ -74,6 +76,7 @@ void Logger::errorf(const char *message, ...)
     va_end(args);
 }
 
+#if LOGGER_LEVEL_NUM >= 2
 void Logger::debug(const char *message)
 {
     log(message, LOG_LEVEL_DEBUG);
@@ -86,6 +89,7 @@ void Logger::debugf(const char *message, ...)
     logf(message, LOG_LEVEL_DEBUG, args);
     va_end(args);
 }
+#endif
 
 void Logger::setLogLevel(String level, bool saveToPreferences)
 {

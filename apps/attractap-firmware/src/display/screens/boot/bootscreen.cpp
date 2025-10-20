@@ -19,13 +19,6 @@ void BootScreen::init()
     lv_obj_set_style_text_font(firmware_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(firmware_label, lv_color_white(), 0);
     lv_obj_align(firmware_label, LV_ALIGN_CENTER, 0, 20);
-
-    // Board info
-    lv_obj_t *board_label = lv_label_create(this->screen);
-    lv_label_set_text(board_label, BOARD_FAMILY);
-    lv_obj_set_style_text_font(board_label, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(board_label, lv_color_white(), 0);
-    lv_obj_align(board_label, LV_ALIGN_CENTER, 0, 50);
 }
 
 lv_obj_t *BootScreen::getScreen()
