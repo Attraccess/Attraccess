@@ -25,6 +25,7 @@ NoResourcesScreen Display::noResourcesScreen;
 ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
+FirmwareUpdateScreen Display::firmwareUpdateScreen;
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
@@ -239,6 +240,7 @@ void Display::setup()
     Display::resourceListScreen.init();
     Display::resourceDetailsScreen.init();
     Display::enrollmentScreen.init();
+    Display::firmwareUpdateScreen.init();
 
     Display::initDeviceOverlay();
 

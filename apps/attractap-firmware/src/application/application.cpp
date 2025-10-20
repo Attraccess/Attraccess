@@ -14,6 +14,18 @@ void Application::networkTask(void *parameter)
 
 void Application::setup()
 {
+    // Confirm OTA image on first boot after update to avoid rollback
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK)
+    {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY)
+        {
+            // Minimal diagnostic succeeded; mark image valid
+            esp_ota_mark_app_valid_cancel_rollback();
+        }
+    }
+
     Settings::setup();
     Network::setup();
     this->ioExpander.setup();
@@ -141,6 +153,34 @@ void Application::setup()
                                               if (pl) delete pl;
                                           }, p); });
 
+    this->api.setFirmwareUpdateMetaCallback([this](const char *current, const char *available)
+                                            {
+                                                struct Meta { const char *cur; const char *av; };
+                                                Meta *m = new Meta{current, available}; if (!m) return;
+                                                lv_async_call([](void *u){
+                                                    Meta *mm = (Meta*)u; if (!mm) return;
+                                                    Display::firmwareUpdateScreen.setVersions(mm->cur, mm->av);
+                                                    delete mm;
+                                                }, m); });
+
+    this->api.setFirmwareUpdateProgressCallback([this](int percent)
+                                                {
+                                                    struct Payload { Application *self; int pc; };
+                                                    Payload *p = new Payload{this, percent}; if (!p) return;
+                                                    lv_async_call([](void *u){
+                                                        Payload *pl = (Payload*)u; if (!pl) return;
+                                                        if (pl->self->state != APPLICATION_STATE_FIRMWARE_UPDATE)
+                                                        {
+                                                            pl->self->logger.debug("Transitioning to firmware update screen");
+                                                            pl->self->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+                                                            Display::transitionToScreen(&Display::firmwareUpdateScreen);
+                                                        }
+                                                        if (pl->pc % 10 == 0 && pl->pc != 0)
+                                                            pl->self->logger.infof("Firmware Update: progress=%d%%", pl->pc);
+                                                        Display::firmwareUpdateScreen.setProgress(pl->pc);
+                                                        delete pl;
+                                                    }, p); });
+
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
 
@@ -250,6 +290,11 @@ void Application::loop()
 void Application::processState()
 {
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
+    {
+        return;
+    }
+
+    if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE)
     {
         return;
     }

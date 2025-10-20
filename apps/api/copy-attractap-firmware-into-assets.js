@@ -57,7 +57,7 @@ origins.forEach((origin) => {
       // Add firmwares to combined list
       combinedFirmwares.firmwares.push(...firmwaresData.firmwares);
 
-      // Copy each firmware file listed in 'filename'
+      // Copy each firmware file listed in 'filename' and 'filenameOTA' (if present)
       firmwaresData.firmwares.forEach((firmware) => {
         if (!firmware.filename) {
           console.warn(`Warning: firmware entry missing 'filename' field:`, firmware);
@@ -70,6 +70,17 @@ origins.forEach((origin) => {
           console.log(`Copied: ${firmware.filename}`);
         } else {
           console.warn(`Warning: ${sourceFile} does not exist or is not a file`);
+        }
+
+        if (firmware.filenameOTA) {
+          const otaSource = path.join(origin.path, firmware.filenameOTA);
+          if (fs.existsSync(otaSource) && fs.statSync(otaSource).isFile()) {
+            const otaDest = path.join(assetsDir, firmware.filenameOTA);
+            fs.copyFileSync(otaSource, otaDest);
+            console.log(`Copied OTA: ${firmware.filenameOTA}`);
+          } else {
+            console.warn(`Warning: ${otaSource} does not exist or is not a file`);
+          }
         }
       });
     } else {

@@ -22,6 +22,7 @@
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
+#include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 
 class Display
 {
@@ -41,6 +42,7 @@ public:
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
     static EnrollmentScreen enrollmentScreen;
+    static FirmwareUpdateScreen firmwareUpdateScreen;
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(String deviceName);

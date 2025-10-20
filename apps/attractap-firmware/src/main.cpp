@@ -14,6 +14,10 @@ void setup()
     Serial.begin(115200);
     delay(2000);
 
+    // log firmware info
+    mainLogger.info("Welcome to Attractap");
+    mainLogger.infof("Firmware: %s, Variant: %s, Version: %s", FIRMWARE_FRIENDLY_NAME, FIRMWARE_VARIANT_FRIENDLY_NAME, FIRMWARE_VERSION);
+
     mainLogger.info("Serial initialized");
 
     Wire.begin(15, 7);

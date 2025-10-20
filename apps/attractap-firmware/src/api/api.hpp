@@ -6,6 +6,8 @@
 #include "../logger/logger.hpp"
 #include "../websocket/websocket.hpp"
 #include "../utils.hpp"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 
 class API
 {
@@ -135,4 +137,28 @@ private:
 
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const char *type, bool success)> actionResultCallback;
+
+    // Firmware update progress callback with status enum
+public:
+    void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
+    void setFirmwareUpdateMetaCallback(std::function<void(const char *currentVersion, const char *availableVersion)> callback);
+
+private:
+    std::function<void(int)> firmwareUpdateProgressCallback;
+    std::function<void(const char *, const char *)> firmwareUpdateMetaCallback;
+
+    // OTA state
+    struct OtaState
+    {
+        bool inProgress = false;
+        uint32_t totalSize = 0;
+        esp_ota_handle_t otaHandle = 0;
+        const esp_partition_t *updatePartition = nullptr;
+        int lastReportedPercent = -1;
+    } ota;
+
+    void startFirmwareUpdate(JsonObject firmwareMeta);
+    bool performHttpOta(const char *url, uint32_t expectedSize);
+    void abortFirmwareUpdate(const char *reason);
+    void updateFirmwareProgress(int percent);
 };

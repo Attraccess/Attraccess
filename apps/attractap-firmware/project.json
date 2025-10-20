@@ -16,8 +16,7 @@
         "{projectRoot}/platformio.ini",
         "{projectRoot}/build_firmwares.py",
         "{projectRoot}/src/**/*",
-        "{projectRoot}/.pio/**/*",
-        "{projectRoot}/data/**/*"
+        "{projectRoot}/.pio/**/*"
       ],
       "cache": true
     }

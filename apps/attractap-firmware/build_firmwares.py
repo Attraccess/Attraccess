@@ -296,6 +296,16 @@ def main():
                 print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
                 sys.exit(1)
 
+            # Also export the app-only OTA image (do not merge bootloader/partitions)
+            ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+            ota_bin_path = os.path.join(output_dir, ota_filename)
+            try:
+                shutil.copyfile(firmware_path, ota_bin_path)
+                print(f"OTA app image copied to: {ota_bin_path}")
+            except Exception as e:
+                print(f"Error: Failed to copy OTA image for environment '{env}': {e}")
+                sys.exit(1)
+
             firmware_info.append({
                 "name": firmware_name,
                 "friendlyName": firmware_friendly_name,
@@ -303,7 +313,8 @@ def main():
                 "variantFriendlyName": firmware_variant_friendly_name,
                 "version": firmware_version,
                 "boardFamily": board_family if board_family else board_family_auto,
-                "filename": firmware_filename
+                "filename": firmware_filename,
+                "filenameOTA": ota_filename
             })
         
         # Create single consolidated firmware manifest

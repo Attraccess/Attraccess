@@ -8,6 +8,8 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server } from 'ws';
+import { existsSync, statSync } from 'fs';
+import { join } from 'path';
 import { Inject, Logger } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
@@ -189,17 +191,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     };
 
-    const sendBinaryData = (data: Buffer) => {
-      this.logger.verbose(`Sending binary data: ${data.length} bytes`);
-      client.send(data);
-    };
-
     Object.assign(client, {
       id,
       messageCount,
       readerId: null,
       sendMessage,
-      sendBinaryData,
+      // binary streaming removed (HTTP-based OTA)
       state: {
         lastAuthenticatedUserId: null,
       },
@@ -375,8 +372,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         break;
 
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
-      case AttractapEventType.READER_FIRMWARE_STREAM_CHUNK:
-        // TODO: implement firmware updates
+        // no-op on server; metadata-only event sent by server
         break;
       case AttractapEventType.RESOURCE_LIST:
       case AttractapEventType.READER_UNAUTHORIZED:
@@ -400,8 +396,46 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
     if (!firmwareIsUpToDate) {
-      this.logger.debug('Firmware is not up to date, moving reader to WaitForFirmwareUpdateState');
-      // TODO: send info about firmware update
+      this.logger.debug('Firmware is not up to date, notifying client to start OTA');
+
+      try {
+        const current = data.payload as AttractapFirmware;
+        const latest = await this.firmwareService.getFirmwareDefinition(current.name, current.variant);
+        if (!latest) {
+          this.logger.warn(
+            `No firmware definition found for ${current.name}/${current.variant}; treating as up-to-date for now.`,
+          );
+          return;
+        }
+
+        const assetsDir = join(__dirname, 'assets', 'attractap-firmwares');
+        const otaFilename = latest.filenameOTA || latest.filename;
+        const firmwarePath = join(assetsDir, otaFilename);
+        if (!existsSync(firmwarePath)) {
+          this.logger.error(`OTA firmware binary not found at ${firmwarePath}`);
+          return;
+        }
+        const size = statSync(firmwarePath).size;
+        if (!size || size < 1024) {
+          this.logger.error(`OTA firmware size is suspicious (${size} bytes) for ${otaFilename}`);
+          return;
+        }
+
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
+            available: { version: String(latest.version) },
+            firmware: {
+              name: latest.name,
+              variant: latest.variant,
+              version: String(latest.version),
+              totalSize: size,
+              downloadUrl: this.firmwareService.getFirmwareDownloadUrl(latest.name, latest.variant),
+            },
+          }),
+        );
+      } catch (err) {
+        this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
+      }
       return;
     }
   }
@@ -914,4 +948,5 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { error: error.message }));
     }
   }
+  // handleFirmwareStreamChunk removed - HTTP OTA used instead
 }
