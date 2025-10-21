@@ -2,6 +2,25 @@ ARG NODE_VERSION=22.17.1
 
 FROM node:${NODE_VERSION}-alpine AS builder
 
+# System deps required for native Node modules and tooling
+# - python3/py3-pip: node-gyp and Python-based tooling
+# - build-base (make, g++, etc.): compile native deps when prebuilds are unavailable
+# - libstdc++: runtime for some native modules (e.g., sharp)
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    build-base \
+    libstdc++ \
+    git
+
+# Optional: ESP tooling often used by firmware-related scripts
+# Create a virtual environment to avoid PEP 668 restrictions on Alpine
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install platformio esptool
+
 WORKDIR /app
 
 # Copy package.json and pnpm-lock.yaml first for better layer caching
@@ -22,6 +41,9 @@ FROM node:${NODE_VERSION}-alpine
 
 # Set working directory
 WORKDIR /app
+
+# Minimal runtime libs for native Node modules
+RUN apk add --no-cache libstdc++
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist/apps/api dist/apps/api
