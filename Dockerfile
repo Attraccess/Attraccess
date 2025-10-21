@@ -10,12 +10,16 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     build-base \
-    libstdc++
+    libstdc++ \
+    git
 
 # Optional: ESP tooling often used by firmware-related scripts
-# (safe to have in builder; not copied to runtime image)
-RUN python3 -m pip install --upgrade pip && \
-    pip3 install platformio esptool
+# Create a virtual environment to avoid PEP 668 restrictions on Alpine
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install platformio esptool
 
 WORKDIR /app
 
