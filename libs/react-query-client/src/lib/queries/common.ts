@@ -350,6 +350,13 @@ export type AttractapServiceGetFirmwaresDefaultResponse = Awaited<ReturnType<typ
 export type AttractapServiceGetFirmwaresQueryResult<TData = AttractapServiceGetFirmwaresDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetFirmwaresKey = "AttractapServiceGetFirmwares";
 export const UseAttractapServiceGetFirmwaresKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetFirmwaresKey, ...(queryKey ?? [])];
+export type AttractapServiceDownloadFirmwareBinaryDefaultResponse = Awaited<ReturnType<typeof AttractapService.downloadFirmwareBinary>>;
+export type AttractapServiceDownloadFirmwareBinaryQueryResult<TData = AttractapServiceDownloadFirmwareBinaryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceDownloadFirmwareBinaryKey = "AttractapServiceDownloadFirmwareBinary";
+export const UseAttractapServiceDownloadFirmwareBinaryKeyFn = ({ firmwareName, variantName }: {
+  firmwareName: string;
+  variantName: string;
+}, queryKey?: Array<unknown>) => [useAttractapServiceDownloadFirmwareBinaryKey, ...(queryKey ?? [{ firmwareName, variantName }])];
 export type AttractapServiceGetFirmwareBinaryDefaultResponse = Awaited<ReturnType<typeof AttractapService.getFirmwareBinary>>;
 export type AttractapServiceGetFirmwareBinaryQueryResult<TData = AttractapServiceGetFirmwareBinaryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetFirmwareBinaryKey = "AttractapServiceGetFirmwareBinary";

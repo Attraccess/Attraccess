@@ -2925,6 +2925,13 @@ export type ToggleCardActiveResponse = NFCCard;
 
 export type GetFirmwaresResponse = Array<AttractapFirmware>;
 
+export type DownloadFirmwareBinaryData = {
+    firmwareName: string;
+    variantName: string;
+};
+
+export type DownloadFirmwareBinaryResponse = string;
+
 export type GetFirmwareBinaryData = {
     filename: string;
     firmwareName: string;
@@ -4956,6 +4963,17 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/attractap/firmwares/{firmwareName}/variants/{variantName}': {
+        get: {
+            req: DownloadFirmwareBinaryData;
+            res: {
+                /**
+                 * Firmware streamed successfully
+                 */
+                200: string;
             };
         };
     };
