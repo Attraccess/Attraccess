@@ -155,10 +155,16 @@ private:
         esp_ota_handle_t otaHandle = 0;
         const esp_partition_t *updatePartition = nullptr;
         int lastReportedPercent = -1;
+        uint32_t bytesWritten = 0;
     } ota;
 
     void startFirmwareUpdate(JsonObject firmwareMeta);
-    bool performHttpOta(const char *url, uint32_t expectedSize);
+    void requestNextFirmwareChunk();
+    void onFirmwareChunkEvent(esp_websocket_event_data_t data);
     void abortFirmwareUpdate(const char *reason);
     void updateFirmwareProgress(int percent);
+
+    // Chunk reception tracking to avoid interleaving/overlap across WS fragments
+    uint32_t currentChunkExpectedBytes = 0;
+    uint32_t currentChunkReceivedBytes = 0;
 };

@@ -8,7 +8,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server } from 'ws';
-import { existsSync, statSync } from 'fs';
+import { existsSync, statSync, openSync, readSync, closeSync } from 'fs';
 import { join } from 'path';
 import { Inject, Logger } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
@@ -191,14 +191,24 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     };
 
+    const sendBinaryData = (data: Buffer) => {
+      try {
+        client.send(data);
+      } catch (e) {
+        this.logger.error(`Failed to send binary data to client ${id}: ${(e as Error).message}`);
+      }
+    };
+
     Object.assign(client, {
       id,
       messageCount,
       readerId: null,
       sendMessage,
-      // binary streaming removed (HTTP-based OTA)
+      sendBinaryData,
       state: {
         lastAuthenticatedUserId: null,
+        enrollNewCardData: null,
+        ota: null,
       },
     });
 
@@ -292,6 +302,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.logger.log('An unidentified client disconnected.');
     }
 
+    // Clean up OTA file descriptor if present
+    if (socket.state?.ota?.fd) {
+      try {
+        closeSync(socket.state.ota.fd);
+      } catch {
+        // nothing to do
+      }
+    }
     this.websocketService.sockets.delete(socket.id);
   }
 
@@ -363,6 +381,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.TRIGGER_FLOW_BUTTON:
         await this.handleTriggerFlowButton(socket, eventData);
         break;
+      case AttractapEventType.FIRMWARE_REQUEST_CHUNK:
+        await this.handleFirmwareChunkRequest(socket, eventData);
+        break;
       case AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY:
         await this.onEnrollNewCardRequestNFCKey(socket, eventData);
         break;
@@ -388,6 +409,51 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         const exhaustiveCheck: never = eventData.type;
         throw new Error(`Unknown event type: ${exhaustiveCheck}`);
       }
+    }
+  }
+
+  private async handleFirmwareChunkRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    try {
+      if (!socket.state.ota || !socket.state.ota.path || !socket.state.ota.size) {
+        this.logger.error(`FIRMWARE_REQUEST_CHUNK received but no OTA context set for client ${socket.id}`);
+        return;
+      }
+
+      const { offset, length } = data.payload;
+      const total = socket.state.ota.size;
+      if (typeof offset !== 'number' || typeof length !== 'number' || offset < 0 || length <= 0 || offset >= total) {
+        this.logger.error(`Invalid chunk request from client ${socket.id}: offset=${offset} length=${length}`);
+        return;
+      }
+
+      const maxChunk = 4096; // hard cap chunk size
+      const safeLen = Math.min(length, maxChunk, total - offset);
+
+      // Lazily open file descriptor
+      if (!socket.state.ota.fd) {
+        try {
+          socket.state.ota.fd = openSync(socket.state.ota.path, 'r');
+        } catch (e) {
+          this.logger.error(`Failed to open firmware for client ${socket.id}: ${(e as Error).message}`);
+          return;
+        }
+      }
+
+      const fd = socket.state.ota.fd as number;
+      const buffer = Buffer.allocUnsafe(safeLen);
+      let bytesRead = 0;
+      try {
+        bytesRead = readSync(fd, buffer, 0, safeLen, offset);
+      } catch (e) {
+        this.logger.error(`Failed to read firmware chunk for client ${socket.id}: ${(e as Error).message}`);
+        return;
+      }
+
+      if (bytesRead > 0) {
+        socket.sendBinaryData(buffer.subarray(0, bytesRead));
+      }
+    } catch (err) {
+      this.logger.error(`handleFirmwareChunkRequest error: ${(err as Error).message}`);
     }
   }
 
@@ -421,6 +487,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           return;
         }
 
+        // Store OTA context for this socket
+        socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];
+
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
             available: { version: String(latest.version) },
@@ -429,7 +498,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
               variant: latest.variant,
               version: String(latest.version),
               totalSize: size,
-              downloadUrl: this.firmwareService.getFirmwareDownloadUrl(latest.name, latest.variant),
             },
           }),
         );

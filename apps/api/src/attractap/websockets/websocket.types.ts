@@ -17,6 +17,7 @@ export enum AttractapEventType {
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
+  FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
@@ -71,6 +72,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       keyNo: number;
       cardUID: string;
     } | null;
+    ota?: {
+      path: string;
+      size: number;
+      fd?: number;
+    } | null;
   };
 }
 
@@ -80,6 +86,11 @@ export interface FirmwareUpdateStartPayload {
   checksum?: string;
   version?: string;
   is_retry?: boolean;
+}
+
+export interface FirmwareRequestChunkPayload {
+  offset: number;
+  length: number;
 }
 
 export interface FirmwareUpdateResponse {

@@ -1,10 +1,6 @@
 #include "api.hpp"
-#include <WiFiClientSecure.h>
-#include <WiFiClient.h>
-#include <HTTPClient.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "../websocket/certManager/AdaptiveCertManager.hpp"
 
 void API::updateSateInfo()
 {
@@ -25,6 +21,8 @@ void API::setup()
     this->websocket.setup();
     this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
+    this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
+                                          { this->onFirmwareChunkEvent(data); });
 }
 void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
 {
@@ -173,13 +171,12 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
     this->logger.info("Starting OTA firmware update");
 
     this->ota.totalSize = firmwareMeta["totalSize"].is<uint32_t>() ? firmwareMeta["totalSize"].as<uint32_t>() : 0;
+    this->ota.bytesWritten = 0;
     this->ota.inProgress = false;
 
-    const char *downloadUrl = firmwareMeta["downloadUrl"].as<const char *>();
-
-    if (this->ota.totalSize == 0 || !downloadUrl || downloadUrl[0] == '\0')
+    if (this->ota.totalSize == 0)
     {
-        this->logger.error("Invalid firmware meta (totalSize/downloadUrl)");
+        this->logger.error("Invalid firmware meta (totalSize)");
         return;
     }
 
@@ -210,171 +207,111 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
     }
     this->updateFirmwareProgress(0);
 
-    // Perform HTTP OTA synchronously; UI will be updated via progress callback.
-    // Suspend websocket activity to avoid contention during OTA
-    this->websocket.disableConnectionAttempts();
-    bool ok = this->performHttpOta(downloadUrl, this->ota.totalSize);
-    if (!ok)
-    {
-        this->abortFirmwareUpdate("HTTP OTA failed");
-        this->websocket.enableConnectionAttempts();
-        return;
-    }
+    // Request first chunk via websocket; keep the WS connection active during OTA
+    this->requestNextFirmwareChunk();
 }
 
-bool API::performHttpOta(const char *url, uint32_t expectedSize)
+void API::requestNextFirmwareChunk()
 {
-    // Build absolute URL if a relative path was provided
-    String finalUrl = String(url ? url : "");
-    if (!(finalUrl.startsWith("http://") || finalUrl.startsWith("https://")))
+    const uint32_t remaining = (this->ota.totalSize > this->ota.bytesWritten) ? (this->ota.totalSize - this->ota.bytesWritten) : 0;
+    if (remaining == 0)
     {
-        auto apiCfg = Settings::getAttraccessApiConfig();
-        String scheme = apiCfg.useSSL ? "https" : "http";
-        String host = apiCfg.hostname;
-        uint16_t port = apiCfg.port;
-        // Ensure path starts with '/'
-        if (!finalUrl.startsWith("/"))
-            finalUrl = String("/") + finalUrl;
-        finalUrl = scheme + "://" + host + ":" + String(port) + finalUrl;
+        return;
+    }
+    const uint32_t CHUNK = 4096; // must match server maxChunk to avoid split across WS frames
+    uint32_t len = remaining < CHUNK ? remaining : CHUNK;
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["offset"] = this->ota.bytesWritten;
+    payload["length"] = len;
+    this->sendMessage("FIRMWARE_REQUEST_CHUNK", payload);
+}
+
+void API::onFirmwareChunkEvent(esp_websocket_event_data_t data)
+{
+    if (!this->ota.inProgress)
+    {
+        return; // ignore unexpected binary frames
     }
 
-    this->logger.infof("Starting HTTP OTA from %s (expected %u bytes)", finalUrl.c_str(), (unsigned)expectedSize);
+    // The ESP websocket client may deliver a single server send across multiple callbacks
+    // Use payload_len (total message size) and payload_offset (offset within message) to write contiguously
+    const uint8_t *fragmentPtr = (const uint8_t *)data.data_ptr;
+    const size_t fragmentLen = (size_t)data.data_len;
+    const size_t messageTotal = (size_t)data.payload_len;     // entire WS message length
+    const size_t messageOffset = (size_t)data.payload_offset; // offset within current WS message
 
-    HTTPClient http;
-    bool began = false;
-
-    auto apiCfg = Settings::getAttraccessApiConfig();
-    if (apiCfg.useSSL)
+    // First fragment of this binary message: validate image header if it's the first file bytes
+    if (this->ota.bytesWritten == 0 && messageOffset == 0 && fragmentLen >= sizeof(esp_image_header_t))
     {
-        WiFiClientSecure secureClient;
-        // Attach certificate from AdaptiveCertManager
-        adaptiveCertManager.begin();
-        const char *certData = nullptr;
-        if (adaptiveCertManager.getCertificate(&certData))
+        const esp_image_header_t *hdr = (const esp_image_header_t *)fragmentPtr;
+        if (hdr->magic != ESP_IMAGE_HEADER_MAGIC)
         {
-            secureClient.setCACert(certData);
+            this->abortFirmwareUpdate("Invalid firmware image header magic");
+            return;
         }
-        began = http.begin(secureClient, finalUrl);
-    }
-    else
-    {
-        WiFiClient plainClient;
-        began = http.begin(plainClient, finalUrl);
     }
 
-    if (!began)
+    // Write this fragment to OTA
+    if (fragmentLen > 0)
     {
-        this->logger.error("HTTP begin failed");
-        return false;
-    }
-
-    int httpCode = http.GET();
-    if (httpCode != HTTP_CODE_OK)
-    {
-        this->logger.errorf("HTTP GET failed: %d", httpCode);
-        http.end();
-        return false;
-    }
-
-    int len = http.getSize();
-    if (len <= 0)
-    {
-        len = expectedSize; // fallback to expected
-    }
-
-    WiFiClient *stream = http.getStreamPtr();
-
-    const size_t bufferSize = 1024; // smaller buffer to reduce UI contention during OTA
-    uint8_t *buffer = (uint8_t *)malloc(bufferSize);
-    if (!buffer)
-    {
-        this->logger.error("Failed to allocate OTA buffer");
-        http.end();
-        return false;
-    }
-
-    uint32_t written = 0;
-    while (http.connected() && (len > 0 || len == -1))
-    {
-        size_t available = stream->available();
-        if (available)
+        esp_err_t werr = esp_ota_write(this->ota.otaHandle, fragmentPtr, fragmentLen);
+        if (werr != ESP_OK)
         {
-            int c = stream->readBytes(buffer, available > bufferSize ? bufferSize : available);
-            if (c > 0)
-            {
-                // Verify app image header on first chunk
-                if (written == 0 && c >= sizeof(esp_image_header_t))
-                {
-                    const esp_image_header_t *hdr = (const esp_image_header_t *)buffer;
-                    if (hdr->magic != ESP_IMAGE_HEADER_MAGIC)
-                    {
-                        this->logger.error("Invalid firmware image header magic");
-                        free(buffer);
-                        http.end();
-                        return false;
-                    }
-                }
-
-                esp_err_t werr = esp_ota_write(this->ota.otaHandle, buffer, c);
-                if (werr != ESP_OK)
-                {
-                    this->logger.error((String("esp_ota_write failed: ") + esp_err_to_name(werr)).c_str());
-                    free(buffer);
-                    http.end();
-                    return false;
-                }
-                written += (uint32_t)c;
-                if (len > 0)
-                    len -= c;
-                if (expectedSize > 0)
-                {
-                    int pct = (int)(((float)written / (float)expectedSize) * 100.0f);
-                    if (pct < 0)
-                        pct = 0;
-                    if (pct > 100)
-                        pct = 100;
-                    // Only report when percent increased by at least 5% (or final 100%)
-                    if (pct == 100 || this->ota.lastReportedPercent < 0 || pct - this->ota.lastReportedPercent >= 5)
-                    {
-                        this->ota.lastReportedPercent = pct;
-                        this->updateFirmwareProgress(pct);
-                    }
-                }
-            }
+            this->abortFirmwareUpdate((String("esp_ota_write failed: ") + esp_err_to_name(werr)).c_str());
+            return;
         }
-        delay(1);
-        yield();
+        this->ota.bytesWritten += (uint32_t)fragmentLen;
+        this->currentChunkReceivedBytes += (uint32_t)fragmentLen;
     }
 
-    free(buffer);
-    http.end();
-
-    this->logger.infof("HTTP OTA wrote %u bytes", (unsigned)written);
-
-    if (expectedSize > 0 && written != expectedSize)
+    if (this->ota.totalSize > 0)
     {
-        this->logger.errorf("OTA size mismatch: expected %u, wrote %u", (unsigned)expectedSize, (unsigned)written);
-        return false;
+        int pct = (int)(((float)this->ota.bytesWritten / (float)this->ota.totalSize) * 100.0f);
+        if (pct < 0)
+            pct = 0;
+        if (pct > 100)
+            pct = 100;
+        if (pct == 100 || this->ota.lastReportedPercent < 0 || pct - this->ota.lastReportedPercent >= 5)
+        {
+            this->ota.lastReportedPercent = pct;
+            this->updateFirmwareProgress(pct);
+        }
+    }
+
+    // When a full WS message (one requested chunk) is finished, request next chunk
+    if (messageOffset + fragmentLen < messageTotal)
+    {
+        // still more fragments for this WS message; wait for next callback
+        return;
+    }
+    // Full message completed
+    this->currentChunkReceivedBytes = 0;
+    this->currentChunkExpectedBytes = 0;
+
+    if (this->ota.bytesWritten < this->ota.totalSize)
+    {
+        this->requestNextFirmwareChunk();
+        return;
     }
 
     esp_err_t endErr = esp_ota_end(this->ota.otaHandle);
     if (endErr != ESP_OK)
     {
-        this->logger.error((String("esp_ota_end failed: ") + esp_err_to_name(endErr)).c_str());
-        return false;
+        this->abortFirmwareUpdate((String("esp_ota_end failed: ") + esp_err_to_name(endErr)).c_str());
+        return;
     }
     esp_err_t setBootErr = esp_ota_set_boot_partition(this->ota.updatePartition);
     if (setBootErr != ESP_OK)
     {
-        this->logger.error((String("esp_ota_set_boot_partition failed: ") + esp_err_to_name(setBootErr)).c_str());
-        return false;
+        this->abortFirmwareUpdate((String("esp_ota_set_boot_partition failed: ") + esp_err_to_name(setBootErr)).c_str());
+        return;
     }
 
     this->updateFirmwareProgress(100);
     this->logger.info("Firmware update complete, restarting...");
     delay(250);
     esp_restart();
-    return true;
 }
 
 void API::abortFirmwareUpdate(const char *reason)
@@ -385,6 +322,7 @@ void API::abortFirmwareUpdate(const char *reason)
         esp_ota_abort(this->ota.otaHandle);
     }
     this->ota.inProgress = false;
+    this->ota.bytesWritten = 0;
     this->updateFirmwareProgress(0);
 }
 
