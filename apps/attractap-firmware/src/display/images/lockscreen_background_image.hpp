@@ -691227,7 +691227,7 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t lockscreen_map[] = {
     0xFF,
 };
 const lv_image_dsc_t lockscreen_background_image = {
-    {
+    .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
         .w = 480,

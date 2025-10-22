@@ -15970,11 +15970,11 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_40h_data[] = {
 };
 
 const lv_image_dsc_t logo_40h = {
-    {
+    .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
         .w = 133,
         .h = 40,
     },
-    sizeof(logo_40h_data),
+    .data_size = sizeof(logo_40h_data),
     .data = logo_40h_data};

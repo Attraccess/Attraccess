@@ -188,7 +188,7 @@ void Display::setup()
     lv_tick_set_cb(Display::tick_cb);
 
     /* Allocate draw buffers in bytes for LVGL v9 */
-    const uint32_t buf_pixels = Display::screenWidth * Display::screenHeight / 8; /* eighth of screen to save RAM */
+    const uint32_t buf_pixels = Display::screenWidth * 20; /* eighth of screen to save RAM */
     const uint32_t buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
     uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
     uint8_t *buf2 = NULL; /* single buffering to further reduce RAM usage */
