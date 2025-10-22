@@ -5,9 +5,6 @@
 #include "esp_netif.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "task_priorities.h"
 #include "state/state.hpp"
 #include "../../logger/logger.hpp"
 #include "../../settings/settings.hpp"
@@ -26,14 +23,12 @@ public:
     };
 
     static void setup();
+    static void loop();
     static esp_err_t initializeNetwork();
 
     static void deinit();
 
 private:
-    static void taskFn(void *parameter);
-    static void loop();
-
     static esp_ip4_addr_t getIPAddress();
 
     static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);

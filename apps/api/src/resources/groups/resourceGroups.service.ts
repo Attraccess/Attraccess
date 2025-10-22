@@ -1,11 +1,13 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
 import { ResourceGroupNotFoundException } from './errors/groupNotFound.error';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceGroupIntroductionChangedEvent } from './introductions/events/resource-group-introduction-changed.event';
 
 interface GetOneSearchOptions {
   id: number;
@@ -18,6 +20,8 @@ export class ResourceGroupsService {
     private readonly resourceGroupRepository: Repository<ResourceGroup>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
@@ -25,7 +29,12 @@ export class ResourceGroupsService {
       name: dto.name,
       description: dto.description,
     });
-    return await this.resourceGroupRepository.save(resourceGroup);
+    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+    );
+    return savedResourceGroup;
   }
 
   public async getMany(): Promise<ResourceGroup[]> {
@@ -51,11 +60,16 @@ export class ResourceGroupsService {
   public async updateOneById(id: number, updateDto: UpdateResourceGroupDto): Promise<ResourceGroup> {
     const resourceGroup = await this.getOne({ id });
 
-    return await this.resourceGroupRepository.save({
+    const savedResourceGroup = await this.resourceGroupRepository.save({
       ...resourceGroup,
       name: updateDto.name,
       description: updateDto.description,
     });
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+    );
+    return savedResourceGroup;
   }
 
   public async addResource(groupId: number, resourceId: number): Promise<void> {
@@ -78,7 +92,11 @@ export class ResourceGroupsService {
     }
 
     resourceGroup.resources.push(resource);
-    await this.resourceGroupRepository.save(resourceGroup);
+    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+    );
   }
 
   public async removeResource(groupId: number, resourceId: number): Promise<void> {
@@ -90,7 +108,11 @@ export class ResourceGroupsService {
     }
 
     resourceGroup.resources = resourceGroup.resources.filter((resource) => resource.id !== resourceId);
-    await this.resourceGroupRepository.save(resourceGroup);
+    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+    );
   }
 
   public async deleteOne(groupId: number): Promise<void> {
@@ -98,6 +120,10 @@ export class ResourceGroupsService {
     if (result.affected === 0) {
       throw new ResourceGroupNotFoundException({ id: groupId });
     }
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(groupId),
+    );
   }
 
   public async getGroupsOfResource(

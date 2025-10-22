@@ -1,419 +1,315 @@
 #include "nfc.hpp"
 
+uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+uint8_t NFC::NEW_KEY[16] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
+
 void NFC::setup()
 {
-    // Avoid blocking NFC driver init; it configures internally
+    this->logger.info("Initializing PN532");
     this->pn532.begin();
 
-    this->logger.info("Creating NFC task");
-    xTaskCreatePinnedToCore(NFC::task_function, "NFC", 8192, this, TASK_PRIORITY_NFC, NULL, 0);
+    this->logger.info("Checking hardware");
+    this->checkHardware(true);
+
+    // configure board to read RFID tags
+    bool samConfigSuccess = this->pn532.SAMConfig();
+    if (!samConfigSuccess)
+    {
+        this->logger.error("SAMConfig failed");
+        return;
+    }
+
+    this->logger.infof("Factory key is: %s", hexToString(NFC::FACTORY_KEY, 16).c_str());
 }
 
-void NFC::task_function(void *pvParameters)
+void NFC::enableCardDetection()
 {
-    NFC *nfc = (NFC *)pvParameters;
-
-    const int LOOP_DELAY_MS = 40; // faster loop to avoid long blocking sections
-
-    while (true)
+    this->logger.info("Enabling card detection");
+    this->checkHardware();
+    /*pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
+    auto irqHandler = [this]
     {
-        nfc->loop();
-        vTaskDelay(LOOP_DELAY_MS / portTICK_PERIOD_MS);
-    }
+        this->onCardDetectedInterruptHandler();
+    };
+    attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
+    this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+    this->timeOfCardDetectionEnabledMs = millis();*/
+    this->cardDetectionEnabled = true;
+}
+
+void NFC::setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback)
+{
+    this->cardDetectionCallback = callback;
+}
+
+void NFC::disableCardDetection()
+{
+    this->logger.info("Disabling card detection");
+    this->cardDetectionEnabled = false;
 }
 
 void NFC::loop()
 {
-    if (!this->nfc_is_detected && !this->detectNfcModule())
-    {
-        return;
-    }
-
-    if (!this->nfc_is_ready && !this->configureNfcModule())
-    {
-        return;
-    }
-
-    this->updateStateFromAppState();
-    this->processNfcCommands();
-
-    if (!this->loop_card_detection_is_enabled)
-    {
-        return;
-    }
-
-    // log every 1s that we are looking for cards
-    static uint32_t lastCardDetectionLogTime = 0;
-    if (millis() - lastCardDetectionLogTime > 1000)
-    {
-        lastCardDetectionLogTime = millis();
-        logger.info("loop: Looking for cards");
-    }
-
-    char dicoveredUuid[16];       // Buffer for UID
-    uint8_t discoveredUuidLength; // Length of UID
-
-    // Clear the buffer to prevent memory issues
-    memset(dicoveredUuid, 0, sizeof(dicoveredUuid));
-    discoveredUuidLength = 0;
-
-    // Keep PN532 polling responsive to avoid blocking other time-sensitive tasks
-    if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 1000))
-    {
-        String uidHex = "";
-        for (uint8_t i = 0; i < discoveredUuidLength; i++)
-        {
-            if (dicoveredUuid[i] < 0x10)
-            {
-                uidHex += "0";
-            }
-            uidHex += String(dicoveredUuid[i], HEX);
-        }
-        logger.infof("loop: Detected card UID=%s", uidHex.c_str());
-
-        State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_DETECTED, uidHex);
-    }
+    this->checkHardware();
+    this->handleCardDetection();
 }
 
-void NFC::processNfcCommands()
+void NFC::handleCardDetection()
 {
-    State::NfcCommand command;
-    if (!State::getNextNfcCommand(command))
+    if (!this->cardDetectionEnabled)
     {
         return;
     }
 
-    switch (command.type)
+    uint8_t cardDetectedUid[7] = {0};
+    uint8_t cardDetectedUidLength = 0;
+
+    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 50);
+    if (!foundCard)
     {
-    case State::NfcCommandType::NFC_COMMAND_TYPE_CHANGE_KEY:
-    {
-        String payload(command.payload);
 
-        // Parse space-delimited values more efficiently
-        int firstSpace = payload.indexOf(' ');
-        int secondSpace = payload.indexOf(' ', firstSpace + 1);
-        int thirdSpace = payload.indexOf(' ', secondSpace + 1);
-
-        String keyNumberStr = payload.substring(0, firstSpace);
-        String authKeyHex = payload.substring(firstSpace + 1, secondSpace);
-        String oldKeyHex = payload.substring(secondSpace + 1, thirdSpace);
-        String newKeyHex = payload.substring(thirdSpace + 1);
-
-        uint8_t keyNumber = keyNumberStr.toInt();
-        uint8_t authKey[16];
-        uint8_t oldKey[16];
-        uint8_t newKey[16];
-
-        this->hexStringToBytes(authKeyHex, authKey, 16);
-        this->hexStringToBytes(oldKeyHex, oldKey, 16);
-        this->hexStringToBytes(newKeyHex, newKey, 16);
-
-        bool success = this->changeKey(keyNumber, authKey, oldKey, newKey);
-        if (success)
-        {
-            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_SUCCESS, command.payload);
-        }
-        else
-        {
-            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_CHANGE_KEY_FAILED, command.payload);
-        }
-        break;
-    }
-
-    case State::NfcCommandType::NFC_COMMAND_TYPE_AUTHENTICATE:
-    {
-        String payload(command.payload);
-
-        // Parse space-delimited values more efficiently
-        int firstSpace = payload.indexOf(' ');
-        String keyNumberStr = payload.substring(0, firstSpace);
-        String authKeyHex = payload.substring(firstSpace + 1);
-
-        uint8_t keyNumber = keyNumberStr.toInt();
-        uint8_t authKey[16];
-
-        this->hexStringToBytes(authKeyHex, authKey, 16);
-
-        char discoveredUuid[16];
-        uint8_t discoveredUuidLength;
-
-        bool foundCard = this->discoverNfcCard(discoveredUuid, &discoveredUuidLength, 1000);
-        if (!foundCard)
-        {
-            logger.error("authenticate Failed to find NFC card");
-            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_FAILED, command.payload);
-            break;
-        }
-
-        bool success = this->authenticate(keyNumber, authKey, true);
-        if (success)
-        {
-            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_SUCCESS, command.payload);
-        }
-        else
-        {
-            State::pushEventToApi(State::ApiInputEventType::API_INPUT_EVENT_NFC_CARD_AUTHENTICATE_FAILED, command.payload);
-        }
-
-        break;
-    }
-    }
-}
-
-void NFC::hexStringToBytes(const String &hexString, uint8_t *byteArray, size_t byteArrayLength)
-{
-    // Initialize array with zeros
-    memset(byteArray, 0, byteArrayLength);
-
-    // Process the hex string - 2 characters per byte
-    for (size_t i = 0; i < byteArrayLength && i * 2 + 1 < hexString.length(); i++)
-    {
-        String byteHex = hexString.substring(i * 2, i * 2 + 2);
-        byteArray[i] = strtol(byteHex.c_str(), NULL, 16);
-    }
-}
-
-void NFC::updateStateFromAppState()
-{
-    bool stateChanged = false;
-    uint32_t lastAppStateChangeTime = State::getLastStateChangeTime();
-    if (this->lastKnownAppStateChangeTime < lastAppStateChangeTime)
-    {
-        stateChanged = true;
-        this->lastKnownAppStateChangeTime = lastAppStateChangeTime;
-        State::NetworkState networkState = State::getNetworkState();
-        this->network_connected = networkState.wifi_connected || networkState.ethernet_connected;
-    }
-
-    uint32_t lastApiEventTime = State::getLastApiEventTime();
-    if (this->lastKnownApiEventTime < lastApiEventTime)
-    {
-        stateChanged = true;
-        this->lastKnownApiEventTime = lastApiEventTime;
-        this->nfc_detection_enabled_from_state = State::getApiEventData().state == State::ApiEventState::API_EVENT_STATE_WAIT_FOR_NFC_TAP;
-    }
-
-    if (!stateChanged)
-    {
         return;
     }
 
-    this->loop_card_detection_is_enabled = this->network_connected && this->nfc_detection_enabled_from_state;
+    this->disableCardDetection();
+
+    if (this->cardDetectionCallback == nullptr)
+    {
+        this->logger.error("Card detection callback is null");
+        return;
+    }
+
+    this->logger.info("Calling card detection callback");
+    this->cardDetectionCallback(cardDetectedUid, cardDetectedUidLength);
+    this->logger.info("Card detection callback returned");
 }
 
-bool NFC::detectNfcModule()
+void NFC::demo()
 {
+    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0}; // Buffer to store the returned UID
+    uint8_t uidLength;                     // Length of the UID (4 or 7 bytes depending on ISO14443A
+                                           // card type)
+
+    // Wait for an NTAG242 card.  When one is found 'uid' will be populated with
+    // the UID, and uidLength will indicate the size of the UUID (normally 7)
+    uint8_t uidDetected = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 100);
+
+    if (!uidDetected)
+    {
+        Serial.println("No tag detected");
+        return;
+    }
+
+    // Display some basic information about the card
+    Serial.println("Found a tag");
+    Serial.print("  UID Length: ");
+    Serial.print(uidLength, DEC);
+    Serial.println(" bytes");
+    Serial.print("  UID Value: ");
+    this->pn532.PrintHex(uid, uidLength);
+    Serial.println("");
+
+    bool isNTAG424 = ((uidLength == 7) || (uidLength == 4)) && (this->pn532.ntag424_isNTAG424());
+
+    if (!isNTAG424)
+    {
+        Serial.println("This doesn't seem to be an NTAG424 tag. (UUID length != 7 bytes and UUID length != 4)");
+        return;
+    }
+
+    Serial.println("Found an NTAG424-tag");
+    // select application
+    // uint8_t filename[7] = {0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01};
+    // this->pn532.ntag424_ISOSelectFileByDFN(filename);
+
+    // Authenticate with default_key. Will only work if no keys are set.
+
+    uint8_t keyno = 0;
+    uint8_t authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, keyno, 0x71);
+    if (authSuccess != 1)
+    {
+        Serial.println("Authentication (0) with factory key failed.");
+        return;
+    }
+    Serial.println("Authentication (0) with factory key successful.");
+
+    // uint8_t carduid[16];
+    // uint8_t bytesread = this->pn532.ntag424_GetCardUID(carduid);
+    // Serial.println("CardUId:");
+    // this->pn532.PrintHexChar(carduid, bytesread);
+
+    // the next few methods write to the picc and may ruin your tag so you
+    // have to uncomment them on your on risk :-)
+
+    bool authenticateDefaultKeySuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 1, 0x71);
+    if (!authenticateDefaultKeySuccess)
+    {
+        Serial.println("Authentication with default key failed.");
+        return;
+    }
+    Serial.println("Authentication with default key successful.");
+
+    // change key 1 - uncomment next line
+    Serial.println("Changing key 1 to new key...");
+    this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, keyno, 0x71);
+    bool changeKeyToNewKeySuccess = this->pn532.ntag424_ChangeKey(NFC::FACTORY_KEY, NFC::NEW_KEY, 1);
+    if (!changeKeyToNewKeySuccess)
+    {
+        Serial.println("Changing key 1 to new key failed.");
+        return;
+    }
+    Serial.println("Changing key 1 to new key successful.");
+
+    bool authenticateNewKeySuccess = this->pn532.ntag424_Authenticate(NFC::NEW_KEY, 1, 0x71);
+    if (!authenticateNewKeySuccess)
+    {
+        Serial.println("Authentication with new key failed.");
+        return;
+    }
+    Serial.println("Authentication with new key successful.");
+
+    // change key 1 back to default-key
+    Serial.println("Changing key 1 back to default-key...");
+    this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, keyno, 0x71);
+    bool changeKeyToDefaultKeySuccess = this->pn532.ntag424_ChangeKey(NFC::NEW_KEY, NFC::FACTORY_KEY, 1);
+    if (!changeKeyToDefaultKeySuccess)
+    {
+        Serial.println("Changing key 1 back to default-key failed.");
+        return;
+    }
+    Serial.println("Changing key 1 back to default-key successful.");
+
+    delay(3000);
+}
+
+bool NFC::waitForCard(uint32_t timeoutMs)
+{
+    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0}; // Buffer to store the returned UID
+    uint8_t uidLength;                     // Length of the UID (4 or 7 bytes depending on ISO14443A
+                                           // card type)
+
+    // Wait for an NTAG242 card.  When one is found 'uid' will be populated with
+    // the UID, and uidLength will indicate the size of the UUID (normally 7)
+    uint8_t uidDetected = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeoutMs);
+
+    if (!uidDetected)
+    {
+        this->logger.error("No tag detected within timeout");
+        return false;
+    }
+
+    this->logger.info("Tag detected");
+    this->pn532.PrintHex(uid, uidLength);
+    return true;
+}
+
+bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey)
+{
+    this->logger.info("changeKey started");
+
+    // Step 1: Authenticate with master key
+    bool authenticateOldKeySuccess = this->pn532.ntag424_Authenticate(masterKey, 0, 0x71);
+    if (!authenticateOldKeySuccess)
+    {
+        this->logger.error("changeKey failed, authenticate old key failed");
+        return false;
+    }
+
+    // Step 2: Change key
+    bool changeKeySuccess = this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber);
+    if (!changeKeySuccess)
+    {
+        this->logger.error("changeKey failed, change key procedure failed");
+        return false;
+    }
+
+    // Step 3: Validate by authenticating with new key
+    bool authenticateNewKeySuccess = this->pn532.ntag424_Authenticate(newKey, keyNumber, 0x71);
+    if (!authenticateNewKeySuccess)
+    {
+        this->logger.error("changeKey failed, authenticate new key failed");
+        return false;
+    }
+
+    this->logger.info("changeKey successful");
+    return true;
+}
+
+bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
+{
+    this->logger.info("authenticate started");
+
+    // Step 1: Authenticate with key
+    bool authenticateSuccess = this->pn532.ntag424_Authenticate(key, keyNumber, 0x71);
+    if (!authenticateSuccess)
+    {
+        this->logger.error("authenticate failed, authenticate procedure failed");
+        return false;
+    }
+
+    this->logger.info("authenticate successful");
+    return true;
+}
+
+void NFC::checkHardware(bool logHardwareInfo)
+{
+    uint32_t now = millis();
+    if (now - this->lastHardwareCheckMs < NFC::hardwareCheckIntervalMs)
+    {
+        return;
+    }
+    this->lastHardwareCheckMs = now;
+
     uint32_t versiondata = this->pn532.getFirmwareVersion();
-
     if (!versiondata)
     {
-        this->nfc_is_detected = false;
-        logger.error("detectNfcModule Error: Didn't find PN53x board. Check wiring.");
-        return false;
-    }
-
-    this->nfc_is_detected = true;
-
-    // Print board info
-    String versionStr = "detectNfcModule Found PN53x board version: " + String((versiondata >> 24) & 0xFF, HEX) + "." + String((versiondata >> 16) & 0xFF, DEC) + "." + String((versiondata >> 8) & 0xFF, DEC);
-    logger.info(versionStr.c_str());
-
-    return true;
-}
-
-bool NFC::configureNfcModule()
-{
-    bool success = this->pn532.SAMConfig();
-
-    if (!success)
-    {
-        logger.error("configureNfcModule Error: Failed to configure NFC module");
-        this->nfc_is_ready = false;
-        return false;
-    }
-
-    logger.info("configureNfcModule NFC module configured successfully");
-    this->nfc_is_ready = true;
-
-    return true;
-}
-
-bool NFC::waitForNfcCard(char *detectedUid, uint8_t *detectedUidLength, const uint32_t timeoutMs)
-{
-    logger.debug("waitForNfcCard version with detectedUid and detectedUidLength");
-
-    // Add parameter validation
-    if (!detectedUid || !detectedUidLength)
-    {
-        logger.error("waitForNfcCard Error: Invalid parameters");
-        return false;
-    }
-
-    char dicoveredUuid[16];       // Buffer for UID
-    uint8_t discoveredUuidLength; // Length of UID
-
-    // Clear buffers to prevent memory issues
-    memset(dicoveredUuid, 0, sizeof(dicoveredUuid));
-    discoveredUuidLength = 0;
-
-    uint32_t startTime = millis();
-
-    logger.info("waitForNfcCard Waiting for NTAG424 card");
-
-    while (millis() - startTime < timeoutMs)
-    {
-        // Wait for an ISO14443A card
-        // readPassiveTargetID will return 1 if a card is found
-        // It will populate uid and uidLength
-        if (this->discoverNfcCard(dicoveredUuid, &discoveredUuidLength, 100))
+        this->logger.error("Didn't find PN53x board");
+        while (1)
         {
+            this->logger.error("PN53x board not found, restarting in 5 seconds");
+            delay(5000);
+            ESP.restart();
+        }
+    }
 
-            logger.info("waitForNfcCard Card is NTAG424.");
+    if (!logHardwareInfo)
+    {
+        return;
+    }
 
-            // Safely copy the discovered UID to the output parameters
-            if (discoveredUuidLength <= 16)
-            {
-                memcpy(detectedUid, dicoveredUuid, discoveredUuidLength);
-                *detectedUidLength = discoveredUuidLength;
-            }
-            else
-            {
-                logger.error("waitForNfcCard Error: UID too long");
-                return false;
-            }
+    // Got ok data, print it out!
+    this->logger.info("Found chip PN53x");
+    this->logger.info((String((versiondata >> 24) & 0xFF) + " HEX").c_str());
+    this->logger.info(("Firmware ver. " + String((versiondata >> 16) & 0xFF) + "." + String((versiondata >> 8) & 0xFF)).c_str());
+}
 
+bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
+{
+    this->logger.info("getAvailableKeyNo started");
+
+    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 30000);
+    if (!foundCard)
+    {
+        this->logger.error("getAvailableKeyNo failed, no card detected");
+        return false;
+    }
+
+    this->logger.debug("getAvailableKeyNo, card detected");
+
+    // check key 1 to 5, the first one that we can authenticate using factory key is an available key
+    for (uint8_t i = 1; i <= 5; i++)
+    {
+        bool authenticateSuccess = this->authenticate(i, NFC::FACTORY_KEY);
+        if (authenticateSuccess)
+        {
+            this->logger.debugf("getAvailableKeyNo, key %d authenticated", i);
+            *keyNo = i;
             return true;
         }
 
-        // Be cooperative with other tasks
-        delay(20);
+        this->logger.debugf("getAvailableKeyNo, key %d not authenticated", i);
     }
 
-    logger.info("waitForNfcCard Timeout waiting for NFC card");
+    this->logger.error("getAvailableKeyNo failed, no available key found");
     return false;
-}
-
-bool NFC::authenticate(uint8_t keyNumber, uint8_t *key, bool waitForRemovalAtEnd)
-{
-    // retry 3 times
-    bool success = false;
-    for (int i = 0; i < 3; i++)
-    {
-        if (this->pn532.ntag424_Authenticate(key, keyNumber, NFC::AUTH_CMD))
-        {
-            success = true;
-        }
-
-        if (success)
-        {
-            break;
-        }
-
-        logger.debug("authenticate Failed to authenticate with NFC card, retrying in .5sec");
-        delay(500);
-    }
-
-    if (!success)
-    {
-        logger.error("authenticate Failed to authenticate with NFC card");
-        return false;
-    }
-
-    if (waitForRemovalAtEnd)
-    {
-        this->waitForCardRemoval();
-    }
-
-    return true;
-}
-
-bool NFC::changeKey(const uint8_t keyNumber, uint8_t authKey[16], uint8_t *oldKey, uint8_t *newKey)
-{
-    // Add memory protection and error handling
-    if (!authKey || !oldKey || !newKey)
-    {
-        logger.error("changeKey Error: Invalid parameters");
-        return false;
-    }
-
-    // 1. Authenticate with master key (0)
-    if (!this->authenticate(NFC::AUTH_KEY_NO, authKey, false))
-    {
-        logger.error("changeKey Failed to authenticate with NFC card");
-        return false;
-    }
-
-    // 2. Change key
-
-    if (!this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber))
-    {
-        logger.error("changeKey Failed to change key");
-        return false;
-    }
-
-    logger.debug("changeKey Validating new key...");
-    if (!this->authenticate(keyNumber, newKey, true))
-    {
-        logger.error("changeKey Failed to authenticate with NFC card after changing key");
-        return false;
-    }
-    else
-    {
-
-        logger.info("changeKey Key change operation completed successfully");
-        return true;
-    }
-}
-
-void NFC::waitForCardRemoval()
-{
-    uint8_t uid[7];
-    uint8_t uidLength;
-
-    logger.info("waitForCardRemoval Please remove the card.");
-    while (true)
-    {
-        bool stillPresent = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, 50);
-
-        if (!stillPresent)
-            break;
-        // Wait indicator removed for logger
-    }
-
-    logger.info("Card removed.");
-}
-
-bool NFC::discoverNfcCard(char *dicoveredUuid, uint8_t *discoveredUuidLength, const uint32_t timeoutMs)
-{
-    uint8_t uid[7];
-    uint8_t uidLength;
-
-    bool gotTarget = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeoutMs);
-
-    if (!gotTarget)
-    {
-        return false;
-    }
-
-    bool is424 = this->pn532.ntag424_isNTAG424();
-
-    if (!is424)
-    {
-        return false;
-    }
-
-    this->uintArrayToCharArray(uid, uidLength, dicoveredUuid);
-    *discoveredUuidLength = uidLength;
-
-    return true;
-}
-
-void NFC::uintArrayToCharArray(const uint8_t *uuid, const uint8_t length, char *charArray)
-{
-    for (int i = 0; i < length; i++)
-    {
-        charArray[i] = uuid[i];
-    }
-    // Null terminate the string
-    charArray[length] = '\0';
 }

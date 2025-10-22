@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
@@ -9,6 +9,8 @@ import { ResourceImageService } from './resourceImage.service';
 import { FileUpload } from '../common/types/file-upload.types';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 import { LicenseError, LicenseService } from '../license/license.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceChangedEvent } from './events/resource-changed.event';
 
 @Injectable()
 export class ResourcesService {
@@ -19,6 +21,8 @@ export class ResourcesService {
     private readonly resourceRepository: Repository<Resource>,
     private readonly resourceImageService: ResourceImageService,
     private readonly licenseService: LicenseService,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createResource(dto: CreateResourceDto, image?: FileUpload): Promise<Resource> {
@@ -60,6 +64,8 @@ export class ResourcesService {
         throw error;
       });
     }
+
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(resource.id));
 
     return resource;
   }
@@ -123,7 +129,9 @@ export class ResourcesService {
       resource.imageFilename = null;
     }
 
-    return this.resourceRepository.save(resource);
+    const updatedResource = await this.resourceRepository.save(resource);
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(updatedResource.id));
+    return updatedResource;
   }
 
   async deleteResource(id: number): Promise<void> {
@@ -131,6 +139,8 @@ export class ResourcesService {
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
     }
+
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
   }
 
   async listResources(options?: {

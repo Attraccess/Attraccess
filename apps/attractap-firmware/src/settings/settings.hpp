@@ -4,6 +4,11 @@
 #include <Preferences.h>
 #include "../logger/logger.hpp"
 
+struct DeviceConfig
+{
+    String passCode = "0000";
+};
+
 struct NetworkConfig
 {
     String ssid = "";
@@ -28,6 +33,9 @@ class Settings
 public:
     static void setup();
 
+    static DeviceConfig getDeviceConfig();
+    static void saveDeviceConfig(String passCode);
+
     static NetworkConfig getNetworkConfig();
     static void saveNetworkConfig(String ssid, String password);
 
@@ -40,14 +48,11 @@ public:
 
     static String getHostname();
 
-    // Keypad (MPR121) thresholds
-    static bool getMpr121Thresholds(uint8_t &touch, uint8_t &release);
-    static void saveMpr121Thresholds(uint8_t touch, uint8_t release);
-
 private:
     static Preferences preferences;
     static Logger logger;
 
+    static DeviceConfig _deviceConfig;
     static NetworkConfig _networkConfig;
     static AttraccessApiConfig _attraccessApiConfig;
     static AttraccessAuthConfig _attraccessAuthConfig;

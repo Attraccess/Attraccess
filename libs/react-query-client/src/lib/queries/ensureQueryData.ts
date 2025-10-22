@@ -180,6 +180,10 @@ export const ensureUseAttractapServiceGetReaderByIdData = (queryClient: QueryCli
 export const ensureUseAttractapServiceGetReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const ensureUseAttractapServiceGetAllCardsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
 export const ensureUseAttractapServiceGetFirmwaresData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetFirmwaresKeyFn(), queryFn: () => AttractapService.getFirmwares() });
+export const ensureUseAttractapServiceDownloadFirmwareBinaryData = (queryClient: QueryClient, { firmwareName, variantName }: {
+  firmwareName: string;
+  variantName: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceDownloadFirmwareBinaryKeyFn({ firmwareName, variantName }), queryFn: () => AttractapService.downloadFirmwareBinary({ firmwareName, variantName }) });
 export const ensureUseAttractapServiceGetFirmwareBinaryData = (queryClient: QueryClient, { filename, firmwareName, variantName }: {
   filename: string;
   firmwareName: string;

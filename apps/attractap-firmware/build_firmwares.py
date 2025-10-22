@@ -39,20 +39,35 @@ def main():
     print("Overriding build_type to 'release' for release builds")
     config['env']['build_type'] = 'release'
     
-    # Override LOG_LEVEL to INFO for production builds
-    print("Overriding LOG_LEVEL to 'INFO' for production builds")
+    # Override LOG_LEVEL to ERROR for production builds and add production flags
+    print("Overriding LOG_LEVEL to 'ERROR' for production builds")
     for section_name in config.sections():
         if section_name.startswith('env:'):
             if 'build_flags' in config[section_name]:
                 build_flags = config[section_name]['build_flags']
                 # Replace existing LOG_LEVEL definition or add it if not present
                 if 'LOG_LEVEL=' in build_flags:
-                    # Replace existing LOG_LEVEL
+                    # Replace existing LOG_LEVEL to ERROR (unquoted token)
                     pattern = r'-D\s*LOG_LEVEL=["\']?[^"\'\s]*["\']?'
-                    build_flags = re.sub(pattern, '-D LOG_LEVEL="INFO"', build_flags)
+                    build_flags = re.sub(pattern, '-D LOG_LEVEL=ERROR', build_flags)
                 else:
                     # Add LOG_LEVEL if not present
-                    build_flags += '\n\t-D LOG_LEVEL="INFO"'
+                    build_flags += '\n\t-D LOG_LEVEL=ERROR'
+
+                # Ensure additional production hardening flags are present
+                extra_flags = [
+                    '-D LOG_LEVEL_NUM=0',                 # compile-time numeric level (0=ERROR)
+                    '-D CORE_DEBUG_LEVEL=0',              # silence Arduino core
+                    '-D ARDUHAL_LOG_LEVEL_NONE',          # silence ESP-IDF/Arduino HAL logs
+                    '-ffunction-sections',                # enable sectioning
+                    '-fdata-sections',                    # enable sectioning
+                    '-Wl,--gc-sections',                  # drop unused sections
+                    '-g0',                                # strip debug symbols
+                ]
+
+                for flag in extra_flags:
+                    if flag not in build_flags:
+                        build_flags += f"\n\t{flag}"
                 config[section_name]['build_flags'] = build_flags
     
     # Write the modified config to a temporary file for the build process
@@ -135,24 +150,35 @@ def main():
             firmware_variant = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT')
             firmware_variant_friendly_name = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
             board_family = extract_define_value(env_build_flags, 'BOARD_FAMILY')
-            
+
             if not firmware_variant:
                 print(f"Error: FIRMWARE_VARIANT is not defined in build_flags for environment '{env}'")
                 sys.exit(1)
-                
+
             if not firmware_variant_friendly_name:
                 print(f"Error: FIRMWARE_VARIANT_FRIENDLY_NAME is not defined in build_flags for environment '{env}'")
                 sys.exit(1)
-                
-            if not board_family:
-                print(f"Error: BOARD_FAMILY is not defined in build_flags for environment '{env}'")
-                sys.exit(1)
-                
+
+            # Derive chip from the PlatformIO 'board' setting, not from BOARD_FAMILY define
+            board = config[env_section].get('board', '')
+            board_l = board.lower()
+            if 'esp32c3' in board_l or 'esp32-c3' in board_l:
+                chip = 'esp32c3'
+                board_family_auto = 'ESP32-C3'
+            elif 'esp32-s3' in board_l or 'esp32s3' in board_l:
+                chip = 'esp32s3'
+                board_family_auto = 'ESP32-S3'
+            else:
+                chip = 'esp32'
+                board_family_auto = 'ESP32'
+
             print(f"  Firmware name: {firmware_name}")
             print(f"  Firmware variant: {firmware_variant}")
             print(f"  Firmware variant friendly name: {firmware_variant_friendly_name}")
             print(f"  Firmware version: {firmware_version}")
-            print(f"  Board family: {board_family}")
+            print(f"  Board: {board} -> chip: {chip}")
+            if board_family:
+                print(f"  BOARD_FAMILY define: {board_family}")
             
             # Build firmware using temporary config with production build type
             try:
@@ -203,63 +229,23 @@ def main():
                     print(f"Warning: Failed to read idedata.json: {e}")
                     flash_images = []
             
-            # Fall back to manual partition detection if idedata not available or failed
+            # Fall back to simple, known-good offsets if idedata not available or failed
             if not flash_images:
-                print(f"Falling back to manual partition detection for {env}")
-                
-                # Get partition information to find the filesystem offset
-                try:
-                    print(f"Getting partition information for {env}...")
-                    partinfo = subprocess.check_output(['python', '-m', 'esptool', 'partition_table', partitions_path]).decode('utf-8')
-                    print(partinfo)
-                    
-                    # Find the spiffs/littlefs partition
-                    fs_offset = None
-                    for line in partinfo.split('\n'):
-                        if 'spiffs' in line.lower() or 'littlefs' in line.lower():
-                            parts = line.split()
-                            for i, part in enumerate(parts):
-                                if part.startswith('0x'):
-                                    fs_offset = part
-                                    break
-                            if fs_offset:
-                                break
-                                
-                    if not fs_offset:
-                        print("Warning: Could not find filesystem partition offset, using default 0x290000")
-                        fs_offset = "0x290000"
-                        
-                    print(f"Filesystem offset: {fs_offset}")
-                    
-                    # Build flash images manually
-                    if "ESP32-C3" in board_family or "ESP32_C3" in board_family:
-                        flash_images = [
-                            (0x0, "0x0", bootloader_path),
-                            (0x8000, "0x8000", partitions_path),
-                            (0x10000, "0x10000", firmware_path),
-                        ]
-                    else:
-                        flash_images = [
-                            (0x1000, "0x1000", bootloader_path),
-                            (0x8000, "0x8000", partitions_path),
-                            (0x10000, "0x10000", firmware_path),
-                        ]
-                except Exception as e:
-                    print(f"Warning: Failed to get partition information: {e}")
-                    print("Using default offsets")
-                    fs_offset = "0x290000"
-                    if "ESP32-C3" in board_family or "ESP32_C3" in board_family:
-                        flash_images = [
-                            (0x0, "0x0", bootloader_path),
-                            (0x8000, "0x8000", partitions_path),
-                            (0x10000, "0x10000", firmware_path),
-                        ]
-                    else:
-                        flash_images = [
-                            (0x1000, "0x1000", bootloader_path),
-                            (0x8000, "0x8000", partitions_path),
-                            (0x10000, "0x10000", firmware_path),
-                        ]
+                print(f"Falling back to default offsets for chip '{chip}'")
+                if chip in ("esp32s3", "esp32c3"):
+                    # S3/C3 bootloader at 0x0000
+                    flash_images = [
+                        (0x0, "0x0", bootloader_path),
+                        (0x8000, "0x8000", partitions_path),
+                        (0x10000, "0x10000", firmware_path),
+                    ]
+                else:
+                    # Classic ESP32 bootloader at 0x1000
+                    flash_images = [
+                        (0x1000, "0x1000", bootloader_path),
+                        (0x8000, "0x8000", partitions_path),
+                        (0x10000, "0x10000", firmware_path),
+                    ]
             
             # Sort by integer offset to ensure correct order
             flash_images.sort(key=lambda x: x[0])
@@ -286,11 +272,8 @@ def main():
             try:
                 print(f"Creating merged firmware for {env}...")
                 merge_cmd = [
-                    'python', '-m', 'esptool', '--chip', board_family.lower().replace('_', '-'), 'merge_bin',
+                    'python', '-m', 'esptool', '--chip', chip, 'merge_bin',
                     '-o', merged_bin_path,
-                    '--flash_mode', 'dio',
-                    '--flash_freq', '40m',
-                    '--flash_size', '4MB',
                 ]
                 
                 # Add flash images in sorted order
@@ -313,14 +296,25 @@ def main():
                 print(f"Error: Failed to create merged firmware for environment '{env}': {e}")
                 sys.exit(1)
 
+            # Also export the app-only OTA image (do not merge bootloader/partitions)
+            ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+            ota_bin_path = os.path.join(output_dir, ota_filename)
+            try:
+                shutil.copyfile(firmware_path, ota_bin_path)
+                print(f"OTA app image copied to: {ota_bin_path}")
+            except Exception as e:
+                print(f"Error: Failed to copy OTA image for environment '{env}': {e}")
+                sys.exit(1)
+
             firmware_info.append({
                 "name": firmware_name,
                 "friendlyName": firmware_friendly_name,
                 "variant": firmware_variant,
                 "variantFriendlyName": firmware_variant_friendly_name,
                 "version": firmware_version,
-                "boardFamily": board_family,
-                "filename": firmware_filename
+                "boardFamily": board_family if board_family else board_family_auto,
+                "filename": firmware_filename,
+                "filenameOTA": ota_filename
             })
         
         # Create single consolidated firmware manifest

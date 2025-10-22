@@ -26,8 +26,108 @@ void Ethernet::setup()
     }
 
     logger.info("Starting");
+}
 
-    xTaskCreate(taskFn, "EthernetTask", 4096, nullptr, TASK_PRIORITY_ETHERNET, nullptr);
+void Ethernet::loop()
+{
+    if (PIN_ETH_SPI_CS < 0)
+    {
+        return;
+    }
+
+    switch (_state)
+    {
+    case ETHERNET_STATE_INIT:
+        // Start connection process
+        setState(ETHERNET_STATE_CONNECTING);
+        break;
+    case ETHERNET_STATE_CONNECTING:
+    {
+        // Check if we've exceeded maximum retry count
+        if (retry_count >= MAX_RETRY_COUNT)
+        {
+            logger.errorf("Maximum retry count (%u) reached. Giving up.", MAX_RETRY_COUNT);
+            initialization_in_progress = false;
+            setState(ETHERNET_STATE_CONNECT_FAILED);
+            break;
+        }
+
+        // Don't retry if initialization is currently in progress (waiting for async events)
+        if (initialization_in_progress)
+        {
+            break;
+        }
+
+        // Implement exponential backoff
+        uint32_t current_time = millis();
+        uint32_t retry_delay = BASE_RETRY_DELAY_MS * (1 << retry_count); // Exponential backoff
+
+        if (retry_count > 0 && (current_time - last_retry_time) < retry_delay)
+        {
+            // Still waiting for retry delay
+            break;
+        }
+
+        logger.infof("Connection attempt %u/%u", retry_count + 1, MAX_RETRY_COUNT);
+
+        // Clean up any previous failed attempt
+        cleanupPartialInit();
+
+        // Mark initialization as in progress
+        initialization_in_progress = true;
+
+        // Try to initialize network
+        if (initializeNetwork() != ESP_OK)
+        {
+            logger.errorf("Network initialization failed (attempt %u/%u)", retry_count + 1, MAX_RETRY_COUNT);
+            initialization_in_progress = false;
+            retry_count++;
+            last_retry_time = current_time;
+            break;
+        }
+
+        // Success! Reset retry count for next time (but keep initialization_in_progress = true)
+        retry_count = 0;
+        logger.info("Connection attempt successful - waiting for events");
+        break;
+    }
+    case ETHERNET_STATE_CONNECTED_WAITING_FOR_IP:
+    {
+        // Check if DHCP is taking too long
+        uint32_t current_time = millis();
+        if (dhcp_start_time > 0 && (current_time - dhcp_start_time) > DHCP_TIMEOUT_MS)
+        {
+            logger.errorf("DHCP timeout after %u ms", DHCP_TIMEOUT_MS);
+            logger.info("Retrying network initialization...");
+            dhcp_start_time = 0;
+            setState(ETHERNET_STATE_DISCONNECTED); // This will trigger a reconnection attempt
+        }
+        break;
+    }
+    case ETHERNET_STATE_DISCONNECTED:
+    {
+        // Auto-retry connection if we get disconnected
+        logger.info("Ethernet disconnected, attempting to reconnect");
+        setState(ETHERNET_STATE_CONNECTING);
+        break;
+    }
+    case ETHERNET_STATE_CONNECT_FAILED:
+    {
+        // Reset retry count after a longer delay to try again
+        uint32_t current_time = millis();
+        if (retry_count == 0 || (current_time - last_retry_time) > (BASE_RETRY_DELAY_MS * 10))
+        {
+            logger.info("Resetting after connection failure, will retry");
+            retry_count = 0;
+            dhcp_start_time = 0;
+            initialization_in_progress = false;
+            setState(ETHERNET_STATE_CONNECTING);
+        }
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 esp_err_t Ethernet::initializeNetwork()
@@ -288,7 +388,7 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
 
     // Set MAC address - generate a local unicast MAC address based on ESP32 chip ID
     uint8_t mac_addr[6];
-    esp_read_mac(mac_addr, ESP_MAC_ETH);
+    esp_netif_get_mac(eth_netif, mac_addr);
 
     // Ensure it's a locally administered unicast address
     mac_addr[0] = (mac_addr[0] & 0xFC) | 0x02; // Set locally administered bit, clear multicast bit
@@ -472,111 +572,5 @@ void Ethernet::cleanupPartialInit()
     {
         spi_bus_remove_device(spi_handle);
         spi_handle = nullptr;
-    }
-}
-
-void Ethernet::taskFn(void *parameter)
-{
-    for (;;)
-    {
-        loop();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-}
-
-void Ethernet::loop()
-{
-    switch (_state)
-    {
-    case ETHERNET_STATE_INIT:
-        // Start connection process
-        setState(ETHERNET_STATE_CONNECTING);
-        break;
-    case ETHERNET_STATE_CONNECTING:
-    {
-        // Check if we've exceeded maximum retry count
-        if (retry_count >= MAX_RETRY_COUNT)
-        {
-            logger.errorf("Maximum retry count (%u) reached. Giving up.", MAX_RETRY_COUNT);
-            initialization_in_progress = false;
-            setState(ETHERNET_STATE_CONNECT_FAILED);
-            break;
-        }
-
-        // Don't retry if initialization is currently in progress (waiting for async events)
-        if (initialization_in_progress)
-        {
-            break;
-        }
-
-        // Implement exponential backoff
-        uint32_t current_time = millis();
-        uint32_t retry_delay = BASE_RETRY_DELAY_MS * (1 << retry_count); // Exponential backoff
-
-        if (retry_count > 0 && (current_time - last_retry_time) < retry_delay)
-        {
-            // Still waiting for retry delay
-            break;
-        }
-
-        logger.infof("Connection attempt %u/%u", retry_count + 1, MAX_RETRY_COUNT);
-
-        // Clean up any previous failed attempt
-        cleanupPartialInit();
-
-        // Mark initialization as in progress
-        initialization_in_progress = true;
-
-        // Try to initialize network
-        if (initializeNetwork() != ESP_OK)
-        {
-            logger.errorf("Network initialization failed (attempt %u/%u)", retry_count + 1, MAX_RETRY_COUNT);
-            initialization_in_progress = false;
-            retry_count++;
-            last_retry_time = current_time;
-            break;
-        }
-
-        // Success! Reset retry count for next time (but keep initialization_in_progress = true)
-        retry_count = 0;
-        logger.info("Connection attempt successful - waiting for events");
-        break;
-    }
-    case ETHERNET_STATE_CONNECTED_WAITING_FOR_IP:
-    {
-        // Check if DHCP is taking too long
-        uint32_t current_time = millis();
-        if (dhcp_start_time > 0 && (current_time - dhcp_start_time) > DHCP_TIMEOUT_MS)
-        {
-            logger.errorf("DHCP timeout after %u ms", DHCP_TIMEOUT_MS);
-            logger.info("Retrying network initialization...");
-            dhcp_start_time = 0;
-            setState(ETHERNET_STATE_DISCONNECTED); // This will trigger a reconnection attempt
-        }
-        break;
-    }
-    case ETHERNET_STATE_DISCONNECTED:
-    {
-        // Auto-retry connection if we get disconnected
-        logger.info("Ethernet disconnected, attempting to reconnect");
-        setState(ETHERNET_STATE_CONNECTING);
-        break;
-    }
-    case ETHERNET_STATE_CONNECT_FAILED:
-    {
-        // Reset retry count after a longer delay to try again
-        uint32_t current_time = millis();
-        if (retry_count == 0 || (current_time - last_retry_time) > (BASE_RETRY_DELAY_MS * 10))
-        {
-            logger.info("Resetting after connection failure, will retry");
-            retry_count = 0;
-            dhcp_start_time = 0;
-            initialization_in_progress = false;
-            setState(ETHERNET_STATE_CONNECTING);
-        }
-        break;
-    }
-    default:
-        break;
     }
 }
