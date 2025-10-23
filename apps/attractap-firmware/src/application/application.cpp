@@ -78,6 +78,7 @@ void Application::setup()
                                                                if (!payload)
                                                                {
                                                                    this->logger.error("Failed to allocate async payload for card auth details");
+                                                                   this->nfc.enableCardDetection();
                                                                    return;
                                                                }
                                                                payload->self = this;
@@ -117,6 +118,12 @@ void Application::setup()
     // Wire global API error -> central popup and stop any ongoing action overlay
     this->api.setErrorCallback([this](const char *title, const char *message)
                                {
+                                   this->ioExpander.errorBeep();
+
+                                   if (this->state == APPLICATION_STATE_LOCKED) {
+                                    this->nfc.enableCardDetection();
+                                   }
+
                                    // Ensure UI operations on LVGL thread
                                    struct ErrPayload { Application *self; String t; String m; };
                                    ErrPayload *p = new ErrPayload();
@@ -208,6 +215,7 @@ void Application::setup()
                                                                     },
                                                                     payload);
                                                             }
+                                                            this->nfc.disableCardDetection();
                                                             this->state = APPLICATION_STATE_ENROLLMENT;
                                                             return this->nfc.getAvailableKeyNo(uid, uidLength, keyNo); });
 
@@ -266,7 +274,10 @@ void Application::setup()
     {
         this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
 
-        this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
+        if (this->state == APPLICATION_STATE_LOCKED)
+        {
+            this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
+        }
     };
     this->nfc.setCardDetectionCallback(cardDetectionCallback);
 

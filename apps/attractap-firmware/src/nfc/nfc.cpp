@@ -313,3 +313,8 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
     this->logger.error("getAvailableKeyNo failed, no available key found");
     return false;
 }
+
+bool NFC::isCardDetectionEnabled()
+{
+    return this->cardDetectionEnabled;
+}

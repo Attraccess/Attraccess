@@ -30,6 +30,8 @@ public:
     // TODO: remove this, should come from API
     static uint8_t NEW_KEY[16];
 
+    bool isCardDetectionEnabled();
+
 private:
     Logger logger;
     Adafruit_PN532 pn532;
