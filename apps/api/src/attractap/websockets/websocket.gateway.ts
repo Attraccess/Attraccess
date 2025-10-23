@@ -819,7 +819,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     socket.state.lastAuthenticatedUserId = nfcCard.user.id;
 
-    const hasIntroduction = await this.resourceIntroductionService.hasValidIntroduction(resourceId, nfcCard.user.id);
+    const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
 
     await socket.sendMessage(
