@@ -817,6 +817,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
+    if (!nfcCard.isActive) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'CARD_NOT_ACTIVE',
+        }),
+      );
+      return;
+    }
+
     socket.state.lastAuthenticatedUserId = nfcCard.user.id;
 
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
