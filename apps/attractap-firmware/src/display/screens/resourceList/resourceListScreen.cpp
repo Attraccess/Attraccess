@@ -62,6 +62,18 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_add_flag(resourceButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(resourceButton, LV_OBJ_FLAG_SCROLLABLE);
 
+   lv_obj_set_style_border_opa(resourceButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_width(resourceButton, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_side(resourceButton, LV_BORDER_SIDE_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+   if (resource.hasActiveUsage)
+   {
+      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
+   else
+   {
+      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
+
    lv_obj_t *resourceNameLabel = lv_label_create(resourceButton);
    lv_obj_set_width(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(resourceNameLabel, LV_SIZE_CONTENT);

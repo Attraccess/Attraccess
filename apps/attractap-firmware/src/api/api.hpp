@@ -18,7 +18,7 @@ public:
     void loop();
     void processIncomingMessage(const char *buf, size_t len);
     static constexpr size_t MAX_RESOURCES = 20;
-    static constexpr size_t MAX_NAME_LEN = 64;
+    static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
     static constexpr size_t MAX_DESC_LEN = 128;
     static constexpr size_t MAX_USERNAME_LEN = 32;
     static constexpr size_t MAX_INTRODUCERS = 15;
@@ -36,7 +36,7 @@ public:
         uint8_t type; // 0: machine, 1: door (encode from API strings)
         bool separateUnlockAndUnlatch;
         bool allowTakeOver;
-        char name[MAX_NAME_LEN];
+        char name[MAX_RESOURCE_NAME_LEN];
         char description[MAX_DESC_LEN];
         bool hasActiveUsage;
         char activeUser[MAX_USERNAME_LEN];

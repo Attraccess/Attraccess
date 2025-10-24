@@ -554,6 +554,9 @@ void Application::selectResource(const API::ResourceBrief &resource)
     this->selectedResourceId = resource.id;
     this->restartResourceSelectionTimeout();
 
+    Display::lockscreen.setResourceName(const_cast<char *>(resource.name));
+    Display::lockscreen.setUsageInfo(resource.hasActiveUsage, const_cast<char *>(resource.activeUser));
+
     // Directly pass the native struct to the screen so it can avoid String conversions
     Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
 }

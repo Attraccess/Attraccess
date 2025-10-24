@@ -3,8 +3,9 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include "../../images/lockscreen_background_image.hpp"
-#include "../../images/logo_400w_png.hpp"
+#include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
+#include "../../../api/api.hpp"
 
 class Lockscreen : public IScreen
 {
@@ -14,6 +15,18 @@ public:
     void loop() override;
     String getName() override;
 
+    void setResourceName(char *resourceName);
+    void setUsageInfo(bool hasActiveUsage, char *username);
+
 private:
     lv_obj_t *screen;
+
+    lv_obj_t *resourceNameLabel;
+    lv_obj_t *usageInfoLabel;
+
+    char resourceName[API::MAX_RESOURCE_NAME_LEN];
+    char username[API::MAX_USERNAME_LEN];
+    bool hasActiveUsage;
+
+    void updateUsageInfo();
 };
