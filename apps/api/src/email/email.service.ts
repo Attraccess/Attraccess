@@ -153,9 +153,7 @@ export class EmailService {
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
     }));
 
-    const totalFromItems = items.reduce((sum, it) => sum + it.total, 0);
     const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit); // transaction.amount is negative when charging user
-    const discount = totalFromItems - totalCredits;
 
     const context = {
       ...this.getBaseContext(user),
@@ -169,7 +167,6 @@ export class EmailService {
         roundedMinutes,
       },
       items,
-      discount,
       totalCredits,
       newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit), // already updated by DB triggers for completed tx
     };

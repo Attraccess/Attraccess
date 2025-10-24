@@ -60,3 +60,4 @@ export * from './1759918355010-billing-factor';
 export * from './1760018355010-email-templates-add-resource-usage-billing-summary';
 export * from './1760018355011-seed-resource-usage-billing-transaction-summary-template';
 export * from './1760467441063-nfc-card-single-key';
+export * from './1760468005000-email-templates-variables-fix';
