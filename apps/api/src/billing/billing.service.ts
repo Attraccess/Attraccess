@@ -339,12 +339,15 @@ export class BillingService {
             relations: ['items'],
           });
           const billingConfiguration = await this.getConfiguration();
-          await this.emailService.sendResourceUsageBillingSummaryEmail(
-            freshUser,
-            transaction,
-            usage,
-            billingConfiguration.minorUnit,
-          );
+
+          if (transaction.amount !== 0) {
+            await this.emailService.sendResourceUsageBillingSummaryEmail(
+              freshUser,
+              transaction,
+              usage,
+              billingConfiguration.minorUnit,
+            );
+          }
         } catch {
           // ignore email failures to not break billing
         }

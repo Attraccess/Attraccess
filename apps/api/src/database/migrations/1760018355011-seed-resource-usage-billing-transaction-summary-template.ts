@@ -43,10 +43,6 @@ const BILLING_SUMMARY_MJML = `
           </tr>
           {{/each}}
           <tr>
-            <td colspan="3" align="right"><strong>Discount</strong></td>
-            <td align="right">{{discount}}</td>
-          </tr>
-          <tr>
             <td colspan="3" align="right"><strong>Total Credits</strong></td>
             <td align="right"><strong>{{totalCredits}}</strong></td>
           </tr>
@@ -71,7 +67,7 @@ export class SeedBillingTransactionSummaryTemplate1759800000100 implements Migra
         'resource-usage-billing-transaction-summary',
         'Your usage receipt for {{resource.name}}',
         BILLING_SUMMARY_MJML,
-        JSON.stringify([
+        [
           'user.username',
           'user.email',
           'host.frontend',
@@ -83,10 +79,9 @@ export class SeedBillingTransactionSummaryTemplate1759800000100 implements Migra
           'items[].quantity',
           'items[].unitPrice',
           'items[].total',
-          'discount',
           'totalCredits',
           'newBalance',
-        ]),
+        ].join(','),
       ],
     );
   }
