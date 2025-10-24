@@ -1,0 +1,63 @@
+name: Balena Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Git ref to checkout (e.g., main or feature branch)
+        required: true
+        type: string
+      version:
+        description: Version to write into balena.yml (replaces {{VERSION_TO_BE_REPLACED}})
+        required: true
+        type: string
+      draft:
+        description: Push as draft release
+        required: false
+        default: true
+        type: boolean
+      note:
+        description: Optional note for Balena release
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  balena:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set balena.yml version
+        run: |
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/${{ inputs.version }}/" balena.yml
+          cat balena.yml
+
+      - name: Install balena-cli
+        run: |
+          BALENA_CLI_VERSION=v22.4.9
+          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+
+      - name: Balena login and push
+        env:
+          BALENA_TOKEN: ${{ secrets.BALENA_TOKEN }}
+          BALENA_FLEET: ${{ secrets.BALENA_FLEET }}
+        run: |
+          set -euo pipefail
+          balena/bin/balena login --token "$BALENA_TOKEN"
+          DRAFT_FLAG=$([ "${{ inputs.draft }}" = "true" ] && echo "--draft" )
+          NOTE_INPUT="${{ inputs.note }}"
+          if [ -z "$NOTE_INPUT" ]; then NOTE_INPUT="Manual @ ${{ steps.vars.outputs.SHORT_SHA }}"; fi
+          balena/bin/balena push "$BALENA_FLEET" $DRAFT_FLAG --note "$NOTE_INPUT"
