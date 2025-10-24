@@ -82,18 +82,20 @@ String Lockscreen::getName()
     return "Lockscreen";
 }
 
-void Lockscreen::setResourceName(char *resourceName)
+void Lockscreen::setResourceName(const char *resourceName)
 {
-    strcpy(this->resourceName, resourceName);
+    strlcpy(this->resourceName, resourceName, API::MAX_RESOURCE_NAME_LEN);
+    this->resourceName[API::MAX_RESOURCE_NAME_LEN - 1] = '\0';
 
     this->updateUsageInfo();
 }
 
-void Lockscreen::setUsageInfo(bool hasActiveUsage, char *username)
+void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username)
 {
     if (hasActiveUsage)
     {
-        strcpy(this->username, username);
+        strlcpy(this->username, username, API::MAX_USERNAME_LEN);
+        this->username[API::MAX_USERNAME_LEN - 1] = '\0';
     }
     this->hasActiveUsage = hasActiveUsage;
 

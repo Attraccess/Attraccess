@@ -15,8 +15,8 @@ public:
     void loop() override;
     String getName() override;
 
-    void setResourceName(char *resourceName);
-    void setUsageInfo(bool hasActiveUsage, char *username);
+    void setResourceName(const char *resourceName);
+    void setUsageInfo(bool hasActiveUsage, const char *username);
 
 private:
     lv_obj_t *screen;
