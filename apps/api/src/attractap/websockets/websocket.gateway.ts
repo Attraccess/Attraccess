@@ -710,6 +710,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
+    const existingCard = await this.attractapService.getNFCCardByUID(uid);
+    if (existingCard) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'CARD_ALREADY_ENROLLED' }),
+      );
+      return;
+    }
+
     const key = await this.attractapService.generateNTAG424Key({
       userId: socket.state.lastAuthenticatedUserId,
       keyNo,
@@ -812,6 +820,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
           error: 'CARD_NOT_FOUND',
+        }),
+      );
+      return;
+    }
+
+    if (!nfcCard.isActive) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
+          error: 'CARD_NOT_ACTIVE',
         }),
       );
       return;
