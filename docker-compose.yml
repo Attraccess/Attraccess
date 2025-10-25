@@ -5,7 +5,13 @@ services:
     image: 'jc21/nginx-proxy-manager:latest'
     restart: unless-stopped
     ports:
-      - '80-2000:80-2000'
+      - '80:80' # HTTP
+      - '81:81' # Proxy Manager Admin
+      - '443:443' # HTTPS
+      - '1883:1883' # MQTT
+      - '8883:8883' # MQTT SSL
+      - '8080:8080' # MQTT WS
+      - '8081:8081' # MQTT WS SSL
     volumes:
       - proxy-data:/data
       - proxy-letsencrypt:/etc/letsencrypt

@@ -2,10 +2,6 @@
   "title": "Abrechnung",
   "billingValue": "{{credits}} {{currency}}",
   "perUnit": "pro Einheit",
-  "free": {
-    "title": "Kostenlos",
-    "description": "Diese Ressource ist kostenlos nutzbar."
-  },
   "balance": {
     "label": "Aktuelles Guthaben"
   },

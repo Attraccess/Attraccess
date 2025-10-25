@@ -2,8 +2,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Chip,
-  Divider,
   CardProps,
   Table,
   TableHeader,
@@ -16,7 +14,7 @@ import {
   cn,
   Skeleton,
 } from '@heroui/react';
-import { CreditCard, Edit2Icon, Info } from 'lucide-react';
+import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
@@ -49,7 +47,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const formatNumber = useNumberFormatter();
 
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
   const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
     refetchInterval: 5000,
   });
@@ -131,6 +129,10 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
     return <Skeleton className="h-10 w-full" />;
   }
 
+  if (isFree && !hasPermission('canManageBilling')) {
+    return null;
+  }
+
   return (
     <Card {...cardProps}>
       <CardHeader className="flex items-center justify-between py-3">
@@ -138,124 +140,96 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
           title={t('title')}
           icon={<CreditCard />}
           actions={
-            <>
-              {isFree && (
-                <Chip color="success" variant="flat" size="sm">
-                  {t('free.title')}
-                </Chip>
+            <ResourceBillingInfoEditor resourceId={resourceId}>
+              {(onOpen) => (
+                <Button size="sm" color="primary" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />
               )}
-              <ResourceBillingInfoEditor resourceId={resourceId}>
-                {(onOpen) => (
-                  <Button
-                    size="sm"
-                    color="primary"
-                    isIconOnly
-                    startContent={<Edit2Icon size={12} />}
-                    onPress={onOpen}
-                  />
-                )}
-              </ResourceBillingInfoEditor>
-            </>
+            </ResourceBillingInfoEditor>
           }
           noMargin
         />
       </CardHeader>
 
-      {isFree ? (
-        <>
-          <Divider />
-          <CardBody>
-            <div className="flex items-center gap-3 text-success">
-              <Info className="w-5 h-5" />
-              <div className="flex flex-col">
-                <span className="font-medium">{t('free.title')}</span>
-                <span className="text-default-500 text-sm">{t('free.description')}</span>
-              </div>
-            </div>
-          </CardBody>
-        </>
-      ) : (
-        <CardBody>
-          <Table hideHeader removeWrapper>
-            <TableHeader>
-              <TableColumn> </TableColumn>
-              <TableColumn align="end"> </TableColumn>
-            </TableHeader>
-            <TableBody>
-              <TableRow className="border-b-4 border-divider">
-                <TableCell>{t('balance.label')}</TableCell>
-                <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
-                  {t('billingValue', {
-                    credits: formatNumber(adjustedBalance),
-                    currency: configuration.currency,
-                  })}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>{t('perUse.label')}</TableCell>
-                <TableCell className="text-warning">
-                  {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>{t('perMinute.label')}</TableCell>
-                <TableCell className="text-warning">
-                  {t('billingValue', {
-                    credits: formatNumber(creditsPerMinute),
-                    currency: configuration.currency,
-                  })}
-                </TableCell>
-              </TableRow>
-              {
-                resourceBillingConfiguration.additionalItems.map((item) => (
-                  <TableRow key={JSON.stringify(item)}>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell className="text-warning">
-                      {t('billingValue', {
-                        credits: formatNumber(
-                          dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
-                        ),
-                        currency: configuration.currency,
-                      })}
-                      <br />
-                      <small>{t('perUnit')}</small>
-                    </TableCell>
-                  </TableRow>
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                )) as any
-              }
-              <TableRow className="border-t border-b-4 border-divider">
-                <TableCell>
-                  <NumberInput
-                    size="sm"
-                    value={exampleMinutes}
-                    onValueChange={(value) => setExampleMinutes(value)}
-                    label={t('example.label', { minutes: exampleMinutes })}
-                    minValue={0}
-                    defaultValue={10}
-                  />
-                </TableCell>
-                <TableCell>
-                  {t('billingValue', {
-                    credits: formatNumber(exampleCost),
-                    currency: configuration.currency,
-                    minutes: exampleMinutes,
-                  })}
-                </TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>{t('exampleResultingBalance.label')}</TableCell>
-                <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
-                  {t('billingValue', {
-                    credits: formatNumber(exampleResultingBalance),
-                    currency: configuration.currency,
-                  })}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardBody>
-      )}
+      <CardBody>
+        <Table hideHeader removeWrapper>
+          <TableHeader>
+            <TableColumn> </TableColumn>
+            <TableColumn align="end"> </TableColumn>
+          </TableHeader>
+          <TableBody>
+            <TableRow className="border-b-4 border-divider">
+              <TableCell>{t('balance.label')}</TableCell>
+              <TableCell className={cn(adjustedBalance < 0 ? 'text-danger' : 'text-success')}>
+                {t('billingValue', {
+                  credits: formatNumber(adjustedBalance),
+                  currency: configuration.currency,
+                })}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>{t('perUse.label')}</TableCell>
+              <TableCell className="text-warning">
+                {t('billingValue', { credits: formatNumber(creditsPerUsage), currency: configuration.currency })}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>{t('perMinute.label')}</TableCell>
+              <TableCell className="text-warning">
+                {t('billingValue', {
+                  credits: formatNumber(creditsPerMinute),
+                  currency: configuration.currency,
+                })}
+              </TableCell>
+            </TableRow>
+            {
+              resourceBillingConfiguration.additionalItems.map((item) => (
+                <TableRow key={JSON.stringify(item)}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell className="text-warning">
+                    {t('billingValue', {
+                      credits: formatNumber(
+                        dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration.minorUnit),
+                      ),
+                      currency: configuration.currency,
+                    })}
+                    <br />
+                    <small>{t('perUnit')}</small>
+                  </TableCell>
+                </TableRow>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              )) as any
+            }
+            <TableRow className="border-t border-b-4 border-divider">
+              <TableCell>
+                <NumberInput
+                  size="sm"
+                  value={exampleMinutes}
+                  onValueChange={(value) => setExampleMinutes(value)}
+                  label={t('example.label', { minutes: exampleMinutes })}
+                  minValue={0}
+                  defaultValue={10}
+                />
+              </TableCell>
+              <TableCell>
+                {t('billingValue', {
+                  credits: formatNumber(exampleCost),
+                  currency: configuration.currency,
+                  minutes: exampleMinutes,
+                })}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>{t('exampleResultingBalance.label')}</TableCell>
+              <TableCell className={cn(exampleResultingBalance < 0 ? 'text-danger' : 'text-success')}>
+                {t('billingValue', {
+                  credits: formatNumber(exampleResultingBalance),
+                  currency: configuration.currency,
+                })}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardBody>
     </Card>
   );
 }
