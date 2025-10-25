@@ -99,7 +99,7 @@ describe('SumUpService', () => {
   beforeEach(async () => {
     resetAllMocks();
 
-    mockConfigService.get.mockReturnValue({ ATTRACCESS_URL: 'https://example.com' });
+    mockConfigService.get.mockReturnValue({ ATTRACCESS_PUBLIC_INTERNET_URL: 'https://example.com' });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
