@@ -29,8 +29,9 @@ const AppEnvSchema = z
         message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
       }),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
-    ATTRACCESS_URL: z.string().url({ message: 'ATTRACCESS_URL must be a valid URL' }),
-    ATTRACCESS_FRONTEND_URL: z.string().url({ message: 'ATTRACCESS_FRONTEND_URL must be a valid URL' }),
+    ATTRACCESS_URL: z.url(),
+    ATTRACCESS_FRONTEND_URL: z.url(),
+    ATTRACCESS_PUBLIC_INTERNET_URL: z.url(),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
@@ -69,14 +70,21 @@ export type AppConfigType = z.infer<typeof AppEnvSchema> & {
 
 const appConfigFactory = (): AppConfigType => {
   try {
+    const FRONTEND_URL_ENV =
+      process.env.ATTRACCESS_FRONTEND_URL ??
+      process.env.FRONTEND_URL ??
+      process.env.ATTRACCESS_URL ??
+      process.env.VITE_ATTRACCESS_URL;
+
+    const ATTRACCESS_URL_ENV = process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL;
+
+    const ATTRACCESS_PUBLIC_INTERNET_URL_ENV = process.env.ATTRACCESS_PUBLIC_INTERNET_URL ?? ATTRACCESS_URL_ENV;
+
     const env = AppEnvSchema.parse({
       ...process.env,
-      ATTRACCESS_FRONTEND_URL:
-        process.env.ATTRACCESS_FRONTEND_URL ??
-        process.env.FRONTEND_URL ??
-        process.env.ATTRACCESS_URL ??
-        process.env.VITE_ATTRACCESS_URL,
-      ATTRACCESS_URL: process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL,
+      ATTRACCESS_FRONTEND_URL: FRONTEND_URL_ENV,
+      ATTRACCESS_URL: ATTRACCESS_URL_ENV,
+      ATTRACCESS_PUBLIC_INTERNET_URL: ATTRACCESS_PUBLIC_INTERNET_URL_ENV,
     });
 
     let licensoDeviceId = env.ATTRACCESS_FRONTEND_URL;
