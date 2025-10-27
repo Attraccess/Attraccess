@@ -176,7 +176,7 @@ export class UsersService {
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
 
-    if (updates.username) {
+    if (updates.username !== undefined) {
       this.validateUsernameOrThrow(updates.username);
     }
 
