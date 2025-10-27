@@ -1,26 +1,5 @@
 #include "websocket.hpp"
 
-#include <time.h>
-
-static bool timeSettingsSet = false;
-static bool ensureTimeSynced(Logger &logger)
-{
-    time_t now = time(nullptr);
-    if (now > 1700000000)
-    {                // ~2023-11-14
-        return true; // time already valid
-    }
-
-    if (!timeSettingsSet)
-    {
-        logger.info("Configuring SNTP...");
-        configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-        timeSettingsSet = true;
-    }
-
-    return false;
-}
-
 void Websocket::setup()
 {
     logger.info("Websocket setup");
@@ -71,12 +50,6 @@ void Websocket::connectWebSocket()
 {
     if (!connectionAttemptsEnabled)
     {
-        return;
-    }
-
-    if (!ensureTimeSynced(logger))
-    {
-        setState(INIT);
         return;
     }
 
