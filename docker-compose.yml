@@ -8,7 +8,10 @@ services:
       - '80:80' # HTTP
       - '81:81' # Proxy Manager Admin
       - '443:443' # HTTPS
-      - '1900:1900' # MQTT
+      - '1883:1883' # MQTT
+      - '8883:8883' # MQTT SSL
+      - '8080:8080' # MQTT WS
+      - '8081:8081' # MQTT WS SSL
     volumes:
       - proxy-data:/data
       - proxy-letsencrypt:/etc/letsencrypt
@@ -54,6 +57,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management
+    hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
     expose:
@@ -65,8 +69,6 @@ services:
       RABBITMQ_HOST: '%'
       RABBITMQ_DEFAULT_USER: attraccess
       RABBITMQ_DEFAULT_PASS: password
-      RABBITMQ_NODENAME: rabbitmq
-      #RABBITMQ_ERLANG_COOKIE: 'please change on production'
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:

@@ -134,8 +134,8 @@ export class SumUpService {
     const merchantCode = merchant.merchant_profile.merchant_code;
 
     let returnUrl: string;
-    if (this.appConfig.ATTRACCESS_URL.startsWith('https://')) {
-      returnUrl = this.appConfig.ATTRACCESS_URL + '/api/billing/top-up/sumup/callback';
+    if (this.appConfig.ATTRACCESS_PUBLIC_INTERNET_URL.startsWith('https://')) {
+      returnUrl = this.appConfig.ATTRACCESS_PUBLIC_INTERNET_URL + '/api/billing/top-up/sumup/callback';
       this.logger.debug('setting returl_url for sumup checkout', { returnUrl });
     }
 
