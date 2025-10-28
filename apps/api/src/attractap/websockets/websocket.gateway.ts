@@ -1096,6 +1096,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.logger.debug(`Started SumUp top-up for user ${userId} on reader ${preferred.id} amount ${amountCents}`);
     } catch (err) {
       this.logger.error(`handleBillingRequestTopup error: ${(err as Error).message}`);
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, {
+          error: 'SUMUP_TOPUP_FAILED',
+          details: (err as Error).message,
+        }),
+      );
     }
   }
   // handleFirmwareStreamChunk removed - HTTP OTA used instead

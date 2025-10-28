@@ -463,6 +463,12 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_t *keyboard;
     };
     InsufficientBalancePopupCtx *ctx = new InsufficientBalancePopupCtx{onStart, onCancel, dialog, amountTa, errorLbl, nullptr};
+    // Ensure context is freed when popup is destroyed (covers all close paths)
+    lv_obj_add_event_cb(overlay, [](lv_event_t *e)
+                        {
+        if (lv_event_get_code(e) != LV_EVENT_DELETE) return;
+        auto *c = (InsufficientBalancePopupCtx*)lv_event_get_user_data(e);
+        delete c; }, LV_EVENT_DELETE, ctx);
 
     // On-screen keyboard (hidden by default)
     lv_obj_t *keyboard = lv_keyboard_create(overlay);
@@ -522,7 +528,6 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
             auto *c = (InsufficientBalancePopupCtx*)lv_event_get_user_data(e);
             if (c && c->onCancel) c->onCancel();
-            if (c) delete c;
             Display::hidePopup();
         } }, LV_EVENT_CLICKED, ctx);
 
@@ -559,9 +564,6 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_set_style_text_font(infoLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         if (c->onStart) c->onStart(amountCents);
-
-        // Free context now; popup will close shortly
-        delete c;
         // Close after short delay
         Display::popupAutoCloseTimer = lv_timer_create([](lv_timer_t *tmr){ (void)tmr; Display::hidePopup(); Display::popupAutoCloseTimer = nullptr; }, 1200, NULL);
         (void)Display::popupAutoCloseTimer; }, LV_EVENT_CLICKED, ctx);
