@@ -80,6 +80,8 @@ public:
     void unlatchDoor(uint32_t resourceId);
     void triggerFlowButton(uint32_t resourceId, const char *buttonId);
 
+    void requestBillingTopup(uint32_t amountCents);
+
     void onDeviceName(std::function<void(String)> callback);
 
     void disableConnectionAttempts();
@@ -89,6 +91,9 @@ public:
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
     void setActionResultCallback(std::function<void(const char *type, bool success)> callback);
+
+    // Special-case callback for insufficient balance with server-provided SumUp flag
+    void setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback);
 
 private:
     Logger logger;
@@ -137,6 +142,7 @@ private:
 
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const char *type, bool success)> actionResultCallback;
+    std::function<void(bool)> insufficientBalanceCallback;
 
     // Firmware update progress callback with status enum
 public:

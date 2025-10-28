@@ -17,6 +17,7 @@ import { AttractapService } from '../attractap.service';
 import { nanoid } from 'nanoid';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapFirmwareService } from '../firmware.service';
+import { SumUpService } from '../../billing/sumup.service';
 import { Mutex } from 'async-mutex';
 import { LicenseModuleType, LicenseService } from '../../license/license.service';
 import { AttractapFirmware } from '../dtos/firmware.dto';
@@ -27,6 +28,7 @@ import { ResourceIntroducersService } from '../../resources/introducers/resource
 import { ResourceFlowsService } from '../../resources/flows/resource-flows.service';
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 import { ResourceInUseError } from '../../resources/usage/errors/resource-in-use.error';
+import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 import { ResourceFlowNodeType } from '@attraccess/database-entities';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
@@ -66,6 +68,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceFlowsExecutorService)
   private resourceFlowsExecutorService: ResourceFlowsExecutorService;
+
+  @Inject(SumUpService)
+  private sumUpService: SumUpService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -380,6 +385,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         break;
       case AttractapEventType.TRIGGER_FLOW_BUTTON:
         await this.handleTriggerFlowButton(socket, eventData);
+        break;
+      case AttractapEventType.BILLING_REQUEST_TOPUP:
+        await this.handleBillingRequestTopup(socket, eventData);
         break;
       case AttractapEventType.FIRMWARE_REQUEST_CHUNK:
         await this.handleFirmwareChunkRequest(socket, eventData);
@@ -913,6 +921,16 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         }, 1000);
         return;
       }
+      if (error instanceof InsufficientBalanceError || error?.message === 'INSUFFICIENT_BALANCE') {
+        const sumUpEnabled = await this.sumUpService.getIsEnabled();
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, {
+            error: 'INSUFFICIENT_BALANCE',
+            sumUpEnabled,
+          }),
+        );
+        return;
+      }
       this.logger.error(`Failed to start resource usage session: ${error.message}`);
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message }),
@@ -1031,6 +1049,53 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error(`Failed to trigger flow button: ${error.message}`);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.TRIGGER_FLOW_BUTTON, { error: error.message }));
+    }
+  }
+
+  private async handleBillingRequestTopup(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    try {
+      const enabled = await this.sumUpService.getIsEnabled();
+      if (!enabled) {
+        this.logger.warn('BILLING_REQUEST_TOPUP received but SumUp is not enabled');
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'SUMUP_NOT_ENABLED' }),
+        );
+        return;
+      }
+
+      const userId = socket.state.lastAuthenticatedUserId;
+      if (!userId) {
+        this.logger.warn('BILLING_REQUEST_TOPUP received but no authenticated user is set on socket');
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'USER_NOT_AUTHENTICATED' }),
+        );
+        return;
+      }
+
+      const { amountCents } = data.payload as { amountCents: number };
+      if (typeof amountCents !== 'number' || !Number.isInteger(amountCents) || amountCents <= 0) {
+        this.logger.warn(`BILLING_REQUEST_TOPUP invalid amount: ${JSON.stringify(data.payload)}`);
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'INVALID_AMOUNT' }),
+        );
+        return;
+      }
+
+      const readers = await this.sumUpService.getReaders();
+      if (!readers || readers.length === 0) {
+        this.logger.warn('BILLING_REQUEST_TOPUP requested but no SumUp readers are linked');
+        await socket.sendMessage(
+          new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'NO_SUMUP_TERMINALS_AVAILABLE' }),
+        );
+        return;
+      }
+
+      // Prefer a paired/active reader if available, otherwise first one
+      const preferred = readers.find((r) => r.status === 'paired') || readers[0];
+      await this.sumUpService.topUpWithReader(userId, preferred.id, amountCents);
+      this.logger.debug(`Started SumUp top-up for user ${userId} on reader ${preferred.id} amount ${amountCents}`);
+    } catch (err) {
+      this.logger.error(`handleBillingRequestTopup error: ${(err as Error).message}`);
     }
   }
   // handleFirmwareStreamChunk removed - HTTP OTA used instead

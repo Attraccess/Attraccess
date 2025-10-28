@@ -115,13 +115,34 @@ void Application::setup()
                                                                    },
                                                                    payload); });
 
-    // Wire global API error -> central popup and stop any ongoing action overlay
+    // Insufficient balance special-case (with SumUp capability flag)
+    this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled)
+                                             {
+                                                 this->ioExpander.errorBeep();
+                                                 
+                                                 struct Payload { Application *self; bool enabled; };
+                                                 Payload *pl = new Payload{this, sumUpEnabled}; if (!pl) return;
+                                                 lv_async_call([](void *u){
+                                                     auto *p = (Payload*)u; if (!p || !p->self) { if (p) delete p; return; }
+                                                     p->self->endActionPause();
+                                                     Display::resourceDetailsScreen.hideActionProgress();
+                                                     if (p->enabled) {
+                                                         Display::showInsufficientBalancePopup(
+                                                             [self = p->self](uint32_t amountCents){ self->api.requestBillingTopup(amountCents); },
+                                                             [](){});
+                                                     } else {
+                                                         Display::showErrorPopup("Fehler", "INSUFFICIENT_BALANCE");
+                                                     }
+                                                     delete p;
+                                                 }, pl); });
+
+    // Generic error fallback for all other errors
     this->api.setErrorCallback([this](const char *title, const char *message)
                                {
                                    this->ioExpander.errorBeep();
 
                                    if (this->state == APPLICATION_STATE_LOCKED) {
-                                    this->nfc.enableCardDetection();
+                                       this->nfc.enableCardDetection();
                                    }
 
                                    // Ensure UI operations on LVGL thread
@@ -131,9 +152,8 @@ void Application::setup()
                                    p->self = this; p->t = String(title); p->m = String(message);
                                    lv_async_call([](void *u){
                                        auto *pl = (ErrPayload *)u;
-                                       if (pl && pl->self) {
-                                           pl->self->endActionPause();
-                                       }
+                                       if (!pl || !pl->self) { if (pl) delete pl; return; }
+                                       pl->self->endActionPause();
                                        Display::resourceDetailsScreen.hideActionProgress();
                                        Display::showErrorPopup(pl->t, pl->m);
                                        delete pl;
