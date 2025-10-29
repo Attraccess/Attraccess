@@ -193,6 +193,9 @@ export class ResourceUsageService {
             relations: ['user', 'resource'],
           });
 
+          // Charge the previous user's ended session
+          await this.billingService.chargeForResourceUsage(updatedSession, transactionalEntityManager);
+
           // Defer event for the ended session until after commit
           endedUsageIdToEmit = updatedSession.id;
         } else if (dto.forceTakeOver && !resource.allowTakeOver) {
@@ -245,7 +248,7 @@ export class ResourceUsageService {
 
         await this.flowExecutorService.runFlow(
           existingActiveSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
           { ...existingActiveSession, takeOverTime: now, newUser: user, oldUser: existingActiveSession.user },
           transactionalEntityManager,
         );
@@ -258,14 +261,14 @@ export class ResourceUsageService {
       } else {
         // Defer event for the newly started session until after commit
         startedUsageIdToEmit = createdSession.id;
-      }
 
-      await this.flowExecutorService.runFlow(
-        createdSession.resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-        createdSession,
-        transactionalEntityManager,
-      );
+        await this.flowExecutorService.runFlow(
+          createdSession.resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+          createdSession,
+          transactionalEntityManager,
+        );
+      }
 
       // Return the created session to the caller; events will be emitted after commit
       return createdSession;
