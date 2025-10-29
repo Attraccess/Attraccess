@@ -73,9 +73,21 @@ void API::processIncomingMessage(const char *buf, size_t len)
             String err = payload["error"].as<String>();
             if (err.length() > 0)
             {
-                if (this->errorCallback)
+                // Special-case insufficient balance: propagate sumUpEnabled flag if present
+                if (err == "INSUFFICIENT_BALANCE")
                 {
-                    this->errorCallback("Fehler", err.c_str());
+                    bool sumUpEnabled = payload["sumUpEnabled"].is<bool>() ? payload["sumUpEnabled"].as<bool>() : false;
+                    if (this->insufficientBalanceCallback)
+                    {
+                        this->insufficientBalanceCallback(sumUpEnabled);
+                    }
+                }
+                else
+                {
+                    if (this->errorCallback)
+                    {
+                        this->errorCallback("Fehler", err.c_str());
+                    }
                 }
                 // Do not process further
                 this->sendAck(eventType);
@@ -340,6 +352,11 @@ void API::setErrorCallback(std::function<void(const char *title, const char *mes
 void API::setActionResultCallback(std::function<void(const char *type, bool success)> callback)
 {
     this->actionResultCallback = callback;
+}
+
+void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback)
+{
+    this->insufficientBalanceCallback = callback;
 }
 
 void API::onRegistrationData(JsonObject data)
@@ -669,6 +686,15 @@ void API::triggerFlowButton(uint32_t resourceId, const char *buttonId)
     payload["resourceId"] = resourceId;
     payload["buttonId"] = buttonId ? buttonId : "";
     this->sendMessage("TRIGGER_FLOW_BUTTON", payload);
+}
+
+void API::requestBillingTopup(uint32_t amountCents)
+{
+    this->logger.info("Requesting billing top-up");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["amountCents"] = amountCents;
+    this->sendMessage("BILLING_REQUEST_TOPUP", payload);
 }
 
 void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback)

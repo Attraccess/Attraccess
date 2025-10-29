@@ -50,6 +50,7 @@ public:
 
     // Global error popup helpers
     static void showErrorPopup(const String &title, const String &message);
+    static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
 private:
@@ -84,4 +85,5 @@ private:
     static String deviceNameInitValue;
 
     static lv_obj_t *activePopup;
+    static lv_timer_t *popupAutoCloseTimer;
 };

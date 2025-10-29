@@ -20,6 +20,7 @@ import { LicenseModule } from '../license/license.module';
 import { ResourceIntroductionsModule } from '../resources/introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from '../resources/introducers/resourceIntroducers.module';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
     ResourceFlowsModule,
+    BillingModule,
   ],
   providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService, AttractapFirmwareService],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
