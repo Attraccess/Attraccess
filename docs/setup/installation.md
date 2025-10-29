@@ -75,11 +75,18 @@ docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMP
 | `SMTP_PORT` | SMTP server port | If SMTP_SERVICE=SMTP | - |
 | `SMTP_USER` | SMTP authentication username | Optional | - |
 | `SMTP_PASS` | SMTP authentication password | Optional | - |
-| `SMTP_SECURE` | Use secure connection ("true"/"false") | Optional | "false" |
+| `SMTP_SECURE` | Use SMTPS TLS from start; set `true` for port 465, `false` for STARTTLS ports like 587 (only the string "true" is treated as true) | Optional | "false" |
 | `SMTP_IGNORE_TLS` | Ignore TLS ("true"/"false") | Optional | "true" |
 | `SMTP_REQUIRE_TLS` | Require TLS ("true"/"false") | Optional | "false" |
 | `SMTP_TLS_REJECT_UNAUTHORIZED` | Reject unauthorized TLS ("true"/"false") | Optional | "true" |
 | `SMTP_TLS_CIPHERS` | TLS cipher configuration | Optional | - |
+
+> [!TIP]
+> SMTP guidance:
+>
+> - Use `SMTP_PORT=465` with `SMTP_SECURE=true` for implicit TLS (SMTPS)
+> - Use `SMTP_PORT=587` with `SMTP_SECURE=false` for STARTTLS
+> - Any value other than the string `"true"` (case-insensitive) is treated as `false`
 
 #### SSL Configuration
 
@@ -117,6 +124,7 @@ docker run -d \
   -e SMTP_FROM=no-reply@yourdomain.com \
   -e SMTP_HOST=smtp.yourdomain.com \
   -e SMTP_PORT=587 \
+  -e SMTP_SECURE=false \
   -e SMTP_USER=your_smtp_user \
   -e SMTP_PASS=your_smtp_password \
   -e LOG_LEVELS=error,warn,log \

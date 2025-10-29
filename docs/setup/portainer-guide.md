@@ -67,7 +67,6 @@ docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /va
 1. Click on "Advanced container settings"
 
 2. Go to the "Volumes" tab:
-
    - Click "Map additional volume"
    - **Container**: /app/storage
    - **Volume**: attraccess_storage
@@ -85,6 +84,7 @@ docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /va
 | SMTP_FROM           | your-email@example.com                  |
 | SMTP_HOST           | smtp.example.com                        |
 | SMTP_PORT           | 587                                     |
+| SMTP_SECURE         | false                                   |
 | SMTP_USER           | your-email-username                     |
 | SMTP_PASS           | your-email-password                     |
 | LOG_LEVELS          | error,warn,log                          |
@@ -123,6 +123,7 @@ services:
       - SMTP_FROM=your-email@example.com
       - SMTP_HOST=smtp.example.com
       - SMTP_PORT=587
+      - SMTP_SECURE=false
       - SMTP_USER=your-email-username
       - SMTP_PASS=your-email-password
 
@@ -187,10 +188,14 @@ To use Gmail as your email service:
 | SMTP_FROM    | your-gmail@gmail.com |
 | SMTP_HOST    | smtp.gmail.com       |
 | SMTP_PORT    | 587                  |
+| SMTP_SECURE  | false                |
 | SMTP_USER    | your-gmail@gmail.com |
 | SMTP_PASS    | your-app-password    |
 
 > Note: For Gmail, you need to set up an "App Password" in your Google Account security settings.
+
+> [!TIP]
+> Use `SMTP_SECURE=true` only with port `465` (SMTPS). For port `587` (STARTTLS), set `SMTP_SECURE=false`.
 
 ### Outlook/Office 365 Configuration
 
@@ -208,13 +213,11 @@ For Outlook or Office 365:
 ### Common Issues in Portainer
 
 1. **Container fails to start**:
-
    - Check the container logs for error messages
    - Verify all environment variables are set correctly
    - Ensure the ports aren't already in use by another container
 
 2. **Can't access Attraccess from web browser**:
-
    - Verify the container is running in Portainer
    - Check if your firewall is blocking port 3000
    - Make sure you're using the correct URL

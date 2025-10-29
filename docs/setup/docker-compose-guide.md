@@ -58,6 +58,7 @@ services:
       - SMTP_FROM=your-email@example.com
       - SMTP_HOST=smtp.example.com
       - SMTP_PORT=587
+      - SMTP_SECURE=false
       - SMTP_USER=your-email-username
       - SMTP_PASS=your-email-password
 
@@ -111,6 +112,7 @@ Update the email settings in your `docker-compose.yml` file with your actual SMT
 - SMTP_FROM=your-gmail@gmail.com
 - SMTP_HOST=smtp.gmail.com
 - SMTP_PORT=587
+- SMTP_SECURE=false
 - SMTP_USER=your-gmail@gmail.com
 - SMTP_PASS=your-app-password
 ```
@@ -234,6 +236,7 @@ SMTP_SERVICE=SMTP
 SMTP_FROM=your-email@example.com
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=your-email-username
 SMTP_PASS=your-email-password
 
@@ -265,13 +268,11 @@ services:
 ### Common Issues
 
 1. **Container fails to start**:
-
    - Check your `docker-compose.yml` for syntax errors
    - Verify all required environment variables are set correctly
    - Check if port 3000 is already in use by another application
 
 2. **Can't access Attraccess in browser**:
-
    - Verify the container is running with `docker-compose ps`
    - Check if your firewall is blocking port 3000
    - Make sure you're using the correct URL
