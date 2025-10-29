@@ -134,130 +134,132 @@ export function AttraccessNode(props: Props) {
     });
   }, [schema, t]);
 
-  const actions = useMemo(() => {
+  const isEditable = useMemo(() => {
     if (previewMode) {
-      return undefined;
+      return false;
     }
 
     const properties = schema.configSchema.properties as Record<string, unknown>;
 
     if (Object.keys(properties).length === 0) {
-      return undefined;
+      return false;
     }
 
-    return (
-      <NodeEditor schema={schema} tNodeTranslations={t}>
-        {(onOpen) => <Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={onOpen} />}
-      </NodeEditor>
-    );
-  }, [previewMode, schema, t]);
+    return true;
+  }, [previewMode, schema]);
 
   const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
 
   return (
-    <div>
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirmation}
-        onClose={userDoesNotWantToDelete}
-        onConfirm={remove}
-        itemName={t('nodes.' + schema.type + '.title')}
-      />
+    <NodeEditor schema={schema} tNodeTranslations={t}>
+      {(openEditor) => (
+        <div>
+          <DeleteConfirmationModal
+            isOpen={showDeleteConfirmation}
+            onClose={userDoesNotWantToDelete}
+            onConfirm={remove}
+            itemName={t('nodes.' + schema.type + '.title')}
+          />
 
-      <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
-        <div className="flex flex-row gap-2">
-          {actions}
-          {!previewMode && (
-            <Button
-              isIconOnly
-              color="danger"
-              size="sm"
-              startContent={<Trash2Icon size={12} />}
-              onPress={userWantsToDelete}
-            />
-          )}
-        </div>
-      </NodeToolbar>
-      <Card className={cardClasses}>
-        <CardHeader className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center min-w-0">
-              <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
+          <NodeToolbar isVisible={data?.forceToolbarVisible || undefined} position={data?.toolbarPosition}>
+            <div className="flex flex-row gap-2">
+              {isEditable && (
+                <Button size="sm" isIconOnly startContent={<Edit2Icon size={12} />} onPress={openEditor} />
+              )}
+              {!previewMode && (
+                <Button
+                  isIconOnly
+                  color="danger"
+                  size="sm"
+                  startContent={<Trash2Icon size={12} />}
+                  onPress={userWantsToDelete}
+                />
+              )}
             </div>
-            {!previewMode && (
-              <Tooltip
-                content={
-                  processingState === ProcessingState.PROCESSING
-                    ? 'Processing'
-                    : processingState === ProcessingState.COMPLETED
-                      ? 'Completed'
-                      : processingState === ProcessingState.FAILED
-                        ? 'Failed'
-                        : 'Idle'
-                }
-              >
-                <span
-                  className={cn(
-                    'w-2 h-2 rounded-full shrink-0',
-                    processingState === ProcessingState.PROCESSING
-                      ? 'bg-blue-500 animate-pulse'
-                      : processingState === ProcessingState.COMPLETED
-                        ? 'bg-green-500'
-                        : processingState === ProcessingState.FAILED
-                          ? 'bg-red-500'
-                          : 'bg-default-400',
-                  )}
+          </NodeToolbar>
+          <Card className={cardClasses} onDoubleClick={isEditable ? openEditor : undefined}>
+            <CardHeader className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center min-w-0">
+                  <span className="font-bold text-sm truncate">{t('nodes.' + schema.type + '.title')}</span>
+                </div>
+                {!previewMode && (
+                  <Tooltip
+                    content={
+                      processingState === ProcessingState.PROCESSING
+                        ? 'Processing'
+                        : processingState === ProcessingState.COMPLETED
+                          ? 'Completed'
+                          : processingState === ProcessingState.FAILED
+                            ? 'Failed'
+                            : 'Idle'
+                    }
+                  >
+                    <span
+                      className={cn(
+                        'w-2 h-2 rounded-full shrink-0',
+                        processingState === ProcessingState.PROCESSING
+                          ? 'bg-blue-500 animate-pulse'
+                          : processingState === ProcessingState.COMPLETED
+                            ? 'bg-green-500'
+                            : processingState === ProcessingState.FAILED
+                              ? 'bg-red-500'
+                              : 'bg-default-400',
+                      )}
+                    />
+                  </Tooltip>
+                )}
+              </div>
+              {previewMode && (
+                <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
+              )}
+            </CardHeader>
+
+            {!previewMode && previewRows.length > 0 && (
+              <CardBody className="pt-0">
+                <div className="flex flex-col gap-2">
+                  {previewRows.map((row) => (
+                    <div className="flex flex-col gap-2" key={row.label}>
+                      <small>{row.label}</small>
+                      <Code className="text-ellipsis overflow-hidden" title={row.value}>
+                        {row.value}
+                      </Code>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            )}
+          </Card>
+
+          {!previewMode && !schema.supportedByResource && (
+            <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
+              <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
+            </div>
+          )}
+
+          {!previewMode &&
+            targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
+              <Tooltip content={label} key={handleId} isDisabled={!label}>
+                <Handle
+                  key={handleId}
+                  type="target"
+                  position={Position.Top}
+                  className="!w-4 !h-4"
+                  style={style}
+                  id={handleId}
                 />
               </Tooltip>
-            )}
-          </div>
-          {previewMode && (
-            <span className="text-xs text-default-500 text-wrap">{t('nodes.' + schema.type + '.description')}</span>
-          )}
-        </CardHeader>
-
-        {!previewMode && previewRows.length > 0 && (
-          <CardBody className="pt-0">
-            <div className="flex flex-col gap-2">
-              {previewRows.map((row) => (
-                <div className="flex flex-col gap-2" key={row.label}>
-                  <small>{row.label}</small>
-                  <Code className="text-ellipsis overflow-hidden" title={row.value}>
-                    {row.value}
-                  </Code>
-                </div>
+            ))}
+          <div style={{ position: 'relative', marginInline: '25px' }}>
+            {!previewMode &&
+              sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
+                <Tooltip content={label} key={handleId} isDisabled={!label}>
+                  <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
+                </Tooltip>
               ))}
-            </div>
-          </CardBody>
-        )}
-      </Card>
-
-      {!previewMode && !schema.supportedByResource && (
-        <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
-          <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
+          </div>
         </div>
       )}
-
-      {!previewMode &&
-        targetHandlesWithStyles.map(({ id: handleId, label, style }) => (
-          <Tooltip content={label} key={handleId} isDisabled={!label}>
-            <Handle
-              key={handleId}
-              type="target"
-              position={Position.Top}
-              className="!w-4 !h-4"
-              style={style}
-              id={handleId}
-            />
-          </Tooltip>
-        ))}
-      <div style={{ position: 'relative', marginInline: '25px' }}>
-        {!previewMode &&
-          sourceHandlesWithStyles.map(({ id: handleId, label, style }) => (
-            <Tooltip content={label} key={handleId} isDisabled={!label}>
-              <Handle style={style} type="source" position={Position.Bottom} className="!w-4 !h-4" id={handleId} />
-            </Tooltip>
-          ))}
-      </div>
-    </div>
+    </NodeEditor>
   );
 }
