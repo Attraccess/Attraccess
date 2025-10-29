@@ -8,6 +8,7 @@ import {
   ResourceUsageAction,
   User,
   ResourceBillingConfiguration,
+  ResourceFlowNodeType,
 } from '@attraccess/database-entities';
 import { Repository, IsNull, SelectQueryBuilder } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -27,6 +28,7 @@ import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resour
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 import { ResourceInUseError } from './errors/resource-in-use.error';
+import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -40,6 +42,7 @@ describe('ResourceUsageService', () => {
   let resourceMaintenanceService: jest.Mocked<ResourceMaintenanceService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
   let billingService: jest.Mocked<BillingService>;
+  let flowExecutorService: { runFlow: jest.Mock };
   // Expose transactional entity manager for assertions
   let transactionalEntityManager: {
     createQueryBuilder: jest.Mock;
@@ -197,6 +200,7 @@ describe('ResourceUsageService', () => {
     resourceMaintenanceService = module.get(ResourceMaintenanceService);
     eventEmitter = module.get(EventEmitter2);
     billingService = module.get(BillingService);
+    flowExecutorService = module.get(ResourceFlowsExecutorService) as unknown as { runFlow: jest.Mock };
 
     // Provide transaction-capable manager on the repository
     transactionalEntityManager = {
@@ -421,7 +425,13 @@ describe('ResourceUsageService', () => {
       resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
-      const mockActiveSession = { id: 1, userId: 2, startTime: new Date(), user: { id: 2 } as User } as ResourceUsage;
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 2,
+        startTime: new Date(),
+        user: { id: 2 } as User,
+      } as ResourceUsage;
       const updatedEndedSession = {
         ...mockActiveSession,
         endTime: new Date(),
@@ -474,6 +484,82 @@ describe('ResourceUsageService', () => {
       expect(takeoverPayload.newUser).toMatchObject({ id: mockUser.id });
       expect(takeoverPayload.previousUser).toMatchObject({ id: mockActiveSession.user?.id });
       expect(takeoverPayload.takeoverTime).toBeInstanceOf(Date);
+
+      // Previous user is charged for ended session
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledTimes(1);
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(updatedEndedSession, expect.anything());
+
+      // Ensure the charged usage belongs to the previous user, not the new one
+      const chargedArg = (billingService.chargeForResourceUsage as unknown as jest.Mock).mock
+        .calls[0][0] as ResourceUsage;
+      expect(chargedArg.id).toBe(updatedEndedSession.id);
+      expect(chargedArg.user?.id).toBe(mockActiveSession.user.id);
+      // Ensure the new session was not charged
+      const chargedIds = (billingService.chargeForResourceUsage as unknown as jest.Mock).mock.calls.map(
+        (c) => c[0]?.id,
+      );
+      expect(chargedIds).not.toContain(mockNewUsage.id);
+    });
+
+    it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+
+      resourceRepository.findOne.mockResolvedValue(mockResourceWithTakeOver);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      const mockActiveSession = {
+        id: 10,
+        resourceId: 1,
+        userId: 9,
+        startTime: new Date(),
+        user: { id: 9 } as User,
+      } as ResourceUsage;
+      const updatedEndedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session ended due to takeover by user 1',
+      } as ResourceUsage;
+      const mockNewUsage = { id: 11, resourceId: 1, userId: 1 } as ResourceUsage;
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession) // getActiveSession
+        .mockResolvedValueOnce(updatedEndedSession) // fetch updated ended session
+        .mockResolvedValueOnce(mockNewUsage) // fetch new session inside tx
+        .mockResolvedValueOnce(updatedEndedSession) // emitUsageEvent for ended
+        .mockResolvedValueOnce(mockNewUsage); // emitUsageEvent for started
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      const mockInsertQueryBuilder = createMockQueryBuilder(null);
+
+      (transactionalEntityManager.createQueryBuilder as jest.Mock)
+        .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>)
+        .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>);
+
+      await service.startSession(1, mockUser, dto);
+
+      // Only one flow call and it must be TAKEOVER
+      expect(flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
+      const [resId, nodeType, payload] = flowExecutorService.runFlow.mock.calls[0];
+      expect(resId).toBe(mockActiveSession.resourceId ?? 1);
+      expect(nodeType).toBe(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER);
+      expect(payload).toMatchObject({ newUser: { id: mockUser.id }, oldUser: { id: mockActiveSession.user.id } });
+
+      // Billing start should still be called exactly once for the new session
+      expect(billingService.handleResourceUsageStart).toHaveBeenCalledTimes(1);
+      // Billing charge should occur for previous ended session exactly once
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledTimes(1);
+      const chargedArg = (billingService.chargeForResourceUsage as unknown as jest.Mock).mock
+        .calls[0][0] as ResourceUsage;
+      expect(chargedArg.user?.id).toBe(mockActiveSession.user.id);
+      const chargedIds = (billingService.chargeForResourceUsage as unknown as jest.Mock).mock.calls.map(
+        (c) => c[0]?.id,
+      );
+      expect(chargedIds).not.toContain(mockNewUsage.id);
     });
 
     it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
