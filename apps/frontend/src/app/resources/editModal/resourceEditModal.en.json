@@ -1,5 +1,8 @@
 {
-  "modalTitle": "Edit Resource",
+  "modalTitle": {
+    "create": "Create Resource",
+    "update": "Update Resource"
+  },
   "inputs": {
     "type": {
       "options": {
