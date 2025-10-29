@@ -199,7 +199,7 @@
     "typescript-eslint": "^8.32.0",
     "util": "^0.12.5",
     "verdaccio": "6.1.2",
-    "vite": "6.3.5",
+    "vite": "6.4.1",
     "vite-plugin-dts": "4.5.4",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^1.6.1",
