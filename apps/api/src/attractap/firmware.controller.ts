@@ -15,7 +15,7 @@ export class AttractapFirmwareController {
     @Inject(AttractapFirmwareService)
     private readonly attractapFirmwareService: AttractapFirmwareService,
     @Inject(AttractapGateway)
-    private readonly attractapGateway: AttractapGateway
+    private readonly attractapGateway: AttractapGateway,
   ) {}
 
   @Get()
@@ -33,6 +33,48 @@ export class AttractapFirmwareController {
     return firmwares;
   }
 
+  @Get('/:firmwareName/variants/:variantName')
+  @ApiOperation({ summary: 'Download OTA firmware by name and variant', operationId: 'downloadFirmwareBinary' })
+  @ApiResponse({ status: 200, description: 'Firmware streamed successfully', type: String })
+  async downloadFirmwareBinary(
+    @Param('firmwareName') firmwareName: string,
+    @Param('variantName') variantName: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.debug(
+      `GET /attractap/firmwares/${firmwareName}/variants/${variantName} - Streaming OTA firmware binary`,
+    );
+
+    try {
+      const { stream, size, filename } = this.attractapFirmwareService.getOtaFile(firmwareName, variantName);
+
+      res.set({
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': size.toString(),
+        Connection: 'keep-alive',
+        'Cache-Control': 'no-cache',
+      });
+
+      stream.on('error', (error) => {
+        this.logger.error(`Stream error during OTA firmware download: ${error.message}`, (error as Error).stack);
+        if (!res.headersSent) {
+          res.status(500).send('Stream error during firmware download');
+        }
+      });
+
+      stream.on('end', () => {
+        this.logger.debug('OTA firmware stream completed successfully');
+      });
+
+      stream.pipe(res);
+    } catch (err) {
+      const e = err as Error;
+      this.logger.error(`Error serving OTA firmware: ${e.message}`, e.stack);
+      res.status(404).send('Firmware binary not found');
+    }
+  }
+
   @Get('/:firmwareName/variants/:variantName/:filename')
   @ApiOperation({ summary: 'Get a firmware by name and variant', operationId: 'getFirmwareBinary' })
   @ApiResponse({
@@ -44,10 +86,10 @@ export class AttractapFirmwareController {
     @Param('firmwareName') firmwareName: string,
     @Param('variantName') variantName: string,
     @Param('filename') filename: string,
-    @Res() res: Response
+    @Res() res: Response,
   ): Promise<void> {
     this.logger.debug(
-      `GET /attractap/firmwares/${firmwareName}/variants/${variantName}/${filename} - Fetching firmware binary`
+      `GET /attractap/firmwares/${firmwareName}/variants/${variantName}/${filename} - Fetching firmware binary`,
     );
     this.logger.debug(`Parameters: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`);
 
@@ -87,8 +129,8 @@ export class AttractapFirmwareController {
         if (bytesTransferred >= nextLogPoint) {
           this.logger.debug(
             `Firmware download progress: ${bytesTransferred} / ${fileSize} bytes (${Math.round(
-              (bytesTransferred / fileSize) * 100
-            )}%)`
+              (bytesTransferred / fileSize) * 100,
+            )}%)`,
           );
           nextLogPoint += logInterval;
         }
@@ -100,7 +142,7 @@ export class AttractapFirmwareController {
     } catch (err) {
       this.logger.error(`Error serving firmware binary: ${err.message}`, err.stack);
       this.logger.debug(
-        `Error occurred for request: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`
+        `Error occurred for request: firmwareName=${firmwareName}, variantName=${variantName}, filename=${filename}`,
       );
       res.status(404).send('Firmware binary not found');
     }

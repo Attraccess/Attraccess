@@ -105,9 +105,14 @@ export const $User = {
         creditBalance: {
             type: 'number',
             description: 'The credit balance of the user'
+        },
+        billingFactor: {
+            type: 'number',
+            description: 'The percentage rate the user to actually pay for activities that cost credits',
+            example: 100
         }
     },
-    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance']
+    required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
 } as const;
 
 export const $VerifyEmailDto = {
@@ -258,6 +263,18 @@ export const $SetUserPasswordDto = {
         }
     },
     required: ['password']
+} as const;
+
+export const $ChangeBillingFactorDto = {
+    type: 'object',
+    properties: {
+        billingFactor: {
+            type: 'number',
+            description: 'The new billing factor',
+            example: 50
+        }
+    },
+    required: ['billingFactor']
 } as const;
 
 export const $CreateSessionResponse = {
@@ -567,7 +584,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'reset-password', 'username-changed', 'password-changed'],
+    enum: ['verify-email', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -820,6 +837,12 @@ This is a markdown documentation for the resource.`
             type: 'string',
             description: 'When the resource was last updated'
         },
+        deletedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the resource was deleted',
+            nullable: true
+        },
         groups: {
             description: 'The groups the resource belongs to',
             type: 'array',
@@ -828,7 +851,7 @@ This is a markdown documentation for the resource.`
             }
         }
     },
-    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'groups']
+    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'deletedAt', 'groups']
 } as const;
 
 export const $PaginatedResourceResponseDto = {
@@ -1042,169 +1065,6 @@ export const $UpdateMqttServerDto = {
             default: false
         }
     }
-} as const;
-
-export const $TestConnectionResponseDto = {
-    type: 'object',
-    properties: {
-        success: {
-            type: 'boolean',
-            description: 'Whether the connection test was successful',
-            example: true
-        },
-        message: {
-            type: 'string',
-            description: 'Message describing the test result',
-            example: 'Connection successful'
-        }
-    },
-    required: ['success', 'message']
-} as const;
-
-export const $MqttHealthStatusDto = {
-    type: 'object',
-    properties: {
-        healthy: {
-            type: 'boolean',
-            description: 'Whether the connection is healthy',
-            example: true
-        },
-        details: {
-            type: 'string',
-            description: 'Detailed health status message',
-            example: 'Connected: true, Failures: 0/3, Messages: 10 sent, 0 failed'
-        }
-    },
-    required: ['healthy', 'details']
-} as const;
-
-export const $MqttConnectionStatsDto = {
-    type: 'object',
-    properties: {
-        connectionAttempts: {
-            type: 'number',
-            description: 'Number of connection attempts',
-            example: 5
-        },
-        connectionFailures: {
-            type: 'number',
-            description: 'Number of failed connections',
-            example: 1
-        },
-        connectionSuccesses: {
-            type: 'number',
-            description: 'Number of successful connections',
-            example: 4
-        },
-        lastConnectTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'Timestamp of last successful connection',
-            example: '2023-01-01T12:00:00.000Z'
-        },
-        lastDisconnectTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'Timestamp of last disconnection',
-            example: '2023-01-01T12:30:00.000Z'
-        }
-    },
-    required: ['connectionAttempts', 'connectionFailures', 'connectionSuccesses']
-} as const;
-
-export const $MqttMessageStatsDto = {
-    type: 'object',
-    properties: {
-        published: {
-            type: 'number',
-            description: 'Number of successfully published messages',
-            example: 42
-        },
-        failed: {
-            type: 'number',
-            description: 'Number of failed message publications',
-            example: 3
-        },
-        lastPublishTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'Timestamp of last successful message publication',
-            example: '2023-01-01T12:15:00.000Z'
-        },
-        lastFailureTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'Timestamp of last failed message publication',
-            example: '2023-01-01T12:10:00.000Z'
-        }
-    },
-    required: ['published', 'failed']
-} as const;
-
-export const $MqttServerStatsDto = {
-    type: 'object',
-    properties: {
-        connection: {
-            description: 'Connection statistics',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/MqttConnectionStatsDto'
-                }
-            ]
-        },
-        messages: {
-            description: 'Message statistics',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/MqttMessageStatsDto'
-                }
-            ]
-        }
-    },
-    required: ['connection', 'messages']
-} as const;
-
-export const $MqttServerStatusDto = {
-    type: 'object',
-    properties: {
-        connected: {
-            type: 'boolean',
-            description: 'Whether the server is currently connected',
-            example: true
-        },
-        healthStatus: {
-            description: 'Health status of the connection',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/MqttHealthStatusDto'
-                }
-            ]
-        },
-        stats: {
-            description: 'Detailed statistics',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/MqttServerStatsDto'
-                }
-            ]
-        }
-    },
-    required: ['connected', 'healthStatus', 'stats']
-} as const;
-
-export const $AllMqttServerStatusesDto = {
-    type: 'object',
-    properties: {
-        servers: {
-            type: 'object',
-            description: 'Map of server IDs to their statuses',
-            additionalProperties: {
-                type: 'object',
-                '$ref': '#/components/schemas/MqttServerStatusDto'
-            }
-        }
-    },
-    required: ['servers']
 } as const;
 
 export const $CreateResourceGroupDto = {
@@ -2217,13 +2077,24 @@ export const $SumupTransactionCallbackDto = {
     required: ['id', 'event_type', 'payload', 'timestamp']
 } as const;
 
+export const $RefundTransactionDto = {
+    type: 'object',
+    properties: {
+        amount: {
+            type: 'number',
+            example: 100
+        }
+    },
+    required: ['amount']
+} as const;
+
 export const $ResourceFlowNodeSchemaDto = {
     type: 'object',
     properties: {
         type: {
             type: 'string',
             description: 'The name of the node type',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if', 'processing.set-payload']
         },
         configSchema: {
             type: 'object',
@@ -2285,7 +2156,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'processing.wait', 'processing.if', 'processing.set-payload']
         },
         position: {
             description: 'The position of the node',

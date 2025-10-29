@@ -1,4 +1,5 @@
 import {
+  Button,
   Chip,
   Divider,
   Modal,
@@ -23,20 +24,35 @@ import {
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
 import { DateTimeDisplay, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
-import { apiCurrencyToFrontendCurrency } from '../../../../../utils/currency';
-import { useMemo } from 'react';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { useEffect, useMemo } from 'react';
+import { RefundModal } from './refund';
 
 interface Props {
-  children: (onOpen: () => void) => React.ReactNode;
+  children?: (onOpen: () => void) => React.ReactNode;
   transactionId: number;
+  isOpen?: boolean;
+  onClose?: () => unknown;
 }
 
 export function TransactionDetailsModal(props: Props) {
-  const { children, transactionId } = props;
+  const { children, transactionId, isOpen: isOpenProp, onClose: onCloseProp } = props;
 
   const { t, tExists } = useTranslations({ en, de });
 
-  const { onOpen, isOpen, onOpenChange } = useDisclosure();
+  const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure({ onClose: onCloseProp });
+
+  useEffect(() => {
+    if (isOpenProp === undefined) {
+      return;
+    }
+
+    if (isOpenProp) {
+      onOpen();
+    } else {
+      onClose();
+    }
+  }, [isOpenProp, onOpen, onClose]);
 
   const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -64,11 +80,23 @@ export function TransactionDetailsModal(props: Props) {
 
   return (
     <>
-      {children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl">
+      {children && children(onOpen)}
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
+            <PageHeader
+              title={t('title')}
+              noMargin
+              actions={
+                <RefundModal transactionId={transactionId}>
+                  {(onOpen) => (
+                    <Button color="danger" variant="light" onPress={onOpen}>
+                      {t('actions.refund')}
+                    </Button>
+                  )}
+                </RefundModal>
+              }
+            />
           </ModalHeader>
           <ModalBody>
             {!transaction ? (
@@ -112,7 +140,7 @@ export function TransactionDetailsModal(props: Props) {
                       className={transaction.amount < 0 ? 'text-danger font-semibold' : 'text-success font-semibold'}
                     >
                       {transaction.amount > 0 && '+'}
-                      {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
+                      {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration?.minorUnit ?? 2))}
                     </div>
                   </div>
                   {transaction.initiator && (
@@ -171,14 +199,11 @@ export function TransactionDetailsModal(props: Props) {
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
-                            {formatNumber(apiCurrencyToFrontendCurrency(item.unitPrice, configuration?.minorUnit ?? 2))}
+                            {formatNumber(dbCurrencyToUserCurrency(item.unitPrice, configuration?.minorUnit ?? 2))}
                           </TableCell>
                           <TableCell className="text-right">
                             {formatNumber(
-                              apiCurrencyToFrontendCurrency(
-                                item.unitPrice * item.quantity,
-                                configuration?.minorUnit ?? 2,
-                              ),
+                              dbCurrencyToUserCurrency(item.unitPrice * item.quantity, configuration?.minorUnit ?? 2),
                             )}
                           </TableCell>
                         </TableRow>
@@ -189,7 +214,7 @@ export function TransactionDetailsModal(props: Props) {
                     <div>
                       {t('items.total')}:{' '}
                       <span className="font-semibold text-foreground">
-                        {formatNumber(apiCurrencyToFrontendCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
+                        {formatNumber(dbCurrencyToUserCurrency(totalItemsAmount, configuration?.minorUnit ?? 2))}
                       </span>
                     </div>
                   </div>

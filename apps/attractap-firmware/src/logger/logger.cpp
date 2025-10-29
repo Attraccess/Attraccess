@@ -5,56 +5,34 @@
 #define STRINGIFY(x) STRINGIFY_HELPER(x)
 #endif
 
-LogLevel Logger::level = LOG_LEVEL_INFO;
+LogLevel Logger::level = LOG_LEVEL_DEBUG;
 
 Logger::Logger(const char *name) : name(name)
 {
-    Preferences preferences;
-    preferences.begin("logging", true);
-    bool hasLogLevel = preferences.isKey("log.level");
+    const char *macroValue = STRINGIFY(LOG_LEVEL);
 
-    if (hasLogLevel)
+    // If macro expands to a quoted string (e.g. "INFO"), trim quotes.
+    if (macroValue[0] == '"')
     {
-        Serial.println("Logger: has persisted log level, restoring");
-        LogLevel storedLogLevel = (LogLevel)preferences.getUChar("log.level", 0);
-        Logger::setLevel(storedLogLevel, false);
-    }
-    else
-    {
-        Serial.println("Logger: no persisted log level, using LOG_LEVEL if exists");
-#ifdef LOG_LEVEL
-        Serial.println("Logger: LOG_LEVEL is defined, using it");
-        const char *macroValue = STRINGIFY(LOG_LEVEL);
-
-        // If macro expands to a quoted string (e.g. "INFO"), trim quotes.
-        if (macroValue[0] == '"')
+        size_t length = strlen(macroValue);
+        if (length >= 2 && macroValue[length - 1] == '"')
         {
-            size_t length = strlen(macroValue);
-            if (length >= 2 && macroValue[length - 1] == '"')
-            {
-                char trimmed[16];
-                size_t copyLength = min((size_t)14, length - 2); // leave room for null terminator
-                memcpy(trimmed, macroValue + 1, copyLength);
-                trimmed[copyLength] = '\0';
-                Logger::setLevel(getLogLevelFromString(trimmed));
-            }
-            else
-            {
-                Logger::setLevel(getLogLevelFromString(macroValue));
-            }
+            char trimmed[16];
+            size_t copyLength = min((size_t)14, length - 2); // leave room for null terminator
+            memcpy(trimmed, macroValue + 1, copyLength);
+            trimmed[copyLength] = '\0';
+            Logger::setLevel(getLogLevelFromString(trimmed));
         }
         else
         {
-            // If macro expands to a bare token (e.g. INFO), STRINGIFY makes it "INFO"
             Logger::setLevel(getLogLevelFromString(macroValue));
         }
-#else
-
-        Serial.println("Logger: no persisted log level, no LOG_LEVEL, using LOG_LEVEL_INFO");
-        Logger::setLevel(LOG_LEVEL_INFO, false);
-#endif
     }
-    preferences.end();
+    else
+    {
+        // If macro expands to a bare token (e.g. INFO), STRINGIFY makes it "INFO"
+        Logger::setLevel(getLogLevelFromString(macroValue));
+    }
 }
 
 void Logger::log(const char *message)
@@ -70,6 +48,7 @@ void Logger::logf(const char *message, ...)
     va_end(args);
 }
 
+#if LOGGER_LEVEL_NUM >= 1
 void Logger::info(const char *message)
 {
     log(message, LOG_LEVEL_INFO);
@@ -82,6 +61,7 @@ void Logger::infof(const char *message, ...)
     logf(message, LOG_LEVEL_INFO, args);
     va_end(args);
 }
+#endif
 
 void Logger::error(const char *message)
 {
@@ -96,6 +76,7 @@ void Logger::errorf(const char *message, ...)
     va_end(args);
 }
 
+#if LOGGER_LEVEL_NUM >= 2
 void Logger::debug(const char *message)
 {
     log(message, LOG_LEVEL_DEBUG);
@@ -108,6 +89,7 @@ void Logger::debugf(const char *message, ...)
     logf(message, LOG_LEVEL_DEBUG, args);
     va_end(args);
 }
+#endif
 
 void Logger::setLogLevel(String level, bool saveToPreferences)
 {
@@ -117,14 +99,6 @@ void Logger::setLogLevel(String level, bool saveToPreferences)
 void Logger::setLevel(LogLevel level, bool saveToPreferences)
 {
     Logger::level = level;
-
-    if (saveToPreferences)
-    {
-        Preferences preferences;
-        preferences.begin("logging", false);
-        preferences.putUChar("log.level", level);
-        preferences.end();
-    }
 }
 
 String Logger::getLogLevelString(LogLevel level)

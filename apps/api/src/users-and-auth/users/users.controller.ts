@@ -31,6 +31,7 @@ import { ResetPasswordDto } from './dtos/resetPassword.dto';
 import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -41,7 +42,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -253,7 +254,7 @@ export class UsersController {
     // Allow access if the user is requesting their own data or has canManageUsers permission
     if (authenticatedUser?.id !== id && !authenticatedUser.systemPermissions.canManageUsers) {
       this.logger.debug(
-        `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`
+        `Access denied - User ID ${authenticatedUser.id} attempting to access user ID ${id} without required permissions`,
       );
       throw new ForbiddenException();
     }
@@ -313,7 +314,7 @@ export class UsersController {
   async updatePermissions(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateUserPermissionsDto,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     this.logger.debug(`Updating permissions for user ID: ${id}, by user ID: ${request.user.id}`);
 
@@ -380,7 +381,7 @@ export class UsersController {
   })
   async bulkUpdatePermissions(
     @Body() body: BulkUpdateUserPermissionsDto,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<User[]> {
     this.logger.debug(`Bulk updating permissions for ${body.updates.length} users, by user ID: ${request.user.id}`);
 
@@ -427,7 +428,7 @@ export class UsersController {
         }
 
         this.logger.debug(
-          `Applying permission updates for user ID: ${update.userId}: ${JSON.stringify(updates.systemPermissions)}`
+          `Applying permission updates for user ID: ${update.userId}: ${JSON.stringify(updates.systemPermissions)}`,
         );
 
         // Update the user
@@ -505,7 +506,7 @@ export class UsersController {
     })) as PaginatedUsersResponseDto;
 
     this.logger.debug(
-      `Found ${result.total} users with permission ${permission}, returning ${result.data.length} users`
+      `Found ${result.total} users with permission ${permission}, returning ${result.data.length} users`,
     );
 
     return result;
@@ -535,7 +536,7 @@ export class UsersController {
   async setUserPassword(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: SetUserPasswordDto,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${request.user.id}`);
 
@@ -564,8 +565,19 @@ export class UsersController {
   async changeUserUsername(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeUsernameDto,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     return await this.usersService.changeUsername(id, body.username, request.user);
+  }
+
+  @Patch(':id/billing-factor')
+  @Auth('canManageBilling')
+  @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
+  @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
+  async changeUserBillingFactor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeBillingFactorDto,
+  ): Promise<User> {
+    return await this.usersService.changeBillingFactor(id, body.billingFactor);
   }
 }

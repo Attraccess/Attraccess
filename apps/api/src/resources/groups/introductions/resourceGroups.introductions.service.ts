@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
@@ -8,6 +8,8 @@ import {
 } from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
@@ -16,6 +18,8 @@ export class ResourceGroupsIntroductionsService {
     private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @InjectRepository(ResourceIntroductionHistoryItem)
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async getLastHistoryItemOfIntroduction(
@@ -69,7 +73,12 @@ export class ResourceGroupsIntroductionsService {
       comment: data?.comment,
     });
 
-    return await this.resourceIntroductionHistoryItemRepository.save(historyItem);
+    const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(groupId),
+    );
+    return savedHistoryItem;
   }
 
   public async getManyByGroupId(groupId: number): Promise<ResourceIntroduction[]> {

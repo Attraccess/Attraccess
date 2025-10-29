@@ -9,7 +9,8 @@
   "groups": {
     "##default##": {
       "items": {
-        "resources": "Resources"
+        "resources": "Resources",
+        "billing": "Billing"
       }
     },
     "attractap": {
@@ -40,7 +41,8 @@
       "items": {
         "plugins": "Plugins",
         "emailTemplates": "Email Templates",
-        "mqttServers": "MQTT Servers"
+        "mqttServers": "MQTT Servers",
+        "csvExport": "CSV Export"
       }
     }
   },

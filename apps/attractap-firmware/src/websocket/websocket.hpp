@@ -4,15 +4,14 @@
 #include "esp_websocket_client.h"
 #include "../settings/settings.hpp"
 #include <functional>
-#include "certManager/AdaptiveCertManager.hpp"
-#include "task_priorities.h"
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
+#include "certManager/AdaptiveCertManager.hpp"
 
 class Websocket
 {
 public:
-    Websocket() : logger("Websocket"), lastKnownAppStateChangeTime(0) {}
+    Websocket() : logger("Websocket") {}
 
     enum ConnectionState
     {
@@ -21,29 +20,35 @@ public:
         CONNECTED,
     };
     void setup();
+    void loop();
+    void sendMessage(const String &message);
+    void sendMessage(const char *message, size_t length);
+    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
+    void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
 
-    void connectWebSocket();
+    void enableConnectionAttempts();
+    void disableConnectionAttempts();
 
 private:
-    static void taskFn(void *parameter);
-    void loop();
-
-    void updateInfoFromAppState();
-    uint32_t lastKnownAppStateChangeTime;
-
-    void processOutgoingMessages();
+    std::function<void(const char *, size_t)> messageCallbackRaw;
+    std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
 
     AdaptiveCertManager _certManager;
 
-    bool network_is_connected = false;
+    bool connectionAttemptsEnabled = true;
+
+    void updateInfoFromAppState();
+    void connectWebSocket();
+    bool shouldReconnect();
+    uint32_t lastReconnectAttemptTime;
     const uint32_t RECONNECT_INTERVAL_MS = 10000;
+
+    bool network_is_connected = false;
 
     AttraccessApiConfig _lastApiConfig;
 
     ConnectionState _state = INIT;
     void setState(ConnectionState state);
-
-    void connectTCP();
 
     esp_websocket_client_handle_t ws_client;
 

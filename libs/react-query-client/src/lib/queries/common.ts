@@ -95,7 +95,7 @@ export type EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse =
 export type EmailTemplatesServiceEmailTemplateControllerFindOneQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindOneKey = "EmailTemplatesServiceEmailTemplateControllerFindOne";
 export const UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn = ({ type }: {
-  type: "verify-email" | "reset-password" | "username-changed" | "password-changed";
+  type: "verify-email" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
 }, queryKey?: Array<unknown>) => [useEmailTemplatesServiceEmailTemplateControllerFindOneKey, ...(queryKey ?? [{ type }])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -170,16 +170,6 @@ export const useMqttServiceMqttServersGetOneByIdKey = "MqttServiceMqttServersGet
 export const UseMqttServiceMqttServersGetOneByIdKeyFn = ({ id }: {
   id: number;
 }, queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetOneByIdKey, ...(queryKey ?? [{ id }])];
-export type MqttServiceMqttServersGetStatusOfOneDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetStatusOfOne>>;
-export type MqttServiceMqttServersGetStatusOfOneQueryResult<TData = MqttServiceMqttServersGetStatusOfOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttServersGetStatusOfOneKey = "MqttServiceMqttServersGetStatusOfOne";
-export const UseMqttServiceMqttServersGetStatusOfOneKeyFn = ({ id }: {
-  id: number;
-}, queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetStatusOfOneKey, ...(queryKey ?? [{ id }])];
-export type MqttServiceMqttServersGetStatusOfAllDefaultResponse = Awaited<ReturnType<typeof MqttService.mqttServersGetStatusOfAll>>;
-export type MqttServiceMqttServersGetStatusOfAllQueryResult<TData = MqttServiceMqttServersGetStatusOfAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useMqttServiceMqttServersGetStatusOfAllKey = "MqttServiceMqttServersGetStatusOfAll";
-export const UseMqttServiceMqttServersGetStatusOfAllKeyFn = (queryKey?: Array<unknown>) => [useMqttServiceMqttServersGetStatusOfAllKey, ...(queryKey ?? [])];
 export type AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGetMany>>;
 export type AccessControlServiceResourceGroupIntroductionsGetManyQueryResult<TData = AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAccessControlServiceResourceGroupIntroductionsGetManyKey = "AccessControlServiceResourceGroupIntroductionsGetMany";
@@ -360,6 +350,13 @@ export type AttractapServiceGetFirmwaresDefaultResponse = Awaited<ReturnType<typ
 export type AttractapServiceGetFirmwaresQueryResult<TData = AttractapServiceGetFirmwaresDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetFirmwaresKey = "AttractapServiceGetFirmwares";
 export const UseAttractapServiceGetFirmwaresKeyFn = (queryKey?: Array<unknown>) => [useAttractapServiceGetFirmwaresKey, ...(queryKey ?? [])];
+export type AttractapServiceDownloadFirmwareBinaryDefaultResponse = Awaited<ReturnType<typeof AttractapService.downloadFirmwareBinary>>;
+export type AttractapServiceDownloadFirmwareBinaryQueryResult<TData = AttractapServiceDownloadFirmwareBinaryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAttractapServiceDownloadFirmwareBinaryKey = "AttractapServiceDownloadFirmwareBinary";
+export const UseAttractapServiceDownloadFirmwareBinaryKeyFn = ({ firmwareName, variantName }: {
+  firmwareName: string;
+  variantName: string;
+}, queryKey?: Array<unknown>) => [useAttractapServiceDownloadFirmwareBinaryKey, ...(queryKey ?? [{ firmwareName, variantName }])];
 export type AttractapServiceGetFirmwareBinaryDefaultResponse = Awaited<ReturnType<typeof AttractapService.getFirmwareBinary>>;
 export type AttractapServiceGetFirmwareBinaryQueryResult<TData = AttractapServiceGetFirmwareBinaryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAttractapServiceGetFirmwareBinaryKey = "AttractapServiceGetFirmwareBinary";
@@ -400,7 +397,6 @@ export type ResourcesServiceLockDoorMutationResult = Awaited<ReturnType<typeof R
 export type ResourcesServiceUnlockDoorMutationResult = Awaited<ReturnType<typeof ResourcesService.unlockDoor>>;
 export type ResourcesServiceUnlatchDoorMutationResult = Awaited<ReturnType<typeof ResourcesService.unlatchDoor>>;
 export type MqttServiceMqttServersCreateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersCreateOne>>;
-export type MqttServiceMqttServersTestConnectionMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersTestConnection>>;
 export type AccessControlServiceResourceGroupIntroductionsGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsGrant>>;
 export type AccessControlServiceResourceGroupIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroductionsRevoke>>;
 export type AccessControlServiceResourceGroupIntroducersGrantMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceGroupIntroducersGrant>>;
@@ -415,6 +411,7 @@ export type BillingServiceSetBillingConfigurationMutationResult = Awaited<Return
 export type BillingServicePairSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.pairSumUpReader>>;
 export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.topUpWithSumUpReader>>;
 export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
+export type BillingServiceRefundTransactionMutationResult = Awaited<ReturnType<typeof BillingService.refundTransaction>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
@@ -430,6 +427,7 @@ export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnT
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeUserUsername>>;
+export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnType<typeof UsersService.changeUserBillingFactor>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;

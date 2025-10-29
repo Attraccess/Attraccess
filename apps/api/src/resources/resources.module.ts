@@ -53,6 +53,6 @@ import { LicenseModule } from '../license/license.module';
   ],
   controllers: [ResourcesController],
   providers: [ResourcesService, ResourceImageService],
-  exports: [ResourcesService],
+  exports: [ResourcesService, ResourceImageService],
 })
 export class ResourcesModule {}

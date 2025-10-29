@@ -5,6 +5,9 @@
     }
   },
   "nodes": {
+    "flow": {
+      "title": "Flow"
+    },
     "unsupportedForResourceType": "von dieser Ressource nicht unterstützt",
     "genericConfig": {
       "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}"
@@ -80,6 +83,28 @@
             }
           }
         }
+      },
+      "mqtt": {
+        "message": {
+          "received": {
+            "title": "MQTT-Nachricht empfangen",
+            "description": "Dieser Knoten wird ausgelöst, wenn eine MQTT-Nachricht empfangen wird.",
+            "outputs": {
+              "output": "Ausgabe"
+            },
+            "preview": {
+              "topic": "Thema"
+            },
+            "config": {
+              "topic": {
+                "label": "Thema"
+              },
+              "serverId": {
+                "label": "Server"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -142,6 +167,30 @@
           },
           "comparisonValue": {
             "label": "Vergleichs-Wert"
+          }
+        }
+      },
+      "set-payload": {
+        "title": "Payload setzen",
+        "description": "Schlüssel im Payload mittels Templates setzen oder abbilden.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "mappings": "Zuordnungen"
+        },
+        "config": {
+          "entries": {
+            "label": "Einträge",
+            "empty": "Keine Einträge konfiguriert.",
+            "add": "Eintrag hinzufügen",
+            "items": {
+              "key": { "label": "Schlüssel (Pfad)" },
+              "value": { "label": "Wert-Template" }
+            }
           }
         }
       }
@@ -224,7 +273,7 @@
                 "input": "Eingabe"
               },
               "preview": {
-                "pois": "Position"
+                "position": "Position"
               },
               "config": {
                 "name": {

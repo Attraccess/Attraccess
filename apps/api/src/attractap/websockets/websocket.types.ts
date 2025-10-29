@@ -1,34 +1,45 @@
 import { Attractap } from '@attraccess/database-entities';
-import { ReaderState } from './reader-states/reader-state.interface';
 
 interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
     id: number;
     token: string;
   };
+  messageId?: number;
   payload: TPayload;
 }
 
 export enum AttractapEventType {
   READER_REGISTER = 'READER_REGISTER',
   READER_AUTHENTICATE = 'READER_AUTHENTICATE',
-  NFC_AUTHENTICATE = 'NFC_AUTHENTICATE',
   READER_UNAUTHORIZED = 'READER_UNAUTHORIZED',
   READER_REQUEST_AUTHENTICATION = 'READER_REQUEST_AUTHENTICATION',
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
-  NFC_TAP = 'NFC_TAP',
-  NFC_CHANGE_KEY = 'NFC_CHANGE_KEY',
-  NFC_ENABLE_CARD_CHECKING = 'NFC_ENABLE_CARD_CHECKING',
-  WAIT_FOR_PROCESSING = 'WAIT_FOR_PROCESSING',
-  DISPLAY_TEXT = 'DISPLAY_TEXT',
-  DISPLAY_SUCCESS = 'DISPLAY_SUCCESS',
-  DISPLAY_ERROR = 'DISPLAY_ERROR',
-  CANCEL = 'CANCEL',
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
-  READER_FIRMWARE_STREAM_CHUNK = 'READER_FIRMWARE_STREAM_CHUNK',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
-  SELECT_ITEM = 'SELECT_ITEM',
-  CONFIRM_ACTION = 'CONFIRM_ACTION',
+  FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
+  RESOURCE_LIST = 'RESOURCE_LIST',
+  REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
+  CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
+  START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
+  STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  LOCK_DOOR = 'LOCK_DOOR',
+  UNLOCK_DOOR = 'UNLOCK_DOOR',
+  UNLATCH_DOOR = 'UNLATCH_DOOR',
+  ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO = 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
+  ENROLL_NEW_CARD_REQUEST_NFC_KEY = 'ENROLL_NEW_CARD_REQUEST_NFC_KEY',
+  ENROLL_NEW_CARD = 'ENROLL_NEW_CARD',
+  TRIGGER_FLOW_BUTTON = 'TRIGGER_FLOW_BUTTON',
+  BILLING_REQUEST_TOPUP = 'BILLING_REQUEST_TOPUP',
+}
+
+export interface ResourceThumbnailDescriptorPayload {
+  transferId: string;
+  resourceId: number;
+  width: number;
+  height: number;
+  format: 'PNG';
+  contentLength: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,38 +58,27 @@ export class AttractapEvent<TPayload = any | undefined> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class AttractapResponse<TPayload = any | undefined> {
-  public readonly event = 'RESPONSE';
-  public readonly data: AttractapMessageBaseData<TPayload> & {
-    type: AttractapEventType;
-  };
-
-  public constructor(type: AttractapEventType, payload: TPayload) {
-    this.data = {
-      type,
-      payload,
-    };
-  }
-
-  public static fromEventData<TPayload>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    eventData: AttractapEvent<any>['data'],
-    payload: TPayload
-  ): AttractapResponse<TPayload> {
-    return new AttractapResponse(eventData.type, payload);
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPayload> | AttractapResponse<TPayload>;
+export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPayload>;
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
+  messageCount: number;
   id: string;
-  reader?: Attractap;
-  state?: ReaderState;
-  transitionToState: (state: ReaderState) => Promise<void>;
+  readerId: Attractap['id'] | null;
   sendMessage: (message: AttractapMessage) => Promise<void>;
   sendBinaryData: (data: Buffer) => void;
+  state: {
+    lastAuthenticatedUserId: number | null;
+    enrollNewCardData: {
+      key: string;
+      keyNo: number;
+      cardUID: string;
+    } | null;
+    ota?: {
+      path: string;
+      size: number;
+      fd?: number;
+    } | null;
+  };
 }
 
 // Firmware update related types
@@ -87,6 +87,11 @@ export interface FirmwareUpdateStartPayload {
   checksum?: string;
   version?: string;
   is_retry?: boolean;
+}
+
+export interface FirmwareRequestChunkPayload {
+  offset: number;
+  length: number;
 }
 
 export interface FirmwareUpdateResponse {

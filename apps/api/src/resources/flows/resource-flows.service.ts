@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -16,12 +16,15 @@ import {
   ButtonNodeDataSchema,
   IfNodeDataSchema,
   BillingTransactionItemCreateSchema,
+  SetPayloadNodeDataSchema,
+  MqttMessageReceivedNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
 import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { z } from 'zod';
+import { MqttClientService } from '../../mqtt/mqtt-client.service';
 
 export interface ValidationError {
   nodeId: string;
@@ -39,6 +42,8 @@ export interface ResourceFlowResponse {
 
 @Injectable()
 export class ResourceFlowsService {
+  private readonly logger = new Logger(ResourceFlowsService.name);
+
   constructor(
     @InjectRepository(ResourceFlowNode)
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
@@ -48,6 +53,7 @@ export class ResourceFlowsService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
+    private readonly mqttClientService: MqttClientService,
   ) {}
 
   async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
@@ -126,6 +132,24 @@ export class ResourceFlowsService {
 
     // Start transaction to ensure data consistency
     const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
+      const oldMqttMessageReceivedNodes = await transactionalEntityManager.find(ResourceFlowNode, {
+        where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+      });
+
+      const newOrChangedMqttMessageReceivedNodes = [];
+      for (const nodeData of flowData.nodes) {
+        const existingNode = oldMqttMessageReceivedNodes.find((oldNode) => oldNode.id === nodeData.id);
+        if (!existingNode) {
+          newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          continue;
+        }
+
+        if (existingNode.data.topic !== nodeData.data.topic || existingNode.data.serverId !== nodeData.data.serverId) {
+          newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          continue;
+        }
+      }
+
       // Delete existing nodes and edges (cascading will handle relationships)
       await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
       await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
@@ -161,6 +185,21 @@ export class ResourceFlowsService {
         transactionalEntityManager.save(ResourceFlowNode, newNodes),
         transactionalEntityManager.save(ResourceFlowEdge, newEdges),
       ]);
+
+      for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
+        if (!nodeData.data.serverId || !nodeData.data.topic) {
+          this.logger.warn(
+            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
+          );
+          continue;
+        }
+        this.mqttClientService.subscribe(nodeData.data.serverId, nodeData.data.topic).catch((error) => {
+          this.logger.error(
+            `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+            error.stack,
+          );
+        });
+      }
 
       return { nodes: savedNodes, edges: savedEdges };
     });
@@ -255,6 +294,12 @@ export class ResourceFlowsService {
           schema.supportedByResource = resource.type === ResourceType.Door;
           break;
 
+        case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+          schema.configSchema = z.toJSONSchema(MqttMessageReceivedNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
           schema.inputs = ['input'];
@@ -288,6 +333,13 @@ export class ResourceFlowsService {
           schema.configSchema = z.toJSONSchema(IfNodeDataSchema);
           schema.inputs = ['input'];
           schema.outputs = ['output-true', 'output-false'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+          schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 

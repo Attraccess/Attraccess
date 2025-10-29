@@ -24,7 +24,8 @@
       "@attraccess/plugins-backend-sdk": ["libs/plugins-backend-sdk/src/index.ts"],
       "@attraccess/plugins-frontend-sdk": ["libs/plugins-frontend-sdk/src/index.ts"],
       "@attraccess/plugins-frontend-ui": ["libs/plugins-frontend-ui/src/index.ts"],
-      "@attraccess/react-query-client": ["libs/react-query-client/src/index.ts"]
+      "@attraccess/react-query-client": ["libs/react-query-client/src/index.ts"],
+      "@attraccess/shared": ["libs/shared/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp", "*.md"]

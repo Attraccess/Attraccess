@@ -35,9 +35,13 @@
     },
     "system": {
       "PER_SESSION": "Pro Sitzung",
-      "PER_MINUTE": "Pro Minute"
+      "PER_MINUTE": "Pro Minute",
+      "BILLING_FACTOR": "Zahlungsfaktor"
     },
     "empty": "Keine Positionen",
     "total": "Summe Positionen"
+  },
+  "actions": {
+    "refund": "Erstattung"
   }
 }

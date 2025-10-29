@@ -1,0 +1,24 @@
+{
+  "title": "Billing Factor",
+  "subtitle": "Factor by which the billing amount for a user is scaled",
+  "inputs": {
+    "amount": "Amount"
+  },
+  "actions": {
+    "update": "Update"
+  },
+  "success": {
+    "toast": {
+      "title": "Billing factor updated",
+      "description": "Billing factor was updated successfully"
+    }
+  },
+  "error": {
+    "toast": {
+      "generic": {
+        "title": "Error updating billing factor",
+        "description": "Billing factor could not be updated"
+      }
+    }
+  }
+}

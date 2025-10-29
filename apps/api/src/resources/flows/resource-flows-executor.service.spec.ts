@@ -146,7 +146,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         description: 'Energy',
         externalReference: 'power',
         unitPrice: 1,
-        quantity: 2.5,
+        quantity: 2,
       },
     });
     nodesById[inputNode.id] = inputNode;
@@ -167,7 +167,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         description: 'Energy',
         externalReference: 'power',
         unitPrice: 1,
-        quantity: 2.5,
+        quantity: 2,
       },
     ]);
   });

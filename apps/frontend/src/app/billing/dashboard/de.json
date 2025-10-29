@@ -1,3 +1,6 @@
 {
-  "title": "Zahlungen"
+  "title": "Zahlungen",
+  "actions": {
+    "administration": "Verwaltung"
+  }
 }

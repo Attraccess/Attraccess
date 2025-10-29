@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   # Build and test to ensure everything is working before release
-  build-test:
+  compile:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -46,13 +46,12 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.x'
 
-      - name: Install PlatformIO Core
+      - name: Install PlatformIO and ESP tools
         run: |
           python -m pip install --upgrade pip
-          pip install --upgrade platformio esptool
-          platformio --version
+          pip install platformio esptool
 
       - name: Run everything
         env:
@@ -63,13 +62,13 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: build-artifacts-${{ github.run_id }}
           path: |
             dist/
 
   # Build and push Docker container
   containerize:
-    needs: build-test
+    needs: compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -79,7 +78,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts
+          name: build-artifacts-${{ github.run_id }}
           path: dist
 
       # Login to GitHub Container Registry
@@ -106,14 +105,6 @@ jobs:
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
-
-      # Debug step to verify dist directory existence
-      - name: Debug dist directory
-        run: |
-          echo "Current directory structure:"
-          ls -la
-          echo "Dist directory contents:"
-          ls -la dist || echo "Dist directory not found"
 
       # Build and push Docker image in one step
       - name: Build and push Docker image
@@ -163,7 +154,7 @@ jobs:
           append_body: true
 
   balena:
-    needs: build-test
+    needs: compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -177,14 +168,13 @@ jobs:
       # set balena.yml version to semver with build metadata: ${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
-          sed -i 's/^version: .*/version: ${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}/' balena.yml
+          sed -i "s/{{VERSION_TO_BE_REPLACED}}/${{ env.RELEASE_VERSION }}/" balena.yml
+          cat balena.yml
 
-      - uses: balena-io/deploy-to-balena-action@f7d434197ec7d57218da93bf9c720e4c14c6b197
-        id: build
-        with:
-          balena_token: ${{ secrets.BALENA_TOKEN }}
-          fleet: ${{ secrets.BALENA_FLEET }}
-          note: 'Release ${{ env.RELEASE_VERSION }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
-
-      - name: Log release ID built
-        run: echo "Built release ID ${{ steps.build.outputs.release_id }}"
+      - name: Balena Release
+        run: |
+          BALENA_CLI_VERSION=v22.4.9
+          # Install balena-cli via standlone zip to save install time
+          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+          balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
+          balena/bin/balena push ${{ secrets.BALENA_FLEET }} --note 'Release ${{ env.RELEASE_VERSION }} @ ${{ steps.vars.outputs.SHORT_SHA }}'

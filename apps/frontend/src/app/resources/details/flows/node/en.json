@@ -5,6 +5,9 @@
     }
   },
   "nodes": {
+    "flow": {
+      "title": "Flow"
+    },
     "unsupportedForResourceType": "not supported by this resource",
     "genericConfig": {
       "overridableByInput": "Overridable by input: {{fieldName}}"
@@ -80,6 +83,28 @@
             }
           }
         }
+      },
+      "mqtt": {
+        "message": {
+          "received": {
+            "title": "MQTT message received",
+            "description": "This node is triggered when a MQTT message is received.",
+            "outputs": {
+              "output": "Output"
+            },
+            "preview": {
+              "topic": "Topic"
+            },
+            "config": {
+              "topic": {
+                "label": "Topic"
+              },
+              "serverId": {
+                "label": "Server"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -144,6 +169,30 @@
             "label": "Comparison value"
           }
         }
+      },
+      "set-payload": {
+        "title": "Set payload",
+        "description": "Set or map keys on the payload using templates.",
+        "inputs": {
+          "input": "Input"
+        },
+        "outputs": {
+          "output": "Output"
+        },
+        "preview": {
+          "mappings": "Mappings"
+        },
+        "config": {
+          "entries": {
+            "label": "Entries",
+            "empty": "No entries configured.",
+            "add": "Add entry",
+            "items": {
+              "key": { "label": "Key (path)" },
+              "value": { "label": "Value template" }
+            }
+          }
+        }
       }
     },
     "output": {
@@ -190,7 +239,7 @@
       },
       "mqtt": {
         "sendMessage": {
-          "title": "MQTT message send",
+          "title": "Send MQTT message",
           "description": "This node sends a MQTT message.",
           "inputs": {
             "input": "Input"

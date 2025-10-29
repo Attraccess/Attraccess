@@ -22,6 +22,7 @@ import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { BillingService } from '../../billing/billing.service';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
+import { ResourceInUseError } from './errors/resource-in-use.error';
 
 @Injectable()
 export class ResourceUsageService {
@@ -143,7 +144,11 @@ export class ResourceUsageService {
   async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
 
-    return await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+    // Defer event emission until after the transaction commits to avoid stale reads in listeners
+    let endedUsageIdToEmit: number | null = null;
+    let startedUsageIdToEmit: number | null = null;
+
+    const newSession = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       const resource = await this.getResource(
         resourceId,
         user,
@@ -188,14 +193,14 @@ export class ResourceUsageService {
             relations: ['user', 'resource'],
           });
 
-          // Emit event for the ended session
-          await this.emitUsageEvent(updatedSession.id, transactionalEntityManager);
+          // Defer event for the ended session until after commit
+          endedUsageIdToEmit = updatedSession.id;
         } else if (dto.forceTakeOver && !resource.allowTakeOver) {
           this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
           throw new BadRequestException('This resource does not allow overtaking');
         } else {
           this.logger.warn(`Resource ${resourceId} is currently in use by user ${existingActiveSession.user.id}`);
-          throw new BadRequestException('Resource is currently in use by another user');
+          throw new ResourceInUseError();
         }
       }
 
@@ -213,7 +218,7 @@ export class ResourceUsageService {
 
       await transactionalEntityManager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 
-      const newSession = await transactionalEntityManager.findOne(ResourceUsage, {
+      const createdSession = await transactionalEntityManager.findOne(ResourceUsage, {
         where: {
           resourceId,
           userId: user.id,
@@ -225,13 +230,15 @@ export class ResourceUsageService {
         relations: ['resource', 'user'],
       });
 
-      if (!newSession) {
+      if (!createdSession) {
         this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
         throw new Error('Failed to retrieve the newly created session.');
       }
 
-      this.logger.debug(`Successfully created session ${newSession.id} for resource ${resourceId} by user ${user.id}`);
-      await this.billingService.handleResourceUsageStart(resourceId, newSession, user, transactionalEntityManager);
+      this.logger.debug(
+        `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
+      );
+      await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, transactionalEntityManager);
 
       if (existingActiveSession) {
         const now = new Date();
@@ -249,19 +256,36 @@ export class ResourceUsageService {
           new ResourceUsageTakenOverEvent(resource, now, user, existingActiveSession.user),
         );
       } else {
-        // Emit event after successful save
-        this.emitUsageEvent(newSession.id, transactionalEntityManager);
+        // Defer event for the newly started session until after commit
+        startedUsageIdToEmit = createdSession.id;
       }
 
       await this.flowExecutorService.runFlow(
-        newSession.resourceId,
+        createdSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-        newSession,
+        createdSession,
         transactionalEntityManager,
       );
 
-      return newSession;
+      // Return the created session to the caller; events will be emitted after commit
+      return createdSession;
     });
+
+    // Emit events after the transaction committed to ensure readers can observe DB state
+    try {
+      if (endedUsageIdToEmit) {
+        await this.emitUsageEvent(endedUsageIdToEmit);
+      }
+      if (newSession?.id) {
+        await this.emitUsageEvent(newSession.id);
+      } else if (startedUsageIdToEmit) {
+        await this.emitUsageEvent(startedUsageIdToEmit);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to emit usage events after startSession commit`, (error as Error).stack);
+    }
+
+    return newSession;
   }
 
   async endSession(resourceId: number, user: User, dto: EndUsageSessionDto): Promise<ResourceUsage> {
@@ -294,12 +318,16 @@ export class ResourceUsageService {
       endNotes = `[By #${user.id} - ${user.username}] ${endNotes ?? ''}`;
     }
 
-    return await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+    // Defer event emission until after the transaction commits to avoid stale reads in listeners
+    let endedUsageIdToEmit: number | null = null;
+
+    const updatedUsage = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       const updateData = {
         endTime,
         endNotes,
       };
 
+      this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
       await this.flowExecutorService.runFlow(
         activeSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
@@ -309,6 +337,8 @@ export class ResourceUsageService {
         },
         transactionalEntityManager,
       );
+
+      this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
 
       // Update session with end time and notes - using explicit update to avoid the generated column
       await transactionalEntityManager
@@ -327,12 +357,23 @@ export class ResourceUsageService {
 
       await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
 
-      // Emit event after successful save
-      await this.emitUsageEvent(activeSession.id);
+      // Defer event after successful save until after commit
+      endedUsageIdToEmit = activeSession.id;
 
       // Fetch the updated record
       return updatedUsage;
     });
+
+    // Emit event after the transaction committed to ensure readers can observe DB state
+    try {
+      if (endedUsageIdToEmit) {
+        await this.emitUsageEvent(endedUsageIdToEmit);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to emit usage event after endSession commit`, (error as Error).stack);
+    }
+
+    return updatedUsage;
   }
 
   private async emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void> {

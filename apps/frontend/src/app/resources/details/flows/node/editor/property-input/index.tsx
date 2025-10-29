@@ -14,14 +14,18 @@ import { MqttServerSelect } from '../../../../../../../components/mqttServerSele
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo } from 'react';
-import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../../../../utils/currency';
+import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 
 export interface Property<TValue> {
-  type: 'string' | 'integer' | 'number' | 'object' | 'boolean';
+  type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
   enum?: string[];
   default?: TValue;
   additionalProperties?: {
     type: Property<unknown>['type'];
+  };
+  items?: {
+    type: 'object' | 'string' | 'number' | 'integer' | 'boolean';
+    properties?: Record<string, Property<unknown>>;
   };
   stringVariant?: 'multiline';
   exclusiveMinimum?: number;
@@ -40,10 +44,11 @@ interface Props<TValue> {
   value: TValue;
   onChange: (value: TValue) => void;
   isRequired: boolean;
+  hideLabel?: boolean;
 }
 
 export function PropertyInput<TValue>(props: Props<TValue>) {
-  const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange } = props;
+  const { name, isRequired, schema, tNodeTranslations: t, nodeType, value, onChange, hideLabel } = props;
 
   let description = undefined;
   if (schema.overrideWithInput) {
@@ -54,7 +59,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
   const parsedValue = useMemo(() => {
     if (schema.isCurrency) {
-      return apiCurrencyToFrontendCurrency(value as number, configuration?.minorUnit ?? 2);
+      return dbCurrencyToUserCurrency(value as number, configuration?.minorUnit ?? 2);
     }
     return value;
   }, [value, schema.isCurrency, configuration]);
@@ -65,7 +70,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         if (!configuration) {
           return;
         }
-        onChange(frontendCurrencyToApiCurrency(newValue as number, configuration.minorUnit) as TValue);
+        onChange(userCurrencyToDbCurrency(newValue as number, configuration.minorUnit) as TValue);
       } else {
         onChange(newValue);
       }
@@ -78,7 +83,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       <Input
         type="text"
         isDisabled
-        label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+        placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
         description={description}
         isRequired={isRequired}
       />
@@ -90,7 +96,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       <MqttServerSelect
         selectedId={value as number}
         onSelectionChange={(newValue) => onChange(newValue as TValue)}
-        label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
         isRequired={isRequired}
         description={description}
       />
@@ -105,7 +111,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             isRequired={isRequired}
             defaultSelectedKey={String(value ?? schema.default ?? '')}
             onSelectionChange={(newValue) => onChange(newValue as TValue)}
-            label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             description={description}
           >
             {schema.enum.map((enumValue) => (
@@ -121,7 +127,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         return (
           <Textarea
             isRequired={isRequired}
-            label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
             value={value ? String(value) : undefined}
             defaultValue={schema.default ? String(schema.default) : undefined}
             onValueChange={(newValue) => onChange(newValue as TValue)}
@@ -134,7 +141,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         <Input
           type="text"
           isRequired={isRequired}
-          label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+          placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
           value={value ? String(value) : undefined}
           defaultValue={schema.default ? String(schema.default) : undefined}
           onValueChange={(newValue) => onChange(newValue as TValue)}
@@ -146,7 +154,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       return (
         <NumberInput
           isRequired={isRequired}
-          label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onValueChange={(newValue) => setValue(newValue as TValue)}
@@ -211,7 +219,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
         return (
           <div className="flex flex-col gap-2">
-            <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>
+            {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
             {content}
             <Button
               size="sm"
@@ -226,10 +234,125 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       }
       break;
 
+    case 'array': {
+      const arrayValue = (value as Array<unknown>) ?? [];
+      const items = schema.items;
+
+      const emptyText = t('nodes.' + nodeType + '.config.' + name + '.empty');
+      const addText = t('nodes.' + nodeType + '.config.' + name + '.add');
+
+      let content = null;
+      if (arrayValue.length === 0) {
+        content = (
+          <Card>
+            <CardBody>
+              <p className="text-sm text-gray-500">{emptyText}</p>
+            </CardBody>
+          </Card>
+        );
+      } else {
+        content = (
+          <div className="flex flex-col gap-2 w-full">
+            {arrayValue.map((row, index) => (
+              <Card key={index} className="p-2 w-full">
+                <CardBody className="p-0">
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                    <div className="flex flex-col gap-2 p-2 w-full">
+                      {items && items.type === 'object' && items.properties ? (
+                        <>
+                          {Object.entries(items.properties).map(([propName, propSchema]) => (
+                            <PropertyInput
+                              key={propName}
+                              nodeType={nodeType}
+                              tNodeTranslations={t}
+                              name={name + '.items.' + propName}
+                              schema={propSchema as Property<unknown>}
+                              value={(row as Record<string, unknown>)?.[propName]}
+                              onChange={(newItemPropValue) => {
+                                const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
+                                newArrayValue[index] = {
+                                  ...(newArrayValue[index] ?? {}),
+                                  [propName]: newItemPropValue,
+                                };
+                                onChange(newArrayValue as TValue);
+                              }}
+                              isRequired={false}
+                              hideLabel
+                            />
+                          ))}
+                        </>
+                      ) : items ? (
+                        <PropertyInput
+                          nodeType={nodeType}
+                          tNodeTranslations={t}
+                          name={name + '.items'}
+                          schema={items as unknown as Property<unknown>}
+                          value={row as unknown}
+                          onChange={(newItemValue) => {
+                            const newArrayValue = [...arrayValue];
+                            newArrayValue[index] = newItemValue as unknown;
+                            onChange(newArrayValue as TValue);
+                          }}
+                          isRequired={false}
+                          hideLabel
+                        />
+                      ) : null}
+                    </div>
+                    <div className="row-span-2 flex items-start p-2">
+                      <Button
+                        size="sm"
+                        isIconOnly
+                        variant="flat"
+                        color="danger"
+                        onPress={() => {
+                          const copy = (arrayValue as Array<unknown>).filter((_, i) => i !== index);
+                          onChange(copy as TValue);
+                        }}
+                      >
+                        <XIcon size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        );
+      }
+
+      const handleAdd = () => {
+        let newItem: unknown = {};
+        if (items) {
+          if (items.type === 'object' && items.properties) {
+            newItem = {};
+          } else if (items.type === 'string') {
+            newItem = '';
+          } else if (items.type === 'number' || items.type === 'integer') {
+            newItem = 0;
+          } else if (items.type === 'boolean') {
+            newItem = false;
+          } else {
+            newItem = {};
+          }
+        }
+        onChange([...(arrayValue ?? []), newItem] as TValue);
+      };
+
+      return (
+        <div className="flex flex-col gap-2 w-full">
+          {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
+          {content}
+          <Button size="sm" variant="flat" startContent={<PlusIcon size={16} />} onPress={handleAdd}>
+            {addText}
+          </Button>
+        </div>
+      );
+    }
+
     case 'boolean':
       return (
         <Switch isSelected={value as boolean} onValueChange={(newValue) => onChange(newValue as TValue)}>
-          {t('nodes.' + nodeType + '.config.' + name + '.label')}
+          {!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : null}
         </Switch>
       );
   }

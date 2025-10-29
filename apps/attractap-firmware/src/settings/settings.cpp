@@ -3,6 +3,7 @@
 Preferences Settings::preferences;
 Logger Settings::logger("Settings");
 
+DeviceConfig Settings::_deviceConfig;
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
 AttraccessAuthConfig Settings::_attraccessAuthConfig;
@@ -14,6 +15,9 @@ void Settings::setup()
 
     // load settings from preferences
     preferences.begin("settings", true);
+
+    _deviceConfig.passCode = preferences.getString("device.passCode", "0000");
+
     _networkConfig.ssid = preferences.getString("wifi.ssid", "");
     _networkConfig.password = preferences.getString("wifi.pass", "");
 
@@ -29,6 +33,22 @@ void Settings::setup()
     preferences.end();
 
     logger.info("Setup complete.");
+}
+
+DeviceConfig Settings::getDeviceConfig()
+{
+    return _deviceConfig;
+}
+
+void Settings::saveDeviceConfig(String passCode)
+{
+    logger.info("Saving device config...");
+    preferences.begin("settings", false);
+
+    preferences.putString("device.passCode", passCode);
+    _deviceConfig.passCode = passCode;
+
+    preferences.end();
 }
 
 NetworkConfig Settings::getNetworkConfig()
@@ -117,25 +137,4 @@ String Settings::getHostname()
     }
 
     return _hostname;
-}
-
-bool Settings::getMpr121Thresholds(uint8_t &touch, uint8_t &release)
-{
-    preferences.begin("settings", true);
-    bool has = preferences.isKey("mpr121.touch") && preferences.isKey("mpr121.release");
-    if (has)
-    {
-        touch = preferences.getUChar("mpr121.touch", 0);
-        release = preferences.getUChar("mpr121.release", 0);
-    }
-    preferences.end();
-    return has;
-}
-
-void Settings::saveMpr121Thresholds(uint8_t touch, uint8_t release)
-{
-    preferences.begin("settings", false);
-    preferences.putUChar("mpr121.touch", touch);
-    preferences.putUChar("mpr121.release", release);
-    preferences.end();
 }

@@ -26,6 +26,7 @@ import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exc
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
 import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
+import { ResourceInUseError } from './errors/resource-in-use.error';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -384,9 +385,7 @@ describe('ResourceUsageService', () => {
       // Mock getActiveSession to return an active session
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
-      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
-        new BadRequestException('Resource is currently in use by another user'),
-      );
+      await expect(service.startSession(1, mockUser, dto)).rejects.toBeInstanceOf(ResourceInUseError);
     });
 
     it('should throw error when takeover requested but resource does not allow it', async () => {
@@ -433,9 +432,10 @@ describe('ResourceUsageService', () => {
       // Mock getActiveSession to return an active session, then mock findOne for new session
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
-        .mockResolvedValueOnce(updatedEndedSession) // 2) fetch updated ended session
-        .mockResolvedValueOnce(updatedEndedSession) // 3) emitUsageEvent fetch for ended session
-        .mockResolvedValueOnce(mockNewUsage); // 4) fetch newly created session
+        .mockResolvedValueOnce(updatedEndedSession) // 2) fetch updated ended session (in-transaction)
+        .mockResolvedValueOnce(mockNewUsage) // 3) fetch newly created session (in-transaction)
+        .mockResolvedValueOnce(updatedEndedSession) // 4) emitUsageEvent fetch for ended session (after commit)
+        .mockResolvedValueOnce(mockNewUsage); // 5) emitUsageEvent fetch for newly created session (after commit)
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       const mockInsertQueryBuilder = createMockQueryBuilder(null);

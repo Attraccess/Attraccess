@@ -51,7 +51,7 @@ export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: Q
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
-  type: "verify-email" | "reset-password" | "username-changed" | "password-changed";
+  type: "verify-email" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
 }) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const prefetchUseResourcesServiceGetAllResources = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
@@ -90,10 +90,6 @@ export const prefetchUseMqttServiceMqttServersGetAll = (queryClient: QueryClient
 export const prefetchUseMqttServiceMqttServersGetOneById = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }), queryFn: () => MqttService.mqttServersGetOneById({ id }) });
-export const prefetchUseMqttServiceMqttServersGetStatusOfOne = (queryClient: QueryClient, { id }: {
-  id: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfOneKeyFn({ id }), queryFn: () => MqttService.mqttServersGetStatusOfOne({ id }) });
-export const prefetchUseMqttServiceMqttServersGetStatusOfAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfAllKeyFn(), queryFn: () => MqttService.mqttServersGetStatusOfAll() });
 export const prefetchUseAccessControlServiceResourceGroupIntroductionsGetMany = (queryClient: QueryClient, { groupId }: {
   groupId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) });
@@ -184,6 +180,10 @@ export const prefetchUseAttractapServiceGetReaderById = (queryClient: QueryClien
 export const prefetchUseAttractapServiceGetReaders = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const prefetchUseAttractapServiceGetAllCards = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
 export const prefetchUseAttractapServiceGetFirmwares = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceGetFirmwaresKeyFn(), queryFn: () => AttractapService.getFirmwares() });
+export const prefetchUseAttractapServiceDownloadFirmwareBinary = (queryClient: QueryClient, { firmwareName, variantName }: {
+  firmwareName: string;
+  variantName: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAttractapServiceDownloadFirmwareBinaryKeyFn({ firmwareName, variantName }), queryFn: () => AttractapService.downloadFirmwareBinary({ firmwareName, variantName }) });
 export const prefetchUseAttractapServiceGetFirmwareBinary = (queryClient: QueryClient, { filename, firmwareName, variantName }: {
   filename: string;
   firmwareName: string;

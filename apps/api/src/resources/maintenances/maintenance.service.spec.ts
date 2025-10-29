@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenance, Resource, ResourceIntroducer } from '@attraccess/database-entities';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Mock the database entities to avoid import issues
 const mockResource = {
@@ -62,6 +63,10 @@ describe('MaintenanceService', () => {
             findOne: jest.fn(),
           },
         },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -104,7 +109,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(null);
 
       await expect(service.createMaintenance(999, dto)).rejects.toThrow(
-        new NotFoundException('Resource with ID 999 not found')
+        new NotFoundException('Resource with ID 999 not found'),
       );
     });
 
@@ -143,7 +148,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(maintenanceRepository, 'findOne').mockResolvedValue(null);
 
       await expect(service.finishMaintenance(999)).rejects.toThrow(
-        new NotFoundException('Maintenance with ID 999 not found')
+        new NotFoundException('Maintenance with ID 999 not found'),
       );
     });
 
@@ -153,7 +158,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(maintenanceRepository, 'findOne').mockResolvedValue(finishedMaintenance);
 
       await expect(service.finishMaintenance(1)).rejects.toThrow(
-        new BadRequestException('Maintenance is already finished')
+        new BadRequestException('Maintenance is already finished'),
       );
     });
   });
@@ -172,7 +177,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(maintenanceRepository, 'findOne').mockResolvedValue(null);
 
       await expect(service.cancelMaintenance(999)).rejects.toThrow(
-        new NotFoundException('Maintenance with ID 999 not found')
+        new NotFoundException('Maintenance with ID 999 not found'),
       );
     });
   });
@@ -220,7 +225,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(maintenanceRepository, 'findOne').mockResolvedValue(null);
 
       await expect(service.updateMaintenance(999, dto)).rejects.toThrow(
-        new NotFoundException('Maintenance with ID 999 not found')
+        new NotFoundException('Maintenance with ID 999 not found'),
       );
     });
 
@@ -239,7 +244,7 @@ describe('MaintenanceService', () => {
       jest.spyOn(maintenanceRepository, 'findOne').mockResolvedValue(mockMaintenance);
 
       await expect(service.updateMaintenance(1, dto)).rejects.toThrow(
-        new BadRequestException('End time must be after start time')
+        new BadRequestException('End time must be after start time'),
       );
     });
 

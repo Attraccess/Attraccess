@@ -8,6 +8,8 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 import { ResourceImageService } from './resourceImage.service';
 import { LicenseService } from '../license/license.service';
+import { createMockResource } from '../test-utils/resource.fixtures';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
@@ -22,6 +24,7 @@ describe('ResourcesService', () => {
     create: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    softDelete: jest.fn(),
     createQueryBuilder: jest.fn(() => ({
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       leftJoin: jest.fn().mockReturnThis(),
@@ -60,6 +63,10 @@ describe('ResourcesService', () => {
             verifyLicense: jest.fn().mockResolvedValue({ valid: true, payload: { cfg: {} } }),
           },
         },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -74,33 +81,6 @@ describe('ResourcesService', () => {
 
   describe('listResources', () => {
     let mockQueryBuilder: jest.Mocked<SelectQueryBuilder<Resource>>;
-
-    const createMockResource = (id: number, name: string, description: string) => ({
-      id,
-      name,
-      description,
-      type: ResourceType.Machine,
-      separateUnlockAndUnlatch: false,
-      imageFilename: null,
-      documentationType: DocumentationType.MARKDOWN,
-      documentationMarkdown: `# Documentation ${id}`,
-      documentationUrl: null,
-      allowTakeOver: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      introductions: [],
-      usages: [],
-      introducers: [],
-      mqttConfigs: [],
-      webhookConfigs: [],
-      groups: [],
-      flowNodes: [],
-      flowEdges: [],
-      flowLogs: [],
-      attractapReaders: [],
-      maintenances: [],
-      billingConfigurations: [],
-    });
 
     beforeEach(() => {
       mockQueryBuilder = {
@@ -122,8 +102,18 @@ describe('ResourcesService', () => {
     describe('Basic functionality', () => {
       it('should return paginated resources with default options', async () => {
         const mockResources = [
-          createMockResource(1, 'Resource 1', 'Description 1'),
-          createMockResource(2, 'Resource 2', 'Description 2'),
+          createMockResource({
+            id: 1,
+            name: 'Resource 1',
+            description: 'Description 1',
+            documentationMarkdown: '# Documentation 1',
+          }),
+          createMockResource({
+            id: 2,
+            name: 'Resource 2',
+            description: 'Description 2',
+            documentationMarkdown: '# Documentation 2',
+          }),
         ];
 
         mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 2]);
@@ -142,7 +132,14 @@ describe('ResourcesService', () => {
       });
 
       it('should handle custom pagination', async () => {
-        const mockResources = [createMockResource(1, 'Resource 1', 'Description 1')];
+        const mockResources = [
+          createMockResource({
+            id: 1,
+            name: 'Resource 1',
+            description: 'Description 1',
+            documentationMarkdown: '# Documentation 1',
+          }),
+        ];
         mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
         const result = await service.listResources({ page: 2, limit: 5 });
@@ -165,7 +162,14 @@ describe('ResourcesService', () => {
 
     describe('Search filtering', () => {
       it('should filter by search term in name and description', async () => {
-        const mockResources = [createMockResource(1, 'Test Resource', 'Test Description')];
+        const mockResources = [
+          createMockResource({
+            id: 1,
+            name: 'Test Resource',
+            description: 'Test Description',
+            documentationMarkdown: '# Documentation 1',
+          }),
+        ];
         mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
         await service.listResources({ search: 'test' });
@@ -297,7 +301,14 @@ describe('ResourcesService', () => {
 
     describe('Combined filtering', () => {
       it('should handle multiple filters simultaneously', async () => {
-        const mockResources = [createMockResource(1, 'Test Resource', 'Test Description')];
+        const mockResources = [
+          createMockResource({
+            id: 1,
+            name: 'Test Resource',
+            description: 'Test Description',
+            documentationMarkdown: '# Documentation 1',
+          }),
+        ];
         mockQueryBuilder.getManyAndCount.mockResolvedValue([mockResources, 1]);
 
         const result = await service.listResources({
@@ -440,32 +451,12 @@ describe('ResourcesService', () => {
 
   describe('getResourceById', () => {
     it('should return a resource by id', async () => {
-      const mockResource = {
+      const mockResource = createMockResource({
         id: 1,
         name: 'Resource 1',
         description: 'Description 1',
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
-        documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Documentation 1',
-        documentationUrl: null,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+      });
 
       resourceRepository.find.mockResolvedValue([mockResource]);
 
@@ -497,32 +488,15 @@ describe('ResourcesService', () => {
         allowTakeOver: false,
       };
 
-      const newResource = {
+      const newResource = createMockResource({
         id: 1,
         name: createDto.name,
         description: createDto.description,
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
         documentationType: createDto.documentationType,
-        documentationMarkdown: createDto.documentationMarkdown,
+        documentationMarkdown: createDto.documentationMarkdown as string,
         documentationUrl: createDto.documentationUrl,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+        imageFilename: null,
+      });
 
       resourceRepository.create.mockReturnValue(newResource);
       resourceRepository.save.mockResolvedValue(newResource);
@@ -555,42 +529,26 @@ describe('ResourcesService', () => {
         documentationUrl: 'https://example.com/updated',
       };
 
-      const existingResource = {
+      const existingResource = createMockResource({
         id: resourceId,
         name: 'Old Resource',
         description: 'Old Description',
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
         documentationType: DocumentationType.MARKDOWN,
         documentationMarkdown: '# Old Documentation',
         documentationUrl: null,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
+        imageFilename: null,
+      });
 
-      const updatedResource = {
-        ...existingResource,
+      const updatedResource = createMockResource({
+        id: resourceId,
         name: updateDto.name,
         description: updateDto.description,
         documentationType: updateDto.documentationType,
         documentationMarkdown: null,
         documentationUrl: updateDto.documentationUrl,
+        imageFilename: null,
         maintenances: [],
-      };
+      });
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
       resourceRepository.save.mockResolvedValue(updatedResource);
@@ -617,43 +575,15 @@ describe('ResourcesService', () => {
 
   describe('deleteResource', () => {
     it('should delete a resource', async () => {
-      const mockResource = {
-        id: 1,
-        name: 'Resource 1',
-        description: 'Description 1',
-        type: ResourceType.Machine,
-        separateUnlockAndUnlatch: false,
-        imageFilename: null,
-        documentationType: DocumentationType.MARKDOWN,
-        documentationMarkdown: '# Documentation 1',
-        documentationUrl: null,
-        allowTakeOver: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        introductions: [],
-        usages: [],
-        introducers: [],
-        mqttConfigs: [],
-        webhookConfigs: [],
-        groups: [],
-        flowNodes: [],
-        flowEdges: [],
-        flowLogs: [],
-        attractapReaders: [],
-        maintenances: [],
-        billingConfigurations: [],
-      };
-
-      resourceRepository.find.mockResolvedValue([mockResource]);
-      resourceRepository.delete.mockResolvedValue({ affected: 1, raw: {} });
+      (resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 1, raw: {}, generatedMaps: [] });
 
       await service.deleteResource(1);
 
-      expect(resourceRepository.delete).toHaveBeenCalledWith(1);
+      expect(resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {
-      resourceRepository.find.mockResolvedValue([]);
+      (resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 0, raw: {}, generatedMaps: [] });
 
       await expect(service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
     });

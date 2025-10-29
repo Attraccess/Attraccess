@@ -8,7 +8,7 @@ import {
   ResourceUsage,
   ResourceFlowNodeType,
 } from '@attraccess/database-entities';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
@@ -21,6 +21,12 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { EmailService } from '../email/email.service';
+import { BillingTransactionNotFoundException } from './errors/billing-transaction-not-found.error';
+import { RefundAmountHigherThanTransactionAmountException } from './errors/refund-amount-higher-than-transaction-amount.error';
+import { RefundTransactionDto } from './dto/refund-transaction.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 
 @Injectable()
 export class BillingService {
@@ -37,6 +43,9 @@ export class BillingService {
     @InjectRepository(BillingTransactionItem)
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly resourceFlowsService: ResourceFlowsService,
+    private readonly emailService: EmailService,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -126,7 +135,7 @@ export class BillingService {
     };
   }
 
-  async getTransaction(transactionId: number, userId: number): Promise<BillingTransaction> {
+  async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
     return await this.billingTransactionRepository.findOne({
       where: { id: transactionId, userId },
       relations: this.DEFAULT_RELATIONS,
@@ -225,14 +234,27 @@ export class BillingService {
       throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
     }
 
-    return await this.resourceBillingConfigurationRepository.save(configuration);
+    const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
+    this.eventEmitter.emit(
+      ResourceBillingConfigurationChangedEvent.EVENT_NAME,
+      new ResourceBillingConfigurationChangedEvent(resourceId),
+    );
+    return savedConfiguration;
   }
 
   async chargeForResourceUsage(usage: ResourceUsage, transactionManager?: EntityManager): Promise<BillingTransaction> {
-    const existingTransaction = await transactionManager.findOneBy(BillingTransaction, {
-      resourceUsageId: usage.id,
-      status: BillingTransactionStatus.Completed,
-    });
+    let existingTransaction: BillingTransaction | null;
+    if (transactionManager) {
+      existingTransaction = await transactionManager.findOneBy(BillingTransaction, {
+        resourceUsageId: usage.id,
+        status: BillingTransactionStatus.Completed,
+      });
+    } else {
+      existingTransaction = await this.billingTransactionRepository.findOneBy({
+        resourceUsageId: usage.id,
+        status: BillingTransactionStatus.Completed,
+      });
+    }
     if (existingTransaction) {
       throw new BadRequestException('Billing transaction already exists for this resource usage');
     }
@@ -260,6 +282,9 @@ export class BillingService {
       (transaction?.items ?? []).forEach((item) => {
         totalCredits += item.unitPrice * item.quantity;
       });
+
+      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (usage.user.billingFactor / 100));
+      totalCredits = totalCredits - billingFactorDiscountAmount;
 
       if (transaction) {
         await manager.update(BillingTransaction, transaction.id, {
@@ -292,7 +317,41 @@ export class BillingService {
         quantity: roundedMinutes,
       });
 
+      if (billingFactorDiscountAmount !== 0) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: transaction.id,
+          name: 'BILLING_FACTOR',
+          description: `${usage.user.billingFactor}%`,
+          unitPrice: -billingFactorDiscountAmount,
+          quantity: 1,
+        });
+      }
+
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
+
+      const freshUser = await manager.findOne(User, { where: { id: transaction.userId } });
+      if (freshUser?.email) {
+        try {
+          // load items relation if not present
+          // Ensure items relation is loaded
+          transaction = await manager.findOne(BillingTransaction, {
+            where: { id: transaction.id },
+            relations: ['items'],
+          });
+          const billingConfiguration = await this.getConfiguration();
+
+          if (transaction.amount !== 0) {
+            await this.emailService.sendResourceUsageBillingSummaryEmail(
+              freshUser,
+              transaction,
+              usage,
+              billingConfiguration.minorUnit,
+            );
+          }
+        } catch {
+          // ignore email failures to not break billing
+        }
+      }
 
       return transaction;
     };
@@ -351,5 +410,35 @@ export class BillingService {
     }
 
     return false;
+  }
+
+  public async refundTransaction(executingUserId: number, transactionId: number, data: RefundTransactionDto) {
+    const transaction = await this.getTransaction(transactionId);
+
+    if (!transaction) {
+      throw new BillingTransactionNotFoundException();
+    }
+
+    if (data.amount <= 0) {
+      throw new BadRequestException('Amount must be greater than 0');
+    }
+
+    if (data.amount > Math.abs(transaction.amount)) {
+      throw new RefundAmountHigherThanTransactionAmountException();
+    }
+
+    const refundAmount = transaction.amount > 0 ? -data.amount : data.amount;
+
+    const refundTransaction = await this.billingTransactionRepository.save({
+      userId: transaction.userId,
+      initiatorId: executingUserId,
+      amount: refundAmount,
+      status: BillingTransactionStatus.Completed,
+      refundOfId: transaction.id,
+    } as Partial<BillingTransaction>);
+
+    this.liveNotificationsService.notifyTransactionUpdate(transaction);
+
+    return await this.getTransaction(refundTransaction.id);
   }
 }

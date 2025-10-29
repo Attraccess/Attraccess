@@ -1,6 +1,5 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -29,7 +28,7 @@ import {
 } from '@attraccess/react-query-client';
 import { CreditCardIcon, ReceiptTextIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { apiCurrencyToFrontendCurrency } from '../../../../utils/currency';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { TransactionDetailsModal } from './transactionDetailsModal';
 
 interface Props {
@@ -70,18 +69,52 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
   );
 
   const getDetailsCellContent = useCallback(
-    (transaction: BillingTransaction): string => {
+    (transaction: BillingTransaction, skipNested = false): string => {
       let type = '';
-      let details = {};
+      let details = {} as Record<string, unknown>;
 
       if (transaction.refundOfId) {
         const originalTransaction = transactions?.data?.find((t) => t.id === transaction.refundOfId);
-        let originalDetails = {};
+        let originalDetails = '';
+
         if (originalTransaction) {
-          originalDetails = getDetailsCellContent(originalTransaction);
+          if (!skipNested) {
+            // One level of nesting: get a proper string for the original
+            originalDetails = getDetailsCellContent(originalTransaction, true);
+          } else {
+            // Skip deeper recursion but still provide a human-friendly label
+            if (originalTransaction.resourceUsageId) {
+              type = 'resourceUsage';
+              const tmp = t('transactions.table.cells.details.resourceUsage', {
+                resourceUsage: originalTransaction.resourceUsage,
+              }) as string;
+              originalDetails = tmp;
+              type = '';
+            } else if (originalTransaction.initiatorId) {
+              const tmp = t('transactions.table.cells.details.manual', {
+                initiator: originalTransaction.initiator,
+              }) as string;
+              originalDetails = tmp;
+            } else if (originalTransaction.externalReference?.startsWith('sumup_topup_transaction')) {
+              originalDetails = t('transactions.table.cells.details.sumup:topup') as string;
+            } else if (originalTransaction.refundOfId) {
+              // Show a compact refund label without further nesting
+              originalDetails = t('transactions.table.cells.details.refund', {
+                originalDetails: '',
+                originalId: originalTransaction.refundOfId,
+              }) as string;
+            } else {
+              originalDetails = t('transactions.table.cells.details.unknown') as string;
+            }
+          }
         }
+
         type = 'refund';
-        details = { originalDetails, originalId: originalTransaction?.id };
+        details = {
+          originalDetails,
+          // Fallback to the known id even if the original transaction object isn't loaded
+          originalId: originalTransaction?.id ?? transaction.refundOfId,
+        };
       } else if (transaction.resourceUsageId) {
         type = 'resourceUsage';
         details = { resourceUsage: transaction.resourceUsage };
@@ -120,6 +153,14 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
   const formatNumber = useNumberFormatter();
 
+  const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
+  const [isOpenDetails, setIsOpenDetails] = useState(false);
+
+  const openDetails = useCallback((transactionId: number) => {
+    setOpenedTransactionId(transactionId);
+    setIsOpenDetails(true);
+  }, []);
+
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
   }
@@ -136,7 +177,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           ) : (
             <p className="text-2xl font-bold">
               {t('balance', {
-                balance: formatNumber(apiCurrencyToFrontendCurrency(balance?.value ?? 0, configuration.minorUnit)),
+                balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
                 currency: configuration.currency,
               })}
             </p>
@@ -156,6 +197,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
               />
             )
           }
+          onRowAction={(key) => openDetails(key as number)}
         >
           <TableHeader>
             <TableColumn align="start">{t('transactions.table.columns.id')}</TableColumn>
@@ -169,7 +211,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (
-              <TableRow key={transaction.id} className="wrap-none">
+              <TableRow key={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>
                 <TableCell className="whitespace-nowrap">
                   <DateTimeDisplay date={transaction.createdAt} />
@@ -179,20 +221,28 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
                     {t('transactions.table.cells.status.' + transaction.status)}
                   </Chip>
                 </TableCell>
-                <TableCell>{getDetailsCellContent(transaction)}</TableCell>
+                <TableCell className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  {getDetailsCellContent(transaction)}
+                </TableCell>
                 <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                   {transaction.amount > 0 && '+'}
-                  {formatNumber(apiCurrencyToFrontendCurrency(transaction.amount, configuration.minorUnit))}
+                  {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
                 </TableCell>
                 <TableCell>
-                  <TransactionDetailsModal transactionId={transaction.id}>
-                    {(onOpen) => <Button isIconOnly startContent={<ReceiptTextIcon />} onPress={onOpen} />}
-                  </TransactionDetailsModal>
+                  <ReceiptTextIcon />
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+
+        {openedTransactionId && (
+          <TransactionDetailsModal
+            transactionId={openedTransactionId}
+            isOpen={isOpenDetails}
+            onClose={() => setIsOpenDetails(false)}
+          />
+        )}
       </CardBody>
     </Card>
   );

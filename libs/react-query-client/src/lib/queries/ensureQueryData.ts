@@ -51,7 +51,7 @@ export const ensureUseAuthenticationServiceOidcLoginCallbackData = (queryClient:
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindAllData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindOneData = (queryClient: QueryClient, { type }: {
-  type: "verify-email" | "reset-password" | "username-changed" | "password-changed";
+  type: "verify-email" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
 }) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const ensureUseResourcesServiceGetAllResourcesData = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
@@ -90,10 +90,6 @@ export const ensureUseMqttServiceMqttServersGetAllData = (queryClient: QueryClie
 export const ensureUseMqttServiceMqttServersGetOneByIdData = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }), queryFn: () => MqttService.mqttServersGetOneById({ id }) });
-export const ensureUseMqttServiceMqttServersGetStatusOfOneData = (queryClient: QueryClient, { id }: {
-  id: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfOneKeyFn({ id }), queryFn: () => MqttService.mqttServersGetStatusOfOne({ id }) });
-export const ensureUseMqttServiceMqttServersGetStatusOfAllData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseMqttServiceMqttServersGetStatusOfAllKeyFn(), queryFn: () => MqttService.mqttServersGetStatusOfAll() });
 export const ensureUseAccessControlServiceResourceGroupIntroductionsGetManyData = (queryClient: QueryClient, { groupId }: {
   groupId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) });
@@ -184,6 +180,10 @@ export const ensureUseAttractapServiceGetReaderByIdData = (queryClient: QueryCli
 export const ensureUseAttractapServiceGetReadersData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetReadersKeyFn(), queryFn: () => AttractapService.getReaders() });
 export const ensureUseAttractapServiceGetAllCardsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetAllCardsKeyFn(), queryFn: () => AttractapService.getAllCards() });
 export const ensureUseAttractapServiceGetFirmwaresData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceGetFirmwaresKeyFn(), queryFn: () => AttractapService.getFirmwares() });
+export const ensureUseAttractapServiceDownloadFirmwareBinaryData = (queryClient: QueryClient, { firmwareName, variantName }: {
+  firmwareName: string;
+  variantName: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAttractapServiceDownloadFirmwareBinaryKeyFn({ firmwareName, variantName }), queryFn: () => AttractapService.downloadFirmwareBinary({ firmwareName, variantName }) });
 export const ensureUseAttractapServiceGetFirmwareBinaryData = (queryClient: QueryClient, { filename, firmwareName, variantName }: {
   filename: string;
   firmwareName: string;

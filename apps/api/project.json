@@ -6,18 +6,18 @@
   "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
   "tags": [],
   "targets": {
-    "copy-attractap-assets": {
+    "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
-      "not-dependsOn": ["attractap-firmware:build"],
+      "dependsOn": ["attractap-firmware:build"],
       "cache": false,
       "options": {
-        "command": "node {projectRoot}/copy-attractap-assets.js"
+        "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
       }
     },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "not-dependsOn": ["copy-attractap-assets"],
+      "dependsOn": ["copy-attractap-firmware-into-assets"],
       "inputs": [
         "production",
         "^production",

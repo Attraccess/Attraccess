@@ -219,7 +219,7 @@ export function AttraccessNode(props: Props) {
           <CardBody className="pt-0">
             <div className="flex flex-col gap-2">
               {previewRows.map((row) => (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2" key={row.label}>
                   <small>{row.label}</small>
                   <Code className="text-ellipsis overflow-hidden" title={row.value}>
                     {row.value}

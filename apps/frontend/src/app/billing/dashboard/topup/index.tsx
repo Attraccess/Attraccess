@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Select } from '../../../../components/select';
 import { TransactionProcessingCard } from './transactionProcessingStatus';
 import { useAuth } from '../../../../hooks/useAuth';
-import { apiCurrencyToFrontendCurrency, frontendCurrencyToApiCurrency } from '../../../../utils/currency';
+import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 
 type Props = Omit<CardProps, 'children'> & {
   title?: string;
@@ -74,7 +74,7 @@ export function BillingDashboardTopupCard(props: Props) {
     let actualDesiredAmount = desiredAmount ?? DEFAULT_DESIRED_AMOUNT;
     if (desiredAmount !== undefined) {
       if ((balance?.value ?? 0) < 0) {
-        actualDesiredAmount += apiCurrencyToFrontendCurrency(Math.abs(balance?.value ?? 0), configuration.minorUnit);
+        actualDesiredAmount += dbCurrencyToUserCurrency(Math.abs(balance?.value ?? 0), configuration.minorUnit);
       }
     }
 
@@ -92,7 +92,7 @@ export function BillingDashboardTopupCard(props: Props) {
 
     topUpWithSumUpReader({
       requestBody: {
-        amount: frontendCurrencyToApiCurrency(amount, configuration.minorUnit),
+        amount: userCurrencyToDbCurrency(amount, configuration.minorUnit),
         readerId,
       },
     });

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
@@ -9,6 +9,8 @@ import { ResourceImageService } from './resourceImage.service';
 import { FileUpload } from '../common/types/file-upload.types';
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 import { LicenseError, LicenseService } from '../license/license.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceChangedEvent } from './events/resource-changed.event';
 
 @Injectable()
 export class ResourcesService {
@@ -18,7 +20,9 @@ export class ResourcesService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     private readonly resourceImageService: ResourceImageService,
-    private readonly licenseService: LicenseService
+    private readonly licenseService: LicenseService,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createResource(dto: CreateResourceDto, image?: FileUpload): Promise<Resource> {
@@ -61,11 +65,13 @@ export class ResourcesService {
       });
     }
 
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(resource.id));
+
     return resource;
   }
 
   async getResourceById<Tid extends number | number[]>(
-    idOrArrayOfIds: Tid
+    idOrArrayOfIds: Tid,
   ): Promise<Tid extends number ? Resource | null : Resource[]> {
     const arrayOfIds: number[] = Array.isArray(idOrArrayOfIds) ? idOrArrayOfIds : [idOrArrayOfIds];
 
@@ -123,21 +129,18 @@ export class ResourcesService {
       resource.imageFilename = null;
     }
 
-    return this.resourceRepository.save(resource);
+    const updatedResource = await this.resourceRepository.save(resource);
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(updatedResource.id));
+    return updatedResource;
   }
 
   async deleteResource(id: number): Promise<void> {
-    const resource = await this.getResourceById(id);
-
-    // Delete associated image if it exists
-    if (resource.imageFilename) {
-      await this.resourceImageService.deleteImage(id, resource.imageFilename);
-    }
-
-    const result = await this.resourceRepository.delete(id);
+    const result = await this.resourceRepository.softDelete(id);
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
     }
+
+    this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
   }
 
   async listResources(options?: {
@@ -198,7 +201,7 @@ export class ResourcesService {
         new Brackets((qb) => {
           qb.where('usage.userId = :userId', { userId: onlyInUseByUserId });
           qb.andWhere('usage.endTime IS NULL');
-        })
+        }),
       );
     }
 
@@ -211,7 +214,7 @@ export class ResourcesService {
         'introduction.history',
         'laterResourceIntroductionHistory',
         'laterResourceIntroductionHistory.introductionId = resourceIntroductionHistory.introductionId \
-         AND laterResourceIntroductionHistory.createdAt > resourceIntroductionHistory.createdAt'
+         AND laterResourceIntroductionHistory.createdAt > resourceIntroductionHistory.createdAt',
       );
 
       queryBuilder.leftJoin('resource.groups', 'resourceGroup');
@@ -222,7 +225,7 @@ export class ResourcesService {
         'groupIntroduction.history',
         'laterGroupIntroductionHistory',
         'laterGroupIntroductionHistory.introductionId = groupIntroductionHistory.introductionId \
-         AND laterGroupIntroductionHistory.createdAt > groupIntroductionHistory.createdAt'
+         AND laterGroupIntroductionHistory.createdAt > groupIntroductionHistory.createdAt',
       );
 
       queryBuilder.andWhere(
@@ -240,7 +243,7 @@ export class ResourcesService {
                 .where('introduction.receiverUserId = :userId', { userId: onlyWithPermissionForUserId })
                 .andWhere('resourceIntroductionHistory.action = :action', { action: 'grant' })
                 .andWhere('laterResourceIntroductionHistory.id IS NULL');
-            })
+            }),
           );
 
           // Group introductions (users who received introduction to resource group)
@@ -250,9 +253,9 @@ export class ResourcesService {
                 .where('groupIntroduction.receiverUserId = :userId', { userId: onlyWithPermissionForUserId })
                 .andWhere('groupIntroductionHistory.action = :action', { action: 'grant' })
                 .andWhere('laterGroupIntroductionHistory.id IS NULL');
-            })
+            }),
           );
-        })
+        }),
       );
     }
 
@@ -278,7 +281,7 @@ export class ResourcesService {
         '(LOWER(resource.name) LIKE LOWER(:search) OR LOWER(resource.description) LIKE LOWER(:search))',
         {
           search: `%${search}%`,
-        }
+        },
       );
     }
 

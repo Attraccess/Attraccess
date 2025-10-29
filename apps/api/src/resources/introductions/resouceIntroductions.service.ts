@@ -3,10 +3,12 @@ import {
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -17,6 +19,8 @@ export class ResourceIntroductionsService {
     private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @InjectRepository(ResourceIntroductionHistoryItem)
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
+    @Inject(EventEmitter2)
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async getIntroductionOfUser(
@@ -94,6 +98,7 @@ export class ResourceIntroductionsService {
 
     const savedIntroduction = await this.resourceIntroductionRepository.save(introduction);
     this.logger.debug(`Created new introduction with id: ${savedIntroduction.id}`);
+
     return savedIntroduction;
   }
 
@@ -121,6 +126,12 @@ export class ResourceIntroductionsService {
 
     const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
     this.logger.debug(`Created new history item with id: ${savedHistoryItem.id}`);
+
+    this.eventEmitter.emit(
+      ResourceIntroductionChangedEvent.EVENT_NAME,
+      new ResourceIntroductionChangedEvent(resourceIntroduction.id),
+    );
+
     return savedHistoryItem;
   }
 

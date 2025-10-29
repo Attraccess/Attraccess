@@ -9,7 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import { BaseCsvExportModal, ColumnDefinition } from '../base-modal';
 import { useMemo } from 'react';
-import { apiCurrencyToFrontendCurrency } from '../../../utils/currency';
+import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
 export function BillingTransactionsExport(props: ExporterProps) {
   const { start, end } = props;
@@ -46,7 +46,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
       {
         label: t('columns.amount'),
         key: 'amount',
-        getter: (item) => apiCurrencyToFrontendCurrency(item.amount, billingConfiguration.minorUnit),
+        getter: (item) => dbCurrencyToUserCurrency(item.amount, billingConfiguration.minorUnit),
         selectedByDefault: true,
       },
       { label: t('columns.initiator'), key: 'initiator', getter: (item) => item.initiator?.username },
@@ -70,7 +70,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
           item.items
             .map(
               (item) =>
-                `${item.quantity}x ${item.name} @ ${apiCurrencyToFrontendCurrency(item.unitPrice, billingConfiguration.minorUnit)}`,
+                `${item.quantity}x ${item.name} @ ${dbCurrencyToUserCurrency(item.unitPrice, billingConfiguration.minorUnit)}`,
             )
             .join(', '),
       },

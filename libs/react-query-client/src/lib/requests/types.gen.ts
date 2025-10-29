@@ -79,6 +79,10 @@ export type User = {
      * The credit balance of the user
      */
     creditBalance: number;
+    /**
+     * The percentage rate the user to actually pay for activities that cost credits
+     */
+    billingFactor: number;
 };
 
 export type VerifyEmailDto = {
@@ -163,6 +167,13 @@ export type SetUserPasswordDto = {
      * The new password for the user
      */
     password: string;
+};
+
+export type ChangeBillingFactorDto = {
+    /**
+     * The new billing factor
+     */
+    billingFactor: number;
 };
 
 export type CreateSessionResponse = {
@@ -384,7 +395,8 @@ export enum EmailTemplateType {
     VERIFY_EMAIL = 'verify-email',
     RESET_PASSWORD = 'reset-password',
     USERNAME_CHANGED = 'username-changed',
-    PASSWORD_CHANGED = 'password-changed'
+    PASSWORD_CHANGED = 'password-changed',
+    RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary'
 }
 
 export type EmailTemplate = {
@@ -578,6 +590,10 @@ export type Resource = {
      */
     updatedAt: string;
     /**
+     * When the resource was deleted
+     */
+    deletedAt: string | null;
+    /**
      * The groups the resource belongs to
      */
     groups: Array<ResourceGroup>;
@@ -736,105 +752,6 @@ export type UpdateMqttServerDto = {
      * Whether to use TLS/SSL for the connection
      */
     useTls?: boolean;
-};
-
-export type TestConnectionResponseDto = {
-    /**
-     * Whether the connection test was successful
-     */
-    success: boolean;
-    /**
-     * Message describing the test result
-     */
-    message: string;
-};
-
-export type MqttHealthStatusDto = {
-    /**
-     * Whether the connection is healthy
-     */
-    healthy: boolean;
-    /**
-     * Detailed health status message
-     */
-    details: string;
-};
-
-export type MqttConnectionStatsDto = {
-    /**
-     * Number of connection attempts
-     */
-    connectionAttempts: number;
-    /**
-     * Number of failed connections
-     */
-    connectionFailures: number;
-    /**
-     * Number of successful connections
-     */
-    connectionSuccesses: number;
-    /**
-     * Timestamp of last successful connection
-     */
-    lastConnectTime?: string;
-    /**
-     * Timestamp of last disconnection
-     */
-    lastDisconnectTime?: string;
-};
-
-export type MqttMessageStatsDto = {
-    /**
-     * Number of successfully published messages
-     */
-    published: number;
-    /**
-     * Number of failed message publications
-     */
-    failed: number;
-    /**
-     * Timestamp of last successful message publication
-     */
-    lastPublishTime?: string;
-    /**
-     * Timestamp of last failed message publication
-     */
-    lastFailureTime?: string;
-};
-
-export type MqttServerStatsDto = {
-    /**
-     * Connection statistics
-     */
-    connection: MqttConnectionStatsDto;
-    /**
-     * Message statistics
-     */
-    messages: MqttMessageStatsDto;
-};
-
-export type MqttServerStatusDto = {
-    /**
-     * Whether the server is currently connected
-     */
-    connected: boolean;
-    /**
-     * Health status of the connection
-     */
-    healthStatus: MqttHealthStatusDto;
-    /**
-     * Detailed statistics
-     */
-    stats: MqttServerStatsDto;
-};
-
-export type AllMqttServerStatusesDto = {
-    /**
-     * Map of server IDs to their statuses
-     */
-    servers: {
-        [key: string]: MqttServerStatusDto;
-    };
 };
 
 export type CreateResourceGroupDto = {
@@ -1511,11 +1428,15 @@ export enum event_type {
     SOLO_TRANSACTION_UPDATED = 'solo.transaction.updated'
 }
 
+export type RefundTransactionDto = {
+    amount: number;
+};
+
 export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
     /**
      * The schema for a node type
      */
@@ -1551,11 +1472,13 @@ export enum type3 {
     INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
+    INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     PROCESSING_WAIT = 'processing.wait',
-    PROCESSING_IF = 'processing.if'
+    PROCESSING_IF = 'processing.if',
+    PROCESSING_SET_PAYLOAD = 'processing.set-payload'
 }
 
 export type ResourceFlowNodePositionDto = {
@@ -1577,7 +1500,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
     /**
      * The position of the node
      */
@@ -2140,6 +2063,13 @@ export type ChangeUserUsernameData = {
 
 export type ChangeUserUsernameResponse = User;
 
+export type ChangeUserBillingFactorData = {
+    id: number;
+    requestBody: ChangeBillingFactorDto;
+};
+
+export type ChangeUserBillingFactorResponse = User;
+
 export type CreateSessionData = {
     requestBody: {
         username?: string;
@@ -2272,7 +2202,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -2282,7 +2212,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed';
+    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
@@ -2505,20 +2435,6 @@ export type MqttServersDeleteOneData = {
 };
 
 export type MqttServersDeleteOneResponse = unknown;
-
-export type MqttServersTestConnectionData = {
-    id: number;
-};
-
-export type MqttServersTestConnectionResponse = TestConnectionResponseDto;
-
-export type MqttServersGetStatusOfOneData = {
-    id: number;
-};
-
-export type MqttServersGetStatusOfOneResponse = MqttServerStatusDto;
-
-export type MqttServersGetStatusOfAllResponse = AllMqttServerStatusesDto;
 
 export type ResourceGroupIntroductionsGetManyData = {
     /**
@@ -2855,6 +2771,13 @@ export type SumUpTopUpCallbackData = {
 
 export type SumUpTopUpCallbackResponse = unknown;
 
+export type RefundTransactionData = {
+    requestBody: RefundTransactionDto;
+    transactionId: number;
+};
+
+export type RefundTransactionResponse = BillingTransaction;
+
 export type GetNodeSchemasData = {
     resourceId: number;
 };
@@ -3001,6 +2924,13 @@ export type ToggleCardActiveData = {
 export type ToggleCardActiveResponse = NFCCard;
 
 export type GetFirmwaresResponse = Array<AttractapFirmware>;
+
+export type DownloadFirmwareBinaryData = {
+    firmwareName: string;
+    variantName: string;
+};
+
+export type DownloadFirmwareBinaryResponse = string;
 
 export type GetFirmwareBinaryData = {
     filename: string;
@@ -3306,6 +3236,21 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/billing-factor': {
+        patch: {
+            req: ChangeUserBillingFactorData;
+            res: {
+                /**
+                 * Billing factor changed.
                  */
                 200: User;
                 /**
@@ -4057,58 +4002,6 @@ export type $OpenApiTs = {
             };
         };
     };
-    '/api/mqtt/servers/{id}/test': {
-        post: {
-            req: MqttServersTestConnectionData;
-            res: {
-                /**
-                 * Connection test result
-                 */
-                200: TestConnectionResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * MQTT server not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/mqtt/servers/{id}/status': {
-        get: {
-            req: MqttServersGetStatusOfOneData;
-            res: {
-                /**
-                 * MQTT server connection status and statistics
-                 */
-                200: MqttServerStatusDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-                /**
-                 * MQTT server not found
-                 */
-                404: unknown;
-            };
-        };
-    };
-    '/api/mqtt/servers/status': {
-        get: {
-            res: {
-                /**
-                 * All MQTT server connection statuses and statistics
-                 */
-                200: AllMqttServerStatusesDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-    };
     '/api/resource-groups/{groupId}/introductions': {
         get: {
             req: ResourceGroupIntroductionsGetManyData;
@@ -4704,6 +4597,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/billing/transactions/{transactionId}/refund': {
+        post: {
+            req: RefundTransactionData;
+            res: {
+                /**
+                 * The billing transaction has been refunded.
+                 */
+                200: BillingTransaction;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/resources/{resourceId}/flow/node-schemas': {
         get: {
             req: GetNodeSchemasData;
@@ -5055,6 +4963,17 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/attractap/firmwares/{firmwareName}/variants/{variantName}': {
+        get: {
+            req: DownloadFirmwareBinaryData;
+            res: {
+                /**
+                 * Firmware streamed successfully
+                 */
+                200: string;
             };
         };
     };

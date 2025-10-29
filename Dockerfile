@@ -1,6 +1,27 @@
 ARG NODE_VERSION=22.17.1
 
-FROM node:${NODE_VERSION}-alpine AS builder
+FROM node:${NODE_VERSION}-bookworm AS builder
+
+# System deps required for native Node modules and tooling
+# - python3/py3-pip: node-gyp and Python-based tooling
+# - build-base (make, g++, etc.): compile native deps when prebuilds are unavailable
+# - libstdc++: runtime for some native modules (e.g., sharp)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-venv \
+    python3-pip \
+    build-essential \
+    libstdc++6 \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Optional: ESP tooling often used by firmware-related scripts
+# Create a virtual environment to avoid PEP 668 restrictions on Alpine
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip install --upgrade pip && \
+    pip install platformio esptool
 
 WORKDIR /app
 
@@ -15,13 +36,16 @@ RUN corepack enable && corepack prepare && \
 COPY . .
 
 # Build the application
-RUN pnpm nx run-many -t build --projects=api,frontend --verbose
+RUN pnpm nx run-many -t build --projects=api,frontend
 
 
 FROM node:${NODE_VERSION}-alpine
 
 # Set working directory
 WORKDIR /app
+
+# Minimal runtime libs for native Node modules
+RUN apk add --no-cache libstdc++
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist/apps/api dist/apps/api

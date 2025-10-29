@@ -91,7 +91,12 @@ export class UsersService {
     return user || null;
   }
 
-  async createOne(data: { username: string; email: string; externalIdentifier: string | null }): Promise<User> {
+  async createOne(userData: { username: string; email: string; externalIdentifier: string | null }): Promise<User> {
+    const data = {
+      username: userData.username.trim(),
+      email: userData.email.trim(),
+      externalIdentifier: userData.externalIdentifier?.trim() ?? null,
+    };
     this.logger.debug(`Creating new user - username: ${data.username}, email: ${data.email}`);
 
     this.validateUsernameOrThrow(data.username);
@@ -163,10 +168,15 @@ export class UsersService {
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
-  async updateOne(id: number, updates: Partial<User>): Promise<User> {
+  async updateOne(id: number, updateData: Partial<User>): Promise<User> {
+    const updates = {
+      username: updateData.username?.trim() ?? undefined,
+      email: updateData.email?.trim() ?? undefined,
+      externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
+    };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
 
-    if (updates.username) {
+    if (updates.username !== undefined) {
       this.validateUsernameOrThrow(updates.username);
     }
 
@@ -210,6 +220,11 @@ export class UsersService {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+    newUsername = newUsername.trim();
+    if (newUsername.length === 0) {
+      throw new BadRequestException('Username cannot be empty');
+    }
+
     const targetUser = await this.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
@@ -338,5 +353,19 @@ export class UsersService {
       page: paginationOptions.page,
       limit: paginationOptions.limit,
     };
+  }
+
+  async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
+    const targetUser = await this.findOne({ id: targetUserId });
+    if (!targetUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    if (newBillingFactor < 0) {
+      throw new BadRequestException('Billing factor must be at least 0');
+    }
+
+    const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
+    return updated;
   }
 }
