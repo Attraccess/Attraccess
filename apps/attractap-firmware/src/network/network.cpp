@@ -1,6 +1,7 @@
 #include "network.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
+#include <time.h>
 
 // Static member definitions
 bool Network::_sharedComponentsInitialized = false;
@@ -24,6 +25,9 @@ void Network::setup()
 
     logger.info("Starting Ethernet interface");
     Ethernet::setup();
+
+    logger.info("Configuring SNTP time server...");
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 
     logger.info("initialization complete");
 }
