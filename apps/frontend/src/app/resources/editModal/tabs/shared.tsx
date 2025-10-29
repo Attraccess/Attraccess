@@ -32,6 +32,7 @@ export function SharedDataTab(props: EditorTabProps & Props) {
         id="image"
         onChange={onImageSelected}
         className="w-full"
+        autoScale={{ maxWidth: 800, maxHeight: 800, output: 'auto' }}
         currentImageUrl={resource?.imageFilename ? filenameToUrl(resource?.imageFilename) : undefined}
       />
 

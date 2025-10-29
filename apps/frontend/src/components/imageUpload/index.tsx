@@ -4,6 +4,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../toastProvider';
+import { AutoScaleOptions, processImageWithAutoScale } from './imageProcessing';
 
 interface ImageUploadProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
   id: string;
@@ -11,6 +12,8 @@ interface ImageUploadProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChang
   onChange: (file: File | null) => void;
   disabled?: boolean;
   currentImageUrl?: string;
+  /** When provided, input images are resized/compressed in-browser before upload */
+  autoScale?: AutoScaleOptions;
 }
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -23,6 +26,7 @@ export function ImageUpload({
   disabled = false,
   className = '',
   currentImageUrl,
+  autoScale,
   ...rest
 }: Readonly<ImageUploadProps>) {
   const { t } = useTranslations({
@@ -67,11 +71,12 @@ export function ImageUpload({
       }
 
       // Check file size
-      if (file.size > MAX_FILE_SIZE) {
+      const effectiveMax = autoScale?.maxBytes ?? MAX_FILE_SIZE;
+      if (file.size > effectiveMax) {
         error({
           title: t('fileTooLarge'),
           description: t('fileTooLargeDescription', {
-            maxSize: MAX_FILE_SIZE / 1024 / 1024,
+            maxSize: Math.round((effectiveMax / 1024 / 1024) * 10) / 10,
           }),
         });
         return false;
@@ -79,32 +84,41 @@ export function ImageUpload({
 
       return true;
     },
-    [error, t],
+    [error, t, autoScale?.maxBytes],
   );
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0] || null;
-      if (file && !validateFile(file)) {
-        e.target.value = '';
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const originalFile = e.target.files?.[0] || null;
+      if (!originalFile) {
         setSelectedFile(null);
         setPreviewUrl(null);
         onChange(null);
         return;
       }
 
-      if (file) {
-        setSelectedFile(file);
-        const url = URL.createObjectURL(file);
+      try {
+        const processed = autoScale ? await processImageWithAutoScale(originalFile, autoScale) : originalFile;
+        if (!validateFile(processed)) {
+          e.target.value = '';
+          setSelectedFile(null);
+          setPreviewUrl(null);
+          onChange(null);
+          return;
+        }
+
+        setSelectedFile(processed);
+        const url = URL.createObjectURL(processed);
         setPreviewUrl(url);
-      } else {
+        onChange(processed);
+      } catch (err) {
+        console.error('Image processing failed', err);
         setSelectedFile(null);
         setPreviewUrl(null);
+        onChange(null);
       }
-
-      onChange(file);
     },
-    [onChange, validateFile],
+    [onChange, autoScale, validateFile],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -118,26 +132,34 @@ export function ImageUpload({
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragActive(false);
 
-      const file = e.dataTransfer.files[0];
-      if (file && !validateFile(file)) {
+      const originalFile = e.dataTransfer.files[0];
+      if (!originalFile) return;
+
+      try {
+        const processed = autoScale ? await processImageWithAutoScale(originalFile, autoScale) : originalFile;
+        if (!validateFile(processed)) {
+          setSelectedFile(null);
+          setPreviewUrl(null);
+          onChange(null);
+          return;
+        }
+
+        setSelectedFile(processed);
+        const url = URL.createObjectURL(processed);
+        setPreviewUrl(url);
+        onChange(processed);
+      } catch (err) {
+        console.error('Image processing failed', err);
         setSelectedFile(null);
         setPreviewUrl(null);
         onChange(null);
-        return;
-      }
-
-      if (file) {
-        setSelectedFile(file);
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
-        onChange(file);
       }
     },
-    [onChange, validateFile],
+    [onChange, autoScale, validateFile],
   );
 
   const handleRemoveFile = useCallback(() => {
@@ -175,7 +197,7 @@ export function ImageUpload({
             <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('dragAndDrop')}</p>
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-              {t('acceptedFormats', { maxSize: MAX_FILE_SIZE / 1024 / 1024 })}
+              {t('acceptedFormats', { maxSize: (autoScale?.maxBytes ?? MAX_FILE_SIZE) / 1024 / 1024 })}
             </p>
           </div>
         )}
