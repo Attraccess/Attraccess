@@ -177,7 +177,7 @@ export function AttraccessNode(props: Props) {
               )}
             </div>
           </NodeToolbar>
-          <Card className={cardClasses} onDoubleClick={openEditor}>
+          <Card className={cardClasses} onDoubleClick={isEditable ? openEditor : undefined}>
             <CardHeader className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center min-w-0">
