@@ -5,6 +5,10 @@ export type AutoScaleOptions = {
   output?: 'auto' | 'jpeg' | 'webp';
   quality?: number;
   downscaleOnly?: boolean;
+  /** Minimum output width in pixels to avoid over-downscaling (default 100) */
+  minWidth?: number;
+  /** Minimum output height in pixels to avoid over-downscaling (default 100) */
+  minHeight?: number;
 };
 
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -148,13 +152,16 @@ export async function processImageWithAutoScale(file: File, options: AutoScaleOp
   await runQualitySearch();
 
   let attempts = 0;
+  const minWidth = options.minWidth ?? 100;
+  const minHeight = options.minHeight ?? 100;
   while (
     chosenBlob.size > targetMaxBytes &&
     attempts < 6 &&
-    (options.maxWidth || options.maxHeight || !downscaleOnly)
+    (options.maxWidth || options.maxHeight || !downscaleOnly) &&
+    (width > minWidth || height > minHeight)
   ) {
-    width = Math.max(100, Math.floor(width * 0.85));
-    height = Math.max(100, Math.floor(height * 0.85));
+    width = Math.max(minWidth, Math.floor(width * 0.85));
+    height = Math.max(minHeight, Math.floor(height * 0.85));
     renderToCanvas();
     await runQualitySearch();
     attempts++;
