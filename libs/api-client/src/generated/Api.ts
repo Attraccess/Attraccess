@@ -2483,6 +2483,8 @@ export type ToggleCardActiveData = NFCCard;
 
 export type GetFirmwaresData = AttractapFirmware[];
 
+export type DownloadFirmwareBinaryData = string;
+
 export type GetFirmwareBinaryData = string;
 
 export interface GetResourceUsageHoursInDateRangeParams {
@@ -4845,6 +4847,24 @@ export namespace Attractap {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetFirmwaresData;
+  }
+
+  /**
+   * No description
+   * @tags Attractap
+   * @name DownloadFirmwareBinary
+   * @summary Download OTA firmware by name and variant
+   * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}
+   */
+  export namespace DownloadFirmwareBinary {
+    export type RequestParams = {
+      firmwareName: string;
+      variantName: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DownloadFirmwareBinaryData;
   }
 
   /**
@@ -7655,6 +7675,26 @@ export class Api<
         path: `/api/attractap/firmwares`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Attractap
+     * @name DownloadFirmwareBinary
+     * @summary Download OTA firmware by name and variant
+     * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}
+     */
+    downloadFirmwareBinary: (
+      firmwareName: string,
+      variantName: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<DownloadFirmwareBinaryData, any>({
+        path: `/api/attractap/firmwares/${firmwareName}/variants/${variantName}`,
+        method: "GET",
         format: "json",
         ...params,
       }),
