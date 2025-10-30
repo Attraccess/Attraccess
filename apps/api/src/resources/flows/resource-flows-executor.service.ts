@@ -134,9 +134,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   private async subscribeToMqttTopics() {
-    const mqttMessageReceivedNodes = await this.flowNodeRepository.find({
-      where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-    });
+    const [mqttMessageReceivedNodes, mqttWaitForMessageNodes] = await Promise.all([
+      this.flowNodeRepository.find({
+        where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+      }),
+      this.flowNodeRepository.find({
+        where: { type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
+      }),
+    ]);
+
+    const subscribePairs: Array<{ serverId: number; topic: string }> = [];
 
     for (const node of mqttMessageReceivedNodes) {
       const { topic, serverId } = node.data as z.infer<typeof MqttMessageReceivedNodeDataSchema>;
@@ -144,6 +151,19 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         this.logger.warn(`Skipping subscription to topic ${topic} for server ID ${serverId} because it is missing`);
         continue;
       }
+      subscribePairs.push({ serverId, topic });
+    }
+
+    for (const node of mqttWaitForMessageNodes) {
+      const { topic, serverId } = node.data as z.infer<typeof MqttWaitForMessageNodeDataSchema>;
+      if (!serverId || !topic) {
+        this.logger.warn(`Skipping subscription to topic ${topic} for server ID ${serverId} because it is missing`);
+        continue;
+      }
+      subscribePairs.push({ serverId, topic });
+    }
+
+    for (const { serverId, topic } of subscribePairs) {
       await this.mqttClientService.subscribe(serverId, topic).catch((error) => {
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });

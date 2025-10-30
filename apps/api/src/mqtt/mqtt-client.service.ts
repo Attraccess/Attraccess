@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import * as mqtt from 'mqtt';
 import { MqttClient } from 'mqtt';
-import { MqttConnectionError } from './errors/mqtt-connection.error';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent } from './mqtt-message.event';
 
@@ -12,6 +11,7 @@ import { MqttMessageEvent } from './mqtt-message.event';
 export class MqttClientService implements OnModuleDestroy {
   private clients: Map<number, MqttClient> = new Map();
   private connectionPromises: Map<number, Promise<MqttClient>> = new Map();
+  private subscriptions: Map<number, Set<string>> = new Map();
   private readonly logger = new Logger(MqttClientService.name);
 
   constructor(
@@ -100,6 +100,14 @@ export class MqttClientService implements OnModuleDestroy {
 
       client.on('connect', () => {
         this.logger.log(`Connected to MQTT server ${server.name} (${url})`);
+        // Re-subscribe to all known topics for this server on each successful connect
+        const topics = this.subscriptions.get(serverId);
+        if (topics && topics.size > 0) {
+          for (const t of topics.values()) {
+            client.subscribe(t);
+            this.logger.debug(`(re)subscribed to ${t} on server ${server.name}`);
+          }
+        }
         resolve(client);
       });
 
@@ -158,12 +166,20 @@ export class MqttClientService implements OnModuleDestroy {
   }
 
   async subscribe(serverId: number, topic: string): Promise<void> {
+    // Track desired subscriptions so they can be (re)applied on connect/reconnect
+    if (!this.subscriptions.has(serverId)) {
+      this.subscriptions.set(serverId, new Set());
+    }
+    this.subscriptions.get(serverId).add(topic);
+
     try {
       const client = await this.getOrCreateClient(serverId, true);
       client.subscribe(topic);
     } catch (error) {
-      this.logger.error(`Failed to subscribe to topic ${topic} for server ${serverId}`, error);
-      throw new MqttConnectionError(error.message);
+      // Do not throw: the client will keep trying to connect and will subscribe on next connect
+      this.logger.warn(
+        `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
+      );
     }
   }
 }

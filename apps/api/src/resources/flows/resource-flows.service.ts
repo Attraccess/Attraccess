@@ -133,21 +133,41 @@ export class ResourceFlowsService {
 
     // Start transaction to ensure data consistency
     const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
-      const oldMqttMessageReceivedNodes = await transactionalEntityManager.find(ResourceFlowNode, {
-        where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-      });
+      const [oldMqttMessageReceivedNodes, oldMqttWaitForMessageNodes] = await Promise.all([
+        transactionalEntityManager.find(ResourceFlowNode, {
+          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+        }),
+        transactionalEntityManager.find(ResourceFlowNode, {
+          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
+        }),
+      ]);
 
-      const newOrChangedMqttMessageReceivedNodes = [];
+      const newOrChangedMqttMessageReceivedNodes = [] as typeof flowData.nodes;
+      const newOrChangedMqttWaitForMessageNodes = [] as typeof flowData.nodes;
+
       for (const nodeData of flowData.nodes) {
-        const existingNode = oldMqttMessageReceivedNodes.find((oldNode) => oldNode.id === nodeData.id);
-        if (!existingNode) {
-          newOrChangedMqttMessageReceivedNodes.push(nodeData);
-          continue;
+        if (nodeData.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED) {
+          const existingNode = oldMqttMessageReceivedNodes.find((oldNode) => oldNode.id === nodeData.id);
+          if (!existingNode) {
+            newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          } else if (
+            existingNode.data.topic !== nodeData.data.topic ||
+            existingNode.data.serverId !== nodeData.data.serverId
+          ) {
+            newOrChangedMqttMessageReceivedNodes.push(nodeData);
+          }
         }
 
-        if (existingNode.data.topic !== nodeData.data.topic || existingNode.data.serverId !== nodeData.data.serverId) {
-          newOrChangedMqttMessageReceivedNodes.push(nodeData);
-          continue;
+        if (nodeData.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE) {
+          const existingNode = oldMqttWaitForMessageNodes.find((oldNode) => oldNode.id === nodeData.id);
+          if (!existingNode) {
+            newOrChangedMqttWaitForMessageNodes.push(nodeData);
+          } else if (
+            existingNode.data.topic !== nodeData.data.topic ||
+            existingNode.data.serverId !== nodeData.data.serverId
+          ) {
+            newOrChangedMqttWaitForMessageNodes.push(nodeData);
+          }
         }
       }
 
@@ -194,12 +214,31 @@ export class ResourceFlowsService {
           );
           continue;
         }
-        this.mqttClientService.subscribe(nodeData.data.serverId, nodeData.data.topic).catch((error) => {
-          this.logger.error(
-            `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
-            error.stack,
+        this.mqttClientService
+          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
+          .catch((error) => {
+            this.logger.error(
+              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+              error.stack,
+            );
+          });
+      }
+
+      for (const nodeData of newOrChangedMqttWaitForMessageNodes) {
+        if (!nodeData.data.serverId || !nodeData.data.topic) {
+          this.logger.warn(
+            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
           );
-        });
+          continue;
+        }
+        this.mqttClientService
+          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
+          .catch((error) => {
+            this.logger.error(
+              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+              error.stack,
+            );
+          });
       }
 
       return { nodes: savedNodes, edges: savedEdges };
