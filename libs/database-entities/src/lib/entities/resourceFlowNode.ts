@@ -16,6 +16,7 @@ export enum ResourceFlowNodeType {
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
+  OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
@@ -103,6 +104,14 @@ export const MqttWaitForMessageNodeDataSchema = z.object({
   timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
 });
 
+export const ResourceUsageEndSessionNodeDataSchema = z
+  .object({
+    notes: z.string().optional().meta({
+      stringVariant: 'multiline',
+    }),
+  })
+  .optional();
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -140,6 +149,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
       return MqttWaitForMessageNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+      return ResourceUsageEndSessionNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

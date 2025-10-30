@@ -281,6 +281,20 @@
         }
       },
       "resource": {
+        "usage": {
+          "end-session": {
+            "title": "End usage session",
+            "description": "Ends the active usage session. Optionally sends notes (template or static).",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "config": {
+              "notes": { "label": "Notes (templates allowed)" }
+            },
+            "preview": {
+              "notes": "Notes"
+            }
+          }
+        },
         "billing": {
           "calculation": {
             "set-additional-items": {

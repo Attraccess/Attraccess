@@ -281,6 +281,20 @@
         }
       },
       "resource": {
+        "usage": {
+          "end-session": {
+            "title": "Nutzung beenden",
+            "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
+            "inputs": { "input": "Eingabe" },
+            "outputs": { "output": "Ausgabe" },
+            "config": {
+              "notes": { "label": "Notizen (Templates erlaubt)" }
+            },
+            "preview": {
+              "notes": "Notizen"
+            }
+          }
+        },
         "billing": {
           "calculation": {
             "set-additional-items": {
