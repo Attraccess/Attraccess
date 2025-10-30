@@ -32,6 +32,7 @@ import {
   BillingTransactionItemCreateSchema,
   SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
+  MqttWaitForMessageNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -88,6 +89,7 @@ export {
   BillingTransactionItem,
   BillingTransactionItemCreateSchema,
   MqttMessageReceivedNodeDataSchema,
+  MqttWaitForMessageNodeDataSchema,
 };
 
 // Export the entities object

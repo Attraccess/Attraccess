@@ -18,6 +18,7 @@ import {
   BillingTransactionItemCreateSchema,
   SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
+  MqttWaitForMessageNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -338,6 +339,13 @@ export class ResourceFlowsService {
 
         case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
           schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+          schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema);
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
