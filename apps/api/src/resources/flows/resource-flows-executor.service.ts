@@ -29,6 +29,7 @@ import {
   SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
+  ResourceUsageEndSessionNodeDataSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
@@ -489,6 +490,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           );
           break;
 
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+          responseOfNode = await this.processEndUsageSessionNode(
+            node,
+            resultOfPreviousNode.payload,
+            transactionManager,
+          );
+          break;
+
         case ResourceFlowNodeType.PROCESSING_IF:
           responseOfNode = await this.processIfNode(node, resultOfPreviousNode.payload, transactionManager);
           break;
@@ -781,6 +790,34 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return {
       payload: input,
     };
+  }
+
+  private async processEndUsageSessionNode(
+    node: ResourceFlowNode,
+    input: object,
+    transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
+    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+
+    if (!activeUsage) {
+      throw new NoUsageSessionError();
+    }
+
+    if (!activeUsage.user) {
+      throw new ForbiddenException('Active session has no owner user; cannot end');
+    }
+
+    const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
+
+    let finalNotes = '';
+    if (typeof notes === 'string' && notes.length > 0) {
+      const compiled = this.compileTemplate(notes, input);
+      finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
+    }
+
+    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes });
+
+    return { payload: input };
   }
 
   private compileTemplate(template: string, data: object): string {

@@ -14,6 +14,7 @@ import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { FlowConfigType } from './flow.config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
+import { NoUsageSessionError } from './errors/no-usage-session.error';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -251,6 +252,64 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       unitPrice: 1,
       quantity: 1,
     });
+  });
+
+  it('ends the active usage session with templated notes and passes payload through', async () => {
+    // Arrange nodes: INPUT -> END_SESSION (terminal)
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const endNode = createNode({
+      id: 'end-1',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION,
+      data: { notes: 'Ended by {{user.username}}' },
+    });
+    nodesById[inputNode.id] = inputNode;
+    nodesById[endNode.id] = endNode;
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: endNode.id }];
+    edgesBySourceAndHandle[`${endNode.id}|`] = [];
+
+    // Mock active session and endSession
+    (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue({
+      id: 'ru-1',
+      user: { id: 42, username: 'alice' },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (resourceUsageService as any).endSession = jest.fn().mockResolvedValue(undefined);
+
+    const initialData = { user: { username: 'bob' } };
+
+    // Act
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
+
+    // Assert leaf payload passthrough
+    expect(result).toEqual([initialData]);
+
+    // Assert endSession called with compiled notes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((resourceUsageService as any).endSession).toHaveBeenCalledWith(
+      1,
+      { id: 42, username: 'alice' },
+      {
+        notes: 'Ended by bob',
+      },
+    );
+  });
+
+  it('throws NoUsageSessionError when no active session exists', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const endNode = createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} });
+    nodesById[inputNode.id] = inputNode;
+    nodesById[endNode.id] = endNode;
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: endNode.id }];
+    edgesBySourceAndHandle[`${endNode.id}|`] = [];
+
+    (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue(null);
+
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toBeInstanceOf(
+      NoUsageSessionError,
+    );
   });
 });
 

@@ -19,6 +19,7 @@ import {
   SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
+  ResourceUsageEndSessionNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -359,6 +360,14 @@ export class ResourceFlowsService {
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+          schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
 

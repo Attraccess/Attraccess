@@ -44,34 +44,6 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'output.resource.billing.calculation.set-additional-items':
-        return [
-          {
-            label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
-            value: nodeData?.data.name as string,
-          },
-        ];
-
-      case 'output.http.sendRequest':
-        return [
-          {
-            label: t('nodes.output.http.sendRequest.preview.method'),
-            value: nodeData?.data.method as string,
-          },
-          {
-            label: t('nodes.output.http.sendRequest.preview.url'),
-            value: nodeData?.data.url as string,
-          },
-        ];
-
-      case 'output.mqtt.sendMessage':
-        return [
-          {
-            label: t('nodes.output.mqtt.sendMessage.preview.topic'),
-            value: nodeData?.data.topic as string,
-          },
-        ];
-
       case 'processing.wait':
         return [
           {
@@ -113,6 +85,42 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
       }
+
+      case 'output.resource.billing.calculation.set-additional-items':
+        return [
+          {
+            label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
+            value: nodeData?.data.name as string,
+          },
+        ];
+
+      case 'output.http.sendRequest':
+        return [
+          {
+            label: t('nodes.output.http.sendRequest.preview.method'),
+            value: nodeData?.data.method as string,
+          },
+          {
+            label: t('nodes.output.http.sendRequest.preview.url'),
+            value: nodeData?.data.url as string,
+          },
+        ];
+
+      case 'output.mqtt.sendMessage':
+        return [
+          {
+            label: t('nodes.output.mqtt.sendMessage.preview.topic'),
+            value: nodeData?.data.topic as string,
+          },
+        ];
+
+      case 'output.resource.usage.end-session':
+        return [
+          {
+            label: t('nodes.output.resource.usage.end-session.preview.notes'),
+            value: nodeData?.data.notes as string,
+          },
+        ];
 
       default: {
         const exhaustiveCheck: never = schema.type;
