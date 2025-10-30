@@ -1436,7 +1436,7 @@ export type ResourceFlowNodeSchemaDto = {
     /**
      * The name of the node type
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload' | 'processing.mqtt.waitForMessage';
     /**
      * The schema for a node type
      */
@@ -1478,7 +1478,8 @@ export enum type3 {
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     PROCESSING_WAIT = 'processing.wait',
     PROCESSING_IF = 'processing.if',
-    PROCESSING_SET_PAYLOAD = 'processing.set-payload'
+    PROCESSING_SET_PAYLOAD = 'processing.set-payload',
+    PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage'
 }
 
 export type ResourceFlowNodePositionDto = {
@@ -1500,7 +1501,7 @@ export type ResourceFlowNodeDto = {
     /**
      * The type of the node
      */
-    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload';
+    type: 'input.button' | 'input.resource.usage.started' | 'input.resource.usage.stopped' | 'input.resource.usage.takeover' | 'input.resource.door.unlocked' | 'input.resource.door.locked' | 'input.resource.door.unlatched' | 'input.mqtt.message.received' | 'output.http.sendRequest' | 'output.mqtt.sendMessage' | 'output.resource.billing.calculation.set-additional-items' | 'processing.wait' | 'processing.if' | 'processing.set-payload' | 'processing.mqtt.waitForMessage';
     /**
      * The position of the node
      */

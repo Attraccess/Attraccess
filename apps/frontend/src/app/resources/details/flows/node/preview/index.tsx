@@ -80,6 +80,18 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
+      case 'processing.mqtt.waitForMessage':
+        return [
+          {
+            label: t('nodes.processing.mqtt.waitForMessage.preview.topic'),
+            value: nodeData?.data.topic as string,
+          },
+          {
+            label: t('nodes.processing.mqtt.waitForMessage.preview.timeoutSeconds'),
+            value: String(nodeData?.data.timeoutSeconds ?? ''),
+          },
+        ];
+
       case 'processing.if':
         return [
           {

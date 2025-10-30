@@ -19,6 +19,7 @@ export enum ResourceFlowNodeType {
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
+  PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
 }
 
 // Zod schemas for node data validation
@@ -37,11 +38,13 @@ export const HttpRequestNodeDataSchema = z.object({
   }),
 });
 
+const MqttServerIdSchema = z.number().int().positive().meta({
+  selectFromEntity: 'mqttServer',
+  entityProperty: 'id',
+});
+
 export const MqttSendMessageNodeDataSchema = z.object({
-  serverId: z.number().int().positive('Server ID must be a positive integer').meta({
-    selectFromEntity: 'mqttServer',
-    entityProperty: 'id',
-  }),
+  serverId: MqttServerIdSchema,
   topic: z.string().min(1, 'Topic is required'),
   payload: z.string().optional().default('').meta({
     stringVariant: 'multiline',
@@ -78,10 +81,7 @@ export const BillingTransactionItemCreateSchema = z.object({
 
 export const MqttMessageReceivedNodeDataSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
-  serverId: z.number().int().positive().meta({
-    selectFromEntity: 'mqttServer',
-    entityProperty: 'id',
-  }),
+  serverId: MqttServerIdSchema,
 });
 
 export const SetPayloadNodeDataSchema = z.object({
@@ -95,6 +95,12 @@ export const SetPayloadNodeDataSchema = z.object({
       }),
     )
     .default([]),
+});
+
+export const MqttWaitForMessageNodeDataSchema = z.object({
+  serverId: MqttServerIdSchema,
+  topic: z.string().min(1, 'Topic is required'),
+  timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
 });
 
 // Helper function to get the appropriate schema for a node type
@@ -131,6 +137,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
       return SetPayloadNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+      return MqttWaitForMessageNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

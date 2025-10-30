@@ -93,7 +93,7 @@ export class MqttClientService implements OnModuleDestroy {
         } catch {
           // propably not json, just ignore it
         }
-        this.logger.debug('mqtt message', topic, payload);
+        this.logger.debug(`mqtt message: ${topic}: ${payloadString}`);
 
         this.eventEmitter.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(serverId, topic, payload));
       });

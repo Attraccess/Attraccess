@@ -1486,7 +1486,8 @@ export interface ResourceFlowNodeSchemaDto {
     | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
     | "processing.if"
-    | "processing.set-payload";
+    | "processing.set-payload"
+    | "processing.mqtt.waitForMessage";
   /** The schema for a node type */
   configSchema: Record<string, any>;
   /** The inputs for a node type */
@@ -1536,7 +1537,8 @@ export interface ResourceFlowNodeDto {
     | "output.resource.billing.calculation.set-additional-items"
     | "processing.wait"
     | "processing.if"
-    | "processing.set-payload";
+    | "processing.set-payload"
+    | "processing.mqtt.waitForMessage";
   /**
    * The position of the node
    * @example {"x":100,"y":200}

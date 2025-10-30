@@ -134,6 +134,23 @@
           }
         }
       },
+      "mqtt": {
+        "waitForMessage": {
+          "title": "Auf MQTT-Nachricht warten",
+          "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
+          "inputs": { "input": "Eingabe" },
+          "outputs": { "output": "Ausgabe" },
+          "preview": {
+            "topic": "Thema",
+            "timeoutSeconds": "Timeout (s)"
+          },
+          "config": {
+            "serverId": { "label": "Server" },
+            "topic": { "label": "Thema (unterstützt + und #)" },
+            "timeoutSeconds": { "label": "Timeout (Sekunden)" }
+          }
+        }
+      },
       "if": {
         "title": "Wenn",
         "description": "Wenn ein Wert einem Vergleichsoperator entspricht, wird der true-Output ausgelöst, ansonsten der false-Output.",

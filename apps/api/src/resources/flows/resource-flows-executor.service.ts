@@ -28,6 +28,7 @@ import {
   MqttSendMessageNodeDataSchema,
   SetPayloadNodeDataSchema,
   MqttMessageReceivedNodeDataSchema,
+  MqttWaitForMessageNodeDataSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
@@ -44,6 +45,7 @@ import { ResourceUsageService } from '../usage/resourceUsage.service';
 import z from 'zod';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -106,6 +108,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly resourceUsageService: ResourceUsageService,
     @InjectRepository(BillingTransactionItem)
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -145,6 +148,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });
     }
+  }
+
+  private topicMatches(filter: string, topic: string): boolean {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = filter.split('/').map((segment, index, arr) => {
+      if (segment === '+') {
+        return '[^/]+';
+      }
+      if (segment === '#' && index === arr.length - 1) {
+        return '.*';
+      }
+      return escapeRegex(segment);
+    });
+    const pattern = '^' + parts.join('/') + '$';
+    return new RegExp(pattern).test(topic);
   }
 
   private async createFlowLog(
@@ -243,7 +261,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
       const { serverId: nodeServerId, topic: nodeTopic } = MqttMessageReceivedNodeDataSchema.parse(node.data);
-      return nodeServerId === serverId && nodeTopic === topic;
+      return nodeServerId === serverId && (this.topicMatches(nodeTopic, topic) || this.topicMatches(topic, nodeTopic));
     });
 
     if (filteredMessageReceivedNodes.length === 0) {
@@ -459,6 +477,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           responseOfNode = await this.processSetPayloadNode(node, resultOfPreviousNode.payload, transactionManager);
           break;
 
+        case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+          responseOfNode = await this.processMqttWaitForMessageNode(
+            node,
+            resultOfPreviousNode.payload,
+            transactionManager,
+          );
+          break;
+
         default: {
           const exhaustiveCheck: never = node.type;
           throw new Error(`Unknown node type: ${exhaustiveCheck}`);
@@ -665,6 +691,54 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return {
       payload: response.data,
     };
+  }
+
+  private async processMqttWaitForMessageNode(
+    node: ResourceFlowNode,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
+    const { serverId, topic, timeoutSeconds } = node.data as z.infer<typeof MqttWaitForMessageNodeDataSchema>;
+
+    // Ensure subscription exists (wildcards allowed)
+    await this.mqttClientService.subscribe(serverId, topic).catch((error) => {
+      this.logger.error(`Failed to subscribe for wait node to topic ${topic} on server ${serverId}`, error.stack);
+      throw error;
+    });
+
+    this.logger.debug(
+      `Waiting for MQTT message (serverId=${serverId}, topicFilter=${topic}, timeout=${timeoutSeconds}s)`,
+    );
+
+    const result = await new Promise<{ topic: string; payload: unknown }>((resolve, reject) => {
+      const onMessage = (event: MqttMessageReceivedEvent) => {
+        if (event.serverId !== serverId) {
+          return;
+        }
+        if (!this.topicMatches(topic, event.topic)) {
+          return;
+        }
+        cleanup();
+        resolve({ topic: event.topic, payload: event.payload });
+      };
+
+      const onTimeout = () => {
+        cleanup();
+        reject(new Error(`Timeout waiting for MQTT message on topic '${topic}' (server ${serverId})`));
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeoutHandle);
+        this.eventEmitter.off(MqttMessageReceivedEvent.EVENT_NAME, onMessage as unknown as () => void);
+      };
+
+      const timeoutHandle = setTimeout(onTimeout, timeoutSeconds * 1000);
+      this.eventEmitter.on(MqttMessageReceivedEvent.EVENT_NAME, onMessage as unknown as () => void);
+    });
+
+    return { payload: { topic: result.topic, payload: result.payload } };
   }
 
   private async processMqttSendMessageNode(
