@@ -228,6 +228,18 @@ export type SSOProviderOIDCConfiguration = {
      */
     clientSecret: string;
     /**
+     * Optional list of OIDC scopes to request
+     */
+    scopes?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the username
+     */
+    usernameClaimPaths?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the email
+     */
+    emailClaimPaths?: Array<(string)>;
+    /**
      * When the user was created
      */
     createdAt: string;
@@ -304,6 +316,18 @@ export type CreateOIDCConfigurationDto = {
      * The client secret of the provider
      */
     clientSecret: string;
+    /**
+     * Optional list of OIDC scopes to request
+     */
+    scopes?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the username
+     */
+    usernameClaimPaths?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the email
+     */
+    emailClaimPaths?: Array<(string)>;
 };
 
 export type CreateSSOProviderDto = {
@@ -353,6 +377,18 @@ export type UpdateOIDCConfigurationDto = {
      * The client secret of the provider
      */
     clientSecret?: string;
+    /**
+     * Optional list of OIDC scopes to request
+     */
+    scopes?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the username
+     */
+    usernameClaimPaths?: Array<(string)>;
+    /**
+     * Ordered list of claim paths to resolve the email
+     */
+    emailClaimPaths?: Array<(string)>;
 };
 
 export type UpdateSSOProviderDto = {

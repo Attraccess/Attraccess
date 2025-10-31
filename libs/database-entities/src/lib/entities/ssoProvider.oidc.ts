@@ -36,24 +36,21 @@ export class SSOProviderOIDCConfiguration {
   @Column({ type: 'text' })
   @ApiProperty({
     description: 'The authorization URL of the provider',
-    example:
-      'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/auth',
+    example: 'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/auth',
   })
   authorizationURL!: string;
 
   @Column({ type: 'text' })
   @ApiProperty({
     description: 'The token URL of the provider',
-    example:
-      'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/token',
+    example: 'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/token',
   })
   tokenURL!: string;
 
   @Column({ type: 'text' })
   @ApiProperty({
     description: 'The user info URL of the provider',
-    example:
-      'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/userinfo',
+    example: 'https://sso.csh.rit.edu/auth/realms/csh/protocol/openid-connect/userinfo',
   })
   userInfoURL!: string;
 
@@ -70,6 +67,30 @@ export class SSOProviderOIDCConfiguration {
     example: '1234567890',
   })
   clientSecret!: string;
+
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description: 'Optional list of OIDC scopes to request',
+    example: ['openid', 'email', 'profile'],
+    required: false,
+  })
+  scopes!: string[] | null;
+
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description: 'Ordered list of claim paths to resolve the username',
+    example: ['preferred_username', 'email', 'sub'],
+    required: false,
+  })
+  usernameClaimPaths!: string[] | null;
+
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description: 'Ordered list of claim paths to resolve the email',
+    example: ['email', 'emails[0].value', 'upn'],
+    required: false,
+  })
+  emailClaimPaths!: string[] | null;
 
   @CreateDateColumn()
   @ApiProperty({

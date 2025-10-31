@@ -71,6 +71,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
+  const [scopesInput, setScopesInput] = useState('');
+  const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
+  const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const queryClient = useQueryClient();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
@@ -140,6 +143,22 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           clientId: extendedProvider.oidcConfiguration.clientId,
           clientSecret: extendedProvider.oidcConfiguration.clientSecret,
         };
+
+        setScopesInput(
+          Array.isArray(extendedProvider.oidcConfiguration.scopes)
+            ? extendedProvider.oidcConfiguration.scopes.join(', ')
+            : '',
+        );
+        setUsernameClaimPathsInput(
+          Array.isArray(extendedProvider.oidcConfiguration.usernameClaimPaths)
+            ? extendedProvider.oidcConfiguration.usernameClaimPaths.join(', ')
+            : '',
+        );
+        setEmailClaimPathsInput(
+          Array.isArray(extendedProvider.oidcConfiguration.emailClaimPaths)
+            ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
+            : '',
+        );
       }
 
       setFormValues(updatedFormValues);
@@ -225,17 +244,31 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
   const handleSubmit = async () => {
     try {
+      const parseList = (value: string) =>
+        value
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+      const requestBody: UpdateSSOProviderDto = { ...formValues };
+      if (!requestBody.oidcConfiguration) requestBody.oidcConfiguration = {};
+      if (scopesInput.trim().length > 0) requestBody.oidcConfiguration.scopes = parseList(scopesInput);
+      if (usernameClaimPathsInput.trim().length > 0)
+        requestBody.oidcConfiguration.usernameClaimPaths = parseList(usernameClaimPathsInput);
+      if (emailClaimPathsInput.trim().length > 0)
+        requestBody.oidcConfiguration.emailClaimPaths = parseList(emailClaimPathsInput);
+
       if (editingProvider) {
         await updateSSOProvider.mutateAsync({
           id: editingProvider.id,
-          requestBody: formValues as UpdateSSOProviderDto,
+          requestBody: requestBody,
         });
         success({
           title: t('providerUpdated'),
           description: t('providerUpdatedDesc'),
         });
       } else {
-        await createSSOProvider.mutateAsync({ requestBody: formValues });
+        await createSSOProvider.mutateAsync({ requestBody: requestBody as CreateSSOProviderDto });
         success({
           title: t('providerCreated'),
           description: t('providerCreatedDesc'),
@@ -469,6 +502,29 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                             </Button>
                           </Tooltip>
                         }
+                      />
+
+                      <Divider className="my-2" />
+                      <Input
+                        label={t('scopes')}
+                        value={scopesInput}
+                        onChange={(e) => setScopesInput(e.target.value)}
+                        placeholder="openid, email, profile"
+                        data-cy="sso-provider-form-oidc-scopes-input"
+                      />
+                      <Input
+                        label={t('usernameClaimPaths')}
+                        value={usernameClaimPathsInput}
+                        onChange={(e) => setUsernameClaimPathsInput(e.target.value)}
+                        placeholder="preferred_username, email, sub"
+                        data-cy="sso-provider-form-oidc-username-claims-input"
+                      />
+                      <Input
+                        label={t('emailClaimPaths')}
+                        value={emailClaimPathsInput}
+                        onChange={(e) => setEmailClaimPathsInput(e.target.value)}
+                        placeholder="email, emails[0].value, upn"
+                        data-cy="sso-provider-form-oidc-email-claims-input"
                       />
                     </>
                   )}

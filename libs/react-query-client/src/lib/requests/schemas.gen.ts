@@ -350,6 +350,30 @@ export const $SSOProviderOIDCConfiguration = {
             description: 'The client secret of the provider',
             example: '1234567890'
         },
+        scopes: {
+            description: 'Optional list of OIDC scopes to request',
+            example: ['openid', 'email', 'profile'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        usernameClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the username',
+            example: ['preferred_username', 'email', 'sub'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        emailClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the email',
+            example: ['email', 'emails[0].value', 'upn'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
         createdAt: {
             format: 'date-time',
             type: 'string',
@@ -462,6 +486,30 @@ export const $CreateOIDCConfigurationDto = {
             type: 'string',
             description: 'The client secret of the provider',
             example: 'client-secret'
+        },
+        scopes: {
+            description: 'Optional list of OIDC scopes to request',
+            example: ['openid', 'email', 'profile'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        usernameClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the username',
+            example: ['preferred_username', 'email', 'sub'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        emailClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the email',
+            example: ['email', 'emails[0].value', 'upn'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
         }
     },
     required: ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL', 'clientId', 'clientSecret']
@@ -525,6 +573,30 @@ export const $UpdateOIDCConfigurationDto = {
             type: 'string',
             description: 'The client secret of the provider',
             example: 'client-secret'
+        },
+        scopes: {
+            description: 'Optional list of OIDC scopes to request',
+            example: ['openid', 'email', 'profile'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        usernameClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the username',
+            example: ['preferred_username', 'email', 'sub'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        emailClaimPaths: {
+            description: 'Ordered list of claim paths to resolve the email',
+            example: ['email', 'emails[0].value', 'upn'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
         }
     }
 } as const;
