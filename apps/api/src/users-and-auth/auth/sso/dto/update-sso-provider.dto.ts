@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsObject,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
+import { IsObject, IsOptional, IsString, ValidateNested, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateOIDCConfigurationDto {
@@ -19,8 +14,7 @@ export class UpdateOIDCConfigurationDto {
 
   @ApiProperty({
     description: 'The authorization URL of the provider',
-    example:
-      'https://sso.example.com/auth/realms/example/protocol/openid-connect/auth',
+    example: 'https://sso.example.com/auth/realms/example/protocol/openid-connect/auth',
     required: false,
   })
   @IsString()
@@ -29,8 +23,7 @@ export class UpdateOIDCConfigurationDto {
 
   @ApiProperty({
     description: 'The token URL of the provider',
-    example:
-      'https://sso.example.com/auth/realms/example/protocol/openid-connect/token',
+    example: 'https://sso.example.com/auth/realms/example/protocol/openid-connect/token',
     required: false,
   })
   @IsString()
@@ -39,8 +32,7 @@ export class UpdateOIDCConfigurationDto {
 
   @ApiProperty({
     description: 'The user info URL of the provider',
-    example:
-      'https://sso.example.com/auth/realms/example/protocol/openid-connect/userinfo',
+    example: 'https://sso.example.com/auth/realms/example/protocol/openid-connect/userinfo',
     required: false,
   })
   @IsString()
@@ -64,6 +56,36 @@ export class UpdateOIDCConfigurationDto {
   @IsString()
   @IsOptional()
   clientSecret?: string;
+
+  @ApiProperty({
+    description: 'Optional list of OIDC scopes to request',
+    example: ['openid', 'email', 'profile'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scopes?: string[];
+
+  @ApiProperty({
+    description: 'Ordered list of claim paths to resolve the username',
+    example: ['preferred_username', 'email', 'sub'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  usernameClaimPaths?: string[];
+
+  @ApiProperty({
+    description: 'Ordered list of claim paths to resolve the email',
+    example: ['email', 'emails[0].value', 'upn'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  emailClaimPaths?: string[];
 }
 
 export class UpdateSSOProviderDto {
