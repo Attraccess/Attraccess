@@ -10,6 +10,6 @@ export default defineConfig({
     setupFiles: ['./src/test-utils/setup.ts'],
   },
   esbuild: {
-    target: 'node14',
+    target: 'node20',
   },
 });

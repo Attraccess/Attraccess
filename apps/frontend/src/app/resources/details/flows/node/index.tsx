@@ -32,7 +32,6 @@ enum ProcessingState {
 export function AttraccessNode(props: Props) {
   const { schema, previewMode, tNodeTranslations: t, data } = props;
 
-  const { removeNode } = useFlowContext();
   const nodeId = useNodeId();
 
   const [processingState, setProcessingState] = useState<ProcessingState>(ProcessingState.IDLE);
@@ -65,7 +64,7 @@ export function AttraccessNode(props: Props) {
     [nodeId],
   );
 
-  const { addLiveLogReceiver, removeLiveLogReceiver } = useFlowContext();
+  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode } = useFlowContext();
 
   useEffect(() => {
     if (!nodeId || previewMode) {

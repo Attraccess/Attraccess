@@ -64,3 +64,4 @@ export * from './1760468005000-email-templates-variables-fix';
 export * from './1761776665535-wait-for-mqtt-message-flow-node';
 export * from './1761832730725-end-usage-session-flow-node';
 export * from './1761903220000-sso-oidc-add-scopes-and-claim-paths';
+export * from './1761910926026-mqtt-qos-retain-setting-per-flow-node';

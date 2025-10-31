@@ -35,6 +35,9 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
     username: '',
     password: '',
     useTls: false,
+    defaultPublishQos: 0,
+    defaultPublishRetain: false,
+    defaultSubscribeQos: 0,
   });
 
   const createMqttServer = useMqttServiceMqttServersCreateOne({
@@ -166,6 +169,46 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       >
         {t('useTls')}
       </Checkbox>
+
+      <Input
+        label={t('defaultPublishQosLabel')}
+        id="defaultPublishQos"
+        name="defaultPublishQos"
+        type="number"
+        min={0}
+        max={2}
+        step={1}
+        placeholder={t('qosPlaceholder')}
+        value={String(formValues.defaultPublishQos ?? 0)}
+        onChange={handleInputChange}
+        fullWidth
+        data-cy="create-mqtt-server-form-default-publish-qos-input"
+      />
+
+      <Checkbox
+        id="defaultPublishRetain"
+        name="defaultPublishRetain"
+        isSelected={!!formValues.defaultPublishRetain}
+        onValueChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+        data-cy="create-mqtt-server-form-default-publish-retain-checkbox"
+      >
+        {t('defaultPublishRetainLabel')}
+      </Checkbox>
+
+      <Input
+        label={t('defaultSubscribeQosLabel')}
+        id="defaultSubscribeQos"
+        name="defaultSubscribeQos"
+        type="number"
+        min={0}
+        max={2}
+        step={1}
+        placeholder={t('qosPlaceholder')}
+        value={String(formValues.defaultSubscribeQos ?? 0)}
+        onChange={handleInputChange}
+        fullWidth
+        data-cy="create-mqtt-server-form-default-subscribe-qos-input"
+      />
 
       <div className="flex justify-end space-x-3 mt-4">
         <Button color="default" variant="flat" onPress={handleCancel} data-cy="create-mqtt-server-form-cancel-button">

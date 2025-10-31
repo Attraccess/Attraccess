@@ -62,6 +62,27 @@ export class MqttServer {
   })
   useTls!: boolean;
 
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({
+    description: 'Default QoS level for publish operations (0, 1, or 2)',
+    example: 0,
+  })
+  defaultPublishQos!: number;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description: 'Default retain flag for publish operations',
+    example: false,
+  })
+  defaultPublishRetain!: boolean;
+
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({
+    description: 'Default QoS level for subscribe operations (0, 1, or 2)',
+    example: 0,
+  })
+  defaultSubscribeQos!: number;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the MQTT server was created',

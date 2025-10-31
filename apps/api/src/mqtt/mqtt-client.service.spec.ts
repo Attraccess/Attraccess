@@ -60,6 +60,9 @@ describe('MqttClientService', () => {
     username: 'testuser',
     password: 'testpass',
     useTls: false,
+    defaultPublishQos: 0,
+    defaultPublishRetain: false,
+    defaultSubscribeQos: 0,
   };
 
   let mockEventEmitter: Partial<EventEmitter2>;
@@ -143,6 +146,55 @@ describe('MqttClientService', () => {
 
       // Act & Assert
       await expect(service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
+    });
+
+    it('should use server defaults when no options are provided', async () => {
+      // Arrange
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...mockServer,
+        defaultPublishQos: 1,
+        defaultPublishRetain: true,
+      });
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const mockClient = mqtt.connect({});
+      getOrCreateClientSpy.mockResolvedValue(mockClient);
+
+      // Spy on publish call args
+      const publishSpy = jest.spyOn(mockClient, 'publish');
+
+      // Act
+      await service.publish(1, 'test/topic', 'test message');
+
+      // Assert
+      expect(publishSpy).toHaveBeenCalled();
+      const args = (publishSpy.mock.calls[0] ?? []) as unknown[];
+      const options = (args[2] ?? {}) as { qos?: number; retain?: boolean };
+      expect(options.qos).toBe(1);
+      expect(options.retain).toBe(true);
+    });
+
+    it('should prefer per-call options over server defaults', async () => {
+      // Arrange
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+        ...mockServer,
+        defaultPublishQos: 0,
+        defaultPublishRetain: true,
+      });
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const mockClient = mqtt.connect({});
+      getOrCreateClientSpy.mockResolvedValue(mockClient);
+
+      const publishSpy = jest.spyOn(mockClient, 'publish');
+
+      // Act
+      await service.publish(1, 'test/topic', 'test message', { qos: 2, retain: false });
+
+      // Assert
+      expect(publishSpy).toHaveBeenCalled();
+      const args = (publishSpy.mock.calls[0] ?? []) as unknown[];
+      const options = (args[2] ?? {}) as { qos?: number; retain?: boolean };
+      expect(options.qos).toBe(2);
+      expect(options.retain).toBe(false);
     });
   });
 

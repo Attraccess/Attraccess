@@ -1052,6 +1052,21 @@ export const $MqttServer = {
             description: 'Whether to use TLS/SSL',
             example: false
         },
+        defaultPublishQos: {
+            type: 'number',
+            description: 'Default QoS level for publish operations (0, 1, or 2)',
+            example: 0
+        },
+        defaultPublishRetain: {
+            type: 'boolean',
+            description: 'Default retain flag for publish operations',
+            example: false
+        },
+        defaultSubscribeQos: {
+            type: 'number',
+            description: 'Default QoS level for subscribe operations (0, 1, or 2)',
+            example: 0
+        },
         createdAt: {
             format: 'date-time',
             type: 'string',
@@ -1063,7 +1078,7 @@ export const $MqttServer = {
             description: 'When the MQTT server was last updated'
         }
     },
-    required: ['id', 'name', 'host', 'port', 'useTls', 'createdAt', 'updatedAt']
+    required: ['id', 'name', 'host', 'port', 'useTls', 'defaultPublishQos', 'defaultPublishRetain', 'defaultSubscribeQos', 'createdAt', 'updatedAt']
 } as const;
 
 export const $CreateMqttServerDto = {
@@ -1098,6 +1113,21 @@ export const $CreateMqttServerDto = {
             type: 'boolean',
             description: 'Whether to use TLS/SSL for the connection',
             default: false
+        },
+        defaultPublishQos: {
+            type: 'number',
+            description: 'Default publish QoS (0, 1, or 2)',
+            example: 0
+        },
+        defaultPublishRetain: {
+            type: 'boolean',
+            description: 'Default publish retain flag',
+            example: false
+        },
+        defaultSubscribeQos: {
+            type: 'number',
+            description: 'Default subscribe QoS (0, 1, or 2)',
+            example: 0
         }
     },
     required: ['name', 'host', 'port']
@@ -1135,6 +1165,21 @@ export const $UpdateMqttServerDto = {
             type: 'boolean',
             description: 'Whether to use TLS/SSL for the connection',
             default: false
+        },
+        defaultPublishQos: {
+            type: 'number',
+            description: 'Default publish QoS (0, 1, or 2)',
+            example: 0
+        },
+        defaultPublishRetain: {
+            type: 'boolean',
+            description: 'Default publish retain flag',
+            example: false
+        },
+        defaultSubscribeQos: {
+            type: 'number',
+            description: 'Default subscribe QoS (0, 1, or 2)',
+            example: 0
         }
     }
 } as const;

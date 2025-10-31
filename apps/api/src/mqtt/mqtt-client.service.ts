@@ -11,7 +11,7 @@ import { MqttMessageEvent } from './mqtt-message.event';
 export class MqttClientService implements OnModuleDestroy {
   private clients: Map<number, MqttClient> = new Map();
   private connectionPromises: Map<number, Promise<MqttClient>> = new Map();
-  private subscriptions: Map<number, Set<string>> = new Map();
+  private subscriptions: Map<number, Map<string, 0 | 1 | 2>> = new Map();
   private readonly logger = new Logger(MqttClientService.name);
 
   constructor(
@@ -103,9 +103,13 @@ export class MqttClientService implements OnModuleDestroy {
         // Re-subscribe to all known topics for this server on each successful connect
         const topics = this.subscriptions.get(serverId);
         if (topics && topics.size > 0) {
-          for (const t of topics.values()) {
-            client.subscribe(t);
-            this.logger.debug(`(re)subscribed to ${t} on server ${server.name}`);
+          for (const [t, qos] of topics.entries()) {
+            client.subscribe(t, { qos: qos ?? (server.defaultSubscribeQos as 0 | 1 | 2) ?? 0 }, (err) => {
+              if (err) {
+                this.logger.warn(`Failed to (re)subscribe to ${t} on server ${server.name}: ${err.message}`);
+              }
+            });
+            this.logger.debug(`(re)subscribed to ${t} on server ${server.name} with qos=${qos ?? 0}`);
           }
         }
         resolve(client);
@@ -145,11 +149,26 @@ export class MqttClientService implements OnModuleDestroy {
     });
   }
 
-  async publish(serverId: number, topic: string, message: string): Promise<void> {
+  async publish(
+    serverId: number,
+    topic: string,
+    message: string,
+    options?: { qos?: 0 | 1 | 2; retain?: boolean },
+  ): Promise<void> {
     try {
-      const client = await this.getOrCreateClient(serverId);
+      const [client, server] = await Promise.all([
+        this.getOrCreateClient(serverId),
+        this.mqttServerRepository.findOneBy({ id: serverId }),
+      ]);
+
+      if (!server) {
+        throw new Error(`MQTT server with ID ${serverId} not found`);
+      }
+
+      const qos: 0 | 1 | 2 = (options?.qos ?? (server.defaultPublishQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
+      const retain: boolean = options?.retain ?? Boolean(server.defaultPublishRetain ?? false);
       return new Promise((resolve, reject) => {
-        client.publish(topic, message, { qos: 2, retain: true }, (error) => {
+        client.publish(topic, message, { qos, retain }, (error) => {
           if (error) {
             this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
             reject(error);
@@ -165,16 +184,26 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  async subscribe(serverId: number, topic: string): Promise<void> {
+  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2): Promise<void> {
     // Track desired subscriptions so they can be (re)applied on connect/reconnect
     if (!this.subscriptions.has(serverId)) {
-      this.subscriptions.set(serverId, new Set());
+      this.subscriptions.set(serverId, new Map());
     }
-    this.subscriptions.get(serverId).add(topic);
+    const serverTopics = this.subscriptions.get(serverId);
+    if (qos !== undefined) {
+      serverTopics.set(topic, qos);
+    } else if (!serverTopics.has(topic)) {
+      // Leave qos undefined to allow resolution from server defaults on (re)subscribe
+      serverTopics.set(topic, undefined as unknown as 0 | 1 | 2);
+    }
 
     try {
-      const client = await this.getOrCreateClient(serverId, true);
-      client.subscribe(topic);
+      const [client, server] = await Promise.all([
+        this.getOrCreateClient(serverId, true),
+        this.mqttServerRepository.findOneBy({ id: serverId }),
+      ]);
+      const effectiveQos: 0 | 1 | 2 = (qos ?? (server?.defaultSubscribeQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
+      client.subscribe(topic, { qos: effectiveQos });
     } catch (error) {
       // Do not throw: the client will keep trying to connect and will subscribe on next connect
       this.logger.warn(

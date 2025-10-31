@@ -14,15 +14,18 @@ When a resource is used or released, Attraccess can automatically publish messag
 
 MQTT servers can be configured with the following parameters:
 
-| Parameter   | Description                               | Required | Default            |
-| ----------- | ----------------------------------------- | -------- | ------------------ |
-| Name        | Friendly name for the server              | Yes      | -                  |
-| Host        | Hostname or IP address of the MQTT server | Yes      | -                  |
-| Port        | Port number of the MQTT server            | Yes      | 1883               |
-| Client ID   | Client identifier for the MQTT connection | No       | Randomly generated |
-| Username    | Authentication username                   | No       | -                  |
-| Password    | Authentication password                   | No       | -                  |
-| Use TLS/SSL | Whether to use TLS/SSL for the connection | No       | false              |
+| Parameter             | Description                                                   | Required | Default            |
+| --------------------- | ------------------------------------------------------------- | -------- | ------------------ |
+| Name                  | Friendly name for the server                                  | Yes      | -                  |
+| Host                  | Hostname or IP address of the MQTT server                     | Yes      | -                  |
+| Port                  | Port number of the MQTT server                                | Yes      | 1883               |
+| Client ID             | Client identifier for the MQTT connection                     | No       | Randomly generated |
+| Username              | Authentication username                                       | No       | -                  |
+| Password              | Authentication password                                       | No       | -                  |
+| Use TLS/SSL           | Whether to use TLS/SSL for the connection                     | No       | false              |
+| Default publish QoS   | Default QoS used when publishing if not set per node (0/1/2)  | No       | 0                  |
+| Default retain        | Default retain flag used when publishing if not set per node  | No       | false              |
+| Default subscribe QoS | Default QoS used when subscribing if not set per node (0/1/2) | No       | 0                  |
 
 ### Resource MQTT Configuration
 
@@ -37,6 +40,15 @@ Each resource can have its own MQTT configuration with the following parameters:
 | Not-In-Use Message | Message template for when the resource is not in use | Yes      |
 
 ## Template Variables
+
+## QoS and retain behavior
+
+- Publish options can be set per node (flow editor) or defaulted per MQTT server.
+- Subscribe QoS can be set on the "Wait for MQTT message" node, or defaulted per MQTT server.
+- Precedence: per-node settings → server defaults → global defaults.
+- Global defaults: publish QoS 0, retain false; subscribe QoS 0.
+- Effective delivery QoS equals the lower of the publisher QoS and the subscriber QoS.
+- Retain stores the last published message on the broker so new subscribers receive it immediately.
 
 Both topic and message templates use Handlebars syntax and support the following variables:
 
@@ -198,13 +210,11 @@ mosquitto_pub -h localhost -p 1883 -t "test/topic" -m "Hello MQTT"
 ### Common Issues
 
 1. **Connection Refused**
-
    - Check if the MQTT server is running
    - Verify the hostname and port are correct
    - Ensure there are no firewall rules blocking the connection
 
 2. **Authentication Failed**
-
    - Verify the username and password are correct
    - Check if the MQTT server requires authentication
 
@@ -228,19 +238,16 @@ To view detailed logs of MQTT connections and message publishing:
 ## Production Considerations
 
 1. **Security**
-
    - Use TLS/SSL for all MQTT connections in production
    - Set strong, unique passwords
    - Consider using a dedicated MQTT broker with access controls
 
 2. **Reliability**
-
    - Configure appropriate QoS levels based on your requirements
    - Implement monitoring for MQTT connections
    - Consider using a managed MQTT service for production
 
 3. **Scaling**
-
    - For high-volume environments, consider using a clustered MQTT broker
    - Monitor message throughput and adjust accordingly
 

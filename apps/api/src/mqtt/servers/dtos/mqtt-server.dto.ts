@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, IsIn } from 'class-validator';
 import { PartialType } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -56,6 +56,38 @@ export class CreateMqttServerDto {
     default: false,
   })
   useTls?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @IsIn([0, 1, 2])
+  @ApiProperty({
+    description: 'Default publish QoS (0, 1, or 2)',
+    required: false,
+    example: 0,
+  })
+  defaultPublishQos?: number;
+
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
+  @ApiProperty({
+    description: 'Default publish retain flag',
+    required: false,
+    example: false,
+  })
+  defaultPublishRetain?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @IsIn([0, 1, 2])
+  @ApiProperty({
+    description: 'Default subscribe QoS (0, 1, or 2)',
+    required: false,
+    example: 0,
+  })
+  defaultSubscribeQos?: number;
 }
 
 /**

@@ -50,6 +50,12 @@ export const MqttSendMessageNodeDataSchema = z.object({
   payload: z.string().optional().default('').meta({
     stringVariant: 'multiline',
   }),
+  qos: z.number().min(0).max(2).optional().meta({
+    helpText: 'Publish QoS: 0 (at most once), 1 (at least once), 2 (exactly once)',
+  }),
+  retain: z.boolean().optional().meta({
+    helpText: 'Retain publishes: broker stores last message for new subscribers',
+  }),
 });
 
 export const WaitNodeDataSchema = z.object({
@@ -102,6 +108,10 @@ export const MqttWaitForMessageNodeDataSchema = z.object({
   serverId: MqttServerIdSchema,
   topic: z.string().min(1, 'Topic is required'),
   timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
+  subscribeQos: z.number().min(0).max(2).optional().meta({
+    helpText:
+      'Subscribe QoS sets the maximum delivery level for received messages; effective QoS is the lower of publisher and subscriber QoS.',
+  }),
 });
 
 export const ResourceUsageEndSessionNodeDataSchema = z

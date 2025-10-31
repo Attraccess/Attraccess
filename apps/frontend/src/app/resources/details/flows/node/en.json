@@ -147,7 +147,8 @@
           "config": {
             "serverId": { "label": "Server" },
             "topic": { "label": "Topic (supports + and #)" },
-            "timeoutSeconds": { "label": "Timeout (seconds)" }
+            "timeoutSeconds": { "label": "Timeout (seconds)" },
+            "subscribeQos": { "label": "QoS (effective is min(publish, subscribe))" }
           }
         }
       },
@@ -276,7 +277,9 @@
             },
             "payload": {
               "label": "Payload"
-            }
+            },
+            "qos": { "label": "QoS" },
+            "retain": { "label": "Retain message" }
           }
         }
       },
