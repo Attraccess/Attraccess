@@ -214,15 +214,21 @@ function FlowsPageInner() {
 
   const addStartNode = useCallback(
     (nodeType: string) => {
+      let maxX = 0;
+      nodes.forEach((node) => {
+        maxX = Math.max(maxX, node.position.x);
+      });
       const newNode: Node = {
         id: nanoid(),
-        position: { x: 0, y: 0 },
+        position: { x: maxX + 300, y: 0 },
         type: nodeType,
         data: {},
       };
       addNode(newNode);
+
+      fitView({ nodes: [newNode], duration: 1000, maxZoom: 0.9 });
     },
-    [addNode],
+    [addNode, nodes, fitView],
   );
 
   const [flowIsRunning, setFlowIsRunning] = useState(false);

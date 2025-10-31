@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, Input, Checkbox, Spinner } from '@heroui/react';
+import { Button, Card, CardHeader, Input, Checkbox, Spinner, Switch } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -30,6 +30,9 @@ export function EditMqttServerPage() {
     username: '',
     password: '',
     useTls: false,
+    defaultPublishQos: 0,
+    defaultPublishRetain: false,
+    defaultSubscribeQos: 0,
   });
 
   // Fetch server details
@@ -50,6 +53,9 @@ export function EditMqttServerPage() {
         username: server.username ?? '',
         password: server.password ?? '',
         useTls: server.useTls,
+        defaultPublishQos: server.defaultPublishQos ?? 0,
+        defaultPublishRetain: server.defaultPublishRetain ?? false,
+        defaultSubscribeQos: server.defaultSubscribeQos ?? 0,
       });
     }
   }, [server]);
@@ -237,6 +243,52 @@ export function EditMqttServerPage() {
                 <label htmlFor="useTls" className="text-sm">
                   {t('useTls')}
                 </label>
+              </div>
+
+              <div>
+                <Input
+                  label={t('defaultPublishQosLabel')}
+                  id="defaultPublishQos"
+                  name="defaultPublishQos"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={1}
+                  placeholder={t('qosPlaceholder')}
+                  value={String(formValues.defaultPublishQos ?? 0)}
+                  onChange={handleInputChange}
+                  fullWidth
+                  data-cy="edit-mqtt-server-form-default-publish-qos-input"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="defaultPublishRetain"
+                  name="defaultPublishRetain"
+                  isSelected={!!formValues.defaultPublishRetain}
+                  onValueChange={(checked) => setFormValues((prev) => ({ ...prev, defaultPublishRetain: checked }))}
+                  data-cy="edit-mqtt-server-form-default-publish-retain-checkbox"
+                >
+                  {t('defaultPublishRetainLabel')}
+                </Switch>
+              </div>
+
+              <div>
+                <Input
+                  label={t('defaultSubscribeQosLabel')}
+                  id="defaultSubscribeQos"
+                  name="defaultSubscribeQos"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={1}
+                  placeholder={t('qosPlaceholder')}
+                  value={String(formValues.defaultSubscribeQos ?? 0)}
+                  onChange={handleInputChange}
+                  fullWidth
+                  data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
+                />
               </div>
             </div>
 

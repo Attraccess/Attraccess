@@ -719,6 +719,18 @@ export type MqttServer = {
      */
     useTls: boolean;
     /**
+     * Default QoS level for publish operations (0, 1, or 2)
+     */
+    defaultPublishQos: number;
+    /**
+     * Default retain flag for publish operations
+     */
+    defaultPublishRetain: boolean;
+    /**
+     * Default QoS level for subscribe operations (0, 1, or 2)
+     */
+    defaultSubscribeQos: number;
+    /**
      * When the MQTT server was created
      */
     createdAt: string;
@@ -757,6 +769,18 @@ export type CreateMqttServerDto = {
      * Whether to use TLS/SSL for the connection
      */
     useTls?: boolean;
+    /**
+     * Default publish QoS (0, 1, or 2)
+     */
+    defaultPublishQos?: number;
+    /**
+     * Default publish retain flag
+     */
+    defaultPublishRetain?: boolean;
+    /**
+     * Default subscribe QoS (0, 1, or 2)
+     */
+    defaultSubscribeQos?: number;
 };
 
 export type UpdateMqttServerDto = {
@@ -788,6 +812,18 @@ export type UpdateMqttServerDto = {
      * Whether to use TLS/SSL for the connection
      */
     useTls?: boolean;
+    /**
+     * Default publish QoS (0, 1, or 2)
+     */
+    defaultPublishQos?: number;
+    /**
+     * Default publish retain flag
+     */
+    defaultPublishRetain?: boolean;
+    /**
+     * Default subscribe QoS (0, 1, or 2)
+     */
+    defaultSubscribeQos?: number;
 };
 
 export type CreateResourceGroupDto = {

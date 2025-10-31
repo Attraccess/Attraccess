@@ -144,7 +144,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       }),
     ]);
 
-    const subscribePairs: Array<{ serverId: number; topic: string }> = [];
+    const subscribePairs: Array<{ serverId: number; topic: string; qos?: 0 | 1 | 2 }> = [];
 
     for (const node of mqttMessageReceivedNodes) {
       const { topic, serverId } = node.data as z.infer<typeof MqttMessageReceivedNodeDataSchema>;
@@ -156,16 +156,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     for (const node of mqttWaitForMessageNodes) {
-      const { topic, serverId } = node.data as z.infer<typeof MqttWaitForMessageNodeDataSchema>;
+      const { topic, serverId, subscribeQos } = node.data as z.infer<typeof MqttWaitForMessageNodeDataSchema>;
       if (!serverId || !topic) {
         this.logger.warn(`Skipping subscription to topic ${topic} for server ID ${serverId} because it is missing`);
         continue;
       }
-      subscribePairs.push({ serverId, topic });
+      subscribePairs.push({ serverId, topic, qos: subscribeQos as unknown as 0 | 1 | 2 });
     }
 
-    for (const { serverId, topic } of subscribePairs) {
-      await this.mqttClientService.subscribe(serverId, topic).catch((error) => {
+    for (const { serverId, topic, qos } of subscribePairs) {
+      await this.mqttClientService.subscribe(serverId, topic, qos).catch((error) => {
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });
     }
@@ -729,10 +729,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const { serverId, topic, timeoutSeconds } = node.data as z.infer<typeof MqttWaitForMessageNodeDataSchema>;
+    const { serverId, topic, timeoutSeconds, subscribeQos } = node.data as z.infer<
+      typeof MqttWaitForMessageNodeDataSchema
+    >;
 
     // Ensure subscription exists (wildcards allowed)
-    await this.mqttClientService.subscribe(serverId, topic).catch((error) => {
+    await this.mqttClientService.subscribe(serverId, topic, subscribeQos as unknown as 0 | 1 | 2).catch((error) => {
       this.logger.error(`Failed to subscribe for wait node to topic ${topic} on server ${serverId}`, error.stack);
       throw error;
     });
@@ -785,7 +787,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       `Publishing MQTT message to server ID: ${serverId} with topic: ${topic} and payload: "${payload}"`,
     );
 
-    await this.mqttClientService.publish(serverId, topic, payload);
+    await this.mqttClientService.publish(serverId, topic, payload, {
+      qos: data.qos as 0 | 1 | 2,
+      retain: data.retain as boolean,
+    });
 
     return {
       payload: input,

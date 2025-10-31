@@ -1,4 +1,5 @@
-import { act, screen, waitForElementToBeRemoved } from '@testing-library/react';
+import { screen, waitForElementToBeRemoved } from '@testing-library/react';
+import { act } from 'react';
 import { vi } from 'vitest';
 
 /**
@@ -71,7 +72,7 @@ export function createMockResponse<T>(data: T, ok = true, status = 200): Respons
 export function createMockEvent(
   type: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  values: Record<string, any> = {}
+  values: Record<string, any> = {},
 ): Partial<Event> {
   return {
     type,
@@ -87,7 +88,7 @@ export function createMockEvent(
 export function createMockKeyboardEvent(
   key: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  values: Record<string, any> = {}
+  values: Record<string, any> = {},
 ): Partial<KeyboardEvent> {
   return {
     key,

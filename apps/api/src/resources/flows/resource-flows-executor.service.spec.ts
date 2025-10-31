@@ -470,7 +470,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
 
     const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
     expect(results).toEqual([{ topic: 'devices/abc/state', payload: { on: true } }]);
-    expect(mqttClientService.subscribe).toHaveBeenCalledWith(7, 'devices/+/state');
+    expect(mqttClientService.subscribe).toHaveBeenCalledWith(7, 'devices/+/state', undefined);
   });
 
   it('processing.mqtt.waitForMessage times out and throws error', async () => {
