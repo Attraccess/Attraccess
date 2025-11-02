@@ -16,7 +16,9 @@ void NoResourcesScreen::init()
    lv_obj_set_width(noResourcesMessage, lv_pct(100));
    lv_obj_set_height(noResourcesMessage, LV_SIZE_CONTENT);
    lv_obj_set_align(noResourcesMessage, LV_ALIGN_CENTER);
-   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Reader verknuepft, bitte konfigurieren Sie den Reader in der Attraccess Administration");
+
+   State::ApiState apiState = State::getApiState();
+   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Lesegeraet verknuepft, bitte konfigurieren Sie das Lesegeraet in der Attraccess Administration");
    lv_obj_set_style_text_font(noResourcesMessage, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(noResourcesMessage, lv_color_hex(0xff0000), LV_PART_MAIN | LV_STATE_DEFAULT);
 }

@@ -15,7 +15,18 @@
 class Application
 {
 public:
-    Application() : logger("Application"), api(), unlocked(false), resourceCount(0), resourceIsSelected(false), bootDone(false) {}
+    Application() : logger("Application"),
+                    api(),
+                    unlocked(false),
+                    resourceCount(0),
+                    resourceIsSelected(false),
+                    bootDone(false),
+                    externalState(EXTERNAL_STATE_NONE),
+                    resourceListUpdated(false),
+                    selectedResourceChanged(false),
+                    firmwareUpdateProgressPct(0)
+    {
+    }
 
     void setup();
     void loop();
@@ -26,7 +37,38 @@ private:
     API api;
     IOExpander ioExpander;
 
-    static void networkTask(void *parameter);
+    enum ExternalStates_t
+    {
+        EXTERNAL_STATE_NONE,
+        EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
+        EXTERNAL_STATE_ENROLL_NEW_CARD,
+        EXTERNAL_STATE_AUTHENTICATE_CARD,
+        EXTERNAL_STATE_FIRMWARE_UPDATE,
+    };
+
+    ExternalStates_t externalState;
+    struct ApiEnrollNewCardGetAvailableKeyNoData_t
+    {
+        String username;
+    };
+    ApiEnrollNewCardGetAvailableKeyNoData_t apiEnrollNewCardGetAvailableKeyNoData;
+    uint32_t apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
+
+    struct ApiEnrollNewCardData_t
+    {
+        uint8_t keyNo;
+        uint8_t keyBytes[16];
+    };
+    ApiEnrollNewCardData_t apiEnrollNewCardData;
+
+    API::CardAuthenticationDetailsResponse cardAuthenticationData;
+
+    int firmwareUpdateProgressPct;
+
+    String availableFirmwareVersion;
+
+    static void
+    networkTask(void *parameter);
 
     void processState();
     void handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg);
@@ -48,8 +90,10 @@ private:
     uint8_t resourceCount;
     bool resourceIsSelected;
     uint32_t selectedResourceId;
+    bool selectedResourceChanged;
     // Own a persistent copy of the latest resource list to avoid dangling references
     API::ResourceList resourceList;
+    bool resourceListUpdated;
 
     void selectResource(const API::ResourceBrief &resource);
 
@@ -61,6 +105,7 @@ private:
         APPLICATION_STATE_INIT,
         APPLICATION_STATE_CUSTOM,
         APPLICATION_STATE_LOCKED,
+        APPLICATION_STATE_AUTHENTICATE_CARD,
         APPLICATION_STATE_NO_RESOURCES,
         APPLICATION_STATE_RESOURCE_LIST,
         APPLICATION_STATE_UNLOCKED,
@@ -70,7 +115,7 @@ private:
     applicationState_t state;
 
     void handleResourceListUpdate(const API::ResourceList &resourceList);
-    void handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response);
+    void processCardAuthenticationData();
 
     void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);
 

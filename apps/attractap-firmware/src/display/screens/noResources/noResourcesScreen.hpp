@@ -2,6 +2,7 @@
 
 #include "../IScreen.hpp"
 #include "../../images/lockscreen_background_image.hpp"
+#include "../../../state/state.hpp"
 
 class NoResourcesScreen : public IScreen
 {

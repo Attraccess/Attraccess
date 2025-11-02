@@ -7,6 +7,7 @@
 struct DeviceConfig
 {
     String passCode = "0000";
+    bool beeperEnabled = true;
 };
 
 struct NetworkConfig
@@ -34,7 +35,8 @@ public:
     static void setup();
 
     static DeviceConfig getDeviceConfig();
-    static void saveDeviceConfig(String passCode);
+    static void setDevicePin(String passCode);
+    static void setBeeperEnabled(bool beeperEnabled);
 
     static NetworkConfig getNetworkConfig();
     static void saveNetworkConfig(String ssid, String password);

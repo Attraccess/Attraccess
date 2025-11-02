@@ -20,6 +20,7 @@ public:
         String host;
         bool useSSL;
         String devicePin;
+        bool beeperEnabled;
     };
 
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
@@ -61,6 +62,8 @@ private:
     lv_obj_t *devicePin;
     lv_obj_t *labelForDevicePin;
     lv_color_t labelForDevicePinDefaultColor;
+
+    lv_obj_t *beeperEnabled;
 
     lv_obj_t *createSaveButton(lv_obj_t *parent);
     lv_obj_t *createSaveContainer(lv_obj_t *parent);

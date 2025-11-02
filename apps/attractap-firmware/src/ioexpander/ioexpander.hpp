@@ -1,6 +1,9 @@
 #pragma once
 #include <Arduino.h>
 #include <Wire.h>
+
+#include "../settings/settings.hpp"
+
 // TCA9554 defaults to 0x20 when A2..A0 = 000
 #define IOEXPANDER_I2C_ADDR (0x20)
 // Pins on the expander (bit index 0..7)

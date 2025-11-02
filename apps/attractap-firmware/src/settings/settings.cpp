@@ -17,6 +17,7 @@ void Settings::setup()
     preferences.begin("settings", true);
 
     _deviceConfig.passCode = preferences.getString("device.passCode", "0000");
+    _deviceConfig.beeperEnabled = preferences.getBool("device.beeper", true);
 
     _networkConfig.ssid = preferences.getString("wifi.ssid", "");
     _networkConfig.password = preferences.getString("wifi.pass", "");
@@ -40,15 +41,24 @@ DeviceConfig Settings::getDeviceConfig()
     return _deviceConfig;
 }
 
-void Settings::saveDeviceConfig(String passCode)
+void Settings::setDevicePin(String passCode)
+{
+    logger.info("Setting device pin...");
+    _deviceConfig.passCode = passCode;
+    preferences.begin("settings", false);
+    preferences.putString("device.passCode", passCode);
+    preferences.end();
+    logger.info("Device pin set.");
+}
+
+void Settings::setBeeperEnabled(bool beeperEnabled)
 {
     logger.info("Saving device config...");
+    _deviceConfig.beeperEnabled = beeperEnabled;
     preferences.begin("settings", false);
-
-    preferences.putString("device.passCode", passCode);
-    _deviceConfig.passCode = passCode;
-
+    preferences.putBool("device.beeper", beeperEnabled);
     preferences.end();
+    logger.info("Device beeper enabled set.");
 }
 
 NetworkConfig Settings::getNetworkConfig()
