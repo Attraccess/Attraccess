@@ -211,6 +211,21 @@
             }
           }
         }
+      },
+      "error": {
+        "title": "Fehler",
+        "description": "Erzeugt einen Fehler und beendet den aktuellen Flow.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "preview": {
+          "message": "Fehlermeldung"
+        },
+        "config": {
+          "message": {
+            "label": "Fehlermeldungs-Vorlage"
+          }
+        }
       }
     },
     "output": {

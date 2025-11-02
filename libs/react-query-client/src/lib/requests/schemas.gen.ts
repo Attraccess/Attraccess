@@ -2211,7 +2211,7 @@ export const $ResourceFlowNodeSchemaDto = {
         type: {
             type: 'string',
             description: 'The name of the node type',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error']
         },
         configSchema: {
             type: 'object',
@@ -2273,7 +2273,7 @@ export const $ResourceFlowNodeDto = {
             type: 'string',
             description: 'The type of the node',
             example: 'input.resource.usage.started',
-            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage']
+            enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error']
         },
         position: {
             description: 'The position of the node',

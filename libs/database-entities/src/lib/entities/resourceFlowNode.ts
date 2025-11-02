@@ -21,6 +21,7 @@ export enum ResourceFlowNodeType {
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
   PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
+  PROCESSING_ERROR = 'processing.error',
 }
 
 // Zod schemas for node data validation
@@ -114,6 +115,10 @@ export const MqttWaitForMessageNodeDataSchema = z.object({
   }),
 });
 
+export const ErrorNodeDataSchema = z.object({
+  message: z.string().min(1),
+});
+
 export const ResourceUsageEndSessionNodeDataSchema = z
   .object({
     notes: z.string().optional().meta({
@@ -159,6 +164,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
       return MqttWaitForMessageNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_ERROR:
+      return ErrorNodeDataSchema;
 
     case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
       return ResourceUsageEndSessionNodeDataSchema;

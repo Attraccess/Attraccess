@@ -6,6 +6,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionTimer } from '../SessionTimer';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import {
+  ApiError,
   useResourcesServiceResourceUsageEndSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
@@ -21,8 +22,8 @@ interface ActiveSessionDisplayProps {
 }
 
 export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDisplayProps) {
-  const { t } = useTranslations({ en, de });
-  const { success, error: showError } = useToastMessage();
+  const { t, tExists } = useTranslations({ en, de });
+  const toast = useToastMessage();
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
@@ -45,16 +46,18 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
       queryClient.resetQueries({
         queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
       });
-      success({
-        title: t('sessionEnded'),
-        description: t('sessionEndedDescription'),
+      toast.success({
+        title: t('sessionEnded.success.title'),
+        description: t('sessionEnded.success.description'),
       });
     },
     onError: (err) => {
       console.error('Error ending session:', err);
-      showError({
-        title: t('sessionEndError'),
-        description: t('sessionEndErrorDescription'),
+      toast.apiError({
+        baseTranslationKey: 'sessionEnded.error',
+        t,
+        tExists,
+        error: err as ApiError,
       });
     },
   });

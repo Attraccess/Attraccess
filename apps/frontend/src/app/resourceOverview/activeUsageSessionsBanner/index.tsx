@@ -8,6 +8,7 @@ import {
   useResourcesServiceResourceUsageEndSession,
   useResourcesServiceGetAllResourcesKey,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  ApiError,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/en.json';
@@ -19,9 +20,9 @@ type ActiveUsageSessionsBannerProps = {
 };
 
 export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({ en, de });
   const queryClient = useQueryClient();
-  const { success, error: showError } = useToastMessage();
+  const toast = useToastMessage();
 
   // Fetch just the total count (1 item per page is sufficient)
   const { data, isLoading, isFetching } = useResourcesServiceGetAllResources({
@@ -74,11 +75,16 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       setEndStatuses(collected.reduce((acc, r) => ({ ...acc, [r.id]: 'pending' }), {}));
     } catch (e) {
       console.error(e);
-      showError({ title: t('endedAllError') });
+      toast.apiError({
+        baseTranslationKey: 'endedAll.error',
+        error: e as ApiError,
+        t,
+        tExists,
+      });
     } finally {
       setIsLoadingResources(false);
     }
-  }, [activeCount, showError, t]);
+  }, [activeCount, tExists, t, toast]);
 
   const confirmEndAll = useCallback(async () => {
     if (isEndingAll || resourcesInUse.length === 0) return;
@@ -90,17 +96,15 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       return updated;
     });
     try {
-      const localStatuses: Record<number, 'done' | 'error'> = {};
-      await Promise.all(
+      const results = await Promise.allSettled(
         resourcesInUse.map(async (r) => {
           try {
             await endSession({ resourceId: r.id, requestBody: {} });
-            localStatuses[r.id] = 'done';
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'done' }));
           } catch (err) {
             console.error('Failed to end session for resource', r.id, err);
-            localStatuses[r.id] = 'error';
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'error' }));
+            throw err;
           }
         }),
       );
@@ -109,18 +113,23 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       await queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
 
       // If all succeeded -> show completion state and auto-close
-      const allSucceeded = resourcesInUse.every((r) => localStatuses[r.id] === 'done');
-      if (allSucceeded) {
+      const rejectedResult = results.find((r) => r.status === 'rejected');
+      if (!rejectedResult) {
         setAllCompleted(true);
-        success({ title: t('endedAllSuccess') });
+        toast.success({ title: t('endedAll.success') });
         setTimeout(() => setIsModalOpen(false), 1000);
       } else {
-        showError({ title: t('endedAllError') });
+        toast.apiError({
+          error: rejectedResult.reason as ApiError,
+          t,
+          tExists,
+          baseTranslationKey: 'endedAll.error',
+        });
       }
     } finally {
       setIsEndingAll(false);
     }
-  }, [endSession, isEndingAll, queryClient, resourcesInUse, success, showError, t]);
+  }, [endSession, isEndingAll, queryClient, resourcesInUse, toast, t, tExists]);
 
   if (isLoading || isFetching) {
     return (

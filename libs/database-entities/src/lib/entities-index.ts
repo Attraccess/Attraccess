@@ -34,6 +34,7 @@ import {
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
+  ErrorNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -92,6 +93,7 @@ export {
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
+  ErrorNodeDataSchema,
 };
 
 // Export the entities object

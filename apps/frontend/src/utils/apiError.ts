@@ -10,13 +10,20 @@ export interface Props {
 }
 
 export function getTranslationKeyForApiError(props: Props) {
-  const errorMessage =
-    ((props.error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? props.error.message;
+  let errorMessage = String(
+    ((props.error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? props.error.message,
+  );
 
-  const translationExists = props.tExists(props.baseTranslationKey + '.' + errorMessage);
+  let errorMessageTranslationKey = errorMessage;
 
+  if (errorMessage.startsWith('FLOW_EXECUTION_ERROR: ')) {
+    errorMessageTranslationKey = 'FLOW_EXECUTION_ERROR';
+    errorMessage = errorMessage.replace('FLOW_EXECUTION_ERROR: ', '');
+  }
+
+  const translationExists = props.tExists(props.baseTranslationKey + '.' + errorMessageTranslationKey);
   const fullBaseKey = translationExists
-    ? props.baseTranslationKey + '.' + errorMessage
+    ? props.baseTranslationKey + '.' + errorMessageTranslationKey
     : props.baseTranslationKey + '.' + (props.fallbackKey ?? 'generic');
 
   return { key: fullBaseKey, errorMessage };
