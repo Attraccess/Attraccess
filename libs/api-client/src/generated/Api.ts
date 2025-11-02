@@ -267,6 +267,21 @@ export interface SSOProviderOIDCConfiguration {
    */
   clientSecret: string;
   /**
+   * Optional list of OIDC scopes to request
+   * @example ["openid","email","profile"]
+   */
+  scopes?: string[];
+  /**
+   * Ordered list of claim paths to resolve the username
+   * @example ["preferred_username","email","sub"]
+   */
+  usernameClaimPaths?: string[];
+  /**
+   * Ordered list of claim paths to resolve the email
+   * @example ["email","emails[0].value","upn"]
+   */
+  emailClaimPaths?: string[];
+  /**
    * When the user was created
    * @format date-time
    */
@@ -357,6 +372,21 @@ export interface CreateOIDCConfigurationDto {
    * @example "client-secret"
    */
   clientSecret: string;
+  /**
+   * Optional list of OIDC scopes to request
+   * @example ["openid","email","profile"]
+   */
+  scopes?: string[];
+  /**
+   * Ordered list of claim paths to resolve the username
+   * @example ["preferred_username","email","sub"]
+   */
+  usernameClaimPaths?: string[];
+  /**
+   * Ordered list of claim paths to resolve the email
+   * @example ["email","emails[0].value","upn"]
+   */
+  emailClaimPaths?: string[];
 }
 
 export interface CreateSSOProviderDto {
@@ -405,6 +435,21 @@ export interface UpdateOIDCConfigurationDto {
    * @example "client-secret"
    */
   clientSecret?: string;
+  /**
+   * Optional list of OIDC scopes to request
+   * @example ["openid","email","profile"]
+   */
+  scopes?: string[];
+  /**
+   * Ordered list of claim paths to resolve the username
+   * @example ["preferred_username","email","sub"]
+   */
+  usernameClaimPaths?: string[];
+  /**
+   * Ordered list of claim paths to resolve the email
+   * @example ["email","emails[0].value","upn"]
+   */
+  emailClaimPaths?: string[];
 }
 
 export interface UpdateSSOProviderDto {
@@ -758,6 +803,21 @@ export interface MqttServer {
    */
   useTls: boolean;
   /**
+   * Default QoS level for publish operations (0, 1, or 2)
+   * @example 0
+   */
+  defaultPublishQos: number;
+  /**
+   * Default retain flag for publish operations
+   * @example false
+   */
+  defaultPublishRetain: boolean;
+  /**
+   * Default QoS level for subscribe operations (0, 1, or 2)
+   * @example 0
+   */
+  defaultSubscribeQos: number;
+  /**
    * When the MQTT server was created
    * @format date-time
    */
@@ -790,6 +850,21 @@ export interface CreateMqttServerDto {
    * @default false
    */
   useTls?: boolean;
+  /**
+   * Default publish QoS (0, 1, or 2)
+   * @example 0
+   */
+  defaultPublishQos?: number;
+  /**
+   * Default publish retain flag
+   * @example false
+   */
+  defaultPublishRetain?: boolean;
+  /**
+   * Default subscribe QoS (0, 1, or 2)
+   * @example 0
+   */
+  defaultSubscribeQos?: number;
 }
 
 export interface UpdateMqttServerDto {
@@ -813,6 +888,21 @@ export interface UpdateMqttServerDto {
    * @default false
    */
   useTls?: boolean;
+  /**
+   * Default publish QoS (0, 1, or 2)
+   * @example 0
+   */
+  defaultPublishQos?: number;
+  /**
+   * Default publish retain flag
+   * @example false
+   */
+  defaultPublishRetain?: boolean;
+  /**
+   * Default subscribe QoS (0, 1, or 2)
+   * @example 0
+   */
+  defaultSubscribeQos?: number;
 }
 
 export interface CreateResourceGroupDto {
@@ -1484,6 +1574,7 @@ export interface ResourceFlowNodeSchemaDto {
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
+    | "output.resource.usage.end-session"
     | "processing.wait"
     | "processing.if"
     | "processing.set-payload"
@@ -1535,6 +1626,7 @@ export interface ResourceFlowNodeDto {
     | "output.http.sendRequest"
     | "output.mqtt.sendMessage"
     | "output.resource.billing.calculation.set-additional-items"
+    | "output.resource.usage.end-session"
     | "processing.wait"
     | "processing.if"
     | "processing.set-payload"
