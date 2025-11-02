@@ -170,6 +170,19 @@ void ConnectionConfigurationScreen::init()
    lv_obj_add_event_cb(this->devicePin, &ConnectionConfigurationScreen::onTextAreaEvent, LV_EVENT_ALL, this);
    lv_textarea_set_text(this->devicePin, deviceConfig.passCode.c_str());
 
+   lv_obj_t *labelForBeeperEnabled = lv_label_create(deviceTab);
+   lv_obj_set_width(labelForBeeperEnabled, LV_SIZE_CONTENT);
+   lv_obj_set_height(labelForBeeperEnabled, LV_SIZE_CONTENT);
+   lv_obj_set_align(labelForBeeperEnabled, LV_ALIGN_CENTER);
+   lv_label_set_text(labelForBeeperEnabled, "Beeper");
+   lv_obj_set_style_text_color(labelForBeeperEnabled, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->beeperEnabled = lv_switch_create(deviceTab);
+   lv_obj_set_width(this->beeperEnabled, 50);
+   lv_obj_set_height(this->beeperEnabled, 25);
+   lv_obj_set_align(this->beeperEnabled, LV_ALIGN_CENTER);
+   lv_obj_set_state(this->beeperEnabled, LV_STATE_CHECKED, deviceConfig.beeperEnabled);
+
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
    this->createSaveButton(containerForSaveButtonDevice);
 
@@ -390,6 +403,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       cfg.host = hostValue;
       cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
       cfg.devicePin = String(devicePinText);
+      cfg.beeperEnabled = lv_obj_has_state(self->beeperEnabled, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);
    }
 }

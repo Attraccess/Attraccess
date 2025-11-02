@@ -44,76 +44,11 @@ void Application::setup()
                                                     API::ResourceList list;
                                                 };
 
-                                                ResourceListAsyncPayload *payload = new ResourceListAsyncPayload();
-                                                if (!payload)
-                                                {
-                                                    this->logger.error("Failed to allocate async payload for resource list");
-                                                    return;
-                                                }
-                                                payload->self = this;
-                                                payload->list = resourceList; // deep copy of fixed-size struct
-
-                                                lv_async_call(
-                                                    [](void *p)
-                                                    {
-                                                        ResourceListAsyncPayload *pl = (ResourceListAsyncPayload *)p;
-                                                        if (pl && pl->self)
-                                                        {
-                                                            pl->self->handleResourceListUpdate(pl->list);
-                                                        }
-                                                        delete pl;
-                                                    },
-                                                    payload); });
+                                                this->handleResourceListUpdate(resourceList); });
 
     this->api.setCardAuthenticationDetailsResponseCallback([this](API::CardAuthenticationDetailsResponse response)
-                                                           {
-                                                               struct CardDetailsAsyncPayload
-                                                               {
-                                                                   Application *self;
-                                                                   API::CardAuthenticationDetailsResponse resp;
-                                                                   uint8_t keyBytesCopy[16];
-                                                               };
-
-                                                               CardDetailsAsyncPayload *payload = new CardDetailsAsyncPayload();
-                                                               if (!payload)
-                                                               {
-                                                                   this->logger.error("Failed to allocate async payload for card auth details");
-                                                                   this->nfc.enableCardDetection();
-                                                                   return;
-                                                               }
-                                                               payload->self = this;
-                                                               payload->resp = response; // copy POD fields and pointers (we'll fix keyBytes next)
-                                                               // Ensure key material remains valid after scheduling
-                                                               memset(payload->keyBytesCopy, 0, sizeof(payload->keyBytesCopy));
-                                                               if (response.keyBytes && response.keyLen == 16)
-                                                               {
-                                                                   memcpy(payload->keyBytesCopy, response.keyBytes, 16);
-                                                                   payload->resp.keyBytes = payload->keyBytesCopy;
-                                                               }
-                                                               else
-                                                               {
-                                                                   payload->resp.keyBytes = nullptr;
-                                                                   payload->resp.keyLen = 0;
-                                                               }
-
-                                                               lv_async_call(
-                                                                   [](void *p)
-                                                                   {
-                                                                       CardDetailsAsyncPayload *pl = (CardDetailsAsyncPayload *)p;
-                                                                       if (pl && pl->self)
-                                                                       {
-                                                                           pl->self->logger.debugf("Card authentication details: Username: %s", pl->resp.username.c_str());
-                                                                           Display::resourceDetailsScreen.setUserDetails(
-                                                                               ResourceDetailsScreen::UserDetails{
-                                                                                   .username = pl->resp.username,
-                                                                                   .canManageResource = pl->resp.canManageResource,
-                                                                                   .hasIntroduction = pl->resp.hasIntroduction,
-                                                                                   .isIntroducer = pl->resp.isIntroducer});
-                                                                           pl->self->handleCardAuthenticationDetails(pl->resp);
-                                                                       }
-                                                                       delete pl;
-                                                                   },
-                                                                   payload); });
+                                                           { this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+                                                            this->cardAuthenticationData = response; });
 
     // Insufficient balance special-case (with SumUp capability flag)
     this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled)
@@ -211,63 +146,28 @@ void Application::setup()
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
 
-    this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
+    this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username)
                                                         {
-                                                            struct EnrollmentUiAsyncPayload
-                                                            {
-                                                                String username;
+                                                            this->apiEnrollNewCardGetAvailableKeyNoData = {
+                                                                username = username,
                                                             };
-                                                            EnrollmentUiAsyncPayload *payload = new EnrollmentUiAsyncPayload();
-                                                            if (payload)
-                                                            {
-                                                                payload->username = username;
-                                                                lv_async_call(
-                                                                    [](void *p)
-                                                                    {
-                                                                        EnrollmentUiAsyncPayload *pl = (EnrollmentUiAsyncPayload *)p;
-                                                                        if (pl)
-                                                                        {
-                                                                            Display::enrollmentScreen.setUserName(pl->username);
-                                                                            Display::enrollmentScreen.setEnrollmentTimeoutTime(millis() + 30000);
-                                                                            Display::transitionToScreen(&Display::enrollmentScreen);
-                                                                        }
-                                                                        delete pl;
-                                                                    },
-                                                                    payload);
-                                                            }
-                                                            this->nfc.disableCardDetection();
-                                                            this->state = APPLICATION_STATE_ENROLLMENT;
-                                                            return this->nfc.getAvailableKeyNo(uid, uidLength, keyNo); });
+                                                            this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO; });
 
     this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key)
                                        {
                                            uint8_t keyBytes[16] = {0};
                                            stringToHexArray(key, keyBytes, 16);
-                                           bool success = this->nfc.changeKey(keyNo, this->nfc.FACTORY_KEY, this->nfc.FACTORY_KEY, keyBytes);
-                                           if (success)
-                                           {
-                                               this->ioExpander.successBeep();
-                                               // Schedule screen transition on LVGL thread
-                                               lv_async_call(
-                                                   [](void *p)
-                                                   {
-                                                       (void)p;
-                                                       Display::transitionToScreen(&Display::resourceListScreen);
-                                                   },
-                                                   nullptr);
-                                           }
-                                           else
-                                           {
-                                               this->ioExpander.errorBeep();
-                                           }
 
-                                           // TODO: why is a nfc card entry created before this succeeds?
+                                           this->apiEnrollNewCardData = {
+                                               .keyNo = keyNo,
+                                               .keyBytes = {0},
+                                           };
+                                           memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
 
-                                           this->state = APPLICATION_STATE_RESOURCE_LIST;
-                                           return success; });
+                                           this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD; });
 
     Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
-                                                    { Settings::saveDeviceConfig(pin); });
+                                                    { Settings::setDevicePin(pin); });
 
     Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]()
                                                                       { 
@@ -297,6 +197,31 @@ void Application::setup()
         if (this->state == APPLICATION_STATE_LOCKED)
         {
             this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
+        }
+
+        if (this->state == APPLICATION_STATE_ENROLLMENT)
+        {
+
+            bool success = this->nfc.changeKey(
+                this->apiEnrollNewCardData.keyNo,
+                this->nfc.FACTORY_KEY,
+                this->nfc.FACTORY_KEY,
+                this->apiEnrollNewCardData.keyBytes);
+
+            if (success)
+            {
+                this->ioExpander.successBeep();
+                this->externalState = EXTERNAL_STATE_NONE;
+            }
+            else
+            {
+                this->ioExpander.errorBeep();
+            }
+
+            this->api.sendEnrollNewCard(success);
+
+            this->externalState = EXTERNAL_STATE_NONE;
+            return;
         }
     };
     this->nfc.setCardDetectionCallback(cardDetectionCallback);
@@ -391,6 +316,73 @@ void Application::processState()
         return;
     }
 
+    if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO)
+    {
+        if (this->state == APPLICATION_STATE_ENROLLMENT)
+        {
+            uint32_t now = millis();
+            if (now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs > 30000)
+            {
+                this->logger.error("Enroll new card get available key number timeout reached");
+                this->externalState = EXTERNAL_STATE_NONE;
+                return;
+            }
+
+            uint8_t uid[7] = {0};
+            uint8_t uidLength = 0;
+            uint8_t keyNo = 0;
+            bool success = this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo);
+
+            if (success)
+            {
+                this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
+                this->externalState = EXTERNAL_STATE_NONE;
+            }
+            return;
+        }
+
+        this->nfc.disableCardDetection();
+        Display::enrollmentScreen.setUserName(this->apiEnrollNewCardGetAvailableKeyNoData.username);
+        this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+        Display::enrollmentScreen.setEnrollmentTimeoutTime(this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
+        Display::transitionToScreen(&Display::enrollmentScreen);
+
+        this->state = APPLICATION_STATE_ENROLLMENT;
+
+        return;
+    }
+
+    if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD)
+    {
+        if (this->state == APPLICATION_STATE_ENROLLMENT)
+        {
+            return;
+        }
+
+        this->nfc.enableCardDetection();
+        this->state = APPLICATION_STATE_ENROLLMENT;
+        return;
+    }
+
+    if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD)
+    {
+        if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
+        {
+            this->processCardAuthenticationData();
+            return;
+        }
+
+        Display::resourceDetailsScreen.setUserDetails(
+            ResourceDetailsScreen::UserDetails{
+                .username = this->cardAuthenticationData.username,
+                .canManageResource = this->cardAuthenticationData.canManageResource,
+                .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
+                .isIntroducer = this->cardAuthenticationData.isIntroducer});
+
+        this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+        return;
+    }
+
     if (this->resourceCount == 0)
     {
         if (this->state == APPLICATION_STATE_NO_RESOURCES)
@@ -413,6 +405,13 @@ void Application::processState()
 
     if (this->resourceCount > 0 && !this->resourceIsSelected)
     {
+        if (this->resourceListUpdated)
+        {
+            // Update UI with the list
+            Display::resourceListScreen.setResourceList(this->resourceList);
+            this->resourceListUpdated = false;
+        }
+
         if (this->state == APPLICATION_STATE_RESOURCE_LIST)
         {
             return;
@@ -422,6 +421,26 @@ void Application::processState()
         this->state = APPLICATION_STATE_RESOURCE_LIST;
         Display::transitionToScreen(&Display::resourceListScreen);
         return;
+    }
+
+    if (this->selectedResourceChanged)
+    {
+        for (uint16_t i = 0; i < this->resourceList.count; ++i)
+        {
+            if (this->resourceList.items[i].id == this->selectedResourceId)
+            {
+                API::ResourceBrief resource = this->resourceList.items[i];
+
+                Display::lockscreen.setResourceName(resource.name);
+                Display::lockscreen.setUsageInfo(resource.hasActiveUsage, resource.activeUser);
+
+                // Directly pass the native struct to the screen so it can avoid String conversions
+                Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+
+                break;
+            }
+        }
+        this->selectedResourceChanged = false;
     }
 
     uint32_t now = millis();
@@ -486,25 +505,18 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
     }
     Settings::saveNetworkConfig(cfg.ssid, cfg.password);
     Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
-    if (cfg.devicePin.length() > 0)
-    {
-        Settings::saveDeviceConfig(cfg.devicePin);
-    }
+
+    Settings::setDevicePin(cfg.devicePin);
+    Settings::setBeeperEnabled(cfg.beeperEnabled);
 };
 
 void Application::handleResourceListUpdate(const API::ResourceList &resourceList)
 {
     this->logger.infof("Resource list updated: %d resources", resourceList.count);
-#ifdef ESP_PLATFORM
-    size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    size_t free_dma = heap_caps_get_free_size(MALLOC_CAP_DMA);
-    this->logger.debugf("Heap free (INT/DMA): %u / %u", (unsigned)free_internal, (unsigned)free_dma);
-#endif
+
     this->resourceList = resourceList;
     this->resourceCount = resourceList.count;
-
-    // Update UI with the list
-    Display::resourceListScreen.setResourceList(this->resourceList);
+    this->resourceListUpdated = true;
 
     // If a resource is already selected, try to find it in the new list and refresh the details screen.
     if (this->resourceIsSelected)
@@ -523,47 +535,43 @@ void Application::handleResourceListUpdate(const API::ResourceList &resourceList
     }
 }
 
-void Application::handleCardAuthenticationDetails(API::CardAuthenticationDetailsResponse response)
+void Application::processCardAuthenticationData()
 {
-    this->logger.infof("Card authentication details: KeyNo: %u", response.keyNo);
-
-    if (this->state != APPLICATION_STATE_LOCKED)
-    {
-        this->logger.error("Card authentication details received in state other than APPLICATION_STATE_LOCKED");
-        this->ioExpander.errorBeep();
-        return;
-    }
-
-    if (response.error.length() > 0)
+    if (this->cardAuthenticationData.error.length() > 0)
     {
         // TODO: indicate to user that authentication failed
-        this->logger.errorf("Authentication failed: %s", response.error.c_str());
+        this->logger.errorf("Authentication failed: %s", this->cardAuthenticationData.error.c_str());
         this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
+        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         return;
     }
 
-    if (response.keyBytes == nullptr || response.keyLen != 16)
+    if (this->cardAuthenticationData.keyBytes == nullptr || this->cardAuthenticationData.keyLen != 16)
     {
         this->logger.error("Invalid key bytes provided");
         this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
+        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         return;
     }
 
-    this->logger.infof("Trying to authenticate with keyNo: %u", response.keyNo);
-    bool authenticated = this->nfc.authenticate(response.keyNo, const_cast<uint8_t *>(response.keyBytes));
+    this->logger.infof("Trying to authenticate with keyNo: %u", this->cardAuthenticationData.keyNo);
+    bool authenticated = this->nfc.authenticate(this->cardAuthenticationData.keyNo, const_cast<uint8_t *>(this->cardAuthenticationData.keyBytes));
 
     if (!authenticated)
     {
         this->logger.error("Authentication failed");
         this->ioExpander.errorBeep();
         this->nfc.enableCardDetection();
+        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         return;
     }
 
     this->ioExpander.successBeep();
     this->logger.info("Authentication successful");
+
+    this->externalState = EXTERNAL_STATE_NONE;
     this->unlocked = true;
 }
 
@@ -573,12 +581,7 @@ void Application::selectResource(const API::ResourceBrief &resource)
     this->resourceIsSelected = true;
     this->selectedResourceId = resource.id;
     this->restartResourceSelectionTimeout();
-
-    Display::lockscreen.setResourceName(resource.name);
-    Display::lockscreen.setUsageInfo(resource.hasActiveUsage, resource.activeUser);
-
-    // Directly pass the native struct to the screen so it can avoid String conversions
-    Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+    this->selectedResourceChanged = true;
 }
 
 void Application::handleTouch(int16_t x, int16_t y)

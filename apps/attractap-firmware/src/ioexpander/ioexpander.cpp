@@ -25,6 +25,11 @@ void IOExpander::setup()
 
 void IOExpander::errorBeep()
 {
+    if (!Settings::getDeviceConfig().beeperEnabled)
+    {
+        return;
+    }
+
     this->singleBeep();
     delay(100);
     this->singleBeep();
@@ -34,12 +39,22 @@ void IOExpander::errorBeep()
 
 void IOExpander::successBeep()
 {
+    if (!Settings::getDeviceConfig().beeperEnabled)
+    {
+        return;
+    }
+
     this->singleBeep();
 }
 
 void IOExpander::singleBeep()
 {
     if (!initialized)
+    {
+        return;
+    }
+
+    if (!Settings::getDeviceConfig().beeperEnabled)
     {
         return;
     }

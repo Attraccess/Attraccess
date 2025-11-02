@@ -67,8 +67,8 @@ public:
     };
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
 
-    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> callback);
-    void setEnrollNewCardCallback(std::function<bool(uint8_t keyNo, String key)> callback);
+    void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback);
+    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback);
 
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
@@ -134,8 +134,8 @@ private:
     void onResourceList(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
 
-    std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> enrollNewCardGetAvailableKeyNoCallback;
-    std::function<bool(uint8_t keyNo, String key)> enrollNewCardCallback;
+    std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
+    std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);

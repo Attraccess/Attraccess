@@ -287,7 +287,7 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 {
     this->logger.info("getAvailableKeyNo started");
 
-    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 30000);
+    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, uidLength, 50);
     if (!foundCard)
     {
         this->logger.error("getAvailableKeyNo failed, no card detected");

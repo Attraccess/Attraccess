@@ -807,12 +807,12 @@ void API::unlatchDoor(uint32_t resourceId)
     this->sendMessage("UNLATCH_DOOR", payload);
 }
 
-void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<bool(String username, uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)> callback)
+void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(String username)> callback)
 {
     this->enrollNewCardGetAvailableKeyNoCallback = callback;
 }
 
-void API::setEnrollNewCardCallback(std::function<bool(uint8_t, String)> callback)
+void API::setEnrollNewCardCallback(std::function<void(uint8_t keyNo, String key)> callback)
 {
     this->enrollNewCardCallback = callback;
 }
@@ -846,17 +846,7 @@ void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 
     String username = data["payload"]["username"].as<String>();
 
-    uint8_t cardDetectedUid[7] = {0};
-    uint8_t cardDetectedUidLength = 0;
-    uint8_t keyNo = 0;
-    bool success = this->enrollNewCardGetAvailableKeyNoCallback(username, cardDetectedUid, &cardDetectedUidLength, &keyNo);
-
-    if (!success)
-    {
-        return;
-    }
-
-    this->sendEnrollNewCardAvailableKeyNo(cardDetectedUid, cardDetectedUidLength, keyNo);
+    this->enrollNewCardGetAvailableKeyNoCallback(username);
 }
 
 void API::onEnrollNewCard(JsonObject data)
@@ -887,9 +877,7 @@ void API::onEnrollNewCard(JsonObject data)
     uint8_t keyNo = payload["keyNo"].as<uint8_t>();
     String key = payload["key"].as<String>();
 
-    bool success = this->enrollNewCardCallback(keyNo, key);
-
-    this->sendEnrollNewCard(success);
+    this->enrollNewCardCallback(keyNo, key);
 }
 
 void API::onDeviceName(std::function<void(String)> callback)
