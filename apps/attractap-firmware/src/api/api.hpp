@@ -170,7 +170,7 @@ private:
     void onFirmwareChunkEvent(esp_websocket_event_data_t data);
     uint32_t lastFirmwareChunkRequestTimeMs = 0;
     const uint32_t FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS = 30000;
-    bool firmwareUpdateFailedTimeMs = 0;
+    uint32_t firmwareUpdateFailedTimeMs = 0;
     void abortFirmwareUpdate(const char *reason);
     void updateFirmwareProgress(int percent);
 
