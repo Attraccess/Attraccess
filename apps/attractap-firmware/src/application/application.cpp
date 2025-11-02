@@ -47,8 +47,28 @@ void Application::setup()
                                                 this->handleResourceListUpdate(resourceList); });
 
     this->api.setCardAuthenticationDetailsResponseCallback([this](API::CardAuthenticationDetailsResponse response)
-                                                           { this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-                                                            this->cardAuthenticationData = response; });
+                                                           {
+                                                               if (response.error.length() > 0)
+                                                               {
+                                                                   this->logger.errorf("Authentication failed: %s", response.error.c_str());
+                                                                   this->ioExpander.errorBeep();
+                                                                   this->nfc.enableCardDetection();
+                                                                   this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+                                                                   return;
+                                                               }
+
+                                                               if (response.keyLen != 16)
+                                                               {
+                                                                   this->logger.error("Invalid key bytes provided");
+                                                                   this->ioExpander.errorBeep();
+                                                                   this->nfc.enableCardDetection();
+                                                                   this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+                                                                   return;
+                                                               }
+
+                                                               this->cardAuthenticationData = response;
+
+                                                               this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD; });
 
     // Insufficient balance special-case (with SumUp capability flag)
     this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled)
@@ -115,33 +135,16 @@ void Application::setup()
                                               if (pl) delete pl;
                                           }, p); });
 
-    this->api.setFirmwareUpdateMetaCallback([this](const char *current, const char *available)
-                                            {
-                                                struct Meta { const char *cur; const char *av; };
-                                                Meta *m = new Meta{current, available}; if (!m) return;
-                                                lv_async_call([](void *u){
-                                                    Meta *mm = (Meta*)u; if (!mm) return;
-                                                    Display::firmwareUpdateScreen.setVersions(mm->cur, mm->av);
-                                                    delete mm;
-                                                }, m); });
+    this->api.setFirmwareUpdateMetaCallback([this](String availableVersion)
+                                            { 
+                                                this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+                                                this->availableFirmwareVersion = String(availableVersion); });
 
     this->api.setFirmwareUpdateProgressCallback([this](int percent)
                                                 {
-                                                    struct Payload { Application *self; int pc; };
-                                                    Payload *p = new Payload{this, percent}; if (!p) return;
-                                                    lv_async_call([](void *u){
-                                                        Payload *pl = (Payload*)u; if (!pl) return;
-                                                        if (pl->self->state != APPLICATION_STATE_FIRMWARE_UPDATE)
-                                                        {
-                                                            pl->self->logger.debug("Transitioning to firmware update screen");
-                                                            pl->self->state = APPLICATION_STATE_FIRMWARE_UPDATE;
-                                                            Display::transitionToScreen(&Display::firmwareUpdateScreen);
-                                                        }
-                                                        if (pl->pc % 10 == 0 && pl->pc != 0)
-                                                            pl->self->logger.infof("Firmware Update: progress=%d%%", pl->pc);
-                                                        Display::firmwareUpdateScreen.setProgress(pl->pc);
-                                                        delete pl;
-                                                    }, p); });
+                                                    this->logger.debugf("Got firmware update pct %d", percent);
+                                                    this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+                                                    this->firmwareUpdateProgressPct = percent; });
 
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
@@ -197,6 +200,7 @@ void Application::setup()
         if (this->state == APPLICATION_STATE_LOCKED)
         {
             this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
+            return;
         }
 
         if (this->state == APPLICATION_STATE_ENROLLMENT)
@@ -221,6 +225,12 @@ void Application::setup()
             this->api.sendEnrollNewCard(success);
 
             this->externalState = EXTERNAL_STATE_NONE;
+            return;
+        }
+
+        if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
+        {
+            this->processCardAuthenticationData();
             return;
         }
     };
@@ -368,7 +378,6 @@ void Application::processState()
     {
         if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
         {
-            this->processCardAuthenticationData();
             return;
         }
 
@@ -380,6 +389,22 @@ void Application::processState()
                 .isIntroducer = this->cardAuthenticationData.isIntroducer});
 
         this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+        this->nfc.enableCardDetection();
+        return;
+    }
+
+    if (this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE)
+    {
+        if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE)
+        {
+            this->logger.debugf("Updating firmware update progress %d", this->firmwareUpdateProgressPct);
+            Display::firmwareUpdateScreen.setProgress(this->firmwareUpdateProgressPct);
+            Display::firmwareUpdateScreen.setAvailableVersion(this->availableFirmwareVersion);
+            return;
+        }
+
+        Display::transitionToScreen(&Display::firmwareUpdateScreen);
+        this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
         return;
     }
 
@@ -537,17 +562,8 @@ void Application::handleResourceListUpdate(const API::ResourceList &resourceList
 
 void Application::processCardAuthenticationData()
 {
-    if (this->cardAuthenticationData.error.length() > 0)
-    {
-        // TODO: indicate to user that authentication failed
-        this->logger.errorf("Authentication failed: %s", this->cardAuthenticationData.error.c_str());
-        this->ioExpander.errorBeep();
-        this->nfc.enableCardDetection();
-        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-        return;
-    }
-
-    if (this->cardAuthenticationData.keyBytes == nullptr || this->cardAuthenticationData.keyLen != 16)
+    this->logger.infof("Trying to authenticate with keyNo: %u", this->cardAuthenticationData.keyNo);
+    if (this->cardAuthenticationData.keyLen != 16)
     {
         this->logger.error("Invalid key bytes provided");
         this->ioExpander.errorBeep();
@@ -556,8 +572,7 @@ void Application::processCardAuthenticationData()
         return;
     }
 
-    this->logger.infof("Trying to authenticate with keyNo: %u", this->cardAuthenticationData.keyNo);
-    bool authenticated = this->nfc.authenticate(this->cardAuthenticationData.keyNo, const_cast<uint8_t *>(this->cardAuthenticationData.keyBytes));
+    bool authenticated = this->nfc.authenticate(this->cardAuthenticationData.keyNo, this->cardAuthenticationData.keyBytes);
 
     if (!authenticated)
     {

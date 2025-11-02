@@ -29,7 +29,7 @@ void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
     this->firmwareUpdateProgressCallback = callback;
 }
 
-void API::setFirmwareUpdateMetaCallback(std::function<void(const char *currentVersion, const char *availableVersion)> callback)
+void API::setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback)
 {
     this->firmwareUpdateMetaCallback = callback;
 }
@@ -43,6 +43,33 @@ void API::loop()
     if (this->loopIsEnabled)
     {
         this->sendHeartbeat();
+    }
+
+    if (this->lastFirmwareChunkRequestTimeMs != 0 && this->firmwareUpdateFailedTimeMs == 0)
+    {
+        uint32_t now = millis();
+        if (now - this->lastFirmwareChunkRequestTimeMs > this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS)
+        {
+            this->logger.error("Firmware chunk request timeout reached");
+            this->abortFirmwareUpdate("Firmware chunk request timeout");
+            return;
+        }
+    }
+
+    if (this->firmwareUpdateFailedTimeMs != 0)
+    {
+        uint32_t now = millis();
+        if (now - this->firmwareUpdateFailedTimeMs > 3000)
+        {
+            esp_restart();
+            return;
+        }
+    }
+
+    if (this->readyForNextFirmwareChunk)
+    {
+        this->requestNextFirmwareChunk();
+        return;
     }
 }
 
@@ -156,10 +183,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
     {
         // Initialize OTA from metadata and request first chunk
-        JsonObject fw = inboundDoc["data"]["payload"]["firmware"].as<JsonObject>();
+        JsonObject fw = inboundDoc["data"]["payload"]["available"].as<JsonObject>();
         if (fw.isNull())
         {
-            logger.error("Firmware update required event missing firmware payload");
+            logger.error("Firmware update required event missing available firmware payload");
             return;
         }
         this->startFirmwareUpdate(fw);
@@ -207,24 +234,21 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
     this->ota.inProgress = true;
     this->ota.lastReportedPercent = -1;
 
-    // Inform UI: preparing and version meta if available
-    if (inboundDoc["data"]["payload"]["available"]["version"].is<const char *>() && inboundDoc["data"]["payload"]["firmware"]["version"].is<const char *>())
+    String availableVersion = firmwareMeta["version"].as<String>();
+    if (this->firmwareUpdateMetaCallback)
     {
-        const char *available = inboundDoc["data"]["payload"]["available"]["version"].as<const char *>();
-        const char *current = inboundDoc["data"]["payload"]["firmware"]["version"].as<const char *>();
-        if (this->firmwareUpdateMetaCallback)
-        {
-            this->firmwareUpdateMetaCallback(current, available);
-        }
+        this->logger.debugf("Firmware update available: %s > %s", FIRMWARE_VERSION, availableVersion.c_str());
+        this->firmwareUpdateMetaCallback(availableVersion.c_str());
     }
+
     this->updateFirmwareProgress(0);
 
-    // Request first chunk via websocket; keep the WS connection active during OTA
-    this->requestNextFirmwareChunk();
+    this->readyForNextFirmwareChunk = true;
 }
 
 void API::requestNextFirmwareChunk()
 {
+    this->readyForNextFirmwareChunk = false;
     const uint32_t remaining = (this->ota.totalSize > this->ota.bytesWritten) ? (this->ota.totalSize - this->ota.bytesWritten) : 0;
     if (remaining == 0)
     {
@@ -236,6 +260,8 @@ void API::requestNextFirmwareChunk()
     JsonObject payload = doc.to<JsonObject>();
     payload["offset"] = this->ota.bytesWritten;
     payload["length"] = len;
+
+    this->lastFirmwareChunkRequestTimeMs = millis();
     this->sendMessage("FIRMWARE_REQUEST_CHUNK", payload);
 }
 
@@ -284,11 +310,16 @@ void API::onFirmwareChunkEvent(esp_websocket_event_data_t data)
             pct = 0;
         if (pct > 100)
             pct = 100;
+
         if (pct == 100 || this->ota.lastReportedPercent < 0 || pct - this->ota.lastReportedPercent >= 5)
         {
             this->ota.lastReportedPercent = pct;
             this->updateFirmwareProgress(pct);
         }
+    }
+    else
+    {
+        this->logger.error("For some reason, ota.totalsize is 0");
     }
 
     // When a full WS message (one requested chunk) is finished, request next chunk
@@ -303,7 +334,8 @@ void API::onFirmwareChunkEvent(esp_websocket_event_data_t data)
 
     if (this->ota.bytesWritten < this->ota.totalSize)
     {
-        this->requestNextFirmwareChunk();
+        this->logger.debug("firmware update last chunk writte, ready for next one");
+        this->readyForNextFirmwareChunk = true;
         return;
     }
 
@@ -333,15 +365,27 @@ void API::abortFirmwareUpdate(const char *reason)
     {
         esp_ota_abort(this->ota.otaHandle);
     }
-    this->ota.inProgress = false;
-    this->ota.bytesWritten = 0;
-    this->updateFirmwareProgress(0);
+
+    if (this->errorCallback)
+    {
+        this->errorCallback("Firmware update failed", reason);
+    }
+
+    this->firmwareUpdateFailedTimeMs = millis();
 }
 
 void API::updateFirmwareProgress(int percent)
 {
     if (this->firmwareUpdateProgressCallback)
-        this->firmwareUpdateProgressCallback(percent);
+    {
+        this->logger.debugf("calling firmware update progress handler %d", percent);
+    }
+    else
+    {
+        this->logger.error("firmware update progress callback not set");
+    }
+
+    this->firmwareUpdateProgressCallback(percent);
 }
 
 void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
@@ -747,7 +791,14 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
 
     CardAuthenticationDetailsResponse response;
     response.keyNo = keyNo;
-    response.keyBytes = keyBytes;
+    if (keyLen == 16)
+    {
+        memcpy(response.keyBytes, keyBytes, 16);
+    }
+    else
+    {
+        memset(response.keyBytes, 0, 16);
+    }
     response.keyLen = keyLen;
     response.error = error;
     response.username = username;

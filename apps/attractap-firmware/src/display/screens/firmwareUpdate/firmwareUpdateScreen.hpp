@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../../api/api.hpp"
@@ -14,7 +15,7 @@ public:
     lv_obj_t *getScreen() override { return screen; }
     String getName() override { return "FirmwareUpdate"; }
 
-    void setVersions(const char *current, const char *available);
+    void setAvailableVersion(String version);
     void setProgress(int percent);
 
 private:

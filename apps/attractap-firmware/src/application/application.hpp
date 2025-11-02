@@ -15,7 +15,18 @@
 class Application
 {
 public:
-    Application() : logger("Application"), api(), unlocked(false), resourceCount(0), resourceIsSelected(false), bootDone(false), externalState(EXTERNAL_STATE_NONE), resourceListUpdated(false), selectedResourceChanged(false) {}
+    Application() : logger("Application"),
+                    api(),
+                    unlocked(false),
+                    resourceCount(0),
+                    resourceIsSelected(false),
+                    bootDone(false),
+                    externalState(EXTERNAL_STATE_NONE),
+                    resourceListUpdated(false),
+                    selectedResourceChanged(false),
+                    firmwareUpdateProgressPct(0)
+    {
+    }
 
     void setup();
     void loop();
@@ -32,6 +43,7 @@ private:
         EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
         EXTERNAL_STATE_ENROLL_NEW_CARD,
         EXTERNAL_STATE_AUTHENTICATE_CARD,
+        EXTERNAL_STATE_FIRMWARE_UPDATE,
     };
 
     ExternalStates_t externalState;
@@ -50,6 +62,10 @@ private:
     ApiEnrollNewCardData_t apiEnrollNewCardData;
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
+
+    int firmwareUpdateProgressPct;
+
+    String availableFirmwareVersion;
 
     static void
     networkTask(void *parameter);

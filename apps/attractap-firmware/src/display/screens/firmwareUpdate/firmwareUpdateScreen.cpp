@@ -55,9 +55,10 @@ void FirmwareUpdateScreen::loop()
 {
 }
 
-void FirmwareUpdateScreen::setVersions(const char *current, const char *available)
+void FirmwareUpdateScreen::setAvailableVersion(String availablevVersion)
 {
-    String s = String(current) + " → " + String(available);
+    this->logger.debugf("Updating available version to %s", availablevVersion);
+    String s = String(FIRMWARE_VERSION) + " > " + availablevVersion;
     lv_label_set_text(this->versionsLabel, s.c_str());
 }
 
@@ -69,5 +70,6 @@ void FirmwareUpdateScreen::setProgress(int percent)
     if (percent > 100)
         percent = 100;
 
+    this->logger.debugf("Updating firmware update progress %d", percent);
     lv_bar_set_value(this->progressBar, percent, LV_ANIM_OFF);
 }

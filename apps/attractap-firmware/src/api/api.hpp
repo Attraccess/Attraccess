@@ -57,7 +57,7 @@ public:
     struct CardAuthenticationDetailsResponse
     {
         uint8_t keyNo;
-        const uint8_t *keyBytes;
+        uint8_t keyBytes[16];
         uint8_t keyLen;
         String error;
         String username;
@@ -147,11 +147,11 @@ private:
     // Firmware update progress callback with status enum
 public:
     void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
-    void setFirmwareUpdateMetaCallback(std::function<void(const char *currentVersion, const char *availableVersion)> callback);
+    void setFirmwareUpdateMetaCallback(std::function<void(String availableVersion)> callback);
 
 private:
     std::function<void(int)> firmwareUpdateProgressCallback;
-    std::function<void(const char *, const char *)> firmwareUpdateMetaCallback;
+    std::function<void(String availableVersion)> firmwareUpdateMetaCallback;
 
     // OTA state
     struct OtaState
@@ -165,8 +165,12 @@ private:
     } ota;
 
     void startFirmwareUpdate(JsonObject firmwareMeta);
+    bool readyForNextFirmwareChunk = false;
     void requestNextFirmwareChunk();
     void onFirmwareChunkEvent(esp_websocket_event_data_t data);
+    uint32_t lastFirmwareChunkRequestTimeMs = 0;
+    const uint32_t FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS = 30000;
+    bool firmwareUpdateFailedTimeMs = 0;
     void abortFirmwareUpdate(const char *reason);
     void updateFirmwareProgress(int percent);
 

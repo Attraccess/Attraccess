@@ -500,8 +500,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
-            available: { version: String(latest.version) },
-            firmware: {
+            available: {
               name: latest.name,
               variant: latest.variant,
               version: String(latest.version),
