@@ -64,6 +64,14 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
+      case 'processing.error':
+        return [
+          {
+            label: t('nodes.processing.error.preview.message'),
+            value: nodeData?.data.message as string,
+          },
+        ];
+
       case 'processing.if':
         return [
           {

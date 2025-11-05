@@ -211,6 +211,21 @@
             }
           }
         }
+      },
+      "error": {
+        "title": "Error",
+        "description": "This node throws an error and stops the current flow.",
+        "inputs": {
+          "input": "Input"
+        },
+        "preview": {
+          "message": "Error message"
+        },
+        "config": {
+          "message": {
+            "label": "Error message template"
+          }
+        }
       }
     },
     "output": {

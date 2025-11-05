@@ -1,9 +1,21 @@
 {
   "endSession": "Sitzung beenden",
-  "sessionEnded": "Sitzung beendet",
-  "sessionEndedDescription": "Ihre Nutzungssitzung wurde erfolgreich beendet.",
-  "sessionEndError": "Fehler beim Beenden der Sitzung",
-  "sessionEndErrorDescription": "Beim Beenden der Sitzung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+  "sessionEnded": {
+    "success": {
+      "title": "Sitzung beendet",
+      "description": "Ihre Nutzungssitzung wurde erfolgreich beendet."
+    },
+    "error": {
+      "generic": {
+        "title": "Fehler beim Beenden der Sitzung",
+        "description": "Beim Beenden der Sitzung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+      },
+      "FLOW_EXECUTION_ERROR": {
+        "title": "Fehler beim Beenden der Sitzung",
+        "description": "{{error}}"
+      }
+    }
+  },
   "alternativeEndSessionOptionsMenu": {
     "label": "Alternative Sitzungsbeendigung",
     "endWithNotes": {

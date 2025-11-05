@@ -5,8 +5,19 @@
   "description": "You currently have {{count}} ongoing sessions. You can quickly filter to your sessions or end them all.",
   "showMine": "Show mine",
   "endAll": "End all",
-  "endedAllSuccess": "All your active usage sessions were ended.",
-  "endedAllError": "Failed to end all sessions. Some sessions may still be active.",
+  "endedAll": {
+    "success": "All your active usage sessions were ended.",
+    "error": {
+      "generic": {
+        "title": "Failed to end all sessions. Some sessions may still be active.",
+        "description": "An error occurred while ending the sessions. Please try again."
+      },
+      "FLOW_EXECUTION_ERROR": {
+        "title": "Failed to end all sessions. Some sessions may still be active.",
+        "description": "{{error}}"
+      }
+    }
+  },
   "modal.title": "End all your active sessions",
   "modal.description": "We will end the session for each resource below.",
   "modal.loadingList": "Loading active sessions...",

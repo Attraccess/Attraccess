@@ -30,6 +30,7 @@ import {
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
+  ErrorNodeDataSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
@@ -47,6 +48,7 @@ import z from 'zod';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { FlowExecutionError } from './errors/flow-execution.error';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -514,6 +516,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           );
           break;
 
+        case ResourceFlowNodeType.PROCESSING_ERROR:
+          responseOfNode = await this.processErrorNode(node, resultOfPreviousNode.payload, transactionManager);
+          break;
+
         default: {
           const exhaustiveCheck: never = node.type;
           throw new Error(`Unknown node type: ${exhaustiveCheck}`);
@@ -667,7 +673,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         break;
       default: {
         const exhaustiveCheck: never = comparisonOperator;
-        throw new Error(`Unknown comparison operator: ${exhaustiveCheck}`);
+        throw new FlowExecutionError(`Unknown comparison operator: ${exhaustiveCheck}`);
       }
     }
 
@@ -772,6 +778,19 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return { payload: { topic: result.topic, payload: result.payload } };
   }
 
+  private async processErrorNode(
+    node: ResourceFlowNode,
+    input: object,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
+    const { message: messageTemplate } = node.data as z.infer<typeof ErrorNodeDataSchema>;
+
+    const message = this.compileTemplate(messageTemplate, input);
+
+    throw new FlowExecutionError(message);
+  }
+
   private async processMqttSendMessageNode(
     node: ResourceFlowNode,
     input: object,
@@ -809,7 +828,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     if (!activeUsage.user) {
-      throw new ForbiddenException('Active session has no owner user; cannot end');
+      throw new FlowExecutionError('Active session has no owner user; cannot end');
     }
 
     const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
