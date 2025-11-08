@@ -12,5 +12,8 @@
     "title": "Oops! Sign-in hiccup",
     "generic": "Please check your credentials and try again"
   },
-  "signingIn": "Signing in..."
+  "signingIn": "Signing in...",
+  "accordion": {
+    "title": "Sign in with email and password"
+  }
 }

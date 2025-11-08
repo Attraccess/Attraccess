@@ -12,5 +12,8 @@
     "title": "Hoppla! Kleines Anmeldeproblem",
     "generic": "Bitte überprüfe deine Anmeldedaten und versuche es erneut"
   },
-  "signingIn": "Anmelden..."
+  "signingIn": "Anmelden...",
+  "accordion": {
+    "title": "Anmelden mit E-Mail und Passwort"
+  }
 }

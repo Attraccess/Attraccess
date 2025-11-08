@@ -4,12 +4,14 @@ import { type QueryClient } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
+export const prefetchUseUsersServiceGetLocalSignupDomainWhitelist = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
   ids?: number[];
   limit?: number;
   page?: number;
   search?: string;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, page, search }), queryFn: () => UsersService.findMany({ ids, limit, page, search }) });
+export const prefetchUseUsersServiceIsLocalSignupEnabled = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceIsLocalSignupEnabledKeyFn(), queryFn: () => UsersService.isLocalSignupEnabled() });
 export const prefetchUseUsersServiceGetCurrent = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetCurrentKeyFn(), queryFn: () => UsersService.getCurrent() });
 export const prefetchUseUsersServiceGetOneUserById = (queryClient: QueryClient, { id }: {
   id: number;

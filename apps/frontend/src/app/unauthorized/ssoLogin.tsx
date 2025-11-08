@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Divider, Link } from '@heroui/react';
+import { Button, Link } from '@heroui/react';
 import de from './ssoLogin.de.json';
 import en from './ssoLogin.en.json';
 import { useMemo } from 'react';
@@ -50,7 +50,6 @@ export function SSOLogin() {
 
   return (
     <>
-      <Divider />
       <SSOLinkingRequiredModal show={ssoLinkingIsRequired} />
       {providers?.map((provider) => (
         <SSOLoginButton key={provider.id} provider={provider} />

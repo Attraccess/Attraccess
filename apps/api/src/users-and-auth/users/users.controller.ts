@@ -19,7 +19,7 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
-import { AuthenticationDetail, User, SystemPermissions } from '@attraccess/database-entities';
+import { AuthenticationDetail, User, SystemPermissions, Setting } from '@attraccess/database-entities';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
@@ -32,6 +32,10 @@ import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
+import { BooleanDto } from '../../types/boolean.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -43,6 +47,8 @@ export class UsersController {
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
+    @InjectRepository(Setting)
+    private readonly settingRepository: Repository<Setting>,
   ) {}
 
   /**
@@ -61,6 +67,49 @@ export class UsersController {
     }
   }
 
+  @Get('local-signup-domain-whitelist')
+  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get the local signup domain whitelist', operationId: 'getLocalSignupDomainWhitelist' })
+  @ApiResponse({
+    status: 200,
+    description: 'The local signup domain whitelist.',
+    type: [String],
+  })
+  public async getLocalSignupDomainWhitelist(): Promise<string[]> {
+    const localSignupDomainWhitelist = await this.settingRepository.findOne({
+      where: {
+        parent: 'auth',
+        key: 'local_signup_domain_whitelist',
+      },
+    });
+
+    return (localSignupDomainWhitelist?.value ?? '*')
+      .split(',')
+      .map((domain) => domain.trim().toLowerCase())
+      .filter((domain) => domain !== '');
+  }
+
+  @Post('local-signup-domain-whitelist')
+  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Set the local signup domain whitelist', operationId: 'setLocalSignupDomainWhitelist' })
+  @ApiResponse({
+    status: 200,
+    description: 'The local signup domain whitelist has been successfully set.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  async setLocalSignupDomainWhitelist(@Body() body: string[]): Promise<void> {
+    await this.settingRepository.update(
+      {
+        parent: 'auth',
+        key: 'local_signup_domain_whitelist',
+      },
+      { value: body.join(',') },
+    );
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create a new user', operationId: 'createOneUser' })
   @ApiResponse({
@@ -74,6 +123,16 @@ export class UsersController {
   })
   async createOne(@Body() body: CreateUserDto): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
+
+    const signupDomainWhitelist = await this.getLocalSignupDomainWhitelist();
+
+    if (!signupDomainWhitelist.includes('*')) {
+      const emailDomain = body.email.split('@').pop().toLowerCase();
+
+      if (!signupDomainWhitelist.includes(emailDomain)) {
+        throw new ForbiddenSignupDomainException(emailDomain);
+      }
+    }
 
     const user = await this.usersService.createOne({
       username: body.username,
@@ -115,6 +174,18 @@ export class UsersController {
 
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
     return user;
+  }
+
+  @Get('local-signup-enabled')
+  @ApiOperation({ summary: 'Check if local signup is enabled', operationId: 'isLocalSignupEnabled' })
+  @ApiResponse({
+    status: 200,
+    description: 'Local signup is enabled.',
+    type: BooleanDto,
+  })
+  async isLocalSignupEnabled(): Promise<BooleanDto> {
+    const whitelist = await this.getLocalSignupDomainWhitelist();
+    return { value: whitelist.length > 0 };
   }
 
   @Post('verify-email')

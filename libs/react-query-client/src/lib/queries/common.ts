@@ -6,6 +6,10 @@ export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemS
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
 export const UseSystemServiceInfoKeyFn = (queryKey?: Array<unknown>) => [useSystemServiceInfoKey, ...(queryKey ?? [])];
+export type UsersServiceGetLocalSignupDomainWhitelistDefaultResponse = Awaited<ReturnType<typeof UsersService.getLocalSignupDomainWhitelist>>;
+export type UsersServiceGetLocalSignupDomainWhitelistQueryResult<TData = UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUsersServiceGetLocalSignupDomainWhitelistKey = "UsersServiceGetLocalSignupDomainWhitelist";
+export const UseUsersServiceGetLocalSignupDomainWhitelistKeyFn = (queryKey?: Array<unknown>) => [useUsersServiceGetLocalSignupDomainWhitelistKey, ...(queryKey ?? [])];
 export type UsersServiceFindManyDefaultResponse = Awaited<ReturnType<typeof UsersService.findMany>>;
 export type UsersServiceFindManyQueryResult<TData = UsersServiceFindManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceFindManyKey = "UsersServiceFindMany";
@@ -15,6 +19,10 @@ export const UseUsersServiceFindManyKeyFn = ({ ids, limit, page, search }: {
   page?: number;
   search?: string;
 } = {}, queryKey?: Array<unknown>) => [useUsersServiceFindManyKey, ...(queryKey ?? [{ ids, limit, page, search }])];
+export type UsersServiceIsLocalSignupEnabledDefaultResponse = Awaited<ReturnType<typeof UsersService.isLocalSignupEnabled>>;
+export type UsersServiceIsLocalSignupEnabledQueryResult<TData = UsersServiceIsLocalSignupEnabledDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useUsersServiceIsLocalSignupEnabledKey = "UsersServiceIsLocalSignupEnabled";
+export const UseUsersServiceIsLocalSignupEnabledKeyFn = (queryKey?: Array<unknown>) => [useUsersServiceIsLocalSignupEnabledKey, ...(queryKey ?? [])];
 export type UsersServiceGetCurrentDefaultResponse = Awaited<ReturnType<typeof UsersService.getCurrent>>;
 export type UsersServiceGetCurrentQueryResult<TData = UsersServiceGetCurrentDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceGetCurrentKey = "UsersServiceGetCurrent";
@@ -379,6 +387,7 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
 export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof UsersService.createOneUser>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;
