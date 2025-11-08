@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { PageHeader } from '../../components/pageHeader';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  Button,
   Card,
   CardBody,
   CardFooter,
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { Users, ShieldOffIcon, ShieldCheckIcon } from 'lucide-react';
+import { Users, ShieldOffIcon, ShieldCheckIcon, Settings2Icon } from 'lucide-react';
 import { useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
@@ -23,6 +24,7 @@ import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useRea
 import en from './en.json';
 import de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
+import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -56,6 +58,15 @@ export const UserManagementPage: React.FC = () => {
         backTo="/"
         icon={<Users className="w-6 h-6" />}
         data-cy="user-management-page-header"
+        actions={
+          <AllowedSignupDomainsEditorModal>
+            {(onOpen) => (
+              <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
+                {t('actions.editAllowedSignupDomains')}
+              </Button>
+            )}
+          </AllowedSignupDomainsEditorModal>
+        }
       />
 
       <Card>

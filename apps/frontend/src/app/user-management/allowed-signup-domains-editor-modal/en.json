@@ -1,0 +1,34 @@
+{
+  "title": "Allowed Signup Domains",
+  "subtitle": "Allowed domains for new user registration.",
+  "noteAboutNoneAndWildcard": "If no domains are entered, no self-registration is possible.\nIf a star (*) is entered, any domain is allowed.",
+  "inputs": {
+    "addDomain": {
+      "label": "Additional Domain"
+    }
+  },
+  "table": {
+    "columns": {
+      "domain": "Domain",
+      "actions": "Actions"
+    },
+    "actions": {
+      "removeDomain": "Remove"
+    }
+  },
+  "actions": {
+    "save": {
+      "label": "Save",
+      "success": {
+        "title": "Success",
+        "description": "The domains were successfully saved."
+      },
+      "error": {
+        "generic": {
+          "title": "Error",
+          "description": "Error saving the domains. Please try again. {{error}}"
+        }
+      }
+    }
+  }
+}

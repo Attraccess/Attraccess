@@ -3,9 +3,10 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
-import { User, AuthenticationType } from '@attraccess/database-entities';
+import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateUserDto } from './dtos/createUser.dto';
+import { getRepositoryToken } from '@nestjs/typeorm';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -38,6 +39,14 @@ describe('UsersController', () => {
           provide: EmailService,
           useValue: {
             sendVerificationEmail: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Setting),
+          useValue: {
+            findOne: jest.fn(),
+            insert: jest.fn(),
+            update: jest.fn(),
           },
         },
       ],

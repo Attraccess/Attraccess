@@ -22,6 +22,7 @@ import {
   SSOProviderOIDCConfiguration,
   SSOProvider,
   Session,
+  Setting,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
@@ -43,6 +44,7 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
       SSOProvider,
       SSOProviderOIDCConfiguration,
       Session,
+      Setting,
     ]),
     PassportModule,
     EmailModule,

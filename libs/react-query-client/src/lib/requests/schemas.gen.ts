@@ -115,6 +115,18 @@ export const $User = {
     required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
 } as const;
 
+export const $BooleanDto = {
+    type: 'object',
+    properties: {
+        value: {
+            type: 'boolean',
+            description: 'The boolean value',
+            example: true
+        }
+    },
+    required: ['value']
+} as const;
+
 export const $VerifyEmailDto = {
     type: 'object',
     properties: {

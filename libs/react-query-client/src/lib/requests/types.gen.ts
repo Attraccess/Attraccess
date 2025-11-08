@@ -85,6 +85,13 @@ export type User = {
     billingFactor: number;
 };
 
+export type BooleanDto = {
+    /**
+     * The boolean value
+     */
+    value: boolean;
+};
+
 export type VerifyEmailDto = {
     /**
      * The token to verify the email
@@ -2020,6 +2027,14 @@ export type InfoResponse = {
     status?: string;
 };
 
+export type GetLocalSignupDomainWhitelistResponse = Array<(string)>;
+
+export type SetLocalSignupDomainWhitelistData = {
+    requestBody: Array<(string)>;
+};
+
+export type SetLocalSignupDomainWhitelistResponse = unknown;
+
 export type CreateOneUserData = {
     requestBody: CreateUserDto;
 };
@@ -2046,6 +2061,8 @@ export type FindManyData = {
 };
 
 export type FindManyResponse = PaginatedUsersResponseDto;
+
+export type IsLocalSignupEnabledResponse = BooleanDto;
 
 export type VerifyEmailData = {
     requestBody: VerifyEmailDto;
@@ -3055,6 +3072,37 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/local-signup-domain-whitelist': {
+        get: {
+            res: {
+                /**
+                 * The local signup domain whitelist.
+                 */
+                200: Array<(string)>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: SetLocalSignupDomainWhitelistData;
+            res: {
+                /**
+                 * The local signup domain whitelist has been successfully set.
+                 */
+                200: unknown;
+                /**
+                 * Invalid input data.
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users': {
         post: {
             req: CreateOneUserData;
@@ -3084,6 +3132,16 @@ export type $OpenApiTs = {
                  * Forbidden - User does not have permission to manage users.
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/users/local-signup-enabled': {
+        get: {
+            res: {
+                /**
+                 * Local signup is enabled.
+                 */
+                200: BooleanDto;
             };
         };
     };

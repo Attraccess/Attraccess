@@ -1,0 +1,34 @@
+{
+  "title": "Erlaubte Registrierungs-Domains",
+  "subtitle": "Erlaubte Domains für die Registrierung von neuen Benutzern.",
+  "noteAboutNoneAndWildcard": "Wenn keine Domains eingetragen sind, ist keine selbst-Registrierung möglich.\nIst ein Stern (*) eingetragen, ist jede Domain erlaubt.",
+  "inputs": {
+    "addDomain": {
+      "label": "Zusätzliche Domain"
+    }
+  },
+  "table": {
+    "columns": {
+      "domain": "Domain",
+      "actions": "Aktionen"
+    },
+    "actions": {
+      "removeDomain": "entfernen"
+    }
+  },
+  "actions": {
+    "save": {
+      "label": "Speichern",
+      "success": {
+        "title": "Erfolg",
+        "description": "Die Domains wurden erfolgreich gespeichert."
+      },
+      "error": {
+        "generic": {
+          "title": "Fehler",
+          "description": "Fehler beim Speichern der Domains. Bitte versuchen Sie es erneut. {{error}}"
+        }
+      }
+    }
+  }
+}

@@ -12,7 +12,8 @@
   "error": {
     "title": "Hoppla! Ein kleiner Fehler",
     "generic": "Bitte überprüfe deine Angaben und versuche es erneut",
-    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein."
+    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+    "ForbiddenSignupDomainException": "Die Domain der E-Mail-Adresse ist nicht erlaubt."
   },
   "success": {
     "title": "Konto erfolgreich erstellt!",

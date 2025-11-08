@@ -12,7 +12,8 @@
   "error": {
     "title": "Oops! A small hiccup",
     "generic": "Please check your info and try again",
-    "passwordTooShort": "Password must be at least 8 characters long."
+    "passwordTooShort": "Password must be at least 8 characters long.",
+    "ForbiddenSignupDomainException": "The domain of the email address is not allowed."
   },
   "success": {
     "title": "Account Created Successfully!",

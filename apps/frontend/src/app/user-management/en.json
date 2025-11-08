@@ -11,5 +11,8 @@
       "username": "Username",
       "externalIdentifier": "External ID"
     }
+  },
+  "actions": {
+    "editAllowedSignupDomains": "Edit signup domains"
   }
 }
