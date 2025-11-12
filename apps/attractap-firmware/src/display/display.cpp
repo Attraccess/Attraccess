@@ -278,11 +278,13 @@ void Display::transitionToScreen(IScreen *screen)
 void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete)
 {
     Display::logger.infof("Transitioning to screen: %s", screen->getName().c_str());
-    Display::activeScreen = screen;
 
-    // TODO: reInit the screen
-    // Display::activeScreen->destroy();
-    // Display::activeScreen->init();
+    if (Display::activeScreen)
+    {
+        Display::activeScreen->onScreenLeave();
+    }
+
+    Display::activeScreen = screen;
 
     lv_screen_load_anim(Display::activeScreen->getScreen(), Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();

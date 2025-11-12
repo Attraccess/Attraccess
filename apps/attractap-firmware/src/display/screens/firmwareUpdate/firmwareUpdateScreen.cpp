@@ -73,3 +73,7 @@ void FirmwareUpdateScreen::setProgress(int percent)
     this->logger.debugf("Updating firmware update progress %d", percent);
     lv_bar_set_value(this->progressBar, percent, LV_ANIM_OFF);
 }
+
+void FirmwareUpdateScreen::onScreenLeave()
+{
+}

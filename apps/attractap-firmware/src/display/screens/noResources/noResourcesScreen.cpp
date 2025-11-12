@@ -37,3 +37,7 @@ String NoResourcesScreen::getName()
 {
    return "NoResourcesScreen";
 }
+
+void NoResourcesScreen::onScreenLeave()
+{
+}

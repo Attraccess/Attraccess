@@ -28,6 +28,8 @@ import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 export interface ValidationError {
   nodeId: string;
@@ -57,6 +59,7 @@ export class ResourceFlowsService {
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly mqttClientService: MqttClientService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
@@ -255,6 +258,8 @@ export class ResourceFlowsService {
     if (allValidationErrors.length > 0) {
       response.validationErrors = allValidationErrors;
     }
+
+    this.eventEmitter.emit(ResourceFlowChangedEvent.EVENT_NAME, resourceId);
 
     return response;
   }

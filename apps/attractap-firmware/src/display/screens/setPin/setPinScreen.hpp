@@ -12,6 +12,7 @@ class SetPinScreen : public IScreen
 public:
     SetPinScreen() : logger("SetPinScreen") {}
     void init();
+    void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
     String getName() override;

@@ -313,27 +313,10 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->flowButtonsContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(this->flowButtonsContainer, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->flowButtonsContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_set_style_pad_row(this->flowButtonsContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(this->flowButtonsContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   /*
-   // TODO: add flow buttons
-   lv_obj_t *flowButton = lv_button_create(this->flowButtonsContainer);
-   lv_obj_set_height(flowButton, 50);
-   lv_obj_set_width(flowButton, lv_pct(100));
-   lv_obj_set_align(flowButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(flowButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON});
-
-   lv_obj_t *labelForFlowButton = lv_label_create(flowButton);
-   lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForFlowButton, "Trigger a Flow");
-   */
 
    this->noIntroductionPanel = lv_obj_create(this->screen);
    lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
@@ -430,7 +413,8 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON, fb.id};
+      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON};
+      strlcpy(evt->flowButtonId, fb.id, API::MAX_FLOW_BUTTON_ID_LEN);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
 
@@ -670,4 +654,16 @@ void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
           lv_timer_del(timer);
        },
        ms, this);
+}
+
+void ResourceDetailsScreen::onScreenLeave()
+{
+   if (this->actionOverlay)
+   {
+      lv_obj_add_flag(this->actionOverlay, LV_OBJ_FLAG_HIDDEN);
+   }
+   if (this->successToast)
+   {
+      lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);
+   }
 }

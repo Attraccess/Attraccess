@@ -11,6 +11,7 @@ class InitScreen : public IScreen
 {
 public:
     void init();
+    void onScreenLeave();
     lv_obj_t *getScreen() override;
     void loop() override;
     String getName() override;
@@ -23,15 +24,7 @@ private:
     void finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color);
     void markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label);
     void markStateAsError(lv_obj_t *spinner, lv_obj_t *label);
-
-    void markWifiStateAsSuccess();
-    void markWifiStateAsError();
-    void markEthernetStateAsSuccess();
-    void markEthernetStateAsError();
-    void markApiConnectionStateAsSuccess();
-    void markApiConnectionStateAsError();
-    void markApiAuthenticationStateAsSuccess();
-    void markApiAuthenticationStateAsError();
+    void resetState(lv_obj_t *spinner, lv_obj_t *label);
 
     static void onOpenSettingsButtonEvent(lv_event_t *e);
 

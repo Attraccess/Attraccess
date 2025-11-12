@@ -28,6 +28,7 @@ public:
 
     ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE") {}
     void init();
+    void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;
@@ -50,7 +51,7 @@ public:
     {
         ResourceDetailsScreen *self;
         button_click_type_t buttonClickType;
-        const char *flowButtonId; // valid when buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON
+        char flowButtonId[API::MAX_FLOW_BUTTON_ID_LEN]; // valid when buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
 
