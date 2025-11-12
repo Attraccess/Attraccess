@@ -1,3 +1,34 @@
+## 1.2.0 (2025-11-12)
+
+### 🚀 Features
+
+- nfc readers, finally a working version ([#231](https://github.com/Attraccess/Attraccess/pull/231), [#232](https://github.com/Attraccess/Attraccess/issues/232))
+- **ATT-131:** flow node to wait for mqtt message ([#273](https://github.com/Attraccess/Attraccess/pull/273))
+- **ATT-134:** auto downscale resource images before upload ([#269](https://github.com/Attraccess/Attraccess/pull/269))
+- **ATT-148:** show resource usage status in resource list and locksc… ([#250](https://github.com/Attraccess/Attraccess/pull/250))
+- **ATT-149:** add Balena manual release workflow and update .env.docker-compose for Hetzner DNS Updater ([#254](https://github.com/Attraccess/Attraccess/pull/254))
+- **ATT-151:** resource flow node to end usage session ([#275](https://github.com/Attraccess/Attraccess/pull/275))
+- **ATT-152:** open node editor on double click ([#267](https://github.com/Attraccess/Attraccess/pull/267))
+- **ATT-154:** trigger sumup topup from nfc reader ([#266](https://github.com/Attraccess/Attraccess/pull/266))
+- **ATT-158:** custom error flow node ([#286](https://github.com/Attraccess/Attraccess/pull/286))
+- **ATT-161:** mqtt qos and retain settings per resource flow node ([#282](https://github.com/Attraccess/Attraccess/pull/282))
+- **ATT-96:** make scopes and claim paths configurable for OIDC ([#279](https://github.com/Attraccess/Attraccess/pull/279))
+
+### 🩹 Fixes
+
+- use correct permissions on nfc reader for resource introductions ([#245](https://github.com/Attraccess/Attraccess/pull/245))
+- allow ssl connection without synced time ([#264](https://github.com/Attraccess/Attraccess/pull/264))
+- **AT-147:** trim username on create, update and login ([#262](https://github.com/Attraccess/Attraccess/pull/262))
+- **ATT-146:** do not send resource usage receipt email when usage costs nothing ([#251](https://github.com/Attraccess/Attraccess/pull/251))
+- **ATT-157:** ensure topic scubscriptions on mqtt server re-connect ([#274](https://github.com/Attraccess/Attraccess/pull/274))
+- **ATT-165:** better api error handling and user api error toasts ([#297](https://github.com/Attraccess/Attraccess/pull/297))
+- **ATT-166:** correctly pass flow button id to api from nfc readers ([#298](https://github.com/Attraccess/Attraccess/pull/298))
+- **ATT-97:** takeover billing and flow handling correctified ([#270](https://github.com/Attraccess/Attraccess/pull/270))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.1.0 (2025-10-09)
 
 ### 🚀 Features
