@@ -1,0 +1,46 @@
+{
+  "generic": {
+    "title": "Server Error",
+    "description": "An error occurred. Please try again."
+  },
+  "FLOW_EXECUTION_ERROR": {
+    "title": "Failed to end all sessions. Some sessions may still be active.",
+    "description": "{{error}}"
+  },
+  "ResourceInUseError": {
+    "title": "Resource already in use",
+    "description": "The resource is currently in use by another user and cannot be started by you until it is released."
+  },
+  "INSUFFICIENT_BALANCE": {
+    "title": "Insufficient balance",
+    "description": "The balance is not sufficient for this action."
+  },
+  "Invalid API key": {
+    "title": "Invalid API key",
+    "description": "The API key is invalid. Please try again."
+  },
+  "malformed pairing code": {
+    "title": "Invalid pairing code",
+    "description": "The pairing code is invalid. Please try again."
+  },
+  "no pairing for code": {
+    "title": "Invalid pairing code",
+    "description": "The pairing code is invalid. Please try again."
+  },
+  "REFUND_AMOUNT_HIGHER_THAN_TRANSACTION_AMOUNT_EXCEPTION": {
+    "title": "Refund amount higher than transaction amount",
+    "description": "The refund amount is higher than the transaction amount"
+  },
+  "password must be longer than or equal to 8 characters": {
+    "title": "Password too short",
+    "description": "Password must be at least 8 characters long."
+  },
+  "ForbiddenSignupDomainException": {
+    "title": "Forbidden signup domain",
+    "description": "The domain of the email address is not allowed."
+  },
+  "UnkownUserOrPasswordException": {
+    "title": "Unknown user or password",
+    "description": "The user or password is invalid."
+  }
+}

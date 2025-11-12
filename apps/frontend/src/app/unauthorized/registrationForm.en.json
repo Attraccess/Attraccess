@@ -9,11 +9,9 @@
   "passwordConfirmation": "Confirm your password",
   "createAccountButton": "Create account and start making!",
   "creatingAccount": "Creating your account...",
-  "error": {
-    "title": "Oops! A small hiccup",
-    "generic": "Please check your info and try again",
+  "validationError": {
     "passwordTooShort": "Password must be at least 8 characters long.",
-    "ForbiddenSignupDomainException": "The domain of the email address is not allowed."
+    "passwordsDoNotMatch": "The passwords do not match"
   },
   "success": {
     "title": "Account Created Successfully!",

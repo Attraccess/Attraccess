@@ -13,21 +13,5 @@
       "title": "SumUp reader paired",
       "description": "The SumUp reader has been paired successfully"
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Pair a SumUp reader",
-        "description": "The SumUp reader could not be paired"
-      },
-      "malformed pairing code": {
-        "title": "Invalid pairing code",
-        "description": "The pairing code is invalid. Please try again."
-      },
-      "no pairing for code": {
-        "title": "Invalid pairing code",
-        "description": "The pairing code is invalid. Please try again."
-      }
-    }
   }
 }

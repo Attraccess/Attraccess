@@ -26,6 +26,8 @@ import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import { useAuth } from '../../../../../../hooks/useAuth';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
@@ -35,7 +37,16 @@ interface Props {
 export function RefundModal(props: Props) {
   const { children, transactionId } = props;
 
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
 
   const { onOpen, isOpen, onOpenChange, onClose } = useDisclosure();
   const toast = useToastMessage();
@@ -69,7 +80,7 @@ export function RefundModal(props: Props) {
         error: error as Error,
         t,
         tExists,
-        baseTranslationKey: 'error.toast',
+        baseTranslationKey: 'api',
       });
     },
   });

@@ -10,6 +10,8 @@ import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { DeleteConfirmationModal } from '../../../../../../components/deleteConfirmationModal';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
 
 interface Props {
   readerId: string;
@@ -21,8 +23,14 @@ export function SumUpReaderDeleteModal(props: Props) {
   const { readerId, readerName, children: activator } = props;
 
   const { t, tExists } = useTranslations({
-    de,
-    en,
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
   });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
@@ -38,7 +46,7 @@ export function SumUpReaderDeleteModal(props: Props) {
         error,
         t,
         tExists,
-        baseTranslationKey: 'error.toast',
+        baseTranslationKey: 'api',
       });
     },
   });

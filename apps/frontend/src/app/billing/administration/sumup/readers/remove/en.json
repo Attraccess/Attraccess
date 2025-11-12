@@ -1,12 +1,4 @@
 {
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Error deleting card reader",
-        "description": "Card reader could not be deleted"
-      }
-    }
-  },
   "success": {
     "toast": {
       "title": "Card reader deleted",

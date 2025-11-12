@@ -18,13 +18,5 @@
       "title": "Billing updated",
       "description": "The usage-based billing has been updated successfully."
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Error updating billing",
-        "description": "The usage-based billing could not be updated. Please try again."
-      }
-    }
   }
 }

@@ -22,12 +22,6 @@
       "success": {
         "title": "Success",
         "description": "The domains were successfully saved."
-      },
-      "error": {
-        "generic": {
-          "title": "Error",
-          "description": "Error saving the domains. Please try again. {{error}}"
-        }
       }
     }
   }

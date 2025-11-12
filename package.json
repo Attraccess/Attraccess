@@ -6,7 +6,8 @@
     "start": "ts-node src/index.ts",
     "typeorm": "typeorm-ts-node-commonjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
-    "prepare": "husky"
+    "prepare": "husky",
+    "precommit": "pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e"
   },
   "private": true,
   "dependencies": {

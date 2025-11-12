@@ -6,18 +6,6 @@
     "sessionStartedDescription": "Sie haben erfolgreich mit der Nutzung dieser Ressource begonnen.",
     "sessionTakeOvernDescription": "Sie haben die Sitzung erfolgreich übernommen.",
     "sessionTakeOverErrorDescription": "Fehler beim Übernehmen der Sitzung. Der andere Benutzer hat möglicherweise seine Sitzung beendet oder es ist ein Fehler aufgetreten.",
-    "start": {
-      "error": {
-        "generic": {
-          "title": "Fehler beim Starten der Sitzung",
-          "description": "Beim Starten der Sitzung ist ein Fehler aufgetreten: {{error}}"
-        },
-        "INSUFFICIENT_BALANCE": {
-          "title": "Nicht genügend Guthaben",
-          "description": "Sie haben nicht genügend Guthaben, um die Sitzung zu starten. Bitte laden Sie Ihr Guthaben nach."
-        }
-      }
-    },
     "alternativeStartSessionOptionsMenu": {
       "label": "Alternative Sitzungsstart",
       "startWithNotes": {
@@ -33,14 +21,6 @@
     "success": {
       "title": "Steuerung erfolgreich",
       "description": "Die Steuerung wurde erfolgreich ausgeführt."
-    },
-    "start": {
-      "error": {
-        "generic": {
-          "title": "Fehler beim Steuern der Tür",
-          "description": "Die Steuerung der Tür ist fehlgeschlagen. Bitte versuchen Sie es erneut."
-        }
-      }
     }
   }
 }

@@ -24,6 +24,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
 interface Props {
   resourceId: number;
@@ -34,7 +36,16 @@ export function ResourceBillingInfoEditor(props: Props) {
   const { resourceId } = props;
 
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -56,7 +67,7 @@ export function ResourceBillingInfoEditor(props: Props) {
         error,
         t,
         tExists,
-        baseTranslationKey: 'error.toast',
+        baseTranslationKey: 'api',
       });
     },
   });

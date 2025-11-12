@@ -6,17 +6,7 @@
   "showMine": "Meine anzeigen",
   "endAll": "Alle beenden",
   "endedAll": {
-    "success": "Alle aktiven Nutzungssitzungen wurden beendet.",
-    "error": {
-      "generic": {
-        "title": "Fehler beim Beenden. Einige Sitzungen sind möglicherweise noch aktiv.",
-        "description": "Beim Beenden der Sitzungen ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
-      },
-      "FLOW_EXECUTION_ERROR": {
-        "title": "Fehler beim Beenden der Sitzung",
-        "description": "{{error}}"
-      }
-    }
+    "success": "Alle aktiven Nutzungssitzungen wurden beendet."
   },
   "modal.title": "Alle aktiven Sitzungen beenden",
   "modal.description": "Wir beenden die Sitzung für jede Ressource unten.",

@@ -20,6 +20,8 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
 import { InsufficientBalanceModal } from './insufficientBalanceModal';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
 interface StartSessionControlsProps {
   resourceId: number;
@@ -33,7 +35,16 @@ export function StartSessionControls(
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
@@ -95,7 +106,7 @@ export function StartSessionControls(
         error,
         t,
         tExists,
-        baseTranslationKey: resource.type + '.start.error',
+        baseTranslationKey: 'api',
       });
 
       if (errorMessage === 'INSUFFICIENT_BALANCE') {
@@ -106,7 +117,7 @@ export function StartSessionControls(
         error,
         t,
         tExists,
-        baseTranslationKey: resource.type + '.start.error',
+        baseTranslationKey: 'api',
       });
 
       console.error('Failed to start session:', JSON.stringify(error));

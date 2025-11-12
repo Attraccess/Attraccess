@@ -14,13 +14,24 @@ import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 
 type ActiveUsageSessionsBannerProps = {
   onShowMySessions: () => void;
 };
 
 export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
@@ -76,7 +87,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
     } catch (e) {
       console.error(e);
       toast.apiError({
-        baseTranslationKey: 'endedAll.error',
+        baseTranslationKey: 'api',
         error: e as ApiError,
         t,
         tExists,
@@ -123,7 +134,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
           error: rejectedResult.reason as ApiError,
           t,
           tExists,
-          baseTranslationKey: 'endedAll.error',
+          baseTranslationKey: 'api',
         });
       }
     } finally {

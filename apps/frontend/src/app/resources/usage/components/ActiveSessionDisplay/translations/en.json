@@ -4,16 +4,6 @@
     "success": {
       "title": "Session Ended",
       "description": "Your usage session has been successfully ended."
-    },
-    "error": {
-      "generic": {
-        "title": "Failed to End Session",
-        "description": "An error occurred while ending the session. Please try again."
-      },
-      "FLOW_EXECUTION_ERROR": {
-        "title": "Failed to End Session",
-        "description": "{{error}}"
-      }
     }
   },
   "alternativeEndSessionOptionsMenu": {

@@ -3,12 +3,15 @@ import { ArrowRight, LogInIcon } from 'lucide-react';
 import { Accordion, AccordionItem, Input, Skeleton } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Alert } from '@heroui/react';
-import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { useLogin } from '../../hooks/useAuth';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
-import { useUsersServiceIsLocalSignupEnabled } from '@attraccess/react-query-client';
+import { ApiError, useUsersServiceIsLocalSignupEnabled } from '@attraccess/react-query-client';
+import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import { getTranslationKeyForApiError } from '../../utils/apiError';
 
 interface LoginFormProps {
   onNeedsAccount: () => void;
@@ -18,9 +21,15 @@ interface LoginFormProps {
 export function LoginForm(props: LoginFormProps) {
   const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
 
-  const { t } = useTranslations({
-    en,
-    de,
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
   });
 
   if (isLoading) {
@@ -31,7 +40,7 @@ export function LoginForm(props: LoginFormProps) {
     return (
       <>
         <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled.value} t={t} />
-        <LoginFormContent {...props} t={t} />
+        <LoginFormContent {...props} t={t} tExists={tExists} />
       </>
     );
   }
@@ -41,7 +50,7 @@ export function LoginForm(props: LoginFormProps) {
       <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
       <Accordion variant="splitted" className="w-full">
         <AccordionItem title={t('accordion.title')} indicator={<LogInIcon />} className="bg-default-100">
-          <LoginFormContent {...props} t={t} />
+          <LoginFormContent {...props} t={t} tExists={tExists} />
         </AccordionItem>
       </Accordion>
     </>
@@ -66,10 +75,34 @@ function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean
   );
 }
 
-function LoginFormContent(props: LoginFormProps & { t: TFunction }) {
-  const { onForgotPassword, t } = props;
+function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
+  const { onForgotPassword, t, tExists } = props;
 
   const { mutate: login, isPending, error } = useLogin();
+
+  const { errorTitle, errorDescription } = useMemo(() => {
+    if (!error) {
+      return {
+        errorTitle: null,
+        errorDescription: null,
+      };
+    }
+
+    const { key } = getTranslationKeyForApiError({
+      error: error as ApiError,
+      t,
+      tExists,
+      baseTranslationKey: 'api',
+      fallbackKey: 'generic',
+    });
+
+    return {
+      errorTitle: t(key + '.title', { error }),
+      errorDescription: t(key + '.description', {
+        error,
+      }),
+    };
+  }, [error, t, tExists]);
 
   const handleSubmit: React.FormEventHandler = useCallback(
     async (event) => {
@@ -142,13 +175,8 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction }) {
         {isPending ? t('signingIn') : t('signInButton')}
       </Button>
 
-      {(error as Error) && (
-        <Alert
-          color="danger"
-          title={t('error.title')}
-          description={(error as Error).message}
-          data-cy="login-form-error-alert"
-        />
+      {errorTitle && (
+        <Alert color="danger" title={errorTitle} description={errorDescription} data-cy="login-form-error-alert" />
       )}
     </form>
   );

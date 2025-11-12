@@ -18,6 +18,8 @@ import { useCallback, useRef, useState } from 'react';
 import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
@@ -25,7 +27,16 @@ interface Props {
 
 export function SumUpReadersPairing(props: Props) {
   const { children } = props;
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -44,7 +55,7 @@ export function SumUpReadersPairing(props: Props) {
         error,
         t,
         tExists,
-        baseTranslationKey: 'error.toast',
+        baseTranslationKey: 'api',
       });
     },
   });

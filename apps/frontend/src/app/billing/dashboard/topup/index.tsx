@@ -20,6 +20,8 @@ import { Select } from '../../../../components/select';
 import { TransactionProcessingCard } from './transactionProcessingStatus';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
 type Props = Omit<CardProps, 'children'> & {
   title?: string;
@@ -30,7 +32,16 @@ type Props = Omit<CardProps, 'children'> & {
 
 export function BillingDashboardTopupCard(props: Props) {
   const { title, subtitle, desiredAmount, onProcessingComplete, ...cardProps } = props;
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 

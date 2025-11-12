@@ -1,6 +1,14 @@
-import { useResourceFlowsServiceGetButtons, useResourceFlowsServicePressButton } from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  ApiError,
+  useResourceFlowsServiceGetButtons,
+  useResourceFlowsServicePressButton,
+} from '@attraccess/react-query-client';
 import { Button } from '@heroui/react';
 import { useState } from 'react';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
+import { useToastMessage } from '../../../../../../components/toastProvider';
 
 interface Props {
   resourceId: number;
@@ -8,6 +16,17 @@ interface Props {
 
 export function FlowButtons(props: Props) {
   const { resourceId } = props;
+
+  const { t, tExists } = useTranslations({
+    de: {
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+    en: {
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+  });
+
+  const toast = useToastMessage();
 
   const { data: buttons } = useResourceFlowsServiceGetButtons({ resourceId });
   const [pendingButtons, setPendingButtons] = useState<string[]>([]);
@@ -20,6 +39,12 @@ export function FlowButtons(props: Props) {
     },
     onError(_error, variables, _context) {
       setPendingButtons((prev) => prev.filter((id) => id !== variables.buttonId));
+      toast.apiError({
+        error: _error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
     },
   });
 

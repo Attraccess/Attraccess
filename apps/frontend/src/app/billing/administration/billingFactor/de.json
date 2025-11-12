@@ -12,13 +12,5 @@
       "title": "Zahlungsfaktor aktualisiert",
       "description": "Zahlungsfaktor wurde erfolgreich aktualisiert"
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Fehler beim Aktualisieren des Zahlungsfaktors",
-        "description": "Zahlungsfaktor konnte nicht aktualisiert werden"
-      }
-    }
   }
 }
