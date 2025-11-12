@@ -4874,7 +4874,7 @@ export type $OpenApiTs = {
                  */
                 403: unknown;
                 /**
-                 * Button not found
+                 * UNKNOWN_BUTTON_ID
                  */
                 404: unknown;
             };

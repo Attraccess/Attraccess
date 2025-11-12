@@ -3,3037 +3,2716 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type {
-  InfoResponse,
-  GetLocalSignupDomainWhitelistResponse,
-  SetLocalSignupDomainWhitelistData,
-  SetLocalSignupDomainWhitelistResponse,
-  CreateOneUserData,
-  CreateOneUserResponse,
-  FindManyData,
-  FindManyResponse,
-  IsLocalSignupEnabledResponse,
-  VerifyEmailData,
-  VerifyEmailResponse,
-  RequestPasswordResetData,
-  RequestPasswordResetResponse,
-  ChangePasswordViaResetTokenData,
-  ChangePasswordViaResetTokenResponse,
-  GetCurrentResponse,
-  ChangeMyUsernameData,
-  ChangeMyUsernameResponse,
-  GetOneUserByIdData,
-  GetOneUserByIdResponse,
-  UpdatePermissionsData,
-  UpdatePermissionsResponse,
-  GetPermissionsData,
-  GetPermissionsResponse,
-  BulkUpdatePermissionsData,
-  BulkUpdatePermissionsResponse,
-  GetAllWithPermissionData,
-  GetAllWithPermissionResponse,
-  SetUserPasswordData,
-  SetUserPasswordResponse,
-  ChangeUserUsernameData,
-  ChangeUserUsernameResponse,
-  ChangeUserBillingFactorData,
-  ChangeUserBillingFactorResponse,
-  CreateSessionData,
-  CreateSessionResponse2,
-  RefreshSessionData,
-  RefreshSessionResponse,
-  EndSessionResponse,
-  GetAllSsoProvidersResponse,
-  CreateOneSsoProviderData,
-  CreateOneSsoProviderResponse,
-  LinkUserToExternalAccountData,
-  LinkUserToExternalAccountResponse,
-  GetOneSsoProviderByIdData,
-  GetOneSsoProviderByIdResponse,
-  UpdateOneSsoProviderData,
-  UpdateOneSsoProviderResponse,
-  DeleteOneSsoProviderData,
-  DeleteOneSsoProviderResponse,
-  DiscoverAuthentikOidcData,
-  DiscoverAuthentikOidcResponse,
-  DiscoverKeycloakOidcData,
-  DiscoverKeycloakOidcResponse,
-  LoginWithOidcData,
-  LoginWithOidcResponse,
-  OidcLoginCallbackData,
-  OidcLoginCallbackResponse,
-  EmailTemplateControllerPreviewMjmlData,
-  EmailTemplateControllerPreviewMjmlResponse,
-  EmailTemplateControllerFindAllResponse,
-  EmailTemplateControllerFindOneData,
-  EmailTemplateControllerFindOneResponse,
-  EmailTemplateControllerUpdateData,
-  EmailTemplateControllerUpdateResponse,
-  GetLicenseInformationResponse,
-  CreateOneResourceData,
-  CreateOneResourceResponse,
-  GetAllResourcesData,
-  GetAllResourcesResponse,
-  GetAllResourcesInUseResponse,
-  GetOneResourceByIdData,
-  GetOneResourceByIdResponse,
-  UpdateOneResourceData,
-  UpdateOneResourceResponse,
-  DeleteOneResourceData,
-  DeleteOneResourceResponse,
-  SseControllerStreamEventsData,
-  SseControllerStreamEventsResponse,
-  ResourceGroupsCreateOneData,
-  ResourceGroupsCreateOneResponse,
-  ResourceGroupsGetManyResponse,
-  ResourceGroupsGetOneData,
-  ResourceGroupsGetOneResponse,
-  ResourceGroupsUpdateOneData,
-  ResourceGroupsUpdateOneResponse,
-  ResourceGroupsAddResourceData,
-  ResourceGroupsAddResourceResponse,
-  ResourceGroupsRemoveResourceData,
-  ResourceGroupsRemoveResourceResponse,
-  ResourceGroupsDeleteOneData,
-  ResourceGroupsDeleteOneResponse,
-  ResourceUsageStartSessionData,
-  ResourceUsageStartSessionResponse,
-  ResourceUsageEndSessionData,
-  ResourceUsageEndSessionResponse,
-  LockDoorData,
-  LockDoorResponse,
-  UnlockDoorData,
-  UnlockDoorResponse,
-  UnlatchDoorData,
-  UnlatchDoorResponse,
-  ResourceUsageGetHistoryData,
-  ResourceUsageGetHistoryResponse,
-  ResourceUsageGetActiveSessionData,
-  ResourceUsageGetActiveSessionResponse,
-  ResourceUsageCanControlData,
-  ResourceUsageCanControlResponse,
-  MqttServersGetAllResponse,
-  MqttServersCreateOneData,
-  MqttServersCreateOneResponse,
-  MqttServersGetOneByIdData,
-  MqttServersGetOneByIdResponse,
-  MqttServersUpdateOneData,
-  MqttServersUpdateOneResponse,
-  MqttServersDeleteOneData,
-  MqttServersDeleteOneResponse,
-  ResourceGroupIntroductionsGetManyData,
-  ResourceGroupIntroductionsGetManyResponse,
-  ResourceGroupIntroductionsGetHistoryData,
-  ResourceGroupIntroductionsGetHistoryResponse,
-  ResourceGroupIntroductionsGrantData,
-  ResourceGroupIntroductionsGrantResponse,
-  ResourceGroupIntroductionsRevokeData,
-  ResourceGroupIntroductionsRevokeResponse,
-  ResourceGroupIntroducersGetManyData,
-  ResourceGroupIntroducersGetManyResponse,
-  ResourceGroupIntroducersIsIntroducerData,
-  ResourceGroupIntroducersIsIntroducerResponse,
-  ResourceGroupIntroducersGrantData,
-  ResourceGroupIntroducersGrantResponse,
-  ResourceGroupIntroducersRevokeData,
-  ResourceGroupIntroducersRevokeResponse,
-  ResourceIntroducersIsIntroducerData,
-  ResourceIntroducersIsIntroducerResponse,
-  ResourceIntroducersGetManyData,
-  ResourceIntroducersGetManyResponse,
-  ResourceIntroducersGrantData,
-  ResourceIntroducersGrantResponse,
-  ResourceIntroducersRevokeData,
-  ResourceIntroducersRevokeResponse,
-  ResourceIntroductionsGetManyData,
-  ResourceIntroductionsGetManyResponse,
-  ResourceIntroductionsGrantData,
-  ResourceIntroductionsGrantResponse,
-  ResourceIntroductionsRevokeData,
-  ResourceIntroductionsRevokeResponse,
-  ResourceIntroductionsGetHistoryData,
-  ResourceIntroductionsGetHistoryResponse,
-  CanManageMaintenanceData,
-  CanManageMaintenanceResponse,
-  CreateMaintenanceData,
-  CreateMaintenanceResponse,
-  FindMaintenancesData,
-  FindMaintenancesResponse,
-  GetMaintenanceData,
-  GetMaintenanceResponse,
-  UpdateMaintenanceData,
-  UpdateMaintenanceResponse,
-  CancelMaintenanceData,
-  CancelMaintenanceResponse,
-  GetBillingBalanceData,
-  GetBillingBalanceResponse,
-  GetBillingTransactionsData,
-  GetBillingTransactionsResponse,
-  CreateManualTransactionData,
-  CreateManualTransactionResponse,
-  GetBillingTransactionData,
-  GetBillingTransactionResponse,
-  GetResourceBillingConfigurationData,
-  GetResourceBillingConfigurationResponse,
-  UpdateResourceBillingConfigurationData,
-  UpdateResourceBillingConfigurationResponse,
-  SetSumUpApiKeyData,
-  SetSumUpApiKeyResponse,
-  SetBillingConfigurationData,
-  SetBillingConfigurationResponse,
-  GetBillingConfigurationResponse,
-  GetSumUpConfigurationResponse,
-  GetSumUpReadersResponse,
-  PairSumUpReaderData,
-  PairSumUpReaderResponse,
-  RemoveSumUpReaderData,
-  TopUpWithSumUpReaderData,
-  TopUpWithSumUpReaderResponse,
-  SumUpTopUpCallbackData,
-  SumUpTopUpCallbackResponse,
-  RefundTransactionData,
-  RefundTransactionResponse,
-  GetNodeSchemasData,
-  GetNodeSchemasResponse,
-  GetResourceFlowData,
-  GetResourceFlowResponse,
-  SaveResourceFlowData,
-  SaveResourceFlowResponse,
-  GetResourceFlowLogsData,
-  GetResourceFlowLogsResponse,
-  ResourceFlowsControllerStreamEventsData,
-  ResourceFlowsControllerStreamEventsResponse,
-  PressButtonData,
-  PressButtonResponse,
-  GetButtonsData,
-  GetButtonsResponse,
-  GetPluginsResponse,
-  UploadPluginData,
-  GetFrontendPluginFileData,
-  GetFrontendPluginFileResponse,
-  DeletePluginData,
-  DeletePluginResponse,
-  EnrollNfcCardData,
-  EnrollNfcCardResponse,
-  ResetNfcCardData,
-  ResetNfcCardResponse,
-  UpdateReaderData,
-  UpdateReaderResponse,
-  GetReaderByIdData,
-  GetReaderByIdResponse,
-  DeleteReaderData,
-  DeleteReaderResponse,
-  GetReadersResponse,
-  GetAppKeyByUidData,
-  GetAppKeyByUidResponse,
-  GetAllCardsResponse,
-  ToggleCardActiveData,
-  ToggleCardActiveResponse,
-  GetFirmwaresResponse,
-  DownloadFirmwareBinaryData,
-  DownloadFirmwareBinaryResponse,
-  GetFirmwareBinaryData,
-  GetFirmwareBinaryResponse,
-  GetResourceUsageHoursInDateRangeData,
-  GetResourceUsageHoursInDateRangeResponse,
-  GetBillingTransactionsInDateRangeData,
-  GetBillingTransactionsInDateRangeResponse,
-} from './types.gen';
+import type { InfoResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, GetOneUserByIdData, GetOneUserByIdResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, UpdateMaintenanceData, UpdateMaintenanceResponse, CancelMaintenanceData, CancelMaintenanceResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
 
 export class SystemService {
-  /**
-   * Return API information
-   * @returns unknown API information
-   * @throws ApiError
-   */
-  public static info(): CancelablePromise<InfoResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/info',
-    });
-  }
+    /**
+     * Return API information
+     * @returns unknown API information
+     * @throws ApiError
+     */
+    public static info(): CancelablePromise<InfoResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/info'
+        });
+    }
+    
 }
 
 export class UsersService {
-  /**
-   * Get the local signup domain whitelist
-   * @returns string The local signup domain whitelist.
-   * @throws ApiError
-   */
-  public static getLocalSignupDomainWhitelist(): CancelablePromise<GetLocalSignupDomainWhitelistResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/local-signup-domain-whitelist',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Set the local signup domain whitelist
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns unknown The local signup domain whitelist has been successfully set.
-   * @throws ApiError
-   */
-  public static setLocalSignupDomainWhitelist(
-    data: SetLocalSignupDomainWhitelistData,
-  ): CancelablePromise<SetLocalSignupDomainWhitelistResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/local-signup-domain-whitelist',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Create a new user
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns User The user has been successfully created.
-   * @throws ApiError
-   */
-  public static createOneUser(data: CreateOneUserData): CancelablePromise<CreateOneUserResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-      },
-    });
-  }
-
-  /**
-   * Get a paginated list of users
-   * @param data The data for the request.
-   * @param data.page Page number (1-based)
-   * @param data.limit Number of items per page
-   * @param data.search Search query
-   * @param data.ids User IDs
-   * @returns PaginatedUsersResponseDto List of users.
-   * @throws ApiError
-   */
-  public static findMany(data: FindManyData = {}): CancelablePromise<FindManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users',
-      query: {
-        page: data.page,
-        limit: data.limit,
-        search: data.search,
-        ids: data.ids,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to manage users.',
-      },
-    });
-  }
-
-  /**
-   * Check if local signup is enabled
-   * @returns BooleanDto Local signup is enabled.
-   * @throws ApiError
-   */
-  public static isLocalSignupEnabled(): CancelablePromise<IsLocalSignupEnabledResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/local-signup-enabled',
-    });
-  }
-
-  /**
-   * Verify a user email address
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns unknown Email verified successfully.
-   * @throws ApiError
-   */
-  public static verifyEmail(data: VerifyEmailData): CancelablePromise<VerifyEmailResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/verify-email',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid token or email.',
-      },
-    });
-  }
-
-  /**
-   * Request a password reset
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns unknown OK
-   * @throws ApiError
-   */
-  public static requestPasswordReset(data: RequestPasswordResetData): CancelablePromise<RequestPasswordResetResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/reset-password',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-      },
-    });
-  }
-
-  /**
-   * Change a user password after password reset
-   * @param data The data for the request.
-   * @param data.userId
-   * @param data.requestBody
-   * @returns unknown OK
-   * @throws ApiError
-   */
-  public static changePasswordViaResetToken(
-    data: ChangePasswordViaResetTokenData,
-  ): CancelablePromise<ChangePasswordViaResetTokenResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/{userId}/change-password-by-token',
-      path: {
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-      },
-    });
-  }
-
-  /**
-   * Get the current authenticated user
-   * @returns User The current user.
-   * @throws ApiError
-   */
-  public static getCurrent(): CancelablePromise<GetCurrentResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/me',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Change current user username (limit once per day)
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns User Username changed.
-   * @throws ApiError
-   */
-  public static changeMyUsername(data: ChangeMyUsernameData): CancelablePromise<ChangeMyUsernameResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/users/me/username',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get a user by ID
-   * @param data The data for the request.
-   * @param data.id
-   * @returns User The user with the specified ID.
-   * @throws ApiError
-   */
-  public static getOneUserById(data: GetOneUserByIdData): CancelablePromise<GetOneUserByIdResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to access this resource.',
-        404: 'User not found.',
-      },
-    });
-  }
-
-  /**
-   * Update a user's system permissions
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns User The user permissions have been successfully updated.
-   * @throws ApiError
-   */
-  public static updatePermissions(data: UpdatePermissionsData): CancelablePromise<UpdatePermissionsResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/users/{id}/permissions',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to manage users.',
-        404: 'User not found.',
-      },
-    });
-  }
-
-  /**
-   * Get a user's system permissions
-   * @param data The data for the request.
-   * @param data.id
-   * @returns unknown The user's permissions.
-   * @throws ApiError
-   */
-  public static getPermissions(data: GetPermissionsData): CancelablePromise<GetPermissionsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/{id}/permissions',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to manage users.',
-        404: 'User not found.',
-      },
-    });
-  }
-
-  /**
-   * Bulk update user permissions
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns User The user permissions have been successfully updated.
-   * @throws ApiError
-   */
-  public static bulkUpdatePermissions(
-    data: BulkUpdatePermissionsData,
-  ): CancelablePromise<BulkUpdatePermissionsResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/permissions',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to manage users.',
-      },
-    });
-  }
-
-  /**
-   * Get users with a specific permission
-   * @param data The data for the request.
-   * @param data.page Page number (1-based)
-   * @param data.limit Number of items per page
-   * @param data.permission Filter users by permission
-   * @returns PaginatedUsersResponseDto List of users with the specified permission.
-   * @throws ApiError
-   */
-  public static getAllWithPermission(
-    data: GetAllWithPermissionData = {},
-  ): CancelablePromise<GetAllWithPermissionResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/with-permission',
-      query: {
-        page: data.page,
-        limit: data.limit,
-        permission: data.permission,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - User does not have permission to manage users.',
-      },
-    });
-  }
-
-  /**
-   * Set a user's password directly
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns unknown The password has been successfully updated.
-   * @throws ApiError
-   */
-  public static setUserPassword(data: SetUserPasswordData): CancelablePromise<SetUserPasswordResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/{id}/password',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data.',
-        401: 'Unauthorized',
-        404: 'User not found.',
-      },
-    });
-  }
-
-  /**
-   * Admin: Change a user's username (no limit)
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns User Username changed.
-   * @throws ApiError
-   */
-  public static changeUserUsername(data: ChangeUserUsernameData): CancelablePromise<ChangeUserUsernameResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/users/{id}/username',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Change a user's billing factor
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns User Billing factor changed.
-   * @throws ApiError
-   */
-  public static changeUserBillingFactor(
-    data: ChangeUserBillingFactorData,
-  ): CancelablePromise<ChangeUserBillingFactorResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/users/{id}/billing-factor',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Get the local signup domain whitelist
+     * @returns string The local signup domain whitelist.
+     * @throws ApiError
+     */
+    public static getLocalSignupDomainWhitelist(): CancelablePromise<GetLocalSignupDomainWhitelistResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/local-signup-domain-whitelist',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Set the local signup domain whitelist
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown The local signup domain whitelist has been successfully set.
+     * @throws ApiError
+     */
+    public static setLocalSignupDomainWhitelist(data: SetLocalSignupDomainWhitelistData): CancelablePromise<SetLocalSignupDomainWhitelistResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/local-signup-domain-whitelist',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.',
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Create a new user
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns User The user has been successfully created.
+     * @throws ApiError
+     */
+    public static createOneUser(data: CreateOneUserData): CancelablePromise<CreateOneUserResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.'
+            }
+        });
+    }
+    
+    /**
+     * Get a paginated list of users
+     * @param data The data for the request.
+     * @param data.page Page number (1-based)
+     * @param data.limit Number of items per page
+     * @param data.search Search query
+     * @param data.ids User IDs
+     * @returns PaginatedUsersResponseDto List of users.
+     * @throws ApiError
+     */
+    public static findMany(data: FindManyData = {}): CancelablePromise<FindManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users',
+            query: {
+                page: data.page,
+                limit: data.limit,
+                search: data.search,
+                ids: data.ids
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to manage users.'
+            }
+        });
+    }
+    
+    /**
+     * Check if local signup is enabled
+     * @returns BooleanDto Local signup is enabled.
+     * @throws ApiError
+     */
+    public static isLocalSignupEnabled(): CancelablePromise<IsLocalSignupEnabledResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/local-signup-enabled'
+        });
+    }
+    
+    /**
+     * Verify a user email address
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown Email verified successfully.
+     * @throws ApiError
+     */
+    public static verifyEmail(data: VerifyEmailData): CancelablePromise<VerifyEmailResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/verify-email',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid token or email.'
+            }
+        });
+    }
+    
+    /**
+     * Request a password reset
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown OK
+     * @throws ApiError
+     */
+    public static requestPasswordReset(data: RequestPasswordResetData): CancelablePromise<RequestPasswordResetResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/reset-password',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.'
+            }
+        });
+    }
+    
+    /**
+     * Change a user password after password reset
+     * @param data The data for the request.
+     * @param data.userId
+     * @param data.requestBody
+     * @returns unknown OK
+     * @throws ApiError
+     */
+    public static changePasswordViaResetToken(data: ChangePasswordViaResetTokenData): CancelablePromise<ChangePasswordViaResetTokenResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/{userId}/change-password-by-token',
+            path: {
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.'
+            }
+        });
+    }
+    
+    /**
+     * Get the current authenticated user
+     * @returns User The current user.
+     * @throws ApiError
+     */
+    public static getCurrent(): CancelablePromise<GetCurrentResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/me',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Change current user username (limit once per day)
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns User Username changed.
+     * @throws ApiError
+     */
+    public static changeMyUsername(data: ChangeMyUsernameData): CancelablePromise<ChangeMyUsernameResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/users/me/username',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get a user by ID
+     * @param data The data for the request.
+     * @param data.id
+     * @returns User The user with the specified ID.
+     * @throws ApiError
+     */
+    public static getOneUserById(data: GetOneUserByIdData): CancelablePromise<GetOneUserByIdResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to access this resource.',
+                404: 'User not found.'
+            }
+        });
+    }
+    
+    /**
+     * Update a user's system permissions
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns User The user permissions have been successfully updated.
+     * @throws ApiError
+     */
+    public static updatePermissions(data: UpdatePermissionsData): CancelablePromise<UpdatePermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/users/{id}/permissions',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.',
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to manage users.',
+                404: 'User not found.'
+            }
+        });
+    }
+    
+    /**
+     * Get a user's system permissions
+     * @param data The data for the request.
+     * @param data.id
+     * @returns unknown The user's permissions.
+     * @throws ApiError
+     */
+    public static getPermissions(data: GetPermissionsData): CancelablePromise<GetPermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{id}/permissions',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to manage users.',
+                404: 'User not found.'
+            }
+        });
+    }
+    
+    /**
+     * Bulk update user permissions
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns User The user permissions have been successfully updated.
+     * @throws ApiError
+     */
+    public static bulkUpdatePermissions(data: BulkUpdatePermissionsData): CancelablePromise<BulkUpdatePermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/permissions',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.',
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to manage users.'
+            }
+        });
+    }
+    
+    /**
+     * Get users with a specific permission
+     * @param data The data for the request.
+     * @param data.page Page number (1-based)
+     * @param data.limit Number of items per page
+     * @param data.permission Filter users by permission
+     * @returns PaginatedUsersResponseDto List of users with the specified permission.
+     * @throws ApiError
+     */
+    public static getAllWithPermission(data: GetAllWithPermissionData = {}): CancelablePromise<GetAllWithPermissionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/with-permission',
+            query: {
+                page: data.page,
+                limit: data.limit,
+                permission: data.permission
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - User does not have permission to manage users.'
+            }
+        });
+    }
+    
+    /**
+     * Set a user's password directly
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns unknown The password has been successfully updated.
+     * @throws ApiError
+     */
+    public static setUserPassword(data: SetUserPasswordData): CancelablePromise<SetUserPasswordResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/{id}/password',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data.',
+                401: 'Unauthorized',
+                404: 'User not found.'
+            }
+        });
+    }
+    
+    /**
+     * Admin: Change a user's username (no limit)
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns User Username changed.
+     * @throws ApiError
+     */
+    public static changeUserUsername(data: ChangeUserUsernameData): CancelablePromise<ChangeUserUsernameResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/users/{id}/username',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Change a user's billing factor
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns User Billing factor changed.
+     * @throws ApiError
+     */
+    public static changeUserBillingFactor(data: ChangeUserBillingFactorData): CancelablePromise<ChangeUserBillingFactorResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/users/{id}/billing-factor',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class AuthenticationService {
-  /**
-   * Create a new session using local authentication
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns CreateSessionResponse The session has been created
-   * @throws ApiError
-   */
-  public static createSession(data: CreateSessionData): CancelablePromise<CreateSessionResponse2> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/auth/session/local',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized - Invalid credentials',
-      },
-    });
-  }
-
-  /**
-   * Refresh the current session
-   * @param data The data for the request.
-   * @param data.tokenLocation
-   * @returns CreateSessionResponse The session has been refreshed
-   * @throws ApiError
-   */
-  public static refreshSession(data: RefreshSessionData): CancelablePromise<RefreshSessionResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/session/refresh',
-      query: {
-        tokenLocation: data.tokenLocation,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Logout and invalidate the current session
-   * @returns unknown The session has been deleted
-   * @throws ApiError
-   */
-  public static endSession(): CancelablePromise<EndSessionResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/auth/session',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all SSO providers
-   * @returns SSOProvider The list of SSO providers
-   * @throws ApiError
-   */
-  public static getAllSsoProviders(): CancelablePromise<GetAllSsoProvidersResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/providers',
-    });
-  }
-
-  /**
-   * Create a new SSO provider
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns SSOProvider The SSO provider has been created
-   * @throws ApiError
-   */
-  public static createOneSsoProvider(data: CreateOneSsoProviderData): CancelablePromise<CreateOneSsoProviderResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/auth/sso/providers',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - Insufficient permissions',
-      },
-    });
-  }
-
-  /**
-   * Link an account to an external identifier
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns unknown The account has been linked to the external identifier
-   * @throws ApiError
-   */
-  public static linkUserToExternalAccount(
-    data: LinkUserToExternalAccountData,
-  ): CancelablePromise<LinkUserToExternalAccountResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/auth/sso/link-account',
-      body: data.requestBody,
-      mediaType: 'application/json',
-    });
-  }
-
-  /**
-   * Get SSO provider by ID with full configuration
-   * @param data The data for the request.
-   * @param data.id The ID of the SSO provider
-   * @returns SSOProvider The SSO provider with full configuration
-   * @throws ApiError
-   */
-  public static getOneSsoProviderById(
-    data: GetOneSsoProviderByIdData,
-  ): CancelablePromise<GetOneSsoProviderByIdResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/providers/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - Insufficient permissions',
-        404: 'Provider not found',
-      },
-    });
-  }
-
-  /**
-   * Update an existing SSO provider
-   * @param data The data for the request.
-   * @param data.id The ID of the SSO provider
-   * @param data.requestBody
-   * @returns SSOProvider The SSO provider has been updated
-   * @throws ApiError
-   */
-  public static updateOneSsoProvider(data: UpdateOneSsoProviderData): CancelablePromise<UpdateOneSsoProviderResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/auth/sso/providers/{id}',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - Insufficient permissions',
-        404: 'Provider not found',
-      },
-    });
-  }
-
-  /**
-   * Delete an SSO provider
-   * @param data The data for the request.
-   * @param data.id The ID of the SSO provider
-   * @returns unknown The SSO provider has been deleted
-   * @throws ApiError
-   */
-  public static deleteOneSsoProvider(data: DeleteOneSsoProviderData): CancelablePromise<DeleteOneSsoProviderResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/auth/sso/providers/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Forbidden - Insufficient permissions',
-        404: 'Provider not found',
-      },
-    });
-  }
-
-  /**
-   * Proxy Authentik OIDC well-known discovery
-   * @param data The data for the request.
-   * @param data.host Authentik host, e.g. http://localhost:9000
-   * @param data.applicationName Authentik application slug
-   * @returns unknown OIDC configuration JSON
-   * @throws ApiError
-   */
-  public static discoverAuthentikOidc(
-    data: DiscoverAuthentikOidcData,
-  ): CancelablePromise<DiscoverAuthentikOidcResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/discovery/authentik',
-      query: {
-        host: data.host,
-        applicationName: data.applicationName,
-      },
-      errors: {
-        400: 'Invalid host or applicationName',
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Proxy Keycloak OIDC well-known discovery
-   * @param data The data for the request.
-   * @param data.host Keycloak host, e.g. http://localhost:8080
-   * @param data.realm Keycloak realm name
-   * @returns unknown OIDC configuration JSON
-   * @throws ApiError
-   */
-  public static discoverKeycloakOidc(data: DiscoverKeycloakOidcData): CancelablePromise<DiscoverKeycloakOidcResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/discovery/keycloak',
-      query: {
-        host: data.host,
-        realm: data.realm,
-      },
-      errors: {
-        400: 'Invalid host or realm',
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Login with OIDC
-   * Login with OIDC and redirect to the callback URL (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
-   * @param data The data for the request.
-   * @param data.providerId The ID of the SSO provider
-   * @param data.redirectTo The URL to redirect to after login (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
-   * @returns unknown The user has been logged in
-   * @throws ApiError
-   */
-  public static loginWithOidc(data: LoginWithOidcData): CancelablePromise<LoginWithOidcResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/OIDC/{providerId}/login',
-      path: {
-        providerId: data.providerId,
-      },
-      query: {
-        redirectTo: data.redirectTo,
-      },
-    });
-  }
-
-  /**
-   * Callback for OIDC login
-   * @param data The data for the request.
-   * @param data.redirectTo
-   * @param data.code
-   * @param data.iss
-   * @param data.sessionState
-   * @param data.state
-   * @param data.providerId The ID of the SSO provider
-   * @returns CreateSessionResponse The user has been logged in
-   * @throws ApiError
-   */
-  public static oidcLoginCallback(data: OidcLoginCallbackData): CancelablePromise<OidcLoginCallbackResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/auth/sso/OIDC/{providerId}/callback',
-      path: {
-        providerId: data.providerId,
-      },
-      query: {
-        redirectTo: data.redirectTo,
-        code: data.code,
-        iss: data.iss,
-        'session-state': data.sessionState,
-        state: data.state,
-      },
-    });
-  }
+    /**
+     * Create a new session using local authentication
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns CreateSessionResponse The session has been created
+     * @throws ApiError
+     */
+    public static createSession(data: CreateSessionData): CancelablePromise<CreateSessionResponse2> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/session/local',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized - Invalid credentials'
+            }
+        });
+    }
+    
+    /**
+     * Refresh the current session
+     * @param data The data for the request.
+     * @param data.tokenLocation
+     * @returns CreateSessionResponse The session has been refreshed
+     * @throws ApiError
+     */
+    public static refreshSession(data: RefreshSessionData): CancelablePromise<RefreshSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/session/refresh',
+            query: {
+                tokenLocation: data.tokenLocation
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Logout and invalidate the current session
+     * @returns unknown The session has been deleted
+     * @throws ApiError
+     */
+    public static endSession(): CancelablePromise<EndSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/auth/session',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all SSO providers
+     * @returns SSOProvider The list of SSO providers
+     * @throws ApiError
+     */
+    public static getAllSsoProviders(): CancelablePromise<GetAllSsoProvidersResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/providers'
+        });
+    }
+    
+    /**
+     * Create a new SSO provider
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns SSOProvider The SSO provider has been created
+     * @throws ApiError
+     */
+    public static createOneSsoProvider(data: CreateOneSsoProviderData): CancelablePromise<CreateOneSsoProviderResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/providers',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - Insufficient permissions'
+            }
+        });
+    }
+    
+    /**
+     * Link an account to an external identifier
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown The account has been linked to the external identifier
+     * @throws ApiError
+     */
+    public static linkUserToExternalAccount(data: LinkUserToExternalAccountData): CancelablePromise<LinkUserToExternalAccountResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/link-account',
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * Get SSO provider by ID with full configuration
+     * @param data The data for the request.
+     * @param data.id The ID of the SSO provider
+     * @returns SSOProvider The SSO provider with full configuration
+     * @throws ApiError
+     */
+    public static getOneSsoProviderById(data: GetOneSsoProviderByIdData): CancelablePromise<GetOneSsoProviderByIdResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/providers/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - Insufficient permissions',
+                404: 'Provider not found'
+            }
+        });
+    }
+    
+    /**
+     * Update an existing SSO provider
+     * @param data The data for the request.
+     * @param data.id The ID of the SSO provider
+     * @param data.requestBody
+     * @returns SSOProvider The SSO provider has been updated
+     * @throws ApiError
+     */
+    public static updateOneSsoProvider(data: UpdateOneSsoProviderData): CancelablePromise<UpdateOneSsoProviderResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/auth/sso/providers/{id}',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - Insufficient permissions',
+                404: 'Provider not found'
+            }
+        });
+    }
+    
+    /**
+     * Delete an SSO provider
+     * @param data The data for the request.
+     * @param data.id The ID of the SSO provider
+     * @returns unknown The SSO provider has been deleted
+     * @throws ApiError
+     */
+    public static deleteOneSsoProvider(data: DeleteOneSsoProviderData): CancelablePromise<DeleteOneSsoProviderResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/auth/sso/providers/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Forbidden - Insufficient permissions',
+                404: 'Provider not found'
+            }
+        });
+    }
+    
+    /**
+     * Proxy Authentik OIDC well-known discovery
+     * @param data The data for the request.
+     * @param data.host Authentik host, e.g. http://localhost:9000
+     * @param data.applicationName Authentik application slug
+     * @returns unknown OIDC configuration JSON
+     * @throws ApiError
+     */
+    public static discoverAuthentikOidc(data: DiscoverAuthentikOidcData): CancelablePromise<DiscoverAuthentikOidcResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/discovery/authentik',
+            query: {
+                host: data.host,
+                applicationName: data.applicationName
+            },
+            errors: {
+                400: 'Invalid host or applicationName',
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Proxy Keycloak OIDC well-known discovery
+     * @param data The data for the request.
+     * @param data.host Keycloak host, e.g. http://localhost:8080
+     * @param data.realm Keycloak realm name
+     * @returns unknown OIDC configuration JSON
+     * @throws ApiError
+     */
+    public static discoverKeycloakOidc(data: DiscoverKeycloakOidcData): CancelablePromise<DiscoverKeycloakOidcResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/discovery/keycloak',
+            query: {
+                host: data.host,
+                realm: data.realm
+            },
+            errors: {
+                400: 'Invalid host or realm',
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Login with OIDC
+     * Login with OIDC and redirect to the callback URL (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.redirectTo The URL to redirect to after login (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication
+     * @returns unknown The user has been logged in
+     * @throws ApiError
+     */
+    public static loginWithOidc(data: LoginWithOidcData): CancelablePromise<LoginWithOidcResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/OIDC/{providerId}/login',
+            path: {
+                providerId: data.providerId
+            },
+            query: {
+                redirectTo: data.redirectTo
+            }
+        });
+    }
+    
+    /**
+     * Callback for OIDC login
+     * @param data The data for the request.
+     * @param data.redirectTo
+     * @param data.code
+     * @param data.iss
+     * @param data.sessionState
+     * @param data.state
+     * @param data.providerId The ID of the SSO provider
+     * @returns CreateSessionResponse The user has been logged in
+     * @throws ApiError
+     */
+    public static oidcLoginCallback(data: OidcLoginCallbackData): CancelablePromise<OidcLoginCallbackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/sso/OIDC/{providerId}/callback',
+            path: {
+                providerId: data.providerId
+            },
+            query: {
+                redirectTo: data.redirectTo,
+                code: data.code,
+                iss: data.iss,
+                'session-state': data.sessionState,
+                state: data.state
+            }
+        });
+    }
+    
 }
 
 export class EmailTemplatesService {
-  /**
-   * Preview MJML content as HTML
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns PreviewMjmlResponseDto MJML preview result
-   * @throws ApiError
-   */
-  public static emailTemplateControllerPreviewMjml(
-    data: EmailTemplateControllerPreviewMjmlData,
-  ): CancelablePromise<EmailTemplateControllerPreviewMjmlResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/email-templates/preview-mjml',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid MJML content',
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * List all email templates
-   * @returns EmailTemplate List of email templates
-   * @throws ApiError
-   */
-  public static emailTemplateControllerFindAll(): CancelablePromise<EmailTemplateControllerFindAllResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/email-templates',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get an email template by type
-   * @param data The data for the request.
-   * @param data.type Template type/type
-   * @returns EmailTemplate Email template found
-   * @throws ApiError
-   */
-  public static emailTemplateControllerFindOne(
-    data: EmailTemplateControllerFindOneData,
-  ): CancelablePromise<EmailTemplateControllerFindOneResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/email-templates/{type}',
-      path: {
-        type: data.type,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'Template not found',
-      },
-    });
-  }
-
-  /**
-   * Update an email template
-   * @param data The data for the request.
-   * @param data.type Template type/type
-   * @param data.requestBody
-   * @returns EmailTemplate Template updated successfully
-   * @throws ApiError
-   */
-  public static emailTemplateControllerUpdate(
-    data: EmailTemplateControllerUpdateData,
-  ): CancelablePromise<EmailTemplateControllerUpdateResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/email-templates/{type}',
-      path: {
-        type: data.type,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid input data',
-        401: 'Unauthorized',
-        404: 'Template not found',
-      },
-    });
-  }
+    /**
+     * Preview MJML content as HTML
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns PreviewMjmlResponseDto MJML preview result
+     * @throws ApiError
+     */
+    public static emailTemplateControllerPreviewMjml(data: EmailTemplateControllerPreviewMjmlData): CancelablePromise<EmailTemplateControllerPreviewMjmlResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/email-templates/preview-mjml',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid MJML content',
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * List all email templates
+     * @returns EmailTemplate List of email templates
+     * @throws ApiError
+     */
+    public static emailTemplateControllerFindAll(): CancelablePromise<EmailTemplateControllerFindAllResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/email-templates',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get an email template by type
+     * @param data The data for the request.
+     * @param data.type Template type/type
+     * @returns EmailTemplate Email template found
+     * @throws ApiError
+     */
+    public static emailTemplateControllerFindOne(data: EmailTemplateControllerFindOneData): CancelablePromise<EmailTemplateControllerFindOneResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/email-templates/{type}',
+            path: {
+                type: data.type
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'Template not found'
+            }
+        });
+    }
+    
+    /**
+     * Update an email template
+     * @param data The data for the request.
+     * @param data.type Template type/type
+     * @param data.requestBody
+     * @returns EmailTemplate Template updated successfully
+     * @throws ApiError
+     */
+    public static emailTemplateControllerUpdate(data: EmailTemplateControllerUpdateData): CancelablePromise<EmailTemplateControllerUpdateResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/email-templates/{type}',
+            path: {
+                type: data.type
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid input data',
+                401: 'Unauthorized',
+                404: 'Template not found'
+            }
+        });
+    }
+    
 }
 
 export class LicenseService {
-  /**
-   * Get license information
-   * @returns LicenseDataDto The current license data.
-   * @throws ApiError
-   */
-  public static getLicenseInformation(): CancelablePromise<GetLicenseInformationResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/license-data',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Get license information
+     * @returns LicenseDataDto The current license data.
+     * @throws ApiError
+     */
+    public static getLicenseInformation(): CancelablePromise<GetLicenseInformationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/license-data',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class ResourcesService {
-  /**
-   * Create a new resource
-   * @param data The data for the request.
-   * @param data.formData
-   * @returns Resource The resource has been successfully created.
-   * @throws ApiError
-   */
-  public static createOneResource(data: CreateOneResourceData): CancelablePromise<CreateOneResourceResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources',
-      formData: data.formData,
-      mediaType: 'multipart/form-data',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all resources
-   * @param data The data for the request.
-   * @param data.page Page number (1-based)
-   * @param data.limit Number of items per page
-   * @param data.search Search term to filter resources
-   * @param data.groupId Group ID to filter resources. Send -1 to find ungrouped resources.
-   * @param data.ids Resource IDs to filter resources
-   * @param data.onlyInUseByMe Only resources in use by me
-   * @param data.onlyWithPermissions Only resources with permissions
-   * @returns PaginatedResourceResponseDto List of resources with pagination.
-   * @throws ApiError
-   */
-  public static getAllResources(data: GetAllResourcesData = {}): CancelablePromise<GetAllResourcesResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources',
-      query: {
-        page: data.page,
-        limit: data.limit,
-        search: data.search,
-        groupId: data.groupId,
-        ids: data.ids,
-        onlyInUseByMe: data.onlyInUseByMe,
-        onlyWithPermissions: data.onlyWithPermissions,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all resources in use
-   * @returns Resource List of resources in use.
-   * @throws ApiError
-   */
-  public static getAllResourcesInUse(): CancelablePromise<GetAllResourcesInUseResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/in-use',
-    });
-  }
-
-  /**
-   * Get a resource by ID
-   * @param data The data for the request.
-   * @param data.id
-   * @returns Resource The found resource.
-   * @throws ApiError
-   */
-  public static getOneResourceById(data: GetOneResourceByIdData): CancelablePromise<GetOneResourceByIdResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Update a resource
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.formData
-   * @returns Resource The resource has been successfully updated.
-   * @throws ApiError
-   */
-  public static updateOneResource(data: UpdateOneResourceData): CancelablePromise<UpdateOneResourceResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/resources/{id}',
-      path: {
-        id: data.id,
-      },
-      formData: data.formData,
-      mediaType: 'multipart/form-data',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Delete a resource
-   * @param data The data for the request.
-   * @param data.id
-   * @returns void The resource has been successfully deleted.
-   * @throws ApiError
-   */
-  public static deleteOneResource(data: DeleteOneResourceData): CancelablePromise<DeleteOneResourceResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resources/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns unknown
-   * @throws ApiError
-   */
-  public static sseControllerStreamEvents(
-    data: SseControllerStreamEventsData,
-  ): CancelablePromise<SseControllerStreamEventsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/events',
-      path: {
-        resourceId: data.resourceId,
-      },
-    });
-  }
-
-  /**
-   * Create a new resource group
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns ResourceGroup The resource group has been successfully created.
-   * @throws ApiError
-   */
-  public static resourceGroupsCreateOne(
-    data: ResourceGroupsCreateOneData,
-  ): CancelablePromise<ResourceGroupsCreateOneResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get many resource groups
-   * @returns ResourceGroup The resource groups have been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceGroupsGetMany(): CancelablePromise<ResourceGroupsGetManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups',
-    });
-  }
-
-  /**
-   * Get a resource group by ID
-   * @param data The data for the request.
-   * @param data.id The ID of the resource group
-   * @returns ResourceGroup The resource group has been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceGroupsGetOne(data: ResourceGroupsGetOneData): CancelablePromise<ResourceGroupsGetOneResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        404: 'The resource group has not been found.',
-      },
-    });
-  }
-
-  /**
-   * Update a resource group by ID
-   * @param data The data for the request.
-   * @param data.id The ID of the resource group
-   * @param data.requestBody
-   * @returns ResourceGroup The resource group has been successfully updated.
-   * @throws ApiError
-   */
-  public static resourceGroupsUpdateOne(
-    data: ResourceGroupsUpdateOneData,
-  ): CancelablePromise<ResourceGroupsUpdateOneResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/resource-groups/{id}',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-        404: 'The resource group has not been found.',
-      },
-    });
-  }
-
-  /**
-   * Add a resource to a resource group
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @param data.resourceId The ID of the resource
-   * @returns unknown The resource has been successfully added to the resource group.
-   * @throws ApiError
-   */
-  public static resourceGroupsAddResource(
-    data: ResourceGroupsAddResourceData,
-  ): CancelablePromise<ResourceGroupsAddResourceResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups/{groupId}/resources/{resourceId}',
-      path: {
-        groupId: data.groupId,
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Remove a resource from a resource group
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @param data.resourceId The ID of the resource
-   * @returns unknown The resource has been successfully removed from the resource group.
-   * @throws ApiError
-   */
-  public static resourceGroupsRemoveResource(
-    data: ResourceGroupsRemoveResourceData,
-  ): CancelablePromise<ResourceGroupsRemoveResourceResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resource-groups/{groupId}/resources/{resourceId}',
-      path: {
-        groupId: data.groupId,
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Delete a resource group by ID
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @returns unknown The resource group has been successfully deleted.
-   * @throws ApiError
-   */
-  public static resourceGroupsDeleteOne(
-    data: ResourceGroupsDeleteOneData,
-  ): CancelablePromise<ResourceGroupsDeleteOneResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resource-groups/{groupId}',
-      path: {
-        groupId: data.groupId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Start a resource usage session
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.requestBody
-   * @returns ResourceUsage Usage session started successfully.
-   * @throws ApiError
-   */
-  public static resourceUsageStartSession(
-    data: ResourceUsageStartSessionData,
-  ): CancelablePromise<ResourceUsageStartSessionResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/usage/start',
-      path: {
-        resourceId: data.resourceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Bad Request - Invalid input data',
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * End a resource usage session
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.requestBody
-   * @returns ResourceUsage Usage session ended successfully.
-   * @throws ApiError
-   */
-  public static resourceUsageEndSession(
-    data: ResourceUsageEndSessionData,
-  ): CancelablePromise<ResourceUsageEndSessionResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/resources/{resourceId}/usage/end',
-      path: {
-        resourceId: data.resourceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Bad Request - Invalid input data or no active session',
-        401: 'Unauthorized',
-        404: 'Resource or session not found',
-      },
-    });
-  }
-
-  /**
-   * Lock a resource of door type
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceUsage Door locked successfully.
-   * @throws ApiError
-   */
-  public static lockDoor(data: LockDoorData): CancelablePromise<LockDoorResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/usage/lock',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        400: 'Bad Request - Invalid input data',
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Unlock a resource of door type
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceUsage Door unlocked successfully.
-   * @throws ApiError
-   */
-  public static unlockDoor(data: UnlockDoorData): CancelablePromise<UnlockDoorResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/usage/unlock',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        400: 'Bad Request - Invalid input data',
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Unlatch a resource of door type (if supported)
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceUsage Door unlatch successfully.
-   * @throws ApiError
-   */
-  public static unlatchDoor(data: UnlatchDoorData): CancelablePromise<UnlatchDoorResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/usage/unlatch',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        400: 'Bad Request - Invalid input data',
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Get usage history for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.page The page number to retrieve
-   * @param data.limit The number of items per page
-   * @param data.userId The user ID to filter by
-   * @returns GetResourceHistoryResponseDto Resource usage history retrieved successfully.
-   * @throws ApiError
-   */
-  public static resourceUsageGetHistory(
-    data: ResourceUsageGetHistoryData,
-  ): CancelablePromise<ResourceUsageGetHistoryResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/usage/history',
-      path: {
-        resourceId: data.resourceId,
-      },
-      query: {
-        page: data.page,
-        limit: data.limit,
-        userId: data.userId,
-      },
-      errors: {
-        400: 'Bad Request - Invalid pagination parameters',
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Get active usage session for current user
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns GetActiveUsageSessionDto Active session retrieved successfully.
-   * @throws ApiError
-   */
-  public static resourceUsageGetActiveSession(
-    data: ResourceUsageGetActiveSessionData,
-  ): CancelablePromise<ResourceUsageGetActiveSessionResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/usage/active',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Check if the current user can control a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns CanControlResponseDto User can control resource
-   * @throws ApiError
-   */
-  public static resourceUsageCanControl(
-    data: ResourceUsageCanControlData,
-  ): CancelablePromise<ResourceUsageCanControlResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/usage/can-control',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Create a new resource
+     * @param data The data for the request.
+     * @param data.formData
+     * @returns Resource The resource has been successfully created.
+     * @throws ApiError
+     */
+    public static createOneResource(data: CreateOneResourceData): CancelablePromise<CreateOneResourceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources',
+            formData: data.formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all resources
+     * @param data The data for the request.
+     * @param data.page Page number (1-based)
+     * @param data.limit Number of items per page
+     * @param data.search Search term to filter resources
+     * @param data.groupId Group ID to filter resources. Send -1 to find ungrouped resources.
+     * @param data.ids Resource IDs to filter resources
+     * @param data.onlyInUseByMe Only resources in use by me
+     * @param data.onlyWithPermissions Only resources with permissions
+     * @returns PaginatedResourceResponseDto List of resources with pagination.
+     * @throws ApiError
+     */
+    public static getAllResources(data: GetAllResourcesData = {}): CancelablePromise<GetAllResourcesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources',
+            query: {
+                page: data.page,
+                limit: data.limit,
+                search: data.search,
+                groupId: data.groupId,
+                ids: data.ids,
+                onlyInUseByMe: data.onlyInUseByMe,
+                onlyWithPermissions: data.onlyWithPermissions
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all resources in use
+     * @returns Resource List of resources in use.
+     * @throws ApiError
+     */
+    public static getAllResourcesInUse(): CancelablePromise<GetAllResourcesInUseResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/in-use'
+        });
+    }
+    
+    /**
+     * Get a resource by ID
+     * @param data The data for the request.
+     * @param data.id
+     * @returns Resource The found resource.
+     * @throws ApiError
+     */
+    public static getOneResourceById(data: GetOneResourceByIdData): CancelablePromise<GetOneResourceByIdResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Update a resource
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.formData
+     * @returns Resource The resource has been successfully updated.
+     * @throws ApiError
+     */
+    public static updateOneResource(data: UpdateOneResourceData): CancelablePromise<UpdateOneResourceResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{id}',
+            path: {
+                id: data.id
+            },
+            formData: data.formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete a resource
+     * @param data The data for the request.
+     * @param data.id
+     * @returns void The resource has been successfully deleted.
+     * @throws ApiError
+     */
+    public static deleteOneResource(data: DeleteOneResourceData): CancelablePromise<DeleteOneResourceResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static sseControllerStreamEvents(data: SseControllerStreamEventsData): CancelablePromise<SseControllerStreamEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/events',
+            path: {
+                resourceId: data.resourceId
+            }
+        });
+    }
+    
+    /**
+     * Create a new resource group
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ResourceGroup The resource group has been successfully created.
+     * @throws ApiError
+     */
+    public static resourceGroupsCreateOne(data: ResourceGroupsCreateOneData): CancelablePromise<ResourceGroupsCreateOneResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get many resource groups
+     * @returns ResourceGroup The resource groups have been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupsGetMany(): CancelablePromise<ResourceGroupsGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups'
+        });
+    }
+    
+    /**
+     * Get a resource group by ID
+     * @param data The data for the request.
+     * @param data.id The ID of the resource group
+     * @returns ResourceGroup The resource group has been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupsGetOne(data: ResourceGroupsGetOneData): CancelablePromise<ResourceGroupsGetOneResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                404: 'The resource group has not been found.'
+            }
+        });
+    }
+    
+    /**
+     * Update a resource group by ID
+     * @param data The data for the request.
+     * @param data.id The ID of the resource group
+     * @param data.requestBody
+     * @returns ResourceGroup The resource group has been successfully updated.
+     * @throws ApiError
+     */
+    public static resourceGroupsUpdateOne(data: ResourceGroupsUpdateOneData): CancelablePromise<ResourceGroupsUpdateOneResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resource-groups/{id}',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                404: 'The resource group has not been found.'
+            }
+        });
+    }
+    
+    /**
+     * Add a resource to a resource group
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.resourceId The ID of the resource
+     * @returns unknown The resource has been successfully added to the resource group.
+     * @throws ApiError
+     */
+    public static resourceGroupsAddResource(data: ResourceGroupsAddResourceData): CancelablePromise<ResourceGroupsAddResourceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/resources/{resourceId}',
+            path: {
+                groupId: data.groupId,
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Remove a resource from a resource group
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.resourceId The ID of the resource
+     * @returns unknown The resource has been successfully removed from the resource group.
+     * @throws ApiError
+     */
+    public static resourceGroupsRemoveResource(data: ResourceGroupsRemoveResourceData): CancelablePromise<ResourceGroupsRemoveResourceResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resource-groups/{groupId}/resources/{resourceId}',
+            path: {
+                groupId: data.groupId,
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete a resource group by ID
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @returns unknown The resource group has been successfully deleted.
+     * @throws ApiError
+     */
+    public static resourceGroupsDeleteOne(data: ResourceGroupsDeleteOneData): CancelablePromise<ResourceGroupsDeleteOneResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resource-groups/{groupId}',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Start a resource usage session
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.requestBody
+     * @returns ResourceUsage Usage session started successfully.
+     * @throws ApiError
+     */
+    public static resourceUsageStartSession(data: ResourceUsageStartSessionData): CancelablePromise<ResourceUsageStartSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/usage/start',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Bad Request - Invalid input data',
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * End a resource usage session
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.requestBody
+     * @returns ResourceUsage Usage session ended successfully.
+     * @throws ApiError
+     */
+    public static resourceUsageEndSession(data: ResourceUsageEndSessionData): CancelablePromise<ResourceUsageEndSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{resourceId}/usage/end',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Bad Request - Invalid input data or no active session',
+                401: 'Unauthorized',
+                404: 'Resource or session not found'
+            }
+        });
+    }
+    
+    /**
+     * Lock a resource of door type
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceUsage Door locked successfully.
+     * @throws ApiError
+     */
+    public static lockDoor(data: LockDoorData): CancelablePromise<LockDoorResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/usage/lock',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                400: 'Bad Request - Invalid input data',
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Unlock a resource of door type
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceUsage Door unlocked successfully.
+     * @throws ApiError
+     */
+    public static unlockDoor(data: UnlockDoorData): CancelablePromise<UnlockDoorResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/usage/unlock',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                400: 'Bad Request - Invalid input data',
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Unlatch a resource of door type (if supported)
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceUsage Door unlatch successfully.
+     * @throws ApiError
+     */
+    public static unlatchDoor(data: UnlatchDoorData): CancelablePromise<UnlatchDoorResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/usage/unlatch',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                400: 'Bad Request - Invalid input data',
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get usage history for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.page The page number to retrieve
+     * @param data.limit The number of items per page
+     * @param data.userId The user ID to filter by
+     * @returns GetResourceHistoryResponseDto Resource usage history retrieved successfully.
+     * @throws ApiError
+     */
+    public static resourceUsageGetHistory(data: ResourceUsageGetHistoryData): CancelablePromise<ResourceUsageGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/usage/history',
+            path: {
+                resourceId: data.resourceId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit,
+                userId: data.userId
+            },
+            errors: {
+                400: 'Bad Request - Invalid pagination parameters',
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get active usage session for current user
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns GetActiveUsageSessionDto Active session retrieved successfully.
+     * @throws ApiError
+     */
+    public static resourceUsageGetActiveSession(data: ResourceUsageGetActiveSessionData): CancelablePromise<ResourceUsageGetActiveSessionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/usage/active',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Check if the current user can control a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns CanControlResponseDto User can control resource
+     * @throws ApiError
+     */
+    public static resourceUsageCanControl(data: ResourceUsageCanControlData): CancelablePromise<ResourceUsageCanControlResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/usage/can-control',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class MqttService {
-  /**
-   * Get all MQTT servers
-   * @returns MqttServer Returns all MQTT servers
-   * @throws ApiError
-   */
-  public static mqttServersGetAll(): CancelablePromise<MqttServersGetAllResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/mqtt/servers',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Create new MQTT server
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns MqttServer MQTT server created successfully
-   * @throws ApiError
-   */
-  public static mqttServersCreateOne(data: MqttServersCreateOneData): CancelablePromise<MqttServersCreateOneResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/mqtt/servers',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get MQTT server by ID
-   * @param data The data for the request.
-   * @param data.id
-   * @returns MqttServer Returns the MQTT server with the specified ID
-   * @throws ApiError
-   */
-  public static mqttServersGetOneById(
-    data: MqttServersGetOneByIdData,
-  ): CancelablePromise<MqttServersGetOneByIdResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/mqtt/servers/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'MQTT server not found',
-      },
-    });
-  }
-
-  /**
-   * Update MQTT server
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns MqttServer MQTT server updated successfully
-   * @throws ApiError
-   */
-  public static mqttServersUpdateOne(data: MqttServersUpdateOneData): CancelablePromise<MqttServersUpdateOneResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/mqtt/servers/{id}',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-        404: 'MQTT server not found',
-      },
-    });
-  }
-
-  /**
-   * Delete MQTT server
-   * @param data The data for the request.
-   * @param data.id
-   * @returns unknown MQTT server deleted successfully
-   * @throws ApiError
-   */
-  public static mqttServersDeleteOne(data: MqttServersDeleteOneData): CancelablePromise<MqttServersDeleteOneResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/mqtt/servers/{id}',
-      path: {
-        id: data.id,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'MQTT server not found',
-      },
-    });
-  }
+    /**
+     * Get all MQTT servers
+     * @returns MqttServer Returns all MQTT servers
+     * @throws ApiError
+     */
+    public static mqttServersGetAll(): CancelablePromise<MqttServersGetAllResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/mqtt/servers',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Create new MQTT server
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns MqttServer MQTT server created successfully
+     * @throws ApiError
+     */
+    public static mqttServersCreateOne(data: MqttServersCreateOneData): CancelablePromise<MqttServersCreateOneResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/mqtt/servers',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get MQTT server by ID
+     * @param data The data for the request.
+     * @param data.id
+     * @returns MqttServer Returns the MQTT server with the specified ID
+     * @throws ApiError
+     */
+    public static mqttServersGetOneById(data: MqttServersGetOneByIdData): CancelablePromise<MqttServersGetOneByIdResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/mqtt/servers/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'MQTT server not found'
+            }
+        });
+    }
+    
+    /**
+     * Update MQTT server
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns MqttServer MQTT server updated successfully
+     * @throws ApiError
+     */
+    public static mqttServersUpdateOne(data: MqttServersUpdateOneData): CancelablePromise<MqttServersUpdateOneResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/mqtt/servers/{id}',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                404: 'MQTT server not found'
+            }
+        });
+    }
+    
+    /**
+     * Delete MQTT server
+     * @param data The data for the request.
+     * @param data.id
+     * @returns unknown MQTT server deleted successfully
+     * @throws ApiError
+     */
+    public static mqttServersDeleteOne(data: MqttServersDeleteOneData): CancelablePromise<MqttServersDeleteOneResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/mqtt/servers/{id}',
+            path: {
+                id: data.id
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'MQTT server not found'
+            }
+        });
+    }
+    
 }
 
 export class AccessControlService {
-  /**
-   * Get many introductions by group ID
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @returns ResourceIntroduction The introductions have been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroductionsGetMany(
-    data: ResourceGroupIntroductionsGetManyData,
-  ): CancelablePromise<ResourceGroupIntroductionsGetManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups/{groupId}/introductions',
-      path: {
-        groupId: data.groupId,
-      },
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource group',
-      },
-    });
-  }
-
-  /**
-   * Get history of introductions by group ID and user ID
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @param data.userId The ID of the user
-   * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroductionsGetHistory(
-    data: ResourceGroupIntroductionsGetHistoryData,
-  ): CancelablePromise<ResourceGroupIntroductionsGetHistoryResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups/{groupId}/introductions/{userId}/history',
-      path: {
-        groupId: data.groupId,
-        userId: data.userId,
-      },
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource group',
-      },
-    });
-  }
-
-  /**
-   * Grant introduction permission for a resource group to a user
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @param data.userId The ID of the user
-   * @param data.requestBody
-   * @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroductionsGrant(
-    data: ResourceGroupIntroductionsGrantData,
-  ): CancelablePromise<ResourceGroupIntroductionsGrantResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups/{groupId}/introductions/{userId}/grant',
-      path: {
-        groupId: data.groupId,
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource group',
-      },
-    });
-  }
-
-  /**
-   * Revoke introduction permission for a resource group from a user
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @param data.userId The ID of the user
-   * @param data.requestBody
-   * @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroductionsRevoke(
-    data: ResourceGroupIntroductionsRevokeData,
-  ): CancelablePromise<ResourceGroupIntroductionsRevokeResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups/{groupId}/introductions/{userId}/revoke',
-      path: {
-        groupId: data.groupId,
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource group',
-      },
-    });
-  }
-
-  /**
-   * Get all introducers for a resource group
-   * @param data The data for the request.
-   * @param data.groupId The ID of the resource group
-   * @returns ResourceIntroducer The introducers have been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroducersGetMany(
-    data: ResourceGroupIntroducersGetManyData,
-  ): CancelablePromise<ResourceGroupIntroducersGetManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups/{groupId}/introducers',
-      path: {
-        groupId: data.groupId,
-      },
-      errors: {
-        404: 'The resource group has not been found.',
-      },
-    });
-  }
-
-  /**
-   * Check if a user is an introducer for a resource group
-   * @param data The data for the request.
-   * @param data.userId The ID of the user
-   * @param data.groupId The ID of the resource group
-   * @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroducersIsIntroducer(
-    data: ResourceGroupIntroducersIsIntroducerData,
-  ): CancelablePromise<ResourceGroupIntroducersIsIntroducerResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resource-groups/{groupId}/introducers/{userId}/is-introducer',
-      path: {
-        userId: data.userId,
-        groupId: data.groupId,
-      },
-    });
-  }
-
-  /**
-   * Grant a user introduction permission for a resource group
-   * @param data The data for the request.
-   * @param data.userId The ID of the user
-   * @param data.groupId The ID of the resource group
-   * @returns unknown The introducer has been successfully granted.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroducersGrant(
-    data: ResourceGroupIntroducersGrantData,
-  ): CancelablePromise<ResourceGroupIntroducersGrantResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups/{groupId}/introducers/{userId}/grant',
-      path: {
-        userId: data.userId,
-        groupId: data.groupId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Revoke a user introduction permission for a resource group
-   * @param data The data for the request.
-   * @param data.userId The ID of the user
-   * @param data.groupId The ID of the resource group
-   * @returns unknown The introducer has been successfully revoked.
-   * @throws ApiError
-   */
-  public static resourceGroupIntroducersRevoke(
-    data: ResourceGroupIntroducersRevokeData,
-  ): CancelablePromise<ResourceGroupIntroducersRevokeResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resource-groups/{groupId}/introducers/{userId}/revoke',
-      path: {
-        userId: data.userId,
-        groupId: data.groupId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Check if a user is an introducer for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.userId
-   * @param data.includeGroups
-   * @returns IsResourceIntroducerResponseDto User is an introducer for the resource
-   * @throws ApiError
-   */
-  public static resourceIntroducersIsIntroducer(
-    data: ResourceIntroducersIsIntroducerData,
-  ): CancelablePromise<ResourceIntroducersIsIntroducerResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/introducers/{userId}/is-introducer',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      query: {
-        includeGroups: data.includeGroups,
-      },
-    });
-  }
-
-  /**
-   * Get all introducers for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceIntroducer All introducers for a resource
-   * @throws ApiError
-   */
-  public static resourceIntroducersGetMany(
-    data: ResourceIntroducersGetManyData,
-  ): CancelablePromise<ResourceIntroducersGetManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/introducers',
-      path: {
-        resourceId: data.resourceId,
-      },
-    });
-  }
-
-  /**
-   * Grant a user introduction permission for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.userId
-   * @returns ResourceIntroducer Introduction permissions granted
-   * @throws ApiError
-   */
-  public static resourceIntroducersGrant(
-    data: ResourceIntroducersGrantData,
-  ): CancelablePromise<ResourceIntroducersGrantResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/introducers/{userId}/grant',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Revoke a user introduction permission for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.userId
-   * @returns unknown Introduction permissions revoked
-   * @throws ApiError
-   */
-  public static resourceIntroducersRevoke(
-    data: ResourceIntroducersRevokeData,
-  ): CancelablePromise<ResourceIntroducersRevokeResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resources/{resourceId}/introducers/{userId}/revoke',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all introductions for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceIntroduction All introductions for a resource
-   * @throws ApiError
-   */
-  public static resourceIntroductionsGetMany(
-    data: ResourceIntroductionsGetManyData,
-  ): CancelablePromise<ResourceIntroductionsGetManyResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/introductions',
-      path: {
-        resourceId: data.resourceId,
-      },
-    });
-  }
-
-  /**
-   * Grant a user usage permission for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.userId
-   * @param data.requestBody
-   * @returns ResourceIntroductionHistoryItem Introduction granted
-   * @throws ApiError
-   */
-  public static resourceIntroductionsGrant(
-    data: ResourceIntroductionsGrantData,
-  ): CancelablePromise<ResourceIntroductionsGrantResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/introductions/{userId}/grant',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource',
-      },
-    });
-  }
-
-  /**
-   * Revoke a user usage permission for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.userId
-   * @param data.requestBody
-   * @returns ResourceIntroductionHistoryItem Introduction revoked
-   * @throws ApiError
-   */
-  public static resourceIntroductionsRevoke(
-    data: ResourceIntroductionsRevokeData,
-  ): CancelablePromise<ResourceIntroductionsRevokeResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resources/{resourceId}/introductions/{userId}/revoke',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource',
-      },
-    });
-  }
-
-  /**
-   * Get history of introductions by resource ID and user ID
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.userId The ID of the user
-   * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-   * @throws ApiError
-   */
-  public static resourceIntroductionsGetHistory(
-    data: ResourceIntroductionsGetHistoryData,
-  ): CancelablePromise<ResourceIntroductionsGetHistoryResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/introductions/{userId}/history',
-      path: {
-        resourceId: data.resourceId,
-        userId: data.userId,
-      },
-      errors: {
-        401: 'User is not authenticated',
-        403: 'User does not have permission to introduce users to this resource',
-      },
-    });
-  }
+    /**
+     * Get many introductions by group ID
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @returns ResourceIntroduction The introductions have been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGetMany(data: ResourceGroupIntroductionsGetManyData): CancelablePromise<ResourceGroupIntroductionsGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introductions',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Get history of introductions by group ID and user ID
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGetHistory(data: ResourceGroupIntroductionsGetHistoryData): CancelablePromise<ResourceGroupIntroductionsGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/history',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Grant introduction permission for a resource group to a user
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGrant(data: ResourceGroupIntroductionsGrantData): CancelablePromise<ResourceGroupIntroductionsGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/grant',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Revoke introduction permission for a resource group from a user
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsRevoke(data: ResourceGroupIntroductionsRevokeData): CancelablePromise<ResourceGroupIntroductionsRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/revoke',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Get all introducers for a resource group
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @returns ResourceIntroducer The introducers have been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersGetMany(data: ResourceGroupIntroducersGetManyData): CancelablePromise<ResourceGroupIntroducersGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introducers',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                404: 'The resource group has not been found.'
+            }
+        });
+    }
+    
+    /**
+     * Check if a user is an introducer for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersIsIntroducer(data: ResourceGroupIntroducersIsIntroducerData): CancelablePromise<ResourceGroupIntroducersIsIntroducerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/is-introducer',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user introduction permission for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns unknown The introducer has been successfully granted.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersGrant(data: ResourceGroupIntroducersGrantData): CancelablePromise<ResourceGroupIntroducersGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/grant',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user introduction permission for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns unknown The introducer has been successfully revoked.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersRevoke(data: ResourceGroupIntroducersRevokeData): CancelablePromise<ResourceGroupIntroducersRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/revoke',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Check if a user is an introducer for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.includeGroups
+     * @returns IsResourceIntroducerResponseDto User is an introducer for the resource
+     * @throws ApiError
+     */
+    public static resourceIntroducersIsIntroducer(data: ResourceIntroducersIsIntroducerData): CancelablePromise<ResourceIntroducersIsIntroducerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introducers/{userId}/is-introducer',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            query: {
+                includeGroups: data.includeGroups
+            }
+        });
+    }
+    
+    /**
+     * Get all introducers for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceIntroducer All introducers for a resource
+     * @throws ApiError
+     */
+    public static resourceIntroducersGetMany(data: ResourceIntroducersGetManyData): CancelablePromise<ResourceIntroducersGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introducers',
+            path: {
+                resourceId: data.resourceId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user introduction permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @returns ResourceIntroducer Introduction permissions granted
+     * @throws ApiError
+     */
+    public static resourceIntroducersGrant(data: ResourceIntroducersGrantData): CancelablePromise<ResourceIntroducersGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introducers/{userId}/grant',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user introduction permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @returns unknown Introduction permissions revoked
+     * @throws ApiError
+     */
+    public static resourceIntroducersRevoke(data: ResourceIntroducersRevokeData): CancelablePromise<ResourceIntroducersRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/introducers/{userId}/revoke',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all introductions for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceIntroduction All introductions for a resource
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGetMany(data: ResourceIntroductionsGetManyData): CancelablePromise<ResourceIntroductionsGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introductions',
+            path: {
+                resourceId: data.resourceId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user usage permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem Introduction granted
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGrant(data: ResourceIntroductionsGrantData): CancelablePromise<ResourceIntroductionsGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introductions/{userId}/grant',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user usage permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem Introduction revoked
+     * @throws ApiError
+     */
+    public static resourceIntroductionsRevoke(data: ResourceIntroductionsRevokeData): CancelablePromise<ResourceIntroductionsRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/introductions/{userId}/revoke',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Get history of introductions by resource ID and user ID
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.userId The ID of the user
+     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGetHistory(data: ResourceIntroductionsGetHistoryData): CancelablePromise<ResourceIntroductionsGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introductions/{userId}/history',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
 }
 
 export class ResourceMaintenancesService {
-  /**
-   * Check if user can manage maintenance
-   * Check if the authenticated user has permission to manage maintenance for the specified resource
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @returns CanManageMaintenanceResponseDto Permission check completed successfully
-   * @throws ApiError
-   */
-  public static canManageMaintenance(data: CanManageMaintenanceData): CancelablePromise<CanManageMaintenanceResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/maintenances/can-manage',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized - User is not authenticated',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Create a maintenance for a resource
-   * Create a new maintenance schedule for a specific resource
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.requestBody
-   * @returns ResourceMaintenance Maintenance created successfully
-   * @throws ApiError
-   */
-  public static createMaintenance(data: CreateMaintenanceData): CancelablePromise<CreateMaintenanceResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/maintenances',
-      path: {
-        resourceId: data.resourceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Bad request - invalid maintenance data',
-        401: 'Unauthorized - User is not authenticated',
-        403: 'Forbidden - User does not have permission to manage maintenances for this resource',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Get maintenances for a resource
-   * Retrieve paginated list of maintenances for a specific resource with optional filtering
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.page Page number for pagination
-   * @param data.limit Number of items per page
-   * @param data.includeUpcoming Include upcoming maintenances (start time in the future)
-   * @param data.includeActive Include active maintenances (currently ongoing)
-   * @param data.includePast Include past maintenances (already finished)
-   * @returns PaginatedMaintenanceResponse Maintenances retrieved successfully
-   * @throws ApiError
-   */
-  public static findMaintenances(data: FindMaintenancesData): CancelablePromise<FindMaintenancesResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/maintenances',
-      path: {
-        resourceId: data.resourceId,
-      },
-      query: {
-        page: data.page,
-        limit: data.limit,
-        includeUpcoming: data.includeUpcoming,
-        includeActive: data.includeActive,
-        includePast: data.includePast,
-      },
-      errors: {
-        401: 'Unauthorized - User is not authenticated',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Get a specific maintenance by ID
-   * Retrieve details of a specific maintenance
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.maintenanceId The ID of the maintenance
-   * @returns ResourceMaintenance Maintenance retrieved successfully
-   * @throws ApiError
-   */
-  public static getMaintenance(data: GetMaintenanceData): CancelablePromise<GetMaintenanceResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
-      path: {
-        resourceId: data.resourceId,
-        maintenanceId: data.maintenanceId,
-      },
-      errors: {
-        401: 'Unauthorized - User is not authenticated',
-        404: 'Maintenance not found',
-      },
-    });
-  }
-
-  /**
-   * Update a maintenance
-   * Update a maintenance with new start time, end time, and/or reason
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.maintenanceId The ID of the maintenance
-   * @param data.requestBody
-   * @returns ResourceMaintenance Maintenance updated successfully
-   * @throws ApiError
-   */
-  public static updateMaintenance(data: UpdateMaintenanceData): CancelablePromise<UpdateMaintenanceResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
-      path: {
-        resourceId: data.resourceId,
-        maintenanceId: data.maintenanceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Bad request - invalid maintenance data',
-        401: 'Unauthorized - User is not authenticated',
-        403: 'Forbidden - User does not have permission to manage maintenances for this resource',
-        404: 'Maintenance not found',
-      },
-    });
-  }
-
-  /**
-   * Cancel a maintenance
-   * Delete a maintenance (cancel it)
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource
-   * @param data.maintenanceId The ID of the maintenance
-   * @returns void Maintenance cancelled successfully
-   * @throws ApiError
-   */
-  public static cancelMaintenance(data: CancelMaintenanceData): CancelablePromise<CancelMaintenanceResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
-      path: {
-        resourceId: data.resourceId,
-        maintenanceId: data.maintenanceId,
-      },
-      errors: {
-        401: 'Unauthorized - User is not authenticated',
-        403: 'Forbidden - User does not have permission to manage maintenances for this resource',
-        404: 'Maintenance not found',
-      },
-    });
-  }
+    /**
+     * Check if user can manage maintenance
+     * Check if the authenticated user has permission to manage maintenance for the specified resource
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @returns CanManageMaintenanceResponseDto Permission check completed successfully
+     * @throws ApiError
+     */
+    public static canManageMaintenance(data: CanManageMaintenanceData): CancelablePromise<CanManageMaintenanceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/maintenances/can-manage',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized - User is not authenticated',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Create a maintenance for a resource
+     * Create a new maintenance schedule for a specific resource
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.requestBody
+     * @returns ResourceMaintenance Maintenance created successfully
+     * @throws ApiError
+     */
+    public static createMaintenance(data: CreateMaintenanceData): CancelablePromise<CreateMaintenanceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/maintenances',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Bad request - invalid maintenance data',
+                401: 'Unauthorized - User is not authenticated',
+                403: 'Forbidden - User does not have permission to manage maintenances for this resource',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get maintenances for a resource
+     * Retrieve paginated list of maintenances for a specific resource with optional filtering
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.page Page number for pagination
+     * @param data.limit Number of items per page
+     * @param data.includeUpcoming Include upcoming maintenances (start time in the future)
+     * @param data.includeActive Include active maintenances (currently ongoing)
+     * @param data.includePast Include past maintenances (already finished)
+     * @returns PaginatedMaintenanceResponse Maintenances retrieved successfully
+     * @throws ApiError
+     */
+    public static findMaintenances(data: FindMaintenancesData): CancelablePromise<FindMaintenancesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/maintenances',
+            path: {
+                resourceId: data.resourceId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit,
+                includeUpcoming: data.includeUpcoming,
+                includeActive: data.includeActive,
+                includePast: data.includePast
+            },
+            errors: {
+                401: 'Unauthorized - User is not authenticated',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get a specific maintenance by ID
+     * Retrieve details of a specific maintenance
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.maintenanceId The ID of the maintenance
+     * @returns ResourceMaintenance Maintenance retrieved successfully
+     * @throws ApiError
+     */
+    public static getMaintenance(data: GetMaintenanceData): CancelablePromise<GetMaintenanceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
+            path: {
+                resourceId: data.resourceId,
+                maintenanceId: data.maintenanceId
+            },
+            errors: {
+                401: 'Unauthorized - User is not authenticated',
+                404: 'Maintenance not found'
+            }
+        });
+    }
+    
+    /**
+     * Update a maintenance
+     * Update a maintenance with new start time, end time, and/or reason
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.maintenanceId The ID of the maintenance
+     * @param data.requestBody
+     * @returns ResourceMaintenance Maintenance updated successfully
+     * @throws ApiError
+     */
+    public static updateMaintenance(data: UpdateMaintenanceData): CancelablePromise<UpdateMaintenanceResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
+            path: {
+                resourceId: data.resourceId,
+                maintenanceId: data.maintenanceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Bad request - invalid maintenance data',
+                401: 'Unauthorized - User is not authenticated',
+                403: 'Forbidden - User does not have permission to manage maintenances for this resource',
+                404: 'Maintenance not found'
+            }
+        });
+    }
+    
+    /**
+     * Cancel a maintenance
+     * Delete a maintenance (cancel it)
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.maintenanceId The ID of the maintenance
+     * @returns void Maintenance cancelled successfully
+     * @throws ApiError
+     */
+    public static cancelMaintenance(data: CancelMaintenanceData): CancelablePromise<CancelMaintenanceResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/maintenances/{maintenanceId}',
+            path: {
+                resourceId: data.resourceId,
+                maintenanceId: data.maintenanceId
+            },
+            errors: {
+                401: 'Unauthorized - User is not authenticated',
+                403: 'Forbidden - User does not have permission to manage maintenances for this resource',
+                404: 'Maintenance not found'
+            }
+        });
+    }
+    
 }
 
 export class BillingService {
-  /**
-   * Get the billing balance for a user
-   * @param data The data for the request.
-   * @param data.userId
-   * @returns BalanceDto The billing balance for the user.
-   * @throws ApiError
-   */
-  public static getBillingBalance(data: GetBillingBalanceData): CancelablePromise<GetBillingBalanceResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/{userId}/billing/balance',
-      path: {
-        userId: data.userId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the billing transactions for a user
-   * @param data The data for the request.
-   * @param data.userId
-   * @param data.page The page number to retrieve
-   * @param data.limit The number of items per page
-   * @returns TransactionsDto The billing transactions for the user.
-   * @throws ApiError
-   */
-  public static getBillingTransactions(
-    data: GetBillingTransactionsData,
-  ): CancelablePromise<GetBillingTransactionsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/{userId}/billing/transactions',
-      path: {
-        userId: data.userId,
-      },
-      query: {
-        page: data.page,
-        limit: data.limit,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Top up or charge the billing balance for a user
-   * @param data The data for the request.
-   * @param data.userId
-   * @param data.requestBody
-   * @returns number The billing balance for the user has been topped up.
-   * @throws ApiError
-   */
-  public static createManualTransaction(
-    data: CreateManualTransactionData,
-  ): CancelablePromise<CreateManualTransactionResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/users/{userId}/billing/transactions',
-      path: {
-        userId: data.userId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get a billing transaction for a user
-   * @param data The data for the request.
-   * @param data.transactionId
-   * @returns BillingTransaction The billing transaction for the user.
-   * @throws ApiError
-   */
-  public static getBillingTransaction(
-    data: GetBillingTransactionData,
-  ): CancelablePromise<GetBillingTransactionResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/users/{userId}/billing/transactions/{transactionId}',
-      path: {
-        transactionId: data.transactionId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the billing configuration for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceBillingConfigurationDto The billing configuration for the resource.
-   * @throws ApiError
-   */
-  public static getResourceBillingConfiguration(
-    data: GetResourceBillingConfigurationData,
-  ): CancelablePromise<GetResourceBillingConfigurationResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/billing/configuration',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Update the billing configuration for a resource
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.requestBody
-   * @returns ResourceBillingConfiguration The billing configuration for the resource has been updated.
-   * @throws ApiError
-   */
-  public static updateResourceBillingConfiguration(
-    data: UpdateResourceBillingConfigurationData,
-  ): CancelablePromise<UpdateResourceBillingConfigurationResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/billing/configuration',
-      path: {
-        resourceId: data.resourceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Set the SumUp configuration
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns string The SumUp apiKey has been set.
-   * @throws ApiError
-   */
-  public static setSumUpApiKey(data: SetSumUpApiKeyData): CancelablePromise<SetSumUpApiKeyResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/sumup/configuration/api-key',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Set the billing configuration
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns BillingConfigurationDto The billing configuration has been set.
-   * @throws ApiError
-   */
-  public static setBillingConfiguration(
-    data: SetBillingConfigurationData,
-  ): CancelablePromise<SetBillingConfigurationResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/configuration',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the billing configuration
-   * @returns BillingConfigurationDto The current billing configuration.
-   * @throws ApiError
-   */
-  public static getBillingConfiguration(): CancelablePromise<GetBillingConfigurationResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/billing/configuration',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the SumUp configuration
-   * @returns SumUpConfigurationDto The current SumUp configuration.
-   * @throws ApiError
-   */
-  public static getSumUpConfiguration(): CancelablePromise<GetSumUpConfigurationResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/billing/sumup/configuration',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the linked SumUp readers
-   * @returns SumUpReaderDto The linked SumUp readers.
-   * @throws ApiError
-   */
-  public static getSumUpReaders(): CancelablePromise<GetSumUpReadersResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/billing/sumup/readers',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Pair a SumUp reader
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns SumUpReaderDto The created SumUp reader.
-   * @throws ApiError
-   */
-  public static pairSumUpReader(data: PairSumUpReaderData): CancelablePromise<PairSumUpReaderResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/sumup/readers/pair',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Remove a SumUp reader
-   * @param data The data for the request.
-   * @param data.readerId
-   * @throws ApiError
-   */
-  public static removeSumUpReader(data: RemoveSumUpReaderData): CancelablePromise<void> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/billing/sumup/readers/{readerId}',
-      path: {
-        readerId: data.readerId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Top up using a SumUp reader
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns BillingTransaction The billing transaction for the user has been topped up.
-   * @throws ApiError
-   */
-  public static topUpWithSumUpReader(data: TopUpWithSumUpReaderData): CancelablePromise<TopUpWithSumUpReaderResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/top-up/sumup',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Callback from SumUp
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns unknown
-   * @throws ApiError
-   */
-  public static sumUpTopUpCallback(data: SumUpTopUpCallbackData): CancelablePromise<SumUpTopUpCallbackResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/top-up/sumup/callback',
-      body: data.requestBody,
-      mediaType: 'application/json',
-    });
-  }
-
-  /**
-   * @throws ApiError
-   */
-  public static billingControllerStreamEvents(): CancelablePromise<void> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/billing/transactions/live',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Refund a billing transaction
-   * @param data The data for the request.
-   * @param data.transactionId
-   * @param data.requestBody
-   * @returns BillingTransaction The billing transaction has been refunded.
-   * @throws ApiError
-   */
-  public static refundTransaction(data: RefundTransactionData): CancelablePromise<RefundTransactionResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/billing/transactions/{transactionId}/refund',
-      path: {
-        transactionId: data.transactionId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Get the billing balance for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @returns BalanceDto The billing balance for the user.
+     * @throws ApiError
+     */
+    public static getBillingBalance(data: GetBillingBalanceData): CancelablePromise<GetBillingBalanceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{userId}/billing/balance',
+            path: {
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing transactions for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @param data.page The page number to retrieve
+     * @param data.limit The number of items per page
+     * @returns TransactionsDto The billing transactions for the user.
+     * @throws ApiError
+     */
+    public static getBillingTransactions(data: GetBillingTransactionsData): CancelablePromise<GetBillingTransactionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{userId}/billing/transactions',
+            path: {
+                userId: data.userId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Top up or charge the billing balance for a user
+     * @param data The data for the request.
+     * @param data.userId
+     * @param data.requestBody
+     * @returns number The billing balance for the user has been topped up.
+     * @throws ApiError
+     */
+    public static createManualTransaction(data: CreateManualTransactionData): CancelablePromise<CreateManualTransactionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/users/{userId}/billing/transactions',
+            path: {
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get a billing transaction for a user
+     * @param data The data for the request.
+     * @param data.transactionId
+     * @returns BillingTransaction The billing transaction for the user.
+     * @throws ApiError
+     */
+    public static getBillingTransaction(data: GetBillingTransactionData): CancelablePromise<GetBillingTransactionResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/{userId}/billing/transactions/{transactionId}',
+            path: {
+                transactionId: data.transactionId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing configuration for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceBillingConfigurationDto The billing configuration for the resource.
+     * @throws ApiError
+     */
+    public static getResourceBillingConfiguration(data: GetResourceBillingConfigurationData): CancelablePromise<GetResourceBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/billing/configuration',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update the billing configuration for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.requestBody
+     * @returns ResourceBillingConfiguration The billing configuration for the resource has been updated.
+     * @throws ApiError
+     */
+    public static updateResourceBillingConfiguration(data: UpdateResourceBillingConfigurationData): CancelablePromise<UpdateResourceBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/billing/configuration',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Set the SumUp configuration
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns string The SumUp apiKey has been set.
+     * @throws ApiError
+     */
+    public static setSumUpApiKey(data: SetSumUpApiKeyData): CancelablePromise<SetSumUpApiKeyResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/sumup/configuration/api-key',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Set the billing configuration
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns BillingConfigurationDto The billing configuration has been set.
+     * @throws ApiError
+     */
+    public static setBillingConfiguration(data: SetBillingConfigurationData): CancelablePromise<SetBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/configuration',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing configuration
+     * @returns BillingConfigurationDto The current billing configuration.
+     * @throws ApiError
+     */
+    public static getBillingConfiguration(): CancelablePromise<GetBillingConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/billing/configuration',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the SumUp configuration
+     * @returns SumUpConfigurationDto The current SumUp configuration.
+     * @throws ApiError
+     */
+    public static getSumUpConfiguration(): CancelablePromise<GetSumUpConfigurationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/billing/sumup/configuration',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the linked SumUp readers
+     * @returns SumUpReaderDto The linked SumUp readers.
+     * @throws ApiError
+     */
+    public static getSumUpReaders(): CancelablePromise<GetSumUpReadersResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/billing/sumup/readers',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Pair a SumUp reader
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns SumUpReaderDto The created SumUp reader.
+     * @throws ApiError
+     */
+    public static pairSumUpReader(data: PairSumUpReaderData): CancelablePromise<PairSumUpReaderResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/sumup/readers/pair',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Remove a SumUp reader
+     * @param data The data for the request.
+     * @param data.readerId
+     * @throws ApiError
+     */
+    public static removeSumUpReader(data: RemoveSumUpReaderData): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/billing/sumup/readers/{readerId}',
+            path: {
+                readerId: data.readerId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Top up using a SumUp reader
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns BillingTransaction The billing transaction for the user has been topped up.
+     * @throws ApiError
+     */
+    public static topUpWithSumUpReader(data: TopUpWithSumUpReaderData): CancelablePromise<TopUpWithSumUpReaderResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/top-up/sumup',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Callback from SumUp
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static sumUpTopUpCallback(data: SumUpTopUpCallbackData): CancelablePromise<SumUpTopUpCallbackResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/top-up/sumup/callback',
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * @throws ApiError
+     */
+    public static billingControllerStreamEvents(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/billing/transactions/live',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Refund a billing transaction
+     * @param data The data for the request.
+     * @param data.transactionId
+     * @param data.requestBody
+     * @returns BillingTransaction The billing transaction has been refunded.
+     * @throws ApiError
+     */
+    public static refundTransaction(data: RefundTransactionData): CancelablePromise<RefundTransactionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/billing/transactions/{transactionId}/refund',
+            path: {
+                transactionId: data.transactionId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class ResourceFlowsService {
-  /**
-   * Get node schemas
-   * Get the schemas for all node types
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns ResourceFlowNodeSchemaDto Node schemas retrieved successfully
-   * @throws ApiError
-   */
-  public static getNodeSchemas(data: GetNodeSchemasData): CancelablePromise<GetNodeSchemasResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/flow/node-schemas',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get resource flow
-   * Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource to get the flow for
-   * @returns ResourceFlowResponseDto Resource flow retrieved successfully
-   * @throws ApiError
-   */
-  public static getResourceFlow(data: GetResourceFlowData): CancelablePromise<GetResourceFlowResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/flow',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Insufficient permissions to manage resources',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Save resource flow
-   * Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource to save the flow for
-   * @param data.requestBody
-   * @returns ResourceFlowResponseDto Resource flow saved successfully. May include validation errors for individual nodes that have invalid configuration.
-   * @throws ApiError
-   */
-  public static saveResourceFlow(data: SaveResourceFlowData): CancelablePromise<SaveResourceFlowResponse> {
-    return __request(OpenAPI, {
-      method: 'PUT',
-      url: '/api/resources/{resourceId}/flow',
-      path: {
-        resourceId: data.resourceId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        400: 'Invalid request data',
-        401: 'Unauthorized',
-        403: 'Insufficient permissions to manage resources',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * Get resource flow logs
-   * Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource to get the flow logs for
-   * @param data.page Page number (1-based)
-   * @param data.limit Number of items per page
-   * @returns ResourceFlowLogsResponseDto Resource flow logs retrieved successfully
-   * @throws ApiError
-   */
-  public static getResourceFlowLogs(data: GetResourceFlowLogsData): CancelablePromise<GetResourceFlowLogsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/flow/logs',
-      path: {
-        resourceId: data.resourceId,
-      },
-      query: {
-        page: data.page,
-        limit: data.limit,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Insufficient permissions to manage resources',
-        404: 'Resource not found',
-      },
-    });
-  }
-
-  /**
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @returns unknown
-   * @throws ApiError
-   */
-  public static resourceFlowsControllerStreamEvents(
-    data: ResourceFlowsControllerStreamEventsData,
-  ): CancelablePromise<ResourceFlowsControllerStreamEventsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/flow/logs/live',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Press a button
-   * Press a button to trigger the flow
-   * @param data The data for the request.
-   * @param data.resourceId
-   * @param data.buttonId The ID of the button to press
-   * @returns unknown Button pressed successfully
-   * @throws ApiError
-   */
-  public static pressButton(data: PressButtonData): CancelablePromise<PressButtonResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/resources/{resourceId}/flow/buttons/{buttonId}/press',
-      path: {
-        resourceId: data.resourceId,
-        buttonId: data.buttonId,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Insufficient permissions to manage resources',
-        404: 'UNKNOWN_BUTTON_ID',
-      },
-    });
-  }
-
-  /**
-   * Get buttons
-   * Get buttons for a resource
-   * @param data The data for the request.
-   * @param data.resourceId The ID of the resource to get buttons for
-   * @returns ResourceFlowNode Buttons retrieved successfully
-   * @throws ApiError
-   */
-  public static getButtons(data: GetButtonsData): CancelablePromise<GetButtonsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/resources/{resourceId}/flow/buttons',
-      path: {
-        resourceId: data.resourceId,
-      },
-      errors: {
-        401: 'Unauthorized',
-        403: 'Insufficient permissions to manage resources',
-        404: 'Resource not found',
-      },
-    });
-  }
+    /**
+     * Get node schemas
+     * Get the schemas for all node types
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceFlowNodeSchemaDto Node schemas retrieved successfully
+     * @throws ApiError
+     */
+    public static getNodeSchemas(data: GetNodeSchemasData): CancelablePromise<GetNodeSchemasResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/node-schemas',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get resource flow
+     * Retrieve the complete flow configuration for a resource, including all nodes and edges. This endpoint returns the workflow definition that determines what actions are triggered when resource usage events occur.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to get the flow for
+     * @returns ResourceFlowResponseDto Resource flow retrieved successfully
+     * @throws ApiError
+     */
+    public static getResourceFlow(data: GetResourceFlowData): CancelablePromise<GetResourceFlowResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Save resource flow
+     * Save the complete flow configuration for a resource. This will replace all existing nodes and edges. The flow defines what actions (HTTP requests, MQTT messages, etc.) are triggered when resource usage events occur.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to save the flow for
+     * @param data.requestBody
+     * @returns ResourceFlowResponseDto Resource flow saved successfully. May include validation errors for individual nodes that have invalid configuration.
+     * @throws ApiError
+     */
+    public static saveResourceFlow(data: SaveResourceFlowData): CancelablePromise<SaveResourceFlowResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/resources/{resourceId}/flow',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: 'Invalid request data',
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * Get resource flow logs
+     * Retrieve the latest execution logs for a resource flow. Logs are returned in descending order by creation time (newest first). This endpoint provides insights into flow execution, including node processing status, errors, and execution details.
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to get the flow logs for
+     * @param data.page Page number (1-based)
+     * @param data.limit Number of items per page
+     * @returns ResourceFlowLogsResponseDto Resource flow logs retrieved successfully
+     * @throws ApiError
+     */
+    public static getResourceFlowLogs(data: GetResourceFlowLogsData): CancelablePromise<GetResourceFlowLogsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/logs',
+            path: {
+                resourceId: data.resourceId
+            },
+            query: {
+                page: data.page,
+                limit: data.limit
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
+    /**
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns unknown
+     * @throws ApiError
+     */
+    public static resourceFlowsControllerStreamEvents(data: ResourceFlowsControllerStreamEventsData): CancelablePromise<ResourceFlowsControllerStreamEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/logs/live',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Press a button
+     * Press a button to trigger the flow
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.buttonId The ID of the button to press
+     * @returns unknown Button pressed successfully
+     * @throws ApiError
+     */
+    public static pressButton(data: PressButtonData): CancelablePromise<PressButtonResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/flow/buttons/{buttonId}/press',
+            path: {
+                resourceId: data.resourceId,
+                buttonId: data.buttonId
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'UNKNOWN_BUTTON_ID'
+            }
+        });
+    }
+    
+    /**
+     * Get buttons
+     * Get buttons for a resource
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource to get buttons for
+     * @returns ResourceFlowNode Buttons retrieved successfully
+     * @throws ApiError
+     */
+    public static getButtons(data: GetButtonsData): CancelablePromise<GetButtonsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/flow/buttons',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized',
+                403: 'Insufficient permissions to manage resources',
+                404: 'Resource not found'
+            }
+        });
+    }
+    
 }
 
 export class PluginsService {
-  /**
-   * Get all plugins
-   * @returns LoadedPluginManifest The list of all plugins
-   * @throws ApiError
-   */
-  public static getPlugins(): CancelablePromise<GetPluginsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/plugins',
-    });
-  }
-
-  /**
-   * Upload a new plugin
-   * @param data The data for the request.
-   * @param data.formData
-   * @throws ApiError
-   */
-  public static uploadPlugin(data: UploadPluginData): CancelablePromise<void> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/plugins',
-      formData: data.formData,
-      mediaType: 'multipart/form-data',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get any frontend plugin file
-   * @param data The data for the request.
-   * @param data.pluginName
-   * @param data.filePath
-   * @returns string The requested frontend plugin file
-   * @throws ApiError
-   */
-  public static getFrontendPluginFile(
-    data: GetFrontendPluginFileData,
-  ): CancelablePromise<GetFrontendPluginFileResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/plugins/{pluginName}/frontend/module-federation/{filePath}',
-      path: {
-        pluginName: data.pluginName,
-        filePath: data.filePath,
-      },
-    });
-  }
-
-  /**
-   * Delete a plugin
-   * @param data The data for the request.
-   * @param data.pluginId
-   * @returns unknown The plugin has been deleted
-   * @throws ApiError
-   */
-  public static deletePlugin(data: DeletePluginData): CancelablePromise<DeletePluginResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/plugins/{pluginId}',
-      path: {
-        pluginId: data.pluginId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Get all plugins
+     * @returns LoadedPluginManifest The list of all plugins
+     * @throws ApiError
+     */
+    public static getPlugins(): CancelablePromise<GetPluginsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/plugins'
+        });
+    }
+    
+    /**
+     * Upload a new plugin
+     * @param data The data for the request.
+     * @param data.formData
+     * @throws ApiError
+     */
+    public static uploadPlugin(data: UploadPluginData): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/plugins',
+            formData: data.formData,
+            mediaType: 'multipart/form-data',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get any frontend plugin file
+     * @param data The data for the request.
+     * @param data.pluginName
+     * @param data.filePath
+     * @returns string The requested frontend plugin file
+     * @throws ApiError
+     */
+    public static getFrontendPluginFile(data: GetFrontendPluginFileData): CancelablePromise<GetFrontendPluginFileResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/plugins/{pluginName}/frontend/module-federation/{filePath}',
+            path: {
+                pluginName: data.pluginName,
+                filePath: data.filePath
+            }
+        });
+    }
+    
+    /**
+     * Delete a plugin
+     * @param data The data for the request.
+     * @param data.pluginId
+     * @returns unknown The plugin has been deleted
+     * @throws ApiError
+     */
+    public static deletePlugin(data: DeletePluginData): CancelablePromise<DeletePluginResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/plugins/{pluginId}',
+            path: {
+                pluginId: data.pluginId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
 
 export class AttractapService {
-  /**
-   * Enroll a new NFC card
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns EnrollNfcCardResponseDto Enrollment initiated, continue on Reader
-   * @throws ApiError
-   */
-  public static enrollNfcCard(data: EnrollNfcCardData): CancelablePromise<EnrollNfcCardResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/attractap/readers/enroll-nfc-card',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Reset an NFC card
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns ResetNfcCardResponseDto Reset initiated, continue on Reader
-   * @throws ApiError
-   */
-  public static resetNfcCard(data: ResetNfcCardData): CancelablePromise<ResetNfcCardResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/attractap/readers/reset-nfc-card',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Update reader name and connected resources
-   * @param data The data for the request.
-   * @param data.readerId The ID of the reader to update
-   * @param data.requestBody
-   * @returns UpdateReaderResponseDto Reader updated successfully
-   * @throws ApiError
-   */
-  public static updateReader(data: UpdateReaderData): CancelablePromise<UpdateReaderResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/attractap/readers/{readerId}',
-      path: {
-        readerId: data.readerId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-        404: 'Reader not found',
-      },
-    });
-  }
-
-  /**
-   * Get a reader by ID
-   * @param data The data for the request.
-   * @param data.readerId The ID of the reader to get
-   * @returns Attractap The reader
-   * @throws ApiError
-   */
-  public static getReaderById(data: GetReaderByIdData): CancelablePromise<GetReaderByIdResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/readers/{readerId}',
-      path: {
-        readerId: data.readerId,
-      },
-      errors: {
-        401: 'Unauthorized',
-        404: 'Reader not found',
-      },
-    });
-  }
-
-  /**
-   * Delete a reader
-   * @param data The data for the request.
-   * @param data.readerId The ID of the reader to delete
-   * @returns unknown Reader deleted successfully
-   * @throws ApiError
-   */
-  public static deleteReader(data: DeleteReaderData): CancelablePromise<DeleteReaderResponse> {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/api/attractap/readers/{readerId}',
-      path: {
-        readerId: data.readerId,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all readers
-   * @returns Attractap The list of readers
-   * @throws ApiError
-   */
-  public static getReaders(): CancelablePromise<GetReadersResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/readers',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the app key for a card by UID
-   * @param data The data for the request.
-   * @param data.requestBody
-   * @returns AppKeyResponseDto The app key for the card
-   * @throws ApiError
-   */
-  public static getAppKeyByUid(data: GetAppKeyByUidData): CancelablePromise<GetAppKeyByUidResponse> {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/api/attractap/cards/keys',
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all of your cards
-   * @returns NFCCard The list of all cards
-   * @throws ApiError
-   */
-  public static getAllCards(): CancelablePromise<GetAllCardsResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/cards',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Activate or deactivate an NFC card
-   * @param data The data for the request.
-   * @param data.id
-   * @param data.requestBody
-   * @returns NFCCard The updated NFC card
-   * @throws ApiError
-   */
-  public static toggleCardActive(data: ToggleCardActiveData): CancelablePromise<ToggleCardActiveResponse> {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/api/attractap/cards/{id}/active',
-      path: {
-        id: data.id,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get all firmwares
-   * @returns AttractapFirmware Firmwares fetched successfully
-   * @throws ApiError
-   */
-  public static getFirmwares(): CancelablePromise<GetFirmwaresResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/firmwares',
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Download OTA firmware by name and variant
-   * @param data The data for the request.
-   * @param data.firmwareName
-   * @param data.variantName
-   * @returns string Firmware streamed successfully
-   * @throws ApiError
-   */
-  public static downloadFirmwareBinary(
-    data: DownloadFirmwareBinaryData,
-  ): CancelablePromise<DownloadFirmwareBinaryResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/firmwares/{firmwareName}/variants/{variantName}',
-      path: {
-        firmwareName: data.firmwareName,
-        variantName: data.variantName,
-      },
-    });
-  }
-
-  /**
-   * Get a firmware by name and variant
-   * @param data The data for the request.
-   * @param data.firmwareName
-   * @param data.variantName
-   * @param data.filename
-   * @returns string Firmware fetched successfully
-   * @throws ApiError
-   */
-  public static getFirmwareBinary(data: GetFirmwareBinaryData): CancelablePromise<GetFirmwareBinaryResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}',
-      path: {
-        firmwareName: data.firmwareName,
-        variantName: data.variantName,
-        filename: data.filename,
-      },
-    });
-  }
+    /**
+     * Enroll a new NFC card
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns EnrollNfcCardResponseDto Enrollment initiated, continue on Reader
+     * @throws ApiError
+     */
+    public static enrollNfcCard(data: EnrollNfcCardData): CancelablePromise<EnrollNfcCardResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/attractap/readers/enroll-nfc-card',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Reset an NFC card
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ResetNfcCardResponseDto Reset initiated, continue on Reader
+     * @throws ApiError
+     */
+    public static resetNfcCard(data: ResetNfcCardData): CancelablePromise<ResetNfcCardResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/attractap/readers/reset-nfc-card',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update reader name and connected resources
+     * @param data The data for the request.
+     * @param data.readerId The ID of the reader to update
+     * @param data.requestBody
+     * @returns UpdateReaderResponseDto Reader updated successfully
+     * @throws ApiError
+     */
+    public static updateReader(data: UpdateReaderData): CancelablePromise<UpdateReaderResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/attractap/readers/{readerId}',
+            path: {
+                readerId: data.readerId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized',
+                404: 'Reader not found'
+            }
+        });
+    }
+    
+    /**
+     * Get a reader by ID
+     * @param data The data for the request.
+     * @param data.readerId The ID of the reader to get
+     * @returns Attractap The reader
+     * @throws ApiError
+     */
+    public static getReaderById(data: GetReaderByIdData): CancelablePromise<GetReaderByIdResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/readers/{readerId}',
+            path: {
+                readerId: data.readerId
+            },
+            errors: {
+                401: 'Unauthorized',
+                404: 'Reader not found'
+            }
+        });
+    }
+    
+    /**
+     * Delete a reader
+     * @param data The data for the request.
+     * @param data.readerId The ID of the reader to delete
+     * @returns unknown Reader deleted successfully
+     * @throws ApiError
+     */
+    public static deleteReader(data: DeleteReaderData): CancelablePromise<DeleteReaderResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/attractap/readers/{readerId}',
+            path: {
+                readerId: data.readerId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all readers
+     * @returns Attractap The list of readers
+     * @throws ApiError
+     */
+    public static getReaders(): CancelablePromise<GetReadersResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/readers',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the app key for a card by UID
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns AppKeyResponseDto The app key for the card
+     * @throws ApiError
+     */
+    public static getAppKeyByUid(data: GetAppKeyByUidData): CancelablePromise<GetAppKeyByUidResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/attractap/cards/keys',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all of your cards
+     * @returns NFCCard The list of all cards
+     * @throws ApiError
+     */
+    public static getAllCards(): CancelablePromise<GetAllCardsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/cards',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Activate or deactivate an NFC card
+     * @param data The data for the request.
+     * @param data.id
+     * @param data.requestBody
+     * @returns NFCCard The updated NFC card
+     * @throws ApiError
+     */
+    public static toggleCardActive(data: ToggleCardActiveData): CancelablePromise<ToggleCardActiveResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/attractap/cards/{id}/active',
+            path: {
+                id: data.id
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get all firmwares
+     * @returns AttractapFirmware Firmwares fetched successfully
+     * @throws ApiError
+     */
+    public static getFirmwares(): CancelablePromise<GetFirmwaresResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/firmwares',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Download OTA firmware by name and variant
+     * @param data The data for the request.
+     * @param data.firmwareName
+     * @param data.variantName
+     * @returns string Firmware streamed successfully
+     * @throws ApiError
+     */
+    public static downloadFirmwareBinary(data: DownloadFirmwareBinaryData): CancelablePromise<DownloadFirmwareBinaryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/firmwares/{firmwareName}/variants/{variantName}',
+            path: {
+                firmwareName: data.firmwareName,
+                variantName: data.variantName
+            }
+        });
+    }
+    
+    /**
+     * Get a firmware by name and variant
+     * @param data The data for the request.
+     * @param data.firmwareName
+     * @param data.variantName
+     * @param data.filename
+     * @returns string Firmware fetched successfully
+     * @throws ApiError
+     */
+    public static getFirmwareBinary(data: GetFirmwareBinaryData): CancelablePromise<GetFirmwareBinaryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}',
+            path: {
+                firmwareName: data.firmwareName,
+                variantName: data.variantName,
+                filename: data.filename
+            }
+        });
+    }
+    
 }
 
 export class AnalyticsService {
-  /**
-   * Get the resource usage hours in the date range
-   * @param data The data for the request.
-   * @param data.start The start date of the range
-   * @param data.end The end date of the range
-   * @returns ResourceUsage The resource usage hours in the date range
-   * @throws ApiError
-   */
-  public static getResourceUsageHoursInDateRange(
-    data: GetResourceUsageHoursInDateRangeData,
-  ): CancelablePromise<GetResourceUsageHoursInDateRangeResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/analytics/resource-usage-hours',
-      query: {
-        start: data.start,
-        end: data.end,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
-
-  /**
-   * Get the billing transactions in the date range
-   * @param data The data for the request.
-   * @param data.start The start date of the range
-   * @param data.end The end date of the range
-   * @returns BillingTransaction The billing transactions in the date range
-   * @throws ApiError
-   */
-  public static getBillingTransactionsInDateRange(
-    data: GetBillingTransactionsInDateRangeData,
-  ): CancelablePromise<GetBillingTransactionsInDateRangeResponse> {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/api/analytics/billing-transactions',
-      query: {
-        start: data.start,
-        end: data.end,
-      },
-      errors: {
-        401: 'Unauthorized',
-      },
-    });
-  }
+    /**
+     * Get the resource usage hours in the date range
+     * @param data The data for the request.
+     * @param data.start The start date of the range
+     * @param data.end The end date of the range
+     * @returns ResourceUsage The resource usage hours in the date range
+     * @throws ApiError
+     */
+    public static getResourceUsageHoursInDateRange(data: GetResourceUsageHoursInDateRangeData): CancelablePromise<GetResourceUsageHoursInDateRangeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/analytics/resource-usage-hours',
+            query: {
+                start: data.start,
+                end: data.end
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get the billing transactions in the date range
+     * @param data The data for the request.
+     * @param data.start The start date of the range
+     * @param data.end The end date of the range
+     * @returns BillingTransaction The billing transactions in the date range
+     * @throws ApiError
+     */
+    public static getBillingTransactionsInDateRange(data: GetBillingTransactionsInDateRangeData): CancelablePromise<GetBillingTransactionsInDateRangeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/analytics/billing-transactions',
+            query: {
+                start: data.start,
+                end: data.end
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
 }
