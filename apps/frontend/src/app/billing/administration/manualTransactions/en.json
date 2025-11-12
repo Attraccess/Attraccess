@@ -8,16 +8,6 @@
     "createTransaction": "Create Transaction"
   },
   "toast": {
-    "error": {
-      "generic": {
-        "title": "Error",
-        "description": "An error occurred: {{error}}"
-      },
-      "INSUFFICIENT_BALANCE": {
-        "title": "Insufficient Balance",
-        "description": "The user does not have enough balance."
-      }
-    },
     "success": {
       "title": "Success",
       "description": "The transaction was created successfully."

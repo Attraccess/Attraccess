@@ -31,6 +31,8 @@ import en from './en.json';
 import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
 import { useToastMessage } from '../../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
 function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
@@ -82,7 +84,16 @@ function FlowsPageInner() {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: Number(resourceId) });
-  const { t, tExists } = useTranslations({ de, en });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const { t: tNodeTranslations } = useTranslations({
     de: nodesDeTranslations,
     en: nodesEnTranslations,
@@ -123,8 +134,7 @@ function FlowsPageInner() {
         error: error as ApiError,
         t,
         tExists,
-        baseTranslationKey: 'notifications.saveError',
-        fallbackKey: 'generic',
+        baseTranslationKey: 'api',
       });
     },
   });

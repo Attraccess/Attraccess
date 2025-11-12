@@ -8,16 +8,6 @@
     "createTransaction": "Transaktion erstellen"
   },
   "toast": {
-    "error": {
-      "generic": {
-        "title": "Fehler",
-        "description": "Es ist ein Fehler aufgetreten: {{error}}"
-      },
-      "INSUFFICIENT_BALANCE": {
-        "title": "Deckung nicht ausreichend",
-        "description": "Der Benutzer hat nicht genügend Guthaben."
-      }
-    },
     "success": {
       "title": "Erfolg",
       "description": "Die Transaktion wurde erfolgreich erstellt."

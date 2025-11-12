@@ -6,17 +6,7 @@
   "showMine": "Show mine",
   "endAll": "End all",
   "endedAll": {
-    "success": "All your active usage sessions were ended.",
-    "error": {
-      "generic": {
-        "title": "Failed to end all sessions. Some sessions may still be active.",
-        "description": "An error occurred while ending the sessions. Please try again."
-      },
-      "FLOW_EXECUTION_ERROR": {
-        "title": "Failed to end all sessions. Some sessions may still be active.",
-        "description": "{{error}}"
-      }
-    }
+    "success": "All your active usage sessions were ended."
   },
   "modal.title": "End all your active sessions",
   "modal.description": "We will end the session for each resource below.",

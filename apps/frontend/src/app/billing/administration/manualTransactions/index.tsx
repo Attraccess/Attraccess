@@ -14,6 +14,8 @@ import {
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { userCurrencyToDbCurrency } from '@attraccess/shared';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
 interface Props {
   userId?: number;
@@ -21,7 +23,16 @@ interface Props {
 
 export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'>) {
   const { userId, ...cardProps } = props;
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
 
   const [amount, setAmount] = useState<number>(0);
 
@@ -49,7 +60,7 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
           error,
           t,
           tExists,
-          baseTranslationKey: 'toast.error',
+          baseTranslationKey: 'api',
         });
       },
     });

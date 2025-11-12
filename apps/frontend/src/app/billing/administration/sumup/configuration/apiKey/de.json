@@ -26,17 +26,5 @@
       "title": "Zugangsdaten aktualisiert",
       "description": "Zugangsdaten wurden erfolgreich aktualisiert"
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Fehler beim Aktualisieren der Zugangsdaten",
-        "description": "Zugangsdaten konnten nicht aktualisiert werden. Bitte versuchen Sie es erneut."
-      },
-      "Invalid API key": {
-        "title": "Ungültiger API-Schlüssel",
-        "description": "Der API-Schlüssel ist ungültig. Bitte versuchen Sie es erneut."
-      }
-    }
   }
 }

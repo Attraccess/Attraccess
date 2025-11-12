@@ -8,10 +8,6 @@
   "rememberMe": "Angemeldet bleiben",
   "forgotPassword": "Passwort vergessen?",
   "signInButton": "Los geht's",
-  "error": {
-    "title": "Hoppla! Kleines Anmeldeproblem",
-    "generic": "Bitte überprüfe deine Anmeldedaten und versuche es erneut"
-  },
   "signingIn": "Anmelden...",
   "accordion": {
     "title": "Anmelden mit E-Mail und Passwort"

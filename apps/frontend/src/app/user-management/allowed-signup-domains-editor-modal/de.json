@@ -22,12 +22,6 @@
       "success": {
         "title": "Erfolg",
         "description": "Die Domains wurden erfolgreich gespeichert."
-      },
-      "error": {
-        "generic": {
-          "title": "Fehler",
-          "description": "Fehler beim Speichern der Domains. Bitte versuchen Sie es erneut. {{error}}"
-        }
       }
     }
   }

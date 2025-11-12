@@ -5,5 +5,11 @@
   },
   "actions": {
     "refund": "Refund"
+  },
+  "success": {
+    "toast": {
+      "title": "Refund successful",
+      "description": "Refund was successful"
+    }
   }
 }

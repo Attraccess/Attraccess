@@ -1,8 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
 import { Input } from '@heroui/react';
 import { Button } from '@heroui/react';
-import { Alert } from '@heroui/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
@@ -10,7 +9,9 @@ import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import { useUsersServiceCreateOneUser, UseUsersServiceFindManyKeyFn, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { getTranslationKeyForApiError } from '../../utils/apiError';
+import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import { useToastMessage } from '../../components/toastProvider';
 
 interface RegisterFormProps {
   onHasAccount: () => void;
@@ -18,14 +19,39 @@ interface RegisterFormProps {
 
 export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { t, tExists } = useTranslations({
-    en,
-    de,
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
   });
 
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
   const [registeredEmail, setRegisteredEmail] = useState<string>('');
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const toast = useToastMessage();
+
+  const [password, setPassword] = useState<string | null>(null);
+  const [passwordConfirmation, setPasswordConfirmation] = useState<string | null>(null);
+
+  const passwordsDontMatch = useMemo(() => {
+    if (password === null || passwordConfirmation === null) {
+      return false;
+    }
+
+    return password !== passwordConfirmation;
+  }, [password, passwordConfirmation]);
+
+  const passwordTooShort = useMemo(() => {
+    if (password === null) {
+      return false;
+    }
+
+    return password.length < 8;
+  }, [password]);
 
   const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
     onSuccess: () => {
@@ -35,15 +61,12 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       onOpen();
     },
     onError: (error) => {
-      const { key, errorMessage } = getTranslationKeyForApiError({
+      toast.apiError({
         error: error as ApiError,
         t,
         tExists,
-        baseTranslationKey: 'error',
-        fallbackKey: 'generic',
+        baseTranslationKey: 'api',
       });
-
-      setError(t(key, { error: errorMessage }));
     },
   });
 
@@ -57,7 +80,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       const email = formData.get('email');
 
       if (password !== passwordConfirmation) {
-        setError(t('passwordConfirmationError'));
         return;
       }
 
@@ -75,7 +97,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         },
       });
     },
-    [createUserMutate, t],
+    [createUserMutate],
   );
 
   return (
@@ -99,6 +121,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           required
           variant="underlined"
           data-cy="registration-form-username-input"
+          isRequired
         />
 
         <Input
@@ -109,6 +132,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           required
           variant="underlined"
           data-cy="registration-form-email-input"
+          isRequired
         />
 
         <PasswordInput
@@ -119,6 +143,15 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           variant="underlined"
           data-cy="registration-form-password-input"
           autoComplete="new-password"
+          isRequired
+          validate={() => {
+            if (passwordTooShort) {
+              return t('validationError.passwordTooShort');
+            }
+            return true;
+          }}
+          value={password ?? ''}
+          onValueChange={setPassword}
         />
 
         <PasswordInput
@@ -129,6 +162,15 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           variant="underlined"
           data-cy="registration-form-password-confirmation-input"
           autoComplete="new-password"
+          isRequired
+          validate={() => {
+            if (passwordsDontMatch) {
+              return t('validationError.passwordsDoNotMatch');
+            }
+            return true;
+          }}
+          value={passwordConfirmation ?? ''}
+          onValueChange={setPasswordConfirmation}
         />
 
         <Button
@@ -141,10 +183,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
         >
           {isPending ? t('creatingAccount') : t('createAccountButton')}
         </Button>
-
-        {error && (
-          <Alert color="danger" title={t('error.title')} description={error} data-cy="registration-form-error-alert" />
-        )}
       </form>
 
       <Modal

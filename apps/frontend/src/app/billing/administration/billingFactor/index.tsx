@@ -12,6 +12,8 @@ import {
   useUsersServiceChangeUserBillingFactor,
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
 interface Props {
   userId?: number;
@@ -20,7 +22,16 @@ interface Props {
 export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children'>) {
   const { userId, ...cardProps } = props;
 
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -47,7 +58,7 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
         error,
         t,
         tExists,
-        baseTranslationKey: 'error.toast',
+        baseTranslationKey: 'api',
       });
     },
   });

@@ -4,16 +4,6 @@
     "success": {
       "title": "Sitzung beendet",
       "description": "Ihre Nutzungssitzung wurde erfolgreich beendet."
-    },
-    "error": {
-      "generic": {
-        "title": "Fehler beim Beenden der Sitzung",
-        "description": "Beim Beenden der Sitzung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
-      },
-      "FLOW_EXECUTION_ERROR": {
-        "title": "Fehler beim Beenden der Sitzung",
-        "description": "{{error}}"
-      }
     }
   },
   "alternativeEndSessionOptionsMenu": {

@@ -6,13 +6,15 @@ import {
   useResourcesServiceResourceUsageEndSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
+  ApiError,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
-
 import de from './useQrCodeAction.de.json';
 import en from './useQrCodeAction.en.json';
 import { useNavigate } from 'react-router-dom';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 
 interface Props {
   resourceId: number;
@@ -26,9 +28,15 @@ export function useQrCodeAction(props: Props) {
   const navigate = useNavigate();
   const actionExecutedRef = useRef<string | null>(null);
 
-  const { t } = useTranslations({
-    en,
-    de,
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
   });
 
   const { mutate: startResourceMutate } = useResourcesServiceResourceUsageStartSession({
@@ -57,6 +65,14 @@ export function useQrCodeAction(props: Props) {
           : t('actions.start.success.description'),
       });
     },
+    onError: (err) => {
+      toast.apiError({
+        error: err as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
   });
 
   const { mutate: endResourceMutate } = useResourcesServiceResourceUsageEndSession({
@@ -79,6 +95,14 @@ export function useQrCodeAction(props: Props) {
       toast.success({
         title: t('actions.stop.success.title'),
         description: t('actions.stop.success.description'),
+      });
+    },
+    onError: (err) => {
+      toast.apiError({
+        error: err as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
       });
     },
   });

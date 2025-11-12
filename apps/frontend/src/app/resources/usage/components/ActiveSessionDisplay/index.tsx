@@ -15,6 +15,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
 interface ActiveSessionDisplayProps {
   resourceId: number;
@@ -22,7 +24,16 @@ interface ActiveSessionDisplayProps {
 }
 
 export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDisplayProps) {
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -54,7 +65,7 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
     onError: (err) => {
       console.error('Error ending session:', err);
       toast.apiError({
-        baseTranslationKey: 'sessionEnded.error',
+        baseTranslationKey: 'api',
         t,
         tExists,
         error: err as ApiError,

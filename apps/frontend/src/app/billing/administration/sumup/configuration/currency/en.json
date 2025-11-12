@@ -30,17 +30,5 @@
       "title": "Credentials updated",
       "description": "Credentials were updated successfully"
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Error updating credentials",
-        "description": "Credentials could not be updated. Please try again."
-      },
-      "Invalid API key": {
-        "title": "Invalid API key",
-        "description": "The API key is invalid. Please try again."
-      }
-    }
   }
 }

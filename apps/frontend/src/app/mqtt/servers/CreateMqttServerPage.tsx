@@ -24,7 +24,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
   const { onSuccess } = props || {};
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
-  const { success, error: showError } = useToastMessage();
+  const toast = useToastMessage();
   const queryClient = useQueryClient();
 
   const [formValues, setFormValues] = useState<CreateMqttServerDto>({
@@ -42,7 +42,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
 
   const createMqttServer = useMqttServiceMqttServersCreateOne({
     onSuccess: (server) => {
-      success({
+      toast.success({
         title: t('serverCreated'),
         description: t('serverCreatedDesc'),
       });
@@ -56,7 +56,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
       }
     },
     onError: (err: Error) => {
-      showError({
+      toast.error({
         title: t('errorGeneric'),
         description: err.message || t('failedToCreate'),
       });

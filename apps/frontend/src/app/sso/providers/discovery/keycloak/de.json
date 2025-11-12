@@ -6,11 +6,5 @@
   "success": {
     "title": "Erfolgreich",
     "description": "Konfiguration erfolgreich entdeckt"
-  },
-  "error": {
-    "generic": {
-      "title": "Fehler",
-      "description": "Fehler beim Entdecken der Konfiguration"
-    }
   }
 }

@@ -30,17 +30,5 @@
       "title": "Konfiguration aktualisiert",
       "description": "Konfiguration wurde erfolgreich aktualisiert"
     }
-  },
-  "error": {
-    "toast": {
-      "generic": {
-        "title": "Fehler beim Aktualisieren der Konfiguration",
-        "description": "Konfiguration konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut."
-      },
-      "Invalid API key": {
-        "title": "Ungültiger API-Schlüssel",
-        "description": "Der API-Schlüssel ist ungültig. Bitte versuchen Sie es erneut."
-      }
-    }
   }
 }

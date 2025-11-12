@@ -4,10 +4,12 @@ import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
-
 import de from './de.json';
 import en from './en.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { getBaseUrl } from '../../../../../api';
+import { ApiError } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -21,9 +23,15 @@ export function KeycloakDiscoveryDialog(props: Props) {
   const [realm, setRealm] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t } = useTranslations({
-    de,
-    en,
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
   });
 
   const toast = useToastMessage();
@@ -55,14 +63,16 @@ export function KeycloakDiscoveryDialog(props: Props) {
       onClose();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
-      toast.error({
-        title: t('error.generic.title'),
-        description: `${t('error.generic.description')} ${error instanceof Error ? error.message : error}`,
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
       });
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, realm, toast, t, onDiscovery, onClose]);
+  }, [host, realm, toast, t, tExists, onDiscovery, onClose]);
 
   return (
     <>

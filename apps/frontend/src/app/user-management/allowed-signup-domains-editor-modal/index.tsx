@@ -30,6 +30,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
@@ -38,8 +40,14 @@ interface Props {
 export function AllowedSignupDomainsEditorModal(props: Props) {
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const { t, tExists } = useTranslations({
-    en,
-    de,
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
   });
 
   const { data: allowedSignupDomains, status } = useUsersServiceGetLocalSignupDomainWhitelist();
@@ -98,7 +106,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
         error: error as ApiError,
         t,
         tExists,
-        baseTranslationKey: 'actions.save.error',
+        baseTranslationKey: 'api',
       });
     },
   });

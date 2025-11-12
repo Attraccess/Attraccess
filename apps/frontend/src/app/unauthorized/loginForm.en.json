@@ -8,10 +8,6 @@
   "rememberMe": "Keep me signed in",
   "forgotPassword": "Password slipped your mind?",
   "signInButton": "Start making",
-  "error": {
-    "title": "Oops! Sign-in hiccup",
-    "generic": "Please check your credentials and try again"
-  },
   "signingIn": "Signing in...",
   "accordion": {
     "title": "Sign in with email and password"
