@@ -34,3 +34,7 @@ String BootScreen::getName()
 {
     return "BootScreen";
 }
+
+void BootScreen::onScreenLeave()
+{
+}

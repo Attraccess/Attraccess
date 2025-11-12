@@ -11,6 +11,7 @@ class FirmwareUpdateScreen : public IScreen
 public:
     FirmwareUpdateScreen() : logger("FirmwareUpdateScreen") {}
     void init() override;
+    void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override { return screen; }
     String getName() override { return "FirmwareUpdate"; }

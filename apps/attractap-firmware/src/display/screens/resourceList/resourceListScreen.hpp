@@ -14,6 +14,7 @@ class ResourceListScreen : public IScreen
 public:
     ResourceListScreen() : logger("ResourceListScreen") {}
     void init();
+    void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;

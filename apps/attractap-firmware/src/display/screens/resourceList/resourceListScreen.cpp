@@ -166,3 +166,7 @@ String ResourceListScreen::getName()
 {
    return "ResourceListScreen";
 }
+
+void ResourceListScreen::onScreenLeave()
+{
+}

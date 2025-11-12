@@ -536,3 +536,7 @@ String ConnectionConfigurationScreen::getName()
 {
    return "ConnectionConfigurationScreen";
 }
+
+void ConnectionConfigurationScreen::onScreenLeave()
+{
+}

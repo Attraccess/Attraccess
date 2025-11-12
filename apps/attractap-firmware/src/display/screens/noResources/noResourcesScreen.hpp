@@ -8,6 +8,7 @@ class NoResourcesScreen : public IScreen
 {
 public:
     void init();
+    void onScreenLeave();
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;

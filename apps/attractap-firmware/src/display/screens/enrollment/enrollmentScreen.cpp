@@ -88,3 +88,7 @@ String EnrollmentScreen::getName()
 {
    return "EnrollmentScreen";
 }
+
+void EnrollmentScreen::onScreenLeave()
+{
+}

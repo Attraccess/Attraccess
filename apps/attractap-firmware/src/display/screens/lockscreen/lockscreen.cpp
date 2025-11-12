@@ -123,3 +123,7 @@ void Lockscreen::updateUsageInfo()
         lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
+
+void Lockscreen::onScreenLeave()
+{
+}

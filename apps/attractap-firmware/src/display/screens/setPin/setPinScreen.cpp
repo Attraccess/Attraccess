@@ -26,3 +26,7 @@ String SetPinScreen::getName()
 {
    return "SetPinScreen";
 }
+
+void SetPinScreen::onScreenLeave()
+{
+}

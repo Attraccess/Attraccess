@@ -870,7 +870,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     });
 
     if (!button) {
-      throw new NotFoundException('Button not found');
+      throw new NotFoundException('UNKNOWN_BUTTON_ID', { cause: { buttonId } });
     }
 
     await this.startFlow(button, { payload: {} });

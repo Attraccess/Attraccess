@@ -22,6 +22,19 @@ void InitScreen::markStateAsError(lv_obj_t *spinner, lv_obj_t *label)
    this->finalizeState(spinner, label, lv_color_hex(0xFF0000));
 }
 
+void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
+{
+   lv_obj_set_style_arc_color(spinner, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(spinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_arc_color(spinner, lv_color_hex(0x007ffd), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_width(spinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+   lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
 void InitScreen::init()
 {
    this->screen = lv_obj_create(NULL);
@@ -76,9 +89,6 @@ void InitScreen::init()
    lv_obj_set_height(this->wifiSpinner, 26);
    lv_obj_set_align(this->wifiSpinner, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->wifiSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(this->wifiSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_width(this->wifiSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    this->wifiLabel = lv_label_create(wifiContainer);
    lv_obj_set_width(this->wifiLabel, LV_SIZE_CONTENT);
@@ -86,7 +96,8 @@ void InitScreen::init()
    lv_obj_set_align(this->wifiLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->wifiLabel, "verbinde WLAN");
    lv_obj_set_style_text_font(this->wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->wifiLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->wifiSpinner, this->wifiLabel);
 
    lv_obj_t *ethernetContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(ethernetContainer);
@@ -110,9 +121,6 @@ void InitScreen::init()
    lv_obj_set_height(this->ethernetSpinner, 26);
    lv_obj_set_align(this->ethernetSpinner, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->ethernetSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(this->ethernetSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_width(this->ethernetSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    this->ethernetLabel = lv_label_create(ethernetContainer);
    lv_obj_set_width(this->ethernetLabel, LV_SIZE_CONTENT);
@@ -120,7 +128,8 @@ void InitScreen::init()
    lv_obj_set_align(this->ethernetLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
    lv_obj_set_style_text_font(this->ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->ethernetLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->ethernetSpinner, this->ethernetLabel);
 
    lv_obj_t *apiConnectionContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiConnectionContainer);
@@ -139,9 +148,6 @@ void InitScreen::init()
    lv_obj_set_height(this->apiConnectionSpinner, 26);
    lv_obj_set_align(this->apiConnectionSpinner, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->apiConnectionSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(this->apiConnectionSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_width(this->apiConnectionSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    this->apiConnectionLabel = lv_label_create(apiConnectionContainer);
    lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
@@ -149,7 +155,8 @@ void InitScreen::init()
    lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->apiConnectionLabel, "verbinde API");
    lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->apiConnectionLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
 
    lv_obj_t *apiAuthenticationContainer = lv_obj_create(statesContainer);
    lv_obj_remove_style_all(apiAuthenticationContainer);
@@ -168,9 +175,6 @@ void InitScreen::init()
    lv_obj_set_height(this->apiAuthenticationSpinner, 26);
    lv_obj_set_align(this->apiAuthenticationSpinner, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_style_arc_width(this->apiAuthenticationSpinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_set_style_arc_width(this->apiAuthenticationSpinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    this->apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
    lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
@@ -178,7 +182,8 @@ void InitScreen::init()
    lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
    lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->apiAuthenticationLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
    lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
@@ -212,70 +217,46 @@ lv_obj_t *InitScreen::getScreen()
    return this->screen;
 }
 
-void InitScreen::markWifiStateAsSuccess()
-{
-   this->markStateAsSuccess(this->wifiSpinner, this->wifiLabel);
-}
-
-void InitScreen::markWifiStateAsError()
-{
-   this->markStateAsError(this->wifiSpinner, this->wifiLabel);
-}
-
-void InitScreen::markEthernetStateAsSuccess()
-{
-   this->markStateAsSuccess(this->ethernetSpinner, this->ethernetLabel);
-}
-
-void InitScreen::markEthernetStateAsError()
-{
-   this->markStateAsError(this->ethernetSpinner, this->ethernetLabel);
-}
-
-void InitScreen::markApiConnectionStateAsSuccess()
-{
-   this->markStateAsSuccess(this->apiConnectionSpinner, this->apiConnectionLabel);
-}
-
-void InitScreen::markApiConnectionStateAsError()
-{
-   this->markStateAsError(this->apiConnectionSpinner, this->apiConnectionLabel);
-}
-
-void InitScreen::markApiAuthenticationStateAsSuccess()
-{
-   this->markStateAsSuccess(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-}
-
-void InitScreen::markApiAuthenticationStateAsError()
-{
-   this->markStateAsError(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
-}
-
 void InitScreen::loop()
 {
    State::NetworkState networkState = State::getNetworkState();
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)
    {
-      this->markWifiStateAsSuccess();
+      this->markStateAsSuccess(this->wifiSpinner, this->wifiLabel);
+   }
+   else
+   {
+      this->resetState(this->wifiSpinner, this->wifiLabel);
    }
 
    if (networkState.ethernet_connected)
    {
-      this->markEthernetStateAsSuccess();
+      this->markStateAsSuccess(this->ethernetSpinner, this->ethernetLabel);
+   }
+   else
+   {
+      this->resetState(this->ethernetSpinner, this->ethernetLabel);
    }
 
    State::WebsocketState websocketState = State::getWebsocketState();
    if (websocketState.connected)
    {
-      this->markApiConnectionStateAsSuccess();
+      this->markStateAsSuccess(this->apiConnectionSpinner, this->apiConnectionLabel);
+   }
+   else
+   {
+      this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
    }
 
    State::ApiState apiState = State::getApiState();
    if (apiState.authenticated)
    {
-      this->markApiAuthenticationStateAsSuccess();
+      this->markStateAsSuccess(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
+   }
+   else
+   {
+      this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
    }
 }
 
@@ -287,4 +268,12 @@ void InitScreen::setOnOpenSettingsCallback(std::function<void()> onOpenSettingsC
 String InitScreen::getName()
 {
    return "InitScreen";
+}
+
+void InitScreen::onScreenLeave()
+{
+   this->resetState(this->wifiSpinner, this->wifiLabel);
+   this->resetState(this->ethernetSpinner, this->ethernetLabel);
+   this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
+   this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
 }

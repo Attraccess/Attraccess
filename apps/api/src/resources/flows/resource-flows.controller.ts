@@ -20,7 +20,7 @@ export class ResourceFlowsController {
 
   constructor(
     private readonly resourceFlowsService: ResourceFlowsService,
-    private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService
+    private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService,
   ) {}
 
   @Get('node-schemas')
@@ -36,7 +36,7 @@ export class ResourceFlowsController {
     isArray: true,
   })
   public async getNodeSchemas(
-    @Param('resourceId', ParseIntPipe) resourceId: number
+    @Param('resourceId', ParseIntPipe) resourceId: number,
   ): Promise<ResourceFlowNodeSchemaDto[]> {
     return await this.resourceFlowsService.getNodeSchemas(resourceId);
   }
@@ -125,7 +125,7 @@ export class ResourceFlowsController {
   })
   async saveResourceFlow(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() flowData: ResourceFlowSaveDto
+    @Body() flowData: ResourceFlowSaveDto,
   ): Promise<ResourceFlowResponseDto> {
     return await this.resourceFlowsService.saveResourceFlow(resourceId, flowData);
   }
@@ -165,7 +165,7 @@ export class ResourceFlowsController {
   })
   async getResourceFlowLogs(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query() query: ResourceFlowLogsQueryDto
+    @Query() query: ResourceFlowLogsQueryDto,
   ): Promise<ResourceFlowLogsResponseDto> {
     return await this.resourceFlowsService.getResourceFlowLogs(resourceId, query.page, query.limit);
   }
@@ -218,7 +218,7 @@ export class ResourceFlowsController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Button not found',
+    description: 'UNKNOWN_BUTTON_ID',
   })
   @ApiResponse({
     status: 403,
@@ -227,7 +227,7 @@ export class ResourceFlowsController {
   async pressButton(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('buttonId') buttonId: string,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ) {
     await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, req.user.id);
     return 'OK';

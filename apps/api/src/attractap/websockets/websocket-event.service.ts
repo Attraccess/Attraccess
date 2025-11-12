@@ -5,6 +5,7 @@ import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
+import { ResourceFlowChangedEvent } from '../../resources/flows/events/resource-flow-changed.event';
 
 @Injectable()
 export class WebSocketEventService {
@@ -38,6 +39,7 @@ export class WebSocketEventService {
   }
 
   @OnEvent(ResourceChangedEvent.EVENT_NAME)
+  @OnEvent(ResourceFlowChangedEvent.EVENT_NAME)
   public async onResourceChanged(event: ResourceChangedEvent) {
     this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
   }
