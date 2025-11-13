@@ -7,7 +7,7 @@ export class AppService {
   private readonly balenaDeviceId: string | null = null;
 
   public constructor() {
-    const balenaApiToken = process.env.BALENA_API_TOKEN;
+    const balenaApiToken = process.env.MY_BALENA_API_TOKEN;
     this.balenaDeviceId = process.env.BALENA_DEVICE_UUID;
 
     if (balenaApiToken) {
@@ -18,7 +18,7 @@ export class AppService {
 
   private ensureBalena(sdk: BalenaSDK | null): { sdk: BalenaSDK; deviceId: string } {
     if (!sdk) {
-      throw new Error('Balena SDK not available, did you set the BALENA_API_TOKEN environment variable?');
+      throw new Error('Balena SDK not available, did you set the MY_BALENA_API_TOKEN environment variable?');
     }
 
     if (!this.balenaDeviceId) {
