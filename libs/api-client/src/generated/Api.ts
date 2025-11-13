@@ -115,6 +115,14 @@ export interface User {
   billingFactor: number;
 }
 
+export interface BooleanDto {
+  /**
+   * The boolean value
+   * @example true
+   */
+  value: boolean;
+}
+
 export interface VerifyEmailDto {
   /**
    * The token to verify the email
@@ -1578,7 +1586,8 @@ export interface ResourceFlowNodeSchemaDto {
     | "processing.wait"
     | "processing.if"
     | "processing.set-payload"
-    | "processing.mqtt.waitForMessage";
+    | "processing.mqtt.waitForMessage"
+    | "processing.error";
   /** The schema for a node type */
   configSchema: Record<string, any>;
   /** The inputs for a node type */
@@ -1630,7 +1639,8 @@ export interface ResourceFlowNodeDto {
     | "processing.wait"
     | "processing.if"
     | "processing.set-payload"
-    | "processing.mqtt.waitForMessage";
+    | "processing.mqtt.waitForMessage"
+    | "processing.error";
   /**
    * The position of the node
    * @example {"x":100,"y":200}
@@ -2105,6 +2115,16 @@ export interface InfoData {
   status?: string;
 }
 
+export type RebootHostData = any;
+
+export type ShutdownHostData = any;
+
+export type GetLocalSignupDomainWhitelistData = string[];
+
+export type SetLocalSignupDomainWhitelistPayload = string[];
+
+export type SetLocalSignupDomainWhitelistData = any;
+
 export type CreateOneUserData = User;
 
 export interface FindManyParams {
@@ -2119,6 +2139,8 @@ export interface FindManyParams {
 }
 
 export type FindManyData = PaginatedUsersResponseDto;
+
+export type IsLocalSignupEnabledData = BooleanDto;
 
 export interface VerifyEmailData {
   /** @example "Email verified successfully" */
@@ -2630,9 +2652,73 @@ export namespace System {
     export type RequestHeaders = {};
     export type ResponseBody = InfoData;
   }
+
+  /**
+   * No description
+   * @tags System
+   * @name RebootHost
+   * @summary Reboot the host machine (only for balena devices)
+   * @request POST:/api/balena/device/reboot
+   * @secure
+   */
+  export namespace RebootHost {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = RebootHostData;
+  }
+
+  /**
+   * No description
+   * @tags System
+   * @name ShutdownHost
+   * @summary Shutdown the host machine (only for balena devices)
+   * @request POST:/api/balena/device/shutdown
+   * @secure
+   */
+  export namespace ShutdownHost {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ShutdownHostData;
+  }
 }
 
 export namespace Users {
+  /**
+   * No description
+   * @tags Users
+   * @name GetLocalSignupDomainWhitelist
+   * @summary Get the local signup domain whitelist
+   * @request GET:/api/users/local-signup-domain-whitelist
+   * @secure
+   */
+  export namespace GetLocalSignupDomainWhitelist {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetLocalSignupDomainWhitelistData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name SetLocalSignupDomainWhitelist
+   * @summary Set the local signup domain whitelist
+   * @request POST:/api/users/local-signup-domain-whitelist
+   * @secure
+   */
+  export namespace SetLocalSignupDomainWhitelist {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SetLocalSignupDomainWhitelistPayload;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetLocalSignupDomainWhitelistData;
+  }
+
   /**
    * No description
    * @tags Users
@@ -2671,6 +2757,21 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = FindManyData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name IsLocalSignupEnabled
+   * @summary Check if local signup is enabled
+   * @request GET:/api/users/local-signup-enabled
+   */
+  export namespace IsLocalSignupEnabled {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = IsLocalSignupEnabledData;
   }
 
   /**
@@ -5311,8 +5412,82 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags System
+     * @name RebootHost
+     * @summary Reboot the host machine (only for balena devices)
+     * @request POST:/api/balena/device/reboot
+     * @secure
+     */
+    rebootHost: (params: RequestParams = {}) =>
+      this.request<RebootHostData, void>({
+        path: `/api/balena/device/reboot`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags System
+     * @name ShutdownHost
+     * @summary Shutdown the host machine (only for balena devices)
+     * @request POST:/api/balena/device/shutdown
+     * @secure
+     */
+    shutdownHost: (params: RequestParams = {}) =>
+      this.request<ShutdownHostData, void>({
+        path: `/api/balena/device/shutdown`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
   };
   users = {
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name GetLocalSignupDomainWhitelist
+     * @summary Get the local signup domain whitelist
+     * @request GET:/api/users/local-signup-domain-whitelist
+     * @secure
+     */
+    getLocalSignupDomainWhitelist: (params: RequestParams = {}) =>
+      this.request<GetLocalSignupDomainWhitelistData, void>({
+        path: `/api/users/local-signup-domain-whitelist`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name SetLocalSignupDomainWhitelist
+     * @summary Set the local signup domain whitelist
+     * @request POST:/api/users/local-signup-domain-whitelist
+     * @secure
+     */
+    setLocalSignupDomainWhitelist: (
+      data: SetLocalSignupDomainWhitelistPayload,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetLocalSignupDomainWhitelistData, void>({
+        path: `/api/users/local-signup-domain-whitelist`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
     /**
      * No description
      *
@@ -5346,6 +5521,22 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name IsLocalSignupEnabled
+     * @summary Check if local signup is enabled
+     * @request GET:/api/users/local-signup-enabled
+     */
+    isLocalSignupEnabled: (params: RequestParams = {}) =>
+      this.request<IsLocalSignupEnabledData, any>({
+        path: `/api/users/local-signup-enabled`,
+        method: "GET",
         format: "json",
         ...params,
       }),

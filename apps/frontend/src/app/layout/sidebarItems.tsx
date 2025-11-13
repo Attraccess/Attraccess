@@ -25,6 +25,7 @@ import { useMemo } from 'react';
 import de from './sidebarItems.de.json';
 import en from './sidebarItems.en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { BalenaIcon } from '../balena/balena-icon';
 
 export type SidebarItem = {
   path: string;
@@ -106,7 +107,7 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
     items.push(authGroup);
 
     // System group
-    items.push({
+    const systemGroup: SidebarItemGroup = {
       translationKey: 'system',
       isGroup: true,
       icon: CogIcon,
@@ -132,10 +133,20 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           icon: FileIcon,
         },
       ],
-    });
+    };
+
+    if (license?.modules.includes('balena')) {
+      systemGroup.items.push({
+        path: '/balena',
+        translationKey: 'balena',
+        icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
+      });
+    }
+
+    items.push(systemGroup);
 
     return items;
-  }, []);
+  }, [license]);
 
   return useMemo(() => {
     if (!license) {

@@ -387,6 +387,8 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
+export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
 export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof UsersService.createOneUser>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;

@@ -2027,6 +2027,10 @@ export type InfoResponse = {
     status?: string;
 };
 
+export type RebootHostResponse = unknown;
+
+export type ShutdownHostResponse = unknown;
+
 export type GetLocalSignupDomainWhitelistResponse = Array<(string)>;
 
 export type SetLocalSignupDomainWhitelistData = {
@@ -3069,6 +3073,42 @@ export type $OpenApiTs = {
                     name?: string;
                     status?: string;
                 };
+            };
+        };
+    };
+    '/api/balena/device/reboot': {
+        post: {
+            res: {
+                /**
+                 * Host rebooted successfully
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to reboot the host
+                 */
+                403: unknown;
+            };
+        };
+    };
+    '/api/balena/device/shutdown': {
+        post: {
+            res: {
+                /**
+                 * Host shutdown successfully
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to shutdown the host
+                 */
+                403: unknown;
             };
         };
     };

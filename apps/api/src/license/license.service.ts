@@ -32,17 +32,19 @@ interface LicenseRequirements {
 export class LicenseService {
   constructor(private readonly configService: ConfigService) {}
 
-  async getLicenseData(): Promise<LicenseDataDto> {
+  public async getLicenseData(): Promise<LicenseDataDto> {
     const appConfig = this.configService.get<AppConfigType>('app');
     if (!appConfig) {
       throw new LicenseError('Application configuration not loaded');
     }
 
+    let response: LicenseDataDto;
+
     if (
       appConfig.LICENSE_KEY ===
       'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
     ) {
-      return {
+      response = {
         valid: true,
         modules: Object.values(LicenseModuleType),
         usageLimits: Object.fromEntries(
@@ -50,38 +52,42 @@ export class LicenseService {
         ),
         isNonProfit: true,
       };
+    } else {
+      // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
+      try {
+        const { verifyLicense } = await import('@licenso/client');
+        const licenseData = await verifyLicense(
+          appConfig.LICENSE_KEY,
+          appConfig.LICENSO_PUBLIC_KEY,
+          appConfig.LICENSO_DEVICE_ID,
+        );
+
+        response = {
+          valid: licenseData.valid,
+          reason: licenseData.reason,
+          modules: Object.entries(licenseData.payload.cfg.modules)
+            .filter(([, value]) => value === true)
+            .map(([key]) => key),
+          usageLimits: licenseData.payload.cfg.usageLimits ?? {},
+          isNonProfit: false,
+        };
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(error);
+        throw new LicenseError(
+          'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
+        );
+      }
     }
 
-    // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
-    try {
-      const { verifyLicense } = await import('@licenso/client');
-      const licenseData = await verifyLicense(
-        appConfig.LICENSE_KEY,
-        appConfig.LICENSO_PUBLIC_KEY,
-        appConfig.LICENSO_DEVICE_ID,
-      );
-
-      const dto: LicenseDataDto = {
-        valid: licenseData.valid,
-        reason: licenseData.reason,
-        modules: Object.entries(licenseData.payload.cfg.modules)
-          .filter(([, value]) => value === true)
-          .map(([key]) => key),
-        usageLimits: licenseData.payload.cfg.usageLimits ?? {},
-        isNonProfit: false,
-      };
-
-      return dto;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error(error);
-      throw new LicenseError(
-        'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
-      );
+    if (process.env.BALENA_DEVICE_UUID) {
+      response.modules.push('balena');
     }
+
+    return response;
   }
 
-  async verifyLicense(requirements?: LicenseRequirements): Promise<LicenseDataDto> {
+  public async verifyLicense(requirements?: LicenseRequirements): Promise<LicenseDataDto> {
     const licenseData = await this.getLicenseData();
 
     if (!licenseData.valid) {

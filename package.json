@@ -54,6 +54,7 @@
     "@yudiel/react-qr-scanner": "^2.3.1",
     "async-mutex": "^0.5.0",
     "axios": "^1.12.0",
+    "balena-sdk": "^22.4.1",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",

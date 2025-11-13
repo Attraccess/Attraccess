@@ -42,7 +42,8 @@
         "plugins": "Plugins",
         "emailTemplates": "E-Mail-Vorlagen",
         "mqttServers": "MQTT-Server",
-        "csvExport": "CSV-Export"
+        "csvExport": "CSV-Export",
+        "balena": "Balena"
       }
     }
   },

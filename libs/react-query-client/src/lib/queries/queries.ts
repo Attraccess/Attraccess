@@ -200,6 +200,8 @@ export const useAnalyticsServiceGetBillingTransactionsInDateRange = <TData = Com
   end: string;
   start: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }, queryKey), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) as TData, ...options });
+export const useSystemServiceRebootHost = <TData = Common.SystemServiceRebootHostMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SystemService.rebootHost() as unknown as Promise<TData>, ...options });
+export const useSystemServiceShutdownHost = <TData = Common.SystemServiceShutdownHostMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SystemService.shutdownHost() as unknown as Promise<TData>, ...options });
 export const useUsersServiceSetLocalSignupDomainWhitelist = <TData = Common.UsersServiceSetLocalSignupDomainWhitelistMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: string[];
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

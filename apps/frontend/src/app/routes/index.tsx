@@ -24,6 +24,7 @@ import ChangelogPage from '../changelog/ChangelogPage';
 import { BillingDashboardPage } from '../billing/dashboard';
 import { BillingAdministrationPage } from '../billing/administration';
 import { SumUpPage } from '../billing/administration/sumup';
+import { BalenaPage } from '../balena';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -89,6 +90,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/sso/providers',
     element: <SSOProvidersPage />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/balena',
+    element: <BalenaPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {
