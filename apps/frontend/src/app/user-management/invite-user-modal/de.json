@@ -1,0 +1,18 @@
+{
+  "title": "Benutzer einladen",
+  "inputs": {
+    "username": {
+      "label": "Benutzername"
+    },
+    "email": {
+      "label": "E-Mail"
+    }
+  },
+  "actions": {
+    "invite": "Einladen"
+  },
+  "success": {
+    "title": "Erfolg",
+    "description": "Der Benutzer wurde erfolgreich eingeladen."
+  }
+}

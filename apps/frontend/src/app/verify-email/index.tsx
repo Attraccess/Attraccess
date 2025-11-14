@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { Loading } from './loading';
+import { Loading } from '../loading';
 import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import en from './verifyEmail.en.json';
-import de from './verifyEmail.de.json';
+import en from './en.json';
+import de from './de.json';
 import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { getTranslationKeyForApiError } from '../utils/apiError';
+import { getTranslationKeyForApiError } from '../../utils/apiError';
 
 export function VerifyEmail() {
   const query = useUrlQuery();

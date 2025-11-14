@@ -99,6 +99,19 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
+  async sendUserInvitationEmail(user: User, verificationToken: string) {
+    const verificationUrl = `${this.frontendUrl}/accept-invitation?email=${encodeURIComponent(
+      user.email,
+    )}&token=${verificationToken}`;
+
+    const context = {
+      ...this.getBaseContext(user),
+      url: verificationUrl,
+    };
+
+    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context);
+  }
+
   async sendPasswordResetEmail(user: User, resetToken: string) {
     const resetUrl = `${this.frontendUrl}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
 

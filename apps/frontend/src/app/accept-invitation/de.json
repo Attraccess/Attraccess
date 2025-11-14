@@ -1,0 +1,28 @@
+{
+  "title": "Einladung akzeptieren",
+  "inputs": {
+    "password": {
+      "label": "Wählen Sie ein Passwort"
+    },
+    "confirmPassword": {
+      "label": "Bestätigen Sie Ihr Passwort"
+    }
+  },
+  "actions": {
+    "acceptInvitation": "Einladung akzeptieren"
+  },
+  "error": {
+    "noTokenOrEmail": {
+      "title": "Fehler",
+      "description": "Token oder E-Mail nicht gefunden"
+    },
+    "passwordsDoNotMatch": {
+      "title": "Fehler",
+      "description": "Passwörter stimmen nicht überein"
+    }
+  },
+  "success": {
+    "title": "Einladung akzeptiert",
+    "description": "Willkommen bei Attraccess!"
+  }
+}

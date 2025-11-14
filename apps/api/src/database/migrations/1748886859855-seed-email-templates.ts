@@ -87,7 +87,7 @@ export const RESET_PASSWORD_MJML_TEMPLATE = `
         <mj-text font-size="12px" color="#6B7280" align="center" padding="5px 0 0 0">
           Visit us:
           <a href="{{host.frontend}}">{{host.frontend}}</a> |
-          <a href="https://github.com/FabInfra/Attraccess">GitHub</a>
+          <a href="https://github.com/Attraccess/Attraccess">GitHub</a>
         </mj-text>
       </mj-column>
     </mj-section>
@@ -183,7 +183,7 @@ export const VERIFY_EMAIL_MJML_TEMPLATE = `
         <mj-text font-size="12px" color="#6B7280" align="center" padding="5px 0 0 0">
           Visit us:
           <a href="{{host.frontend}}">{{host.frontend}}</a> |
-          <a href="https://github.com/FabInfra/Attraccess">GitHub</a>
+          <a href="https://github.com/Attraccess/Attraccess">GitHub</a>
         </mj-text>
       </mj-column>
     </mj-section>

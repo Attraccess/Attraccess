@@ -85,6 +85,17 @@ export type User = {
     billingFactor: number;
 };
 
+export type InviteUserDto = {
+    /**
+     * The username for the new user
+     */
+    username: string;
+    /**
+     * The email address for the new user
+     */
+    email: string;
+};
+
 export type BooleanDto = {
     /**
      * The boolean value
@@ -101,6 +112,21 @@ export type VerifyEmailDto = {
      * The email to verify
      */
     email: string;
+};
+
+export type AcceptInvitationDto = {
+    /**
+     * The token to accept the invitation
+     */
+    token: string;
+    /**
+     * The email of the invite
+     */
+    email: string;
+    /**
+     * The password for the user
+     */
+    password: string;
 };
 
 export type ResetPasswordDto = {
@@ -436,6 +462,7 @@ export type PreviewMjmlResponseDto = {
  */
 export enum EmailTemplateType {
     VERIFY_EMAIL = 'verify-email',
+    USER_INVITATION = 'user-invitation',
     RESET_PASSWORD = 'reset-password',
     USERNAME_CHANGED = 'username-changed',
     PASSWORD_CHANGED = 'password-changed',
@@ -2066,6 +2093,12 @@ export type FindManyData = {
 
 export type FindManyResponse = PaginatedUsersResponseDto;
 
+export type InviteUserData = {
+    requestBody: InviteUserDto;
+};
+
+export type InviteUserResponse = User;
+
 export type IsLocalSignupEnabledResponse = BooleanDto;
 
 export type VerifyEmailData = {
@@ -2075,6 +2108,12 @@ export type VerifyEmailData = {
 export type VerifyEmailResponse = {
     message?: string;
 };
+
+export type AcceptInvitationData = {
+    requestBody: AcceptInvitationDto;
+};
+
+export type AcceptInvitationResponse = User;
 
 export type RequestPasswordResetData = {
     requestBody: ResetPasswordDto;
@@ -2298,7 +2337,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
+    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -2308,7 +2347,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
+    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
@@ -3175,6 +3214,25 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/invite': {
+        post: {
+            req: InviteUserData;
+            res: {
+                /**
+                 * The user has been successfully invited.
+                 */
+                200: User;
+                /**
+                 * Invalid input data.
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users/local-signup-enabled': {
         get: {
             res: {
@@ -3197,6 +3255,21 @@ export type $OpenApiTs = {
                 };
                 /**
                  * Invalid token or email.
+                 */
+                400: unknown;
+            };
+        };
+    };
+    '/api/users/accept-invitation': {
+        post: {
+            req: AcceptInvitationData;
+            res: {
+                /**
+                 * Invitation accepted successfully.
+                 */
+                200: User;
+                /**
+                 * Invalid input data.
                  */
                 400: unknown;
             };

@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { Users, ShieldOffIcon, ShieldCheckIcon, Settings2Icon } from 'lucide-react';
+import { Users, ShieldOffIcon, ShieldCheckIcon, Settings2Icon, UserPlusIcon } from 'lucide-react';
 import { useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
@@ -25,6 +25,7 @@ import en from './en.json';
 import de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
+import { InviteUserModal } from './invite-user-modal';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -59,13 +60,23 @@ export const UserManagementPage: React.FC = () => {
         icon={<Users className="w-6 h-6" />}
         data-cy="user-management-page-header"
         actions={
-          <AllowedSignupDomainsEditorModal>
-            {(onOpen) => (
-              <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
-                {t('actions.editAllowedSignupDomains')}
-              </Button>
-            )}
-          </AllowedSignupDomainsEditorModal>
+          <>
+            <AllowedSignupDomainsEditorModal>
+              {(onOpen) => (
+                <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
+                  {t('actions.editAllowedSignupDomains')}
+                </Button>
+              )}
+            </AllowedSignupDomainsEditorModal>
+
+            <InviteUserModal>
+              {(onOpen) => (
+                <Button variant="light" onPress={onOpen} startContent={<UserPlusIcon className="w-4 h-4" />} size="md">
+                  {t('actions.inviteUser')}
+                </Button>
+              )}
+            </InviteUserModal>
+          </>
         }
       />
 

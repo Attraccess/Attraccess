@@ -4,6 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 // Add enum for email template types
 export enum EmailTemplateType {
   VERIFY_EMAIL = 'verify-email',
+  USER_INVITATION = 'user-invitation',
   RESET_PASSWORD = 'reset-password',
   USERNAME_CHANGED = 'username-changed',
   PASSWORD_CHANGED = 'password-changed',

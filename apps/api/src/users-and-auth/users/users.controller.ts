@@ -19,7 +19,13 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
-import { AuthenticationDetail, User, SystemPermissions, Setting } from '@attraccess/database-entities';
+import {
+  AuthenticationDetail,
+  User,
+  SystemPermissions,
+  Setting,
+  AuthenticationType,
+} from '@attraccess/database-entities';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
@@ -36,6 +42,8 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 import { BooleanDto } from '../../types/boolean.dto';
+import { InviteUserDto } from './dtos/inviteUser.dto';
+import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -176,6 +184,42 @@ export class UsersController {
     return user;
   }
 
+  @Post('/invite')
+  @ApiOperation({ summary: 'Invite a new user', operationId: 'inviteUser' })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been successfully invited.',
+    type: User,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  @Auth('canManageUsers')
+  async inviteUser(@Body() body: InviteUserDto): Promise<User> {
+    const user = await this.usersService.createOne({
+      username: body.username,
+      email: body.email,
+      externalIdentifier: null,
+    });
+    this.logger.debug(`User created with ID: ${user.id}`);
+
+    try {
+      this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
+      const verificationToken = await this.authService.generateEmailVerificationToken(user);
+      this.logger.debug(`Sending verification email to user ID: ${user.id}`);
+      await this.emailService.sendUserInvitationEmail(user, verificationToken);
+      this.logger.debug(`Verification email sent to user ID: ${user.id}`);
+    } catch (e) {
+      this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
+      await this.usersService.deleteOne(user.id);
+      throw e;
+    }
+
+    this.logger.debug(`User invitation completed successfully for ID: ${user.id}`);
+    return user;
+  }
+
   @Get('local-signup-enabled')
   @ApiOperation({ summary: 'Check if local signup is enabled', operationId: 'isLocalSignupEnabled' })
   @ApiResponse({
@@ -209,6 +253,34 @@ export class UsersController {
     await this.authService.verifyEmail(body.email, body.token);
     this.logger.debug(`Email verified successfully for: ${body.email}`);
     return { message: 'Email verified successfully' };
+  }
+
+  @Post('accept-invitation')
+  @ApiOperation({ summary: 'Accept a user invitation', operationId: 'acceptInvitation' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation accepted successfully.',
+    type: User,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  async acceptInvitation(@Body() body: AcceptInvitationDto): Promise<User> {
+    this.logger.debug(`Accepting invitation for: ${body.email} with token: ${body.token.substring(0, 5)}...`);
+
+    await this.authService.verifyEmail(body.email, body.token);
+
+    const user = await this.usersService.findOne({ email: body.email });
+
+    await this.authService.addAuthenticationDetails(user.id, {
+      type: AuthenticationType.LOCAL_PASSWORD,
+      details: {
+        password: body.password,
+      },
+    });
+    this.logger.debug(`Invitation accepted successfully for: ${body.email}`);
+    return user;
   }
 
   @Post('reset-password')
