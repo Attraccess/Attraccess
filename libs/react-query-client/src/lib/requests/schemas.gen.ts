@@ -115,6 +115,23 @@ export const $User = {
     required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
 } as const;
 
+export const $InviteUserDto = {
+    type: 'object',
+    properties: {
+        username: {
+            type: 'string',
+            example: 'johndoe',
+            description: 'The username for the new user'
+        },
+        email: {
+            type: 'string',
+            example: 'john.doe@example.com',
+            description: 'The email address for the new user'
+        }
+    },
+    required: ['username', 'email']
+} as const;
+
 export const $BooleanDto = {
     type: 'object',
     properties: {
@@ -142,6 +159,28 @@ export const $VerifyEmailDto = {
         }
     },
     required: ['token', 'email']
+} as const;
+
+export const $AcceptInvitationDto = {
+    type: 'object',
+    properties: {
+        token: {
+            type: 'string',
+            description: 'The token to accept the invitation',
+            example: '1234567890'
+        },
+        email: {
+            type: 'string',
+            description: 'The email of the invite',
+            example: 'john.doe@example.com'
+        },
+        password: {
+            type: 'string',
+            description: 'The password for the user',
+            example: 'password123'
+        }
+    },
+    required: ['token', 'email', 'password']
 } as const;
 
 export const $ResetPasswordDto = {
@@ -668,7 +707,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary'],
     description: 'Template type/key used by the system'
 } as const;
 

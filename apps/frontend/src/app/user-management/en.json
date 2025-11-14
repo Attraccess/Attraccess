@@ -13,6 +13,7 @@
     }
   },
   "actions": {
-    "editAllowedSignupDomains": "Edit signup domains"
+    "editAllowedSignupDomains": "Edit signup domains",
+    "inviteUser": "Invite user"
   }
 }

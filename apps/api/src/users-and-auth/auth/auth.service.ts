@@ -1,5 +1,4 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
 import { nanoid } from 'nanoid';
 import { Repository } from 'typeorm';
 import { User, RevokedToken, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
@@ -41,12 +40,13 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private usersService: UsersService,
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
     @InjectRepository(RevokedToken)
     private revokedTokenRepository: Repository<RevokedToken>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {
     this.logger.debug('AuthService initialized');
     // Clean up expired revoked tokens periodically
@@ -134,7 +134,7 @@ export class AuthService {
     username: string,
     options: AuthenticationOptions<T>,
   ): Promise<User | null> {
-    const user = await this.usersService.findOne({ username });
+    const user = await this.userRepository.findOne({ where: { username } });
 
     if (!user) {
       this.logger.debug(`No user found with username: ${username}`);
@@ -158,17 +158,19 @@ export class AuthService {
   async generateEmailVerificationToken(user: User): Promise<string> {
     const token = nanoid();
 
-    await this.usersService.updateOne(user.id, {
+    this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
+    await this.userRepository.update(user.id, {
       emailVerificationToken: token,
       emailVerificationTokenExpiresAt: addDays(new Date(), 3),
     });
 
+    this.logger.debug(`Email verification token set for user ID: ${user.id}`);
     return token;
   }
 
   async verifyEmail(email: string, token: string): Promise<void> {
     this.logger.debug(`Verifying email: ${email} with token: ${token.substring(0, 5)}...`);
-    const user = await this.usersService.findOne({ email });
+    const user = await this.userRepository.findOne({ where: { email } });
 
     if (!user) {
       this.logger.debug(`No user found with email: ${email}`);
@@ -186,7 +188,7 @@ export class AuthService {
     }
 
     this.logger.debug(`Marking email as verified for user ID: ${user.id}`);
-    await this.usersService.updateOne(user.id, {
+    await this.userRepository.update(user.id, {
       isEmailVerified: true,
       emailVerificationToken: null,
       emailVerificationTokenExpiresAt: null,
@@ -195,14 +197,14 @@ export class AuthService {
   }
 
   async generatePasswordResetToken(email: string): Promise<string> {
-    const user = await this.usersService.findOne({ email });
+    const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
       this.logger.debug(`No user found with email: ${email}`);
       return null;
     }
 
     const token = nanoid();
-    await this.usersService.updateOne(user.id, {
+    await this.userRepository.update(user.id, {
       passwordResetToken: token,
       passwordResetTokenExpiresAt: addDays(new Date(), 1),
     });

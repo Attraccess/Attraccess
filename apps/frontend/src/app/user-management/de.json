@@ -13,6 +13,7 @@
     }
   },
   "actions": {
-    "editAllowedSignupDomains": "Registrierungs-Domains bearbeiten"
+    "editAllowedSignupDomains": "Registrierungs-Domains bearbeiten",
+    "inviteUser": "Benutzer einladen"
   }
 }

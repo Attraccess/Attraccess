@@ -1,0 +1,28 @@
+{
+  "title": "Accept Invitation",
+  "inputs": {
+    "password": {
+      "label": "Choose a Password"
+    },
+    "confirmPassword": {
+      "label": "Confirm your Password"
+    }
+  },
+  "actions": {
+    "acceptInvitation": "Accept Invitation"
+  },
+  "error": {
+    "noTokenOrEmail": {
+      "title": "Error",
+      "description": "Token or email not found"
+    },
+    "passwordsDoNotMatch": {
+      "title": "Error",
+      "description": "Passwords do not match"
+    }
+  },
+  "success": {
+    "title": "Invitation Accepted",
+    "description": "Welcome to Attraccess!"
+  }
+}

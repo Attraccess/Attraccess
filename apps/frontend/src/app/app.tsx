@@ -5,7 +5,7 @@ import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
-import { VerifyEmail } from './verifyEmail';
+import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { HeroUIProvider, Spinner } from '@heroui/react';
 import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
@@ -24,6 +24,7 @@ import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { useReliableServerAvailability } from '../hooks/useReliableServerAvailability';
+import { AcceptInvitation } from './accept-invitation';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -122,6 +123,14 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route
+        path="/accept-invitation"
+        element={
+          <UnauthorizedLayout>
+            <AcceptInvitation />
+          </UnauthorizedLayout>
+        }
+      />
       <Route
         path="/reset-password"
         element={
