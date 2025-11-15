@@ -1,0 +1,7 @@
+{
+  "title": "Projects",
+  "subtitle": "Manage projects",
+  "actions": {
+    "create": "Create Project"
+  }
+}

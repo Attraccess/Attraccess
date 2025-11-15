@@ -1,0 +1,21 @@
+{
+  "title": "Projekt erstellen",
+  "inputs": {
+    "name": {
+      "label": "Name"
+    },
+    "description": {
+      "label": "Beschreibung"
+    },
+    "logo": {
+      "label": "Logo"
+    }
+  },
+  "actions": {
+    "create": "Projekt erstellen"
+  },
+  "success": {
+    "title": "Projekt erstellt",
+    "description": "Das Projekt '{{name}}' wurde erfolgreich erstellt."
+  }
+}

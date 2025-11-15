@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const ensureUseUsersServiceGetLocalSignupDomainWhitelistData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
@@ -199,3 +199,7 @@ export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (q
   end: string;
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });

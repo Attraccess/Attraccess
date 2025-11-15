@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { InfiniteData, UseInfiniteQueryOptions, useInfiniteQuery } from "@tanstack/react-query";
-import { BillingService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
+import { BillingService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
 import * as Common from "./common";
 export const useUsersServiceFindManyInfinite = <TData = InfiniteData<Common.UsersServiceFindManyDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, search }: {
   ids?: number[];
@@ -65,6 +65,13 @@ export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = Infin
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceFlowsService.getResourceFlowLogs({ limit, page: pageParam as number, resourceId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+    nextPage: string;
+  }).nextPage, ...options
+});
+export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<Common.ProjectsServiceFindManyProjectsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit }: {
+  limit?: number;
+} = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
     nextPage: string;
   }).nextPage, ...options
 });

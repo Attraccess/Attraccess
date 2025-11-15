@@ -25,6 +25,7 @@ import { BillingDashboardPage } from '../billing/dashboard';
 import { BillingAdministrationPage } from '../billing/administration';
 import { SumUpPage } from '../billing/administration/sumup';
 import { BalenaPage } from '../balena';
+import { ProjectsListPage } from '../projects';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -156,6 +157,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/email-templates/:type',
     element: <EditEmailTemplatePage />,
     authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/projects',
+    element: <ProjectsListPage />,
+    authRequired: true,
   },
 ];
 

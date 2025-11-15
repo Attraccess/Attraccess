@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -387,6 +387,13 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type ProjectsServiceFindManyProjectsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findManyProjects>>;
+export type ProjectsServiceFindManyProjectsQueryResult<TData = ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceFindManyProjectsKey = "ProjectsServiceFindManyProjects";
+export const UseProjectsServiceFindManyProjectsKeyFn = ({ limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ limit, page }])];
 export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
 export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
@@ -430,6 +437,7 @@ export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
+export type ProjectsServiceCreateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.createProject>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;

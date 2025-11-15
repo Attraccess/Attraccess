@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const prefetchUseUsersServiceGetLocalSignupDomainWhitelist = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
@@ -199,3 +199,7 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
