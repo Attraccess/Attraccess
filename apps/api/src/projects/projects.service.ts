@@ -33,6 +33,12 @@ export class ProjectsService {
     });
   }
 
+  public async getTotalCount(userId: number): Promise<number> {
+    return await this.projectRepository.count({
+      where: { owner: { id: userId } },
+    });
+  }
+
   public async findOne(searchOptions: FindOneSearchOptions): Promise<Project> {
     return await this.projectRepository.findOne({
       where: { id: searchOptions.id, owner: { id: searchOptions.ownerId } },

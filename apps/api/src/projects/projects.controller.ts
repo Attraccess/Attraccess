@@ -49,10 +49,11 @@ export class ProjectsController {
     @Query() query: FindManyProjectsQueryDto,
   ): Promise<FindManyProjectsResponseDto> {
     const projects = await this.projectsService.findMany(req.user.id, query);
+    const total = await this.projectsService.getTotalCount(req.user.id);
 
     return {
       data: projects.map(this.transformProject.bind(this)),
-      total: projects.length,
+      total,
       page: query.page,
       limit: query.limit,
     };

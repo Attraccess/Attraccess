@@ -84,6 +84,15 @@ describe('ProjectsService', () => {
     });
   });
 
+  describe('getTotalCount', () => {
+    it('should count projects filtered by owner', async () => {
+      projectRepository.count = jest.fn().mockResolvedValueOnce(42);
+      const total = await service.getTotalCount(99);
+      expect(projectRepository.count).toHaveBeenCalledWith({ where: { owner: { id: 99 } } });
+      expect(total).toBe(42);
+    });
+  });
+
   describe('create', () => {
     it('should create a project without logo and persist once', async () => {
       const ownerUserId = 7;
