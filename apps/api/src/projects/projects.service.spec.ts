@@ -1,26 +1,31 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeleteResult, Repository } from 'typeorm';
 import { ProjectsService } from './projects.service';
 import { Project } from '@attraccess/database-entities';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileUpload } from '../common/types/file-upload.types';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
+import { UpdateProjectDto } from './dto/update.dto';
+import { NotFoundException } from '@nestjs/common';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
   let projectRepository: jest.Mocked<Repository<Project>>;
-  let fileStorageService: { saveFile: jest.Mock };
+  let fileStorageService: { saveFile: jest.Mock; deleteFile: jest.Mock };
 
   beforeEach(async () => {
     projectRepository = {
       find: jest.fn(),
       save: jest.fn(),
+      findOne: jest.fn(),
+      delete: jest.fn(),
     } as unknown as jest.Mocked<Repository<Project>>;
 
     fileStorageService = {
       saveFile: jest.fn(),
+      deleteFile: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -62,6 +67,20 @@ describe('ProjectsService', () => {
         order: { name: 'ASC', createdAt: 'DESC' },
       });
       expect(result).toBe(projects);
+    });
+  });
+
+  describe('findOne', () => {
+    it('should find one project by id and owner', async () => {
+      const project = { id: 10, owner: { id: 7 } } as unknown as Project;
+      projectRepository.findOne.mockResolvedValueOnce(project);
+
+      const result = await service.findOne({ id: 10, ownerId: 7 });
+
+      expect(projectRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 10, owner: { id: 7 } },
+      });
+      expect(result).toBe(project);
     });
   });
 
@@ -142,6 +161,87 @@ describe('ProjectsService', () => {
           logo: 'logo-file.png',
         }),
       );
+    });
+  });
+
+  describe('deleteOne', () => {
+    it('should delete a project by id', async () => {
+      projectRepository.delete.mockResolvedValueOnce({} as DeleteResult);
+
+      await service.deleteOne(123);
+
+      expect(projectRepository.delete).toHaveBeenCalledWith(123);
+    });
+  });
+
+  describe('updateOne', () => {
+    it('should throw NotFoundException when project does not exist', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(null as unknown as Project);
+
+      await expect(service.updateOne(1, 999, { name: 'x' } as UpdateProjectDto)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('should update name and description without touching logo', async () => {
+      const existing = { id: 2, name: 'Old', description: 'Old desc', logo: null } as unknown as Project;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      const updated = await service.updateOne(1, 2, { name: 'New', description: 'New desc' } as UpdateProjectDto);
+
+      expect(fileStorageService.deleteFile).not.toHaveBeenCalled();
+      expect(fileStorageService.saveFile).not.toHaveBeenCalled();
+      expect(projectRepository.save).toHaveBeenCalledTimes(1);
+      expect(projectRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 2, name: 'New', description: 'New desc' }),
+      );
+      expect(updated).toEqual(expect.objectContaining({ id: 2, name: 'New', description: 'New desc' }));
+    });
+
+    it('should delete existing logo when deleteLogo is true', async () => {
+      const existing = { id: 3, name: 'P', description: 'D', logo: 'old.png' } as unknown as Project;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      const result = await service.updateOne(1, 3, { deleteLogo: true } as unknown as UpdateProjectDto);
+
+      expect(fileStorageService.deleteFile).toHaveBeenCalledWith('projects/3', 'old.png');
+      expect(fileStorageService.saveFile).not.toHaveBeenCalled();
+      expect(projectRepository.save).toHaveBeenCalledTimes(1);
+      expect(projectRepository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, logo: null }));
+      expect(result.logo).toBeNull();
+    });
+
+    it('should replace existing logo when a new logo is provided', async () => {
+      const existing = { id: 4, name: 'P', description: 'D', logo: 'old.png' } as unknown as Project;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      const newLogo = Buffer.from('new') as unknown as FileUpload;
+      fileStorageService.saveFile.mockResolvedValueOnce('new.png');
+      // First save inside setLogo, second save as final return
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      const result = await service.updateOne(10, 4, { logo: newLogo } as unknown as UpdateProjectDto);
+
+      expect(fileStorageService.deleteFile).toHaveBeenCalledWith('projects/4', 'old.png');
+      expect(fileStorageService.saveFile).toHaveBeenCalledWith(newLogo, 'projects/4');
+      expect(projectRepository.save).toHaveBeenCalledTimes(2);
+      expect(result.logo).toBe('new.png');
+    });
+
+    it('should add logo when none existed previously', async () => {
+      const existing = { id: 6, name: 'P', description: 'D', logo: null } as unknown as Project;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      const newLogo = Buffer.from('new') as unknown as FileUpload;
+      fileStorageService.saveFile.mockResolvedValueOnce('added.png');
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      const result = await service.updateOne(10, 6, { logo: newLogo } as unknown as UpdateProjectDto);
+
+      expect(fileStorageService.deleteFile).not.toHaveBeenCalled();
+      expect(fileStorageService.saveFile).toHaveBeenCalledWith(newLogo, 'projects/6');
+      expect(projectRepository.save).toHaveBeenCalledTimes(2);
+      expect(result.logo).toBe('added.png');
     });
   });
 });

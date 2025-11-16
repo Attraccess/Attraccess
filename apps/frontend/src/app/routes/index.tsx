@@ -26,6 +26,7 @@ import { BillingAdministrationPage } from '../billing/administration';
 import { SumUpPage } from '../billing/administration/sumup';
 import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
+import { ProjectDetailsPage } from '../projects/details';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -161,6 +162,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/projects',
     element: <ProjectsListPage />,
+    authRequired: true,
+  },
+  {
+    path: '/projects/:id',
+    element: <ProjectDetailsPage />,
     authRequired: true,
   },
 ];

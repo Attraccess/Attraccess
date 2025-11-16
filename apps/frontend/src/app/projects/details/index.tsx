@@ -1,0 +1,111 @@
+import {
+  ApiError,
+  useProjectsServiceDeleteOneProject,
+  useProjectsServiceFindManyProjectsKey,
+  useProjectsServiceFindOneProject,
+} from '@attraccess/react-query-client';
+import { Skeleton, Image, Button } from '@heroui/react';
+import { filenameToUrl } from '../../../api';
+import { PageHeader } from '../../../components/pageHeader';
+import { Edit2Icon, FoldersIcon, Trash2Icon } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
+import { useCallback, useState } from 'react';
+import { useToastMessage } from '../../../components/toastProvider';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import { UpsertProjectModal } from '../upsertModal';
+
+export function ProjectDetailsPage() {
+  const { id } = useParams<{ id: string }>();
+  const projectId = parseInt(id || '', 10);
+
+  const navigate = useNavigate();
+  const toast = useToastMessage();
+  const queryClient = useQueryClient();
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
+
+  const { data: project } = useProjectsServiceFindOneProject({ id: projectId });
+  const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] = useState(false);
+
+  const { mutate: deleteProject } = useProjectsServiceDeleteOneProject({
+    onSuccess: () => {
+      toast.success({
+        title: t('actions.delete.success.title'),
+        description: t('actions.delete.success.description', { name: project?.name ?? '' }),
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useProjectsServiceFindManyProjectsKey],
+      });
+      navigate('/projects');
+    },
+    onError: (error) => {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
+  const onDeleteProject = useCallback(() => {
+    deleteProject({ id: projectId });
+  }, [deleteProject, projectId]);
+
+  return (
+    <>
+      <PageHeader
+        title={project?.name ?? <Skeleton className="w-full h-4" />}
+        subtitle={project?.description ?? <Skeleton className="w-full h-4" />}
+        icon={
+          project?.logo ? (
+            <Image className="max-w-24 max-h-24" src={filenameToUrl(project.logo)} alt={project?.name} />
+          ) : (
+            <FoldersIcon />
+          )
+        }
+        backTo="/projects"
+        actions={
+          <>
+            <UpsertProjectModal projectId={projectId}>
+              {(onOpen) => (
+                <Button onPress={onOpen} startContent={<Edit2Icon className="size-4" />} variant="light">
+                  {t('actions.update.label')}
+                </Button>
+              )}
+            </UpsertProjectModal>
+            <Button
+              onPress={() => setShowDeleteConfirmationModal(true)}
+              startContent={<Trash2Icon className="size-4" />}
+              color="danger"
+              variant="light"
+            >
+              {t('actions.delete.label')}
+            </Button>
+          </>
+        }
+      />
+
+      <DeleteConfirmationModal
+        isOpen={showDeleteConfirmationModal}
+        onClose={() => setShowDeleteConfirmationModal(false)}
+        onConfirm={onDeleteProject}
+        itemName={project?.name ?? ''}
+      />
+    </>
+  );
+}

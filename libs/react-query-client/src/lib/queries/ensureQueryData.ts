@@ -203,3 +203,6 @@ export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryC
   limit?: number;
   page?: number;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });

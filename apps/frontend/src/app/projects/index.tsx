@@ -3,11 +3,11 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardBody, CardHeader, Image, Skeleton } from '@heroui/react';
-import { FolderIcon, PlusIcon, ShapesIcon } from 'lucide-react';
-import { CreateProjectModal } from './createModal';
-import { filenameToUrl } from '../../api';
+import { Button, Skeleton } from '@heroui/react';
+import { FolderIcon, PlusIcon } from 'lucide-react';
+import { UpsertProjectModal } from './upsertModal';
 import { EmptyState } from '../../components/emptyState';
+import { ProjectCard } from './projectCard';
 
 export function ProjectsListPage() {
   const page = 1;
@@ -24,13 +24,13 @@ export function ProjectsListPage() {
         subtitle={t('subtitle')}
         icon={<FolderIcon />}
         actions={
-          <CreateProjectModal>
+          <UpsertProjectModal>
             {(onOpen) => (
               <Button onPress={onOpen} startContent={<PlusIcon size="24" />} variant="light">
                 {t('actions.create')}
               </Button>
             )}
-          </CreateProjectModal>
+          </UpsertProjectModal>
         }
       />
 
@@ -44,33 +44,7 @@ export function ProjectsListPage() {
         )}
         {projects?.data?.length === 0 && !isLoading && <EmptyState />}
         {projects?.data?.map((project) => (
-          <Card key={project.id}>
-            <CardHeader>
-              <PageHeader
-                icon={
-                  project.logo ? (
-                    <Image
-                      src={filenameToUrl(project.logo)}
-                      alt={project.name}
-                      width={48}
-                      height={48}
-                      classNames={{
-                        img: 'object-contain',
-                      }}
-                    />
-                  ) : (
-                    <ShapesIcon size="48" />
-                  )
-                }
-                title={project.name}
-                noMargin
-              />
-            </CardHeader>
-
-            <CardBody>
-              <p>{project.description}</p>
-            </CardBody>
-          </Card>
+          <ProjectCard key={project.id} project={project} />
         ))}
       </div>
     </div>

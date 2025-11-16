@@ -394,6 +394,12 @@ export const UseProjectsServiceFindManyProjectsKeyFn = ({ limit, page }: {
   limit?: number;
   page?: number;
 } = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ limit, page }])];
+export type ProjectsServiceFindOneProjectDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findOneProject>>;
+export type ProjectsServiceFindOneProjectQueryResult<TData = ProjectsServiceFindOneProjectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceFindOneProjectKey = "ProjectsServiceFindOneProject";
+export const UseProjectsServiceFindOneProjectKeyFn = ({ id }: {
+  id: number;
+}, queryKey?: Array<unknown>) => [useProjectsServiceFindOneProjectKey, ...(queryKey ?? [{ id }])];
 export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
 export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
@@ -445,6 +451,7 @@ export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<Retu
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
+export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeUserUsername>>;
@@ -464,3 +471,4 @@ export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;
+export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;

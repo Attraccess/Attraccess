@@ -1,4 +1,18 @@
-import { Body, Controller, Get, Post, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  Req,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
@@ -8,6 +22,7 @@ import { CreateProjectDto } from './dto/create.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FileUpload } from '../common/types/file-upload.types';
 import { FileStorageService } from '../common/services/file-storage.service';
+import { UpdateProjectDto } from './dto/update.dto';
 
 @ApiTags('Projects')
 @Controller('projects')
@@ -43,6 +58,32 @@ export class ProjectsController {
     };
   }
 
+  @Get(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Get one project', operationId: 'findOneProject' })
+  @ApiResponse({ status: 200, description: 'The project.', type: Project })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async getOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<Project> {
+    const project = await this.projectsService.findOne({ id, ownerId: req.user.id });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    return this.transformProject(project);
+  }
+
+  @Delete(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Delete a project', operationId: 'deleteOneProject' })
+  @ApiResponse({ status: 204, description: 'The project has been successfully deleted.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async deleteOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
+    const project = await this.projectsService.findOne({ id, ownerId: req.user.id });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    await this.projectsService.deleteOne(project.id);
+  }
+
   @Post()
   @Auth()
   @ApiOperation({ summary: 'Create a project', operationId: 'createProject' })
@@ -59,6 +100,30 @@ export class ProjectsController {
       data.logo = logo;
     }
     const project = await this.projectsService.create(req.user.id, data);
+    return this.transformProject(project);
+  }
+
+  @Put(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Update a project', operationId: 'updateProject' })
+  @ApiResponse({ status: 200, description: 'The project was updated successfully.', type: Project })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('logo'))
+  async update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateProjectDto,
+    @UploadedFile() logo?: FileUpload,
+  ): Promise<Project> {
+    if (logo) {
+      data.logo = logo;
+    }
+    const project = await this.projectsService.updateOne(
+      req.user.id,
+      id,
+      data as Omit<UpdateProjectDto, 'logo'> & { logo?: FileUpload | null },
+    );
     return this.transformProject(project);
   }
 }

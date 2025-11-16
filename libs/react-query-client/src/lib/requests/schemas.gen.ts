@@ -3175,3 +3175,30 @@ export const $CreateProjectDto = {
     },
     required: ['name']
 } as const;
+
+export const $UpdateProjectDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'The name of the project',
+            example: 'Project 1'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project',
+            example: 'This is a project'
+        },
+        logo: {
+            type: 'string',
+            description: 'Project logo image file',
+            format: 'binary'
+        },
+        deleteLogo: {
+            type: 'boolean',
+            description: 'Whether the project logo should be deleted',
+            default: false
+        }
+    },
+    required: ['name']
+} as const;

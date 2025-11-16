@@ -2102,6 +2102,25 @@ export type CreateProjectDto = {
     logo?: (Blob | File);
 };
 
+export type UpdateProjectDto = {
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description?: string;
+    /**
+     * Project logo image file
+     */
+    logo?: (Blob | File);
+    /**
+     * Whether the project logo should be deleted
+     */
+    deleteLogo?: boolean;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -3172,6 +3191,25 @@ export type CreateProjectData = {
 };
 
 export type CreateProjectResponse = Project;
+
+export type FindOneProjectData = {
+    id: number;
+};
+
+export type FindOneProjectResponse = Project;
+
+export type DeleteOneProjectData = {
+    id: number;
+};
+
+export type DeleteOneProjectResponse = void;
+
+export type UpdateProjectData = {
+    formData: UpdateProjectDto;
+    id: number;
+};
+
+export type UpdateProjectResponse = Project;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -5357,6 +5395,47 @@ export type $OpenApiTs = {
                  * The project was created successfully.
                  */
                 201: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}': {
+        get: {
+            req: FindOneProjectData;
+            res: {
+                /**
+                 * The project.
+                 */
+                200: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeleteOneProjectData;
+            res: {
+                /**
+                 * The project has been successfully deleted.
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        put: {
+            req: UpdateProjectData;
+            res: {
+                /**
+                 * The project was updated successfully.
+                 */
+                200: Project;
                 /**
                  * Unauthorized
                  */

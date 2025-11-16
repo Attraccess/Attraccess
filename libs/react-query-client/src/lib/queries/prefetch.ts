@@ -203,3 +203,6 @@ export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryCli
   limit?: number;
   page?: number;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });
