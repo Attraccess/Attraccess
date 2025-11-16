@@ -75,11 +75,11 @@ export class ProjectsService {
       throw new NotFoundException('Project not found');
     }
 
-    if (data.description) {
+    if (data.description !== undefined) {
       project.description = data.description;
     }
 
-    if (data.name) {
+    if (data.name !== undefined) {
       project.name = data.name;
     }
 

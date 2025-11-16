@@ -120,11 +120,7 @@ export class ProjectsController {
     if (logo) {
       data.logo = logo;
     }
-    const project = await this.projectsService.updateOne(
-      req.user.id,
-      id,
-      data as Omit<UpdateProjectDto, 'logo'> & { logo?: FileUpload | null },
-    );
+    const project = await this.projectsService.updateOne(req.user.id, id, data);
     return this.transformProject(project);
   }
 }
