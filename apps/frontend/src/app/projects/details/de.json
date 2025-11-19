@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "delete": {
+      "label": "Projekt löschen",
+      "success": {
+        "title": "Projekt erfolgreich gelöscht",
+        "description": "Das Projekt {name} wurde erfolgreich gelöscht"
+      }
+    },
+    "update": {
+      "label": "Projekt aktualisieren"
+    }
+  }
+}

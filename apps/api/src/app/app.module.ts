@@ -22,6 +22,7 @@ import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
 import { EncryptionModule } from '../encryption/encryption.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
     LicenseModule,
     BillingModule,
     EncryptionModule,
+    ProjectsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
