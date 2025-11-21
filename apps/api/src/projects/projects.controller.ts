@@ -50,11 +50,17 @@ export class ProjectsController {
     const projects = await this.projectsService.findMany(req.user.id, query);
     const total = await this.projectsService.getTotalCount(req.user.id);
 
+    let nextPage: number | undefined = query.page + 1;
+    if (nextPage * query.limit >= total) {
+      nextPage = undefined;
+    }
+
     return {
       data: projects.map(this.transformProject.bind(this)),
       total,
       page: query.page,
       limit: query.limit,
+      nextPage,
     };
   }
 

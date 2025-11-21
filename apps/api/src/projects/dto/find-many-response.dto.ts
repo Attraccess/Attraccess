@@ -14,4 +14,7 @@ export class FindManyProjectsResponseDto implements PaginatedResponse<Project> {
 
   @ApiProperty()
   limit: number;
+
+  @ApiProperty()
+  nextPage?: number;
 }
