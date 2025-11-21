@@ -1,0 +1,33 @@
+{
+  "title": {
+    "create": "Projekt erstellen",
+    "update": "Projekt aktualisieren"
+  },
+  "inputs": {
+    "name": {
+      "label": "Name"
+    },
+    "description": {
+      "label": "Beschreibung"
+    },
+    "logo": {
+      "label": "Logo"
+    }
+  },
+  "actions": {
+    "create": {
+      "label": "Projekt erstellen",
+      "success": {
+        "title": "Projekt erstellt",
+        "description": "Das Projekt '{{name}}' wurde erfolgreich erstellt."
+      }
+    },
+    "update": {
+      "label": "Projekt aktualisieren",
+      "success": {
+        "title": "Projekt aktualisiert",
+        "description": "Das Projekt '{{name}}' wurde erfolgreich aktualisiert."
+      }
+    }
+  }
+}

@@ -12,6 +12,10 @@
         "label": "Mit Notizen starten",
         "description": "Starten Sie die Sitzung und geben Sie Notizen an."
       }
+    },
+    "project": {
+      "label": "Projekt",
+      "placeholder": "Wählen Sie (optional) ein Projekt"
     }
   },
   "door": {

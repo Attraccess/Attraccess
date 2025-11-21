@@ -25,6 +25,7 @@ public:
     static constexpr size_t MAX_FLOW_BUTTONS = 10;
     static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
     static constexpr size_t MAX_FLOW_BUTTON_ID_LEN = 48;
+    static constexpr size_t MAX_PROJECTS_PER_PAGE = 4;
     struct FlowButton
     {
         char id[MAX_FLOW_BUTTON_ID_LEN];
@@ -51,6 +52,21 @@ public:
         uint16_t count;
         ResourceBrief items[MAX_RESOURCES];
     };
+    struct Project
+    {
+        uint32_t id;
+        String name;
+    };
+    struct ProjectsOfUserResponse
+    {
+        uint16_t count;
+        uint32_t page = 1;
+        uint32_t limit = MAX_PROJECTS_PER_PAGE;
+        uint32_t total = 0;
+        bool hasMore = false;
+        Project items[MAX_PROJECTS_PER_PAGE];
+    };
+
     void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 
@@ -73,7 +89,7 @@ public:
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
 
-    void startResourceUsageSession(uint32_t resourceId);
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
     void stopResourceUsageSession(uint32_t resourceId);
     void lockDoor(uint32_t resourceId);
     void unlockDoor(uint32_t resourceId);
@@ -95,6 +111,9 @@ public:
     // Special-case callback for insufficient balance with server-provided SumUp flag
     void setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback);
 
+    void requestProjectsOfUser(uint32_t page);
+    void setProjectsOfUserResponseCallback(std::function<void(const ProjectsOfUserResponse &)> callback);
+
 private:
     Logger logger;
     Websocket websocket;
@@ -111,6 +130,9 @@ private:
 
     std::function<void(String)> deviceNameCallback;
 
+    uint32_t lastRequestedProjectsOfUserPage = -1;
+    std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
+
     void sendAck(const char *type);
     void sendMessage(const char *type);
     void sendMessage(const char *type, JsonObject payload);
@@ -126,12 +148,15 @@ private:
     StaticJsonDocument<6144> inboundDoc;
     void sendHeartbeat();
 
+    ProjectsOfUserResponse projectsOfUserResponseScratch;
+
     void onRegistrationData(JsonObject data);
     void onUnauthorized(JsonObject data);
     void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void sendFirmwareInfo();
     void onResourceList(JsonObject data);
+    void onProjectsOfUserResponse(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
 
     std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;

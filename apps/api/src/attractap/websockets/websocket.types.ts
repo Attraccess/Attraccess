@@ -31,6 +31,7 @@ export enum AttractapEventType {
   ENROLL_NEW_CARD = 'ENROLL_NEW_CARD',
   TRIGGER_FLOW_BUTTON = 'TRIGGER_FLOW_BUTTON',
   BILLING_REQUEST_TOPUP = 'BILLING_REQUEST_TOPUP',
+  PROJECTS_OF_USER = 'PROJECTS_OF_USER',
 }
 
 export interface ResourceThumbnailDescriptorPayload {

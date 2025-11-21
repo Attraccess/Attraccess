@@ -22,6 +22,7 @@ import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
 import { InsufficientBalanceModal } from './insufficientBalanceModal';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
+import { ProjectsSelect } from '../../../../../components/projectsSelect';
 
 interface StartSessionControlsProps {
   resourceId: number;
@@ -161,10 +162,15 @@ export function StartSessionControls(
     },
   });
 
+  const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
+
   const handleStartSession = async (opts?: StartUsageSessionDto) => {
     startSession({
       resourceId,
-      requestBody: opts ?? {},
+      requestBody: {
+        ...(opts ?? {}),
+        projectId: selectedProjectId,
+      },
     });
   };
 
@@ -211,6 +217,12 @@ export function StartSessionControls(
         {resource?.type === 'machine' && (
           <>
             <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
+            <ProjectsSelect
+              value={selectedProjectId}
+              onValueChange={setSelectedProjectId}
+              label={t('machine.project.label')}
+              placeholder={t('machine.project.placeholder')}
+            />
             <ButtonGroup fullWidth color="primary">
               <Button
                 isLoading={startIsPending}

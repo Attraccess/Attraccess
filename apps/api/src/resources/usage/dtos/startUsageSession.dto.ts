@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ToBoolean } from '../../../common/request-transformers';
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt, IsPositive } from 'class-validator';
 
 export class StartUsageSessionDto {
   @ApiProperty({
@@ -22,4 +22,14 @@ export class StartUsageSessionDto {
   @ToBoolean()
   @IsOptional()
   forceTakeOver?: boolean;
+
+  @ApiProperty({
+    description: 'The project to assign this usage to',
+    required: false,
+    example: 35,
+  })
+  @IsInt()
+  @IsPositive()
+  @IsOptional()
+  projectId?: number;
 }

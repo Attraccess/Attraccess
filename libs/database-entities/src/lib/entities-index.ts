@@ -44,6 +44,7 @@ import { BillingTransaction, BillingTransactionStatus } from './entities/billing
 import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
 import { Setting } from './entities/setting.entity';
 import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
+import { Project } from './entities/project';
 
 // Export all entities individually
 export {
@@ -94,6 +95,7 @@ export {
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
+  Project,
 };
 
 // Export the entities object
@@ -122,4 +124,5 @@ export const entities = {
   ResourceBillingConfiguration,
   Setting,
   BillingTransactionItem,
+  Project,
 };

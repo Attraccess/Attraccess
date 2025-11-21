@@ -12,6 +12,10 @@
         "label": "Start with Notes",
         "description": "Start the session and provide notes."
       }
+    },
+    "project": {
+      "label": "Project",
+      "placeholder": "Select (optional) a project"
     }
   },
   "door": {

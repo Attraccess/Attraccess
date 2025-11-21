@@ -8,6 +8,7 @@ import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { NFCCard } from './nfcCard.entity';
 import { Session } from './session.entity';
 import { BillingTransaction } from './billing-transaction.entity';
+import { Project } from './project';
 
 export class SystemPermissions {
   @Column({ default: false, type: 'boolean' })
@@ -177,4 +178,9 @@ export class User {
     example: 100,
   })
   billingFactor!: number;
+
+  @OneToMany(() => Project, (project) => project.owner, {
+    onDelete: 'CASCADE',
+  })
+  ownedProjects!: Project[];
 }

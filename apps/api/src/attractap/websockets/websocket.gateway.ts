@@ -30,6 +30,7 @@ import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flo
 import { ResourceInUseError } from '../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ProjectsService } from '../../projects/projects.service';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -71,6 +72,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(SumUpService)
   private sumUpService: SumUpService;
+
+  @Inject(ProjectsService)
+  private projectsService: ProjectsService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -398,6 +402,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       case AttractapEventType.ENROLL_NEW_CARD:
         await this.onEnrollNewCard(socket, eventData);
+        break;
+
+      case AttractapEventType.PROJECTS_OF_USER:
+        await this.handleProjectsOfUserRequest(socket, eventData);
         break;
 
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
@@ -896,7 +904,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId } = data.payload as { resourceId: number };
+    const { resourceId, projectId } = data.payload as { resourceId: number; projectId?: number };
 
     if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
       return;
@@ -911,7 +919,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     try {
-      await this.resourceUsageService.startSession(resourceId, user, {});
+      await this.resourceUsageService.startSession(resourceId, user, { projectId });
       await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       if (error instanceof ResourceInUseError) {
@@ -1103,5 +1111,20 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       );
     }
   }
-  // handleFirmwareStreamChunk removed - HTTP OTA used instead
+
+  private async handleProjectsOfUserRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const userId = socket.state.lastAuthenticatedUserId;
+    if (!userId) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.PROJECTS_OF_USER, { error: 'USER_NOT_AUTHENTICATED' }),
+      );
+      return;
+    }
+
+    const { page = 1, limit = 10 } = data.payload as { page?: number; limit?: number };
+
+    const projects = await this.projectsService.findMany(userId, { page, limit });
+    const total = await this.projectsService.getTotalCount(userId);
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.PROJECTS_OF_USER, { projects, page, limit, total }));
+  }
 }

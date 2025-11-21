@@ -4,7 +4,8 @@
     "machine": {
       "startTime": "Start Time",
       "endTime": "End Time",
-      "duration": "Duration"
+      "duration": "Duration",
+      "project": "Project"
     },
     "door": {
       "time": "Time",

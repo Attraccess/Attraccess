@@ -24,6 +24,8 @@ import { ResourceMaintenanceUpsertModal } from './upsert';
 import { CogIcon, ConstructionIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { ResourceMaintenanceCancelModal } from './cancel';
 import { useNow } from '../../../../hooks/useNow';
+import { EmptyState } from '../../../../components/emptyState';
+import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
 
 interface Props {
   resourceId: number;
@@ -39,7 +41,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
 
   const [includePast, setIncludePast] = useState(false);
 
-  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances({
+  const { data: maintenances, status: fetchStatus } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includePast,
     includeActive: true,
@@ -64,6 +66,8 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
       }),
     [maintenances?.data, now],
   );
+
+  const tableLoadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
 
   return (
     <Card {...cardProps}>
@@ -105,7 +109,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
               <CogIcon />
             </TableColumn>
           </TableHeader>
-          <TableBody items={maintenanceWithStatus}>
+          <TableBody items={maintenanceWithStatus} loadingState={tableLoadingState} emptyContent={<EmptyState />}>
             {(maintenance) => (
               <TableRow
                 className={cn(

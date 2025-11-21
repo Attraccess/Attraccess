@@ -1458,8 +1458,54 @@ export const $StartUsageSessionDto = {
             description: 'Whether to force takeover of an existing session (only works if resource allows takeover)',
             example: false,
             default: false
+        },
+        projectId: {
+            type: 'number',
+            description: 'The project to assign this usage to',
+            example: 35
         }
     }
+} as const;
+
+export const $Project = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the project'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was last updated'
+        },
+        owner: {
+            description: 'The ID of the user that owns the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the project'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project'
+        },
+        logo: {
+            type: 'string',
+            description: 'The logo of the project'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo']
 } as const;
 
 export const $ResourceUsage = {
@@ -1526,6 +1572,19 @@ export const $ResourceUsage = {
             type: 'number',
             description: 'The duration of the usage session in minutes',
             example: 120
+        },
+        projectId: {
+            type: 'number',
+            description: 'The ID of the project this usage session belongs to',
+            example: 1
+        },
+        project: {
+            description: 'The project this usage session belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
         }
     },
     required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes']
@@ -2697,6 +2756,77 @@ export const $ResourceFlowNode = {
         }
     },
     required: ['id', 'type', 'position', 'data', 'resourceId']
+} as const;
+
+export const $FindManyProjectsResponseDto = {
+    type: 'object',
+    properties: {
+        data: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/Project'
+            }
+        },
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        }
+    },
+    required: ['data', 'total', 'page', 'limit']
+} as const;
+
+export const $CreateProjectDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'The name of the project',
+            example: 'Project 1'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project',
+            example: 'This is a project'
+        },
+        logo: {
+            type: 'string',
+            description: 'Project logo image file',
+            format: 'binary'
+        }
+    },
+    required: ['name']
+} as const;
+
+export const $UpdateProjectDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'The name of the project',
+            example: 'Project 1'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project',
+            example: 'This is a project'
+        },
+        logo: {
+            type: 'string',
+            description: 'Project logo image file',
+            format: 'binary'
+        },
+        deleteLogo: {
+            type: 'boolean',
+            description: 'Whether the project logo should be deleted',
+            default: false
+        }
+    },
+    required: ['name']
 } as const;
 
 export const $PluginMainFrontend = {

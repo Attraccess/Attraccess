@@ -236,6 +236,7 @@ describe('UsersService', () => {
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
           nfcKeySeedToken: null,
+          ownedProjects: [],
           sessions: [],
           billingTransactions: [],
           initiatedBillingTransactions: [],
@@ -269,6 +270,7 @@ describe('UsersService', () => {
           resourceIntroducerPermissions: [],
           externalIdentifier: null,
           nfcKeySeedToken: null,
+          ownedProjects: [],
           sessions: [],
           billingTransactions: [],
           initiatedBillingTransactions: [],
@@ -322,6 +324,7 @@ describe('UsersService', () => {
         resourceIntroducerPermissions: [],
         externalIdentifier: null,
         nfcKeySeedToken: null,
+        ownedProjects: [],
         sessions: [],
         ...overrides,
       }) as User;

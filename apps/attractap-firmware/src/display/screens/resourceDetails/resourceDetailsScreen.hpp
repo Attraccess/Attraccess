@@ -26,7 +26,10 @@ public:
         BUTTON_CLICK_TYPE_LOGOUT,
     };
 
-    ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE") {}
+    ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE")
+    {
+        this->projectsCache.count = 0;
+    }
     void init();
     void onScreenLeave();
     void loop() override;
@@ -54,11 +57,16 @@ public:
         char flowButtonId[API::MAX_FLOW_BUTTON_ID_LEN]; // valid when buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON
     };
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
+    void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
+    void setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback);
+    void setSelectedProject(uint32_t projectId, const char *projectName);
 
     // UI helpers for async actions
     void showActionProgress(const char *text);
     void hideActionProgress();
     void showSuccessToast(const char *text, uint16_t ms = 1200);
+
+    void setProjects(const API::ProjectsOfUserResponse &projects);
 
 private:
     Logger logger;
@@ -76,7 +84,25 @@ private:
     lv_obj_t *currentUser;
 
     lv_obj_t *sessionControls;
+    lv_obj_t *projectSelectionRow = nullptr;
 
+    API::ProjectsOfUserResponse projectsCache;
+    uint32_t selectedProjectId = 0;
+    String selectedProjectName;
+    uint32_t projectsCurrentPage = 1;
+    uint32_t projectsTotalCount = 0;
+    uint32_t projectsPageLimit = API::MAX_PROJECTS_PER_PAGE;
+    bool projectsHasMore = false;
+    bool projectsDataInitialized = false;
+    lv_obj_t *projectsButton = nullptr;
+    lv_obj_t *projectsButtonLabel = nullptr;
+    lv_obj_t *clearProjectButton = nullptr;
+    lv_obj_t *projectsModal = nullptr;
+    lv_obj_t *projectsModalPanel = nullptr;
+    lv_obj_t *projectsListContainer = nullptr;
+    lv_obj_t *projectsPaginationLabel = nullptr;
+    lv_obj_t *projectsPrevButton = nullptr;
+    lv_obj_t *projectsNextButton = nullptr;
     lv_obj_t *startSessionButton;
     lv_obj_t *stopSessionButton;
     lv_obj_t *doorControls;
@@ -93,9 +119,18 @@ private:
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
+    std::function<void(uint32_t)> projectsPageRequestCallback;
+    std::function<void(uint32_t, const String &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
     static void onToastDelete(lv_event_t *e);
+    static void onProjectsButtonClick(lv_event_t *e);
+    static void onClearProjectSelectionClick(lv_event_t *e);
+    static void onProjectsModalClose(lv_event_t *e);
+    static void onProjectListItemClick(lv_event_t *e);
+    static void onProjectListItemDelete(lv_event_t *e);
+    static void onProjectsPrevPage(lv_event_t *e);
+    static void onProjectsNextPage(lv_event_t *e);
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;
@@ -105,4 +140,20 @@ private:
     lv_obj_t *actionOverlayLabel = nullptr;
     lv_obj_t *successToast = nullptr;
     lv_timer_t *successToastTimer = nullptr;
+
+    struct ProjectButtonEventData
+    {
+        ResourceDetailsScreen *self;
+        uint8_t index;
+    };
+
+    void refreshProjectsButtonLabel();
+    void updateClearProjectButtonState();
+    void clearSelectedProject();
+    void ensureProjectsModal();
+    void showProjectsModal();
+    void hideProjectsModal();
+    void rebuildProjectsList();
+    void showProjectsLoading();
+    void updateProjectsPaginationControls();
 };

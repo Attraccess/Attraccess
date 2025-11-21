@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -329,6 +329,19 @@ export const useResourceFlowsServiceGetButtonsKey = "ResourceFlowsServiceGetButt
 export const UseResourceFlowsServiceGetButtonsKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetButtonsKey, ...(queryKey ?? [{ resourceId }])];
+export type ProjectsServiceFindManyProjectsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findManyProjects>>;
+export type ProjectsServiceFindManyProjectsQueryResult<TData = ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceFindManyProjectsKey = "ProjectsServiceFindManyProjects";
+export const UseProjectsServiceFindManyProjectsKeyFn = ({ limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ limit, page }])];
+export type ProjectsServiceFindOneProjectDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findOneProject>>;
+export type ProjectsServiceFindOneProjectQueryResult<TData = ProjectsServiceFindOneProjectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceFindOneProjectKey = "ProjectsServiceFindOneProject";
+export const UseProjectsServiceFindOneProjectKeyFn = ({ id }: {
+  id: number;
+}, queryKey?: Array<unknown>) => [useProjectsServiceFindOneProjectKey, ...(queryKey ?? [{ id }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -426,6 +439,7 @@ export type BillingServiceTopUpWithSumUpReaderMutationResult = Awaited<ReturnTyp
 export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<typeof BillingService.sumUpTopUpCallback>>;
 export type BillingServiceRefundTransactionMutationResult = Awaited<ReturnType<typeof BillingService.refundTransaction>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
+export type ProjectsServiceCreateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.createProject>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
@@ -437,6 +451,7 @@ export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<Retu
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
+export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeUserUsername>>;
@@ -454,5 +469,6 @@ export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaite
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.cancelMaintenance>>;
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
+export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

@@ -6,6 +6,7 @@ import {
   CreditCardIcon,
   DatabaseIcon,
   FileIcon,
+  FolderIcon,
   GiftIcon,
   KeyIcon,
   LightbulbIcon,
@@ -54,6 +55,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         translationKey: 'resources',
         path: '/resources',
         icon: DatabaseIcon,
+      },
+      {
+        translationKey: 'projects',
+        path: '/projects',
+        icon: FolderIcon,
       },
     ];
 

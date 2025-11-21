@@ -10,6 +10,7 @@
     "##default##": {
       "items": {
         "resources": "Ressourcen",
+        "projects": "Projekte",
         "billing": "Zahlungen"
       }
     },
