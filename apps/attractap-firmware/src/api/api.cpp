@@ -1030,7 +1030,7 @@ void API::onProjectsOfUserResponse(JsonObject data)
         }
         else
         {
-            dst.name[0] = '\0';
+            dst.name = "";
         }
 
         count++;
