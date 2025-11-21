@@ -23,6 +23,7 @@ import { ResourceMaintenanceService } from '../maintenances/maintenance.service'
 import { BillingService } from '../../billing/billing.service';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 import { ResourceInUseError } from './errors/resource-in-use.error';
+import { ProjectsService } from '../../projects/projects.service';
 
 @Injectable()
 export class ResourceUsageService {
@@ -41,6 +42,7 @@ export class ResourceUsageService {
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
     private readonly flowExecutorService: ResourceFlowsExecutorService,
+    private readonly projectsService: ProjectsService,
   ) {}
 
   public async canControllResource(
@@ -207,7 +209,7 @@ export class ResourceUsageService {
         }
       }
 
-      const usageData = {
+      const usageData: Partial<ResourceUsage> = {
         resourceId,
         usageAction: ResourceUsageAction.Usage,
         userId: user.id,
@@ -216,6 +218,12 @@ export class ResourceUsageService {
         endTime: null,
         endNotes: null,
       };
+
+      if (dto.projectId !== undefined) {
+        const project = await this.projectsService.findOneById(user.id, dto.projectId);
+
+        usageData.projectId = project.id;
+      }
 
       this.logger.debug(`Creating new usage session for resource ${resourceId}`, { usageData });
 
@@ -461,7 +469,7 @@ export class ResourceUsageService {
         resourceId,
         endTime: IsNull(),
       },
-      relations: ['user', 'resource', 'billingTransaction'],
+      relations: ['user', 'resource', 'billingTransaction', 'project'],
     });
   }
 
@@ -484,26 +492,10 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user'],
+      relations: ['user', 'project'],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);
-
-    return { data, total };
-  }
-
-  async getUserUsageHistory(userId: number, page = 1, limit = 10): Promise<{ data: ResourceUsage[]; total: number }> {
-    this.logger.debug(`Getting usage history for user ${userId}`, { page, limit });
-
-    const [data, total] = await this.resourceUsageRepository.findAndCount({
-      where: { userId },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { startTime: 'DESC' },
-      relations: ['resource'],
-    });
-
-    this.logger.debug(`Found ${data.length} usage records out of ${total} total for user ${userId}`);
 
     return { data, total };
   }

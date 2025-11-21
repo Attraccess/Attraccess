@@ -8,6 +8,7 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import {
   ApiError,
   useResourcesServiceResourceUsageEndSession,
+  useResourcesServiceResourceUsageGetActiveSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
@@ -91,9 +92,19 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
     setIsNotesModalOpen(true);
   };
 
+  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+
   return (
     <>
       <div className="space-y-4">
+        {activeSession?.usage?.project && (
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('project')}:</p>
+            <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
+              {activeSession.usage.project.name}
+            </p>
+          </div>
+        )}
         <SessionTimer startTime={startTime} />
 
         <FlowButtons resourceId={resourceId} />

@@ -171,6 +171,13 @@ export const ensureUseResourceFlowsServiceResourceFlowsControllerStreamEventsDat
 export const ensureUseResourceFlowsServiceGetButtonsData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetButtonsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getButtons({ resourceId }) });
+export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;
@@ -199,10 +206,3 @@ export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (q
   end: string;
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
-export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { limit, page }: {
-  limit?: number;
-  page?: number;
-} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
-export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryClient, { id }: {
-  id: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });

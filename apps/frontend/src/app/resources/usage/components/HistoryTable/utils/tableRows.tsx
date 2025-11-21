@@ -47,6 +47,7 @@ export function generateRowCells(
           }
         />
       </TableCell>,
+      <TableCell key={`project-${session.id}`}>{session.project?.name}</TableCell>,
       <TableCell key={`icons-${session.id}`} className="flex items-center gap-2">
         {hasNotes && <MessageSquareText />}
       </TableCell>,

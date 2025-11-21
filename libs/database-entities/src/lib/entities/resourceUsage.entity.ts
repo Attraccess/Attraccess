@@ -4,6 +4,7 @@ import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsageAction } from './resourceUsage.type';
 import { BillingTransaction } from './billing-transaction.entity';
+import { Project } from './project';
 
 @Entity()
 export class ResourceUsage {
@@ -107,4 +108,21 @@ export class ResourceUsage {
     nullable: true,
   })
   billingTransaction!: BillingTransaction | null;
+
+  @Column({ nullable: true, type: 'integer' })
+  @ApiProperty({
+    description: 'The ID of the project this usage session belongs to',
+    example: 1,
+    required: false,
+  })
+  projectId!: number | null;
+
+  @ManyToOne(() => Project, (project) => project.resourceUsages, { nullable: true })
+  @JoinColumn({ name: 'projectId' })
+  @ApiProperty({
+    description: 'The project this usage session belongs to',
+    required: false,
+    type: () => Project,
+  })
+  project!: Project | null;
 }

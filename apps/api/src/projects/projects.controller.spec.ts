@@ -14,7 +14,7 @@ describe('ProjectsController', () => {
   const projectsService = {
     findMany: jest.fn(),
     getTotalCount: jest.fn(),
-    findOne: jest.fn(),
+    findOneById: jest.fn(),
     deleteOne: jest.fn(),
     create: jest.fn(),
     updateOne: jest.fn(),
@@ -66,18 +66,18 @@ describe('ProjectsController', () => {
     it('should return a transformed project when found', async () => {
       const req = { user: { id: 2 } };
       const project = { id: 20, name: 'Proj', logo: 'logo.png' } as unknown as Project;
-      projectsService.findOne.mockResolvedValueOnce(project);
+      projectsService.findOneById.mockResolvedValueOnce(project);
       fileStorageService.getPublicPath.mockImplementation((base: string, filename: string) => `${base}/${filename}`);
 
       const result = await controller.getOne(req as AuthenticatedRequest, 20);
 
-      expect(projectsService.findOne).toHaveBeenCalledWith({ id: 20, ownerId: 2 });
+      expect(projectsService.findOneById).toHaveBeenCalledWith(2, 20);
       expect(result).toEqual(expect.objectContaining({ id: 20, logo: 'projects/20/logo.png' }));
     });
 
     it('should throw NotFoundException when project is missing', async () => {
       const req = { user: { id: 3 } };
-      projectsService.findOne.mockResolvedValueOnce(null);
+      projectsService.findOneById.mockRejectedValueOnce(new NotFoundException());
       await expect(controller.getOne(req as AuthenticatedRequest, 999)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
@@ -86,17 +86,17 @@ describe('ProjectsController', () => {
     it('should delete an existing project', async () => {
       const req = { user: { id: 4 } };
       const project = { id: 30, name: 'Del', logo: null } as unknown as Project;
-      projectsService.findOne.mockResolvedValueOnce(project);
+      projectsService.findOneById.mockResolvedValueOnce(project);
 
       await controller.deleteOne(req as AuthenticatedRequest, 30);
 
-      expect(projectsService.findOne).toHaveBeenCalledWith({ id: 30, ownerId: 4 });
+      expect(projectsService.findOneById).toHaveBeenCalledWith(4, 30);
       expect(projectsService.deleteOne).toHaveBeenCalledWith(30);
     });
 
     it('should throw NotFoundException when project to delete is missing', async () => {
       const req = { user: { id: 5 } };
-      projectsService.findOne.mockResolvedValueOnce(null);
+      projectsService.findOneById.mockRejectedValueOnce(new NotFoundException());
       await expect(controller.deleteOne(req as AuthenticatedRequest, 123)).rejects.toBeInstanceOf(NotFoundException);
       expect(projectsService.deleteOne).not.toHaveBeenCalled();
     });

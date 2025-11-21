@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -65,10 +64,7 @@ export class ProjectsController {
   @ApiResponse({ status: 200, description: 'The project.', type: Project })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   async getOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<Project> {
-    const project = await this.projectsService.findOne({ id, ownerId: req.user.id });
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
+    const project = await this.projectsService.findOneById(req.user.id, id);
     return this.transformProject(project);
   }
 
@@ -78,10 +74,7 @@ export class ProjectsController {
   @ApiResponse({ status: 204, description: 'The project has been successfully deleted.' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   async deleteOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    const project = await this.projectsService.findOne({ id, ownerId: req.user.id });
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
+    const project = await this.projectsService.findOneById(req.user.id, id);
     await this.projectsService.deleteOne(project.id);
   }
 

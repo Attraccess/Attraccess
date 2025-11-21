@@ -21,6 +21,7 @@ import { ResourceIntroductionsModule } from '../resources/introductions/resource
 import { ResourceIntroducersModule } from '../resources/introducers/resourceIntroducers.module';
 import { ResourceFlowsModule } from '../resources/flows/resource-flows.module';
 import { BillingModule } from '../billing/billing.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { BillingModule } from '../billing/billing.module';
     ResourceIntroducersModule,
     ResourceFlowsModule,
     BillingModule,
+    ProjectsModule,
   ],
   providers: [AttractapService, WebsocketService, AttractapGateway, WebSocketEventService, AttractapFirmwareService],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],

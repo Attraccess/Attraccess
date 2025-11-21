@@ -95,7 +95,19 @@ private:
     API::ResourceList resourceList;
     bool resourceListUpdated;
 
+    API::ProjectsOfUserResponse projectsOfUserResponse;
+    bool projectsOfUserResponseUpdated = false;
+    uint32_t selectedProjectId = 0;
+    String selectedProjectName;
+    uint32_t projectsCurrentPage = 1;
+    uint32_t projectsTotalCount = 0;
+    bool projectsHasMore = false;
+    String currentProjectsUser;
+
     void selectResource(const API::ResourceBrief &resource);
+    void requestProjectsPage(uint32_t page);
+    void clearProjectSelection();
+    void handleProjectSelection(uint32_t projectId, const String &projectName);
 
     enum applicationState_t
     {

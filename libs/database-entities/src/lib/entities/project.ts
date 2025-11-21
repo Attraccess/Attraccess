@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, UpdateDateColumn } from 'typeorm';
 import { PrimaryGeneratedColumn } from 'typeorm';
 import { User } from './user.entity';
+import { ResourceUsage } from './resourceUsage.entity';
 
 @Entity()
 export class Project {
@@ -42,4 +43,7 @@ export class Project {
   })
   @ApiProperty({ description: 'The logo of the project' })
   logo!: string | null;
+
+  @OneToMany(() => ResourceUsage, (usage) => usage.project)
+  resourceUsages!: ResourceUsage[];
 }

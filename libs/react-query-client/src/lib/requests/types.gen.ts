@@ -1014,6 +1014,41 @@ export type StartUsageSessionDto = {
      * Whether to force takeover of an existing session (only works if resource allows takeover)
      */
     forceTakeOver?: boolean;
+    /**
+     * The project to assign this usage to
+     */
+    projectId?: number;
+};
+
+export type Project = {
+    /**
+     * The ID of the project
+     */
+    id: number;
+    /**
+     * The date and time the NFC card was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the NFC card was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the user that owns the project
+     */
+    owner: User;
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description: string;
+    /**
+     * The logo of the project
+     */
+    logo: string;
 };
 
 export type ResourceUsage = {
@@ -1061,6 +1096,14 @@ export type ResourceUsage = {
      * The duration of the usage session in minutes
      */
     usageInMinutes: number;
+    /**
+     * The ID of the project this usage session belongs to
+     */
+    projectId?: number;
+    /**
+     * The project this usage session belongs to
+     */
+    project?: Project;
 };
 
 /**
@@ -1800,6 +1843,47 @@ export type ResourceFlowNode = {
     resource?: Resource;
 };
 
+export type FindManyProjectsResponseDto = {
+    data: Array<Project>;
+    total: number;
+    page: number;
+    limit: number;
+};
+
+export type CreateProjectDto = {
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description?: string;
+    /**
+     * Project logo image file
+     */
+    logo?: (Blob | File);
+};
+
+export type UpdateProjectDto = {
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description?: string;
+    /**
+     * Project logo image file
+     */
+    logo?: (Blob | File);
+    /**
+     * Whether the project logo should be deleted
+     */
+    deleteLogo?: boolean;
+};
+
 export type PluginMainFrontend = {
     /**
      * The directory of the plugins frontend files
@@ -2047,78 +2131,6 @@ export type AttractapFirmware = {
      * The filename of the firmware for OTA updates (zlib compressed)
      */
     filenameOTA: string;
-};
-
-export type Project = {
-    /**
-     * The ID of the project
-     */
-    id: number;
-    /**
-     * The date and time the NFC card was created
-     */
-    createdAt: string;
-    /**
-     * The date and time the NFC card was last updated
-     */
-    updatedAt: string;
-    /**
-     * The ID of the user that owns the project
-     */
-    owner: User;
-    /**
-     * The name of the project
-     */
-    name: string;
-    /**
-     * The description of the project
-     */
-    description: string;
-    /**
-     * The logo of the project
-     */
-    logo: string;
-};
-
-export type FindManyProjectsResponseDto = {
-    data: Array<Project>;
-    total: number;
-    page: number;
-    limit: number;
-};
-
-export type CreateProjectDto = {
-    /**
-     * The name of the project
-     */
-    name: string;
-    /**
-     * The description of the project
-     */
-    description?: string;
-    /**
-     * Project logo image file
-     */
-    logo?: (Blob | File);
-};
-
-export type UpdateProjectDto = {
-    /**
-     * The name of the project
-     */
-    name: string;
-    /**
-     * The description of the project
-     */
-    description?: string;
-    /**
-     * Project logo image file
-     */
-    logo?: (Blob | File);
-    /**
-     * Whether the project logo should be deleted
-     */
-    deleteLogo?: boolean;
 };
 
 export type InfoResponse = {
@@ -3054,6 +3066,44 @@ export type GetButtonsData = {
 
 export type GetButtonsResponse = Array<ResourceFlowNode>;
 
+export type FindManyProjectsData = {
+    /**
+     * The number of items per page to retrieve
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+};
+
+export type FindManyProjectsResponse = FindManyProjectsResponseDto;
+
+export type CreateProjectData = {
+    formData: CreateProjectDto;
+};
+
+export type CreateProjectResponse = Project;
+
+export type FindOneProjectData = {
+    id: number;
+};
+
+export type FindOneProjectResponse = Project;
+
+export type DeleteOneProjectData = {
+    id: number;
+};
+
+export type DeleteOneProjectResponse = void;
+
+export type UpdateProjectData = {
+    formData: UpdateProjectDto;
+    id: number;
+};
+
+export type UpdateProjectResponse = Project;
+
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
 export type UploadPluginData = {
@@ -3172,44 +3222,6 @@ export type GetBillingTransactionsInDateRangeData = {
 };
 
 export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
-
-export type FindManyProjectsData = {
-    /**
-     * The number of items per page to retrieve
-     */
-    limit?: number;
-    /**
-     * The page number to retrieve
-     */
-    page?: number;
-};
-
-export type FindManyProjectsResponse = FindManyProjectsResponseDto;
-
-export type CreateProjectData = {
-    formData: CreateProjectDto;
-};
-
-export type CreateProjectResponse = Project;
-
-export type FindOneProjectData = {
-    id: number;
-};
-
-export type FindOneProjectResponse = Project;
-
-export type DeleteOneProjectData = {
-    id: number;
-};
-
-export type DeleteOneProjectResponse = void;
-
-export type UpdateProjectData = {
-    formData: UpdateProjectDto;
-    id: number;
-};
-
-export type UpdateProjectResponse = Project;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -5126,6 +5138,75 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/projects': {
+        get: {
+            req: FindManyProjectsData;
+            res: {
+                /**
+                 * The list of projects.
+                 */
+                200: FindManyProjectsResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreateProjectData;
+            res: {
+                /**
+                 * The project was created successfully.
+                 */
+                201: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}': {
+        get: {
+            req: FindOneProjectData;
+            res: {
+                /**
+                 * The project.
+                 */
+                200: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeleteOneProjectData;
+            res: {
+                /**
+                 * The project has been successfully deleted.
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        put: {
+            req: UpdateProjectData;
+            res: {
+                /**
+                 * The project was updated successfully.
+                 */
+                200: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/plugins': {
         get: {
             res: {
@@ -5367,75 +5448,6 @@ export type $OpenApiTs = {
                  * The billing transactions in the date range
                  */
                 200: Array<BillingTransaction>;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-    };
-    '/api/projects': {
-        get: {
-            req: FindManyProjectsData;
-            res: {
-                /**
-                 * The list of projects.
-                 */
-                200: FindManyProjectsResponseDto;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-        post: {
-            req: CreateProjectData;
-            res: {
-                /**
-                 * The project was created successfully.
-                 */
-                201: Project;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-    };
-    '/api/projects/{id}': {
-        get: {
-            req: FindOneProjectData;
-            res: {
-                /**
-                 * The project.
-                 */
-                200: Project;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-        delete: {
-            req: DeleteOneProjectData;
-            res: {
-                /**
-                 * The project has been successfully deleted.
-                 */
-                204: void;
-                /**
-                 * Unauthorized
-                 */
-                401: unknown;
-            };
-        };
-        put: {
-            req: UpdateProjectData;
-            res: {
-                /**
-                 * The project was updated successfully.
-                 */
-                200: Project;
                 /**
                  * Unauthorized
                  */

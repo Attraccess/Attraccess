@@ -26,6 +26,7 @@ export function generateHeaderColumns(
         {t('headers.machine.endTime')}
       </TableColumn>,
       <TableColumn key="duration">{t('headers.machine.duration')}</TableColumn>,
+      <TableColumn key="project">{t('headers.machine.project')}</TableColumn>,
       <TableColumn key="icons">{''}</TableColumn>,
     );
   } else if (resource.type === 'door') {

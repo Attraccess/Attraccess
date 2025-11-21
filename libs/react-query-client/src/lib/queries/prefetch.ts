@@ -171,6 +171,13 @@ export const prefetchUseResourceFlowsServiceResourceFlowsControllerStreamEvents 
 export const prefetchUseResourceFlowsServiceGetButtons = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetButtonsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getButtons({ resourceId }) });
+export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { limit, page }: {
+  limit?: number;
+  page?: number;
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;
@@ -199,10 +206,3 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
-export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { limit, page }: {
-  limit?: number;
-  page?: number;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
-export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClient, { id }: {
-  id: number;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });

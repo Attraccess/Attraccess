@@ -67,6 +67,12 @@ void Application::setup()
                                                                }
 
                                                                this->cardAuthenticationData = response;
+                                                           if (this->currentProjectsUser != response.username)
+                                                           {
+                                                               this->clearProjectSelection();
+                                                           }
+                                                           this->currentProjectsUser = response.username;
+                                                           this->requestProjectsPage(1);
 
                                                                this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD; });
 
@@ -148,6 +154,11 @@ void Application::setup()
 
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
+    Display::resourceDetailsScreen.setProjectsPageRequestCallback([this](uint32_t page)
+                                                                  { this->requestProjectsPage(page); });
+    Display::resourceDetailsScreen.setProjectSelectionCallback(
+        [this](uint32_t projectId, const String &projectName)
+        { this->handleProjectSelection(projectId, projectName); });
 
     this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username)
                                                         {
@@ -192,6 +203,14 @@ void Application::setup()
 
     Display::resourceListScreen.setResourceSelectionCallback([this](const API::ResourceBrief &resource)
                                                              { this->selectResource(resource); });
+
+    this->api.setProjectsOfUserResponseCallback([this](const API::ProjectsOfUserResponse &projectsOfUserResponse)
+                                                {
+                                                    this->projectsOfUserResponse = projectsOfUserResponse;
+                                                    this->projectsCurrentPage = projectsOfUserResponse.page;
+                                                    this->projectsTotalCount = projectsOfUserResponse.total;
+                                                    this->projectsHasMore = projectsOfUserResponse.hasMore;
+                                                    this->projectsOfUserResponseUpdated = true; });
 
     auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
     {
@@ -509,6 +528,14 @@ void Application::processState()
             this->unlocked = false;
             this->resourceIsSelected = this->resourceCount == 1;
         }
+
+        if (this->projectsOfUserResponseUpdated)
+        {
+            Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
+            Display::resourceDetailsScreen.setSelectedProject(this->selectedProjectId, this->selectedProjectName.c_str());
+            this->projectsOfUserResponseUpdated = false;
+        }
+
         return;
     }
 
@@ -599,6 +626,38 @@ void Application::selectResource(const API::ResourceBrief &resource)
     this->selectedResourceChanged = true;
 }
 
+void Application::requestProjectsPage(uint32_t page)
+{
+    if (page == 0)
+    {
+        page = 1;
+    }
+    this->api.requestProjectsOfUser(page);
+}
+
+void Application::clearProjectSelection()
+{
+    this->selectedProjectId = 0;
+    this->selectedProjectName = "";
+    this->projectsCurrentPage = 1;
+    this->projectsTotalCount = 0;
+    this->projectsHasMore = false;
+    this->projectsOfUserResponse.count = 0;
+    this->projectsOfUserResponse.page = 1;
+    this->projectsOfUserResponse.total = 0;
+    this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
+    this->projectsOfUserResponse.hasMore = false;
+    this->projectsOfUserResponseUpdated = true;
+    Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
+}
+
+void Application::handleProjectSelection(uint32_t projectId, const String &projectName)
+{
+    this->selectedProjectId = projectId;
+    this->selectedProjectName = projectName;
+    Display::resourceDetailsScreen.setSelectedProject(projectId, projectName.c_str());
+}
+
 void Application::handleTouch(int16_t x, int16_t y)
 {
     if (this->state == APPLICATION_STATE_UNLOCKED)
@@ -629,7 +688,7 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
         this->beginActionPause();
-        this->api.startResourceUsageSession(this->selectedResourceId);
+        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
@@ -662,6 +721,8 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
             this->resourceIsSelected = false;
         }
         this->unlocked = false;
+        this->currentProjectsUser = "";
+        this->clearProjectSelection();
         break;
     }
 }

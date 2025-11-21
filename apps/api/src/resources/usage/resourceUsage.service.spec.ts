@@ -29,6 +29,7 @@ import { BillingService } from '../../billing/billing.service';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 import { ResourceInUseError } from './errors/resource-in-use.error';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
+import { ProjectsService } from '../../projects/projects.service';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -42,6 +43,7 @@ describe('ResourceUsageService', () => {
   let resourceMaintenanceService: jest.Mocked<ResourceMaintenanceService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
   let billingService: jest.Mocked<BillingService>;
+  let projectsService: jest.Mocked<ProjectsService>;
   let flowExecutorService: { runFlow: jest.Mock };
   // Expose transactional entity manager for assertions
   let transactionalEntityManager: {
@@ -107,6 +109,10 @@ describe('ResourceUsageService', () => {
     handleResourceUsageStart: jest.fn(),
     chargeForResourceUsage: jest.fn(),
   } as unknown as jest.Mocked<BillingService>;
+
+  const mockProjectsService = {
+    findOneById: jest.fn(),
+  } as unknown as jest.Mocked<ProjectsService>;
 
   type MockQueryBuilder = {
     where: jest.Mock;
@@ -181,6 +187,10 @@ describe('ResourceUsageService', () => {
           useValue: mockBillingService,
         },
         {
+          provide: ProjectsService,
+          useValue: mockProjectsService,
+        },
+        {
           provide: require('../flows/resource-flows-executor.service').ResourceFlowsExecutorService,
           useValue: {
             runFlow: jest.fn().mockResolvedValue([]),
@@ -200,6 +210,7 @@ describe('ResourceUsageService', () => {
     resourceMaintenanceService = module.get(ResourceMaintenanceService);
     eventEmitter = module.get(EventEmitter2);
     billingService = module.get(BillingService);
+    projectsService = module.get(ProjectsService);
     flowExecutorService = module.get(ResourceFlowsExecutorService) as unknown as { runFlow: jest.Mock };
 
     // Provide transaction-capable manager on the repository
@@ -244,6 +255,12 @@ describe('ResourceUsageService', () => {
 
     // Silence and stub billing call inside transaction
     billingService.chargeForResourceUsage.mockResolvedValue(undefined);
+    projectsService.findOneById.mockImplementation(
+      async (_userId, projectId) =>
+        ({
+          id: projectId,
+        }) as never,
+    );
 
     // Default: billing disabled to avoid interfering with tests that don't explicitly mock billing
     billingService.getResourceBillingConfiguration.mockResolvedValue({
@@ -704,7 +721,7 @@ describe('ResourceUsageService', () => {
           resourceId: 1,
           endTime: IsNull(),
         },
-        relations: ['user', 'resource', 'billingTransaction'],
+        relations: ['user', 'resource', 'billingTransaction', 'project'],
       });
     });
 

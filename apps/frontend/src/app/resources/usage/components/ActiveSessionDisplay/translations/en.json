@@ -12,5 +12,6 @@
       "label": "End with Notes",
       "description": "End the session and provide notes."
     }
-  }
+  },
+  "project": "Project"
 }

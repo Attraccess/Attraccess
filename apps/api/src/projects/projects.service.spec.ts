@@ -70,17 +70,23 @@ describe('ProjectsService', () => {
     });
   });
 
-  describe('findOne', () => {
+  describe('findOneById', () => {
     it('should find one project by id and owner', async () => {
       const project = { id: 10, owner: { id: 7 } } as unknown as Project;
       projectRepository.findOne.mockResolvedValueOnce(project);
 
-      const result = await service.findOne({ id: 10, ownerId: 7 });
+      const result = await service.findOneById(7, 10);
 
       expect(projectRepository.findOne).toHaveBeenCalledWith({
         where: { id: 10, owner: { id: 7 } },
       });
       expect(result).toBe(project);
+    });
+
+    it('should throw NotFoundException when project is missing', async () => {
+      projectRepository.findOne.mockResolvedValueOnce(null);
+
+      await expect(service.findOneById(7, 10)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -185,7 +191,7 @@ describe('ProjectsService', () => {
 
   describe('updateOne', () => {
     it('should throw NotFoundException when project does not exist', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(null as unknown as Project);
+      projectRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(service.updateOne(1, 999, { name: 'x' } as UpdateProjectDto)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -194,7 +200,7 @@ describe('ProjectsService', () => {
 
     it('should update name and description without touching logo', async () => {
       const existing = { id: 2, name: 'Old', description: 'Old desc', logo: null } as unknown as Project;
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.findOne.mockResolvedValueOnce(existing);
       projectRepository.save.mockImplementation(async (entity: Project) => entity);
 
       const updated = await service.updateOne(1, 2, { name: 'New', description: 'New desc' } as UpdateProjectDto);
@@ -210,7 +216,7 @@ describe('ProjectsService', () => {
 
     it('should delete existing logo when deleteLogo is true', async () => {
       const existing = { id: 3, name: 'P', description: 'D', logo: 'old.png' } as unknown as Project;
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.findOne.mockResolvedValueOnce(existing);
       projectRepository.save.mockImplementation(async (entity: Project) => entity);
 
       const result = await service.updateOne(1, 3, { deleteLogo: true } as unknown as UpdateProjectDto);
@@ -224,7 +230,7 @@ describe('ProjectsService', () => {
 
     it('should replace existing logo when a new logo is provided', async () => {
       const existing = { id: 4, name: 'P', description: 'D', logo: 'old.png' } as unknown as Project;
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.findOne.mockResolvedValueOnce(existing);
       const newLogo = Buffer.from('new') as unknown as FileUpload;
       fileStorageService.saveFile.mockResolvedValueOnce('new.png');
       // First save inside setLogo, second save as final return
@@ -240,7 +246,7 @@ describe('ProjectsService', () => {
 
     it('should add logo when none existed previously', async () => {
       const existing = { id: 6, name: 'P', description: 'D', logo: null } as unknown as Project;
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(existing);
+      projectRepository.findOne.mockResolvedValueOnce(existing);
       const newLogo = Buffer.from('new') as unknown as FileUpload;
       fileStorageService.saveFile.mockResolvedValueOnce('added.png');
       projectRepository.save.mockImplementation(async (entity: Project) => entity);

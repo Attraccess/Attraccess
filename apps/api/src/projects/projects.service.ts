@@ -8,11 +8,6 @@ import { FileStorageService } from '../common/services/file-storage.service';
 import { UpdateProjectDto } from './dto/update.dto';
 import { FileUpload } from '../common/types/file-upload.types';
 
-export interface FindOneSearchOptions {
-  id: number;
-  ownerId: number;
-}
-
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -39,10 +34,16 @@ export class ProjectsService {
     });
   }
 
-  public async findOne(searchOptions: FindOneSearchOptions): Promise<Project> {
-    return await this.projectRepository.findOne({
-      where: { id: searchOptions.id, owner: { id: searchOptions.ownerId } },
+  public async findOneById(userId: number, id: number): Promise<Project> {
+    const project = await this.projectRepository.findOne({
+      where: { id, owner: { id: userId } },
     });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    return project;
   }
 
   private async setLogo(project: Project, logo: FileUpload) {
@@ -70,10 +71,7 @@ export class ProjectsService {
   }
 
   public async updateOne(ownerUserId: number, id: number, data: UpdateProjectDto): Promise<Project> {
-    const project = await this.findOne({ id, ownerId: ownerUserId });
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
+    const project = await this.findOneById(ownerUserId, id);
 
     if (data.description !== undefined) {
       project.description = data.description;
