@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import {
@@ -24,7 +24,10 @@ import {
   Legend,
   BarChart,
   Bar,
+  Rectangle,
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
+import type { Payload as TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
 import en from './en.json';
 import de from './de.json';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
@@ -33,6 +36,18 @@ import { EmptyState } from '../../../../../components/emptyState';
 type ProjectUsageChartsProps = {
   projectId: number;
 };
+
+const TOOLTIP_CONTAINER_CLASS =
+  'rounded-lg border border-divider bg-background/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
+const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-default-500';
+const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
+const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
+const BAR_COLORS = {
+  sessions: { base: '#0ea5e9', active: '#38bdf8' },
+  minutes: { base: '#10b981', active: '#34d399' },
+};
+type ChartTooltipProps = TooltipContentProps<number, string>;
+type ChartTooltipPayload = TooltipPayload<number, string>;
 
 export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
@@ -60,6 +75,77 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
 
   const topResources = data?.topResources ?? [];
 
+  const renderTimeSeriesTooltip = useCallback(
+    (tooltipProps: ChartTooltipProps) => {
+      const { active, payload, label } = tooltipProps;
+      const typedPayload = (payload ?? []) as ChartTooltipPayload[];
+
+      if (!active || typedPayload.length === 0 || label == null) {
+        return null;
+      }
+
+      return (
+        <div className={TOOLTIP_CONTAINER_CLASS}>
+          <p className={TOOLTIP_LABEL_CLASS}>{label}</p>
+          <div className="mt-2 space-y-1">
+            {typedPayload.map((entry, index) => {
+              const numericValue = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
+              const isSpend = entry.dataKey === 'spend';
+              const formattedValue =
+                isSpend && data ? `${data.summary.currency} ${formatNumber(numericValue)}` : formatNumber(numericValue);
+
+              return (
+                <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? '#94a3b8' }} />
+                  <span className="text-default-500">{entry.name}</span>
+                  <span className={TOOLTIP_VALUE_CLASS}>{formattedValue}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [data, formatNumber],
+  );
+
+  const renderTopResourcesTooltip = useCallback(
+    (tooltipProps: ChartTooltipProps) => {
+      const { active, payload, label } = tooltipProps;
+      const typedPayload = (payload ?? []) as ChartTooltipPayload[];
+
+      if (!active || typedPayload.length === 0 || label == null) {
+        return null;
+      }
+
+      return (
+        <div className={TOOLTIP_CONTAINER_CLASS}>
+          <p className={TOOLTIP_LABEL_CLASS}>{label}</p>
+          <div className="mt-2 space-y-1">
+            {typedPayload.map((entry, index) => {
+              const numericValue = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
+              const value =
+                entry.dataKey === 'spend' && data
+                  ? `${data.summary.currency} ${formatNumber(
+                      dbCurrencyToUserCurrency(numericValue, data.summary.minorUnit),
+                    )}`
+                  : formatNumber(numericValue);
+
+              return (
+                <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? '#94a3b8' }} />
+                  <span className="text-default-500">{entry.name}</span>
+                  <span className={TOOLTIP_VALUE_CLASS}>{value}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    },
+    [data, formatNumber],
+  );
+
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
       <Card className="min-h-[360px]">
@@ -85,15 +171,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                   orientation="right"
                   label={{ value: t('tooltip.spend'), angle: 90, position: 'insideRight' }}
                 />
-                <Tooltip
-                  formatter={(value: number, name) => {
-                    if (name === 'spend' && data) {
-                      return `${data.summary.currency} ${formatNumber(value)}`;
-                    }
-                    return formatNumber(value);
-                  }}
-                  labelFormatter={(label) => label}
-                />
+                <Tooltip content={renderTimeSeriesTooltip} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -143,19 +221,36 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="resourceName" />
                     <YAxis />
-                    <Tooltip
-                      formatter={(value: number, name) => {
-                        if (name === 'spend' && data) {
-                          return `${data.summary.currency} ${formatNumber(
-                            dbCurrencyToUserCurrency(value, data.summary.minorUnit),
-                          )}`;
-                        }
-                        return formatNumber(value);
-                      }}
-                    />
+                    <Tooltip content={renderTopResourcesTooltip} />
                     <Legend />
-                    <Bar dataKey="sessions" fill="#0ea5e9" name={t('tooltip.sessions')} />
-                    <Bar dataKey="minutes" fill="#10b981" name={t('tooltip.minutes')} />
+                    <Bar
+                      dataKey="sessions"
+                      fill={BAR_COLORS.sessions.base}
+                      name={t('tooltip.sessions')}
+                      radius={6}
+                      activeBar={
+                        <Rectangle
+                          fill={BAR_COLORS.sessions.active}
+                          stroke={BAR_COLORS.sessions.base}
+                          strokeWidth={2}
+                          radius={8}
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="minutes"
+                      fill={BAR_COLORS.minutes.base}
+                      name={t('tooltip.minutes')}
+                      radius={6}
+                      activeBar={
+                        <Rectangle
+                          fill={BAR_COLORS.minutes.active}
+                          stroke={BAR_COLORS.minutes.base}
+                          strokeWidth={2}
+                          radius={8}
+                        />
+                      }
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
