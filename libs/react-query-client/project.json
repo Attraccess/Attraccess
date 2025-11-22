@@ -36,6 +36,33 @@
       },
       "dependsOn": ["api:export-swagger"]
     },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/react-query-client",
+        "command": "eslint . --max-warnings=0"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/react-query-client",
+        "command": "jest"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["generate"],
+      "options": {
+        "cwd": "libs/react-query-client",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    },
     "nx-release-publish": {
       "options": {
         "packageRoot": "dist/{projectRoot}",

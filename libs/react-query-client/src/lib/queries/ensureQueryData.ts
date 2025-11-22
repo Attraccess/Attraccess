@@ -178,6 +178,18 @@ export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryC
 export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });
+export const ensureUseProjectsServiceGetProjectUsageHistoryData = (queryClient: QueryClient, { endDate, id, limit, page, startDate }: {
+  endDate?: string;
+  id: number;
+  limit?: number;
+  page?: number;
+  startDate?: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) });
+export const ensureUseProjectsServiceGetProjectUsageStatsData = (queryClient: QueryClient, { endDate, id, startDate }: {
+  endDate?: string;
+  id: number;
+  startDate?: string;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

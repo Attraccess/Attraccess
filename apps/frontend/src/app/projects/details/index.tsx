@@ -19,10 +19,14 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { UpsertProjectModal } from '../upsertModal';
+import { ProjectSummaryCards } from './components/projectSummaryCards';
+import { ProjectUsageCharts } from './components/projectUsageCharts';
+import { ProjectUsageHistory } from './components/projectUsageHistory';
 
 export function ProjectDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || '', 10);
+  const hasValidProjectId = Number.isFinite(projectId);
 
   const navigate = useNavigate();
   const toast = useToastMessage();
@@ -38,7 +42,9 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { data: project } = useProjectsServiceFindOneProject({ id: projectId });
+  const { data: project } = useProjectsServiceFindOneProject({ id: projectId }, undefined, {
+    enabled: hasValidProjectId,
+  });
   const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] = useState(false);
 
   const { mutate: deleteProject } = useProjectsServiceDeleteOneProject({
@@ -73,7 +79,7 @@ export function ProjectDetailsPage() {
         subtitle={project?.description ?? <Skeleton className="w-full h-4" />}
         icon={
           project?.logo ? (
-            <Image className="max-w-24 max-h-24" src={filenameToUrl(project.logo)} alt={project?.name} />
+            <Image className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
           ) : (
             <FoldersIcon />
           )
@@ -106,6 +112,14 @@ export function ProjectDetailsPage() {
         onConfirm={onDeleteProject}
         itemName={project?.name ?? ''}
       />
+
+      {hasValidProjectId && (
+        <div className="space-y-6 mt-6">
+          <ProjectSummaryCards projectId={projectId} />
+          <ProjectUsageCharts projectId={projectId} />
+          <ProjectUsageHistory projectId={projectId} />
+        </div>
+      )}
     </>
   );
 }

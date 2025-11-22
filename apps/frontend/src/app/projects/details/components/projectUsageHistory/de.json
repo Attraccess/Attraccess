@@ -1,0 +1,16 @@
+{
+  "history": {
+    "title": "Nutzungshistorie",
+    "empty": "Für dieses Projekt wurden noch keine Nutzungssitzungen erfasst.",
+    "columns": {
+      "resource": "Ressource",
+      "user": "Nutzer",
+      "start": "Start",
+      "end": "Ende",
+      "duration": "Dauer"
+    },
+    "inProgress": "Läuft",
+    "minutes": "{{count}} Min",
+    "pagination": "Seite {{current}} von {{total}}"
+  }
+}

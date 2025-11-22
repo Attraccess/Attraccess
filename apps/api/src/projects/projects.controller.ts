@@ -20,6 +20,11 @@ import { FindManyProjectsResponseDto } from './dto/find-many-response.dto';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FileUpload } from '../common/types/file-upload.types';
+import { ProjectUsageService } from './project-usage.service';
+import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
+import { ProjectUsageHistoryResponseDto } from './dto/project-usage-history-response.dto';
+import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
+import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { UpdateProjectDto } from './dto/update.dto';
 
@@ -29,6 +34,7 @@ export class ProjectsController {
   constructor(
     private readonly projectsService: ProjectsService,
     private readonly fileStorageService: FileStorageService,
+    private readonly projectUsageService: ProjectUsageService,
   ) {}
 
   private transformProject(project: Project): Project {
@@ -121,5 +127,39 @@ export class ProjectsController {
     }
     const project = await this.projectsService.updateOne(req.user.id, id, data);
     return this.transformProject(project);
+  }
+
+  @Get(':id/usage/history')
+  @Auth()
+  @ApiOperation({ summary: 'Get usage history for a project', operationId: 'getProjectUsageHistory' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage history retrieved successfully.',
+    type: ProjectUsageHistoryResponseDto,
+  })
+  async getUsageHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: GetProjectUsageHistoryQueryDto,
+  ): Promise<ProjectUsageHistoryResponseDto> {
+    await this.projectsService.findOneById(req.user.id, id);
+    return await this.projectUsageService.getProjectUsageHistory(id, query);
+  }
+
+  @Get(':id/usage/stats')
+  @Auth()
+  @ApiOperation({ summary: 'Get aggregated usage statistics for a project', operationId: 'getProjectUsageStats' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage statistics retrieved successfully.',
+    type: ProjectUsageStatsDto,
+  })
+  async getUsageStats(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ProjectUsageStatsQueryDto,
+  ): Promise<ProjectUsageStatsDto> {
+    await this.projectsService.findOneById(req.user.id, id);
+    return await this.projectUsageService.getProjectUsageStats(id, query);
   }
 }

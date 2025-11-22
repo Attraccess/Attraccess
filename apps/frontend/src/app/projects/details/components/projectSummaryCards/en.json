@@ -1,0 +1,18 @@
+{
+  "summary": {
+    "sessions": {
+      "title": "Sessions",
+      "description": "Completed usage sessions"
+    },
+    "minutes": {
+      "title": "Minutes",
+      "description": "Total machine time"
+    },
+    "spend": {
+      "title": "Spend",
+      "description": "Credits consumed"
+    },
+    "loading": "Loading usage summary…",
+    "empty": "No usage data available yet"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "history": {
+    "title": "Usage history",
+    "empty": "No usage sessions recorded for this project yet.",
+    "columns": {
+      "resource": "Resource",
+      "user": "User",
+      "start": "Start",
+      "end": "End",
+      "duration": "Duration"
+    },
+    "inProgress": "In progress",
+    "minutes": "{{count}} min",
+    "pagination": "Page {{current}} of {{total}}"
+  }
+}

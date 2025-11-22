@@ -1,0 +1,24 @@
+{
+  "charts": {
+    "title": "Nutzungstrends",
+    "timeSeries": {
+      "title": "Minuten vs. Ausgaben",
+      "empty": "Nicht genug Historie für ein Diagramm"
+    },
+    "topResources": {
+      "title": "Top-Ressourcen",
+      "empty": "Noch keine Ressourcennutzung vorhanden",
+      "columns": {
+        "resource": "Ressource",
+        "sessions": "Sitzungen",
+        "minutes": "Minuten",
+        "spend": "Ausgaben"
+      }
+    }
+  },
+  "tooltip": {
+    "sessions": "Sitzungen",
+    "minutes": "Minuten",
+    "spend": "Ausgaben"
+  }
+}

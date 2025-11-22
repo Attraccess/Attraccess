@@ -44,24 +44,31 @@ export function PageHeader({
             <ArrowLeft className="w-6 h-6" />
           </Button>
         )}
+        <div className="flex-shrink flex flex-col">
+          {(icon || thumbnailSrc) && (
+            <div className="mr-2">
+              {icon}
+              {thumbnailSrc && (
+                <Image
+                  classNames={{
+                    img: 'object-contain',
+                  }}
+                  height={48}
+                  width={48}
+                  isBlurred
+                  src={thumbnailSrc}
+                  alt={thumbnailAlt}
+                />
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="flex-shrink">
-          <div className="flex items-center gap-2">
-            {icon}
-            {thumbnailSrc && (
-              <Image
-                classNames={{
-                  img: 'object-contain',
-                }}
-                height={48}
-                width={48}
-                isBlurred
-                src={thumbnailSrc}
-                alt={thumbnailAlt}
-              />
-            )}
+          <div className="flex items-start gap-2 ">
             <h1 className="text-2xl font-bold">{title}</h1>
           </div>
+
           {subtitle && <p className="mt-1 text-sm text-foreground-500">{subtitle}</p>}
         </div>
       </div>

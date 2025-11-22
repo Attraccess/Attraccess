@@ -13,6 +13,7 @@
 /** Template type/key used by the system */
 export enum EmailTemplateType {
   VerifyEmail = "verify-email",
+  UserInvitation = "user-invitation",
   ResetPassword = "reset-password",
   UsernameChanged = "username-changed",
   PasswordChanged = "password-changed",
@@ -115,6 +116,19 @@ export interface User {
   billingFactor: number;
 }
 
+export interface InviteUserDto {
+  /**
+   * The username for the new user
+   * @example "johndoe"
+   */
+  username: string;
+  /**
+   * The email address for the new user
+   * @example "john.doe@example.com"
+   */
+  email: string;
+}
+
 export interface BooleanDto {
   /**
    * The boolean value
@@ -134,6 +148,24 @@ export interface VerifyEmailDto {
    * @example "john.doe@example.com"
    */
   email: string;
+}
+
+export interface AcceptInvitationDto {
+  /**
+   * The token to accept the invitation
+   * @example "1234567890"
+   */
+  token: string;
+  /**
+   * The email of the invite
+   * @example "john.doe@example.com"
+   */
+  email: string;
+  /**
+   * The password for the user
+   * @example "password123"
+   */
+  password: string;
 }
 
 export type ResetPasswordDto = object;
@@ -1076,6 +1108,34 @@ export interface StartUsageSessionDto {
    * @example false
    */
   forceTakeOver?: boolean;
+  /**
+   * The project to assign this usage to
+   * @example 35
+   */
+  projectId?: number;
+}
+
+export interface Project {
+  /** The ID of the project */
+  id: number;
+  /**
+   * The date and time the NFC card was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the NFC card was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the user that owns the project */
+  owner: User;
+  /** The name of the project */
+  name: string;
+  /** The description of the project */
+  description: string;
+  /** The logo of the project */
+  logo: string;
 }
 
 export interface ResourceUsage {
@@ -1128,6 +1188,13 @@ export interface ResourceUsage {
    * @example 120
    */
   usageInMinutes: number;
+  /**
+   * The ID of the project this usage session belongs to
+   * @example 1
+   */
+  projectId?: number;
+  /** The project this usage session belongs to */
+  project?: Project;
 }
 
 export interface EndUsageSessionDto {
@@ -1846,6 +1913,107 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface FindManyProjectsResponseDto {
+  data: Project[];
+  total: number;
+  page: number;
+  limit: number;
+  nextPage: number;
+}
+
+export interface CreateProjectDto {
+  /**
+   * The name of the project
+   * @example "Project 1"
+   */
+  name: string;
+  /**
+   * The description of the project
+   * @example "This is a project"
+   */
+  description?: string;
+  /**
+   * Project logo image file
+   * @format binary
+   */
+  logo?: File;
+}
+
+export interface UpdateProjectDto {
+  /**
+   * The name of the project
+   * @example "Project 1"
+   */
+  name: string;
+  /**
+   * The description of the project
+   * @example "This is a project"
+   */
+  description?: string;
+  /**
+   * Project logo image file
+   * @format binary
+   */
+  logo?: File;
+  /**
+   * Whether the project logo should be deleted
+   * @default false
+   */
+  deleteLogo?: boolean;
+}
+
+export interface ProjectUsageHistoryResponseDto {
+  data: ResourceUsage[];
+  total: number;
+  page: number;
+  limit: number;
+  nextPage?: number;
+}
+
+export interface ProjectUsageSummaryDto {
+  /** Total completed usage sessions in the range */
+  totalSessions: number;
+  /** Total minutes spent across sessions (rounded up per session) */
+  totalMinutes: number;
+  /** Total credits spent (positive value using currency minor unit) */
+  totalSpend: number;
+  /**
+   * Currency of the spend totals
+   * @example "EUR"
+   */
+  currency: string;
+  /**
+   * Minor unit exponent for the currency
+   * @example 2
+   */
+  minorUnit: number;
+}
+
+export interface ProjectUsageTimeSeriesPointDto {
+  /** ISO date (yyyy-MM-dd) */
+  date: string;
+  /** Number of sessions that started on this day */
+  sessions: number;
+  /** Total minutes of the sessions on this day */
+  minutes: number;
+  /** Total spend (credits) on this day */
+  spend: number;
+}
+
+export interface ProjectUsageTopResourceDto {
+  resourceId: number;
+  resourceName: string;
+  sessions: number;
+  minutes: number;
+  spend: number;
+}
+
+export interface ProjectUsageStatsDto {
+  summary: ProjectUsageSummaryDto;
+  timeSeries: ProjectUsageTimeSeriesPointDto[];
+  topResources: ProjectUsageTopResourceDto[];
+}
+
 export interface PluginMainFrontend {
   /**
    * The directory of the plugins frontend files
@@ -2140,12 +2308,16 @@ export interface FindManyParams {
 
 export type FindManyData = PaginatedUsersResponseDto;
 
+export type InviteUserData = User;
+
 export type IsLocalSignupEnabledData = BooleanDto;
 
 export interface VerifyEmailData {
   /** @example "Email verified successfully" */
   message?: string;
 }
+
+export type AcceptInvitationData = User;
 
 export type RequestPasswordResetData = any;
 
@@ -2573,6 +2745,71 @@ export interface PressButtonData {
 
 export type GetButtonsData = ResourceFlowNode[];
 
+export interface FindManyProjectsParams {
+  /**
+   * The page number to retrieve
+   * @example 1
+   */
+  page?: number;
+  /**
+   * The number of items per page to retrieve
+   * @example 10
+   */
+  limit?: number;
+}
+
+export type FindManyProjectsData = FindManyProjectsResponseDto;
+
+export type CreateProjectData = Project;
+
+export type FindOneProjectData = Project;
+
+export type DeleteOneProjectData = any;
+
+export type UpdateProjectData = Project;
+
+export interface GetProjectUsageHistoryParams {
+  /**
+   * The page number to retrieve
+   * @example 1
+   */
+  page?: number;
+  /**
+   * The number of items per page
+   * @example 10
+   */
+  limit?: number;
+  /**
+   * Filter history to entries starting after this date (inclusive)
+   * @format date-time
+   */
+  startDate?: string;
+  /**
+   * Filter history to entries starting before this date (inclusive)
+   * @format date-time
+   */
+  endDate?: string;
+  id: number;
+}
+
+export type GetProjectUsageHistoryData = ProjectUsageHistoryResponseDto;
+
+export interface GetProjectUsageStatsParams {
+  /**
+   * Calculate statistics starting from this date (inclusive)
+   * @format date-time
+   */
+  startDate?: string;
+  /**
+   * Calculate statistics up to this date (inclusive)
+   * @format date-time
+   */
+  endDate?: string;
+  id: number;
+}
+
+export type GetProjectUsageStatsData = ProjectUsageStatsDto;
+
 export type GetPluginsData = LoadedPluginManifest[];
 
 export type GetFrontendPluginFileData = string;
@@ -2762,6 +2999,22 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name InviteUser
+   * @summary Invite a new user
+   * @request POST:/api/users/invite
+   * @secure
+   */
+  export namespace InviteUser {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = InviteUserDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = InviteUserData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name IsLocalSignupEnabled
    * @summary Check if local signup is enabled
    * @request GET:/api/users/local-signup-enabled
@@ -2787,6 +3040,21 @@ export namespace Users {
     export type RequestBody = VerifyEmailDto;
     export type RequestHeaders = {};
     export type ResponseBody = VerifyEmailData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name AcceptInvitation
+   * @summary Accept a user invitation
+   * @request POST:/api/users/accept-invitation
+   */
+  export namespace AcceptInvitation {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = AcceptInvitationDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = AcceptInvitationData;
   }
 
   /**
@@ -3291,6 +3559,7 @@ export namespace EmailTemplates {
       /** Template type/type */
       type:
         | "verify-email"
+        | "user-invitation"
         | "reset-password"
         | "username-changed"
         | "password-changed"
@@ -3315,6 +3584,7 @@ export namespace EmailTemplates {
       /** Template type/type */
       type:
         | "verify-email"
+        | "user-invitation"
         | "reset-password"
         | "username-changed"
         | "password-changed"
@@ -4794,6 +5064,173 @@ export namespace ResourceFlows {
   }
 }
 
+export namespace Projects {
+  /**
+   * No description
+   * @tags Projects
+   * @name FindManyProjects
+   * @summary Find many projects
+   * @request GET:/api/projects
+   * @secure
+   */
+  export namespace FindManyProjects {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /**
+       * The page number to retrieve
+       * @example 1
+       */
+      page?: number;
+      /**
+       * The number of items per page to retrieve
+       * @example 10
+       */
+      limit?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = FindManyProjectsData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name CreateProject
+   * @summary Create a project
+   * @request POST:/api/projects
+   * @secure
+   */
+  export namespace CreateProject {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CreateProjectDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name FindOneProject
+   * @summary Get one project
+   * @request GET:/api/projects/{id}
+   * @secure
+   */
+  export namespace FindOneProject {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = FindOneProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name DeleteOneProject
+   * @summary Delete a project
+   * @request DELETE:/api/projects/{id}
+   * @secure
+   */
+  export namespace DeleteOneProject {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteOneProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name UpdateProject
+   * @summary Update a project
+   * @request PUT:/api/projects/{id}
+   * @secure
+   */
+  export namespace UpdateProject {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateProjectDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name GetProjectUsageHistory
+   * @summary Get usage history for a project
+   * @request GET:/api/projects/{id}/usage/history
+   * @secure
+   */
+  export namespace GetProjectUsageHistory {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {
+      /**
+       * The page number to retrieve
+       * @example 1
+       */
+      page?: number;
+      /**
+       * The number of items per page
+       * @example 10
+       */
+      limit?: number;
+      /**
+       * Filter history to entries starting after this date (inclusive)
+       * @format date-time
+       */
+      startDate?: string;
+      /**
+       * Filter history to entries starting before this date (inclusive)
+       * @format date-time
+       */
+      endDate?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetProjectUsageHistoryData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name GetProjectUsageStats
+   * @summary Get aggregated usage statistics for a project
+   * @request GET:/api/projects/{id}/usage/stats
+   * @secure
+   */
+  export namespace GetProjectUsageStats {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {
+      /**
+       * Calculate statistics starting from this date (inclusive)
+       * @format date-time
+       */
+      startDate?: string;
+      /**
+       * Calculate statistics up to this date (inclusive)
+       * @format date-time
+       */
+      endDate?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetProjectUsageStatsData;
+  }
+}
+
 export namespace Plugins {
   /**
    * No description
@@ -5388,7 +5825,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -5529,6 +5966,26 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name InviteUser
+     * @summary Invite a new user
+     * @request POST:/api/users/invite
+     * @secure
+     */
+    inviteUser: (data: InviteUserDto, params: RequestParams = {}) =>
+      this.request<InviteUserData, void>({
+        path: `/api/users/invite`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name IsLocalSignupEnabled
      * @summary Check if local signup is enabled
      * @request GET:/api/users/local-signup-enabled
@@ -5552,6 +6009,24 @@ export class Api<
     verifyEmail: (data: VerifyEmailDto, params: RequestParams = {}) =>
       this.request<VerifyEmailData, void>({
         path: `/api/users/verify-email`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name AcceptInvitation
+     * @summary Accept a user invitation
+     * @request POST:/api/users/accept-invitation
+     */
+    acceptInvitation: (data: AcceptInvitationDto, params: RequestParams = {}) =>
+      this.request<AcceptInvitationData, void>({
+        path: `/api/users/accept-invitation`,
         method: "POST",
         body: data,
         type: ContentType.Json,
@@ -6125,6 +6600,7 @@ export class Api<
     emailTemplateControllerFindOne: (
       type:
         | "verify-email"
+        | "user-invitation"
         | "reset-password"
         | "username-changed"
         | "password-changed"
@@ -6151,6 +6627,7 @@ export class Api<
     emailTemplateControllerUpdate: (
       type:
         | "verify-email"
+        | "user-invitation"
         | "reset-password"
         | "username-changed"
         | "password-changed"
@@ -7688,6 +8165,152 @@ export class Api<
       this.request<GetButtonsData, void>({
         path: `/api/resources/${resourceId}/flow/buttons`,
         method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  projects = {
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name FindManyProjects
+     * @summary Find many projects
+     * @request GET:/api/projects
+     * @secure
+     */
+    findManyProjects: (
+      query: FindManyProjectsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<FindManyProjectsData, void>({
+        path: `/api/projects`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name CreateProject
+     * @summary Create a project
+     * @request POST:/api/projects
+     * @secure
+     */
+    createProject: (data: CreateProjectDto, params: RequestParams = {}) =>
+      this.request<CreateProjectData, void>({
+        path: `/api/projects`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name FindOneProject
+     * @summary Get one project
+     * @request GET:/api/projects/{id}
+     * @secure
+     */
+    findOneProject: (id: number, params: RequestParams = {}) =>
+      this.request<FindOneProjectData, void>({
+        path: `/api/projects/${id}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name DeleteOneProject
+     * @summary Delete a project
+     * @request DELETE:/api/projects/{id}
+     * @secure
+     */
+    deleteOneProject: (id: number, params: RequestParams = {}) =>
+      this.request<DeleteOneProjectData, void>({
+        path: `/api/projects/${id}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name UpdateProject
+     * @summary Update a project
+     * @request PUT:/api/projects/{id}
+     * @secure
+     */
+    updateProject: (
+      id: number,
+      data: UpdateProjectDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateProjectData, void>({
+        path: `/api/projects/${id}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name GetProjectUsageHistory
+     * @summary Get usage history for a project
+     * @request GET:/api/projects/{id}/usage/history
+     * @secure
+     */
+    getProjectUsageHistory: (
+      { id, ...query }: GetProjectUsageHistoryParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetProjectUsageHistoryData, void>({
+        path: `/api/projects/${id}/usage/history`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name GetProjectUsageStats
+     * @summary Get aggregated usage statistics for a project
+     * @request GET:/api/projects/{id}/usage/stats
+     * @secure
+     */
+    getProjectUsageStats: (
+      { id, ...query }: GetProjectUsageStatsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetProjectUsageStatsData, void>({
+        path: `/api/projects/${id}/usage/stats`,
+        method: "GET",
+        query: query,
         secure: true,
         format: "json",
         ...params,

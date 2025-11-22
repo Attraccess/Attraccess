@@ -1848,6 +1848,7 @@ export type FindManyProjectsResponseDto = {
     total: number;
     page: number;
     limit: number;
+    nextPage: number;
 };
 
 export type CreateProjectDto = {
@@ -1882,6 +1883,70 @@ export type UpdateProjectDto = {
      * Whether the project logo should be deleted
      */
     deleteLogo?: boolean;
+};
+
+export type ProjectUsageHistoryResponseDto = {
+    data: Array<ResourceUsage>;
+    total: number;
+    page: number;
+    limit: number;
+    nextPage?: number;
+};
+
+export type ProjectUsageSummaryDto = {
+    /**
+     * Total completed usage sessions in the range
+     */
+    totalSessions: number;
+    /**
+     * Total minutes spent across sessions (rounded up per session)
+     */
+    totalMinutes: number;
+    /**
+     * Total credits spent (positive value using currency minor unit)
+     */
+    totalSpend: number;
+    /**
+     * Currency of the spend totals
+     */
+    currency: string;
+    /**
+     * Minor unit exponent for the currency
+     */
+    minorUnit: number;
+};
+
+export type ProjectUsageTimeSeriesPointDto = {
+    /**
+     * ISO date (yyyy-MM-dd)
+     */
+    date: string;
+    /**
+     * Number of sessions that started on this day
+     */
+    sessions: number;
+    /**
+     * Total minutes of the sessions on this day
+     */
+    minutes: number;
+    /**
+     * Total spend (credits) on this day
+     */
+    spend: number;
+};
+
+export type ProjectUsageTopResourceDto = {
+    resourceId: number;
+    resourceName: string;
+    sessions: number;
+    minutes: number;
+    spend: number;
+};
+
+export type ProjectUsageStatsDto = {
+    summary: ProjectUsageSummaryDto;
+    timeSeries: Array<ProjectUsageTimeSeriesPointDto>;
+    topResources: Array<ProjectUsageTopResourceDto>;
 };
 
 export type PluginMainFrontend = {
@@ -3103,6 +3168,42 @@ export type UpdateProjectData = {
 };
 
 export type UpdateProjectResponse = Project;
+
+export type GetProjectUsageHistoryData = {
+    /**
+     * Filter history to entries starting before this date (inclusive)
+     */
+    endDate?: string;
+    id: number;
+    /**
+     * The number of items per page
+     */
+    limit?: number;
+    /**
+     * The page number to retrieve
+     */
+    page?: number;
+    /**
+     * Filter history to entries starting after this date (inclusive)
+     */
+    startDate?: string;
+};
+
+export type GetProjectUsageHistoryResponse = ProjectUsageHistoryResponseDto;
+
+export type GetProjectUsageStatsData = {
+    /**
+     * Calculate statistics up to this date (inclusive)
+     */
+    endDate?: string;
+    id: number;
+    /**
+     * Calculate statistics starting from this date (inclusive)
+     */
+    startDate?: string;
+};
+
+export type GetProjectUsageStatsResponse = ProjectUsageStatsDto;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -5200,6 +5301,36 @@ export type $OpenApiTs = {
                  * The project was updated successfully.
                  */
                 200: Project;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/usage/history': {
+        get: {
+            req: GetProjectUsageHistoryData;
+            res: {
+                /**
+                 * Usage history retrieved successfully.
+                 */
+                200: ProjectUsageHistoryResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/usage/stats': {
+        get: {
+            req: GetProjectUsageStatsData;
+            res: {
+                /**
+                 * Usage statistics retrieved successfully.
+                 */
+                200: ProjectUsageStatsDto;
                 /**
                  * Unauthorized
                  */

@@ -342,6 +342,24 @@ export const useProjectsServiceFindOneProjectKey = "ProjectsServiceFindOneProjec
 export const UseProjectsServiceFindOneProjectKeyFn = ({ id }: {
   id: number;
 }, queryKey?: Array<unknown>) => [useProjectsServiceFindOneProjectKey, ...(queryKey ?? [{ id }])];
+export type ProjectsServiceGetProjectUsageHistoryDefaultResponse = Awaited<ReturnType<typeof ProjectsService.getProjectUsageHistory>>;
+export type ProjectsServiceGetProjectUsageHistoryQueryResult<TData = ProjectsServiceGetProjectUsageHistoryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceGetProjectUsageHistoryKey = "ProjectsServiceGetProjectUsageHistory";
+export const UseProjectsServiceGetProjectUsageHistoryKeyFn = ({ endDate, id, limit, page, startDate }: {
+  endDate?: string;
+  id: number;
+  limit?: number;
+  page?: number;
+  startDate?: string;
+}, queryKey?: Array<unknown>) => [useProjectsServiceGetProjectUsageHistoryKey, ...(queryKey ?? [{ endDate, id, limit, page, startDate }])];
+export type ProjectsServiceGetProjectUsageStatsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.getProjectUsageStats>>;
+export type ProjectsServiceGetProjectUsageStatsQueryResult<TData = ProjectsServiceGetProjectUsageStatsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceGetProjectUsageStatsKey = "ProjectsServiceGetProjectUsageStats";
+export const UseProjectsServiceGetProjectUsageStatsKeyFn = ({ endDate, id, startDate }: {
+  endDate?: string;
+  id: number;
+  startDate?: string;
+}, queryKey?: Array<unknown>) => [useProjectsServiceGetProjectUsageStatsKey, ...(queryKey ?? [{ endDate, id, startDate }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
