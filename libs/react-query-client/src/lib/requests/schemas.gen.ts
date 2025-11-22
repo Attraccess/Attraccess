@@ -2775,9 +2775,12 @@ export const $FindManyProjectsResponseDto = {
         },
         limit: {
             type: 'number'
+        },
+        nextPage: {
+            type: 'number'
         }
     },
-    required: ['data', 'total', 'page', 'limit']
+    required: ['data', 'total', 'page', 'limit', 'nextPage']
 } as const;
 
 export const $CreateProjectDto = {
@@ -2827,6 +2830,127 @@ export const $UpdateProjectDto = {
         }
     },
     required: ['name']
+} as const;
+
+export const $ProjectUsageHistoryResponseDto = {
+    type: 'object',
+    properties: {
+        data: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceUsage'
+            }
+        },
+        total: {
+            type: 'number'
+        },
+        page: {
+            type: 'number'
+        },
+        limit: {
+            type: 'number'
+        },
+        nextPage: {
+            type: 'number'
+        }
+    },
+    required: ['data', 'total', 'page', 'limit']
+} as const;
+
+export const $ProjectUsageSummaryDto = {
+    type: 'object',
+    properties: {
+        totalSessions: {
+            type: 'number',
+            description: 'Total completed usage sessions in the range'
+        },
+        totalMinutes: {
+            type: 'number',
+            description: 'Total minutes spent across sessions (rounded up per session)'
+        },
+        totalSpend: {
+            type: 'number',
+            description: 'Total credits spent (positive value using currency minor unit)'
+        },
+        currency: {
+            type: 'string',
+            description: 'Currency of the spend totals',
+            example: 'EUR'
+        },
+        minorUnit: {
+            type: 'number',
+            description: 'Minor unit exponent for the currency',
+            example: 2
+        }
+    },
+    required: ['totalSessions', 'totalMinutes', 'totalSpend', 'currency', 'minorUnit']
+} as const;
+
+export const $ProjectUsageTimeSeriesPointDto = {
+    type: 'object',
+    properties: {
+        date: {
+            type: 'string',
+            description: 'ISO date (yyyy-MM-dd)'
+        },
+        sessions: {
+            type: 'number',
+            description: 'Number of sessions that started on this day'
+        },
+        minutes: {
+            type: 'number',
+            description: 'Total minutes of the sessions on this day'
+        },
+        spend: {
+            type: 'number',
+            description: 'Total spend (credits) on this day'
+        }
+    },
+    required: ['date', 'sessions', 'minutes', 'spend']
+} as const;
+
+export const $ProjectUsageTopResourceDto = {
+    type: 'object',
+    properties: {
+        resourceId: {
+            type: 'number'
+        },
+        resourceName: {
+            type: 'string'
+        },
+        sessions: {
+            type: 'number'
+        },
+        minutes: {
+            type: 'number'
+        },
+        spend: {
+            type: 'number'
+        }
+    },
+    required: ['resourceId', 'resourceName', 'sessions', 'minutes', 'spend']
+} as const;
+
+export const $ProjectUsageStatsDto = {
+    type: 'object',
+    properties: {
+        summary: {
+            '$ref': '#/components/schemas/ProjectUsageSummaryDto'
+        },
+        timeSeries: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectUsageTimeSeriesPointDto'
+            }
+        },
+        topResources: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectUsageTopResourceDto'
+            }
+        }
+    },
+    required: ['summary', 'timeSeries', 'topResources']
 } as const;
 
 export const $PluginMainFrontend = {

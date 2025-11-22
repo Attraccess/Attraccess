@@ -72,6 +72,16 @@ export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<
   limit?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+    nextPage: number;
+  }).nextPage, ...options
+});
+export const useProjectsServiceGetProjectUsageHistoryInfinite = <TData = InfiniteData<Common.ProjectsServiceGetProjectUsageHistoryDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, limit, startDate }: {
+  endDate?: string;
+  id: number;
+  limit?: number;
+  startDate?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
+  queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, startDate }, queryKey), queryFn: ({ pageParam }) => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page: pageParam as number, startDate }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });

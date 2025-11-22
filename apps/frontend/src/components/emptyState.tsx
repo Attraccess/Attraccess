@@ -1,7 +1,13 @@
 import { MehIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
-export const EmptyState = () => {
+interface Props {
+  message?: string;
+}
+
+export function EmptyState(props: Props) {
+  const { message } = props;
+
   const { t } = useTranslations({
     en: {
       message: 'No entries found',
@@ -10,10 +16,11 @@ export const EmptyState = () => {
       message: 'Keine Einträge gefunden',
     },
   });
+
   return (
     <div className="flex flex-col justify-center items-center p-4">
       <MehIcon size={48} />
-      <p>{t('message')}</p>
+      <p>{message ?? t('message')}</p>
     </div>
   );
-};
+}

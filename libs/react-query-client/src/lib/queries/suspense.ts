@@ -178,6 +178,18 @@ export const useProjectsServiceFindManyProjectsSuspense = <TData = Common.Projec
 export const useProjectsServiceFindOneProjectSuspense = <TData = Common.ProjectsServiceFindOneProjectDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }, queryKey), queryFn: () => ProjectsService.findOneProject({ id }) as TData, ...options });
+export const useProjectsServiceGetProjectUsageHistorySuspense = <TData = Common.ProjectsServiceGetProjectUsageHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, limit, page, startDate }: {
+  endDate?: string;
+  id: number;
+  limit?: number;
+  page?: number;
+  startDate?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) as TData, ...options });
+export const useProjectsServiceGetProjectUsageStatsSuspense = <TData = Common.ProjectsServiceGetProjectUsageStatsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, startDate }: {
+  endDate?: string;
+  id: number;
+  startDate?: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) as TData, ...options });
 export const usePluginsServiceGetPluginsSuspense = <TData = Common.PluginsServiceGetPluginsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(queryKey), queryFn: () => PluginsService.getPlugins() as TData, ...options });
 export const usePluginsServiceGetFrontendPluginFileSuspense = <TData = Common.PluginsServiceGetFrontendPluginFileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filePath, pluginName }: {
   filePath: string;

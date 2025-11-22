@@ -8,6 +8,9 @@ import { NotFoundException } from '@nestjs/common';
 import { CreateProjectDto } from './dto/create.dto';
 import { UpdateProjectDto } from './dto/update.dto';
 import { FileUpload } from '../common/types/file-upload.types';
+import { ProjectUsageService } from './project-usage.service';
+import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
+import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 
 describe('ProjectsController', () => {
   let controller: ProjectsController;
@@ -22,6 +25,10 @@ describe('ProjectsController', () => {
   const fileStorageService = {
     getPublicPath: jest.fn(),
   };
+  const projectUsageService = {
+    getProjectUsageHistory: jest.fn(),
+    getProjectUsageStats: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -30,6 +37,7 @@ describe('ProjectsController', () => {
       providers: [
         { provide: ProjectsService, useValue: projectsService },
         { provide: FileStorageService, useValue: fileStorageService },
+        { provide: ProjectUsageService, useValue: projectUsageService },
       ],
     }).compile();
 
@@ -157,6 +165,46 @@ describe('ProjectsController', () => {
 
       expect(projectsService.updateOne).toHaveBeenCalledWith(9, 56, expect.objectContaining({ ...data }));
       expect(result.logo).toBeNull();
+    });
+  });
+
+  describe('getUsageHistory', () => {
+    it('should validate ownership and return usage history', async () => {
+      const req = { user: { id: 10 } };
+      const query = { page: 1, limit: 10 } as GetProjectUsageHistoryQueryDto;
+      const project = { id: 99 } as Project;
+      const history = { data: [], total: 0, page: 1, limit: 10 };
+
+      projectsService.findOneById.mockResolvedValueOnce(project);
+      projectUsageService.getProjectUsageHistory.mockResolvedValueOnce(history);
+
+      const result = await controller.getUsageHistory(req as AuthenticatedRequest, 99, query);
+
+      expect(projectsService.findOneById).toHaveBeenCalledWith(10, 99);
+      expect(projectUsageService.getProjectUsageHistory).toHaveBeenCalledWith(99, query);
+      expect(result).toEqual(history);
+    });
+  });
+
+  describe('getUsageStats', () => {
+    it('should validate ownership and return usage stats', async () => {
+      const req = { user: { id: 11 } };
+      const query = {} as ProjectUsageStatsQueryDto;
+      const project = { id: 77 } as Project;
+      const stats = {
+        summary: { totalSessions: 1, totalMinutes: 10, totalSpend: 100, currency: 'EUR', minorUnit: 2 },
+        timeSeries: [],
+        topResources: [],
+      };
+
+      projectsService.findOneById.mockResolvedValueOnce(project);
+      projectUsageService.getProjectUsageStats.mockResolvedValueOnce(stats);
+
+      const result = await controller.getUsageStats(req as AuthenticatedRequest, 77, query);
+
+      expect(projectsService.findOneById).toHaveBeenCalledWith(11, 77);
+      expect(projectUsageService.getProjectUsageStats).toHaveBeenCalledWith(77, query);
+      expect(result).toEqual(stats);
     });
   });
 });

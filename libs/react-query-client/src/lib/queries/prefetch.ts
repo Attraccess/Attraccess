@@ -178,6 +178,18 @@ export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryCli
 export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });
+export const prefetchUseProjectsServiceGetProjectUsageHistory = (queryClient: QueryClient, { endDate, id, limit, page, startDate }: {
+  endDate?: string;
+  id: number;
+  limit?: number;
+  page?: number;
+  startDate?: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) });
+export const prefetchUseProjectsServiceGetProjectUsageStats = (queryClient: QueryClient, { endDate, id, startDate }: {
+  endDate?: string;
+  id: number;
+  startDate?: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

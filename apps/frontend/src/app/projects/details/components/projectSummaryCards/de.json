@@ -1,0 +1,18 @@
+{
+  "summary": {
+    "sessions": {
+      "title": "Sitzungen",
+      "description": "Abgeschlossene Nutzungssitzungen"
+    },
+    "minutes": {
+      "title": "Minuten",
+      "description": "Gesamte Maschinenzeit"
+    },
+    "spend": {
+      "title": "Ausgaben",
+      "description": "Verbrauchte Credits"
+    },
+    "loading": "Lade Nutzungsübersicht…",
+    "empty": "Noch keine Nutzungsdaten vorhanden"
+  }
+}

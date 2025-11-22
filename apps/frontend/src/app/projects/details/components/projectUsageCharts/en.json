@@ -1,0 +1,24 @@
+{
+  "charts": {
+    "title": "Usage trends",
+    "timeSeries": {
+      "title": "Minutes vs spend",
+      "empty": "Not enough history to display the chart"
+    },
+    "topResources": {
+      "title": "Top resources",
+      "empty": "No resource usage recorded yet",
+      "columns": {
+        "resource": "Resource",
+        "sessions": "Sessions",
+        "minutes": "Minutes",
+        "spend": "Spend"
+      }
+    }
+  },
+  "tooltip": {
+    "sessions": "Sessions",
+    "minutes": "Minutes",
+    "spend": "Spend"
+  }
+}
