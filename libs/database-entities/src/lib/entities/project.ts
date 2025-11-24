@@ -3,6 +3,8 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, Upd
 import { PrimaryGeneratedColumn } from 'typeorm';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
+import { ProjectMember } from './project-member.entity';
+import { ProjectInvitation } from './project-invitation.entity';
 
 @Entity()
 export class Project {
@@ -46,4 +48,12 @@ export class Project {
 
   @OneToMany(() => ResourceUsage, (usage) => usage.project)
   resourceUsages!: ResourceUsage[];
+
+  @OneToMany(() => ProjectMember, (member) => member.project)
+  @ApiProperty({ description: 'Members that have access to the project', type: () => [ProjectMember] })
+  members!: ProjectMember[];
+
+  @OneToMany(() => ProjectInvitation, (invitation) => invitation.project)
+  @ApiProperty({ description: 'Pending invitations for the project', type: () => [ProjectInvitation] })
+  invitations!: ProjectInvitation[];
 }

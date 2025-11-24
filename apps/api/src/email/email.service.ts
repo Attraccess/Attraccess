@@ -8,6 +8,8 @@ import {
   EmailTemplate,
   BillingTransaction,
   ResourceUsage,
+  Project,
+  ProjectInvitation,
 } from '@attraccess/database-entities';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
@@ -110,6 +112,30 @@ export class EmailService {
     };
 
     await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context);
+  }
+
+  async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {
+    const invitationUrl = `${this.frontendUrl}/projects?invitationId=${invitation.id}`;
+
+    const context = {
+      ...this.getBaseContext(invitedUser),
+      project: {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+      },
+      inviter: {
+        username: invitation.inviter?.username,
+        email: invitation.inviter?.email,
+      },
+      invitation: {
+        id: invitation.id,
+        role: invitation.requestedRole,
+      },
+      invitationUrl,
+    };
+
+    await this.sendEmail(invitedUser, EmailTemplateType.PROJECT_INVITATION, context);
   }
 
   async sendPasswordResetEmail(user: User, resetToken: string) {

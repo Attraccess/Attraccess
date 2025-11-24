@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Project team",
+    "subtitle": "Invite collaborators, manage roles, and track pending invitations."
+  },
+  "owner": "Owner",
+  "sections": {
+    "invite": {
+      "title": "Invite collaborators",
+      "description": "Send invitations to existing Attraccess users to grant them access to this project.",
+      "cta": "Invite member"
+    },
+    "pending": {
+      "title": "Pending invitations",
+      "empty": "No pending invitations."
+    },
+    "members": {
+      "title": "Members",
+      "empty": "No other members yet."
+    }
+  },
+  "actions": {
+    "invite": "Invite member",
+    "remove": "Remove",
+    "resend": "Resend",
+    "cancel": "Cancel"
+  },
+  "statuses": {
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "declined": "Declined",
+    "canceled": "Canceled"
+  },
+  "roles": {
+    "viewer": "Viewer"
+  },
+  "success": {
+    "remove": "Member removed",
+    "resend": "Invitation resent",
+    "cancel": "Invitation canceled"
+  },
+  "messages": {
+    "ownerOnly": "Only project owners can manage members and invitations."
+  }
+}
+

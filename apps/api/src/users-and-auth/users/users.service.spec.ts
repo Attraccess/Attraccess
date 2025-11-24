@@ -242,6 +242,9 @@ describe('UsersService', () => {
           initiatedBillingTransactions: [],
           creditBalance: 0,
           billingFactor: 100,
+          projectMemberships: [],
+          sentProjectInvitations: [],
+          receivedProjectInvitations: [],
         } as User,
         {
           id: 2,
@@ -276,6 +279,9 @@ describe('UsersService', () => {
           initiatedBillingTransactions: [],
           creditBalance: 0,
           billingFactor: 100,
+          projectMemberships: [],
+          sentProjectInvitations: [],
+          receivedProjectInvitations: [],
         } as User,
       ];
 

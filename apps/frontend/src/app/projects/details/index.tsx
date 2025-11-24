@@ -4,10 +4,10 @@ import {
   useProjectsServiceFindManyProjectsKey,
   useProjectsServiceFindOneProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Image, Button } from '@heroui/react';
+import { Skeleton, Image, Button, Link } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
 import { PageHeader } from '../../../components/pageHeader';
-import { Edit2Icon, FoldersIcon, Trash2Icon } from 'lucide-react';
+import { Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useCallback, useState } from 'react';
@@ -22,7 +22,6 @@ import { UpsertProjectModal } from '../upsertModal';
 import { ProjectSummaryCards } from './components/projectSummaryCards';
 import { ProjectUsageCharts } from './components/projectUsageCharts';
 import { ProjectUsageHistory } from './components/projectUsageHistory';
-
 export function ProjectDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || '', 10);
@@ -86,23 +85,33 @@ export function ProjectDetailsPage() {
         }
         backTo="/projects"
         actions={
-          <>
-            <UpsertProjectModal projectId={projectId}>
-              {(onOpen) => (
-                <Button onPress={onOpen} startContent={<Edit2Icon className="size-4" />} variant="light">
-                  {t('actions.update.label')}
-                </Button>
-              )}
-            </UpsertProjectModal>
-            <Button
-              onPress={() => setShowDeleteConfirmationModal(true)}
-              startContent={<Trash2Icon className="size-4" />}
-              color="danger"
-              variant="light"
-            >
-              {t('actions.delete.label')}
-            </Button>
-          </>
+          project?.access.isOwner && (
+            <>
+              <Button
+                variant="light"
+                as={Link}
+                href={`/projects/${projectId}/team`}
+                startContent={<UsersIcon className="size-4" />}
+              >
+                {t('actions.members.label')}
+              </Button>
+              <UpsertProjectModal projectId={projectId}>
+                {(onOpen) => (
+                  <Button onPress={onOpen} startContent={<Edit2Icon className="size-4" />} variant="light">
+                    {t('actions.update.label')}
+                  </Button>
+                )}
+              </UpsertProjectModal>
+              <Button
+                onPress={() => setShowDeleteConfirmationModal(true)}
+                startContent={<Trash2Icon className="size-4" />}
+                color="danger"
+                variant="light"
+              >
+                {t('actions.delete.label')}
+              </Button>
+            </>
+          )
         }
       />
 

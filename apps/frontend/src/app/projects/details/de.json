@@ -9,6 +9,9 @@
     },
     "update": {
       "label": "Projekt aktualisieren"
+    },
+    "members": {
+      "label": "Mitglieder"
     }
   }
 }

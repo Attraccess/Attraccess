@@ -466,7 +466,8 @@ export enum EmailTemplateType {
     RESET_PASSWORD = 'reset-password',
     USERNAME_CHANGED = 'username-changed',
     PASSWORD_CHANGED = 'password-changed',
-    RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary'
+    RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
+    PROJECT_INVITATION = 'project-invitation'
 }
 
 export type EmailTemplate = {
@@ -1020,6 +1021,112 @@ export type StartUsageSessionDto = {
     projectId?: number;
 };
 
+export type ProjectMember = {
+    /**
+     * Unique identifier of the project member
+     */
+    id: number;
+    /**
+     * Project ID the member belongs to
+     */
+    projectId: number;
+    /**
+     * Project the member belongs to
+     */
+    project: Project;
+    /**
+     * User ID of the member
+     */
+    userId: number;
+    /**
+     * User that belongs to the project
+     */
+    user: User;
+    /**
+     * Role of the member within the project
+     */
+    role: 'viewer';
+    /**
+     * When the membership started
+     */
+    joinedAt: string;
+};
+
+/**
+ * Role of the member within the project
+ */
+export enum role {
+    VIEWER = 'viewer'
+}
+
+export type ProjectInvitation = {
+    /**
+     * Unique identifier of the project invitation
+     */
+    id: number;
+    /**
+     * Project ID for which the invitation was created
+     */
+    projectId: number;
+    /**
+     * Project for which the invitation was created
+     */
+    project: Project;
+    /**
+     * User ID that created the invitation
+     */
+    inviterId: number;
+    /**
+     * Inviter user
+     */
+    inviter: User;
+    /**
+     * User ID that is being invited
+     */
+    invitedUserId: number;
+    /**
+     * Invited user
+     */
+    invitedUser: User;
+    /**
+     * Current status of the invitation
+     */
+    status: 'pending' | 'accepted' | 'declined' | 'canceled';
+    /**
+     * Role that should be granted upon acceptance
+     */
+    requestedRole: 'viewer';
+    /**
+     * Timestamp when the invitation was responded to (accept/decline/cancel)
+     */
+    respondedAt?: string;
+    /**
+     * When the invitation was created
+     */
+    createdAt: string;
+    /**
+     * When the invitation was last updated
+     */
+    updatedAt: string;
+};
+
+/**
+ * Current status of the invitation
+ */
+export enum status {
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    DECLINED = 'declined',
+    CANCELED = 'canceled'
+}
+
+/**
+ * Role that should be granted upon acceptance
+ */
+export enum requestedRole {
+    VIEWER = 'viewer'
+}
+
 export type Project = {
     /**
      * The ID of the project
@@ -1049,6 +1156,14 @@ export type Project = {
      * The logo of the project
      */
     logo: string;
+    /**
+     * Members that have access to the project
+     */
+    members: Array<ProjectMember>;
+    /**
+     * Pending invitations for the project
+     */
+    invitations: Array<ProjectInvitation>;
 };
 
 export type ResourceUsage = {
@@ -1352,7 +1467,7 @@ export type BillingTransaction = {
 /**
  * The status of the billing transaction
  */
-export enum status {
+export enum status2 {
     PENDING = 'pending',
     COMPLETED = 'completed',
     FAILED = 'failed'
@@ -1507,7 +1622,7 @@ export type SumUpReaderDto = {
     updated_at: string;
 };
 
-export enum status2 {
+export enum status3 {
     UNKNOWN = 'unknown',
     PROCESSING = 'processing',
     PAIRED = 'paired',
@@ -1546,7 +1661,7 @@ export type Payload = {
 /**
  * The status of the transaction
  */
-export enum status3 {
+export enum status4 {
     SUCCESSFUL = 'successful',
     FAILED = 'failed'
 }
@@ -1843,8 +1958,63 @@ export type ResourceFlowNode = {
     resource?: Resource;
 };
 
+export type ProjectAccessInfoDto = {
+    /**
+     * Whether the authenticated user owns the project
+     */
+    isOwner: boolean;
+    /**
+     * Role of the authenticated user inside the project when they are a member
+     */
+    role?: 'viewer' | null;
+    /**
+     * Whether the authenticated user can manage the project
+     */
+    canManageProject: boolean;
+};
+
+export type ProjectWithAccessDto = {
+    /**
+     * The ID of the project
+     */
+    id: number;
+    /**
+     * The date and time the NFC card was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the NFC card was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the user that owns the project
+     */
+    owner: User;
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description: string;
+    /**
+     * The logo of the project
+     */
+    logo: string;
+    /**
+     * Members that have access to the project
+     */
+    members: Array<ProjectMember>;
+    /**
+     * Pending invitations for the project
+     */
+    invitations: Array<ProjectInvitation>;
+    access: ProjectAccessInfoDto;
+};
+
 export type FindManyProjectsResponseDto = {
-    data: Array<Project>;
+    data: Array<ProjectWithAccessDto>;
     total: number;
     page: number;
     limit: number;
@@ -1947,6 +2117,22 @@ export type ProjectUsageStatsDto = {
     summary: ProjectUsageSummaryDto;
     timeSeries: Array<ProjectUsageTimeSeriesPointDto>;
     topResources: Array<ProjectUsageTopResourceDto>;
+};
+
+export type ProjectMembersResponseDto = {
+    owner: User;
+    members: Array<ProjectMember>;
+};
+
+export type CreateProjectInvitationDto = {
+    /**
+     * ID of the existing user to invite
+     */
+    invitedUserId: number;
+    /**
+     * Role the invited user should receive upon acceptance
+     */
+    role?: 'viewer';
 };
 
 export type PluginMainFrontend = {
@@ -2486,7 +2672,7 @@ export type EmailTemplateControllerFindOneData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
+    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary' | 'project-invitation';
 };
 
 export type EmailTemplateControllerFindOneResponse = EmailTemplate;
@@ -2496,7 +2682,7 @@ export type EmailTemplateControllerUpdateData = {
     /**
      * Template type/type
      */
-    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary';
+    type: 'verify-email' | 'user-invitation' | 'reset-password' | 'username-changed' | 'password-changed' | 'resource-usage-billing-transaction-summary' | 'project-invitation';
 };
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
@@ -3148,13 +3334,13 @@ export type CreateProjectData = {
     formData: CreateProjectDto;
 };
 
-export type CreateProjectResponse = Project;
+export type CreateProjectResponse = ProjectWithAccessDto;
 
 export type FindOneProjectData = {
     id: number;
 };
 
-export type FindOneProjectResponse = Project;
+export type FindOneProjectResponse = ProjectWithAccessDto;
 
 export type DeleteOneProjectData = {
     id: number;
@@ -3167,7 +3353,7 @@ export type UpdateProjectData = {
     id: number;
 };
 
-export type UpdateProjectResponse = Project;
+export type UpdateProjectResponse = ProjectWithAccessDto;
 
 export type GetProjectUsageHistoryData = {
     /**
@@ -3204,6 +3390,60 @@ export type GetProjectUsageStatsData = {
 };
 
 export type GetProjectUsageStatsResponse = ProjectUsageStatsDto;
+
+export type ListProjectMembersData = {
+    id: number;
+};
+
+export type ListProjectMembersResponse = ProjectMembersResponseDto;
+
+export type RemoveProjectMemberData = {
+    id: number;
+    memberId: number;
+};
+
+export type RemoveProjectMemberResponse = void;
+
+export type ListProjectInvitationsData = {
+    id: number;
+};
+
+export type ListProjectInvitationsResponse = Array<ProjectInvitation>;
+
+export type CreateProjectInvitationData = {
+    id: number;
+    requestBody: CreateProjectInvitationDto;
+};
+
+export type CreateProjectInvitationResponse = ProjectInvitation;
+
+export type ResendProjectInvitationData = {
+    id: number;
+    invitationId: number;
+};
+
+export type ResendProjectInvitationResponse = ProjectInvitation;
+
+export type CancelProjectInvitationData = {
+    id: number;
+    invitationId: number;
+};
+
+export type CancelProjectInvitationResponse = ProjectInvitation;
+
+export type ListMyProjectInvitationsResponse = Array<ProjectInvitation>;
+
+export type AcceptProjectInvitationData = {
+    invitationId: number;
+};
+
+export type AcceptProjectInvitationResponse = ProjectInvitation;
+
+export type DeclineProjectInvitationData = {
+    invitationId: number;
+};
+
+export type DeclineProjectInvitationResponse = ProjectInvitation;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -5259,7 +5499,7 @@ export type $OpenApiTs = {
                 /**
                  * The project was created successfully.
                  */
-                201: Project;
+                201: ProjectWithAccessDto;
                 /**
                  * Unauthorized
                  */
@@ -5274,7 +5514,7 @@ export type $OpenApiTs = {
                 /**
                  * The project.
                  */
-                200: Project;
+                200: ProjectWithAccessDto;
                 /**
                  * Unauthorized
                  */
@@ -5300,7 +5540,7 @@ export type $OpenApiTs = {
                 /**
                  * The project was updated successfully.
                  */
-                200: Project;
+                200: ProjectWithAccessDto;
                 /**
                  * Unauthorized
                  */
@@ -5331,6 +5571,111 @@ export type $OpenApiTs = {
                  * Usage statistics retrieved successfully.
                  */
                 200: ProjectUsageStatsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/members': {
+        get: {
+            req: ListProjectMembersData;
+            res: {
+                200: ProjectMembersResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/members/{memberId}': {
+        delete: {
+            req: RemoveProjectMemberData;
+            res: {
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/invitations': {
+        get: {
+            req: ListProjectInvitationsData;
+            res: {
+                200: Array<ProjectInvitation>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreateProjectInvitationData;
+            res: {
+                201: ProjectInvitation;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/invitations/{invitationId}/resend': {
+        post: {
+            req: ResendProjectInvitationData;
+            res: {
+                200: ProjectInvitation;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/invitations/{invitationId}': {
+        delete: {
+            req: CancelProjectInvitationData;
+            res: {
+                200: ProjectInvitation;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/project-invitations': {
+        get: {
+            res: {
+                200: Array<ProjectInvitation>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/project-invitations/{invitationId}/accept': {
+        post: {
+            req: AcceptProjectInvitationData;
+            res: {
+                200: ProjectInvitation;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/project-invitations/{invitationId}/decline': {
+        post: {
+            req: DeclineProjectInvitationData;
+            res: {
+                200: ProjectInvitation;
                 /**
                  * Unauthorized
                  */

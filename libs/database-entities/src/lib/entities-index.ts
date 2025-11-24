@@ -45,6 +45,8 @@ import { ResourceBillingConfiguration } from './entities/resource-billing-config
 import { Setting } from './entities/setting.entity';
 import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
 import { Project } from './entities/project';
+import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
+import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
 
 // Export all entities individually
 export {
@@ -96,6 +98,10 @@ export {
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
   Project,
+  ProjectMember,
+  ProjectMemberRole,
+  ProjectInvitation,
+  ProjectInvitationStatus,
 };
 
 // Export the entities object
@@ -125,4 +131,6 @@ export const entities = {
   Setting,
   BillingTransactionItem,
   Project,
+  ProjectMember,
+  ProjectInvitation,
 };

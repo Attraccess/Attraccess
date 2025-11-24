@@ -6,6 +6,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BillingService } from '../billing/billing.service';
 import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
+import { ProjectAccessService } from './project-access.service';
 
 type MockedQueryBuilder = {
   innerJoin: jest.Mock;
@@ -72,6 +73,9 @@ describe('ProjectUsageService', () => {
   const billingService = {
     getConfiguration: jest.fn(),
   };
+  const projectAccessService = {
+    getAccessOrThrow: jest.fn(),
+  };
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -90,6 +94,10 @@ describe('ProjectUsageService', () => {
             createQueryBuilder: jest.fn(),
           },
         },
+        {
+          provide: ProjectAccessService,
+          useValue: projectAccessService,
+        },
       ],
     }).compile();
 
@@ -102,12 +110,13 @@ describe('ProjectUsageService', () => {
 
   describe('getProjectUsageHistory', () => {
     it('returns paginated history with nextPage when more results exist', async () => {
+      projectAccessService.getAccessOrThrow.mockResolvedValue(undefined);
       const qb = createMockQueryBuilder<ResourceUsage>({
         manyAndCount: [[{ id: 1 } as ResourceUsage], 3],
       });
       jest.spyOn(resourceUsageRepository, 'createQueryBuilder').mockReturnValue(qb as never);
 
-      const result = await service.getProjectUsageHistory(5, {
+      const result = await service.getProjectUsageHistory(1, 5, {
         page: 1,
         limit: 1,
       } as GetProjectUsageHistoryQueryDto);
@@ -121,6 +130,7 @@ describe('ProjectUsageService', () => {
 
   describe('getProjectUsageStats', () => {
     it('aggregates summary, time series, and top resources', async () => {
+      projectAccessService.getAccessOrThrow.mockResolvedValue(undefined);
       const usageQb = createMockQueryBuilder<ResourceUsage>({
         rawOnes: [{ totalSessions: '2', totalMinutes: '45' }],
         rawMany: [
@@ -153,7 +163,7 @@ describe('ProjectUsageService', () => {
       jest.spyOn(billingTransactionRepository, 'createQueryBuilder').mockReturnValue(billingQb as never);
       billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
 
-      const result = await service.getProjectUsageStats(5, {} as ProjectUsageStatsQueryDto);
+      const result = await service.getProjectUsageStats(1, 5, {} as ProjectUsageStatsQueryDto);
 
       expect(result.summary).toEqual({
         totalSessions: 2,

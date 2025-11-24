@@ -707,7 +707,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -1467,6 +1467,123 @@ export const $StartUsageSessionDto = {
     }
 } as const;
 
+export const $ProjectMember = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier of the project member'
+        },
+        projectId: {
+            type: 'number',
+            description: 'Project ID the member belongs to'
+        },
+        project: {
+            description: 'Project the member belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
+        },
+        userId: {
+            type: 'number',
+            description: 'User ID of the member'
+        },
+        user: {
+            description: 'User that belongs to the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        role: {
+            type: 'string',
+            description: 'Role of the member within the project',
+            enum: ['viewer']
+        },
+        joinedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the membership started'
+        }
+    },
+    required: ['id', 'projectId', 'project', 'userId', 'user', 'role', 'joinedAt']
+} as const;
+
+export const $ProjectInvitation = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier of the project invitation'
+        },
+        projectId: {
+            type: 'number',
+            description: 'Project ID for which the invitation was created'
+        },
+        project: {
+            description: 'Project for which the invitation was created',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
+        },
+        inviterId: {
+            type: 'number',
+            description: 'User ID that created the invitation'
+        },
+        inviter: {
+            description: 'Inviter user',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        invitedUserId: {
+            type: 'number',
+            description: 'User ID that is being invited'
+        },
+        invitedUser: {
+            description: 'Invited user',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        status: {
+            type: 'string',
+            description: 'Current status of the invitation',
+            enum: ['pending', 'accepted', 'declined', 'canceled']
+        },
+        requestedRole: {
+            type: 'string',
+            description: 'Role that should be granted upon acceptance',
+            enum: ['viewer']
+        },
+        respondedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Timestamp when the invitation was responded to (accept/decline/cancel)'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the invitation was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the invitation was last updated'
+        }
+    },
+    required: ['id', 'projectId', 'project', 'inviterId', 'inviter', 'invitedUserId', 'invitedUser', 'status', 'requestedRole', 'createdAt', 'updatedAt']
+} as const;
+
 export const $Project = {
     type: 'object',
     properties: {
@@ -1503,9 +1620,23 @@ export const $Project = {
         logo: {
             type: 'string',
             description: 'The logo of the project'
+        },
+        members: {
+            description: 'Members that have access to the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectMember'
+            }
+        },
+        invitations: {
+            description: 'Pending invitations for the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectInvitation'
+            }
         }
     },
-    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo']
+    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo', 'members', 'invitations']
 } as const;
 
 export const $ResourceUsage = {
@@ -2758,13 +2889,92 @@ export const $ResourceFlowNode = {
     required: ['id', 'type', 'position', 'data', 'resourceId']
 } as const;
 
+export const $ProjectAccessInfoDto = {
+    type: 'object',
+    properties: {
+        isOwner: {
+            type: 'boolean',
+            description: 'Whether the authenticated user owns the project'
+        },
+        role: {
+            type: 'string',
+            description: 'Role of the authenticated user inside the project when they are a member',
+            enum: ['viewer'],
+            nullable: true
+        },
+        canManageProject: {
+            type: 'boolean',
+            description: 'Whether the authenticated user can manage the project'
+        }
+    },
+    required: ['isOwner', 'canManageProject']
+} as const;
+
+export const $ProjectWithAccessDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the project'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was last updated'
+        },
+        owner: {
+            description: 'The ID of the user that owns the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the project'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project'
+        },
+        logo: {
+            type: 'string',
+            description: 'The logo of the project'
+        },
+        members: {
+            description: 'Members that have access to the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectMember'
+            }
+        },
+        invitations: {
+            description: 'Pending invitations for the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectInvitation'
+            }
+        },
+        access: {
+            '$ref': '#/components/schemas/ProjectAccessInfoDto'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo', 'members', 'invitations', 'access']
+} as const;
+
 export const $FindManyProjectsResponseDto = {
     type: 'object',
     properties: {
         data: {
             type: 'array',
             items: {
-                '$ref': '#/components/schemas/Project'
+                '$ref': '#/components/schemas/ProjectWithAccessDto'
             }
         },
         total: {
@@ -2951,6 +3161,39 @@ export const $ProjectUsageStatsDto = {
         }
     },
     required: ['summary', 'timeSeries', 'topResources']
+} as const;
+
+export const $ProjectMembersResponseDto = {
+    type: 'object',
+    properties: {
+        owner: {
+            '$ref': '#/components/schemas/User'
+        },
+        members: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectMember'
+            }
+        }
+    },
+    required: ['owner', 'members']
+} as const;
+
+export const $CreateProjectInvitationDto = {
+    type: 'object',
+    properties: {
+        invitedUserId: {
+            type: 'number',
+            description: 'ID of the existing user to invite'
+        },
+        role: {
+            type: 'string',
+            description: 'Role the invited user should receive upon acceptance',
+            enum: ['viewer'],
+            default: 'viewer'
+        }
+    },
+    required: ['invitedUserId']
 } as const;
 
 export const $PluginMainFrontend = {

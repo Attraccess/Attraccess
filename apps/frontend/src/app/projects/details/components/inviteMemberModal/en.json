@@ -1,0 +1,19 @@
+{
+  "title": "Invite member",
+  "description": "Search for an existing user to share this project.",
+  "inputs": {
+    "user": "User",
+    "role": "Role"
+  },
+  "roles": {
+    "viewer": "Viewer"
+  },
+  "actions": {
+    "invite": "Send invitation",
+    "cancel": "Cancel"
+  },
+  "success": {
+    "title": "Invitation sent",
+    "description": "{{username}} will receive an email."
+  }
+}

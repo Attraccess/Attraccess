@@ -7,6 +7,7 @@ import { ProjectUsageHistoryResponseDto } from './dto/project-usage-history-resp
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import { BillingService } from '../billing/billing.service';
+import { ProjectAccessService } from './project-access.service';
 
 type UsageSummaryRaw = {
   totalSessions: string | null;
@@ -48,6 +49,7 @@ export class ProjectUsageService {
     @InjectRepository(BillingTransaction)
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
     private readonly billingService: BillingService,
+    private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   private applyDateFilters<T>(qb: SelectQueryBuilder<T>, alias: string, startDate?: Date, endDate?: Date): void {
@@ -60,9 +62,12 @@ export class ProjectUsageService {
   }
 
   async getProjectUsageHistory(
+    userId: number,
     projectId: number,
     query: GetProjectUsageHistoryQueryDto,
   ): Promise<ProjectUsageHistoryResponseDto> {
+    await this.projectAccessService.getAccessOrThrow(userId, projectId);
+
     const qb = this.resourceUsageRepository
       .createQueryBuilder('usage')
       .leftJoinAndSelect('usage.user', 'user')
@@ -89,7 +94,13 @@ export class ProjectUsageService {
     };
   }
 
-  async getProjectUsageStats(projectId: number, query: ProjectUsageStatsQueryDto): Promise<ProjectUsageStatsDto> {
+  async getProjectUsageStats(
+    userId: number,
+    projectId: number,
+    query: ProjectUsageStatsQueryDto,
+  ): Promise<ProjectUsageStatsDto> {
+    await this.projectAccessService.getAccessOrThrow(userId, projectId);
+
     const configuration = await this.billingService.getConfiguration();
 
     const completedUsageQb = this.resourceUsageRepository

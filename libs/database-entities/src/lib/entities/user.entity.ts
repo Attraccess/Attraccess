@@ -9,6 +9,8 @@ import { NFCCard } from './nfcCard.entity';
 import { Session } from './session.entity';
 import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';
+import { ProjectMember } from './project-member.entity';
+import { ProjectInvitation } from './project-invitation.entity';
 
 export class SystemPermissions {
   @Column({ default: false, type: 'boolean' })
@@ -183,4 +185,19 @@ export class User {
     onDelete: 'CASCADE',
   })
   ownedProjects!: Project[];
+
+  @OneToMany(() => ProjectMember, (member) => member.user, {
+    onDelete: 'CASCADE',
+  })
+  projectMemberships!: ProjectMember[];
+
+  @OneToMany(() => ProjectInvitation, (invitation) => invitation.inviter, {
+    onDelete: 'CASCADE',
+  })
+  sentProjectInvitations!: ProjectInvitation[];
+
+  @OneToMany(() => ProjectInvitation, (invitation) => invitation.invitedUser, {
+    onDelete: 'CASCADE',
+  })
+  receivedProjectInvitations!: ProjectInvitation[];
 }
