@@ -5,5 +5,12 @@
     "image": "Image",
     "name": "Name",
     "status": "Status"
+  },
+  "actions": {
+    "openGroupSettings": "Open group settings"
+  },
+  "accessibility": {
+    "unknownGroup": "Resource group",
+    "tableLabel": "Resources in {{group}}"
   }
 }

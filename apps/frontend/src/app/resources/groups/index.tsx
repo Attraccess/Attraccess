@@ -157,6 +157,7 @@ export function ManageResourceGroups({
       </CardHeader>
       <CardBody>
         <Table
+          aria-label={t('table.ariaLabel')}
           shadow="none"
           removeWrapper
           bottomContent={
@@ -187,6 +188,7 @@ export function ManageResourceGroups({
                     onValueChange={() => {
                       handleGroupClick(group);
                     }}
+                    aria-label={group.name}
                     color={isAdded(group) ? 'danger' : 'primary'}
                     isSelected={isAdded(group)}
                   />

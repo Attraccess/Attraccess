@@ -4,6 +4,7 @@
     "includePast": "Vergangene anzeigen"
   },
   "table": {
+    "ariaLabel": "Wartungsarbeiten",
     "columns": {
       "start": "Start",
       "end": "Ende",

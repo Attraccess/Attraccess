@@ -49,6 +49,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
         <ModalHeader>{t('modal.title')}</ModalHeader>
         <ModalBody>
           <Table
+            aria-label={t('table.ariaLabel')}
             bottomContent={
               <div className="flex w-full justify-center">
                 <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />

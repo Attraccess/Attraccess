@@ -19,6 +19,7 @@ import {
   User,
   ProjectMember,
   ApiError,
+  ProjectMemberRole,
 } from '@attraccess/react-query-client';
 import { useTranslations, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -36,7 +37,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   const { projectId, children } = props;
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [role, setRole] = useState<ProjectMember['role']>('viewer');
+  const [role, setRole] = useState<ProjectMember['role']>(ProjectMemberRole.VIEWER);
   const queryClient = useQueryClient();
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({
@@ -46,7 +47,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
 
   const resetState = useCallback(() => {
     setSelectedUser(null);
-    setRole('viewer');
+    setRole(ProjectMemberRole.VIEWER);
   }, []);
 
   const invalidateCollaboratorQueries = useCallback(async () => {
@@ -80,7 +81,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
     },
   });
 
-  const roleOptions = useMemo(() => ['viewer'] as ProjectMember['role'][], []);
+  const roleOptions = useMemo(() => Object.values(ProjectMemberRole), []);
 
   const onSelectionChange = useCallback(
     (keys: Selection) => {

@@ -1,4 +1,7 @@
 {
+  "table": {
+    "ariaLabel": "Usage History"
+  },
   "headers": {
     "user": "User",
     "machine": {

@@ -16,7 +16,24 @@ self.addEventListener('message', (event) => {
 });
 
 const wb_manifest = self.__WB_MANIFEST;
-setupPrecaching([...wb_manifest]);
+const precacheManifest = [...wb_manifest];
+
+const ensurePrecached = (url: string) => {
+  const alreadyIncluded = precacheManifest.some((entry) => {
+    if (typeof entry === 'string') {
+      return entry === url;
+    }
+
+    return entry.url === url;
+  });
+
+  if (!alreadyIncluded) {
+    precacheManifest.push({ url, revision: null });
+  }
+};
+
+ensurePrecached('index.html');
+setupPrecaching(precacheManifest);
 
 // Cache-first strategy for CDN assets under /cdn/
 registerRoute(

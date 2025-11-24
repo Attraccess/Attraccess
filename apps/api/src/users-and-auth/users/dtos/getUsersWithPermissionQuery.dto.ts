@@ -34,6 +34,7 @@ export class GetUsersWithPermissionQueryDto {
     description: 'Filter users by permission',
     enum: PermissionFilter,
     required: false,
+    enumName: 'PermissionFilter',
   })
   @IsEnum(PermissionFilter)
   @IsOptional()

@@ -100,7 +100,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
       </CardHeader>
 
       <CardBody>
-        <Table removeWrapper>
+        <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>

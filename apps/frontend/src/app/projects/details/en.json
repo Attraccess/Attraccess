@@ -10,6 +10,9 @@
     "update": {
       "label": "Update Project"
     },
+    "members": {
+      "label": "Team members"
+    },
     "inviteMember": {
       "label": "Invite member"
     }

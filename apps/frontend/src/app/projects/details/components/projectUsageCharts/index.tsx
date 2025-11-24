@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@heroui/react';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import {
@@ -54,6 +54,11 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const formatNumber = useNumberFormatter();
   const formatDate = useDateTimeFormatter({ showTime: false });
   const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
+  const [canRenderCharts, setCanRenderCharts] = useState(false);
+
+  useEffect(() => {
+    setCanRenderCharts(true);
+  }, []);
 
   const chartData = useMemo(() => {
     if (!data) {
@@ -160,6 +165,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
             <Skeleton className="w-full h-full" />
           ) : chartData.length === 0 ? (
             <EmptyState message={t('charts.timeSeries.empty')} />
+          ) : !canRenderCharts ? (
+            <Skeleton className="w-full h-full" />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
@@ -216,45 +223,49 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
           ) : (
             <>
               <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topResources}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="resourceName" />
-                    <YAxis />
-                    <Tooltip content={renderTopResourcesTooltip} />
-                    <Legend />
-                    <Bar
-                      dataKey="sessions"
-                      fill={BAR_COLORS.sessions.base}
-                      name={t('tooltip.sessions')}
-                      radius={6}
-                      activeBar={
-                        <Rectangle
-                          fill={BAR_COLORS.sessions.active}
-                          stroke={BAR_COLORS.sessions.base}
-                          strokeWidth={2}
-                          radius={8}
-                        />
-                      }
-                    />
-                    <Bar
-                      dataKey="minutes"
-                      fill={BAR_COLORS.minutes.base}
-                      name={t('tooltip.minutes')}
-                      radius={6}
-                      activeBar={
-                        <Rectangle
-                          fill={BAR_COLORS.minutes.active}
-                          stroke={BAR_COLORS.minutes.base}
-                          strokeWidth={2}
-                          radius={8}
-                        />
-                      }
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {canRenderCharts ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topResources}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="resourceName" />
+                      <YAxis />
+                      <Tooltip content={renderTopResourcesTooltip} />
+                      <Legend />
+                      <Bar
+                        dataKey="sessions"
+                        fill={BAR_COLORS.sessions.base}
+                        name={t('tooltip.sessions')}
+                        radius={6}
+                        activeBar={
+                          <Rectangle
+                            fill={BAR_COLORS.sessions.active}
+                            stroke={BAR_COLORS.sessions.base}
+                            strokeWidth={2}
+                            radius={8}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="minutes"
+                        fill={BAR_COLORS.minutes.base}
+                        name={t('tooltip.minutes')}
+                        radius={6}
+                        activeBar={
+                          <Rectangle
+                            fill={BAR_COLORS.minutes.active}
+                            stroke={BAR_COLORS.minutes.base}
+                            strokeWidth={2}
+                            radius={8}
+                          />
+                        }
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Skeleton className="h-full w-full" />
+                )}
               </div>
-              <Table removeWrapper aria-label="Top resources table">
+              <Table removeWrapper aria-label={t('charts.topResources.table.ariaLabel')}>
                 <TableHeader>
                   <TableColumn>{t('charts.topResources.columns.resource')}</TableColumn>
                   <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>

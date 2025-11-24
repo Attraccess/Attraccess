@@ -294,6 +294,13 @@ function FlowsPageInner() {
     }));
   }, [edges, flowIsRunning]);
 
+  const edgeTypes = useMemo(
+    () => ({
+      'attraccess-edge': EdgeWithDeleteButton,
+    }),
+    [],
+  );
+
   return (
     <div className="h-full w-full flex flex-col">
       <PageHeader
@@ -313,9 +320,7 @@ function FlowsPageInner() {
           fitView
           defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
           nodeTypes={flowNodeTypes}
-          edgeTypes={{
-            'attraccess-edge': EdgeWithDeleteButton,
-          }}
+          edgeTypes={edgeTypes}
         >
           <Controls />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />

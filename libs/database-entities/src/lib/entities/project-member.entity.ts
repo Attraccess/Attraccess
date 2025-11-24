@@ -33,7 +33,11 @@ export class ProjectMember {
   user!: User;
 
   @Column({ type: 'text', enum: ProjectMemberRole, default: ProjectMemberRole.VIEWER })
-  @ApiProperty({ description: 'Role of the member within the project', enum: ProjectMemberRole })
+  @ApiProperty({
+    description: 'Role of the member within the project',
+    enum: ProjectMemberRole,
+    enumName: 'ProjectMemberRole',
+  })
   role!: ProjectMemberRole;
 
   @CreateDateColumn()

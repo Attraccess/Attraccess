@@ -12,6 +12,14 @@
     },
     "members": {
       "label": "Mitglieder"
+    },
+    "inviteMember": {
+      "label": "Mitglied einladen"
     }
+  },
+  "teamCard": {
+    "title": "Team & Einladungen verwalten",
+    "description": "Öffne den Arbeitsbereich, um Mitglieder einzuladen, ausstehende Einladungen zu prüfen und Rollen anzupassen.",
+    "cta": "Teamseite öffnen"
   }
 }

@@ -2,6 +2,7 @@
   "title": "Benutzerverwaltung",
   "subtitle": "Verwalten Sie Benutzerberechtigungen und Zugriffskontrolle",
   "table": {
+    "ariaLabel": "Benutzerverwaltung",
     "inputs": {
       "search": "Suche"
     },

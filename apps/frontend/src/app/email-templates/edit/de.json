@@ -2,7 +2,12 @@
   "subtitle": "Ändern Sie Betreff und Inhalt (MJML) der Vorlage.",
   "templateType": {
     "verify-email": "E-Mail Verifizierung",
-    "reset-password": "Passwort Zurücksetzen"
+    "reset-password": "Passwort Zurücksetzen",
+    "username-changed": "Benutzername geändert",
+    "password-changed": "Passwort geändert",
+    "resource-usage-billing-transaction-summary": "Ressourcennutzung Kostenübersicht",
+    "user-invitation": "Benutzereinladung",
+    "project-invitation": "Projekteinladung"
   },
   "form": {
     "subject": "Betreff",
@@ -15,7 +20,8 @@
   "preview": {
     "iframeTitle": "Körper-Vorschau",
     "loading": "Laden...",
-    "errorPrefix": "Fehler beim Laden der Vorschau."
+    "errorPrefix": "Fehler beim Laden der Vorschau.",
+    "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen."
   },
   "actions": {
     "close": "Schließen",

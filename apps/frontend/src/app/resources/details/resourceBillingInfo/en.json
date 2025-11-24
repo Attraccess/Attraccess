@@ -1,5 +1,8 @@
 {
   "title": "Billing",
+  "table": {
+    "ariaLabel": "Billing"
+  },
   "billingValue": "{{credits}} {{currency}}",
   "perUnit": "per unit",
   "balance": {

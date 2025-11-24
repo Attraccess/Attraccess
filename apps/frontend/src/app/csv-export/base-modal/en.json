@@ -1,4 +1,7 @@
 {
+  "table": {
+    "ariaLabel": "CSV Export"
+  },
   "inputs": {
     "columns": {
       "label": "Columns"

@@ -30,6 +30,7 @@ class Payload {
     example: SumupTransactionStatus.Successful,
     enum: SumupTransactionStatus,
     type: String,
+    enumName: 'SumupTransactionStatus',
   })
   @IsEnum(SumupTransactionStatus)
   status: SumupTransactionStatus;
@@ -55,6 +56,7 @@ export class SumupTransactionCallbackDto {
     example: SumupTransactionEventType.SoloTransactionUpdated,
     enum: SumupTransactionEventType,
     type: String,
+    enumName: 'SumupTransactionEventType',
   })
   @IsEnum(SumupTransactionEventType)
   event_type: SumupTransactionEventType;

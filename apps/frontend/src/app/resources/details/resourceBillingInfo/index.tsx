@@ -151,7 +151,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
       </CardHeader>
 
       <CardBody>
-        <Table hideHeader removeWrapper>
+        <Table hideHeader removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn> </TableColumn>
             <TableColumn align="end"> </TableColumn>

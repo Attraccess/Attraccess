@@ -4,6 +4,7 @@
     "closeButton": "Close"
   },
   "table": {
+    "ariaLabel": "History",
     "columns": {
       "date": "Date",
       "action": "Action",

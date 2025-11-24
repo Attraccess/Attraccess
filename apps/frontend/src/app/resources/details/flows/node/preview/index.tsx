@@ -1,5 +1,5 @@
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 
@@ -20,7 +20,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
 
   return useMemo(() => {
     switch (schema.type) {
-      case 'input.button':
+      case ResourceFlowNodeType.INPUT_BUTTON:
         return [
           {
             label: t('nodes.input.button.preview.label'),
@@ -28,15 +28,15 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'input.resource.usage.started':
-      case 'input.resource.usage.stopped':
-      case 'input.resource.usage.takeover':
-      case 'input.resource.door.unlocked':
-      case 'input.resource.door.locked':
-      case 'input.resource.door.unlatched':
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         return [];
 
-      case 'input.mqtt.message.received':
+      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
         return [
           {
             label: t('nodes.input.mqtt.message.received.preview.topic'),
@@ -44,7 +44,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'processing.wait':
+      case ResourceFlowNodeType.PROCESSING_WAIT:
         return [
           {
             label: t('nodes.processing.wait.preview.duration'),
@@ -52,7 +52,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'processing.mqtt.waitForMessage':
+      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
         return [
           {
             label: t('nodes.processing.mqtt.waitForMessage.preview.topic'),
@@ -64,7 +64,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'processing.error':
+      case ResourceFlowNodeType.PROCESSING_ERROR:
         return [
           {
             label: t('nodes.processing.error.preview.message'),
@@ -72,7 +72,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'processing.if':
+      case ResourceFlowNodeType.PROCESSING_IF:
         return [
           {
             label: t('nodes.processing.if.preview.summary'),
@@ -80,7 +80,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'processing.set-payload': {
+      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD: {
         const entries = (nodeData?.data.entries as Array<{ key: string; value: string }>) ?? [];
         const preview = entries
           .slice(0, 3)
@@ -94,7 +94,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
       }
 
-      case 'output.resource.billing.calculation.set-additional-items':
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS:
         return [
           {
             label: t('nodes.output.resource.billing.calculation.set-additional-items.preview.position'),
@@ -102,7 +102,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'output.http.sendRequest':
+      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
         return [
           {
             label: t('nodes.output.http.sendRequest.preview.method'),
@@ -114,7 +114,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'output.mqtt.sendMessage':
+      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
         return [
           {
             label: t('nodes.output.mqtt.sendMessage.preview.topic'),
@@ -122,7 +122,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case 'output.resource.usage.end-session':
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
         return [
           {
             label: t('nodes.output.resource.usage.end-session.preview.notes'),

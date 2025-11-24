@@ -2,6 +2,7 @@
   "title": "User Management",
   "subtitle": "Manage user permissions and access control",
   "table": {
+    "ariaLabel": "User Management",
     "inputs": {
       "search": "Search"
     },

@@ -13,6 +13,7 @@ export class CreateProjectInvitationDto {
     enum: ProjectMemberRole,
     default: ProjectMemberRole.VIEWER,
     required: false,
+    enumName: 'ProjectMemberRole',
   })
   @IsEnum(ProjectMemberRole)
   @IsOptional()

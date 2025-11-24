@@ -44,6 +44,7 @@ export class Resource {
     description: 'The type of the resource',
     example: ResourceType.Machine,
     enum: ResourceType,
+    enumName: 'ResourceType',
   })
   type!: ResourceType;
 
@@ -77,6 +78,7 @@ export class Resource {
     enum: DocumentationType,
     required: false,
     example: DocumentationType.MARKDOWN,
+    enumName: 'DocumentationType',
   })
   documentationType!: DocumentationType | null;
 

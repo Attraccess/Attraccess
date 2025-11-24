@@ -1,4 +1,4 @@
-import { HTMLAttributes, useEffect, useMemo, useState } from 'react';
+import { HTMLAttributes, useCallback, useEffect, useMemo, useState } from 'react';
 import { Autocomplete, AutocompleteItem, AutocompleteProps } from '@heroui/react';
 import { useTranslations } from '../../i18n';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
@@ -28,6 +28,10 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const handleClearSelection = useCallback(() => {
+    setSelectedKey(null);
+    setSearchTerm('');
+  }, []);
   const selectedUserId = useMemo(() => (selectedKey ? Number(selectedKey) : null), [selectedKey]);
 
   const searchUsers = useUsersServiceFindMany({ search: searchTerm, limit: 10, page: 1 });
@@ -81,14 +85,11 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
           onSelectionChange={(key) => setSelectedKey(key as string | null)}
           isClearable
           inputProps={{ autoComplete: 'off', type: 'search' }}
-          onClear={() => {
-            setSelectedKey(null);
-            setSearchTerm('');
-          }}
+          clearButtonProps={{ onPress: handleClearSelection }}
           size={autocompleteProps?.size}
         >
           {(item) => (
-            <AutocompleteItem key={(item as User).id}>
+            <AutocompleteItem key={(item as User).id} textValue={(item as User).username}>
               <AttraccessUser user={item as User} />
             </AutocompleteItem>
           )}

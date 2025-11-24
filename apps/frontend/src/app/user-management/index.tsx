@@ -91,7 +91,7 @@ export const UserManagementPage: React.FC = () => {
             onClear={() => setSearch('')}
           />
 
-          <Table removeWrapper>
+          <Table removeWrapper aria-label={t('table.ariaLabel')}>
             <TableHeader>
               <TableColumn width="1" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}

@@ -32,6 +32,7 @@ export class ResourceIntroductionHistoryItem {
     description: 'The action performed (revoke or grant)',
     enum: IntroductionHistoryAction,
     example: IntroductionHistoryAction.REVOKE,
+    enumName: 'IntroductionHistoryAction',
   })
   action!: IntroductionHistoryAction;
 

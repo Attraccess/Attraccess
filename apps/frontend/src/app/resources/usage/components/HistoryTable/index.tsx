@@ -7,6 +7,8 @@ import {
   useResourcesServiceResourceUsageGetHistory,
   ResourceUsage,
   useResourcesServiceGetOneResourceById,
+  ResourceType,
+  ResourceUsageAction,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
@@ -82,13 +84,13 @@ export const HistoryTable = ({
       }
 
       switch (resource.type) {
-        case 'machine':
-          return session.usageAction === 'usage';
-        case 'door':
+        case ResourceType.MACHINE:
+          return session.usageAction === ResourceUsageAction.USAGE;
+        case ResourceType.DOOR:
           return (
-            session.usageAction === 'door.lock' ||
-            session.usageAction === 'door.unlock' ||
-            session.usageAction === 'door.unlatch'
+            session.usageAction === ResourceUsageAction.DOOR_LOCK ||
+            session.usageAction === ResourceUsageAction.DOOR_UNLOCK ||
+            session.usageAction === ResourceUsageAction.DOOR_UNLATCH
           );
         default: {
           const exhaustiveCheck: never = resource?.type;
@@ -104,7 +106,7 @@ export const HistoryTable = ({
 
   return (
     <Table
-      aria-label="Resource usage history"
+      aria-label={t('table.ariaLabel')}
       shadow="none"
       data-cy="resource-usage-history-table"
       bottomContent={isFetchedUsageHistory && <Pagination total={totalPages} page={page} onChange={handlePageChange} />}

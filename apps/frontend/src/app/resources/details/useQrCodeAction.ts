@@ -130,7 +130,7 @@ export function useQrCodeAction(props: Props) {
   }, [endResourceMutate, resourceId]);
 
   useEffect(() => {
-    const action = urlSearchParams.get('action');
+    const action = urlSearchParams.get('action') as QrCodeAction | undefined;
 
     if (!action || actionExecutedRef.current === action) {
       return;

@@ -1,6 +1,9 @@
 {
   "title": "Gruppen",
   "subtitle": "Gruppen verwalten",
+  "table": {
+    "ariaLabel": "Gruppen"
+  },
   "columns": {
     "group": "Gruppe",
     "actions": "Aktionen"

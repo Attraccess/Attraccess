@@ -17,6 +17,7 @@ export class CreateResourceDto {
     description: 'The type of the resource',
     example: ResourceType.Machine,
     enum: ResourceType,
+    enumName: 'ResourceType',
   })
   @IsEnum(ResourceType)
   type: ResourceType;
@@ -54,6 +55,7 @@ export class CreateResourceDto {
     enum: DocumentationType,
     required: false,
     example: DocumentationType.MARKDOWN,
+    enumName: 'DocumentationType',
   })
   @IsEnum(DocumentationType)
   @IsOptional()

@@ -210,6 +210,8 @@ export class ResourceFlowNode {
   @ApiProperty({
     description: 'The type of the node',
     example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    enum: ResourceFlowNodeType,
+    enumName: 'ResourceFlowNodeType',
   })
   type!: ResourceFlowNodeType;
 

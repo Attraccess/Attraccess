@@ -112,7 +112,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
               color="primary"
               isLoading={addToSelectionIsLoading}
               isIconOnly
-              endContent={<PlusIcon className="w-4 h-4" />}
+              startContent={<PlusIcon className="w-4 h-4" />}
             />
           )
         }
@@ -120,9 +120,17 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
 
       <Table
         {...tableProps}
+        aria-label={t('table.ariaLabel')}
         bottomContent={
           selectedUsers && (
-            <Pagination isCompact showControls page={page} total={totalPages} onChange={(page) => setPage(page)} />
+            <Pagination
+              aria-label={t('table.pagination.label')}
+              isCompact
+              showControls
+              page={page}
+              total={totalPages}
+              onChange={(page) => setPage(page)}
+            />
           )
         }
       >

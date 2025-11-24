@@ -33,7 +33,7 @@ import de from './de.json';
 import en from './en.json';
 import { AttractapDeleteModal } from './delete';
 
-export const AttractapList = () => {
+export function AttractapList() {
   const { t } = useTranslations({
     de,
     en,
@@ -146,7 +146,7 @@ export const AttractapList = () => {
 
       <div className="flex flex-col gap-4">
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
-          <Card>
+          <Card key={tableIndex}>
             <CardHeader>
               <PageHeader
                 noMargin
@@ -211,4 +211,4 @@ export const AttractapList = () => {
       </div>
     </>
   );
-};
+}

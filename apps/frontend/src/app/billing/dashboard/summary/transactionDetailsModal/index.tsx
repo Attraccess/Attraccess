@@ -20,6 +20,7 @@ import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui
 import { PageHeader } from '../../../../../components/pageHeader';
 import {
   BillingTransaction,
+  BillingTransactionStatus,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
@@ -61,11 +62,11 @@ export function TransactionDetailsModal(props: Props) {
 
   const statusColor = (status: BillingTransaction['status']) => {
     switch (status) {
-      case 'pending':
+      case BillingTransactionStatus.PENDING:
         return 'warning';
-      case 'completed':
+      case BillingTransactionStatus.COMPLETED:
         return 'success';
-      case 'failed':
+      case BillingTransactionStatus.FAILED:
         return 'danger';
       default:
         return 'default';

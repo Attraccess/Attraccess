@@ -1,4 +1,10 @@
 {
+  "table": {
+    "ariaLabel": "Ausgewählte Benutzer",
+    "pagination": {
+      "label": "Seite"
+    }
+  },
   "selectedUsers": {
     "columns": {
       "user": "Benutzer",

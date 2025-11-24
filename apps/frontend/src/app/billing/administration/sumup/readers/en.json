@@ -5,6 +5,7 @@
     "pairReader": "Pair Reader"
   },
   "table": {
+    "ariaLabel": "Card Readers",
     "columns": {
       "name": "Name",
       "device": "Device",

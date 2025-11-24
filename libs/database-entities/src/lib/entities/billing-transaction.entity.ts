@@ -93,7 +93,11 @@ export class BillingTransaction {
   externalReference!: string | null;
 
   @Column({ type: 'simple-enum', enum: BillingTransactionStatus })
-  @ApiProperty({ description: 'The status of the billing transaction', enum: BillingTransactionStatus })
+  @ApiProperty({
+    description: 'The status of the billing transaction',
+    enum: BillingTransactionStatus,
+    enumName: 'BillingTransactionStatus',
+  })
   status!: BillingTransactionStatus;
 
   @OneToMany(() => BillingTransactionItems, (customItem) => customItem.billingTransaction, {

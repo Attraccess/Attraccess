@@ -14,6 +14,7 @@ import {
   useResourcesServiceUnlatchDoor,
   useResourcesServiceLockDoor,
   ApiError,
+  ResourceType,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -76,14 +77,14 @@ export function StartSessionControls(
     }
 
     switch (resource.type) {
-      case 'machine':
+      case ResourceType.MACHINE:
         toast.success({
           title: t('machine.sessionStarted'),
           description: t('machine.sessionStartedDescription'),
         });
         break;
 
-      case 'door':
+      case ResourceType.DOOR:
         toast.success({
           title: t('door.success.title'),
           description: t('door.success.description'),

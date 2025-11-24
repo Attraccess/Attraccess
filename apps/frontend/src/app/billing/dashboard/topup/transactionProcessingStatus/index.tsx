@@ -6,7 +6,11 @@ import en from './en.json';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveTransactionUpdates } from '../../summary/live-updates';
-import { BillingTransaction, useBillingServiceGetBillingTransactions } from '@attraccess/react-query-client';
+import {
+  BillingTransaction,
+  BillingTransactionStatus,
+  useBillingServiceGetBillingTransactions,
+} from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 
 interface Props {
@@ -18,7 +22,7 @@ export function TransactionProcessingCard(props: Props) {
   const { transactionId, onProcessingComplete } = props;
   const { t } = useTranslations({ en, de });
 
-  const [status, setStatus] = useState<BillingTransaction['status']>('pending');
+  const [status, setStatus] = useState<BillingTransactionStatus>(BillingTransactionStatus.PENDING);
   const COUNTER_MAX_VALUE = 60;
   const [counter, setCounter] = useState<number>(COUNTER_MAX_VALUE);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -43,7 +47,7 @@ export function TransactionProcessingCard(props: Props) {
       setLastUpdated(new Date());
       setStatus(transaction.status);
 
-      if (transaction.status !== 'pending') {
+      if (transaction.status !== BillingTransactionStatus.PENDING) {
         setTimeout(() => {
           onProcessingComplete?.();
         }, 1000);
@@ -84,7 +88,7 @@ export function TransactionProcessingCard(props: Props) {
         <PageHeader title={t('title')} subtitle={t('description')} noMargin />
       </CardHeader>
       <CardBody className="flex items-center justify-center">
-        {status === 'pending' && (
+        {status === BillingTransactionStatus.PENDING && (
           <CircularProgress
             size="lg"
             isIndeterminate={false}
@@ -102,8 +106,10 @@ export function TransactionProcessingCard(props: Props) {
             strokeWidth={4}
           />
         )}
-        {status === 'completed' && <CheckCircle2Icon size={128} className="text-success animate-pulse" />}
-        {status === 'failed' && <XCircleIcon size={128} className="text-danger animate-pulse" />}
+        {status === BillingTransactionStatus.COMPLETED && (
+          <CheckCircle2Icon size={128} className="text-success animate-pulse" />
+        )}
+        {status === BillingTransactionStatus.FAILED && <XCircleIcon size={128} className="text-danger animate-pulse" />}
       </CardBody>
     </Card>
   );

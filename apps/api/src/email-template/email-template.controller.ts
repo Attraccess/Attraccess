@@ -11,7 +11,10 @@ import { PreviewMjmlDto, PreviewMjmlResponseDto } from './dto/preview-mjml.dto';
 @ApiBearerAuth()
 @Controller('email-templates')
 export class EmailTemplateController {
-  constructor(private readonly emailTemplateService: EmailTemplateService, private readonly mjmlService: MjmlService) {}
+  constructor(
+    private readonly emailTemplateService: EmailTemplateService,
+    private readonly mjmlService: MjmlService,
+  ) {}
 
   @Post('preview-mjml')
   @Auth('canManageSystemConfiguration' as SystemPermission)
@@ -34,7 +37,7 @@ export class EmailTemplateController {
   @Get(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Get an email template by type' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, description: 'Template type/type' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
   @ApiResponse({ status: 200, description: 'Email template found', type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
   findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
@@ -44,13 +47,13 @@ export class EmailTemplateController {
   @Patch(':type')
   @Auth('canManageSystemConfiguration' as SystemPermission)
   @ApiOperation({ summary: 'Update an email template' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, description: 'Template type/type' })
+  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type/type' })
   @ApiResponse({ status: 200, description: 'Template updated successfully', type: EmailTemplate })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   update(
     @Param('type') type: EmailTemplateType,
-    @Body() updateEmailTemplateDto: UpdateEmailTemplateDto
+    @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
   ): Promise<EmailTemplate> {
     return this.emailTemplateService.update(type, updateEmailTemplateDto);
   }

@@ -9,6 +9,7 @@ export class SumUpReaderDevice implements SumUp.Readers.ReaderDevice {
     type: String,
     example: 'solo',
     enum: ['solo', 'virtual-solo'] as SumUp.Readers.ReaderDevice['model'][],
+    enumName: 'SumUpReaderModel',
   })
   model: 'solo' | 'virtual-solo';
 }
@@ -24,6 +25,7 @@ export class SumUpReaderDto implements SumUp.Readers.Reader {
     type: 'string',
     example: 'active',
     enum: ['unknown', 'processing', 'paired', 'expired'] as SumUp.Readers.ReaderStatus[],
+    enumName: 'SumUpReaderStatus',
   })
   status: SumUp.Readers.ReaderStatus;
 

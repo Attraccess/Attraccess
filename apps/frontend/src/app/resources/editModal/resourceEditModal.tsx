@@ -22,6 +22,7 @@ import {
   useResourcesServiceGetOneResourceById,
   UseResourcesServiceGetOneResourceByIdKeyFn,
   useResourcesServiceCreateOneResource,
+  ResourceType,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -53,7 +54,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     name: '',
     description: '',
     allowTakeOver: false,
-    type: 'machine',
+    type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
   });
 
@@ -141,7 +142,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       name: resource?.name || '',
       description: resource?.description || '',
       allowTakeOver: resource?.allowTakeOver || false,
-      type: resource?.type || 'machine',
+      type: resource?.type || ResourceType.MACHINE,
       separateUnlockAndUnlatch: resource?.separateUnlockAndUnlatch || false,
     });
     setSelectedImage(null);
@@ -187,7 +188,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         description: formData.description as string,
         allowTakeOver: formData.allowTakeOver,
         image: selectedImage ?? undefined,
-        type: formData.type as 'machine' | 'door',
+        type: formData.type as ResourceType,
         separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
       },
     });

@@ -163,6 +163,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
 
           {(options ?? []).map((option) => (
             <Checkbox
+              key={option.key}
               isSelected={option.value}
               onValueChange={(nextValue) => setOption?.(option.key, nextValue)}
               data-cy="resource-usage-export-grouping-checkbox"
@@ -172,7 +173,14 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           ))}
         </div>
 
-        <Table isCompact isVirtualized maxTableHeight={500} rowHeight={40} data-cy="resource-usage-export-table">
+        <Table
+          isCompact
+          isVirtualized
+          maxTableHeight={500}
+          rowHeight={40}
+          data-cy="resource-usage-export-table"
+          aria-label={t('table.ariaLabel')}
+        >
           <TableHeader columns={selectedColumns}>
             {(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}
           </TableHeader>

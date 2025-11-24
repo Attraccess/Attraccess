@@ -4,6 +4,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
+  EmailTemplateType,
 } from '@attraccess/react-query-client';
 import {
   Button,
@@ -33,11 +34,11 @@ export function EditEmailTemplatePage() {
   const navigate = useNavigate();
   const { t } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
 
-  const { type: templateType } = useParams<{ type: string }>();
+  const { type: templateType } = useParams<{ type: EmailTemplateType }>();
 
   const { theme } = useTheme();
 
-  const template = useFindOneEmailTemplate({ type: templateType as 'verify-email' }, undefined, {
+  const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
     enabled: !!templateType,
   });
 
@@ -61,16 +62,25 @@ export function EditEmailTemplatePage() {
   } = useEmailTemplatesServiceEmailTemplateControllerPreviewMjml();
 
   const debouncedBody = useDebounce(body, 500);
+  const bodyIsEmpty = !debouncedBody.trim();
 
   useEffect(() => {
+    if (bodyIsEmpty) {
+      return;
+    }
+
     parseMjml({
       requestBody: {
         mjmlContent: debouncedBody,
       },
     });
-  }, [debouncedBody, parseMjml]);
+  }, [bodyIsEmpty, debouncedBody, parseMjml]);
 
   const previewHtml = useMemo(() => {
+    if (bodyIsEmpty) {
+      return `<p style="text-align:center; color: #64748b; padding-top: 20px;">${t('preview.emptyPlaceholder')}</p>`;
+    }
+
     if (parseMjmlIsPending) {
       return `<p style="text-align:center; color: #00f; padding-top: 20px;">${t('preview.loading')}</p>`;
     }
@@ -86,7 +96,7 @@ export function EditEmailTemplatePage() {
     }
 
     return parsedBody?.html;
-  }, [parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
+  }, [bodyIsEmpty, parsedBody, t, parseMjmlIsPending, parseMjmlisError, parseMjmlError]);
 
   const [editorIsExpanded, setEditorIsExpanded] = useState(false);
 
@@ -111,12 +121,16 @@ export function EditEmailTemplatePage() {
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
 
+      if (!templateType) {
+        return;
+      }
+
       updateTemplate.mutate({
         requestBody: {
           subject,
           body,
         },
-        type: templateType as 'verify-email' | 'reset-password',
+        type: templateType,
       });
     },
     [updateTemplate, subject, body, templateType],

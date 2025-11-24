@@ -2,7 +2,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {
-  currency as BillingCurrency,
+  Currency,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingConfigurationKey,
   useBillingServiceSetBillingConfiguration,
@@ -53,14 +53,12 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
     },
   });
 
-  const [currency, setCurrency] = useState<BillingCurrency>(
-    (configuration?.currency as BillingCurrency) || BillingCurrency.EUR,
-  );
+  const [currency, setCurrency] = useState<Currency>((configuration?.currency as Currency) || Currency.EUR);
 
   const configFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    setCurrency((configuration?.currency as BillingCurrency) || BillingCurrency.EUR);
+    setCurrency(configuration?.currency || Currency.EUR);
   }, [configuration]);
 
   const onSubmitConfiguration = useCallback(() => {
@@ -90,10 +88,13 @@ export function CurrencyCard(props: Omit<CardProps, 'children'>) {
           className="flex flex-col gap-4"
         >
           <Select
-            items={Object.values(BillingCurrency).map((currency) => ({ key: currency, label: currency }))}
+            items={Object.values(Currency).map((currency) => ({
+              key: currency,
+              label: currency,
+            }))}
             label={t('inputs.currency.label')}
             selectedKey={currency}
-            onSelectionChange={(key) => setCurrency(key as BillingCurrency)}
+            onSelectionChange={(key) => setCurrency(key as Currency)}
           />
 
           <input type="submit" hidden />

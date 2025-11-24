@@ -55,11 +55,19 @@ export class ProjectInvitation {
   invitedUser!: User;
 
   @Column({ type: 'text', enum: ProjectInvitationStatus, default: ProjectInvitationStatus.PENDING })
-  @ApiProperty({ description: 'Current status of the invitation', enum: ProjectInvitationStatus })
+  @ApiProperty({
+    description: 'Current status of the invitation',
+    enum: ProjectInvitationStatus,
+    enumName: 'ProjectInvitationStatus',
+  })
   status!: ProjectInvitationStatus;
 
   @Column({ type: 'text', enum: ProjectMemberRole, default: ProjectMemberRole.VIEWER })
-  @ApiProperty({ description: 'Role that should be granted upon acceptance', enum: ProjectMemberRole })
+  @ApiProperty({
+    description: 'Role that should be granted upon acceptance',
+    enum: ProjectMemberRole,
+    enumName: 'ProjectMemberRole',
+  })
   requestedRole!: ProjectMemberRole;
 
   @Column({ type: 'datetime', nullable: true })

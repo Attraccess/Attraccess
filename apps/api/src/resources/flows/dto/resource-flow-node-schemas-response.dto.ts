@@ -6,6 +6,7 @@ export class ResourceFlowNodeSchemaDto {
     description: 'The name of the node type',
     type: 'string',
     enum: ResourceFlowNodeType,
+    enumName: 'ResourceFlowNodeType',
   })
   type: ResourceFlowNodeType;
 

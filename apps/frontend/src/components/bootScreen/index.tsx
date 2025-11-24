@@ -12,7 +12,7 @@ export function BootScreen() {
   return (
     <UnauthorizedLayout>
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
-      <Progress isIndeterminate />
+      <Progress isIndeterminate aria-label={t('progress.ariaLabel')} />
     </UnauthorizedLayout>
   );
 }

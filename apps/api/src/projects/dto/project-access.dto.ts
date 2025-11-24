@@ -10,6 +10,7 @@ export class ProjectAccessInfoDto {
     enum: ProjectMemberRole,
     nullable: true,
     required: false,
+    enumName: 'ProjectMemberRole',
   })
   role!: ProjectMemberRole | null;
 

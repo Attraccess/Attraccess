@@ -1,26 +1,15 @@
-import PWAInstallFromLib from '@khmyznikov/pwa-install/react-legacy';
-import de from './de.json';
-import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { lazy, Suspense } from 'react';
 
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    promptEvent: any;
-  }
-}
+const LazyPWAInstall = import.meta.env.DEV ? null : lazy(() => import('./PWAInstall.production'));
 
 export function PWAInstall() {
-  const { t } = useTranslations({
-    en,
-    de,
-  });
+  if (!LazyPWAInstall) {
+    return null;
+  }
 
   return (
-    <PWAInstallFromLib
-      name="Attraccess"
-      description={t('description')}
-      icon={'/icon-512-maskable.png'}
-    ></PWAInstallFromLib>
+    <Suspense fallback={null}>
+      <LazyPWAInstall />
+    </Suspense>
   );
 }

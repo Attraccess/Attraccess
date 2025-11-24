@@ -43,6 +43,7 @@ export class ResourceFlowLog {
     description: 'The type of the log entry',
     enum: ResourceFlowLogType,
     example: ResourceFlowLogType.NODE_PROCESSING_STARTED,
+    enumName: 'ResourceFlowLogType',
   })
   type!: ResourceFlowLogType;
 
