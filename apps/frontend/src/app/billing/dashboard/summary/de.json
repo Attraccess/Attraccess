@@ -3,6 +3,7 @@
   "balance": "{{balance}} {{currency}}",
   "transactions": {
     "table": {
+      "ariaLabel": "Transaktionen",
       "columns": {
         "id": "ID",
         "dateTime": "Datum",

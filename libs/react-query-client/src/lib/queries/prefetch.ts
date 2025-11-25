@@ -1,7 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const prefetchUseUsersServiceGetLocalSignupDomainWhitelist = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
@@ -22,7 +23,7 @@ export const prefetchUseUsersServiceGetPermissions = (queryClient: QueryClient, 
 export const prefetchUseUsersServiceGetAllWithPermission = (queryClient: QueryClient, { limit, page, permission }: {
   limit?: number;
   page?: number;
-  permission?: "canManageResources" | "canManageSystemConfiguration" | "canManageUsers";
+  permission?: PermissionFilter;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) });
 export const prefetchUseAuthenticationServiceRefreshSession = (queryClient: QueryClient, { tokenLocation }: {
   tokenLocation: string;
@@ -53,7 +54,7 @@ export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: Q
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
-  type: "verify-email" | "user-invitation" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
+  type: EmailTemplateType;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const prefetchUseResourcesServiceGetAllResources = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
@@ -190,6 +191,13 @@ export const prefetchUseProjectsServiceGetProjectUsageStats = (queryClient: Quer
   id: number;
   startDate?: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
+export const prefetchUseProjectsServiceListProjectMembers = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceListProjectMembersKeyFn({ id }), queryFn: () => ProjectsService.listProjectMembers({ id }) });
+export const prefetchUseProjectsServiceListProjectInvitations = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceListProjectInvitationsKeyFn({ id }), queryFn: () => ProjectsService.listProjectInvitations({ id }) });
+export const prefetchUseProjectInvitationsServiceListMyProjectInvitations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(), queryFn: () => ProjectInvitationsService.listMyProjectInvitations() });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

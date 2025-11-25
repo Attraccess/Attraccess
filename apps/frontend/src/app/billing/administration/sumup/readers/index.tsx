@@ -59,7 +59,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
       </CardHeader>
 
       <CardBody>
-        <Table removeWrapper>
+        <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
             <TableColumn>{t('table.columns.device')}</TableColumn>

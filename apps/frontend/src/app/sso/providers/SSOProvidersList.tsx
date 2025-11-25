@@ -296,7 +296,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   return (
     <>
       {providers && providers.length > 0 ? (
-        <Table aria-label="SSO Providers List" data-cy="sso-providers-table">
+        <Table aria-label={t('table.ariaLabel')} data-cy="sso-providers-table">
           <TableHeader>
             <TableColumn>{t('name')}</TableColumn>
             <TableColumn>{t('type')}</TableColumn>

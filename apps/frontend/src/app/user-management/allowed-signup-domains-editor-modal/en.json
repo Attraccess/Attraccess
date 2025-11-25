@@ -8,6 +8,7 @@
     }
   },
   "table": {
+    "ariaLabel": "Allowed Signup Domains",
     "columns": {
       "domain": "Domain",
       "actions": "Actions"

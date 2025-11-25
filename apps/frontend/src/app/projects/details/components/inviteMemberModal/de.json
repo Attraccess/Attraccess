@@ -1,0 +1,19 @@
+{
+  "title": "Mitglied einladen",
+  "description": "Suche nach einem bestehenden Benutzer, um dieses Projekt zu teilen.",
+  "inputs": {
+    "user": "Benutzer",
+    "role": "Rolle"
+  },
+  "roles": {
+    "viewer": "Betrachter"
+  },
+  "actions": {
+    "invite": "Einladung senden",
+    "cancel": "Abbrechen"
+  },
+  "success": {
+    "title": "Einladung gesendet",
+    "description": "{{username}} erhält eine E-Mail."
+  }
+}

@@ -22,7 +22,7 @@ import {
   useResourcesServiceGetOneResourceById,
   useResourcesServiceUpdateOneResource,
   UseResourcesServiceGetOneResourceByIdKeyFn,
-  documentationType as DocumentationType, // alias for local usage
+  DocumentationType,
 } from '@attraccess/react-query-client';
 import ReactMarkdown from 'react-markdown';
 import en from './documentationEditor.en.json';

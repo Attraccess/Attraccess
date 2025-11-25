@@ -107,7 +107,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       return t('ungrouped');
     }
 
-    return group?.name ?? '';
+    const trimmed = group?.name?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : '';
   }, [groupId, group, t]);
 
   const subtitle = useMemo(() => {
@@ -115,8 +116,12 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
       return t('ungroupedDescription');
     }
 
-    return group?.description ?? '';
+    const trimmed = group?.description?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : '';
   }, [groupId, group, t]);
+
+  const accessibleTitle = title?.trim() ? title : t('accessibility.unknownGroup');
+  const tableAriaLabel = t('accessibility.tableLabel', { group: accessibleTitle });
 
   const groupIsFetched = useMemo(() => {
     return groupId === 'none' || fetchStatusGroup === 'success';
@@ -127,7 +132,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   }
 
   return (
-    <Card aria-label={title ?? 'Resource Group Card'} {...cardProps}>
+    <Card aria-label={accessibleTitle} {...cardProps}>
       <CardHeader className="flex flex-row justify-between">
         {groupIsFetched ? (
           <PageHeader title={title} subtitle={subtitle} noMargin />
@@ -136,7 +141,12 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
         )}
 
         {groupId !== 'none' && hasAccessToGroupSettings && (
-          <Button onPress={() => navigate(`/resource-groups/${groupId}`)} isIconOnly startContent={<Settings2Icon />} />
+          <Button
+            onPress={() => navigate(`/resource-groups/${groupId}`)}
+            isIconOnly
+            startContent={<Settings2Icon />}
+            aria-label={t('actions.openGroupSettings')}
+          />
         )}
       </CardHeader>
 
@@ -144,7 +154,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
         <Table
           shadow="none"
           removeWrapper
-          aria-label={title ?? 'Resource Group Table'}
+          aria-label={tableAriaLabel}
           onRowAction={(key) => navigate(`/resources/${key}`)}
         >
           <TableHeader>

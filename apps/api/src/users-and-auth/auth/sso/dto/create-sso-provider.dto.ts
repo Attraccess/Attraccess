@@ -96,6 +96,7 @@ export class CreateSSOProviderDto {
     description: 'The type of SSO provider',
     enum: SSOProviderType,
     example: SSOProviderType.OIDC,
+    enumName: 'SSOProviderType',
   })
   @IsString()
   @IsNotEmpty()

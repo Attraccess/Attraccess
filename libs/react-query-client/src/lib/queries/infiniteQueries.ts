@@ -2,6 +2,7 @@
 
 import { InfiniteData, UseInfiniteQueryOptions, useInfiniteQuery } from "@tanstack/react-query";
 import { BillingService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, UsersService } from "../requests/services.gen";
+import { PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const useUsersServiceFindManyInfinite = <TData = InfiniteData<Common.UsersServiceFindManyDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, search }: {
   ids?: number[];
@@ -14,7 +15,7 @@ export const useUsersServiceFindManyInfinite = <TData = InfiniteData<Common.User
 });
 export const useUsersServiceGetAllWithPermissionInfinite = <TData = InfiniteData<Common.UsersServiceGetAllWithPermissionDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, permission }: {
   limit?: number;
-  permission?: "canManageResources" | "canManageSystemConfiguration" | "canManageUsers";
+  permission?: PermissionFilter;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
   queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, permission }, queryKey), queryFn: ({ pageParam }) => UsersService.getAllWithPermission({ limit, page: pageParam as number, permission }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
     nextPage: string;

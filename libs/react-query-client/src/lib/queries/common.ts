@@ -1,7 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
@@ -45,7 +46,7 @@ export const useUsersServiceGetAllWithPermissionKey = "UsersServiceGetAllWithPer
 export const UseUsersServiceGetAllWithPermissionKeyFn = ({ limit, page, permission }: {
   limit?: number;
   page?: number;
-  permission?: "canManageResources" | "canManageSystemConfiguration" | "canManageUsers";
+  permission?: PermissionFilter;
 } = {}, queryKey?: Array<unknown>) => [useUsersServiceGetAllWithPermissionKey, ...(queryKey ?? [{ limit, page, permission }])];
 export type AuthenticationServiceRefreshSessionDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.refreshSession>>;
 export type AuthenticationServiceRefreshSessionQueryResult<TData = AuthenticationServiceRefreshSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -103,7 +104,7 @@ export type EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse =
 export type EmailTemplatesServiceEmailTemplateControllerFindOneQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindOneKey = "EmailTemplatesServiceEmailTemplateControllerFindOne";
 export const UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn = ({ type }: {
-  type: "verify-email" | "user-invitation" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
+  type: EmailTemplateType;
 }, queryKey?: Array<unknown>) => [useEmailTemplatesServiceEmailTemplateControllerFindOneKey, ...(queryKey ?? [{ type }])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -360,6 +361,22 @@ export const UseProjectsServiceGetProjectUsageStatsKeyFn = ({ endDate, id, start
   id: number;
   startDate?: string;
 }, queryKey?: Array<unknown>) => [useProjectsServiceGetProjectUsageStatsKey, ...(queryKey ?? [{ endDate, id, startDate }])];
+export type ProjectsServiceListProjectMembersDefaultResponse = Awaited<ReturnType<typeof ProjectsService.listProjectMembers>>;
+export type ProjectsServiceListProjectMembersQueryResult<TData = ProjectsServiceListProjectMembersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceListProjectMembersKey = "ProjectsServiceListProjectMembers";
+export const UseProjectsServiceListProjectMembersKeyFn = ({ id }: {
+  id: number;
+}, queryKey?: Array<unknown>) => [useProjectsServiceListProjectMembersKey, ...(queryKey ?? [{ id }])];
+export type ProjectsServiceListProjectInvitationsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.listProjectInvitations>>;
+export type ProjectsServiceListProjectInvitationsQueryResult<TData = ProjectsServiceListProjectInvitationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectsServiceListProjectInvitationsKey = "ProjectsServiceListProjectInvitations";
+export const UseProjectsServiceListProjectInvitationsKeyFn = ({ id }: {
+  id: number;
+}, queryKey?: Array<unknown>) => [useProjectsServiceListProjectInvitationsKey, ...(queryKey ?? [{ id }])];
+export type ProjectInvitationsServiceListMyProjectInvitationsDefaultResponse = Awaited<ReturnType<typeof ProjectInvitationsService.listMyProjectInvitations>>;
+export type ProjectInvitationsServiceListMyProjectInvitationsQueryResult<TData = ProjectInvitationsServiceListMyProjectInvitationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useProjectInvitationsServiceListMyProjectInvitationsKey = "ProjectInvitationsServiceListMyProjectInvitations";
+export const UseProjectInvitationsServiceListMyProjectInvitationsKeyFn = (queryKey?: Array<unknown>) => [useProjectInvitationsServiceListMyProjectInvitationsKey, ...(queryKey ?? [])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -458,6 +475,10 @@ export type BillingServiceSumUpTopUpCallbackMutationResult = Awaited<ReturnType<
 export type BillingServiceRefundTransactionMutationResult = Awaited<ReturnType<typeof BillingService.refundTransaction>>;
 export type ResourceFlowsServicePressButtonMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.pressButton>>;
 export type ProjectsServiceCreateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.createProject>>;
+export type ProjectsServiceCreateProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.createProjectInvitation>>;
+export type ProjectsServiceResendProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.resendProjectInvitation>>;
+export type ProjectInvitationsServiceAcceptProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.acceptProjectInvitation>>;
+export type ProjectInvitationsServiceDeclineProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.declineProjectInvitation>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
@@ -488,5 +509,7 @@ export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awai
 export type ResourceMaintenancesServiceCancelMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.cancelMaintenance>>;
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
 export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
+export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;
+export type ProjectsServiceCancelProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.cancelProjectInvitation>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

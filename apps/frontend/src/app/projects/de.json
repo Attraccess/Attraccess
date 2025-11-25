@@ -3,5 +3,22 @@
   "subtitle": "Projekte verwalten",
   "actions": {
     "create": "Projekt erstellen"
+  },
+  "invitations": {
+    "title": "Projekteinladungen",
+    "description": "Nimm Einladungen an oder lehne sie ab, um gemeinsam an Projekten zu arbeiten.",
+    "invitedBy": "Eingeladen von {{username}}",
+    "empty": "Du hast keine offenen Einladungen.",
+    "roles": {
+      "viewer": "Betrachter"
+    },
+    "actions": {
+      "accept": "Annehmen",
+      "decline": "Ablehnen"
+    },
+    "success": {
+      "accept": "Einladung angenommen",
+      "decline": "Einladung abgelehnt"
+    }
   }
 }

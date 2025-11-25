@@ -1,4 +1,7 @@
 {
   "title": "The application is starting.",
-  "subtitle": "Please wait..."
+  "subtitle": "Please wait...",
+  "progress": {
+    "ariaLabel": "Progress bar"
+  }
 }

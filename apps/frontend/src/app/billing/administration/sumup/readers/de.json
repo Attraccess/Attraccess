@@ -5,6 +5,7 @@
     "pairReader": "Karten-Lesegerät einrichten"
   },
   "table": {
+    "ariaLabel": "Karten-Lesegeräte",
     "columns": {
       "name": "Name",
       "device": "Gerät",

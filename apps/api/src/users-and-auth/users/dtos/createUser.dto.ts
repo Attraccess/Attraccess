@@ -29,6 +29,7 @@ export class CreateUserDto {
     description: 'The authentication strategy to use',
     enum: AuthenticationType,
     example: AuthenticationType.LOCAL_PASSWORD,
+    enumName: 'AuthenticationType',
   })
   @IsEnum(AuthenticationType)
   strategy: AuthenticationType.LOCAL_PASSWORD;

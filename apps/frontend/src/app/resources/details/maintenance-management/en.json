@@ -4,6 +4,7 @@
     "includePast": "Include past"
   },
   "table": {
+    "ariaLabel": "Maintenance",
     "columns": {
       "start": "Start",
       "end": "End",

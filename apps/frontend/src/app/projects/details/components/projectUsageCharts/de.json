@@ -7,6 +7,9 @@
     },
     "topResources": {
       "title": "Top-Ressourcen",
+      "table": {
+        "ariaLabel": "Top-Ressourcen"
+      },
       "empty": "Noch keine Ressourcennutzung vorhanden",
       "columns": {
         "resource": "Ressource",

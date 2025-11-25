@@ -1,7 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const ensureUseUsersServiceGetLocalSignupDomainWhitelistData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
@@ -22,7 +23,7 @@ export const ensureUseUsersServiceGetPermissionsData = (queryClient: QueryClient
 export const ensureUseUsersServiceGetAllWithPermissionData = (queryClient: QueryClient, { limit, page, permission }: {
   limit?: number;
   page?: number;
-  permission?: "canManageResources" | "canManageSystemConfiguration" | "canManageUsers";
+  permission?: PermissionFilter;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) });
 export const ensureUseAuthenticationServiceRefreshSessionData = (queryClient: QueryClient, { tokenLocation }: {
   tokenLocation: string;
@@ -53,7 +54,7 @@ export const ensureUseAuthenticationServiceOidcLoginCallbackData = (queryClient:
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindAllData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindOneData = (queryClient: QueryClient, { type }: {
-  type: "verify-email" | "user-invitation" | "reset-password" | "username-changed" | "password-changed" | "resource-usage-billing-transaction-summary";
+  type: EmailTemplateType;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const ensureUseResourcesServiceGetAllResourcesData = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
@@ -190,6 +191,13 @@ export const ensureUseProjectsServiceGetProjectUsageStatsData = (queryClient: Qu
   id: number;
   startDate?: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
+export const ensureUseProjectsServiceListProjectMembersData = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceListProjectMembersKeyFn({ id }), queryFn: () => ProjectsService.listProjectMembers({ id }) });
+export const ensureUseProjectsServiceListProjectInvitationsData = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceListProjectInvitationsKeyFn({ id }), queryFn: () => ProjectsService.listProjectInvitations({ id }) });
+export const ensureUseProjectInvitationsServiceListMyProjectInvitationsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(), queryFn: () => ProjectInvitationsService.listMyProjectInvitations() });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

@@ -7,7 +7,12 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
-import { useUsersServiceCreateOneUser, UseUsersServiceFindManyKeyFn, ApiError } from '@attraccess/react-query-client';
+import {
+  useUsersServiceCreateOneUser,
+  UseUsersServiceFindManyKeyFn,
+  ApiError,
+  AuthenticationType,
+} from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -93,7 +98,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           username,
           password,
           email,
-          strategy: 'local_password',
+          strategy: AuthenticationType.LOCAL_PASSWORD,
         },
       });
     },

@@ -9,6 +9,17 @@
     },
     "update": {
       "label": "Update Project"
+    },
+    "members": {
+      "label": "Team members"
+    },
+    "inviteMember": {
+      "label": "Invite member"
     }
+  },
+  "teamCard": {
+    "title": "Manage team & invites",
+    "description": "Open the dedicated workspace to invite members, review pending invitations, and adjust roles.",
+    "cta": "Open team page"
   }
 }

@@ -40,6 +40,7 @@ export function ResourceSelector(props: Props) {
         endContent={isResourceSearchLoading ? <Spinner /> : null}
       />
       <Table
+        aria-label={t('table.ariaLabel')}
         selectedKeys={props.selection.map((id) => id.toString())}
         onSelectionChange={(keys) => props.onSelectionChange(Array.from(keys as Set<number>).map((key) => Number(key)))}
         selectionMode="multiple"

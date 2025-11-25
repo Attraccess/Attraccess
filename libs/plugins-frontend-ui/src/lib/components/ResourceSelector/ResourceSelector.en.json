@@ -4,6 +4,7 @@
     "placeholder": "Type to search"
   },
   "table": {
+    "ariaLabel": "Resources",
     "columns": {
       "name": {
         "header": "Name"

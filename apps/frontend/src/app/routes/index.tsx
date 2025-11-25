@@ -27,6 +27,7 @@ import { SumUpPage } from '../billing/administration/sumup';
 import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
 import { ProjectDetailsPage } from '../projects/details';
+import { ProjectTeamPage } from '../projects/details/team';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -167,6 +168,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/projects/:id',
     element: <ProjectDetailsPage />,
+    authRequired: true,
+  },
+  {
+    path: '/projects/:id/team',
+    element: <ProjectTeamPage />,
     authRequired: true,
   },
 ];

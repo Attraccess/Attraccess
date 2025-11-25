@@ -17,6 +17,7 @@ export class ResourceFlowNodeDto {
     description: 'The type of the node',
     example: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     enum: ResourceFlowNodeType,
+    enumName: 'ResourceFlowNodeType',
   })
   @IsEnum(ResourceFlowNodeType)
   type: ResourceFlowNodeType;

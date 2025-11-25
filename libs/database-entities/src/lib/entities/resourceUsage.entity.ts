@@ -20,6 +20,7 @@ export class ResourceUsage {
     description: 'The type of usage',
     example: ResourceUsageAction.Usage,
     enum: ResourceUsageAction,
+    enumName: 'ResourceUsageAction',
   })
   usageAction!: ResourceUsageAction;
 

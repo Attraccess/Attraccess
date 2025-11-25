@@ -14,6 +14,8 @@
     "reset-password": "Passwort Zurücksetzen",
     "username-changed": "Benutzername geändert",
     "password-changed": "Passwort geändert",
-    "resource-usage-billing-transaction-summary": "Ressourcen-Nutzung Kostenübersicht"
+    "resource-usage-billing-transaction-summary": "Ressourcen-Nutzung Kostenübersicht",
+    "user-invitation": "Benutzereinladung",
+    "project-invitation": "Projekteinladung"
   }
 }

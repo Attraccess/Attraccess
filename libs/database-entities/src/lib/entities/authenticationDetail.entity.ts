@@ -27,6 +27,7 @@ export class AuthenticationDetail {
     description: 'The type of authentication',
     enum: AuthenticationType,
     example: AuthenticationType.LOCAL_PASSWORD,
+    enumName: 'AuthenticationType',
   })
   type!: AuthenticationType;
 

@@ -69,7 +69,12 @@ export function PageHeader({
             <h1 className="text-2xl font-bold">{title}</h1>
           </div>
 
-          {subtitle && <p className="mt-1 text-sm text-foreground-500">{subtitle}</p>}
+          {subtitle &&
+            (typeof subtitle === 'string' ? (
+              <p className="mt-1 text-sm text-foreground-500">{subtitle}</p>
+            ) : (
+              <div className="mt-1 text-sm text-foreground-500">{subtitle}</div>
+            ))}
         </div>
       </div>
 

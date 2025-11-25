@@ -3,5 +3,22 @@
   "subtitle": "Manage projects",
   "actions": {
     "create": "Create Project"
+  },
+  "invitations": {
+    "title": "Project invitations",
+    "description": "Accept or decline invitations to collaborate on shared projects.",
+    "invitedBy": "Invited by {{username}}",
+    "empty": "You have no pending invitations.",
+    "roles": {
+      "viewer": "Viewer"
+    },
+    "actions": {
+      "accept": "Accept",
+      "decline": "Decline"
+    },
+    "success": {
+      "accept": "Invitation accepted",
+      "decline": "Invitation declined"
+    }
   }
 }

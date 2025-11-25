@@ -1,4 +1,4 @@
-import { Resource } from '@attraccess/react-query-client';
+import { Resource, ResourceType } from '@attraccess/react-query-client';
 
 /**
  * Creates a mock resource with the given overrides
@@ -6,7 +6,7 @@ import { Resource } from '@attraccess/react-query-client';
 export function createMockResource(overrides?: Partial<Resource>): Resource {
   return {
     id: 1,
-    type: 'machine',
+    type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
     name: 'Test Resource',
     description: 'Test Description',

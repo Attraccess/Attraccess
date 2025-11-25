@@ -10,6 +10,7 @@ export class BillingConfigurationDto {
     example: Currency.EUR,
     required: true,
     enum: Currency,
+    enumName: 'Currency',
   })
   currency!: Currency;
 

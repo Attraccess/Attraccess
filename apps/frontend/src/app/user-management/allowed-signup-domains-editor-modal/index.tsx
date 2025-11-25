@@ -144,7 +144,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
               }}
             />
 
-            <Table removeWrapper>
+            <Table removeWrapper aria-label={t('table.ariaLabel')}>
               <TableHeader>
                 <TableColumn>{t('table.columns.domain')}</TableColumn>
                 <TableColumn>{t('table.columns.actions')}</TableColumn>

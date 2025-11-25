@@ -19,6 +19,7 @@ export class UpdateResourceDto {
     example: ResourceType.Machine,
     enum: ResourceType,
     required: false,
+    enumName: 'ResourceType',
   })
   @IsEnum(ResourceType)
   @IsOptional()
@@ -68,6 +69,7 @@ export class UpdateResourceDto {
     enum: DocumentationType,
     required: false,
     example: DocumentationType.MARKDOWN,
+    enumName: 'DocumentationType',
   })
   @IsEnum(DocumentationType)
   @IsOptional()

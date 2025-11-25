@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Projektteam",
+    "subtitle": "Lade Mitarbeitende ein, verwalte Rollen und behalte Einladungen im Blick."
+  },
+  "owner": "Besitzer",
+  "sections": {
+    "invite": {
+      "title": "Mitwirkende einladen",
+      "description": "Sende Einladungen an bestehende Attraccess-Benutzer, um ihnen Zugriff auf dieses Projekt zu geben.",
+      "cta": "Mitglied einladen"
+    },
+    "pending": {
+      "title": "Ausstehende Einladungen",
+      "empty": "Keine ausstehenden Einladungen."
+    },
+    "members": {
+      "title": "Mitglieder",
+      "empty": "Noch keine weiteren Mitglieder."
+    }
+  },
+  "actions": {
+    "invite": "Mitglied einladen",
+    "remove": "Entfernen",
+    "resend": "Erneut senden",
+    "cancel": "Abbrechen"
+  },
+  "statuses": {
+    "pending": "Ausstehend",
+    "accepted": "Angenommen",
+    "declined": "Abgelehnt",
+    "canceled": "Storniert"
+  },
+  "roles": {
+    "viewer": "Betrachter"
+  },
+  "success": {
+    "remove": "Mitglied entfernt",
+    "resend": "Einladung erneut gesendet",
+    "cancel": "Einladung abgebrochen"
+  },
+  "messages": {
+    "ownerOnly": "Nur Projektbesitzer können Mitglieder und Einladungen verwalten."
+  }
+}
+

@@ -22,6 +22,7 @@ import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
 import {
   BillingTransaction,
+  BillingTransactionStatus,
   useBillingServiceGetBillingBalance,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
@@ -140,11 +141,11 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
 
   const statusColor = useCallback((status: BillingTransaction['status']) => {
     switch (status) {
-      case 'pending':
+      case BillingTransactionStatus.PENDING:
         return 'warning';
-      case 'completed':
+      case BillingTransactionStatus.COMPLETED:
         return 'success';
-      case 'failed':
+      case BillingTransactionStatus.FAILED:
         return 'danger';
       default:
         return 'default';
@@ -185,6 +186,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
         </div>
 
         <Table
+          aria-label={t('transactions.table.ariaLabel')}
           removeWrapper
           bottomContent={
             isFetchedTransactions && (

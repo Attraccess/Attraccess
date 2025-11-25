@@ -4,6 +4,7 @@
     "placeholder": "Tippe um zu suchen"
   },
   "table": {
+    "ariaLabel": "Ressourcen",
     "columns": {
       "name": {
         "header": "Name"

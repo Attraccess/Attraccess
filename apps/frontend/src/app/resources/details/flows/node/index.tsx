@@ -1,4 +1,4 @@
-import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { NodeProps } from '@xyflow/react';
 import { Button, Card, CardBody, CardHeader, cn, Code, Tooltip, useDisclosure } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
@@ -50,13 +50,13 @@ export function AttraccessNode(props: Props) {
       }
 
       switch (log.type) {
-        case 'node.processing.started':
+        case ResourceFlowLogType.NODE_PROCESSING_STARTED:
           setProcessingState(ProcessingState.PROCESSING);
           break;
-        case 'node.processing.completed':
+        case ResourceFlowLogType.NODE_PROCESSING_COMPLETED:
           setProcessingState(ProcessingState.COMPLETED);
           break;
-        case 'node.processing.failed':
+        case ResourceFlowLogType.NODE_PROCESSING_FAILED:
           setProcessingState(ProcessingState.FAILED);
           break;
       }

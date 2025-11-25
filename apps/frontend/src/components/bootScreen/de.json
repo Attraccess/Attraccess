@@ -1,4 +1,7 @@
 {
   "title": "Die Anwendung startet gerade.",
-  "subtitle": "Bitte warten..."
+  "subtitle": "Bitte warten...",
+  "progress": {
+    "ariaLabel": "Ladebalken"
+  }
 }

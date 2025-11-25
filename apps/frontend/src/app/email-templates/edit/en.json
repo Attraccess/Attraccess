@@ -2,7 +2,12 @@
   "subtitle": "Modify the subject and body (MJML) content of the template.",
   "templateType": {
     "verify-email": "Email Verification",
-    "reset-password": "Password Reset"
+    "reset-password": "Password Reset",
+    "username-changed": "Username Changed",
+    "password-changed": "Password Changed",
+    "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
+    "user-invitation": "User Invitation",
+    "project-invitation": "Project Invitation"
   },
   "form": {
     "subject": "Subject",
@@ -15,7 +20,8 @@
   "preview": {
     "iframeTitle": "Body Preview",
     "loading": "Loading...",
-    "errorPrefix": "Error loading preview."
+    "errorPrefix": "Error loading preview.",
+    "emptyPlaceholder": "Start editing the MJML body to see a preview."
   },
   "actions": {
     "close": "Close",
