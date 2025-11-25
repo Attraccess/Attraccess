@@ -73,3 +73,4 @@ export * from './1763568605660-usage-sessions-per-project';
 export * from './1763933042954-1764000000001-project-invitation-role';
 export * from './1763929281915-1764000000000-project-memberships';
 export * from './1763929281916-seed-project-invitation-email';
+export * from './1764094002706-projects';
