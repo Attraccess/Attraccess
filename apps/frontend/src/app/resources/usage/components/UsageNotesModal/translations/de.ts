@@ -6,4 +6,8 @@ export default {
   sessionStarted: 'Sitzung gestartet',
   sessionEnded: 'Sitzung beendet',
   close: 'Schließen',
+  formsTitle: 'Formulareinreichungen',
+  noForms: 'Keine Formulare vorhanden',
+  booleanYes: 'Ja',
+  booleanNo: 'Nein',
 };

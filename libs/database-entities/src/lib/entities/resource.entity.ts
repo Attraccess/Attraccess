@@ -22,6 +22,7 @@ import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
 import { ResourceType } from './resource.type';
 import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
+import { Form } from './form';
 
 @Entity()
 export class Resource {
@@ -160,4 +161,8 @@ export class Resource {
 
   @OneToMany(() => ResourceBillingConfiguration, (configuration) => configuration.resource)
   billingConfigurations!: ResourceBillingConfiguration[];
+
+  @OneToMany(() => Form, (form) => form.resource)
+  @ApiProperty({ description: 'The forms attached to the resource', type: () => Form, isArray: true })
+  forms!: Form[];
 }

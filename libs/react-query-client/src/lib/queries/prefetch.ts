@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -198,6 +198,17 @@ export const prefetchUseProjectsServiceListProjectInvitations = (queryClient: Qu
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceListProjectInvitationsKeyFn({ id }), queryFn: () => ProjectsService.listProjectInvitations({ id }) });
 export const prefetchUseProjectInvitationsServiceListMyProjectInvitations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(), queryFn: () => ProjectInvitationsService.listMyProjectInvitations() });
+export const prefetchUseResourceFormsServiceResourceFormsList = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFormsServiceResourceFormsListKeyFn({ resourceId }), queryFn: () => ResourceFormsService.resourceFormsList({ resourceId }) });
+export const prefetchUseResourceFormsServiceResourceFormsGetRequirements = (queryClient: QueryClient, { action, resourceId }: {
+  action: "start" | "takeover" | "end";
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFormsServiceResourceFormsGetRequirementsKeyFn({ action, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetRequirements({ action, resourceId }) });
+export const prefetchUseResourceFormsServiceResourceFormsGetOne = (queryClient: QueryClient, { formId, resourceId }: {
+  formId: number;
+  resourceId: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

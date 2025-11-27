@@ -24,6 +24,8 @@ import { BillingService } from '../../billing/billing.service';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 import { ResourceInUseError } from './errors/resource-in-use.error';
 import { ProjectsService } from '../../projects/projects.service';
+import { ResourceFormsService } from '../forms/forms.service';
+import { ResourceFormAction } from '@attraccess/database-entities';
 
 @Injectable()
 export class ResourceUsageService {
@@ -43,6 +45,7 @@ export class ResourceUsageService {
     private readonly billingService: BillingService,
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     private readonly projectsService: ProjectsService,
+    private readonly resourceFormsService: ResourceFormsService,
   ) {}
 
   public async canControllResource(
@@ -249,6 +252,19 @@ export class ResourceUsageService {
       this.logger.debug(
         `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
       );
+
+      if (resource.type === ResourceType.Machine) {
+        const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
+        await this.resourceFormsService.saveRequiredSubmissions({
+          resourceId,
+          action,
+          submissions: dto.formSubmissions,
+          userId: user.id,
+          resourceUsageId: createdSession.id,
+          manager: transactionalEntityManager,
+        });
+      }
+
       await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, transactionalEntityManager);
 
       if (existingActiveSession) {
@@ -337,6 +353,17 @@ export class ResourceUsageService {
         endTime,
         endNotes,
       };
+
+      if (activeSession.resource?.type === ResourceType.Machine) {
+        await this.resourceFormsService.saveRequiredSubmissions({
+          resourceId,
+          action: ResourceFormAction.END,
+          submissions: dto.formSubmissions,
+          userId: user.id,
+          resourceUsageId: activeSession.id,
+          manager: transactionalEntityManager,
+        });
+      }
 
       this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
       await this.flowExecutorService.runFlow(
@@ -492,7 +519,7 @@ export class ResourceUsageService {
       skip: (page - 1) * limit,
       take: limit,
       order: { startTime: 'DESC' },
-      relations: ['user', 'project'],
+      relations: ['user', 'project', 'formSubmissions', 'formSubmissions.form', 'formSubmissions.user'],
     });
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);

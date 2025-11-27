@@ -26,6 +26,7 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     attractapReaders: [],
     maintenances: [],
     billingConfigurations: [],
+    forms: [],
   };
 
   return { ...base, ...overrides } as Resource;

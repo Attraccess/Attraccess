@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -198,6 +198,17 @@ export const ensureUseProjectsServiceListProjectInvitationsData = (queryClient: 
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceListProjectInvitationsKeyFn({ id }), queryFn: () => ProjectsService.listProjectInvitations({ id }) });
 export const ensureUseProjectInvitationsServiceListMyProjectInvitationsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(), queryFn: () => ProjectInvitationsService.listMyProjectInvitations() });
+export const ensureUseResourceFormsServiceResourceFormsListData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFormsServiceResourceFormsListKeyFn({ resourceId }), queryFn: () => ResourceFormsService.resourceFormsList({ resourceId }) });
+export const ensureUseResourceFormsServiceResourceFormsGetRequirementsData = (queryClient: QueryClient, { action, resourceId }: {
+  action: "start" | "takeover" | "end";
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFormsServiceResourceFormsGetRequirementsKeyFn({ action, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetRequirements({ action, resourceId }) });
+export const ensureUseResourceFormsServiceResourceFormsGetOneData = (queryClient: QueryClient, { formId, resourceId }: {
+  formId: number;
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

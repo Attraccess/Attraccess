@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ToBoolean } from '../../../common/request-transformers';
-import { IsString, IsOptional, IsBoolean, IsInt, IsPositive } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt, IsPositive, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { FormSubmissionRequestDto } from '../../forms/dto';
 
 export class StartUsageSessionDto {
   @ApiProperty({
@@ -32,4 +34,16 @@ export class StartUsageSessionDto {
   @IsPositive()
   @IsOptional()
   projectId?: number;
+
+  @ApiProperty({
+    description: 'Form submissions required for this action',
+    required: false,
+    type: () => FormSubmissionRequestDto,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormSubmissionRequestDto)
+  formSubmissions?: FormSubmissionRequestDto[];
 }

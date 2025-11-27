@@ -47,6 +47,7 @@ import { BillingTransactionItem } from './entities/billing-transaction-item.enti
 import { Project } from './entities/project';
 import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
 import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
+import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
 
 // Export all entities individually
 export {
@@ -102,6 +103,11 @@ export {
   ProjectMemberRole,
   ProjectInvitation,
   ProjectInvitationStatus,
+  Form,
+  FormField,
+  FormSubmission,
+  FormFieldType,
+  ResourceFormAction,
 };
 
 // Export the entities object
@@ -133,4 +139,7 @@ export const entities = {
   Project,
   ProjectMember,
   ProjectInvitation,
+  Form,
+  FormField,
+  FormSubmission,
 };

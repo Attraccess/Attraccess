@@ -12,6 +12,7 @@ import {
   useResourcesServiceGetOneResourceById,
   useAccessControlServiceResourceIntroducersIsIntroducer,
   useResourcesServiceResourceUsageEndSession,
+  FormSubmissionRequestDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -19,6 +20,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import en from './translations/en.json';
 import de from './translations/de.json';
+import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 
 interface OtherUserSessionDisplayProps {
   resourceId: number;
@@ -31,6 +33,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   const queryClient = useQueryClient();
   const [isTakeoverNotesModalOpen, setIsTakeoverNotesModalOpen] = useState(false);
   const [isStopOtherUserSessionNotesModalOpen, setIsStopOtherUserSessionNotesModalOpen] = useState(false);
+  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
 
   const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
@@ -112,26 +115,57 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
     },
   });
 
+  const runTakeover = useCallback(
+    async (body: { notes?: string }) => {
+      let formSubmissions: FormSubmissionRequestDto[] = [];
+      try {
+        formSubmissions = await requestForms('takeover');
+      } catch (error) {
+        if ((error as Error).message === 'user_cancelled_forms') {
+          return;
+        }
+        throw error;
+      }
+
+      startSession.mutate({
+        resourceId,
+        requestBody: { ...body, forceTakeOver: true, formSubmissions },
+      });
+    },
+    [requestForms, resourceId, startSession],
+  );
+
+  const runStopOtherSession = useCallback(
+    async (body: { notes?: string }) => {
+      let formSubmissions: FormSubmissionRequestDto[] = [];
+      try {
+        formSubmissions = await requestForms('end');
+      } catch (error) {
+        if ((error as Error).message === 'user_cancelled_forms') {
+          return;
+        }
+        throw error;
+      }
+
+      stopSession.mutate({
+        resourceId,
+        requestBody: { ...body, formSubmissions },
+      });
+    },
+    [requestForms, resourceId, stopSession],
+  );
+
   const handleStopOtherUserSessionWithNotes = async (notes: string) => {
-    stopSession.mutate({
-      resourceId,
-      requestBody: { notes },
-    });
+    await runStopOtherSession({ notes });
   };
 
   const handleTakeoverWithNotes = async (notes: string) => {
-    startSession.mutate({
-      resourceId,
-      requestBody: { notes, forceTakeOver: true },
-    });
+    await runTakeover({ notes });
   };
 
   const handleImmediateTakeover = useCallback(() => {
-    startSession.mutate({
-      resourceId,
-      requestBody: { forceTakeOver: true },
-    });
-  }, [startSession, resourceId]);
+    void runTakeover({});
+  }, [runTakeover]);
 
   const handleOpenTakeoverModal = () => {
     setIsTakeoverNotesModalOpen(true);
@@ -142,11 +176,8 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
   };
 
   const handleImmediateStopOtherUserSession = useCallback(() => {
-    stopSession.mutate({
-      resourceId,
-      requestBody: {},
-    });
-  }, [stopSession, resourceId]);
+    void runStopOtherSession({});
+  }, [runStopOtherSession]);
 
   // Early return if no active session or it belongs to current user
   if (!activeSession || activeSession.userId === user?.id) {
@@ -233,7 +264,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
       <SessionNotesModal
         isOpen={isTakeoverNotesModalOpen}
         onClose={() => setIsTakeoverNotesModalOpen(false)}
-        onConfirm={handleTakeoverWithNotes}
+        onConfirm={(notes) => void handleTakeoverWithNotes(notes)}
         mode={SessionModalMode.START}
         isSubmitting={startSession.isPending}
       />
@@ -241,10 +272,11 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
       <SessionNotesModal
         isOpen={isStopOtherUserSessionNotesModalOpen}
         onClose={() => setIsStopOtherUserSessionNotesModalOpen(false)}
-        onConfirm={handleStopOtherUserSessionWithNotes}
+        onConfirm={(notes) => void handleStopOtherUserSessionWithNotes(notes)}
         mode={SessionModalMode.END}
         isSubmitting={stopSession.isPending}
       />
+      {formsModal}
     </>
   );
 }

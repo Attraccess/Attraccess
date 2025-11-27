@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
-import { ArrowLeft, BookOpen, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
+import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { Spinner, Link } from '@heroui/react';
 import { useDisclosure } from '@heroui/react';
@@ -156,6 +156,16 @@ function ResourceDetailsComponent() {
                   data-cy="flows-button"
                 >
                   {t('navItems.flows')}
+                </Button>
+
+                <Button
+                  as={Link}
+                  href={`/resources/${resourceId}/forms`}
+                  variant="light"
+                  startContent={<ListChecks className="w-4 h-4" />}
+                  data-cy="forms-button"
+                >
+                  {t('navItems.forms')}
                 </Button>
 
                 <ResourceEditModal resourceId={resourceId} closeOnSuccess>

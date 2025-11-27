@@ -610,6 +610,63 @@ export type ResourceGroup = {
     updatedAt: string;
 };
 
+/**
+ * The type of the form field
+ */
+export enum FormFieldType {
+    TEXT = 'text',
+    NUMBER = 'number',
+    DATETIME = 'datetime',
+    BOOLEAN = 'boolean'
+}
+
+export type FormField = {
+    /**
+     * The ID of the form field
+     */
+    id: number;
+    /**
+     * The ID of the form that the field belongs to
+     */
+    formId: number;
+    /**
+     * The form that the field belongs to
+     */
+    form: Form;
+    /**
+     * The name of the form field
+     */
+    name: string;
+    /**
+     * The type of the form field
+     */
+    type: FormFieldType;
+    /**
+     * Whether the form field is required
+     */
+    isRequired: boolean;
+    /**
+     * The description of the form field
+     */
+    description: string;
+    /**
+     * The options of the form field
+     */
+    options: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * The type of usage
+ */
+export enum ResourceUsageAction {
+    USAGE = 'usage',
+    DOOR_LOCK = 'door.lock',
+    DOOR_UNLOCK = 'door.unlock',
+    DOOR_UNLATCH = 'door.unlatch'
+}
+
 export type Resource = {
     /**
      * The unique identifier of the resource
@@ -667,6 +724,312 @@ export type Resource = {
      * The groups the resource belongs to
      */
     groups: Array<ResourceGroup>;
+    /**
+     * The forms attached to the resource
+     */
+    forms: Array<Form>;
+};
+
+/**
+ * Role of the member within the project
+ */
+export enum ProjectMemberRole {
+    VIEWER = 'viewer'
+}
+
+export type ProjectMember = {
+    /**
+     * Unique identifier of the project member
+     */
+    id: number;
+    /**
+     * Project ID the member belongs to
+     */
+    projectId: number;
+    /**
+     * Project the member belongs to
+     */
+    project: Project;
+    /**
+     * User ID of the member
+     */
+    userId: number;
+    /**
+     * User that belongs to the project
+     */
+    user: User;
+    /**
+     * Role of the member within the project
+     */
+    role: ProjectMemberRole;
+    /**
+     * When the membership started
+     */
+    joinedAt: string;
+};
+
+/**
+ * Current status of the invitation
+ */
+export enum ProjectInvitationStatus {
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    DECLINED = 'declined',
+    CANCELED = 'canceled'
+}
+
+export type ProjectInvitation = {
+    /**
+     * Unique identifier of the project invitation
+     */
+    id: number;
+    /**
+     * Project ID for which the invitation was created
+     */
+    projectId: number;
+    /**
+     * Project for which the invitation was created
+     */
+    project: Project;
+    /**
+     * User ID that created the invitation
+     */
+    inviterId: number;
+    /**
+     * Inviter user
+     */
+    inviter: User;
+    /**
+     * User ID that is being invited
+     */
+    invitedUserId: number;
+    /**
+     * Invited user
+     */
+    invitedUser: User;
+    /**
+     * Current status of the invitation
+     */
+    status: ProjectInvitationStatus;
+    /**
+     * Role that should be granted upon acceptance
+     */
+    requestedRole: ProjectMemberRole;
+    /**
+     * Timestamp when the invitation was responded to (accept/decline/cancel)
+     */
+    respondedAt?: string;
+    /**
+     * When the invitation was created
+     */
+    createdAt: string;
+    /**
+     * When the invitation was last updated
+     */
+    updatedAt: string;
+};
+
+export type Project = {
+    /**
+     * The ID of the project
+     */
+    id: number;
+    /**
+     * The date and time the NFC card was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the NFC card was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the user that owns the project
+     */
+    owner: User;
+    /**
+     * The name of the project
+     */
+    name: string;
+    /**
+     * The description of the project
+     */
+    description: string;
+    /**
+     * The logo of the project
+     */
+    logo: string;
+    /**
+     * Members that have access to the project
+     */
+    members: Array<ProjectMember>;
+    /**
+     * Pending invitations for the project
+     */
+    invitations: Array<ProjectInvitation>;
+};
+
+export type ResourceUsage = {
+    /**
+     * The unique identifier of the resource usage
+     */
+    id: number;
+    /**
+     * The type of usage
+     */
+    usageAction: ResourceUsageAction;
+    /**
+     * The ID of the resource being used
+     */
+    resourceId: number;
+    /**
+     * The ID of the user using the resource (null if user was deleted)
+     */
+    userId?: number;
+    /**
+     * When the usage session started
+     */
+    startTime: string;
+    /**
+     * Notes provided when starting the session
+     */
+    startNotes?: string;
+    /**
+     * When the usage session ended
+     */
+    endTime?: string;
+    /**
+     * Notes provided when ending the session
+     */
+    endNotes?: string;
+    /**
+     * The resource being used
+     */
+    resource?: Resource;
+    /**
+     * The user who used the resource
+     */
+    user?: User;
+    /**
+     * The duration of the usage session in minutes
+     */
+    usageInMinutes: number;
+    /**
+     * The ID of the project this usage session belongs to
+     */
+    projectId?: number;
+    /**
+     * The project this usage session belongs to
+     */
+    project?: Project;
+    /**
+     * The form submissions that belong to this resource usage
+     */
+    formSubmissions: Array<FormSubmission>;
+};
+
+export type FormSubmission = {
+    /**
+     * The ID of the form submission
+     */
+    id: number;
+    /**
+     * The ID of the form that the submission belongs to
+     */
+    formId: number;
+    /**
+     * The form that the submission belongs to
+     */
+    form: Form;
+    /**
+     * The data of the form submission
+     */
+    data: {
+        [key: string]: unknown;
+    };
+    /**
+     * The date and time the submission was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the submission was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the user that submitted the form
+     */
+    userId: number;
+    /**
+     * The user that submitted the form
+     */
+    user: User;
+    /**
+     * The ID of the resource usage that the submission belongs to
+     */
+    resourceUsageId: number;
+    /**
+     * The resource usage that the submission belongs to
+     */
+    resourceUsage: ResourceUsage;
+    /**
+     * The action that triggered the submission
+     */
+    action: 'start' | 'takeover' | 'end';
+};
+
+/**
+ * The action that triggered the submission
+ */
+export enum action {
+    START = 'start',
+    TAKEOVER = 'takeover',
+    END = 'end'
+}
+
+export type Form = {
+    /**
+     * The ID of the form
+     */
+    id: number;
+    /**
+     * The date and time the form was created
+     */
+    createdAt: string;
+    /**
+     * The date and time the form was last updated
+     */
+    updatedAt: string;
+    /**
+     * The name of the form
+     */
+    name: string;
+    /**
+     * Whether the form is required on resource usage start
+     */
+    isRequiredOnResourceUsageStart: boolean;
+    /**
+     * Whether the form is required on resource usage take over
+     */
+    isRequiredOnResourceUsageTakeOver: boolean;
+    /**
+     * Whether the form is required on resource usage end
+     */
+    isRequiredOnResourceUsageEnd: boolean;
+    /**
+     * The fields of the form
+     */
+    fields: Array<FormField>;
+    /**
+     * The submissions of the form
+     */
+    submissions: Array<FormSubmission>;
+    /**
+     * The ID of the resource that the form belongs to
+     */
+    resourceId: number;
+    /**
+     * The resource that the form belongs to
+     */
+    resource: Resource;
 };
 
 export type PaginatedResourceResponseDto = {
@@ -1005,6 +1368,25 @@ export type IsResourceGroupIntroducerResponseDto = {
     isIntroducer: boolean;
 };
 
+export type FormSubmissionFieldAnswerDto = {
+    /**
+     * Field identifier
+     */
+    fieldId: number;
+    /**
+     * Submitted value
+     */
+    value: string | number | boolean;
+};
+
+export type FormSubmissionRequestDto = {
+    /**
+     * Form identifier
+     */
+    formId: number;
+    answers: Array<FormSubmissionFieldAnswerDto>;
+};
+
 export type StartUsageSessionDto = {
     /**
      * Optional notes about the usage session
@@ -1018,209 +1400,10 @@ export type StartUsageSessionDto = {
      * The project to assign this usage to
      */
     projectId?: number;
-};
-
-/**
- * The type of usage
- */
-export enum ResourceUsageAction {
-    USAGE = 'usage',
-    DOOR_LOCK = 'door.lock',
-    DOOR_UNLOCK = 'door.unlock',
-    DOOR_UNLATCH = 'door.unlatch'
-}
-
-/**
- * Role of the member within the project
- */
-export enum ProjectMemberRole {
-    VIEWER = 'viewer'
-}
-
-export type ProjectMember = {
     /**
-     * Unique identifier of the project member
+     * Form submissions required for this action
      */
-    id: number;
-    /**
-     * Project ID the member belongs to
-     */
-    projectId: number;
-    /**
-     * Project the member belongs to
-     */
-    project: Project;
-    /**
-     * User ID of the member
-     */
-    userId: number;
-    /**
-     * User that belongs to the project
-     */
-    user: User;
-    /**
-     * Role of the member within the project
-     */
-    role: ProjectMemberRole;
-    /**
-     * When the membership started
-     */
-    joinedAt: string;
-};
-
-/**
- * Current status of the invitation
- */
-export enum ProjectInvitationStatus {
-    PENDING = 'pending',
-    ACCEPTED = 'accepted',
-    DECLINED = 'declined',
-    CANCELED = 'canceled'
-}
-
-export type ProjectInvitation = {
-    /**
-     * Unique identifier of the project invitation
-     */
-    id: number;
-    /**
-     * Project ID for which the invitation was created
-     */
-    projectId: number;
-    /**
-     * Project for which the invitation was created
-     */
-    project: Project;
-    /**
-     * User ID that created the invitation
-     */
-    inviterId: number;
-    /**
-     * Inviter user
-     */
-    inviter: User;
-    /**
-     * User ID that is being invited
-     */
-    invitedUserId: number;
-    /**
-     * Invited user
-     */
-    invitedUser: User;
-    /**
-     * Current status of the invitation
-     */
-    status: ProjectInvitationStatus;
-    /**
-     * Role that should be granted upon acceptance
-     */
-    requestedRole: ProjectMemberRole;
-    /**
-     * Timestamp when the invitation was responded to (accept/decline/cancel)
-     */
-    respondedAt?: string;
-    /**
-     * When the invitation was created
-     */
-    createdAt: string;
-    /**
-     * When the invitation was last updated
-     */
-    updatedAt: string;
-};
-
-export type Project = {
-    /**
-     * The ID of the project
-     */
-    id: number;
-    /**
-     * The date and time the NFC card was created
-     */
-    createdAt: string;
-    /**
-     * The date and time the NFC card was last updated
-     */
-    updatedAt: string;
-    /**
-     * The ID of the user that owns the project
-     */
-    owner: User;
-    /**
-     * The name of the project
-     */
-    name: string;
-    /**
-     * The description of the project
-     */
-    description: string;
-    /**
-     * The logo of the project
-     */
-    logo: string;
-    /**
-     * Members that have access to the project
-     */
-    members: Array<ProjectMember>;
-    /**
-     * Pending invitations for the project
-     */
-    invitations: Array<ProjectInvitation>;
-};
-
-export type ResourceUsage = {
-    /**
-     * The unique identifier of the resource usage
-     */
-    id: number;
-    /**
-     * The type of usage
-     */
-    usageAction: ResourceUsageAction;
-    /**
-     * The ID of the resource being used
-     */
-    resourceId: number;
-    /**
-     * The ID of the user using the resource (null if user was deleted)
-     */
-    userId?: number;
-    /**
-     * When the usage session started
-     */
-    startTime: string;
-    /**
-     * Notes provided when starting the session
-     */
-    startNotes?: string;
-    /**
-     * When the usage session ended
-     */
-    endTime?: string;
-    /**
-     * Notes provided when ending the session
-     */
-    endNotes?: string;
-    /**
-     * The resource being used
-     */
-    resource?: Resource;
-    /**
-     * The user who used the resource
-     */
-    user?: User;
-    /**
-     * The duration of the usage session in minutes
-     */
-    usageInMinutes: number;
-    /**
-     * The ID of the project this usage session belongs to
-     */
-    projectId?: number;
-    /**
-     * The project this usage session belongs to
-     */
-    project?: Project;
+    formSubmissions?: Array<FormSubmissionRequestDto>;
 };
 
 export type EndUsageSessionDto = {
@@ -1232,6 +1415,10 @@ export type EndUsageSessionDto = {
      * The end time of the session. If not provided, current time will be used.
      */
     endTime?: string;
+    /**
+     * Form submissions associated with ending the usage session
+     */
+    formSubmissions?: Array<FormSubmissionRequestDto>;
 };
 
 export type GetResourceHistoryResponseDto = {
@@ -2125,6 +2312,165 @@ export type CreateProjectInvitationDto = {
      * Role the invited user should receive upon acceptance
      */
     role?: ProjectMemberRole;
+};
+
+export type FormFieldResponseDto = {
+    /**
+     * Field display name
+     */
+    name: string;
+    /**
+     * Field type
+     */
+    type: FormFieldType;
+    /**
+     * Whether the field is required
+     */
+    isRequired: boolean;
+    /**
+     * Optional description shown below the label
+     */
+    description?: string;
+    /**
+     * Arbitrary options payload (e.g. select choices)
+     */
+    options?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Field identifier
+     */
+    id: number;
+};
+
+export type FormResponseDto = {
+    /**
+     * Form identifier
+     */
+    id: number;
+    /**
+     * Creation timestamp
+     */
+    createdAt: string;
+    /**
+     * Last update timestamp
+     */
+    updatedAt: string;
+    /**
+     * Form name
+     */
+    name: string;
+    /**
+     * Whether required before starting a usage session
+     */
+    isRequiredOnResourceUsageStart: boolean;
+    /**
+     * Whether required before taking over a usage session
+     */
+    isRequiredOnResourceUsageTakeOver: boolean;
+    /**
+     * Whether required when ending a usage session
+     */
+    isRequiredOnResourceUsageEnd: boolean;
+    /**
+     * Owning resource identifier
+     */
+    resourceId: number;
+    fields: Array<FormFieldResponseDto>;
+};
+
+export type CreateFormFieldDto = {
+    /**
+     * Field display name
+     */
+    name: string;
+    /**
+     * Field type
+     */
+    type: FormFieldType;
+    /**
+     * Whether the field is required
+     */
+    isRequired: boolean;
+    /**
+     * Optional description shown below the label
+     */
+    description?: string;
+    /**
+     * Arbitrary options payload (e.g. select choices)
+     */
+    options?: {
+        [key: string]: unknown;
+    };
+};
+
+export type CreateFormDto = {
+    /**
+     * Form name
+     */
+    name: string;
+    /**
+     * Require before resource usage start
+     */
+    isRequiredOnResourceUsageStart: boolean;
+    /**
+     * Require before taking over an active usage
+     */
+    isRequiredOnResourceUsageTakeOver: boolean;
+    /**
+     * Require when ending a usage session
+     */
+    isRequiredOnResourceUsageEnd: boolean;
+    fields: Array<CreateFormFieldDto>;
+};
+
+export type UpdateFormFieldDto = {
+    /**
+     * Field display name
+     */
+    name: string;
+    /**
+     * Field type
+     */
+    type: FormFieldType;
+    /**
+     * Whether the field is required
+     */
+    isRequired: boolean;
+    /**
+     * Optional description shown below the label
+     */
+    description?: string;
+    /**
+     * Arbitrary options payload (e.g. select choices)
+     */
+    options?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Existing field identifier
+     */
+    id?: number;
+};
+
+export type UpdateFormDto = {
+    /**
+     * Form name
+     */
+    name: string;
+    /**
+     * Require before resource usage start
+     */
+    isRequiredOnResourceUsageStart: boolean;
+    /**
+     * Require before taking over an active usage
+     */
+    isRequiredOnResourceUsageTakeOver: boolean;
+    /**
+     * Require when ending a usage session
+     */
+    isRequiredOnResourceUsageEnd: boolean;
+    fields: Array<UpdateFormFieldDto>;
 };
 
 export type PluginMainFrontend = {
@@ -3436,6 +3782,51 @@ export type DeclineProjectInvitationData = {
 };
 
 export type DeclineProjectInvitationResponse = ProjectInvitation;
+
+export type ResourceFormsListData = {
+    resourceId: number;
+};
+
+export type ResourceFormsListResponse = Array<FormResponseDto>;
+
+export type ResourceFormsCreateData = {
+    requestBody: CreateFormDto;
+    resourceId: number;
+};
+
+export type ResourceFormsCreateResponse = FormResponseDto;
+
+export type ResourceFormsGetRequirementsData = {
+    /**
+     * Usage action the forms are required for
+     */
+    action: 'start' | 'takeover' | 'end';
+    resourceId: number;
+};
+
+export type ResourceFormsGetRequirementsResponse = Array<FormResponseDto>;
+
+export type ResourceFormsGetOneData = {
+    formId: number;
+    resourceId: number;
+};
+
+export type ResourceFormsGetOneResponse = FormResponseDto;
+
+export type ResourceFormsUpdateData = {
+    formId: number;
+    requestBody: UpdateFormDto;
+    resourceId: number;
+};
+
+export type ResourceFormsUpdateResponse = FormResponseDto;
+
+export type ResourceFormsDeleteData = {
+    formId: number;
+    resourceId: number;
+};
+
+export type ResourceFormsDeleteResponse = void;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -5668,6 +6059,75 @@ export type $OpenApiTs = {
             req: DeclineProjectInvitationData;
             res: {
                 200: ProjectInvitation;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/forms': {
+        get: {
+            req: ResourceFormsListData;
+            res: {
+                200: Array<FormResponseDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: ResourceFormsCreateData;
+            res: {
+                201: FormResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/forms/requirements': {
+        get: {
+            req: ResourceFormsGetRequirementsData;
+            res: {
+                200: Array<FormResponseDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/forms/{formId}': {
+        get: {
+            req: ResourceFormsGetOneData;
+            res: {
+                200: FormResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        put: {
+            req: ResourceFormsUpdateData;
+            res: {
+                200: FormResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: ResourceFormsDeleteData;
+            res: {
+                /**
+                 * Form deleted
+                 */
+                204: void;
                 /**
                  * Unauthorized
                  */
