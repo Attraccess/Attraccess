@@ -136,6 +136,7 @@ private:
         lv_obj_t *errorLabel = nullptr;
         const API::ResourceUsageFormField *definition = nullptr;
         uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
+        ResourceDetailsScreen *owner = nullptr;
     };
 
     struct SelectOptionEventData
@@ -178,7 +179,9 @@ private:
     static void onFormsKeyboardEvent(lv_event_t *e);
     static void onSelectOptionClick(lv_event_t *e);
     static void onSelectOptionDelete(lv_event_t *e);
+    static void onSelectContainerSizeChanged(lv_event_t *e);
     void updateSelectButtonStyles(FormFieldWidget &widget);
+    void updateSelectOptionLayout(FormFieldWidget &widget);
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;

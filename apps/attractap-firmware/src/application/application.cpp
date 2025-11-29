@@ -383,6 +383,7 @@ void Application::processState()
     State::WebsocketState websocketState = State::getWebsocketState();
     if (!apiState.authenticated || (!networkState.ethernet_connected && !networkState.wifi_connected) || !websocketState.connected)
     {
+        this->resetSessionOnDisconnect();
         if (this->state == APPLICATION_STATE_INIT)
         {
             return;
@@ -887,4 +888,43 @@ void Application::resetPauseAccounting()
     this->actionInProgressCount = 0;
     // Ensure not paused visually
     Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+}
+
+void Application::resetSessionOnDisconnect()
+{
+    bool sessionActive = this->unlocked ||
+                         this->resourceIsSelected ||
+                         this->pendingActionType != PENDING_ACTION_NONE ||
+                         this->hasPendingFormRequest ||
+                         this->pendingFormRequestReady ||
+                         this->currentProjectsUser.length() > 0;
+
+    if (!sessionActive)
+    {
+        return;
+    }
+
+    this->logger.info("Connectivity lost; resetting session state");
+
+    // Ensure any in-progress UI overlays are dismissed
+    Display::resourceDetailsScreen.hideActionProgress();
+    Display::resourceDetailsScreen.hideFormsModal();
+    this->resetPauseAccounting();
+
+    this->pendingActionType = PENDING_ACTION_NONE;
+    this->pendingActionResourceId = 0;
+    this->pendingActionProjectId = 0;
+    this->hasPendingFormRequest = false;
+    this->pendingFormRequestReady = false;
+
+    this->clearProjectSelection();
+    this->currentProjectsUser = "";
+
+    this->selectedResourceId = 0;
+    this->resourceIsSelected = false;
+    this->selectedResourceChanged = false;
+
+    this->unlocked = false;
+    this->externalState = EXTERNAL_STATE_NONE;
+    this->nfc.enableCardDetection();
 }

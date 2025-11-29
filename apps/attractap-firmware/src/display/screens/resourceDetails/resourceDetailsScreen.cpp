@@ -6,6 +6,7 @@
 static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
 static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
 static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
 void ResourceDetailsScreen::init()
 {
@@ -103,7 +104,7 @@ void ResourceDetailsScreen::init()
 
    lv_obj_t *resouceDetails = lv_obj_create(header);
    lv_obj_remove_style_all(resouceDetails);
-   lv_obj_set_width(resouceDetails, LV_SIZE_CONTENT);
+   lv_obj_set_width(resouceDetails, lv_pct(100));
    lv_obj_set_height(resouceDetails, LV_SIZE_CONTENT);
    lv_obj_set_align(resouceDetails, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(resouceDetails, LV_FLEX_FLOW_COLUMN);
@@ -112,7 +113,8 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(resouceDetails, LV_OBJ_FLAG_SCROLLABLE);
 
    this->resourceName = lv_label_create(resouceDetails);
-   lv_obj_set_width(this->resourceName, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->resourceName, lv_pct(100));
+   lv_label_set_long_mode(this->resourceName, LV_LABEL_LONG_SCROLL);
    lv_obj_set_height(this->resourceName, LV_SIZE_CONTENT);
    lv_obj_set_align(this->resourceName, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceName, LV_OBJ_FLAG_SCROLLABLE);
@@ -121,7 +123,8 @@ void ResourceDetailsScreen::init()
 
    this->resourceDescription = lv_label_create(resouceDetails);
    lv_obj_set_height(this->resourceDescription, 28);
-   lv_obj_set_width(this->resourceDescription, LV_SIZE_CONTENT);
+   lv_obj_set_width(this->resourceDescription, lv_pct(100));
+   lv_label_set_long_mode(this->resourceDescription, LV_LABEL_LONG_SCROLL);
    lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1484,27 +1487,40 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_label_set_text(this->formsModalErrorLabel, "");
    }
 
-   String subtitle = "Bitte Formular ausfuellen";
-   if (this->formsModalRequest && this->formsModalRequest->action == API::ResourceUsageFormActionType::START)
+   String pageTitle = "Bitte Formular ausfuellen";
+   String resourceName = "";
+
+   if (this->formsModalRequest)
    {
-      subtitle = "Bitte vor dem Start ausfuellen";
-   }
-   else if (this->formsModalRequest && this->formsModalRequest->action == API::ResourceUsageFormActionType::END)
-   {
-      subtitle = "Bitte vor dem Ende ausfuellen";
-   }
-   else if (this->formsModalRequest && this->formsModalRequest->action == API::ResourceUsageFormActionType::TAKEOVER)
-   {
-      subtitle = "Bitte vor der Uebernahme ausfuellen";
-   }
-   if (this->formsModalRequest && this->formsModalRequest->resourceName.length() > 0)
-   {
-      subtitle += " (" + this->formsModalRequest->resourceName + ")";
+      if (this->formsModalRequest->action == API::ResourceUsageFormActionType::START)
+      {
+         pageTitle = "Bitte vor dem Start ausfuellen";
+      }
+      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::END)
+      {
+         pageTitle = "Bitte vor dem Ende ausfuellen";
+      }
+      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::TAKEOVER)
+      {
+         pageTitle = "Bitte vor der Uebernahme ausfuellen";
+      }
+
+      if (this->formsModalRequest->resourceName.length() > 0)
+      {
+         resourceName = this->formsModalRequest->resourceName;
+      }
    }
 
-   lv_obj_t *subtitleLabel = lv_label_create(this->formsModalList);
-   lv_label_set_text(subtitleLabel, subtitle.c_str());
-   lv_obj_set_style_text_color(subtitleLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *pageTitleLabel = lv_label_create(this->formsModalList);
+   lv_label_set_text(pageTitleLabel, pageTitle.c_str());
+   lv_obj_set_style_text_color(pageTitleLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_width(pageTitleLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *resourceNameLabel = lv_label_create(this->formsModalList);
+   lv_label_set_text(resourceNameLabel, resourceName.c_str());
+   lv_obj_set_style_text_color(resourceNameLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
 
    if (!this->formsModalRequest)
       return;
@@ -1528,6 +1544,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_label_set_text(formTitle, form.name.c_str());
       lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_SCROLL);
+      lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
 
       for (uint8_t f = 0; f < form.fieldCount && this->formFieldWidgetCount < API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM; ++f)
       {
@@ -1566,6 +1584,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
          widget.input = nullptr;
          widget.errorLabel = nullptr;
          widget.definition = &field;
+         widget.owner = this;
 
          if (field.type == API::ResourceUsageFormFieldType::BOOLEAN)
          {
@@ -1593,10 +1612,11 @@ void ResourceDetailsScreen::rebuildFormsModal()
             lv_obj_set_height(selectContainer, LV_SIZE_CONTENT);
             lv_obj_set_flex_flow(selectContainer, LV_FLEX_FLOW_ROW_WRAP);
             lv_obj_set_flex_align(selectContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-            lv_obj_set_style_pad_gap(selectContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_pad_gap(selectContainer, SELECT_FIELD_OPTION_GAP, LV_PART_MAIN | LV_STATE_DEFAULT);
 
             widget.input = selectContainer;
             widget.selectedOptionIndex = 0; // 0 = no selection (placeholder)
+            lv_obj_add_event_cb(selectContainer, &ResourceDetailsScreen::onSelectContainerSizeChanged, LV_EVENT_SIZE_CHANGED, &widget);
 
             if (field.options.select.count == 0)
             {
@@ -1611,14 +1631,17 @@ void ResourceDetailsScreen::rebuildFormsModal()
                for (uint8_t optIndex = 0; optIndex < field.options.select.count; ++optIndex)
                {
                   lv_obj_t *optBtn = lv_button_create(selectContainer);
-                  lv_obj_set_height(optBtn, LV_SIZE_CONTENT);
+                  lv_obj_set_height(optBtn, 48);
                   lv_obj_set_style_pad_all(optBtn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
                   lv_obj_set_style_bg_color(optBtn, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
                   lv_obj_set_style_bg_opa(optBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                   lv_obj_set_style_radius(optBtn, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   lv_obj_t *optLabel = lv_label_create(optBtn);
+                  lv_obj_set_width(optLabel, lv_pct(100));
+                  lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
+                  lv_label_set_long_mode(optLabel, LV_LABEL_LONG_SCROLL);
                   lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   // Store option index and widget pointer in user data
@@ -1626,6 +1649,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
                   lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, evtData);
                   lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionDelete, LV_EVENT_DELETE, evtData);
                }
+               this->updateSelectOptionLayout(widget);
             }
          }
          else
@@ -1997,6 +2021,16 @@ void ResourceDetailsScreen::onSelectOptionDelete(lv_event_t *e)
    }
 }
 
+void ResourceDetailsScreen::onSelectContainerSizeChanged(lv_event_t *e)
+{
+   auto *widget = static_cast<FormFieldWidget *>(lv_event_get_user_data(e));
+   if (!widget || !widget->owner)
+   {
+      return;
+   }
+   widget->owner->updateSelectOptionLayout(*widget);
+}
+
 void ResourceDetailsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
 {
    if (!widget.input)
@@ -2024,4 +2058,52 @@ void ResourceDetailsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
          lv_obj_set_style_bg_color(btn, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
       }
    }
+}
+
+void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
+{
+   if (widget.type != API::ResourceUsageFormFieldType::SELECT)
+   {
+      return;
+   }
+   if (!widget.input)
+   {
+      return;
+   }
+   if (!widget.definition || widget.definition->options.select.count == 0)
+   {
+      return;
+   }
+
+   lv_obj_update_layout(widget.input);
+
+   lv_coord_t containerWidth = lv_obj_get_width(widget.input);
+   lv_coord_t padLeft = lv_obj_get_style_pad_left(widget.input, LV_PART_MAIN);
+   lv_coord_t padRight = lv_obj_get_style_pad_right(widget.input, LV_PART_MAIN);
+   lv_coord_t innerWidth = containerWidth - padLeft - padRight;
+   if (innerWidth <= 0)
+   {
+      return;
+   }
+
+   lv_coord_t gap = SELECT_FIELD_OPTION_GAP;
+   lv_coord_t widthPerButton = (innerWidth - (gap * 2)) / 3;
+   if (widthPerButton < 0)
+   {
+      widthPerButton = innerWidth / 3;
+   }
+
+   uint32_t childCount = lv_obj_get_child_count(widget.input);
+   for (uint32_t i = 0; i < childCount; ++i)
+   {
+      lv_obj_t *btn = lv_obj_get_child(widget.input, i);
+      if (!btn)
+      {
+         continue;
+      }
+      lv_obj_set_width(btn, widthPerButton);
+   }
+
+   lv_obj_mark_layout_as_dirty(widget.input);
+   lv_obj_update_layout(widget.input);
 }

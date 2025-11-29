@@ -57,7 +57,8 @@ void Lockscreen::init()
     lv_obj_remove_flag(resourceInfo, LV_OBJ_FLAG_SCROLLABLE);
 
     this->resourceNameLabel = lv_label_create(resourceInfo);
-    lv_obj_set_width(this->resourceNameLabel, LV_SIZE_CONTENT);
+    lv_obj_set_width(this->resourceNameLabel, 250);
+    lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_SCROLL);
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->resourceNameLabel, "???");

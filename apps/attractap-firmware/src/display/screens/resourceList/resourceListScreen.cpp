@@ -69,8 +69,8 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_t *resourceButton = lv_button_create(this->resourceContainer);
    lv_obj_set_width(resourceButton, lv_pct(100));
    lv_obj_set_height(resourceButton, LV_SIZE_CONTENT);
-   lv_obj_set_x(resourceButton, -18);
-   lv_obj_set_y(resourceButton, 24);
+   // lv_obj_set_x(resourceButton, -18);
+   // lv_obj_set_y(resourceButton, 24);
    lv_obj_set_align(resourceButton, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(resourceButton, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(resourceButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -100,8 +100,8 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_CHAIN);
    lv_obj_set_style_text_font(resourceNameLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceNameLabel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_max_width(resourceNameLabel, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
+   lv_obj_set_style_max_width(resourceNameLabel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
 
    lv_obj_t *resourceDescriptionContainer = lv_label_create(resourceButton);
    lv_obj_set_height(resourceDescriptionContainer, 14);
