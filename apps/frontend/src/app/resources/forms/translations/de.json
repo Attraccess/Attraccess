@@ -14,7 +14,10 @@
     "booleanLabel": "Bestätigen",
     "booleanYes": "Ja",
     "booleanNo": "Nein",
-    "formHeading": "Formular {{name}}"
+    "booleanRequired": "Dieses Feld muss aktiviert sein",
+    "formHeading": "Formular {{name}}",
+    "selectPlaceholder": "Bitte eine Option wählen",
+    "selectInvalid": "Bitte eine der verfügbaren Optionen auswählen",
+    "selectUnavailable": "Keine Optionen verfügbar"
   }
 }
-

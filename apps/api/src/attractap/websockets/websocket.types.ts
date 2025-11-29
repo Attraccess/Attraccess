@@ -1,4 +1,4 @@
-import { Attractap } from '@attraccess/database-entities';
+import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
 
 interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -32,6 +32,7 @@ export enum AttractapEventType {
   TRIGGER_FLOW_BUTTON = 'TRIGGER_FLOW_BUTTON',
   BILLING_REQUEST_TOPUP = 'BILLING_REQUEST_TOPUP',
   PROJECTS_OF_USER = 'PROJECTS_OF_USER',
+  RESOURCE_USAGE_FORM_REQUEST = 'RESOURCE_USAGE_FORM_REQUEST',
 }
 
 export interface ResourceThumbnailDescriptorPayload {
@@ -104,4 +105,27 @@ export interface FirmwareUpdateResponse {
   retry_attempt?: number;
   max_attempts?: number;
   bytes_received_before_timeout?: number;
+}
+
+export interface ResourceUsageFormFieldPayload {
+  id: number;
+  name: string;
+  description: string | null;
+  type: string;
+  isRequired: boolean;
+  options: Record<string, unknown> | string[] | null;
+}
+
+export interface ResourceUsageFormPayload {
+  id: number;
+  name: string;
+  description?: string | null;
+  fields: ResourceUsageFormFieldPayload[];
+}
+
+export interface ResourceUsageFormRequestPayload {
+  resourceId: number;
+  resourceName?: string;
+  action: ResourceFormAction;
+  forms: ResourceUsageFormPayload[];
 }

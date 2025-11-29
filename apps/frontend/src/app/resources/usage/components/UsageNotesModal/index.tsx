@@ -80,10 +80,8 @@ function renderFormSubmissions(session: ResourceUsage, t: (key: string) => strin
 
   return session.formSubmissions.map((submission) => {
     const entries = Object.values(
-      (submission.data as Record<
-        string,
-        { value: string; fieldDefinition: { name: string; type: FormFieldType } }
-      >) ?? {},
+      (submission.data as Record<string, { value: string; fieldDefinition: { name: string; type: FormFieldType } }>) ??
+        {},
     );
 
     if (!entries.length) {
@@ -92,9 +90,7 @@ function renderFormSubmissions(session: ResourceUsage, t: (key: string) => strin
 
     return (
       <div key={submission.id} className="rounded-lg border border-default-200 dark:border-default-100 p-3 space-y-2">
-        <p className="text-xs font-medium text-default-500">
-          {submission.form?.name ?? `Form #${submission.formId}`}
-        </p>
+        <p className="text-xs font-medium text-default-500">{submission.form?.name ?? `Form #${submission.formId}`}</p>
         {entries.map((entry, index) => (
           <div key={`${submission.id}-${index}`}>
             <p className="text-sm font-semibold text-default-600">{entry.fieldDefinition.name}</p>
@@ -106,16 +102,16 @@ function renderFormSubmissions(session: ResourceUsage, t: (key: string) => strin
   });
 }
 
-function formatFieldValue(entry: { value: string; fieldDefinition: { type: FormFieldType } }, t: (key: string) => string) {
+function formatFieldValue(
+  entry: { value: string; fieldDefinition: { type: FormFieldType } },
+  t: (key: string) => string,
+) {
   switch (entry.fieldDefinition.type) {
     case FormFieldType.BOOLEAN:
       return entry.value === 'true' ? t('booleanYes') : t('booleanNo');
     case FormFieldType.NUMBER:
+    case FormFieldType.SELECT:
       return entry.value;
-    case FormFieldType.DATETIME: {
-      const date = new Date(entry.value);
-      return Number.isNaN(date.getTime()) ? entry.value : date.toLocaleString();
-    }
     default:
       return entry.value;
   }

@@ -16,8 +16,8 @@ import { ResourceUsage } from './resourceUsage.entity';
 export enum FormFieldType {
   TEXT = 'text',
   NUMBER = 'number',
-  DATETIME = 'datetime',
   BOOLEAN = 'boolean',
+  SELECT = 'select',
 }
 
 export enum ResourceFormAction {
@@ -110,7 +110,7 @@ export class FormField {
 
   @Column({ type: 'json', nullable: true })
   @ApiProperty({ description: 'The options of the form field' })
-  options!: Record<string, unknown> | null;
+  options!: Record<string, unknown> | string[] | null;
 }
 
 interface FormSubmissionFieldData {

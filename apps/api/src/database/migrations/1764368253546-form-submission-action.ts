@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FormSubmissionAction1764379170000 implements MigrationInterface {
-  name = 'FormSubmissionAction1764379170000';
+export class FormSubmissionAction1764368253546 implements MigrationInterface {
+  name = 'FormSubmissionAction1764368253546';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "form_submission" ADD COLUMN "action" text NOT NULL DEFAULT 'start'`);
@@ -18,4 +18,3 @@ export class FormSubmissionAction1764379170000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "temporary_form_submission"`);
   }
 }
-

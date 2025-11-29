@@ -1,10 +1,10 @@
-import { Card, CardBody, CardHeader, Input, Switch, Textarea } from '@heroui/react';
+import { Card, CardBody, CardHeader, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import {
   EditableFormField,
   TextFieldOptions,
   NumberFieldOptions,
-  DatetimeFieldOptions,
+  SelectFieldOptions,
   BooleanFieldOptions,
 } from '../types';
 
@@ -35,9 +35,7 @@ export function FormPreview({ fields, t }: FormPreviewProps) {
             </p>
             {field.description && <p className="text-sm text-default-500">{field.description}</p>}
           </CardHeader>
-          <CardBody className="pt-2">
-            {renderPreviewField(field, t)}
-          </CardBody>
+          <CardBody className="pt-2">{renderPreviewField(field, t)}</CardBody>
         </Card>
       ))}
     </div>
@@ -50,8 +48,8 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
       return renderPreviewText(field.options as TextFieldOptions);
     case FormFieldType.NUMBER:
       return renderPreviewNumber(field.options as NumberFieldOptions);
-    case FormFieldType.DATETIME:
-      return renderPreviewDatetime(field.options as DatetimeFieldOptions);
+    case FormFieldType.SELECT:
+      return renderPreviewSelect(field.options as SelectFieldOptions, t);
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(field.options as BooleanFieldOptions, t);
     default:
@@ -75,8 +73,15 @@ function renderPreviewNumber(options: NumberFieldOptions) {
   return <Input isDisabled type="number" placeholder="0" min={min} max={max} step={step} />;
 }
 
-function renderPreviewDatetime(options: DatetimeFieldOptions) {
-  return <Input isDisabled type="datetime-local" min={options.earliest} max={options.latest} />;
+function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string) {
+  const items = options.options ?? [];
+  return (
+    <Select isDisabled placeholder={t('preview.selectPlaceholder')}>
+      {items.map((option) => (
+        <SelectItem key={option}>{option}</SelectItem>
+      ))}
+    </Select>
+  );
 }
 
 function renderPreviewBoolean(options: BooleanFieldOptions, t: (key: string) => string) {
@@ -92,4 +97,3 @@ function renderPreviewBoolean(options: BooleanFieldOptions, t: (key: string) => 
     </div>
   );
 }
-

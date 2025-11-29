@@ -7,7 +7,8 @@ enum LogLevel
 {
     LOG_LEVEL_ERROR, // 0 - Highest priority, always shown
     LOG_LEVEL_INFO,  // 1 - Medium priority
-    LOG_LEVEL_DEBUG  // 2 - Lowest priority, only shown in debug mode
+    LOG_LEVEL_WARN,  // 2 - Low priority
+    LOG_LEVEL_DEBUG  // 3 - Lowest priority, only shown in debug mode
 };
 
 class Logger
@@ -32,9 +33,16 @@ public:
     void info(const char *) {}
     void infof(const char *, ...) {}
 #endif
+#if LOGGER_LEVEL_NUM >= 2
+    void warn(const char *message);
+    void warnf(const char *message, ...);
+#else
+    void warn(const char *) {}
+    void warnf(const char *, ...) {}
+#endif
     void error(const char *message);
     void errorf(const char *message, ...);
-#if LOGGER_LEVEL_NUM >= 2
+#if LOGGER_LEVEL_NUM >= 3
     void debug(const char *message);
     void debugf(const char *message, ...);
 #else

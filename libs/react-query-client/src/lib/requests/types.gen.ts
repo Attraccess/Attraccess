@@ -616,8 +616,8 @@ export type ResourceGroup = {
 export enum FormFieldType {
     TEXT = 'text',
     NUMBER = 'number',
-    DATETIME = 'datetime',
-    BOOLEAN = 'boolean'
+    BOOLEAN = 'boolean',
+    SELECT = 'select'
 }
 
 export type FormField = {
@@ -2335,8 +2335,8 @@ export type FormFieldResponseDto = {
      * Arbitrary options payload (e.g. select choices)
      */
     options?: {
-        [key: string]: unknown;
-    };
+    [key: string]: unknown;
+} | Array<(string)>;
     /**
      * Field identifier
      */
@@ -2400,8 +2400,8 @@ export type CreateFormFieldDto = {
      * Arbitrary options payload (e.g. select choices)
      */
     options?: {
-        [key: string]: unknown;
-    };
+    [key: string]: unknown;
+} | Array<(string)>;
 };
 
 export type CreateFormDto = {
@@ -2445,8 +2445,8 @@ export type UpdateFormFieldDto = {
      * Arbitrary options payload (e.g. select choices)
      */
     options?: {
-        [key: string]: unknown;
-    };
+    [key: string]: unknown;
+} | Array<(string)>;
     /**
      * Existing field identifier
      */

@@ -58,9 +58,10 @@
         "max": "Maximaler Wert",
         "step": "Schrittweite"
       },
-      "datetime": {
-        "earliest": "Frühestes Datum",
-        "latest": "Spätestes Datum"
+      "select": {
+        "description": "Definiere die Optionen, aus denen Nutzer wählen können.",
+        "optionPlaceholder": "Optionswert",
+        "addOption": "Option hinzufügen"
       },
       "boolean": {
         "trueLabel": "Bezeichnung für „Ja“",
@@ -70,14 +71,14 @@
     "types": {
       "text": "Text",
       "number": "Zahl",
-      "datetime": "Datum & Uhrzeit",
+      "select": "Einzelauswahl",
       "boolean": "Ja / Nein"
     }
   },
   "preview": {
     "booleanYes": "Ja",
     "booleanNo": "Nein",
+    "selectPlaceholder": "Eine Option auswählen",
     "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
   }
 }
-

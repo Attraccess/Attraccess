@@ -276,6 +276,14 @@ export class ResourceFormsService {
     for (const field of form.fields ?? []) {
       const answer = submission.answers.find((item) => item.fieldId === field.id);
 
+      // For boolean fields, check if it's required and must be true
+      if (field.type === 'boolean' && field.isRequired) {
+        const boolValue = answer?.value === true || answer?.value === 'true';
+        if (!boolValue) {
+          throw new BadRequestException(`Field "${field.name}" must be checked on form "${form.name}".`);
+        }
+      }
+
       if (!answer || answer.value === undefined || answer.value === null || answer.value === '') {
         if (field.isRequired) {
           throw new BadRequestException(`Field "${field.name}" is required on form "${form.name}".`);
@@ -284,7 +292,7 @@ export class ResourceFormsService {
       }
 
       data[field.id.toString()] = {
-        value: parseFieldValue(field.type, answer.value),
+        value: parseFieldValue(field.type, answer.value, field.options),
         fieldDefinition: field,
       };
     }

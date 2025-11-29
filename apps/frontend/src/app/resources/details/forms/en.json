@@ -58,9 +58,10 @@
         "max": "Maximum value",
         "step": "Step size"
       },
-      "datetime": {
-        "earliest": "Earliest allowed date",
-        "latest": "Latest allowed date"
+      "select": {
+        "description": "Define the options that users can choose from.",
+        "optionPlaceholder": "Option value",
+        "addOption": "Add option"
       },
       "boolean": {
         "trueLabel": "Label for \"yes\"",
@@ -70,14 +71,14 @@
     "types": {
       "text": "Text",
       "number": "Number",
-      "datetime": "Date & time",
+      "select": "Single choice",
       "boolean": "Yes / No"
     }
   },
   "preview": {
     "booleanYes": "Yes",
     "booleanNo": "No",
+    "selectPlaceholder": "Select an option",
     "empty": "Add fields to see the preview."
   }
 }
-

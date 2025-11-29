@@ -1,18 +1,13 @@
-import { DatePicker, Input, Switch } from '@heroui/react';
-import type { ComponentType } from 'react';
-import { DateValue, getLocalTimeZone, parseAbsoluteToLocal } from '@internationalized/date';
+import { Button, Input, Switch } from '@heroui/react';
+import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import {
   EditableFormField,
   TextFieldOptions,
   NumberFieldOptions,
-  DatetimeFieldOptions,
+  SelectFieldOptions,
   BooleanFieldOptions,
 } from '../types';
-
-// HeroUI bundles its own @internationalized/date types, so we cast to loosen props.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AnyDatePicker = DatePicker as unknown as ComponentType<any>;
 
 interface FieldOptionsEditorProps {
   field: EditableFormField;
@@ -83,24 +78,43 @@ function renderOptionsByType(
         </div>
       );
     }
-    case FormFieldType.DATETIME: {
-      const datetimeOptions = options as DatetimeFieldOptions;
+    case FormFieldType.SELECT: {
+      const selectOptions = options as SelectFieldOptions;
+      const currentOptions = selectOptions.options ?? [];
+
+      const handleAddOption = () => {
+        updateOptions({ options: [...currentOptions, ''] });
+      };
+
+      const handleRemoveOption = (index: number) => {
+        updateOptions({ options: currentOptions.filter((_, i) => i !== index) });
+      };
+
+      const handleOptionChange = (index: number, value: string) => {
+        const newOptions = [...currentOptions];
+        newOptions[index] = value;
+        updateOptions({ options: newOptions });
+      };
+
       return (
-        <div className="grid gap-3 md:grid-cols-2">
-          <AnyDatePicker
-            label={t('fields.options.datetime.earliest')}
-            labelPlacement="outside"
-            granularity="minute"
-            value={isoToZonedDateTime(datetimeOptions.earliest)}
-            onChange={(value: DateValue | null) => updateOptions({ earliest: dateValueToIso(value) ?? '' })}
-          />
-          <AnyDatePicker
-            label={t('fields.options.datetime.latest')}
-            labelPlacement="outside"
-            granularity="minute"
-            value={isoToZonedDateTime(datetimeOptions.latest)}
-            onChange={(value: DateValue | null) => updateOptions({ latest: dateValueToIso(value) ?? '' })}
-          />
+        <div className="space-y-3">
+          <p className="text-xs text-default-500">{t('fields.options.select.description')}</p>
+          {currentOptions.map((option, index) => (
+            <div key={index} className="flex gap-2 items-center">
+              <Input
+                value={option}
+                placeholder={t('fields.options.select.optionPlaceholder')}
+                onChange={(e) => handleOptionChange(index, e.target.value)}
+                size="sm"
+              />
+              <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => handleRemoveOption(index)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button size="sm" variant="flat" startContent={<Plus className="w-4 h-4" />} onPress={handleAddOption}>
+            {t('fields.options.select.addOption')}
+          </Button>
         </div>
       );
     }
@@ -125,23 +139,3 @@ function renderOptionsByType(
       return null;
   }
 }
-
-const isoToZonedDateTime = (value?: string): DateValue | null => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return parseAbsoluteToLocal(value) as DateValue;
-  } catch {
-    return null;
-  }
-};
-
-const dateValueToIso = (value?: DateValue | null) => {
-  if (!value) {
-    return undefined;
-  }
-
-  return value.toDate(getLocalTimeZone()).toISOString();
-};

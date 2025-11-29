@@ -20,12 +20,6 @@ const coerceOptionalNumber = (message: string) =>
 const coerceOptionalPositiveNumber = (message: string) =>
   coerceOptionalNumber(message).refine((value) => value === undefined || value > 0, { message });
 
-const coerceOptionalDate = (message: string) =>
-  z
-    .preprocess((value) => normalizeOptionalInput(value), z.coerce.date().optional())
-    .refine((value) => value === undefined || !Number.isNaN(value.getTime()), { message })
-    .transform((value) => value ?? undefined);
-
 const optionalTrimmedString = z
   .preprocess((value) => {
     if (typeof value !== 'string') {
@@ -39,11 +33,6 @@ const optionalTrimmedString = z
 const createNumericOptionSchema = (message: string) => coerceOptionalNumber(message);
 
 const createPositiveNumericOptionSchema = (message: string) => coerceOptionalPositiveNumber(message);
-
-const createIsoDateOptionSchema = (optionName: string) =>
-  coerceOptionalDate(`Datetime field ${optionName} option must be a valid ISO date.`).transform((value) =>
-    value ? value.toISOString() : undefined,
-  );
 
 const textFieldOptionsSchema = z
   .object({
@@ -79,27 +68,6 @@ const numberFieldOptionsSchema = z
     return value;
   });
 
-const datetimeFieldOptionsSchema = z
-  .object({
-    earliest: createIsoDateOptionSchema('earliest'),
-    latest: createIsoDateOptionSchema('latest'),
-  })
-  .superRefine((value, ctx) => {
-    if (value.earliest && value.latest && new Date(value.earliest) > new Date(value.latest)) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message: 'Datetime field earliest option cannot be after latest.',
-        path: ['earliest'],
-      });
-    }
-  })
-  .transform((value) => {
-    if (!value.earliest && !value.latest) {
-      return null;
-    }
-    return value;
-  });
-
 const booleanFieldOptionsSchema = z
   .object({
     trueLabel: optionalTrimmedString,
@@ -112,11 +80,52 @@ const booleanFieldOptionsSchema = z
     return value;
   });
 
-const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<Record<string, unknown> | null>> = {
+const MAX_SELECT_OPTIONS = 12;
+
+const selectOptionsArraySchema = z
+  .array(
+    z.preprocess((value) => {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length ? trimmed : undefined;
+      }
+      return value;
+    }, z.string()),
+  )
+  .min(1, 'Select fields must contain at least one option.')
+  .max(MAX_SELECT_OPTIONS, `Select fields can have at most ${MAX_SELECT_OPTIONS} options.`)
+  .transform((value) => {
+    const unique: string[] = [];
+    value.forEach((option) => {
+      if (!unique.includes(option)) {
+        unique.push(option);
+      }
+    });
+    return unique;
+  });
+
+const selectFieldOptionsSchema = z
+  .preprocess((value) => {
+    if (value === undefined || value === null) {
+      return [];
+    }
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'object' && Array.isArray((value as { options?: unknown }).options)) {
+      return (value as { options?: unknown }).options;
+    }
+    return value;
+  }, selectOptionsArraySchema)
+  .transform((value) => (value.length ? value : null));
+
+type FieldOptionsPayload = Record<string, unknown> | string[] | null;
+
+const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<FieldOptionsPayload>> = {
   [FormFieldType.TEXT]: textFieldOptionsSchema,
   [FormFieldType.NUMBER]: numberFieldOptionsSchema,
-  [FormFieldType.DATETIME]: datetimeFieldOptionsSchema,
   [FormFieldType.BOOLEAN]: booleanFieldOptionsSchema,
+  [FormFieldType.SELECT]: selectFieldOptionsSchema,
 };
 
 const textFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
@@ -128,24 +137,21 @@ const numberFieldValueSchema = z
   .refine((value) => !Number.isNaN(value), { message: 'Number field values must be numeric.' })
   .transform((value) => value.toString());
 
-const datetimeFieldValueSchema = z
-  .preprocess((value) => normalizeOptionalInput(value), z.coerce.date())
-  .refine((value) => !Number.isNaN(value.getTime()), {
-    message: 'Datetime field values must be valid ISO strings.',
-  })
-  .transform((value) => value.toISOString());
-
 const booleanFieldValueSchema = z
   .custom<
     boolean | 'true' | 'false'
   >((value) => value === true || value === false || value === 'true' || value === 'false', { message: 'Boolean field values must be true or false.' })
   .transform((value) => (value === true || value === 'true' ? 'true' : 'false'));
 
+const selectFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
+  message: 'Select field values must be strings.',
+});
+
 const formFieldValueSchemaByType: Record<FormFieldType, z.ZodType<string>> = {
   [FormFieldType.TEXT]: textFieldValueSchema,
   [FormFieldType.NUMBER]: numberFieldValueSchema,
-  [FormFieldType.DATETIME]: datetimeFieldValueSchema,
   [FormFieldType.BOOLEAN]: booleanFieldValueSchema,
+  [FormFieldType.SELECT]: selectFieldValueSchema,
 };
 
 const parseWithSchema = <T>(schema: z.ZodType<T>, payload: unknown, fallbackMessage: string): T => {
@@ -154,28 +160,23 @@ const parseWithSchema = <T>(schema: z.ZodType<T>, payload: unknown, fallbackMess
   } catch (error) {
     if (error instanceof ZodError) {
       const firstIssue = error.issues[0];
-      const message =
-        firstIssue?.code === ZodIssueCode.invalid_type && firstIssue.expected === 'date'
-          ? fallbackMessage
-          : (firstIssue?.message ?? fallbackMessage);
+      const message = firstIssue?.message ?? fallbackMessage;
       throw new BadRequestException(message);
     }
     throw error;
   }
 };
 
-export const parseFieldOptions = (
-  type: FormFieldType,
-  options: Record<string, unknown> | null | undefined,
-): Record<string, unknown> | null => {
+export const parseFieldOptions = (type: FormFieldType, options: unknown): FieldOptionsPayload => {
   const schema = formFieldOptionsSchemaByType[type];
   if (!schema) {
     return null;
   }
-  return parseWithSchema(schema, options ?? {}, 'Invalid field options payload.');
+  const fallbackInput = type === FormFieldType.SELECT ? [] : {};
+  return parseWithSchema(schema, options ?? fallbackInput, 'Invalid field options payload.');
 };
 
-export const parseFieldValue = (type: FormFieldType, rawValue: unknown): string => {
+export const parseFieldValue = (type: FormFieldType, rawValue: unknown, options?: FieldOptionsPayload): string => {
   const schema = formFieldValueSchemaByType[type];
   if (!schema) {
     throw new BadRequestException(`Unsupported field type ${type}`);
@@ -186,15 +187,25 @@ export const parseFieldValue = (type: FormFieldType, rawValue: unknown): string 
         return 'Text field values must be strings.';
       case FormFieldType.NUMBER:
         return 'Number field values must be numeric.';
-      case FormFieldType.DATETIME:
-        return 'Datetime field values must be valid ISO strings.';
       case FormFieldType.BOOLEAN:
         return 'Boolean field values must be true or false.';
+      case FormFieldType.SELECT:
+        return 'Select field values must match one of the available options.';
       default:
         return `Invalid value for field type ${type}`;
     }
   })();
-  return parseWithSchema(schema, rawValue, fallbackMessage);
+  const normalized = parseWithSchema(schema, rawValue, fallbackMessage);
+  if (type === FormFieldType.SELECT) {
+    const allowed = Array.isArray(options) ? options : null;
+    if (!allowed?.length) {
+      throw new BadRequestException('Select field has no configured options.');
+    }
+    if (!allowed.includes(normalized)) {
+      throw new BadRequestException('Select field values must match one of the available options.');
+    }
+  }
+  return normalized;
 };
 
 export const fieldOptionsSchemas = formFieldOptionsSchemaByType;

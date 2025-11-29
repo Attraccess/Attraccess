@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, DatePicker, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Switch, Textarea } from '@heroui/react';
-import type { ComponentType } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  FormFieldType,
-  FormResponseDto,
-  FormSubmissionRequestDto,
-} from '@attraccess/react-query-client';
-import { ResourceFormAction, parseFieldOptions, FieldOptions, TextFieldOptions, NumberFieldOptions, DatetimeFieldOptions, BooleanFieldOptions } from '../../details/forms/types';
-import { DateValue, getLocalTimeZone, parseAbsoluteToLocal } from '@internationalized/date';
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Select,
+  SelectItem,
+  Selection,
+  Switch,
+  Textarea,
+} from '@heroui/react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
+import {
+  ResourceFormAction,
+  parseFieldOptions,
+  FieldOptions,
+  TextFieldOptions,
+  NumberFieldOptions,
+  BooleanFieldOptions,
+} from '../../details/forms/types';
 import en from '../translations/en.json';
 import de from '../translations/de.json';
 
@@ -21,10 +35,6 @@ interface ResourceFormsModalProps {
 }
 
 type FieldValue = string | boolean;
-
-// HeroUI bundles its own @internationalized/date types, so we cast to loosen props.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AnyDatePicker = DatePicker as unknown as ComponentType<any>;
 
 export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }: ResourceFormsModalProps) {
   const { t } = useTranslations({ en, de });
@@ -76,6 +86,13 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
         form.fields.forEach((field) => {
           const rawValue = values[field.id];
           const hasValue = fieldHasValue(field.type, rawValue);
+          const selectOptions = field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : undefined;
+
+          // For required boolean fields, the value must be true (checked)
+          if (field.type === FormFieldType.BOOLEAN && field.isRequired && rawValue !== true) {
+            nextErrors[field.id] = t('modal.booleanRequired');
+            throw new Error('VALIDATION_ERROR');
+          }
 
           if (!hasValue) {
             if (field.isRequired) {
@@ -85,7 +102,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
             return;
           }
 
-          const normalizedValue = normalizeValue(field.type, rawValue, t, nextErrors, field.id);
+          const normalizedValue = normalizeValue(field.type, rawValue, t, nextErrors, field.id, selectOptions);
           if (normalizedValue === undefined) {
             throw new Error('VALIDATION_ERROR');
           }
@@ -127,6 +144,8 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
                 {form.fields.map((field) => {
                   const rawOptions = field.options as Record<string, unknown> | null | undefined;
                   const parsedOptions = parseFieldOptions(field.type, rawOptions ?? null);
+                  const selectOptions =
+                    field.type === FormFieldType.SELECT ? extractSelectOptions(field.options) : null;
 
                   return (
                     <div key={field.id} className="space-y-2">
@@ -135,13 +154,12 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
                           {field.name}
                           {field.isRequired && <span className="text-danger-500 ml-1">*</span>}
                         </p>
-                        {field.description && (
-                          <p className="text-xs text-default-400">{field.description}</p>
-                        )}
+                        {field.description && <p className="text-xs text-default-400">{field.description}</p>}
                       </div>
                       {renderFieldInput(
                         field,
                         parsedOptions,
+                        selectOptions ?? undefined,
                         values[field.id],
                         (value) => handleValueChange(field.id, value),
                         errors[field.id],
@@ -170,6 +188,7 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
 function renderFieldInput(
   field: FormResponseDto['fields'][number],
   options: FieldOptions,
+  selectOptions: string[] | undefined,
   value: FieldValue | undefined,
   onChange: (value: FieldValue) => void,
   error: string | null | undefined,
@@ -180,10 +199,10 @@ function renderFieldInput(
       return renderTextInput(options as TextFieldOptions, value, onChange, error);
     case FormFieldType.NUMBER:
       return renderNumberInput(options as NumberFieldOptions, value, onChange, error);
-    case FormFieldType.DATETIME:
-      return renderDatetimeInput(options as DatetimeFieldOptions, value, onChange, error);
     case FormFieldType.BOOLEAN:
-      return renderBooleanInput(options as BooleanFieldOptions, value, onChange, t);
+      return renderBooleanInput(options as BooleanFieldOptions, value, onChange, error, t);
+    case FormFieldType.SELECT:
+      return renderSelectInput(selectOptions ?? [], value, onChange, error, t);
     default:
       return (
         <Input
@@ -200,6 +219,9 @@ function fieldHasValue(type: FormFieldType, value: FieldValue | undefined) {
   if (type === FormFieldType.BOOLEAN) {
     return typeof value === 'boolean';
   }
+  if (type === FormFieldType.SELECT) {
+    return typeof value === 'string' && value.trim().length > 0;
+  }
   return Boolean(value && String(value).trim().length > 0);
 }
 
@@ -209,6 +231,7 @@ function normalizeValue(
   t: (key: string) => string,
   errors: Record<number, string | null>,
   fieldId: number,
+  selectOptions?: string[],
 ) {
   switch (type) {
     case FormFieldType.TEXT:
@@ -221,16 +244,20 @@ function normalizeValue(
       }
       return numericValue;
     }
-    case FormFieldType.DATETIME: {
-      const value = String(rawValue);
-      if (Number.isNaN(new Date(value).getTime())) {
-        errors[fieldId] = t('modal.datetimeInvalid');
+    case FormFieldType.BOOLEAN:
+      return Boolean(rawValue);
+    case FormFieldType.SELECT: {
+      const value = typeof rawValue === 'string' ? rawValue : '';
+      if (!selectOptions?.length) {
+        errors[fieldId] = t('modal.selectUnavailable');
+        return undefined;
+      }
+      if (!selectOptions.includes(value)) {
+        errors[fieldId] = t('modal.selectInvalid');
         return undefined;
       }
       return value;
     }
-    case FormFieldType.BOOLEAN:
-      return Boolean(rawValue);
     default:
       return rawValue ?? '';
   }
@@ -289,48 +316,11 @@ function renderNumberInput(
   );
 }
 
-function renderDatetimeInput(
-  options: DatetimeFieldOptions,
-  value: FieldValue | undefined,
-  onChange: (value: FieldValue) => void,
-  error?: string | null,
-) {
-  return (
-    <AnyDatePicker
-      labelPlacement="outside"
-      granularity="minute"
-      value={isoToZonedDateTime(value as string) as unknown as DateValue}
-      minValue={isoToZonedDateTime(options.earliest) as unknown as DateValue}
-      maxValue={isoToZonedDateTime(options.latest) as unknown as DateValue}
-      onChange={(date: DateValue | null) => onChange(dateValueToIso(date) ?? '')}
-      isInvalid={Boolean(error)}
-      errorMessage={error ?? undefined}
-    />
-  );
-}
-
-const isoToZonedDateTime = (value?: string): DateValue | null => {
-  if (!value) {
-    return null;
-  }
-  try {
-    return parseAbsoluteToLocal(value) as DateValue;
-  } catch {
-    return null;
-  }
-};
-
-const dateValueToIso = (value?: DateValue | null) => {
-  if (!value) {
-    return undefined;
-  }
-  return value.toDate(getLocalTimeZone()).toISOString();
-};
-
 function renderBooleanInput(
   options: BooleanFieldOptions,
   value: FieldValue | undefined,
   onChange: (value: FieldValue) => void,
+  error: string | null | undefined,
   t: (key: string) => string,
 ) {
   const trueLabel = options.trueLabel?.trim() || t('modal.booleanYes');
@@ -338,11 +328,70 @@ function renderBooleanInput(
 
   return (
     <div className="space-y-2">
-      <Switch isSelected={(value as boolean) ?? false} onValueChange={(checked) => onChange(checked)}>
+      <Switch
+        isSelected={(value as boolean) ?? false}
+        onValueChange={(checked) => onChange(checked)}
+        color={error ? 'danger' : 'primary'}
+      >
         {trueLabel}
       </Switch>
-      <p className="text-xs text-default-400">{falseLabel}</p>
+      {error ? (
+        <p className="text-xs text-danger-500">{error}</p>
+      ) : (
+        <p className="text-xs text-default-400">{falseLabel}</p>
+      )}
     </div>
   );
 }
 
+function renderSelectInput(
+  options: string[],
+  value: FieldValue | undefined,
+  onChange: (value: FieldValue) => void,
+  error: string | null | undefined,
+  t: (key: string) => string,
+) {
+  const selected = typeof value === 'string' && options.includes(value) ? new Set([value]) : new Set<string>();
+  const handleSelectionChange = (keys: Selection) => {
+    if (keys === 'all') {
+      return;
+    }
+    const first = keys.values().next().value as string | undefined;
+    onChange(first ?? '');
+  };
+
+  return (
+    <Select
+      selectedKeys={selected}
+      onSelectionChange={handleSelectionChange}
+      placeholder={options.length ? t('modal.selectPlaceholder') : t('modal.selectUnavailable')}
+      isDisabled={!options.length}
+      isInvalid={Boolean(error)}
+      errorMessage={error ?? undefined}
+    >
+      {options.map((option) => (
+        <SelectItem key={option}>{option}</SelectItem>
+      ))}
+    </Select>
+  );
+}
+
+function extractSelectOptions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const unique = new Set<string>();
+  const result: string[] = [];
+  raw.forEach((option) => {
+    if (typeof option !== 'string') {
+      return;
+    }
+    const trimmed = option.trim();
+    if (!trimmed || unique.has(trimmed)) {
+      return;
+    }
+    unique.add(trimmed);
+    result.push(trimmed);
+  });
+  return result;
+}

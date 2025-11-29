@@ -14,7 +14,10 @@
     "booleanLabel": "Confirm",
     "booleanYes": "Yes",
     "booleanNo": "No",
-    "formHeading": "Form {{name}}"
+    "booleanRequired": "This field must be checked",
+    "formHeading": "Form {{name}}",
+    "selectPlaceholder": "Select an option",
+    "selectInvalid": "Choose one of the available options",
+    "selectUnavailable": "No options available"
   }
 }
-

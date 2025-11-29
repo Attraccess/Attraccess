@@ -928,7 +928,7 @@ export const $ResourceGroup = {
 
 export const $FormFieldType = {
     type: 'string',
-    enum: ['text', 'number', 'datetime', 'boolean'],
+    enum: ['text', 'number', 'boolean', 'select'],
     description: 'The type of the form field'
 } as const;
 
@@ -3649,9 +3649,19 @@ export const $FormFieldResponseDto = {
             description: 'Optional description shown below the label'
         },
         options: {
-            type: 'object',
             description: 'Arbitrary options payload (e.g. select choices)',
-            additionalProperties: true
+            oneOf: [
+                {
+                    type: 'object',
+                    additionalProperties: true
+                },
+                {
+                    type: 'array',
+                    items: {
+                        type: 'string'
+                    }
+                }
+            ]
         },
         id: {
             type: 'number',
@@ -3739,9 +3749,19 @@ export const $CreateFormFieldDto = {
             description: 'Optional description shown below the label'
         },
         options: {
-            type: 'object',
             description: 'Arbitrary options payload (e.g. select choices)',
-            additionalProperties: true
+            oneOf: [
+                {
+                    type: 'object',
+                    additionalProperties: true
+                },
+                {
+                    type: 'array',
+                    items: {
+                        type: 'string'
+                    }
+                }
+            ]
         }
     },
     required: ['name', 'type', 'isRequired']
@@ -3807,9 +3827,19 @@ export const $UpdateFormFieldDto = {
             description: 'Optional description shown below the label'
         },
         options: {
-            type: 'object',
             description: 'Arbitrary options payload (e.g. select choices)',
-            additionalProperties: true
+            oneOf: [
+                {
+                    type: 'object',
+                    additionalProperties: true
+                },
+                {
+                    type: 'array',
+                    items: {
+                        type: 'string'
+                    }
+                }
+            ]
         },
         id: {
             type: 'number',

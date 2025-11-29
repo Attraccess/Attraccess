@@ -60,6 +60,10 @@ public:
     void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
     void setProjectSelectionCallback(std::function<void(uint32_t, const String &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
+    void showFormsModal(const API::ResourceUsageFormRequest &request);
+    void hideFormsModal();
+    void setFormsSubmitCallback(std::function<void(const API::FormSubmissionList &)> callback);
+    void setFormsCancelCallback(std::function<void()> callback);
 
     // UI helpers for async actions
     void showActionProgress(const char *text);
@@ -108,6 +112,36 @@ private:
     lv_obj_t *doorControls;
 
     lv_obj_t *flowButtonsContainer;
+    lv_obj_t *formsModalOverlay = nullptr;
+    lv_obj_t *formsModalPanel = nullptr;
+    lv_obj_t *formsModalContent = nullptr;
+    lv_obj_t *formsModalList = nullptr;
+    lv_obj_t *formsModalErrorLabel = nullptr;
+    lv_obj_t *formsKeyboard = nullptr;
+    const API::ResourceUsageFormRequest *formsModalRequest = nullptr;
+    struct FormFieldWidget
+    {
+        uint32_t formId;
+        uint32_t fieldId;
+        API::ResourceUsageFormFieldType type;
+        bool isRequired;
+        lv_obj_t *input = nullptr;
+        lv_obj_t *errorLabel = nullptr;
+        const API::ResourceUsageFormField *definition = nullptr;
+        uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
+    };
+
+    struct SelectOptionEventData
+    {
+        ResourceDetailsScreen *self;
+        FormFieldWidget *widget;
+        uint8_t optionIndex; // 1-based (0 = none)
+    };
+    FormFieldWidget formFieldWidgets[API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM];
+    uint16_t formFieldWidgetCount = 0;
+    API::FormSubmissionList formSubmissionScratch;
+    std::function<void(const API::FormSubmissionList &)> formsSubmitCallback;
+    std::function<void()> formsCancelCallback;
 
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime;
@@ -131,6 +165,13 @@ private:
     static void onProjectListItemDelete(lv_event_t *e);
     static void onProjectsPrevPage(lv_event_t *e);
     static void onProjectsNextPage(lv_event_t *e);
+    static void onFormsSubmit(lv_event_t *e);
+    static void onFormsCancel(lv_event_t *e);
+    static void onFormFieldFocus(lv_event_t *e);
+    static void onFormsKeyboardEvent(lv_event_t *e);
+    static void onSelectOptionClick(lv_event_t *e);
+    static void onSelectOptionDelete(lv_event_t *e);
+    void updateSelectButtonStyles(FormFieldWidget &widget);
 
     lv_obj_t *noIntroductionPanel;
     lv_obj_t *introducersListLabel;
@@ -156,4 +197,13 @@ private:
     void rebuildProjectsList();
     void showProjectsLoading();
     void updateProjectsPaginationControls();
+    void ensureFormsModal();
+    void rebuildFormsModal();
+    bool collectFormSubmissions(API::FormSubmissionList &outSubmissions);
+    FormFieldWidget *findFieldWidget(uint32_t formId, uint32_t fieldId);
+    FormFieldWidget *findFieldWidgetByObject(lv_obj_t *object);
+    void clearFormFieldErrors();
+    void hideFormsKeyboard();
+    void updateFormsModalLayoutForKeyboard(bool keyboardVisible);
+    void showKeyboardForWidget(FormFieldWidget &widget, lv_obj_t *target);
 };

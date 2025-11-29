@@ -61,6 +61,20 @@ void Logger::infof(const char *message, ...)
     logf(message, LOG_LEVEL_INFO, args);
     va_end(args);
 }
+
+void Logger::warn(const char *message)
+{
+    log(message, LOG_LEVEL_WARN);
+}
+
+void Logger::warnf(const char *message, ...)
+{
+    va_list args;
+    va_start(args, message);
+    logf(message, LOG_LEVEL_WARN, args);
+    va_end(args);
+}
+
 #endif
 
 void Logger::error(const char *message)
@@ -107,6 +121,8 @@ String Logger::getLogLevelString(LogLevel level)
     {
     case LOG_LEVEL_ERROR:
         return "ERROR";
+    case LOG_LEVEL_WARN:
+        return "WARN";
     case LOG_LEVEL_INFO:
         return "INFO";
     case LOG_LEVEL_DEBUG:
@@ -120,6 +136,10 @@ LogLevel Logger::getLogLevelFromString(const char *level)
     if (strcmp(level, "ERROR") == 0)
     {
         return LOG_LEVEL_ERROR;
+    }
+    else if (strcmp(level, "WARN") == 0)
+    {
+        return LOG_LEVEL_WARN;
     }
     else if (strcmp(level, "INFO") == 0)
     {
