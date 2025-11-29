@@ -1,0 +1,20 @@
+{
+  "modal": {
+    "title": {
+      "start": "Formulare vor dem Start ausfüllen",
+      "takeover": "Formulare vor der Übernahme ausfüllen",
+      "end": "Formulare vor dem Beenden ausfüllen"
+    },
+    "description": "Bitte fülle die erforderlichen Felder aus, um fortzufahren.",
+    "submit": "Formulare senden",
+    "cancel": "Abbrechen",
+    "fieldRequired": "Dieses Feld ist erforderlich",
+    "numberInvalid": "Bitte eine gültige Zahl eingeben",
+    "datetimeInvalid": "Bitte ein gültiges Datum eingeben",
+    "booleanLabel": "Bestätigen",
+    "booleanYes": "Ja",
+    "booleanNo": "Nein",
+    "formHeading": "Formular {{name}}"
+  }
+}
+

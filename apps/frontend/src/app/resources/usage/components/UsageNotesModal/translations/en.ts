@@ -6,4 +6,8 @@ export default {
   sessionStarted: 'Session started',
   sessionEnded: 'Session ended',
   close: 'Close',
+  formsTitle: 'Form submissions',
+  noForms: 'No form submissions recorded',
+  booleanYes: 'Yes',
+  booleanNo: 'No',
 };

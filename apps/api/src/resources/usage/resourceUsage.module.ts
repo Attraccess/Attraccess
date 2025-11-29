@@ -10,6 +10,7 @@ import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
 import { BillingModule } from '../../billing/billing.module';
 import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ProjectsModule } from '../../projects/projects.module';
+import { ResourceFormsModule } from '../forms/forms.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ProjectsModule } from '../../projects/projects.module';
     forwardRef(() => BillingModule),
     forwardRef(() => ResourceFlowsModule),
     forwardRef(() => ProjectsModule),
+    ResourceFormsModule,
   ],
   controllers: [ResourceUsageController],
   providers: [ResourceUsageService],

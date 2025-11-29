@@ -926,6 +926,65 @@ export const $ResourceGroup = {
     required: ['id', 'name', 'createdAt', 'updatedAt']
 } as const;
 
+export const $FormFieldType = {
+    type: 'string',
+    enum: ['text', 'number', 'datetime', 'boolean'],
+    description: 'The type of the form field'
+} as const;
+
+export const $FormField = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the form field'
+        },
+        formId: {
+            type: 'number',
+            description: 'The ID of the form that the field belongs to'
+        },
+        form: {
+            description: 'The form that the field belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Form'
+                }
+            ]
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the form field'
+        },
+        type: {
+            description: 'The type of the form field',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FormFieldType'
+                }
+            ]
+        },
+        isRequired: {
+            type: 'boolean',
+            description: 'Whether the form field is required'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the form field'
+        },
+        options: {
+            type: 'object',
+            description: 'The options of the form field'
+        }
+    },
+    required: ['id', 'formId', 'form', 'name', 'type', 'isRequired', 'description', 'options']
+} as const;
+
+export const $ResourceUsageAction = {
+    type: 'string',
+    enum: ['usage', 'door.lock', 'door.unlock', 'door.unlatch'],
+    description: 'The type of usage'
+} as const;
+
 export const $Resource = {
     type: 'object',
     properties: {
@@ -1013,9 +1072,430 @@ This is a markdown documentation for the resource.`
             items: {
                 '$ref': '#/components/schemas/ResourceGroup'
             }
+        },
+        forms: {
+            description: 'The forms attached to the resource',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/Form'
+            }
         }
     },
-    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'deletedAt', 'groups']
+    required: ['id', 'name', 'type', 'separateUnlockAndUnlatch', 'allowTakeOver', 'createdAt', 'updatedAt', 'deletedAt', 'groups', 'forms']
+} as const;
+
+export const $ProjectMemberRole = {
+    type: 'string',
+    enum: ['viewer'],
+    description: 'Role of the member within the project'
+} as const;
+
+export const $ProjectMember = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier of the project member'
+        },
+        projectId: {
+            type: 'number',
+            description: 'Project ID the member belongs to'
+        },
+        project: {
+            description: 'Project the member belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
+        },
+        userId: {
+            type: 'number',
+            description: 'User ID of the member'
+        },
+        user: {
+            description: 'User that belongs to the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        role: {
+            description: 'Role of the member within the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ProjectMemberRole'
+                }
+            ]
+        },
+        joinedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the membership started'
+        }
+    },
+    required: ['id', 'projectId', 'project', 'userId', 'user', 'role', 'joinedAt']
+} as const;
+
+export const $ProjectInvitationStatus = {
+    type: 'string',
+    enum: ['pending', 'accepted', 'declined', 'canceled'],
+    description: 'Current status of the invitation'
+} as const;
+
+export const $ProjectInvitation = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier of the project invitation'
+        },
+        projectId: {
+            type: 'number',
+            description: 'Project ID for which the invitation was created'
+        },
+        project: {
+            description: 'Project for which the invitation was created',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
+        },
+        inviterId: {
+            type: 'number',
+            description: 'User ID that created the invitation'
+        },
+        inviter: {
+            description: 'Inviter user',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        invitedUserId: {
+            type: 'number',
+            description: 'User ID that is being invited'
+        },
+        invitedUser: {
+            description: 'Invited user',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        status: {
+            description: 'Current status of the invitation',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ProjectInvitationStatus'
+                }
+            ]
+        },
+        requestedRole: {
+            description: 'Role that should be granted upon acceptance',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ProjectMemberRole'
+                }
+            ]
+        },
+        respondedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Timestamp when the invitation was responded to (accept/decline/cancel)'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the invitation was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the invitation was last updated'
+        }
+    },
+    required: ['id', 'projectId', 'project', 'inviterId', 'inviter', 'invitedUserId', 'invitedUser', 'status', 'requestedRole', 'createdAt', 'updatedAt']
+} as const;
+
+export const $Project = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the project'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the NFC card was last updated'
+        },
+        owner: {
+            description: 'The ID of the user that owns the project',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the project'
+        },
+        description: {
+            type: 'string',
+            description: 'The description of the project'
+        },
+        logo: {
+            type: 'string',
+            description: 'The logo of the project'
+        },
+        members: {
+            description: 'Members that have access to the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectMember'
+            }
+        },
+        invitations: {
+            description: 'Pending invitations for the project',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ProjectInvitation'
+            }
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo', 'members', 'invitations']
+} as const;
+
+export const $ResourceUsage = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the resource usage',
+            example: 1
+        },
+        usageAction: {
+            description: 'The type of usage',
+            example: 'usage',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceUsageAction'
+                }
+            ]
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource being used',
+            example: 1
+        },
+        userId: {
+            type: 'number',
+            description: 'The ID of the user using the resource (null if user was deleted)',
+            example: 1
+        },
+        startTime: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the usage session started'
+        },
+        startNotes: {
+            type: 'string',
+            description: 'Notes provided when starting the session',
+            example: 'Starting prototype development for client XYZ'
+        },
+        endTime: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the usage session ended'
+        },
+        endNotes: {
+            type: 'string',
+            description: 'Notes provided when ending the session',
+            example: 'Completed initial prototype, material usage: 500g'
+        },
+        resource: {
+            description: 'The resource being used',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Resource'
+                }
+            ]
+        },
+        user: {
+            description: 'The user who used the resource',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        usageInMinutes: {
+            type: 'number',
+            description: 'The duration of the usage session in minutes',
+            example: 120
+        },
+        projectId: {
+            type: 'number',
+            description: 'The ID of the project this usage session belongs to',
+            example: 1
+        },
+        project: {
+            description: 'The project this usage session belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Project'
+                }
+            ]
+        },
+        formSubmissions: {
+            description: 'The form submissions that belong to this resource usage',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormSubmission'
+            }
+        }
+    },
+    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes', 'formSubmissions']
+} as const;
+
+export const $FormSubmission = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the form submission'
+        },
+        formId: {
+            type: 'number',
+            description: 'The ID of the form that the submission belongs to'
+        },
+        form: {
+            description: 'The form that the submission belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Form'
+                }
+            ]
+        },
+        data: {
+            type: 'object',
+            description: 'The data of the form submission'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the submission was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the submission was last updated'
+        },
+        userId: {
+            type: 'number',
+            description: 'The ID of the user that submitted the form'
+        },
+        user: {
+            description: 'The user that submitted the form',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        resourceUsageId: {
+            type: 'number',
+            description: 'The ID of the resource usage that the submission belongs to'
+        },
+        resourceUsage: {
+            description: 'The resource usage that the submission belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceUsage'
+                }
+            ]
+        },
+        action: {
+            type: 'string',
+            description: 'The action that triggered the submission',
+            enum: ['start', 'takeover', 'end']
+        }
+    },
+    required: ['id', 'formId', 'form', 'data', 'createdAt', 'updatedAt', 'userId', 'user', 'resourceUsageId', 'resourceUsage', 'action']
+} as const;
+
+export const $Form = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The ID of the form'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the form was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the form was last updated'
+        },
+        name: {
+            type: 'string',
+            description: 'The name of the form'
+        },
+        isRequiredOnResourceUsageStart: {
+            type: 'boolean',
+            description: 'Whether the form is required on resource usage start'
+        },
+        isRequiredOnResourceUsageTakeOver: {
+            type: 'boolean',
+            description: 'Whether the form is required on resource usage take over'
+        },
+        isRequiredOnResourceUsageEnd: {
+            type: 'boolean',
+            description: 'Whether the form is required on resource usage end'
+        },
+        fields: {
+            description: 'The fields of the form',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormField'
+            }
+        },
+        submissions: {
+            description: 'The submissions of the form',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormSubmission'
+            }
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource that the form belongs to'
+        },
+        resource: {
+            description: 'The resource that the form belongs to',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/Resource'
+                }
+            ]
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'fields', 'submissions', 'resourceId', 'resource']
 } as const;
 
 export const $PaginatedResourceResponseDto = {
@@ -1501,6 +1981,50 @@ export const $IsResourceGroupIntroducerResponseDto = {
     required: ['isIntroducer']
 } as const;
 
+export const $FormSubmissionFieldAnswerDto = {
+    type: 'object',
+    properties: {
+        fieldId: {
+            type: 'number',
+            description: 'Field identifier',
+            example: 101
+        },
+        value: {
+            description: 'Submitted value',
+            oneOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'boolean'
+                }
+            ]
+        }
+    },
+    required: ['fieldId', 'value']
+} as const;
+
+export const $FormSubmissionRequestDto = {
+    type: 'object',
+    properties: {
+        formId: {
+            type: 'number',
+            description: 'Form identifier',
+            example: 12
+        },
+        answers: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormSubmissionFieldAnswerDto'
+            }
+        }
+    },
+    required: ['formId', 'answers']
+} as const;
+
 export const $StartUsageSessionDto = {
     type: 'object',
     properties: {
@@ -1519,292 +2043,15 @@ export const $StartUsageSessionDto = {
             type: 'number',
             description: 'The project to assign this usage to',
             example: 35
+        },
+        formSubmissions: {
+            description: 'Form submissions required for this action',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormSubmissionRequestDto'
+            }
         }
     }
-} as const;
-
-export const $ResourceUsageAction = {
-    type: 'string',
-    enum: ['usage', 'door.lock', 'door.unlock', 'door.unlatch'],
-    description: 'The type of usage'
-} as const;
-
-export const $ProjectMemberRole = {
-    type: 'string',
-    enum: ['viewer'],
-    description: 'Role of the member within the project'
-} as const;
-
-export const $ProjectMember = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'Unique identifier of the project member'
-        },
-        projectId: {
-            type: 'number',
-            description: 'Project ID the member belongs to'
-        },
-        project: {
-            description: 'Project the member belongs to',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/Project'
-                }
-            ]
-        },
-        userId: {
-            type: 'number',
-            description: 'User ID of the member'
-        },
-        user: {
-            description: 'User that belongs to the project',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        role: {
-            description: 'Role of the member within the project',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/ProjectMemberRole'
-                }
-            ]
-        },
-        joinedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the membership started'
-        }
-    },
-    required: ['id', 'projectId', 'project', 'userId', 'user', 'role', 'joinedAt']
-} as const;
-
-export const $ProjectInvitationStatus = {
-    type: 'string',
-    enum: ['pending', 'accepted', 'declined', 'canceled'],
-    description: 'Current status of the invitation'
-} as const;
-
-export const $ProjectInvitation = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'Unique identifier of the project invitation'
-        },
-        projectId: {
-            type: 'number',
-            description: 'Project ID for which the invitation was created'
-        },
-        project: {
-            description: 'Project for which the invitation was created',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/Project'
-                }
-            ]
-        },
-        inviterId: {
-            type: 'number',
-            description: 'User ID that created the invitation'
-        },
-        inviter: {
-            description: 'Inviter user',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        invitedUserId: {
-            type: 'number',
-            description: 'User ID that is being invited'
-        },
-        invitedUser: {
-            description: 'Invited user',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        status: {
-            description: 'Current status of the invitation',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/ProjectInvitationStatus'
-                }
-            ]
-        },
-        requestedRole: {
-            description: 'Role that should be granted upon acceptance',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/ProjectMemberRole'
-                }
-            ]
-        },
-        respondedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'Timestamp when the invitation was responded to (accept/decline/cancel)'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the invitation was created'
-        },
-        updatedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the invitation was last updated'
-        }
-    },
-    required: ['id', 'projectId', 'project', 'inviterId', 'inviter', 'invitedUserId', 'invitedUser', 'status', 'requestedRole', 'createdAt', 'updatedAt']
-} as const;
-
-export const $Project = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The ID of the project'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'The date and time the NFC card was created'
-        },
-        updatedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'The date and time the NFC card was last updated'
-        },
-        owner: {
-            description: 'The ID of the user that owns the project',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        name: {
-            type: 'string',
-            description: 'The name of the project'
-        },
-        description: {
-            type: 'string',
-            description: 'The description of the project'
-        },
-        logo: {
-            type: 'string',
-            description: 'The logo of the project'
-        },
-        members: {
-            description: 'Members that have access to the project',
-            type: 'array',
-            items: {
-                '$ref': '#/components/schemas/ProjectMember'
-            }
-        },
-        invitations: {
-            description: 'Pending invitations for the project',
-            type: 'array',
-            items: {
-                '$ref': '#/components/schemas/ProjectInvitation'
-            }
-        }
-    },
-    required: ['id', 'createdAt', 'updatedAt', 'owner', 'name', 'description', 'logo', 'members', 'invitations']
-} as const;
-
-export const $ResourceUsage = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the resource usage',
-            example: 1
-        },
-        usageAction: {
-            description: 'The type of usage',
-            example: 'usage',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/ResourceUsageAction'
-                }
-            ]
-        },
-        resourceId: {
-            type: 'number',
-            description: 'The ID of the resource being used',
-            example: 1
-        },
-        userId: {
-            type: 'number',
-            description: 'The ID of the user using the resource (null if user was deleted)',
-            example: 1
-        },
-        startTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the usage session started'
-        },
-        startNotes: {
-            type: 'string',
-            description: 'Notes provided when starting the session',
-            example: 'Starting prototype development for client XYZ'
-        },
-        endTime: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the usage session ended'
-        },
-        endNotes: {
-            type: 'string',
-            description: 'Notes provided when ending the session',
-            example: 'Completed initial prototype, material usage: 500g'
-        },
-        resource: {
-            description: 'The resource being used',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/Resource'
-                }
-            ]
-        },
-        user: {
-            description: 'The user who used the resource',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        usageInMinutes: {
-            type: 'number',
-            description: 'The duration of the usage session in minutes',
-            example: 120
-        },
-        projectId: {
-            type: 'number',
-            description: 'The ID of the project this usage session belongs to',
-            example: 1
-        },
-        project: {
-            description: 'The project this usage session belongs to',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/Project'
-                }
-            ]
-        }
-    },
-    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes']
 } as const;
 
 export const $EndUsageSessionDto = {
@@ -1819,6 +2066,13 @@ export const $EndUsageSessionDto = {
             format: 'date-time',
             type: 'string',
             description: 'The end time of the session. If not provided, current time will be used.'
+        },
+        formSubmissions: {
+            description: 'Form submissions associated with ending the usage session',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormSubmissionRequestDto'
+            }
         }
     }
 } as const;
@@ -3366,6 +3620,236 @@ export const $CreateProjectInvitationDto = {
         }
     },
     required: ['invitedUserId']
+} as const;
+
+export const $FormFieldResponseDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Field display name',
+            example: 'Project name'
+        },
+        type: {
+            description: 'Field type',
+            example: 'text',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FormFieldType'
+                }
+            ]
+        },
+        isRequired: {
+            type: 'boolean',
+            description: 'Whether the field is required',
+            example: true
+        },
+        description: {
+            type: 'string',
+            description: 'Optional description shown below the label'
+        },
+        options: {
+            type: 'object',
+            description: 'Arbitrary options payload (e.g. select choices)',
+            additionalProperties: true
+        },
+        id: {
+            type: 'number',
+            description: 'Field identifier',
+            example: 42
+        }
+    },
+    required: ['name', 'type', 'isRequired', 'id']
+} as const;
+
+export const $FormResponseDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Form identifier',
+            example: 12
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Creation timestamp'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Last update timestamp'
+        },
+        name: {
+            type: 'string',
+            description: 'Form name',
+            example: 'Machine safety checklist'
+        },
+        isRequiredOnResourceUsageStart: {
+            type: 'boolean',
+            description: 'Whether required before starting a usage session'
+        },
+        isRequiredOnResourceUsageTakeOver: {
+            type: 'boolean',
+            description: 'Whether required before taking over a usage session'
+        },
+        isRequiredOnResourceUsageEnd: {
+            type: 'boolean',
+            description: 'Whether required when ending a usage session'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'Owning resource identifier',
+            example: 5
+        },
+        fields: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/FormFieldResponseDto'
+            }
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'resourceId', 'fields']
+} as const;
+
+export const $CreateFormFieldDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Field display name',
+            example: 'Project name'
+        },
+        type: {
+            description: 'Field type',
+            example: 'text',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FormFieldType'
+                }
+            ]
+        },
+        isRequired: {
+            type: 'boolean',
+            description: 'Whether the field is required',
+            example: true
+        },
+        description: {
+            type: 'string',
+            description: 'Optional description shown below the label'
+        },
+        options: {
+            type: 'object',
+            description: 'Arbitrary options payload (e.g. select choices)',
+            additionalProperties: true
+        }
+    },
+    required: ['name', 'type', 'isRequired']
+} as const;
+
+export const $CreateFormDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Form name',
+            example: 'Machine start checklist'
+        },
+        isRequiredOnResourceUsageStart: {
+            type: 'boolean',
+            description: 'Require before resource usage start',
+            default: false
+        },
+        isRequiredOnResourceUsageTakeOver: {
+            type: 'boolean',
+            description: 'Require before taking over an active usage',
+            default: false
+        },
+        isRequiredOnResourceUsageEnd: {
+            type: 'boolean',
+            description: 'Require when ending a usage session',
+            default: false
+        },
+        fields: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/CreateFormFieldDto'
+            }
+        }
+    },
+    required: ['name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'fields']
+} as const;
+
+export const $UpdateFormFieldDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Field display name',
+            example: 'Project name'
+        },
+        type: {
+            description: 'Field type',
+            example: 'text',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FormFieldType'
+                }
+            ]
+        },
+        isRequired: {
+            type: 'boolean',
+            description: 'Whether the field is required',
+            example: true
+        },
+        description: {
+            type: 'string',
+            description: 'Optional description shown below the label'
+        },
+        options: {
+            type: 'object',
+            description: 'Arbitrary options payload (e.g. select choices)',
+            additionalProperties: true
+        },
+        id: {
+            type: 'number',
+            description: 'Existing field identifier'
+        }
+    },
+    required: ['name', 'type', 'isRequired']
+} as const;
+
+export const $UpdateFormDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Form name',
+            example: 'Machine start checklist'
+        },
+        isRequiredOnResourceUsageStart: {
+            type: 'boolean',
+            description: 'Require before resource usage start',
+            default: false
+        },
+        isRequiredOnResourceUsageTakeOver: {
+            type: 'boolean',
+            description: 'Require before taking over an active usage',
+            default: false
+        },
+        isRequiredOnResourceUsageEnd: {
+            type: 'boolean',
+            description: 'Require when ending a usage session',
+            default: false
+        },
+        fields: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/UpdateFormFieldDto'
+            }
+        }
+    },
+    required: ['name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'fields']
 } as const;
 
 export const $PluginMainFrontend = {

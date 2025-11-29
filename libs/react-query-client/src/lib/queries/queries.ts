@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangePasswordDto, ChangeUsernameDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, UpdateEmailTemplateDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceGetLocalSignupDomainWhitelist = <TData = Common.UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(queryKey), queryFn: () => UsersService.getLocalSignupDomainWhitelist() as TData, ...options });
@@ -198,6 +198,17 @@ export const useProjectsServiceListProjectInvitations = <TData = Common.Projects
   id: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseProjectsServiceListProjectInvitationsKeyFn({ id }, queryKey), queryFn: () => ProjectsService.listProjectInvitations({ id }) as TData, ...options });
 export const useProjectInvitationsServiceListMyProjectInvitations = <TData = Common.ProjectInvitationsServiceListMyProjectInvitationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(queryKey), queryFn: () => ProjectInvitationsService.listMyProjectInvitations() as TData, ...options });
+export const useResourceFormsServiceResourceFormsList = <TData = Common.ResourceFormsServiceResourceFormsListDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFormsServiceResourceFormsListKeyFn({ resourceId }, queryKey), queryFn: () => ResourceFormsService.resourceFormsList({ resourceId }) as TData, ...options });
+export const useResourceFormsServiceResourceFormsGetRequirements = <TData = Common.ResourceFormsServiceResourceFormsGetRequirementsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ action, resourceId }: {
+  action: "start" | "takeover" | "end";
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFormsServiceResourceFormsGetRequirementsKeyFn({ action, resourceId }, queryKey), queryFn: () => ResourceFormsService.resourceFormsGetRequirements({ action, resourceId }) as TData, ...options });
+export const useResourceFormsServiceResourceFormsGetOne = <TData = Common.ResourceFormsServiceResourceFormsGetOneDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ formId, resourceId }: {
+  formId: number;
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }, queryKey), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) as TData, ...options });
 export const usePluginsServiceGetPlugins = <TData = Common.PluginsServiceGetPluginsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(queryKey), queryFn: () => PluginsService.getPlugins() as TData, ...options });
 export const usePluginsServiceGetFrontendPluginFile = <TData = Common.PluginsServiceGetFrontendPluginFileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filePath, pluginName }: {
   filePath: string;
@@ -478,6 +489,13 @@ export const useProjectInvitationsServiceDeclineProjectInvitation = <TData = Com
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   invitationId: number;
 }, TContext>({ mutationFn: ({ invitationId }) => ProjectInvitationsService.declineProjectInvitation({ invitationId }) as unknown as Promise<TData>, ...options });
+export const useResourceFormsServiceResourceFormsCreate = <TData = Common.ResourceFormsServiceResourceFormsCreateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateFormDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateFormDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceFormsService.resourceFormsCreate({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
 export const usePluginsServiceUploadPlugin = <TData = Common.PluginsServiceUploadPluginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   formData: UploadPluginDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
@@ -556,6 +574,15 @@ export const useProjectsServiceUpdateProject = <TData = Common.ProjectsServiceUp
   formData: UpdateProjectDto;
   id: number;
 }, TContext>({ mutationFn: ({ formData, id }) => ProjectsService.updateProject({ formData, id }) as unknown as Promise<TData>, ...options });
+export const useResourceFormsServiceResourceFormsUpdate = <TData = Common.ResourceFormsServiceResourceFormsUpdateMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  formId: number;
+  requestBody: UpdateFormDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  formId: number;
+  requestBody: UpdateFormDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ formId, requestBody, resourceId }) => ResourceFormsService.resourceFormsUpdate({ formId, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
 export const useUsersServiceChangeMyUsername = <TData = Common.UsersServiceChangeMyUsernameMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: ChangeUsernameDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
@@ -678,6 +705,13 @@ export const useProjectsServiceCancelProjectInvitation = <TData = Common.Project
   id: number;
   invitationId: number;
 }, TContext>({ mutationFn: ({ id, invitationId }) => ProjectsService.cancelProjectInvitation({ id, invitationId }) as unknown as Promise<TData>, ...options });
+export const useResourceFormsServiceResourceFormsDelete = <TData = Common.ResourceFormsServiceResourceFormsDeleteMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  formId: number;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  formId: number;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ formId, resourceId }) => ResourceFormsService.resourceFormsDelete({ formId, resourceId }) as unknown as Promise<TData>, ...options });
 export const usePluginsServiceDeletePlugin = <TData = Common.PluginsServiceDeletePluginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   pluginId: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

@@ -16,6 +16,7 @@ export function createMockResource(overrides?: Partial<Resource>): Resource {
     updatedAt: new Date().toISOString(),
     groups: [],
     deletedAt: null,
+    forms: [],
     ...overrides,
   };
 }

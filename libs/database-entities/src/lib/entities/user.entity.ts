@@ -11,6 +11,7 @@ import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';
 import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
+import { FormSubmission } from './form';
 
 export class SystemPermissions {
   @Column({ default: false, type: 'boolean' })
@@ -200,4 +201,9 @@ export class User {
     onDelete: 'CASCADE',
   })
   receivedProjectInvitations!: ProjectInvitation[];
+
+  @OneToMany(() => FormSubmission, (submission) => submission.user, {
+    onDelete: 'CASCADE',
+  })
+  formSubmissions!: FormSubmission[];
 }

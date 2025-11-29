@@ -7,6 +7,7 @@ import { SessionTimer } from '../SessionTimer';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import {
   ApiError,
+  FormSubmissionRequestDto,
   useResourcesServiceResourceUsageEndSession,
   useResourcesServiceResourceUsageGetActiveSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
@@ -18,6 +19,7 @@ import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
+import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 
 interface ActiveSessionDisplayProps {
   resourceId: number;
@@ -38,6 +40,8 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+
+  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
 
   const endSession = useResourcesServiceResourceUsageEndSession({
     onSuccess: () => {
@@ -74,18 +78,32 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
     },
   });
 
+  const runEndSession = useCallback(
+    async (body: { notes?: string }) => {
+      let formSubmissions: FormSubmissionRequestDto[] = [];
+      try {
+        formSubmissions = await requestForms('end');
+      } catch (error) {
+        if ((error as Error).message === 'user_cancelled_forms') {
+          return;
+        }
+        throw error;
+      }
+
+      endSession.mutate({
+        resourceId,
+        requestBody: { ...body, formSubmissions },
+      });
+    },
+    [endSession, requestForms, resourceId],
+  );
+
   const immediatelyEndSession = useCallback(() => {
-    endSession.mutate({
-      resourceId,
-      requestBody: {},
-    });
-  }, [endSession, resourceId]);
+    void runEndSession({});
+  }, [runEndSession]);
 
   const handleEndSession = async (notes: string) => {
-    endSession.mutate({
-      resourceId,
-      requestBody: { notes },
-    });
+    await runEndSession({ notes });
   };
 
   const handleOpenEndSessionModal = () => {
@@ -139,10 +157,11 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
       <SessionNotesModal
         isOpen={isNotesModalOpen}
         onClose={() => setIsNotesModalOpen(false)}
-        onConfirm={handleEndSession}
+        onConfirm={(notes) => void handleEndSession(notes)}
         mode={SessionModalMode.END}
         isSubmitting={endSession.isPending}
       />
+      {formsModal}
     </>
   );
 }

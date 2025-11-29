@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -377,6 +377,26 @@ export type ProjectInvitationsServiceListMyProjectInvitationsDefaultResponse = A
 export type ProjectInvitationsServiceListMyProjectInvitationsQueryResult<TData = ProjectInvitationsServiceListMyProjectInvitationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectInvitationsServiceListMyProjectInvitationsKey = "ProjectInvitationsServiceListMyProjectInvitations";
 export const UseProjectInvitationsServiceListMyProjectInvitationsKeyFn = (queryKey?: Array<unknown>) => [useProjectInvitationsServiceListMyProjectInvitationsKey, ...(queryKey ?? [])];
+export type ResourceFormsServiceResourceFormsListDefaultResponse = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsList>>;
+export type ResourceFormsServiceResourceFormsListQueryResult<TData = ResourceFormsServiceResourceFormsListDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFormsServiceResourceFormsListKey = "ResourceFormsServiceResourceFormsList";
+export const UseResourceFormsServiceResourceFormsListKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFormsServiceResourceFormsListKey, ...(queryKey ?? [{ resourceId }])];
+export type ResourceFormsServiceResourceFormsGetRequirementsDefaultResponse = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsGetRequirements>>;
+export type ResourceFormsServiceResourceFormsGetRequirementsQueryResult<TData = ResourceFormsServiceResourceFormsGetRequirementsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFormsServiceResourceFormsGetRequirementsKey = "ResourceFormsServiceResourceFormsGetRequirements";
+export const UseResourceFormsServiceResourceFormsGetRequirementsKeyFn = ({ action, resourceId }: {
+  action: "start" | "takeover" | "end";
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFormsServiceResourceFormsGetRequirementsKey, ...(queryKey ?? [{ action, resourceId }])];
+export type ResourceFormsServiceResourceFormsGetOneDefaultResponse = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsGetOne>>;
+export type ResourceFormsServiceResourceFormsGetOneQueryResult<TData = ResourceFormsServiceResourceFormsGetOneDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useResourceFormsServiceResourceFormsGetOneKey = "ResourceFormsServiceResourceFormsGetOne";
+export const UseResourceFormsServiceResourceFormsGetOneKeyFn = ({ formId, resourceId }: {
+  formId: number;
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useResourceFormsServiceResourceFormsGetOneKey, ...(queryKey ?? [{ formId, resourceId }])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -479,6 +499,7 @@ export type ProjectsServiceCreateProjectInvitationMutationResult = Awaited<Retur
 export type ProjectsServiceResendProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.resendProjectInvitation>>;
 export type ProjectInvitationsServiceAcceptProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.acceptProjectInvitation>>;
 export type ProjectInvitationsServiceDeclineProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.declineProjectInvitation>>;
+export type ResourceFormsServiceResourceFormsCreateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsCreate>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
@@ -491,6 +512,7 @@ export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<t
 export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
 export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
+export type ResourceFormsServiceResourceFormsUpdateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsUpdate>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
 export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeUserUsername>>;
@@ -511,5 +533,6 @@ export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<t
 export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
 export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;
 export type ProjectsServiceCancelProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.cancelProjectInvitation>>;
+export type ResourceFormsServiceResourceFormsDeleteMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsDelete>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

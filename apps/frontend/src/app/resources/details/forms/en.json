@@ -1,0 +1,83 @@
+{
+  "list": {
+    "title": "{{resourceName}} · Forms",
+    "subtitle": "Create structured checklists that members must complete before using this resource.",
+    "create": "Create form",
+    "emptyTitle": "No forms yet",
+    "emptyDescription": "Use forms to capture safety acknowledgements, consumable usage or custom information.",
+    "updated": "Updated",
+    "badges": {
+      "start": "On start",
+      "takeover": "On takeover",
+      "end": "On end"
+    },
+    "fieldCount": "{{count}} fields"
+  },
+  "editor": {
+    "createTitle": "Create form",
+    "editTitle": "{{formName}}",
+    "nameLabel": "Form name",
+    "namePlaceholder": "Machine safety checklist",
+    "resourceUsageStart": "Require before starting a session",
+    "resourceUsageTakeover": "Require before taking over a session",
+    "resourceUsageEnd": "Require before ending a session",
+    "fieldsTitle": "Fields",
+    "addField": "Add field",
+    "emptyFieldsTitle": "No fields",
+    "emptyFieldsDescription": "Add at least one field so members have something to answer.",
+    "save": "Save form",
+    "delete": "Delete form",
+    "previewTitle": "Live preview",
+    "unsaved": "Unsaved changes",
+    "createSuccess": "Form created",
+    "updateSuccess": "Form updated",
+    "deleteSuccess": "Form deleted",
+    "deleteConfirmTitle": "Delete {{formName}}?",
+    "deleteConfirmDescription": "This removes the form and all historic submissions.",
+    "validation": {
+      "missingFieldName": "Please complete every field label before saving."
+    }
+  },
+  "fields": {
+    "label": "Label",
+    "type": "Type",
+    "required": "Required",
+    "description": "Description",
+    "placeholder": {
+      "label": "E.g. Safety goggles worn?",
+      "description": "Shown below the label"
+    },
+    "optionsTitle": "Field options",
+    "options": {
+      "text": {
+        "placeholder": "Placeholder text",
+        "multiline": "Allow multiline input"
+      },
+      "number": {
+        "min": "Minimum value",
+        "max": "Maximum value",
+        "step": "Step size"
+      },
+      "datetime": {
+        "earliest": "Earliest allowed date",
+        "latest": "Latest allowed date"
+      },
+      "boolean": {
+        "trueLabel": "Label for \"yes\"",
+        "falseLabel": "Label for \"no\""
+      }
+    },
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "datetime": "Date & time",
+      "boolean": "Yes / No"
+    }
+  },
+  "preview": {
+    "booleanYes": "Yes",
+    "booleanNo": "No",
+    "empty": "Add fields to see the preview."
+  }
+}
+

@@ -245,6 +245,7 @@ describe('UsersService', () => {
           projectMemberships: [],
           sentProjectInvitations: [],
           receivedProjectInvitations: [],
+          formSubmissions: [],
         } as User,
         {
           id: 2,
@@ -282,6 +283,7 @@ describe('UsersService', () => {
           projectMemberships: [],
           sentProjectInvitations: [],
           receivedProjectInvitations: [],
+          formSubmissions: [],
         } as User,
       ];
 

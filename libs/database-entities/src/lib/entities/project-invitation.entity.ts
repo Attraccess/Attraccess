@@ -21,7 +21,7 @@ export enum ProjectInvitationStatus {
 }
 
 @Entity('project_invitations')
-@Index(['invitedUserId', 'status'])
+@Index('IDX_project_invitation_unique_by_user_and_status', ['invitedUserId', 'status'])
 export class ProjectInvitation {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'Unique identifier of the project invitation' })

@@ -1,0 +1,83 @@
+{
+  "list": {
+    "title": "{{resourceName}} · Formulare",
+    "subtitle": "Erstelle strukturierte Checklisten, die vor der Ressourcennutzung ausgefüllt werden müssen.",
+    "create": "Formular erstellen",
+    "emptyTitle": "Noch keine Formulare",
+    "emptyDescription": "Nutze Formulare, um Sicherheitsbestätigungen oder individuelle Angaben einzuholen.",
+    "updated": "Aktualisiert",
+    "badges": {
+      "start": "Beim Start",
+      "takeover": "Bei Übernahme",
+      "end": "Beim Beenden"
+    },
+    "fieldCount": "{{count}} Felder"
+  },
+  "editor": {
+    "createTitle": "Formular erstellen",
+    "editTitle": "{{formName}}",
+    "nameLabel": "Formularname",
+    "namePlaceholder": "Maschinen-Sicherheitscheckliste",
+    "resourceUsageStart": "Vor Start einer Sitzung erforderlich",
+    "resourceUsageTakeover": "Vor Übernahme erforderlich",
+    "resourceUsageEnd": "Vor Beenden erforderlich",
+    "fieldsTitle": "Felder",
+    "addField": "Feld hinzufügen",
+    "emptyFieldsTitle": "Keine Felder",
+    "emptyFieldsDescription": "Füge mindestens ein Feld hinzu, damit Mitglieder etwas ausfüllen können.",
+    "save": "Formular speichern",
+    "delete": "Formular löschen",
+    "previewTitle": "Live-Vorschau",
+    "unsaved": "Nicht gespeicherte Änderungen",
+    "createSuccess": "Formular erstellt",
+    "updateSuccess": "Formular aktualisiert",
+    "deleteSuccess": "Formular gelöscht",
+    "deleteConfirmTitle": "{{formName}} löschen?",
+    "deleteConfirmDescription": "Dadurch werden das Formular und alle historischen Einsendungen entfernt.",
+    "validation": {
+      "missingFieldName": "Bitte vergib für jedes Feld eine Beschriftung, bevor du speicherst."
+    }
+  },
+  "fields": {
+    "label": "Beschriftung",
+    "type": "Typ",
+    "required": "Pflichtfeld",
+    "description": "Beschreibung",
+    "placeholder": {
+      "label": "z. B. Sicherheitsbrille getragen?",
+      "description": "Wird unterhalb der Beschriftung angezeigt"
+    },
+    "optionsTitle": "Feldoptionen",
+    "options": {
+      "text": {
+        "placeholder": "Platzhaltertext",
+        "multiline": "Mehrzeilige Eingabe erlauben"
+      },
+      "number": {
+        "min": "Minimaler Wert",
+        "max": "Maximaler Wert",
+        "step": "Schrittweite"
+      },
+      "datetime": {
+        "earliest": "Frühestes Datum",
+        "latest": "Spätestes Datum"
+      },
+      "boolean": {
+        "trueLabel": "Bezeichnung für „Ja“",
+        "falseLabel": "Bezeichnung für „Nein“"
+      }
+    },
+    "types": {
+      "text": "Text",
+      "number": "Zahl",
+      "datetime": "Datum & Uhrzeit",
+      "boolean": "Ja / Nein"
+    }
+  },
+  "preview": {
+    "booleanYes": "Ja",
+    "booleanNo": "Nein",
+    "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
+  }
+}
+

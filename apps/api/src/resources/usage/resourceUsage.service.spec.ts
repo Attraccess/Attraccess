@@ -30,6 +30,7 @@ import { InsufficientBalanceError } from '../../billing/errors/insufficient-bala
 import { ResourceInUseError } from './errors/resource-in-use.error';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 import { ProjectsService } from '../../projects/projects.service';
+import { ResourceFormsService } from '../forms/forms.service';
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -114,6 +115,11 @@ describe('ResourceUsageService', () => {
     findOneById: jest.fn(),
   } as unknown as jest.Mocked<ProjectsService>;
 
+  const mockResourceFormsService = {
+    getFormsForAction: jest.fn(),
+    saveRequiredSubmissions: jest.fn(),
+  } as unknown as jest.Mocked<ResourceFormsService>;
+
   type MockQueryBuilder = {
     where: jest.Mock;
     andWhere: jest.Mock;
@@ -195,6 +201,10 @@ describe('ResourceUsageService', () => {
           useValue: {
             runFlow: jest.fn().mockResolvedValue([]),
           },
+        },
+        {
+          provide: ResourceFormsService,
+          useValue: mockResourceFormsService,
         },
       ],
     }).compile();

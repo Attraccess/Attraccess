@@ -1,10 +1,20 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToOne,
+  OneToMany,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsageAction } from './resourceUsage.type';
 import { BillingTransaction } from './billing-transaction.entity';
 import { Project } from './project';
+import { FormSubmission } from './form';
 
 @Entity()
 export class ResourceUsage {
@@ -126,4 +136,12 @@ export class ResourceUsage {
     type: () => Project,
   })
   project!: Project | null;
+
+  @OneToMany(() => FormSubmission, (formSubmission) => formSubmission.resourceUsage)
+  @ApiProperty({
+    description: 'The form submissions that belong to this resource usage',
+    type: () => FormSubmission,
+    isArray: true,
+  })
+  formSubmissions!: FormSubmission[];
 }

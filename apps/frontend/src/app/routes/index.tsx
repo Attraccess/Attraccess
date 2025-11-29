@@ -19,6 +19,7 @@ import { ResourceOverview } from '../resourceOverview';
 import { Dependencies } from '../dependencies';
 import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
+import { FormEditorPage, FormListPage } from '../resources/details/forms';
 import AccountPage from '../account';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { BillingDashboardPage } from '../billing/dashboard';
@@ -59,6 +60,16 @@ const coreRoutes: RouteConfig[] = [
     path: '/resources/:id/flows',
     element: <FlowsPage />,
     authRequired: true,
+  },
+  {
+    path: '/resources/:id/forms',
+    element: <FormListPage />,
+    authRequired: 'canManageResources',
+  },
+  {
+    path: '/resources/:id/forms/:formId',
+    element: <FormEditorPage />,
+    authRequired: 'canManageResources',
   },
   {
     path: '/resources/:id/documentation',

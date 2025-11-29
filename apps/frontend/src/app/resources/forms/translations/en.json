@@ -1,0 +1,20 @@
+{
+  "modal": {
+    "title": {
+      "start": "Complete forms before starting",
+      "takeover": "Complete forms before taking over",
+      "end": "Complete forms before ending"
+    },
+    "description": "Please fill out the required fields to continue.",
+    "submit": "Submit forms",
+    "cancel": "Cancel",
+    "fieldRequired": "This field is required",
+    "numberInvalid": "Enter a valid number",
+    "datetimeInvalid": "Enter a valid date",
+    "booleanLabel": "Confirm",
+    "booleanYes": "Yes",
+    "booleanNo": "No",
+    "formHeading": "Form {{name}}"
+  }
+}
+

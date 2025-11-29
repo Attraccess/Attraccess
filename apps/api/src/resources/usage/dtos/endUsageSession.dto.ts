@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDate } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { FormSubmissionRequestDto } from '../../forms/dto';
 
 export class EndUsageSessionDto {
   @ApiProperty({
@@ -22,4 +23,16 @@ export class EndUsageSessionDto {
   @IsOptional()
   @Type(() => Date)
   endTime?: Date;
+
+  @ApiProperty({
+    description: 'Form submissions associated with ending the usage session',
+    required: false,
+    type: () => FormSubmissionRequestDto,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FormSubmissionRequestDto)
+  formSubmissions?: FormSubmissionRequestDto[];
 }

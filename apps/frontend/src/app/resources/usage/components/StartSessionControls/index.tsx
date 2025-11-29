@@ -15,6 +15,7 @@ import {
   useResourcesServiceLockDoor,
   ApiError,
   ResourceType,
+  FormSubmissionRequestDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -24,6 +25,8 @@ import { InsufficientBalanceModal } from './insufficientBalanceModal';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
+import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
+import { ResourceFormAction } from '../../../details/forms/types';
 
 interface StartSessionControlsProps {
   resourceId: number;
@@ -127,7 +130,7 @@ export function StartSessionControls(
     [t, toast, resource, tExists],
   );
 
-  const { mutate: startSession, isPending: startIsPending } = useResourcesServiceResourceUsageStartSession({
+  const startSession = useResourcesServiceResourceUsageStartSession({
     onSuccess: () => {
       onStartSuccess();
     },
@@ -135,6 +138,7 @@ export function StartSessionControls(
       onStartError(err as ApiError);
     },
   });
+  const startIsPending = startSession.isPending;
 
   const { mutate: unlockDoor, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
     onSuccess: () => {
@@ -165,15 +169,82 @@ export function StartSessionControls(
 
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(undefined);
 
-  const handleStartSession = async (opts?: StartUsageSessionDto) => {
-    startSession({
-      resourceId,
-      requestBody: {
+  const { requestForms, modal: formsModal } = useResourceFormsSubmission(resourceId);
+
+  const isFormsMissingError = useCallback((error: unknown) => {
+    if (!(error instanceof ApiError)) {
+      return false;
+    }
+
+    if (error.status !== 400) {
+      return false;
+    }
+
+    const rawMessage = (error.body as { message?: string | string[] })?.message ?? error.message;
+    const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
+
+    return typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit');
+  }, []);
+
+  const gatherFormSubmissions = useCallback(
+    async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[] | null> => {
+      try {
+        return await requestForms(action);
+      } catch (error) {
+        if ((error as Error).message === 'user_cancelled_forms') {
+          return null;
+        }
+        throw error;
+      }
+    },
+    [requestForms],
+  );
+
+  const executeStartMutation = useCallback(
+    async (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
+      try {
+        await startSession.mutateAsync({
+          resourceId,
+          requestBody,
+        });
+      } catch (error) {
+        if (!isFormsMissingError(error)) {
+          throw error;
+        }
+
+        const retrySubmissions = await gatherFormSubmissions(action);
+        if (!retrySubmissions) {
+          return;
+        }
+
+        await startSession.mutateAsync({
+          resourceId,
+          requestBody: {
+            ...requestBody,
+            formSubmissions: retrySubmissions,
+          },
+        });
+      }
+    },
+    [gatherFormSubmissions, isFormsMissingError, resourceId, startSession],
+  );
+
+  const handleStartSession = useCallback(
+    async (opts?: StartUsageSessionDto) => {
+      const action: ResourceFormAction = opts?.forceTakeOver ? 'takeover' : 'start';
+      const formSubmissions = await gatherFormSubmissions(action);
+      if (formSubmissions === null) {
+        return;
+      }
+
+      await executeStartMutation(action, {
         ...(opts ?? {}),
         projectId: selectedProjectId,
-      },
-    });
-  };
+        formSubmissions,
+      });
+    },
+    [executeStartMutation, gatherFormSubmissions, selectedProjectId],
+  );
 
   const handleOpenStartSessionModal = () => {
     setIsNotesModalOpen(true);
@@ -228,7 +299,7 @@ export function StartSessionControls(
               <Button
                 isLoading={startIsPending}
                 startContent={<PlayIcon className="w-4 h-4" />}
-                onPress={() => handleStartSession()}
+                onPress={() => void handleStartSession()}
               >
                 {t('machine.startSession')}
               </Button>
@@ -256,7 +327,7 @@ export function StartSessionControls(
       <SessionNotesModal
         isOpen={isNotesModalOpen}
         onClose={() => setIsNotesModalOpen(false)}
-        onConfirm={(notes) => handleStartSession({ notes, forceTakeOver: false })}
+        onConfirm={(notes) => void handleStartSession({ notes, forceTakeOver: false })}
         mode={SessionModalMode.START}
         isSubmitting={startIsPending}
       />
@@ -266,6 +337,7 @@ export function StartSessionControls(
         onClose={() => setIsInsufficientBalance(false)}
         desiredAmount={insufficientBalanceDesiredAmount}
       />
+      {formsModal}
     </div>
   );
 }
