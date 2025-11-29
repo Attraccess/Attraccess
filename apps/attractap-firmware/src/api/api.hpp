@@ -30,7 +30,7 @@ public:
     static constexpr size_t MAX_FORM_FIELDS_PER_FORM = 8;
     static constexpr size_t MAX_FORM_SUBMISSIONS = MAX_FORMS_PER_REQUEST;
     static constexpr size_t MAX_FORM_FIELD_ANSWERS = MAX_FORM_FIELDS_PER_FORM;
-    static constexpr size_t MAX_SELECT_OPTIONS = 6;
+    static constexpr size_t MAX_SELECT_OPTIONS = 12;
     struct FlowButton
     {
         char id[MAX_FLOW_BUTTON_ID_LEN];
