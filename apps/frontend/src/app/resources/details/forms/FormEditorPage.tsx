@@ -12,7 +12,19 @@ import {
   UseResourceFormsServiceResourceFormsGetOneKeyFn,
   UseResourceFormsServiceResourceFormsListKeyFn,
 } from '@attraccess/react-query-client';
-import { Accordion, AccordionItem, Button, Card, CardBody, CardHeader, Divider, Input, Spinner, Switch } from '@heroui/react';
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+  Input,
+  Selection,
+  Spinner,
+  Switch,
+} from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -47,10 +59,7 @@ export function FormEditorPage() {
   const { t, tExists } = useTranslations({ en, de });
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-  const {
-    data: formResponse,
-    isLoading: isLoadingForm,
-  } = useResourceFormsServiceResourceFormsGetOne(
+  const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsServiceResourceFormsGetOne(
     { resourceId, formId: Number(formId) },
     undefined,
     { enabled: !isCreateMode && Number.isFinite(resourceId) },
@@ -58,6 +67,7 @@ export function FormEditorPage() {
 
   const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [expandedFieldKey, setExpandedFieldKey] = useState<Selection | undefined>(undefined);
 
   useEffect(() => {
     if (formResponse) {
@@ -114,12 +124,14 @@ export function FormEditorPage() {
   });
 
   const addField = () => {
+    const temporaryId = Date.now().toString();
     setForm((prev) => ({
       ...prev,
       fields: [
         ...prev.fields,
         {
           name: '',
+          _id: temporaryId,
           type: FormFieldType.TEXT,
           isRequired: true,
           description: '',
@@ -127,6 +139,7 @@ export function FormEditorPage() {
         },
       ],
     }));
+    setExpandedFieldKey(new Set([`field-${temporaryId}`]));
   };
 
   const updateField = (index: number, field: EditableFormField) => {
@@ -197,11 +210,7 @@ export function FormEditorPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={
-          isCreateMode
-            ? t('editor.createTitle')
-            : t('editor.editTitle', { formName: formResponse?.name ?? '' })
-        }
+        title={isCreateMode ? t('editor.createTitle') : t('editor.editTitle', { formName: formResponse?.name ?? '' })}
         subtitle={resource?.name}
         backTo={`/resources/${resourceId}/forms`}
         actions={
@@ -229,25 +238,19 @@ export function FormEditorPage() {
             <div className="grid gap-2">
               <Switch
                 isSelected={form.isRequiredOnResourceUsageStart}
-                onValueChange={(value) =>
-                  setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))
-                }
+                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageStart: value }))}
               >
                 {t('editor.resourceUsageStart')}
               </Switch>
               <Switch
                 isSelected={form.isRequiredOnResourceUsageTakeOver}
-                onValueChange={(value) =>
-                  setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))
-                }
+                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageTakeOver: value }))}
               >
                 {t('editor.resourceUsageTakeover')}
               </Switch>
               <Switch
                 isSelected={form.isRequiredOnResourceUsageEnd}
-                onValueChange={(value) =>
-                  setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))
-                }
+                onValueChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageEnd: value }))}
               >
                 {t('editor.resourceUsageEnd')}
               </Switch>
@@ -270,12 +273,13 @@ export function FormEditorPage() {
             )}
 
             <Accordion
-              selectionMode="multiple"
+              selectionMode="single"
               variant="bordered"
-              defaultExpandedKeys={form.fields.map((field, index) => `field-${field.id ?? index}`)}
+              onSelectionChange={setExpandedFieldKey}
+              selectedKeys={expandedFieldKey}
             >
               {form.fields.map((field, index) => {
-                const key = `field-${field.id ?? index}`;
+                const key = `field-${field.id ?? field._id}`;
                 const typeLabel = t(`fields.types.${field.type}`);
 
                 return (
@@ -285,7 +289,7 @@ export function FormEditorPage() {
                     title={
                       <div className="flex flex-col text-start">
                         <span className="text-sm font-semibold text-default-700">
-                          {field.name || t('fields.placeholder.label')} #{index + 1}
+                          <i className="font-thin">#{index + 1}</i> {field.name || t('fields.placeholder.label')}
                         </span>
                         <span className="text-xs text-default-400">{typeLabel}</span>
                       </div>
@@ -304,9 +308,7 @@ export function FormEditorPage() {
             </Accordion>
 
             <div className="flex items-center justify-between pt-2">
-              {hasUnsavedChanges && (
-                <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>
-              )}
+              {hasUnsavedChanges && <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>}
               <Button
                 color="primary"
                 onPress={handleSave}
@@ -389,4 +391,3 @@ async function invalidateFormQueries(
     });
   }
 }
-

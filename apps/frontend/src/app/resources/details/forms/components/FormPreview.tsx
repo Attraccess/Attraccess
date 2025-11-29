@@ -53,16 +53,16 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(field.options as BooleanFieldOptions, t);
     default:
-      return <Input isDisabled placeholder="…" />;
+      return <Input placeholder="…" />;
   }
 }
 
 function renderPreviewText(options: TextFieldOptions) {
   if (options.multiline) {
-    return <Textarea isDisabled placeholder={options.placeholder ?? '…'} />;
+    return <Textarea placeholder={options.placeholder ?? '…'} />;
   }
 
-  return <Input isDisabled placeholder={options.placeholder ?? '…'} />;
+  return <Input placeholder={options.placeholder ?? '…'} />;
 }
 
 function renderPreviewNumber(options: NumberFieldOptions) {
@@ -70,13 +70,13 @@ function renderPreviewNumber(options: NumberFieldOptions) {
   const max = typeof options.max === 'number' ? options.max : undefined;
   const step = typeof options.step === 'number' ? options.step : undefined;
 
-  return <Input isDisabled type="number" placeholder="0" min={min} max={max} step={step} />;
+  return <Input type="number" placeholder="0" min={min} max={max} step={step} />;
 }
 
 function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string) {
   const items = options.options ?? [];
   return (
-    <Select isDisabled placeholder={t('preview.selectPlaceholder')}>
+    <Select placeholder={t('preview.selectPlaceholder')}>
       {items.map((option) => (
         <SelectItem key={option}>{option}</SelectItem>
       ))}
@@ -90,10 +90,8 @@ function renderPreviewBoolean(options: BooleanFieldOptions, t: (key: string) => 
 
   return (
     <div className="flex items-center gap-3">
-      <Switch isDisabled defaultSelected>
-        {yesLabel}
-      </Switch>
-      <Switch isDisabled>{noLabel}</Switch>
+      <Switch defaultSelected>{yesLabel}</Switch>
+      <Switch>{noLabel}</Switch>
     </div>
   );
 }

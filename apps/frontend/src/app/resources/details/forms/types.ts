@@ -26,6 +26,7 @@ export type FieldOptions = TextFieldOptions | NumberFieldOptions | SelectFieldOp
 
 export interface EditableFormField {
   id?: number;
+  _id?: string;
   name: string;
   type: FormFieldType;
   isRequired: boolean;
