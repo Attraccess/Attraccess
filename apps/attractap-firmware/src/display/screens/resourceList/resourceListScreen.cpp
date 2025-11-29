@@ -2,6 +2,10 @@
 
 void ResourceListScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
@@ -32,10 +36,22 @@ void ResourceListScreen::init()
    lv_obj_set_scroll_dir(resourceContainer, LV_DIR_VER);
    lv_obj_set_scrollbar_mode(resourceContainer, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_style_pad_row(resourceContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   if (this->hasCachedResourceList)
+   {
+      this->setResourceList(this->cachedResourceList);
+   }
 }
 
 void ResourceListScreen::setResourceList(const API::ResourceList &resourceList)
 {
+   this->cachedResourceList = resourceList;
+   this->hasCachedResourceList = true;
+
+   if (!this->resourceContainer)
+   {
+      return;
+   }
    // Clear only the resource items while keeping static UI (logo, container) intact
    if (this->resourceContainer)
    {
@@ -169,4 +185,15 @@ String ResourceListScreen::getName()
 
 void ResourceListScreen::onScreenLeave()
 {
+}
+
+void ResourceListScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->resourceContainer = nullptr;
 }

@@ -10,6 +10,7 @@ int16_t Display::y[5] = {0};
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
 IScreen *Display::activeScreen = NULL;
+std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
 std::function<void()> Display::onTransitionComplete = nullptr;
@@ -232,17 +233,6 @@ void Display::setup()
     lv_obj_add_style(scr, &global_bg_style, 0);
     lv_display_set_theme(disp, base_theme);
 
-    Display::bootScreen.init();
-    Display::setPinScreen.init();
-    Display::connectionConfigurationScreen.init();
-    Display::initScreen.init();
-    Display::lockscreen.init();
-    Display::noResourcesScreen.init();
-    Display::resourceListScreen.init();
-    Display::resourceDetailsScreen.init();
-    Display::enrollmentScreen.init();
-    Display::firmwareUpdateScreen.init();
-
     Display::initDeviceOverlay();
 
     Display::transitionToScreen(&Display::bootScreen);
@@ -253,7 +243,10 @@ void Display::setup()
 void Display::loop()
 {
     lv_timer_handler(); /* let the GUI do its work */
-    Display::activeScreen->loop();
+    if (Display::activeScreen)
+    {
+        Display::activeScreen->loop();
+    }
 
     if (!Display::transitionComplete)
     {
@@ -266,6 +259,18 @@ void Display::loop()
                 Display::onTransitionComplete();
                 Display::onTransitionComplete = nullptr;
             }
+            if (!Display::pendingDestroyScreens.empty())
+            {
+                for (IScreen *scr : Display::pendingDestroyScreens)
+                {
+                    if (scr)
+                    {
+                        Display::logger.debugf("Destroying screen: %s", scr->getName().c_str());
+                        scr->destroy();
+                    }
+                }
+                Display::pendingDestroyScreens.clear();
+            }
         }
     }
 }
@@ -277,8 +282,27 @@ void Display::transitionToScreen(IScreen *screen)
 
 void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransitionComplete)
 {
+    if (!screen)
+    {
+        Display::logger.error("transitionToScreen called with null screen");
+        return;
+    }
+
     Display::logger.infof("Transitioning to screen: %s", screen->getName().c_str());
 
+    if (!screen->isLoaded())
+    {
+        screen->init();
+    }
+
+    lv_obj_t *targetRoot = screen->getScreen();
+    if (!targetRoot)
+    {
+        Display::logger.error("Screen failed to provide lvgl root; aborting transition");
+        return;
+    }
+
+    IScreen *previousScreen = Display::activeScreen;
     if (Display::activeScreen)
     {
         Display::activeScreen->onScreenLeave();
@@ -286,7 +310,7 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
 
     Display::activeScreen = screen;
 
-    lv_screen_load_anim(Display::activeScreen->getScreen(), Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
+    lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();
     Display::transitionComplete = false;
 
@@ -297,6 +321,12 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     else
     {
         Display::onTransitionComplete = nullptr;
+    }
+
+    if (previousScreen && previousScreen != screen && previousScreen->shouldAutoUnload())
+    {
+        Display::logger.debugf("Queued screen %s for unload", previousScreen->getName().c_str());
+        Display::pendingDestroyScreens.push_back(previousScreen);
     }
 }
 

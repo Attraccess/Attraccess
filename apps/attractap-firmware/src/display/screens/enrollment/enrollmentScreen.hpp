@@ -14,16 +14,18 @@ public:
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;
+    void destroy() override;
 
     void setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime);
     void setUserName(String userName);
 
 private:
     Logger logger;
-    lv_obj_t *screen;
+    lv_obj_t *screen = nullptr;
 
-    lv_obj_t *timeoutBar;
-    lv_obj_t *userNameLabel;
+    lv_obj_t *timeoutBar = nullptr;
+    lv_obj_t *userNameLabel = nullptr;
+    String userNameCache;
 
     uint32_t enrollmentTimeoutTime;
     void updateTimeoutBar();

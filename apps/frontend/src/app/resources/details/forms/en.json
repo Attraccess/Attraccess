@@ -62,7 +62,8 @@
       "select": {
         "description": "Define the options that users can choose from.",
         "optionPlaceholder": "Option value",
-        "addOption": "Add option"
+        "addOption": "Add option",
+        "maxOptions": "Maximum number of options reached"
       },
       "boolean": {
         "trueLabel": "Label for \"yes\"",

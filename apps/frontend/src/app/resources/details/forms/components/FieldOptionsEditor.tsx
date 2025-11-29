@@ -112,8 +112,14 @@ function renderOptionsByType(
               </Button>
             </div>
           ))}
-          <Button size="sm" variant="flat" startContent={<Plus className="w-4 h-4" />} onPress={handleAddOption}>
-            {t('fields.options.select.addOption')}
+          <Button
+            size="sm"
+            variant="flat"
+            startContent={<Plus className="w-4 h-4" />}
+            onPress={handleAddOption}
+            isDisabled={currentOptions.length >= 12}
+          >
+            {currentOptions.length >= 12 ? t('fields.options.select.maxOptions') : t('fields.options.select.addOption')}
           </Button>
         </div>
       );

@@ -64,7 +64,8 @@
       "select": {
         "description": "Definiere die Optionen, aus denen Nutzer wählen können.",
         "optionPlaceholder": "Optionswert",
-        "addOption": "Option hinzufügen"
+        "addOption": "Option hinzufügen",
+        "maxOptions": "Maximale Anzahl von Optionen erreicht"
       },
       "boolean": {
         "trueLabel": "Bezeichnung für „Ja“",

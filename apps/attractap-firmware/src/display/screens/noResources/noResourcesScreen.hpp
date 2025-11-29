@@ -12,7 +12,8 @@ public:
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;
+    void destroy() override;
 
 private:
-    lv_obj_t *screen;
+    lv_obj_t *screen = nullptr;
 };

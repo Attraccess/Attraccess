@@ -35,6 +35,7 @@ public:
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;
+    void destroy() override;
 
     void setResourceAndUsageDetails(const API::ResourceBrief &resource);
     void setSessionTimeoutTime(uint32_t sessionTimeoutTime);
@@ -74,21 +75,27 @@ public:
 
 private:
     Logger logger;
-    lv_obj_t *screen;
+    lv_obj_t *screen = nullptr;
 
     String loginUsernameCache;
     lv_obj_t *loginUserLabel = nullptr;
 
-    lv_obj_t *sessionDetailsContainer;
-    time_t sessionStartTime;
+    lv_obj_t *sessionDetailsContainer = nullptr;
+    time_t sessionStartTime = 0;
 
-    lv_obj_t *resourceName;
-    lv_obj_t *resourceDescription;
-    lv_obj_t *sessionStartTimeLabel;
-    lv_obj_t *currentUser;
+    lv_obj_t *resourceName = nullptr;
+    lv_obj_t *resourceDescription = nullptr;
+    lv_obj_t *sessionStartTimeLabel = nullptr;
+    lv_obj_t *currentUser = nullptr;
 
-    lv_obj_t *sessionControls;
+    lv_obj_t *sessionControls = nullptr;
     lv_obj_t *projectSelectionRow = nullptr;
+
+    API::ResourceBrief resourceCache{};
+    bool resourceCacheValid = false;
+
+    UserDetails userDetailsCache{};
+    bool userDetailsInitialized = false;
 
     API::ProjectsOfUserResponse projectsCache;
     uint32_t selectedProjectId = 0;
@@ -107,11 +114,11 @@ private:
     lv_obj_t *projectsPaginationLabel = nullptr;
     lv_obj_t *projectsPrevButton = nullptr;
     lv_obj_t *projectsNextButton = nullptr;
-    lv_obj_t *startSessionButton;
-    lv_obj_t *stopSessionButton;
-    lv_obj_t *doorControls;
+    lv_obj_t *startSessionButton = nullptr;
+    lv_obj_t *stopSessionButton = nullptr;
+    lv_obj_t *doorControls = nullptr;
 
-    lv_obj_t *flowButtonsContainer;
+    lv_obj_t *flowButtonsContainer = nullptr;
     lv_obj_t *formsModalOverlay = nullptr;
     lv_obj_t *formsModalPanel = nullptr;
     lv_obj_t *formsModalContent = nullptr;
@@ -144,12 +151,12 @@ private:
     std::function<void()> formsCancelCallback;
 
     void updateElapsedTimeDisplay();
-    lv_obj_t *elapsedTime;
+    lv_obj_t *elapsedTime = nullptr;
 
-    uint32_t sessionTimeoutTime;
+    uint32_t sessionTimeoutTime = 0;
     bool sessionTimeoutPaused = false;
     uint32_t pauseFrozenAtMs = 0;
-    lv_obj_t *sessionTimeoutIndicator;
+    lv_obj_t *sessionTimeoutIndicator = nullptr;
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
@@ -206,4 +213,10 @@ private:
     void hideFormsKeyboard();
     void updateFormsModalLayoutForKeyboard(bool keyboardVisible);
     void showKeyboardForWidget(FormFieldWidget &widget, lv_obj_t *target);
+    void applyCachedState();
+    void disposeProjectsModal();
+    void disposeFormsModal();
+    void disposeActionOverlay();
+    void disposeSuccessToast();
+    void resetFormsModalState();
 };

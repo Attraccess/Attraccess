@@ -18,14 +18,17 @@ public:
     void loop() override;
     lv_obj_t *getScreen() override;
     String getName() override;
+    void destroy() override;
 
     void setResourceList(const API::ResourceList &resourceList);
     void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback);
 
 private:
     Logger logger;
-    lv_obj_t *screen;
-    lv_obj_t *resourceContainer;
+    lv_obj_t *screen = nullptr;
+    lv_obj_t *resourceContainer = nullptr;
+    API::ResourceList cachedResourceList{};
+    bool hasCachedResourceList = false;
 
     std::function<void(const API::ResourceBrief &)> resourceSelectionCallback;
     void addResourceListItem(const API::ResourceBrief &resource);

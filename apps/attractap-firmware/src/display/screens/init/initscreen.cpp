@@ -37,6 +37,10 @@ void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
 
 void InitScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -276,4 +280,22 @@ void InitScreen::onScreenLeave()
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
    this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
+}
+
+void InitScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->wifiSpinner = nullptr;
+   this->wifiLabel = nullptr;
+   this->ethernetSpinner = nullptr;
+   this->ethernetLabel = nullptr;
+   this->apiConnectionSpinner = nullptr;
+   this->apiConnectionLabel = nullptr;
+   this->apiAuthenticationSpinner = nullptr;
+   this->apiAuthenticationLabel = nullptr;
 }

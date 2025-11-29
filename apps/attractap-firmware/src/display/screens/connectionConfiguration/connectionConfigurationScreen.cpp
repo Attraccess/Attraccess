@@ -3,6 +3,11 @@
 
 void ConnectionConfigurationScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
+
    NetworkConfig networkConfig = Settings::getNetworkConfig();
    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
    DeviceConfig deviceConfig = Settings::getDeviceConfig();
@@ -128,12 +133,12 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_align(this->useSSLSwitch, LV_ALIGN_CENTER);
    lv_obj_set_state(this->useSSLSwitch, LV_STATE_CHECKED, apiConfig.useSSL);
 
-   lv_obj_t *labelForUseSSLSwitch = lv_label_create(useSSLContainer);
-   lv_obj_set_width(labelForUseSSLSwitch, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForUseSSLSwitch, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForUseSSLSwitch, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForUseSSLSwitch, "SSL verwenden");
-   lv_obj_set_style_text_color(labelForUseSSLSwitch, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->labelForUseSSLSwitch = lv_label_create(useSSLContainer);
+   lv_obj_set_width(this->labelForUseSSLSwitch, LV_SIZE_CONTENT);
+   lv_obj_set_height(this->labelForUseSSLSwitch, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->labelForUseSSLSwitch, LV_ALIGN_CENTER);
+   lv_label_set_text(this->labelForUseSSLSwitch, "SSL verwenden");
+   lv_obj_set_style_text_color(this->labelForUseSSLSwitch, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *sslInfoLabel = lv_label_create(apiTab);
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
@@ -212,6 +217,11 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->pinLockOverlay, lv_pct(100));
    lv_obj_set_x(this->pinLockOverlay, 0);
    lv_obj_set_y(this->pinLockOverlay, 0);
+
+   if (!this->pinLockEnabled)
+   {
+      lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
+   }
 }
 
 lv_obj_t *ConnectionConfigurationScreen::getScreen()
@@ -499,6 +509,7 @@ void ConnectionConfigurationScreen::setOnSaveCallback(std::function<void(const C
 
 void ConnectionConfigurationScreen::disablePinLock()
 {
+   this->pinLockEnabled = false;
    if (!this->pinLockOverlay)
       return;
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
@@ -506,6 +517,7 @@ void ConnectionConfigurationScreen::disablePinLock()
 
 void ConnectionConfigurationScreen::enablePinLock()
 {
+   this->pinLockEnabled = true;
    if (!this->pinLockOverlay)
       return;
    lv_obj_clear_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
@@ -539,4 +551,28 @@ String ConnectionConfigurationScreen::getName()
 
 void ConnectionConfigurationScreen::onScreenLeave()
 {
+}
+
+void ConnectionConfigurationScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->pinLockOverlay = nullptr;
+   this->tabs = nullptr;
+   this->keyboard = nullptr;
+   this->wifiSSID = nullptr;
+   this->wifiPassword = nullptr;
+   this->serverHostname = nullptr;
+   this->labelForWifiSSID = nullptr;
+   this->labelForWifiPassword = nullptr;
+   this->labelForServerHostname = nullptr;
+   this->useSSLSwitch = nullptr;
+   this->labelForUseSSLSwitch = nullptr;
+   this->devicePin = nullptr;
+   this->labelForDevicePin = nullptr;
+   this->beeperEnabled = nullptr;
 }

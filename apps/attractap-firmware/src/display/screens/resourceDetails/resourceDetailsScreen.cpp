@@ -9,6 +9,10 @@ static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
 
 void ResourceDetailsScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
@@ -390,10 +394,19 @@ void ResourceDetailsScreen::init()
    // action overlay is created lazily on lv_layer_top() when needed
    this->actionOverlay = nullptr;
    this->actionOverlayLabel = nullptr;
+
+   this->applyCachedState();
 }
 
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
+   this->resourceCache = resource;
+   this->resourceCacheValid = true;
+
+   if (!this->screen || !this->resourceName || !this->resourceDescription || !this->flowButtonsContainer)
+   {
+      return;
+   }
    lv_label_set_text(this->resourceName, resource.name);
    lv_label_set_text(this->resourceDescription, resource.description);
 
@@ -488,6 +501,10 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {
+   if (!this->sessionDetailsContainer || !this->elapsedTime)
+   {
+      return;
+   }
    // If session details are hidden, skip updating elapsed time to avoid using an undefined start time
    if (lv_obj_has_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN))
    {
@@ -533,6 +550,10 @@ void ResourceDetailsScreen::extendSessionTimeoutBy(uint32_t ms)
 
 void ResourceDetailsScreen::updateSessionTimeoutIndicator()
 {
+   if (!this->sessionTimeoutIndicator)
+   {
+      return;
+   }
    // If paused, freeze the bar at the last computed value
    uint32_t now = this->sessionTimeoutPaused ? this->pauseFrozenAtMs : millis();
    // add 1 second to the remaining time to prevent overflow if the transition takes a bit
@@ -550,6 +571,141 @@ void ResourceDetailsScreen::loop()
 {
    this->updateElapsedTimeDisplay();
    this->updateSessionTimeoutIndicator();
+}
+
+void ResourceDetailsScreen::destroy()
+{
+   this->disposeProjectsModal();
+   this->disposeFormsModal();
+   this->disposeActionOverlay();
+   this->disposeSuccessToast();
+
+   if (this->screen)
+   {
+      lv_obj_del(this->screen);
+   }
+
+   this->screen = nullptr;
+   this->loginUserLabel = nullptr;
+   this->sessionDetailsContainer = nullptr;
+   this->resourceName = nullptr;
+   this->resourceDescription = nullptr;
+   this->sessionStartTimeLabel = nullptr;
+   this->currentUser = nullptr;
+   this->sessionControls = nullptr;
+   this->projectSelectionRow = nullptr;
+   this->projectsButton = nullptr;
+   this->projectsButtonLabel = nullptr;
+   this->clearProjectButton = nullptr;
+   this->projectsModalPanel = nullptr;
+   this->projectsListContainer = nullptr;
+   this->projectsPaginationLabel = nullptr;
+   this->projectsPrevButton = nullptr;
+   this->projectsNextButton = nullptr;
+   this->startSessionButton = nullptr;
+   this->stopSessionButton = nullptr;
+   this->doorControls = nullptr;
+   this->flowButtonsContainer = nullptr;
+   this->formsModalPanel = nullptr;
+   this->formsModalContent = nullptr;
+   this->formsModalList = nullptr;
+   this->formsModalErrorLabel = nullptr;
+   this->formsKeyboard = nullptr;
+   this->elapsedTime = nullptr;
+   this->sessionTimeoutIndicator = nullptr;
+   this->noIntroductionPanel = nullptr;
+   this->introducersListLabel = nullptr;
+   this->actionOverlayLabel = nullptr;
+   this->successToast = nullptr;
+   this->formsModalRequest = nullptr;
+   this->formFieldWidgetCount = 0;
+}
+
+void ResourceDetailsScreen::disposeProjectsModal()
+{
+   if (this->projectsModal)
+   {
+      lv_obj_del(this->projectsModal);
+   }
+   this->projectsModal = nullptr;
+   this->projectsModalPanel = nullptr;
+   this->projectsListContainer = nullptr;
+   this->projectsPaginationLabel = nullptr;
+   this->projectsPrevButton = nullptr;
+   this->projectsNextButton = nullptr;
+}
+
+void ResourceDetailsScreen::disposeFormsModal()
+{
+   if (this->formsModalOverlay)
+   {
+      lv_obj_del(this->formsModalOverlay);
+   }
+   this->resetFormsModalState();
+}
+
+void ResourceDetailsScreen::resetFormsModalState()
+{
+   this->formsModalOverlay = nullptr;
+   this->formsModalPanel = nullptr;
+   this->formsModalContent = nullptr;
+   this->formsModalList = nullptr;
+   this->formsModalErrorLabel = nullptr;
+   this->formsKeyboard = nullptr;
+   this->formsModalRequest = nullptr;
+   this->formFieldWidgetCount = 0;
+}
+
+void ResourceDetailsScreen::disposeActionOverlay()
+{
+   if (this->actionOverlay)
+   {
+      lv_obj_del(this->actionOverlay);
+   }
+   this->actionOverlay = nullptr;
+   this->actionOverlayLabel = nullptr;
+}
+
+void ResourceDetailsScreen::disposeSuccessToast()
+{
+   if (this->successToastTimer)
+   {
+      lv_timer_del(this->successToastTimer);
+      this->successToastTimer = nullptr;
+   }
+   if (this->successToast)
+   {
+      lv_obj_del(this->successToast);
+      this->successToast = nullptr;
+   }
+}
+
+void ResourceDetailsScreen::applyCachedState()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+
+   if (this->loginUserLabel && this->loginUsernameCache.length() > 0)
+   {
+      lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
+   }
+
+   if (this->resourceCacheValid)
+   {
+      this->setResourceAndUsageDetails(this->resourceCache);
+   }
+
+   if (this->userDetailsInitialized)
+   {
+      this->setUserDetails(this->userDetailsCache);
+   }
+
+   this->refreshProjectsButtonLabel();
+   this->updateClearProjectButtonState();
+   this->updateSessionTimeoutIndicator();
+   this->updateElapsedTimeDisplay();
 }
 
 lv_obj_t *ResourceDetailsScreen::getScreen()
@@ -703,10 +859,11 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 {
    this->logger.debugf("Setting signed in username: %s", userDetails.username.c_str());
    this->loginUsernameCache = userDetails.username;
+   this->userDetailsCache = userDetails;
+   this->userDetailsInitialized = true;
 
-   if (this->loginUserLabel == nullptr)
+   if (!this->loginUserLabel)
    {
-      this->logger.debug("No login user label found");
       return;
    }
 
@@ -721,10 +878,16 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
    lv_label_set_text(this->loginUserLabel, userDetails.username.c_str());
 
    // show introduction panel only if user does not have introduction
-   lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, userDetails.hasIntroduction);
+   if (this->noIntroductionPanel)
+   {
+      lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN, userDetails.hasIntroduction);
+   }
 
    // show session controls only if the user hasIntroduction, isIntroducer or canManageResource
-   lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !userDetails.hasIntroduction && !userDetails.isIntroducer && !userDetails.canManageResource);
+   if (this->sessionControls)
+   {
+      lv_obj_set_flag(this->sessionControls, LV_OBJ_FLAG_HIDDEN, !userDetails.hasIntroduction && !userDetails.isIntroducer && !userDetails.canManageResource);
+   }
 }
 
 void ResourceDetailsScreen::showActionProgress(const char *text)
@@ -768,6 +931,10 @@ void ResourceDetailsScreen::hideActionProgress()
 
 void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
 {
+   if (!this->screen)
+   {
+      return;
+   }
    // Create toast once and reuse to avoid LVGL invalidation/delete during draw
    if (!this->successToast)
    {

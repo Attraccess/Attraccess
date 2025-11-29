@@ -2,6 +2,10 @@
 
 void Lockscreen::init()
 {
+    if (this->screen)
+    {
+        return;
+    }
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -126,4 +130,16 @@ void Lockscreen::updateUsageInfo()
 
 void Lockscreen::onScreenLeave()
 {
+}
+
+void Lockscreen::destroy()
+{
+    if (!this->screen)
+    {
+        return;
+    }
+    lv_obj_del(this->screen);
+    this->screen = nullptr;
+    this->resourceNameLabel = nullptr;
+    this->usageInfoLabel = nullptr;
 }
