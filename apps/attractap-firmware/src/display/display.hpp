@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "../logger/logger.hpp"
+#include <vector>
 
 #include <lvgl.h>
 #include "Arduino_GFX_Library.h"
@@ -73,6 +74,7 @@ private:
     static uint32_t screenHeight;
     static lv_display_t *disp;
     static lv_indev_t *indev;
+    static std::vector<IScreen *> pendingDestroyScreens;
     static void increase_reboot(void *arg);
     static uint8_t reboot_count;
 

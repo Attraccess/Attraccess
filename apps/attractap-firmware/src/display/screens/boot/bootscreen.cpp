@@ -2,6 +2,10 @@
 
 void BootScreen::init()
 {
+    if (this->screen)
+    {
+        return;
+    }
     this->screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(this->screen, lv_color_black(), 0);
 
@@ -37,4 +41,14 @@ String BootScreen::getName()
 
 void BootScreen::onScreenLeave()
 {
+}
+
+void BootScreen::destroy()
+{
+    if (!this->screen)
+    {
+        return;
+    }
+    lv_obj_del(this->screen);
+    this->screen = nullptr;
 }

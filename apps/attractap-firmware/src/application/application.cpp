@@ -117,29 +117,56 @@ void Application::setup()
                                        pl->self->endActionPause();
                                        Display::resourceDetailsScreen.hideActionProgress();
                                        Display::showErrorPopup(pl->t, pl->m);
+                                       if (pl && pl->self)
+                                       {
+                                           pl->self->pendingActionType = PENDING_ACTION_NONE;
+                                           pl->self->hasPendingFormRequest = false;
+                                           Display::resourceDetailsScreen.hideFormsModal();
+                                       }
                                        delete pl;
                                    }, p); });
 
     // Generic action result handling: stop overlay and show success toast
     this->api.setActionResultCallback([this](const char *type, bool success)
                                       {
-                                          (void)type;
-                                          struct ActionResultPayload { Application *self; bool ok; };
+                                          struct ActionResultPayload
+                                          {
+                                              Application *self;
+                                              bool ok;
+                                              String eventType;
+                                          };
                                           ActionResultPayload *p = new ActionResultPayload();
-                                          if (!p) return;
-                                          p->self = this; p->ok = success;
-                                          lv_async_call([](void *u){
-                                              ActionResultPayload *pl = (ActionResultPayload*)u;
-                                              if (pl && pl->self) {
-                                                  pl->self->endActionPause();
-                                              }
-                                              Display::resourceDetailsScreen.hideActionProgress();
-                                              if (pl && pl->ok)
-                                              {
-                                                  Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
-                                              }
-                                              if (pl) delete pl;
-                                          }, p); });
+                                          if (!p)
+                                          {
+                                              return;
+                                          }
+                                      p->self = this;
+                                      p->ok = success;
+                                      if (type)
+                                      {
+                                          p->eventType = String(type);
+                                      }
+                                      lv_async_call([](void *u)
+                                                    {
+                                                        ActionResultPayload *pl = static_cast<ActionResultPayload *>(u);
+                                                        if (pl && pl->self)
+                                                        {
+                                                            pl->self->endActionPause();
+                                                        }
+                                                        Display::resourceDetailsScreen.hideActionProgress();
+                                                        if (pl && pl->ok)
+                                                        {
+                                                            Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
+                                                        }
+                                                        if (pl && pl->self && pl->ok)
+                                                        {
+                                                            pl->self->onActionResult(pl->eventType);
+                                                        }
+                                                        if (pl)
+                                                        {
+                                                            delete pl;
+                                                        } },
+                                                    p); });
 
     this->api.setFirmwareUpdateMetaCallback([this](String availableVersion)
                                             { 
@@ -159,6 +186,11 @@ void Application::setup()
     Display::resourceDetailsScreen.setProjectSelectionCallback(
         [this](uint32_t projectId, const String &projectName)
         { this->handleProjectSelection(projectId, projectName); });
+    Display::resourceDetailsScreen.setFormsSubmitCallback(
+        [this](const API::FormSubmissionList &submissions)
+        { this->handleFormsSubmit(submissions); });
+    Display::resourceDetailsScreen.setFormsCancelCallback([this]()
+                                                          { this->handleFormsCancel(); });
 
     this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username)
                                                         {
@@ -211,6 +243,24 @@ void Application::setup()
                                                     this->projectsTotalCount = projectsOfUserResponse.total;
                                                     this->projectsHasMore = projectsOfUserResponse.hasMore;
                                                     this->projectsOfUserResponseUpdated = true; });
+    this->api.setResourceFormsRequestCallback([this](const API::ResourceUsageFormRequest &request)
+                                              {
+                                                  // DO NOT copy the large struct here - websocket task has limited stack/heap.
+                                                  // Just set a flag; the LVGL async handler will do the copy on the main thread.
+                                                  (void)request; // The data is in api.getFormRequestScratch()
+                                                  this->pendingFormRequestReady = true;
+                                                  // Schedule the copy + UI update on LVGL thread
+                                                  lv_async_call([](void *u)
+                                                                {
+                                                                    auto *self = static_cast<Application *>(u);
+                                                                    if (self && self->pendingFormRequestReady)
+                                                                    {
+                                                                        self->pendingFormRequestReady = false;
+                                                                        // Copy from API's scratch buffer on the main thread (safe stack/heap)
+                                                                        self->pendingFormRequest = self->api.getFormRequestScratch();
+                                                                        self->handleFormsRequest(self->pendingFormRequest);
+                                                                    } },
+                                                                this); });
 
     auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
     {
@@ -333,6 +383,7 @@ void Application::processState()
     State::WebsocketState websocketState = State::getWebsocketState();
     if (!apiState.authenticated || (!networkState.ethernet_connected && !networkState.wifi_connected) || !websocketState.connected)
     {
+        this->resetSessionOnDisconnect();
         if (this->state == APPLICATION_STATE_INIT)
         {
             return;
@@ -658,6 +709,63 @@ void Application::handleProjectSelection(uint32_t projectId, const String &proje
     Display::resourceDetailsScreen.setSelectedProject(projectId, projectName.c_str());
 }
 
+void Application::handleFormsRequest(const API::ResourceUsageFormRequest &request)
+{
+    // Note: 'request' is already a reference to this->pendingFormRequest from the callback,
+    // so we don't need to copy it again. Just set the flag and show the modal.
+    (void)request; // Suppress unused parameter warning; we use pendingFormRequest directly
+    this->hasPendingFormRequest = true;
+    Display::resourceDetailsScreen.hideActionProgress();
+    // Pass the stored copy since showFormsModal stores a pointer
+    Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
+}
+
+void Application::handleFormsSubmit(const API::FormSubmissionList &submissions)
+{
+    if (this->pendingActionType == PENDING_ACTION_NONE)
+    {
+        this->handleFormsCancel();
+        return;
+    }
+
+    this->formSubmissionBuffer = submissions;
+    this->hasPendingFormRequest = false;
+    Display::resourceDetailsScreen.hideFormsModal();
+    Display::resourceDetailsScreen.showActionProgress("Sende Formular");
+
+    if (this->pendingActionType == PENDING_ACTION_START_SESSION)
+    {
+        this->api.startResourceUsageSession(this->pendingActionResourceId, this->pendingActionProjectId, &this->formSubmissionBuffer);
+    }
+    else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION)
+    {
+        this->api.stopResourceUsageSession(this->pendingActionResourceId, &this->formSubmissionBuffer);
+    }
+}
+
+void Application::handleFormsCancel()
+{
+    if (!this->hasPendingFormRequest)
+    {
+        return;
+    }
+    this->hasPendingFormRequest = false;
+    this->pendingActionType = PENDING_ACTION_NONE;
+    Display::resourceDetailsScreen.hideFormsModal();
+    Display::resourceDetailsScreen.hideActionProgress();
+    this->endActionPause();
+}
+
+void Application::onActionResult(const String &eventType)
+{
+    if (eventType == "START_RESOURCE_USAGE_SESSION" || eventType == "STOP_RESOURCE_USAGE_SESSION")
+    {
+        this->pendingActionType = PENDING_ACTION_NONE;
+        this->hasPendingFormRequest = false;
+        Display::resourceDetailsScreen.hideFormsModal();
+    }
+}
+
 void Application::handleTouch(int16_t x, int16_t y)
 {
     if (this->state == APPLICATION_STATE_UNLOCKED)
@@ -688,11 +796,19 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
         this->beginActionPause();
+        this->pendingActionType = PENDING_ACTION_START_SESSION;
+        this->pendingActionResourceId = this->selectedResourceId;
+        this->pendingActionProjectId = this->selectedProjectId;
+        this->hasPendingFormRequest = false;
         this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
         Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
         this->beginActionPause();
+        this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+        this->pendingActionResourceId = this->selectedResourceId;
+        this->pendingActionProjectId = 0;
+        this->hasPendingFormRequest = false;
         this->api.stopResourceUsageSession(this->selectedResourceId);
         break;
     case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
@@ -723,6 +839,9 @@ void Application::handleResourceDetailsButtonClick(ResourceDetailsScreen::Button
         this->unlocked = false;
         this->currentProjectsUser = "";
         this->clearProjectSelection();
+        this->pendingActionType = PENDING_ACTION_NONE;
+        this->hasPendingFormRequest = false;
+        Display::resourceDetailsScreen.hideFormsModal();
         break;
     }
 }
@@ -769,4 +888,43 @@ void Application::resetPauseAccounting()
     this->actionInProgressCount = 0;
     // Ensure not paused visually
     Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+}
+
+void Application::resetSessionOnDisconnect()
+{
+    bool sessionActive = this->unlocked ||
+                         this->resourceIsSelected ||
+                         this->pendingActionType != PENDING_ACTION_NONE ||
+                         this->hasPendingFormRequest ||
+                         this->pendingFormRequestReady ||
+                         this->currentProjectsUser.length() > 0;
+
+    if (!sessionActive)
+    {
+        return;
+    }
+
+    this->logger.info("Connectivity lost; resetting session state");
+
+    // Ensure any in-progress UI overlays are dismissed
+    Display::resourceDetailsScreen.hideActionProgress();
+    Display::resourceDetailsScreen.hideFormsModal();
+    this->resetPauseAccounting();
+
+    this->pendingActionType = PENDING_ACTION_NONE;
+    this->pendingActionResourceId = 0;
+    this->pendingActionProjectId = 0;
+    this->hasPendingFormRequest = false;
+    this->pendingFormRequestReady = false;
+
+    this->clearProjectSelection();
+    this->currentProjectsUser = "";
+
+    this->selectedResourceId = 0;
+    this->resourceIsSelected = false;
+    this->selectedResourceChanged = false;
+
+    this->unlocked = false;
+    this->externalState = EXTERNAL_STATE_NONE;
+    this->nfc.enableCardDetection();
 }

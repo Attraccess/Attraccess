@@ -2,6 +2,10 @@
 
 void EnrollmentScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_ROW_WRAP);
@@ -22,6 +26,7 @@ void EnrollmentScreen::init()
    lv_obj_set_x(this->timeoutBar, 13);
    lv_obj_set_y(this->timeoutBar, -215);
    lv_obj_set_align(this->timeoutBar, LV_ALIGN_CENTER);
+   this->updateTimeoutBar();
 
    lv_obj_t *logo = lv_image_create(this->screen);
    lv_image_set_src(logo, &logo_400w_png);
@@ -44,7 +49,8 @@ void EnrollmentScreen::init()
    lv_obj_set_width(this->userNameLabel, lv_pct(100));
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->userNameLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->userNameLabel, "<USERNAME>");
+   const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "<USERNAME>";
+    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->userNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -64,9 +70,17 @@ void EnrollmentScreen::loop()
 
 void EnrollmentScreen::updateTimeoutBar()
 {
+   if (!this->timeoutBar)
+   {
+      return;
+   }
    uint32_t now = millis();
-   uint32_t remainingTime = this->enrollmentTimeoutTime - now;
-   lv_bar_set_value(this->timeoutBar, remainingTime, LV_ANIM_ON);
+    uint32_t remainingTime = 0;
+    if (this->enrollmentTimeoutTime > now)
+    {
+       remainingTime = this->enrollmentTimeoutTime - now;
+    }
+    lv_bar_set_value(this->timeoutBar, remainingTime, LV_ANIM_ON);
 }
 
 lv_obj_t *EnrollmentScreen::getScreen()
@@ -77,11 +91,16 @@ lv_obj_t *EnrollmentScreen::getScreen()
 void EnrollmentScreen::setEnrollmentTimeoutTime(uint32_t enrollmentTimeoutTime)
 {
    this->enrollmentTimeoutTime = enrollmentTimeoutTime;
+   this->updateTimeoutBar();
 }
 
 void EnrollmentScreen::setUserName(String userName)
 {
-   lv_label_set_text(this->userNameLabel, userName.c_str());
+   this->userNameCache = userName;
+   if (this->userNameLabel)
+   {
+      lv_label_set_text(this->userNameLabel, userName.c_str());
+   }
 }
 
 String EnrollmentScreen::getName()
@@ -91,4 +110,16 @@ String EnrollmentScreen::getName()
 
 void EnrollmentScreen::onScreenLeave()
 {
+}
+
+void EnrollmentScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
+   this->timeoutBar = nullptr;
+   this->userNameLabel = nullptr;
 }

@@ -16,12 +16,13 @@ public:
     lv_obj_t *getScreen() override;
     void loop() override;
     String getName() override;
+    void destroy() override;
 
     void setOnPinConfirmedCallback(std::function<void(String)> onPinConfirmed);
 
 private:
     Logger logger;
-    lv_obj_t *screen;
+    lv_obj_t *screen = nullptr;
     PinInputPage pinInputPage;
 
     std::function<void(String)> onPinConfirmed;

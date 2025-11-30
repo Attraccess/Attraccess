@@ -82,6 +82,7 @@ private:
     const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
     void restartSessionTimeout();
     void resetPauseAccounting();
+    void resetSessionOnDisconnect();
 
     uint32_t timeOfResourceSelectionMs;
     const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
@@ -104,10 +105,29 @@ private:
     bool projectsHasMore = false;
     String currentProjectsUser;
 
+    enum pending_action_t
+    {
+        PENDING_ACTION_NONE,
+        PENDING_ACTION_START_SESSION,
+        PENDING_ACTION_STOP_SESSION,
+    };
+    pending_action_t pendingActionType = PENDING_ACTION_NONE;
+    uint32_t pendingActionResourceId = 0;
+    uint32_t pendingActionProjectId = 0;
+    bool hasPendingFormRequest = false;
+    // Flag set by websocket callback when a form request arrives; processed by main loop
+    volatile bool pendingFormRequestReady = false;
+    API::ResourceUsageFormRequest pendingFormRequest;
+    API::FormSubmissionList formSubmissionBuffer;
+
     void selectResource(const API::ResourceBrief &resource);
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();
     void handleProjectSelection(uint32_t projectId, const String &projectName);
+    void handleFormsRequest(const API::ResourceUsageFormRequest &request);
+    void handleFormsSubmit(const API::FormSubmissionList &submissions);
+    void handleFormsCancel();
+    void onActionResult(const String &eventType);
 
     enum applicationState_t
     {

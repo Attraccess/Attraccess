@@ -26,6 +26,11 @@ public:
     static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
     static constexpr size_t MAX_FLOW_BUTTON_ID_LEN = 48;
     static constexpr size_t MAX_PROJECTS_PER_PAGE = 4;
+    static constexpr size_t MAX_FORMS_PER_REQUEST = 3;
+    static constexpr size_t MAX_FORM_FIELDS_PER_FORM = 8;
+    static constexpr size_t MAX_FORM_SUBMISSIONS = MAX_FORMS_PER_REQUEST;
+    static constexpr size_t MAX_FORM_FIELD_ANSWERS = MAX_FORM_FIELDS_PER_FORM;
+    static constexpr size_t MAX_SELECT_OPTIONS = 12;
     struct FlowButton
     {
         char id[MAX_FLOW_BUTTON_ID_LEN];
@@ -67,6 +72,106 @@ public:
         Project items[MAX_PROJECTS_PER_PAGE];
     };
 
+    enum class ResourceUsageFormActionType : uint8_t
+    {
+        UNKNOWN,
+        START,
+        END,
+        TAKEOVER,
+    };
+
+    enum class ResourceUsageFormFieldType : uint8_t
+    {
+        UNKNOWN,
+        TEXT,
+        NUMBER,
+        BOOLEAN,
+        SELECT,
+    };
+
+    struct ResourceUsageFormFieldOptions
+    {
+        struct
+        {
+            bool hasPlaceholder = false;
+            String placeholder;
+            bool multiline = false;
+        } text;
+        struct
+        {
+            bool hasMin = false;
+            double min = 0;
+            bool hasMax = false;
+            double max = 0;
+            bool hasStep = false;
+            double step = 0;
+        } number;
+        struct
+        {
+            String trueLabel;
+            String falseLabel;
+        } boolean;
+        struct
+        {
+            uint8_t count = 0;
+            String values[MAX_SELECT_OPTIONS];
+        } select;
+    };
+
+    struct ResourceUsageFormField
+    {
+        uint32_t id = 0;
+        ResourceUsageFormFieldType type = ResourceUsageFormFieldType::UNKNOWN;
+        bool isRequired = false;
+        String name;
+        String description;
+        ResourceUsageFormFieldOptions options;
+    };
+
+    struct ResourceUsageForm
+    {
+        uint32_t id = 0;
+        String name;
+        uint8_t fieldCount = 0;
+        ResourceUsageFormField fields[MAX_FORM_FIELDS_PER_FORM];
+    };
+
+    struct ResourceUsageFormRequest
+    {
+        uint32_t resourceId = 0;
+        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
+        String resourceName;
+        uint8_t formCount = 0;
+        ResourceUsageForm forms[MAX_FORMS_PER_REQUEST];
+    };
+
+    struct FormSubmissionAnswer
+    {
+        uint32_t fieldId = 0;
+        enum class ValueType : uint8_t
+        {
+            STRING,
+            NUMBER,
+            BOOLEAN,
+        } type = ValueType::STRING;
+        String stringValue;
+        double numberValue = 0;
+        bool boolValue = false;
+    };
+
+    struct FormSubmission
+    {
+        uint32_t formId = 0;
+        uint8_t answerCount = 0;
+        FormSubmissionAnswer answers[MAX_FORM_FIELD_ANSWERS];
+    };
+
+    struct FormSubmissionList
+    {
+        uint8_t submissionCount = 0;
+        FormSubmission submissions[MAX_FORM_SUBMISSIONS];
+    };
+
     void setResourceListUpdateCallback(std::function<void(const ResourceList &)> callback);
     void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
 
@@ -89,8 +194,8 @@ public:
     void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
     void sendEnrollNewCard(bool success);
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0);
-    void stopResourceUsageSession(uint32_t resourceId);
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, const FormSubmissionList *formSubmissions = nullptr);
+    void stopResourceUsageSession(uint32_t resourceId, const FormSubmissionList *formSubmissions = nullptr);
     void lockDoor(uint32_t resourceId);
     void unlockDoor(uint32_t resourceId);
     void unlatchDoor(uint32_t resourceId);
@@ -113,6 +218,9 @@ public:
 
     void requestProjectsOfUser(uint32_t page);
     void setProjectsOfUserResponseCallback(std::function<void(const ProjectsOfUserResponse &)> callback);
+    void setResourceFormsRequestCallback(std::function<void(const ResourceUsageFormRequest &)> callback);
+    // Get reference to the form request scratch buffer for deferred copy
+    const ResourceUsageFormRequest &getFormRequestScratch() const { return resourceFormsRequestScratch; }
 
 private:
     Logger logger;
@@ -149,6 +257,8 @@ private:
     void sendHeartbeat();
 
     ProjectsOfUserResponse projectsOfUserResponseScratch;
+    ResourceUsageFormRequest resourceFormsRequestScratch;
+    std::function<void(const ResourceUsageFormRequest &)> resourceFormsRequestCallback;
 
     void onRegistrationData(JsonObject data);
     void onUnauthorized(JsonObject data);
@@ -158,6 +268,13 @@ private:
     void onResourceList(JsonObject data);
     void onProjectsOfUserResponse(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
+    void onResourceUsageFormRequest(JsonObject data);
+    ResourceUsageFormActionType parseFormAction(const char *action);
+    ResourceUsageFormFieldType parseFormFieldType(const char *type);
+    void parseFormFieldOptions(ResourceUsageFormField &field, JsonVariantConst options);
+    void resetResourceUsageForm(ResourceUsageForm &form);
+    void resetResourceUsageFormField(ResourceUsageFormField &field);
+    void serializeFormSubmissions(JsonObject payload, const FormSubmissionList *formSubmissions);
 
     std::function<void(String username)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void(uint8_t keyNo, String key)> enrollNewCardCallback;

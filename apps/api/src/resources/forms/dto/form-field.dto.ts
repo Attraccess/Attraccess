@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsInt, IsObject, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { FormFieldType } from '@attraccess/database-entities';
 
 export class FormFieldBaseDto {
@@ -28,11 +28,10 @@ export class FormFieldBaseDto {
   @ApiProperty({
     description: 'Arbitrary options payload (e.g. select choices)',
     required: false,
-    additionalProperties: true,
+    oneOf: [{ type: 'object', additionalProperties: true }, { type: 'array', items: { type: 'string' } }],
   })
   @IsOptional()
-  @IsObject()
-  options?: Record<string, unknown> | null;
+  options?: Record<string, unknown> | string[] | null;
 }
 
 export class CreateFormFieldDto extends FormFieldBaseDto {}

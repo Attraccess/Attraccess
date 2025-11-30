@@ -11,7 +11,8 @@
       "takeover": "On takeover",
       "end": "On end"
     },
-    "fieldCount": "{{count}} fields"
+    "fieldCount_one": "{{count}} field",
+    "fieldCount_other": "{{count}} fields"
   },
   "editor": {
     "createTitle": "Create form",
@@ -44,7 +45,7 @@
     "required": "Required",
     "description": "Description",
     "placeholder": {
-      "label": "E.g. Safety goggles worn?",
+      "label": "-- Please enter a label --",
       "description": "Shown below the label"
     },
     "optionsTitle": "Field options",
@@ -58,9 +59,11 @@
         "max": "Maximum value",
         "step": "Step size"
       },
-      "datetime": {
-        "earliest": "Earliest allowed date",
-        "latest": "Latest allowed date"
+      "select": {
+        "description": "Define the options that users can choose from.",
+        "optionPlaceholder": "Option value",
+        "addOption": "Add option",
+        "maxOptions": "Maximum number of options reached"
       },
       "boolean": {
         "trueLabel": "Label for \"yes\"",
@@ -70,14 +73,14 @@
     "types": {
       "text": "Text",
       "number": "Number",
-      "datetime": "Date & time",
+      "select": "Single choice",
       "boolean": "Yes / No"
     }
   },
   "preview": {
     "booleanYes": "Yes",
     "booleanNo": "No",
+    "selectPlaceholder": "Select an option",
     "empty": "Add fields to see the preview."
   }
 }
-

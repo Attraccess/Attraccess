@@ -13,9 +13,8 @@ export interface NumberFieldOptions {
   step?: number | '';
 }
 
-export interface DatetimeFieldOptions {
-  earliest?: string;
-  latest?: string;
+export interface SelectFieldOptions {
+  options: string[];
 }
 
 export interface BooleanFieldOptions {
@@ -23,14 +22,11 @@ export interface BooleanFieldOptions {
   falseLabel?: string;
 }
 
-export type FieldOptions =
-  | TextFieldOptions
-  | NumberFieldOptions
-  | DatetimeFieldOptions
-  | BooleanFieldOptions;
+export type FieldOptions = TextFieldOptions | NumberFieldOptions | SelectFieldOptions | BooleanFieldOptions;
 
 export interface EditableFormField {
   id?: number;
+  _id?: string;
   name: string;
   type: FormFieldType;
   isRequired: boolean;
@@ -56,9 +52,8 @@ const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
     max: '',
     step: '',
   },
-  [FormFieldType.DATETIME]: {
-    earliest: '',
-    latest: '',
+  [FormFieldType.SELECT]: {
+    options: [],
   },
   [FormFieldType.BOOLEAN]: {
     trueLabel: '',
@@ -71,7 +66,7 @@ export function createDefaultFieldOptions(type: FormFieldType): FieldOptions {
   return template ? { ...template } : {};
 }
 
-export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unknown> | null): FieldOptions {
+export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unknown> | string[] | null): FieldOptions {
   const options = createDefaultFieldOptions(type);
   if (!raw) {
     return options;
@@ -80,44 +75,48 @@ export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unkn
   switch (type) {
     case FormFieldType.TEXT: {
       const textOptions = options as TextFieldOptions;
-      if (typeof raw.placeholder === 'string') {
-        textOptions.placeholder = raw.placeholder;
-      }
-      if (typeof raw.multiline === 'boolean') {
-        textOptions.multiline = raw.multiline;
+      if (!Array.isArray(raw)) {
+        if (typeof raw.placeholder === 'string') {
+          textOptions.placeholder = raw.placeholder;
+        }
+        if (typeof raw.multiline === 'boolean') {
+          textOptions.multiline = raw.multiline;
+        }
       }
       return textOptions;
     }
     case FormFieldType.NUMBER: {
       const numberOptions = options as NumberFieldOptions;
-      if (isFiniteNumber(raw.min)) {
-        numberOptions.min = Number(raw.min);
-      }
-      if (isFiniteNumber(raw.max)) {
-        numberOptions.max = Number(raw.max);
-      }
-      if (isFiniteNumber(raw.step)) {
-        numberOptions.step = Number(raw.step);
+      if (!Array.isArray(raw)) {
+        if (isFiniteNumber(raw.min)) {
+          numberOptions.min = Number(raw.min);
+        }
+        if (isFiniteNumber(raw.max)) {
+          numberOptions.max = Number(raw.max);
+        }
+        if (isFiniteNumber(raw.step)) {
+          numberOptions.step = Number(raw.step);
+        }
       }
       return numberOptions;
     }
-    case FormFieldType.DATETIME: {
-      const datetimeOptions = options as DatetimeFieldOptions;
-      if (typeof raw.earliest === 'string') {
-        datetimeOptions.earliest = raw.earliest;
+    case FormFieldType.SELECT: {
+      const selectOptions = options as SelectFieldOptions;
+      // SELECT options are stored as a direct array, not wrapped in an object
+      if (Array.isArray(raw)) {
+        selectOptions.options = raw.filter((o): o is string => typeof o === 'string');
       }
-      if (typeof raw.latest === 'string') {
-        datetimeOptions.latest = raw.latest;
-      }
-      return datetimeOptions;
+      return selectOptions;
     }
     case FormFieldType.BOOLEAN: {
       const booleanOptions = options as BooleanFieldOptions;
-      if (typeof raw.trueLabel === 'string') {
-        booleanOptions.trueLabel = raw.trueLabel;
-      }
-      if (typeof raw.falseLabel === 'string') {
-        booleanOptions.falseLabel = raw.falseLabel;
+      if (!Array.isArray(raw)) {
+        if (typeof raw.trueLabel === 'string') {
+          booleanOptions.trueLabel = raw.trueLabel;
+        }
+        if (typeof raw.falseLabel === 'string') {
+          booleanOptions.falseLabel = raw.falseLabel;
+        }
       }
       return booleanOptions;
     }
@@ -126,7 +125,10 @@ export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unkn
   }
 }
 
-export function serializeFieldOptions(type: FormFieldType, options: FieldOptions): Record<string, unknown> | null {
+export function serializeFieldOptions(
+  type: FormFieldType,
+  options: FieldOptions,
+): Record<string, unknown> | string[] | null {
   switch (type) {
     case FormFieldType.TEXT: {
       const { placeholder, multiline } = options as TextFieldOptions;
@@ -153,16 +155,12 @@ export function serializeFieldOptions(type: FormFieldType, options: FieldOptions
       }
       return Object.keys(payload).length ? payload : null;
     }
-    case FormFieldType.DATETIME: {
-      const { earliest, latest } = options as DatetimeFieldOptions;
-      const payload: Record<string, unknown> = {};
-      if (earliest) {
-        payload.earliest = earliest;
+    case FormFieldType.SELECT: {
+      const { options: selectOptions } = options as SelectFieldOptions;
+      if (selectOptions && selectOptions.length > 0) {
+        return selectOptions;
       }
-      if (latest) {
-        payload.latest = latest;
-      }
-      return Object.keys(payload).length ? payload : null;
+      return null;
     }
     case FormFieldType.BOOLEAN: {
       const { trueLabel, falseLabel } = options as BooleanFieldOptions;
@@ -187,7 +185,7 @@ export function parseFieldFromResponse(field: FormFieldResponseDto): EditableFor
     type: field.type,
     isRequired: field.isRequired,
     description: field.description,
-    options: parseFieldOptions(field.type, field.options as Record<string, unknown>),
+    options: parseFieldOptions(field.type, field.options as Record<string, unknown> | string[]),
   };
 }
 
@@ -200,4 +198,3 @@ function isFiniteNumber(value: unknown): value is number {
   }
   return false;
 }
-

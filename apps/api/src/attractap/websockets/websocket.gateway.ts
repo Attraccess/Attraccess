@@ -29,8 +29,11 @@ import { ResourceFlowsService } from '../../resources/flows/resource-flows.servi
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 import { ResourceInUseError } from '../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFormAction } from '@attraccess/database-entities';
 import { ProjectsService } from '../../projects/projects.service';
+import { ResourceFormsService } from '../../resources/forms/forms.service';
+import { FormSubmissionRequestDto } from '../../resources/forms/dto/form-submission-request.dto';
+import { ResourceUsageFormRequestPayload } from './websocket.types';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -75,6 +78,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ProjectsService)
   private projectsService: ProjectsService;
+
+  @Inject(ResourceFormsService)
+  private resourceFormsService: ResourceFormsService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -417,6 +423,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.READER_AUTHENTICATED:
       case AttractapEventType.CARD_AUTHENTICATION_DATA:
       case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
+      case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
         this.logger.error(
           `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
         );
@@ -903,10 +910,78 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return true;
   }
 
+  private async ensureFormsSatisfied({
+    socket,
+    resourceId,
+    action,
+    formSubmissions,
+  }: {
+    socket: AuthenticatedWebSocket;
+    resourceId: number;
+    action: ResourceFormAction;
+    formSubmissions?: FormSubmissionRequestDto[];
+  }): Promise<boolean> {
+    const forms = await this.resourceFormsService.getFormsForAction(resourceId, action);
+    if (!forms.length) {
+      return true;
+    }
+
+    const submissionIds = new Set((formSubmissions ?? []).map((submission) => submission.formId));
+    const allProvided = forms.every((form) => submissionIds.has(form.id));
+    if (allProvided) {
+      return true;
+    }
+
+    let resourceName: string | undefined;
+    try {
+      const reader = socket.readerId ? await this.attractapService.findReaderById(socket.readerId) : null;
+      const resource = reader?.resources?.find((item) => item.id === resourceId);
+      resourceName = resource?.name;
+    } catch (error) {
+      this.logger.debug(`Failed to resolve resource name for form request: ${(error as Error).message}`);
+    }
+
+    const payload: ResourceUsageFormRequestPayload = {
+      resourceId,
+      resourceName,
+      action,
+      forms: forms.map((form) => ({
+        id: form.id,
+        name: form.name,
+        fields: form.fields.map((field) => ({
+          id: field.id,
+          name: field.name,
+          description: field.description ?? null,
+          type: field.type,
+          isRequired: field.isRequired,
+          options: field.options ?? null,
+        })),
+      })),
+    };
+
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST, payload));
+    return false;
+  }
+
   private async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, projectId } = data.payload as { resourceId: number; projectId?: number };
+    const { resourceId, projectId, formSubmissions } = data.payload as {
+      resourceId: number;
+      projectId?: number;
+      formSubmissions?: FormSubmissionRequestDto[];
+    };
 
     if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
+      return;
+    }
+
+    if (
+      !(await this.ensureFormsSatisfied({
+        socket,
+        resourceId,
+        action: ResourceFormAction.START,
+        formSubmissions,
+      }))
+    ) {
       return;
     }
 
@@ -919,7 +994,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     try {
-      await this.resourceUsageService.startSession(resourceId, user, { projectId });
+      await this.resourceUsageService.startSession(resourceId, user, { projectId, formSubmissions });
       await socket.sendMessage(new AttractapEvent(AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       if (error instanceof ResourceInUseError) {
@@ -946,9 +1021,23 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId } = data.payload as { resourceId: number };
+    const { resourceId, formSubmissions } = data.payload as {
+      resourceId: number;
+      formSubmissions?: FormSubmissionRequestDto[];
+    };
 
     if (!(await this.validateResourceAction(socket, resourceId, AttractapEventType.START_RESOURCE_USAGE_SESSION))) {
+      return;
+    }
+
+    if (
+      !(await this.ensureFormsSatisfied({
+        socket,
+        resourceId,
+        action: ResourceFormAction.END,
+        formSubmissions,
+      }))
+    ) {
       return;
     }
 
@@ -961,7 +1050,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     try {
-      await this.resourceUsageService.endSession(resourceId, user, {});
+      await this.resourceUsageService.endSession(resourceId, user, { formSubmissions });
       await socket.sendMessage(new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);

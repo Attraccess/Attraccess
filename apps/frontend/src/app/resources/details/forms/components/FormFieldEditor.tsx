@@ -15,7 +15,7 @@ interface FormFieldEditorProps {
 const FIELD_TYPE_OPTIONS: { value: FormFieldType; labelKey: string }[] = [
   { value: FormFieldType.TEXT, labelKey: 'fields.types.text' },
   { value: FormFieldType.NUMBER, labelKey: 'fields.types.number' },
-  { value: FormFieldType.DATETIME, labelKey: 'fields.types.datetime' },
+  { value: FormFieldType.SELECT, labelKey: 'fields.types.select' },
   { value: FormFieldType.BOOLEAN, labelKey: 'fields.types.boolean' },
 ];
 
@@ -82,4 +82,3 @@ export function FormFieldEditor({ field, index, onChange, onRemove, t }: FormFie
     </div>
   );
 }
-

@@ -2,6 +2,10 @@
 
 void NoResourcesScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
@@ -40,4 +44,14 @@ String NoResourcesScreen::getName()
 
 void NoResourcesScreen::onScreenLeave()
 {
+}
+
+void NoResourcesScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
 }

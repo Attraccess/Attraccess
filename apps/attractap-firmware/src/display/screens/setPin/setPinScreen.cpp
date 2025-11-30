@@ -3,6 +3,10 @@
 
 void SetPinScreen::init()
 {
+   if (this->screen)
+   {
+      return;
+   }
    this->pinInputPage.setOnConfirmCallback([this](String pin)
                                            { this->onPinConfirmed(pin); return true; });
    this->screen = this->pinInputPage.init("Geraete-PIN");
@@ -29,4 +33,14 @@ String SetPinScreen::getName()
 
 void SetPinScreen::onScreenLeave()
 {
+}
+
+void SetPinScreen::destroy()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_del(this->screen);
+   this->screen = nullptr;
 }

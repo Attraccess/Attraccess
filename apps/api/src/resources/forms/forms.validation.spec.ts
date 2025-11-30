@@ -20,6 +20,14 @@ describe('forms.validation', () => {
         new BadRequestException('Number field min option cannot be greater than max.'),
       );
     });
+
+    it('parses select options as trimmed unique values', () => {
+      expect(parseFieldOptions(FormFieldType.SELECT, ['  A  ', 'B', 'A'])).toEqual(['A', 'B']);
+    });
+
+    it('throws when select options are missing', () => {
+      expect(() => parseFieldOptions(FormFieldType.SELECT, [])).toThrow(BadRequestException);
+    });
   });
 
   describe('parseFieldValue', () => {
@@ -32,10 +40,11 @@ describe('forms.validation', () => {
       expect(parseFieldValue(FormFieldType.BOOLEAN, 'true')).toBe('true');
     });
 
-    it('rejects invalid datetime strings', () => {
-      expect(() => parseFieldValue(FormFieldType.DATETIME, 'not-a-date')).toThrowError(
-        new BadRequestException('Datetime field values must be valid ISO strings.'),
+    it('requires select values to match configured options', () => {
+      expect(() => parseFieldValue(FormFieldType.SELECT, 'X', ['A', 'B'])).toThrowError(
+        new BadRequestException('Select field values must match one of the available options.'),
       );
+      expect(parseFieldValue(FormFieldType.SELECT, 'A', ['A', 'B'])).toBe('A');
     });
   });
 });

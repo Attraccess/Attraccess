@@ -10,6 +10,118 @@
  * ---------------------------------------------------------------
  */
 
+/** The type of the log entry */
+export enum ResourceFlowLogType {
+  FlowStart = "flow.start",
+  NodeProcessingStarted = "node.processing.started",
+  NodeProcessingFailed = "node.processing.failed",
+  NodeProcessingCompleted = "node.processing.completed",
+  FlowCompleted = "flow.completed",
+}
+
+/** The name of the node type */
+export enum ResourceFlowNodeType {
+  InputButton = "input.button",
+  InputResourceUsageStarted = "input.resource.usage.started",
+  InputResourceUsageStopped = "input.resource.usage.stopped",
+  InputResourceUsageTakeover = "input.resource.usage.takeover",
+  InputResourceDoorUnlocked = "input.resource.door.unlocked",
+  InputResourceDoorLocked = "input.resource.door.locked",
+  InputResourceDoorUnlatched = "input.resource.door.unlatched",
+  InputMqttMessageReceived = "input.mqtt.message.received",
+  OutputHttpSendRequest = "output.http.sendRequest",
+  OutputMqttSendMessage = "output.mqtt.sendMessage",
+  OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
+  OutputResourceUsageEndSession = "output.resource.usage.end-session",
+  ProcessingWait = "processing.wait",
+  ProcessingIf = "processing.if",
+  ProcessingSetPayload = "processing.set-payload",
+  ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
+  ProcessingError = "processing.error",
+}
+
+/** The status of the transaction */
+export enum SumupTransactionStatus {
+  Successful = "successful",
+  Failed = "failed",
+}
+
+/** The type of the transaction */
+export enum SumupTransactionEventType {
+  SoloTransactionUpdated = "solo.transaction.updated",
+}
+
+export enum SumUpReaderModel {
+  Solo = "solo",
+  VirtualSolo = "virtual-solo",
+}
+
+export enum SumUpReaderStatus {
+  Unknown = "unknown",
+  Processing = "processing",
+  Paired = "paired",
+  Expired = "expired",
+}
+
+/** The currency to use */
+export enum Currency {
+  EUR = "EUR",
+}
+
+/** The status of the billing transaction */
+export enum BillingTransactionStatus {
+  Pending = "pending",
+  Completed = "completed",
+  Failed = "failed",
+}
+
+/** The action performed (revoke or grant) */
+export enum IntroductionHistoryAction {
+  Revoke = "revoke",
+  Grant = "grant",
+}
+
+/** Current status of the invitation */
+export enum ProjectInvitationStatus {
+  Pending = "pending",
+  Accepted = "accepted",
+  Declined = "declined",
+  Canceled = "canceled",
+}
+
+/** Role of the member within the project */
+export enum ProjectMemberRole {
+  Viewer = "viewer",
+}
+
+/** The type of usage */
+export enum ResourceUsageAction {
+  Usage = "usage",
+  DoorLock = "door.lock",
+  DoorUnlock = "door.unlock",
+  DoorUnlatch = "door.unlatch",
+}
+
+/** The type of the form field */
+export enum FormFieldType {
+  Text = "text",
+  Number = "number",
+  Boolean = "boolean",
+  Select = "select",
+}
+
+/** The type of documentation (markdown or url) */
+export enum DocumentationType {
+  Markdown = "markdown",
+  Url = "url",
+}
+
+/** The type of the resource */
+export enum ResourceType {
+  Machine = "machine",
+  Door = "door",
+}
+
 /** Template type/key used by the system */
 export enum EmailTemplateType {
   VerifyEmail = "verify-email",
@@ -18,11 +130,24 @@ export enum EmailTemplateType {
   UsernameChanged = "username-changed",
   PasswordChanged = "password-changed",
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
+  ProjectInvitation = "project-invitation",
 }
 
 /** The type of the provider */
 export enum SSOProviderType {
   OIDC = "OIDC",
+}
+
+export enum PermissionFilter {
+  CanManageResources = "canManageResources",
+  CanManageSystemConfiguration = "canManageSystemConfiguration",
+  CanManageUsers = "canManageUsers",
+}
+
+/** The authentication strategy to use */
+export enum AuthenticationType {
+  LocalPassword = "local_password",
+  Sso = "sso",
 }
 
 export interface CreateUserDto {
@@ -45,7 +170,7 @@ export interface CreateUserDto {
    * The authentication strategy to use
    * @example "local_password"
    */
-  strategy: "local_password" | "sso";
+  strategy: AuthenticationType;
 }
 
 export interface SystemPermissions {
@@ -439,7 +564,7 @@ export interface CreateSSOProviderDto {
    * The type of SSO provider
    * @example "OIDC"
    */
-  type: "OIDC";
+  type: SSOProviderType;
   /** The OIDC configuration for the provider */
   oidcConfiguration?: CreateOIDCConfigurationDto;
 }
@@ -594,7 +719,7 @@ export interface CreateResourceDto {
    * The type of the resource
    * @example "machine"
    */
-  type: "machine" | "door";
+  type: ResourceType;
   /**
    * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
    * @default false
@@ -615,7 +740,7 @@ export interface CreateResourceDto {
    * The type of documentation (markdown or url)
    * @example "markdown"
    */
-  documentationType?: "markdown" | "url";
+  documentationType?: DocumentationType;
   /**
    * Markdown content for resource documentation
    * @example "# Resource Documentation
@@ -664,6 +789,25 @@ export interface ResourceGroup {
   updatedAt: string;
 }
 
+export interface FormField {
+  /** The ID of the form field */
+  id: number;
+  /** The ID of the form that the field belongs to */
+  formId: number;
+  /** The form that the field belongs to */
+  form: Form;
+  /** The name of the form field */
+  name: string;
+  /** The type of the form field */
+  type: FormFieldType;
+  /** Whether the form field is required */
+  isRequired: boolean;
+  /** The description of the form field */
+  description: string;
+  /** The options of the form field */
+  options: object;
+}
+
 export interface Resource {
   /**
    * The unique identifier of the resource
@@ -679,7 +823,7 @@ export interface Resource {
    * The type of the resource
    * @example "machine"
    */
-  type: "machine" | "door";
+  type: ResourceType;
   /**
    * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
    * @default false
@@ -700,7 +844,7 @@ export interface Resource {
    * The type of documentation (markdown or url)
    * @example "markdown"
    */
-  documentationType?: "markdown" | "url";
+  documentationType?: DocumentationType;
   /**
    * Markdown content for resource documentation
    * @example "# Resource Documentation
@@ -736,6 +880,214 @@ export interface Resource {
   deletedAt: string | null;
   /** The groups the resource belongs to */
   groups: ResourceGroup[];
+  /** The forms attached to the resource */
+  forms: Form[];
+}
+
+export interface ProjectMember {
+  /** Unique identifier of the project member */
+  id: number;
+  /** Project ID the member belongs to */
+  projectId: number;
+  /** Project the member belongs to */
+  project: Project;
+  /** User ID of the member */
+  userId: number;
+  /** User that belongs to the project */
+  user: User;
+  /** Role of the member within the project */
+  role: ProjectMemberRole;
+  /**
+   * When the membership started
+   * @format date-time
+   */
+  joinedAt: string;
+}
+
+export interface ProjectInvitation {
+  /** Unique identifier of the project invitation */
+  id: number;
+  /** Project ID for which the invitation was created */
+  projectId: number;
+  /** Project for which the invitation was created */
+  project: Project;
+  /** User ID that created the invitation */
+  inviterId: number;
+  /** Inviter user */
+  inviter: User;
+  /** User ID that is being invited */
+  invitedUserId: number;
+  /** Invited user */
+  invitedUser: User;
+  /** Current status of the invitation */
+  status: ProjectInvitationStatus;
+  /** Role that should be granted upon acceptance */
+  requestedRole: ProjectMemberRole;
+  /**
+   * Timestamp when the invitation was responded to (accept/decline/cancel)
+   * @format date-time
+   */
+  respondedAt?: string;
+  /**
+   * When the invitation was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the invitation was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+}
+
+export interface Project {
+  /** The ID of the project */
+  id: number;
+  /**
+   * The date and time the NFC card was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the NFC card was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the user that owns the project */
+  owner: User;
+  /** The name of the project */
+  name: string;
+  /** The description of the project */
+  description: string;
+  /** The logo of the project */
+  logo: string;
+  /** Members that have access to the project */
+  members: ProjectMember[];
+  /** Pending invitations for the project */
+  invitations: ProjectInvitation[];
+}
+
+export interface ResourceUsage {
+  /**
+   * The unique identifier of the resource usage
+   * @example 1
+   */
+  id: number;
+  /**
+   * The type of usage
+   * @example "usage"
+   */
+  usageAction: ResourceUsageAction;
+  /**
+   * The ID of the resource being used
+   * @example 1
+   */
+  resourceId: number;
+  /**
+   * The ID of the user using the resource (null if user was deleted)
+   * @example 1
+   */
+  userId?: number;
+  /**
+   * When the usage session started
+   * @format date-time
+   */
+  startTime: string;
+  /**
+   * Notes provided when starting the session
+   * @example "Starting prototype development for client XYZ"
+   */
+  startNotes?: string;
+  /**
+   * When the usage session ended
+   * @format date-time
+   */
+  endTime?: string;
+  /**
+   * Notes provided when ending the session
+   * @example "Completed initial prototype, material usage: 500g"
+   */
+  endNotes?: string;
+  /** The resource being used */
+  resource?: Resource;
+  /** The user who used the resource */
+  user?: User;
+  /**
+   * The duration of the usage session in minutes
+   * @example 120
+   */
+  usageInMinutes: number;
+  /**
+   * The ID of the project this usage session belongs to
+   * @example 1
+   */
+  projectId?: number;
+  /** The project this usage session belongs to */
+  project?: Project;
+  /** The form submissions that belong to this resource usage */
+  formSubmissions: FormSubmission[];
+}
+
+export interface FormSubmission {
+  /** The ID of the form submission */
+  id: number;
+  /** The ID of the form that the submission belongs to */
+  formId: number;
+  /** The form that the submission belongs to */
+  form: Form;
+  /** The data of the form submission */
+  data: object;
+  /**
+   * The date and time the submission was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the submission was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the user that submitted the form */
+  userId: number;
+  /** The user that submitted the form */
+  user: User;
+  /** The ID of the resource usage that the submission belongs to */
+  resourceUsageId: number;
+  /** The resource usage that the submission belongs to */
+  resourceUsage: ResourceUsage;
+  /** The action that triggered the submission */
+  action: "start" | "takeover" | "end";
+}
+
+export interface Form {
+  /** The ID of the form */
+  id: number;
+  /**
+   * The date and time the form was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the form was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The name of the form */
+  name: string;
+  /** Whether the form is required on resource usage start */
+  isRequiredOnResourceUsageStart: boolean;
+  /** Whether the form is required on resource usage take over */
+  isRequiredOnResourceUsageTakeOver: boolean;
+  /** Whether the form is required on resource usage end */
+  isRequiredOnResourceUsageEnd: boolean;
+  /** The fields of the form */
+  fields: FormField[];
+  /** The submissions of the form */
+  submissions: FormSubmission[];
+  /** The ID of the resource that the form belongs to */
+  resourceId: number;
+  /** The resource that the form belongs to */
+  resource: Resource;
 }
 
 export interface PaginatedResourceResponseDto {
@@ -755,7 +1107,7 @@ export interface UpdateResourceDto {
    * The type of the resource
    * @example "machine"
    */
-  type?: "machine" | "door";
+  type?: ResourceType;
   /**
    * (only for doors) wheter the door needs seperate actions for unlocking and unlatching
    * @default false
@@ -781,7 +1133,7 @@ export interface UpdateResourceDto {
    * The type of documentation (markdown or url)
    * @example "markdown"
    */
-  documentationType?: "markdown" | "url";
+  documentationType?: DocumentationType;
   /**
    * Markdown content for resource documentation
    * @example "# Resource Documentation
@@ -986,7 +1338,7 @@ export interface ResourceIntroductionHistoryItem {
    * The action performed (revoke or grant)
    * @example "revoke"
    */
-  action: "revoke" | "grant";
+  action: IntroductionHistoryAction;
   /**
    * The ID of the user who performed the action
    * @example 1
@@ -1096,6 +1448,25 @@ export interface IsResourceGroupIntroducerResponseDto {
   isIntroducer: boolean;
 }
 
+export interface FormSubmissionFieldAnswerDto {
+  /**
+   * Field identifier
+   * @example 101
+   */
+  fieldId: number;
+  /** Submitted value */
+  value: string | number | boolean;
+}
+
+export interface FormSubmissionRequestDto {
+  /**
+   * Form identifier
+   * @example 12
+   */
+  formId: number;
+  answers: FormSubmissionFieldAnswerDto[];
+}
+
 export interface StartUsageSessionDto {
   /**
    * Optional notes about the usage session
@@ -1113,88 +1484,8 @@ export interface StartUsageSessionDto {
    * @example 35
    */
   projectId?: number;
-}
-
-export interface Project {
-  /** The ID of the project */
-  id: number;
-  /**
-   * The date and time the NFC card was created
-   * @format date-time
-   */
-  createdAt: string;
-  /**
-   * The date and time the NFC card was last updated
-   * @format date-time
-   */
-  updatedAt: string;
-  /** The ID of the user that owns the project */
-  owner: User;
-  /** The name of the project */
-  name: string;
-  /** The description of the project */
-  description: string;
-  /** The logo of the project */
-  logo: string;
-}
-
-export interface ResourceUsage {
-  /**
-   * The unique identifier of the resource usage
-   * @example 1
-   */
-  id: number;
-  /**
-   * The type of usage
-   * @example "usage"
-   */
-  usageAction: "usage" | "door.lock" | "door.unlock" | "door.unlatch";
-  /**
-   * The ID of the resource being used
-   * @example 1
-   */
-  resourceId: number;
-  /**
-   * The ID of the user using the resource (null if user was deleted)
-   * @example 1
-   */
-  userId?: number;
-  /**
-   * When the usage session started
-   * @format date-time
-   */
-  startTime: string;
-  /**
-   * Notes provided when starting the session
-   * @example "Starting prototype development for client XYZ"
-   */
-  startNotes?: string;
-  /**
-   * When the usage session ended
-   * @format date-time
-   */
-  endTime?: string;
-  /**
-   * Notes provided when ending the session
-   * @example "Completed initial prototype, material usage: 500g"
-   */
-  endNotes?: string;
-  /** The resource being used */
-  resource?: Resource;
-  /** The user who used the resource */
-  user?: User;
-  /**
-   * The duration of the usage session in minutes
-   * @example 120
-   */
-  usageInMinutes: number;
-  /**
-   * The ID of the project this usage session belongs to
-   * @example 1
-   */
-  projectId?: number;
-  /** The project this usage session belongs to */
-  project?: Project;
+  /** Form submissions required for this action */
+  formSubmissions?: FormSubmissionRequestDto[];
 }
 
 export interface EndUsageSessionDto {
@@ -1208,6 +1499,8 @@ export interface EndUsageSessionDto {
    * @format date-time
    */
   endTime?: string;
+  /** Form submissions associated with ending the usage session */
+  formSubmissions?: FormSubmissionRequestDto[];
 }
 
 export interface GetResourceHistoryResponseDto {
@@ -1423,7 +1716,7 @@ export interface BillingTransaction {
   /** The external reference e.g. sumup transaction ID */
   externalReference: string;
   /** The status of the billing transaction */
-  status: "pending" | "completed" | "failed";
+  status: BillingTransactionStatus;
   /** The custom items of the billing transaction */
   items: BillingTransactionItem[];
 }
@@ -1513,7 +1806,7 @@ export interface SetBillingConfigurationDto {
    * The currency to use
    * @example "EUR"
    */
-  currency: "EUR";
+  currency: Currency;
 }
 
 export interface BillingConfigurationDto {
@@ -1521,7 +1814,7 @@ export interface BillingConfigurationDto {
    * The currency to use
    * @example "EUR"
    */
-  currency: "EUR";
+  currency: Currency;
   /**
    * The minor unit of the currency
    * @example 2
@@ -1541,7 +1834,7 @@ export interface SumUpReaderDevice {
   /** @example "1234567890" */
   identifier: string;
   /** @example "solo" */
-  model: "solo" | "virtual-solo";
+  model: SumUpReaderModel;
 }
 
 export interface SumUpReaderDto {
@@ -1550,7 +1843,7 @@ export interface SumUpReaderDto {
   /** @example "Reader 1" */
   name: string;
   /** @example "active" */
-  status: "unknown" | "processing" | "paired" | "expired";
+  status: SumUpReaderStatus;
   device: SumUpReaderDevice;
   /** @example {} */
   meta?: Record<string, any>;
@@ -1598,7 +1891,7 @@ export interface Payload {
    * The status of the transaction
    * @example "successful"
    */
-  status: "successful" | "failed";
+  status: SumupTransactionStatus;
   /**
    * The ID of the transaction
    * @example "8f0973dc-60df-4a8c-80ee-a06103c1d10e"
@@ -1616,7 +1909,7 @@ export interface SumupTransactionCallbackDto {
    * The type of the transaction
    * @example "solo.transaction.updated"
    */
-  event_type: "solo.transaction.updated";
+  event_type: SumupTransactionEventType;
   /**
    * The payload of the transaction
    * @example {"client_transaction_id":"1234567890","merchant_code":"MPMGEBZF","status":"successful","transaction_id":"8f0973dc-60df-4a8c-80ee-a06103c1d10e"}
@@ -1637,24 +1930,7 @@ export interface RefundTransactionDto {
 
 export interface ResourceFlowNodeSchemaDto {
   /** The name of the node type */
-  type:
-    | "input.button"
-    | "input.resource.usage.started"
-    | "input.resource.usage.stopped"
-    | "input.resource.usage.takeover"
-    | "input.resource.door.unlocked"
-    | "input.resource.door.locked"
-    | "input.resource.door.unlatched"
-    | "input.mqtt.message.received"
-    | "output.http.sendRequest"
-    | "output.mqtt.sendMessage"
-    | "output.resource.billing.calculation.set-additional-items"
-    | "output.resource.usage.end-session"
-    | "processing.wait"
-    | "processing.if"
-    | "processing.set-payload"
-    | "processing.mqtt.waitForMessage"
-    | "processing.error";
+  type: ResourceFlowNodeType;
   /** The schema for a node type */
   configSchema: Record<string, any>;
   /** The inputs for a node type */
@@ -1690,24 +1966,7 @@ export interface ResourceFlowNodeDto {
    * The type of the node
    * @example "input.resource.usage.started"
    */
-  type:
-    | "input.button"
-    | "input.resource.usage.started"
-    | "input.resource.usage.stopped"
-    | "input.resource.usage.takeover"
-    | "input.resource.door.unlocked"
-    | "input.resource.door.locked"
-    | "input.resource.door.unlatched"
-    | "input.mqtt.message.received"
-    | "output.http.sendRequest"
-    | "output.mqtt.sendMessage"
-    | "output.resource.billing.calculation.set-additional-items"
-    | "output.resource.usage.end-session"
-    | "processing.wait"
-    | "processing.if"
-    | "processing.set-payload"
-    | "processing.mqtt.waitForMessage"
-    | "processing.error";
+  type: ResourceFlowNodeType;
   /**
    * The position of the node
    * @example {"x":100,"y":200}
@@ -1827,12 +2086,7 @@ export interface ResourceFlowLog {
    * The type of the log entry
    * @example "node.processing.started"
    */
-  type:
-    | "flow.start"
-    | "node.processing.started"
-    | "node.processing.failed"
-    | "node.processing.completed"
-    | "flow.completed";
+  type: ResourceFlowLogType;
   /**
    * Optional payload for additional user information
    * @example "Processing took longer than expected due to network latency"
@@ -1883,7 +2137,7 @@ export interface ResourceFlowNode {
    * The type of the node
    * @example "input.resource.usage.started"
    */
-  type: string;
+  type: ResourceFlowNodeType;
   /**
    * The position of the node
    * @example {"x":100,"y":100}
@@ -1913,8 +2167,45 @@ export interface ResourceFlowNode {
   resource?: Resource;
 }
 
+export interface ProjectAccessInfoDto {
+  /** Whether the authenticated user owns the project */
+  isOwner: boolean;
+  /** Role of the authenticated user inside the project when they are a member */
+  role?: ProjectMemberRole | null;
+  /** Whether the authenticated user can manage the project */
+  canManageProject: boolean;
+}
+
+export interface ProjectWithAccessDto {
+  /** The ID of the project */
+  id: number;
+  /**
+   * The date and time the NFC card was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * The date and time the NFC card was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /** The ID of the user that owns the project */
+  owner: User;
+  /** The name of the project */
+  name: string;
+  /** The description of the project */
+  description: string;
+  /** The logo of the project */
+  logo: string;
+  /** Members that have access to the project */
+  members: ProjectMember[];
+  /** Pending invitations for the project */
+  invitations: ProjectInvitation[];
+  access: ProjectAccessInfoDto;
+}
+
 export interface FindManyProjectsResponseDto {
-  data: Project[];
+  data: ProjectWithAccessDto[];
   total: number;
   page: number;
   limit: number;
@@ -2012,6 +2303,177 @@ export interface ProjectUsageStatsDto {
   summary: ProjectUsageSummaryDto;
   timeSeries: ProjectUsageTimeSeriesPointDto[];
   topResources: ProjectUsageTopResourceDto[];
+}
+
+export interface ProjectMembersResponseDto {
+  owner: User;
+  members: ProjectMember[];
+}
+
+export interface CreateProjectInvitationDto {
+  /** ID of the existing user to invite */
+  invitedUserId: number;
+  /**
+   * Role the invited user should receive upon acceptance
+   * @default "viewer"
+   */
+  role?: ProjectMemberRole;
+}
+
+export interface FormFieldResponseDto {
+  /**
+   * Field display name
+   * @example "Project name"
+   */
+  name: string;
+  /**
+   * Field type
+   * @example "text"
+   */
+  type: FormFieldType;
+  /**
+   * Whether the field is required
+   * @example true
+   */
+  isRequired: boolean;
+  /** Optional description shown below the label */
+  description?: string;
+  /** Arbitrary options payload (e.g. select choices) */
+  options?: Record<string, any> | string[];
+  /**
+   * Field identifier
+   * @example 42
+   */
+  id: number;
+}
+
+export interface FormResponseDto {
+  /**
+   * Form identifier
+   * @example 12
+   */
+  id: number;
+  /**
+   * Creation timestamp
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * Last update timestamp
+   * @format date-time
+   */
+  updatedAt: string;
+  /**
+   * Form name
+   * @example "Machine safety checklist"
+   */
+  name: string;
+  /** Whether required before starting a usage session */
+  isRequiredOnResourceUsageStart: boolean;
+  /** Whether required before taking over a usage session */
+  isRequiredOnResourceUsageTakeOver: boolean;
+  /** Whether required when ending a usage session */
+  isRequiredOnResourceUsageEnd: boolean;
+  /**
+   * Owning resource identifier
+   * @example 5
+   */
+  resourceId: number;
+  fields: FormFieldResponseDto[];
+}
+
+export interface CreateFormFieldDto {
+  /**
+   * Field display name
+   * @example "Project name"
+   */
+  name: string;
+  /**
+   * Field type
+   * @example "text"
+   */
+  type: FormFieldType;
+  /**
+   * Whether the field is required
+   * @example true
+   */
+  isRequired: boolean;
+  /** Optional description shown below the label */
+  description?: string;
+  /** Arbitrary options payload (e.g. select choices) */
+  options?: Record<string, any> | string[];
+}
+
+export interface CreateFormDto {
+  /**
+   * Form name
+   * @example "Machine start checklist"
+   */
+  name: string;
+  /**
+   * Require before resource usage start
+   * @default false
+   */
+  isRequiredOnResourceUsageStart: boolean;
+  /**
+   * Require before taking over an active usage
+   * @default false
+   */
+  isRequiredOnResourceUsageTakeOver: boolean;
+  /**
+   * Require when ending a usage session
+   * @default false
+   */
+  isRequiredOnResourceUsageEnd: boolean;
+  fields: CreateFormFieldDto[];
+}
+
+export interface UpdateFormFieldDto {
+  /**
+   * Field display name
+   * @example "Project name"
+   */
+  name: string;
+  /**
+   * Field type
+   * @example "text"
+   */
+  type: FormFieldType;
+  /**
+   * Whether the field is required
+   * @example true
+   */
+  isRequired: boolean;
+  /** Optional description shown below the label */
+  description?: string;
+  /** Arbitrary options payload (e.g. select choices) */
+  options?: Record<string, any> | string[];
+  /** Existing field identifier */
+  id?: number;
+}
+
+export interface UpdateFormDto {
+  /**
+   * Form name
+   * @example "Machine start checklist"
+   */
+  name: string;
+  /**
+   * Require before resource usage start
+   * @default false
+   */
+  isRequiredOnResourceUsageStart: boolean;
+  /**
+   * Require before taking over an active usage
+   * @default false
+   */
+  isRequiredOnResourceUsageTakeOver: boolean;
+  /**
+   * Require when ending a usage session
+   * @default false
+   */
+  isRequiredOnResourceUsageEnd: boolean;
+  fields: UpdateFormFieldDto[];
 }
 
 export interface PluginMainFrontend {
@@ -2347,10 +2809,7 @@ export interface GetAllWithPermissionParams {
   /** Number of items per page */
   limit?: number;
   /** Filter users by permission */
-  permission?:
-    | "canManageResources"
-    | "canManageSystemConfiguration"
-    | "canManageUsers";
+  permission?: PermissionFilter;
 }
 
 export type GetAllWithPermissionData = PaginatedUsersResponseDto;
@@ -2760,13 +3219,13 @@ export interface FindManyProjectsParams {
 
 export type FindManyProjectsData = FindManyProjectsResponseDto;
 
-export type CreateProjectData = Project;
+export type CreateProjectData = ProjectWithAccessDto;
 
-export type FindOneProjectData = Project;
+export type FindOneProjectData = ProjectWithAccessDto;
 
 export type DeleteOneProjectData = any;
 
-export type UpdateProjectData = Project;
+export type UpdateProjectData = ProjectWithAccessDto;
 
 export interface GetProjectUsageHistoryParams {
   /**
@@ -2809,6 +3268,42 @@ export interface GetProjectUsageStatsParams {
 }
 
 export type GetProjectUsageStatsData = ProjectUsageStatsDto;
+
+export type ListProjectMembersData = ProjectMembersResponseDto;
+
+export type RemoveProjectMemberData = any;
+
+export type ListProjectInvitationsData = ProjectInvitation[];
+
+export type CreateProjectInvitationData = ProjectInvitation;
+
+export type ResendProjectInvitationData = ProjectInvitation;
+
+export type CancelProjectInvitationData = ProjectInvitation;
+
+export type ListMyProjectInvitationsData = ProjectInvitation[];
+
+export type AcceptProjectInvitationData = ProjectInvitation;
+
+export type DeclineProjectInvitationData = ProjectInvitation;
+
+export type ResourceFormsListData = FormResponseDto[];
+
+export type ResourceFormsCreateData = FormResponseDto;
+
+export interface ResourceFormsGetRequirementsParams {
+  /** Usage action the forms are required for */
+  action: "start" | "takeover" | "end";
+  resourceId: number;
+}
+
+export type ResourceFormsGetRequirementsData = FormResponseDto[];
+
+export type ResourceFormsGetOneData = FormResponseDto;
+
+export type ResourceFormsUpdateData = FormResponseDto;
+
+export type ResourceFormsDeleteData = any;
 
 export type GetPluginsData = LoadedPluginManifest[];
 
@@ -3207,10 +3702,7 @@ export namespace Users {
       /** Number of items per page */
       limit?: number;
       /** Filter users by permission */
-      permission?:
-        | "canManageResources"
-        | "canManageSystemConfiguration"
-        | "canManageUsers";
+      permission?: PermissionFilter;
     };
     export type RequestBody = never;
     export type RequestHeaders = {};
@@ -3557,13 +4049,7 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerFindOne {
     export type RequestParams = {
       /** Template type/type */
-      type:
-        | "verify-email"
-        | "user-invitation"
-        | "reset-password"
-        | "username-changed"
-        | "password-changed"
-        | "resource-usage-billing-transaction-summary";
+      type: EmailTemplateType;
     };
     export type RequestQuery = {};
     export type RequestBody = never;
@@ -3582,13 +4068,7 @@ export namespace EmailTemplates {
   export namespace EmailTemplateControllerUpdate {
     export type RequestParams = {
       /** Template type/type */
-      type:
-        | "verify-email"
-        | "user-invitation"
-        | "reset-password"
-        | "username-changed"
-        | "password-changed"
-        | "resource-usage-billing-transaction-summary";
+      type: EmailTemplateType;
     };
     export type RequestQuery = {};
     export type RequestBody = UpdateEmailTemplateDto;
@@ -5229,6 +5709,287 @@ export namespace Projects {
     export type RequestHeaders = {};
     export type ResponseBody = GetProjectUsageStatsData;
   }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name ListProjectMembers
+   * @summary List project members
+   * @request GET:/api/projects/{id}/members
+   * @secure
+   */
+  export namespace ListProjectMembers {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListProjectMembersData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name RemoveProjectMember
+   * @summary Remove a project member
+   * @request DELETE:/api/projects/{id}/members/{memberId}
+   * @secure
+   */
+  export namespace RemoveProjectMember {
+    export type RequestParams = {
+      id: number;
+      memberId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = RemoveProjectMemberData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name ListProjectInvitations
+   * @summary List project invitations
+   * @request GET:/api/projects/{id}/invitations
+   * @secure
+   */
+  export namespace ListProjectInvitations {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListProjectInvitationsData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name CreateProjectInvitation
+   * @summary Create a project invitation
+   * @request POST:/api/projects/{id}/invitations
+   * @secure
+   */
+  export namespace CreateProjectInvitation {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateProjectInvitationDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateProjectInvitationData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name ResendProjectInvitation
+   * @summary Resend a project invitation
+   * @request POST:/api/projects/{id}/invitations/{invitationId}/resend
+   * @secure
+   */
+  export namespace ResendProjectInvitation {
+    export type RequestParams = {
+      id: number;
+      invitationId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResendProjectInvitationData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name CancelProjectInvitation
+   * @summary Cancel a project invitation
+   * @request DELETE:/api/projects/{id}/invitations/{invitationId}
+   * @secure
+   */
+  export namespace CancelProjectInvitation {
+    export type RequestParams = {
+      id: number;
+      invitationId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = CancelProjectInvitationData;
+  }
+}
+
+export namespace ProjectInvitations {
+  /**
+   * No description
+   * @tags Project Invitations
+   * @name ListMyProjectInvitations
+   * @summary List pending project invitations for the authenticated user
+   * @request GET:/api/project-invitations
+   * @secure
+   */
+  export namespace ListMyProjectInvitations {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListMyProjectInvitationsData;
+  }
+
+  /**
+   * No description
+   * @tags Project Invitations
+   * @name AcceptProjectInvitation
+   * @summary Accept a project invitation
+   * @request POST:/api/project-invitations/{invitationId}/accept
+   * @secure
+   */
+  export namespace AcceptProjectInvitation {
+    export type RequestParams = {
+      invitationId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = AcceptProjectInvitationData;
+  }
+
+  /**
+   * No description
+   * @tags Project Invitations
+   * @name DeclineProjectInvitation
+   * @summary Decline a project invitation
+   * @request POST:/api/project-invitations/{invitationId}/decline
+   * @secure
+   */
+  export namespace DeclineProjectInvitation {
+    export type RequestParams = {
+      invitationId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeclineProjectInvitationData;
+  }
+}
+
+export namespace ResourceForms {
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsList
+   * @summary List forms for a resource
+   * @request GET:/api/resources/{resourceId}/forms
+   * @secure
+   */
+  export namespace ResourceFormsList {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsListData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsCreate
+   * @summary Create a form
+   * @request POST:/api/resources/{resourceId}/forms
+   * @secure
+   */
+  export namespace ResourceFormsCreate {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateFormDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsCreateData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsGetRequirements
+   * @summary Get required forms for a resource action
+   * @request GET:/api/resources/{resourceId}/forms/requirements
+   * @secure
+   */
+  export namespace ResourceFormsGetRequirements {
+    export type RequestParams = {
+      resourceId: number;
+    };
+    export type RequestQuery = {
+      /** Usage action the forms are required for */
+      action: "start" | "takeover" | "end";
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsGetRequirementsData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsGetOne
+   * @summary Get a form by id
+   * @request GET:/api/resources/{resourceId}/forms/{formId}
+   * @secure
+   */
+  export namespace ResourceFormsGetOne {
+    export type RequestParams = {
+      resourceId: number;
+      formId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsGetOneData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsUpdate
+   * @summary Update a form
+   * @request PUT:/api/resources/{resourceId}/forms/{formId}
+   * @secure
+   */
+  export namespace ResourceFormsUpdate {
+    export type RequestParams = {
+      resourceId: number;
+      formId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateFormDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsUpdateData;
+  }
+
+  /**
+   * No description
+   * @tags Resource Forms
+   * @name ResourceFormsDelete
+   * @summary Delete a form
+   * @request DELETE:/api/resources/{resourceId}/forms/{formId}
+   * @secure
+   */
+  export namespace ResourceFormsDelete {
+    export type RequestParams = {
+      resourceId: number;
+      formId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceFormsDeleteData;
+  }
 }
 
 export namespace Plugins {
@@ -5825,7 +6586,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -6598,13 +7359,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerFindOne: (
-      type:
-        | "verify-email"
-        | "user-invitation"
-        | "reset-password"
-        | "username-changed"
-        | "password-changed"
-        | "resource-usage-billing-transaction-summary",
+      type: EmailTemplateType,
       params: RequestParams = {},
     ) =>
       this.request<EmailTemplateControllerFindOneData, void>({
@@ -6625,13 +7380,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerUpdate: (
-      type:
-        | "verify-email"
-        | "user-invitation"
-        | "reset-password"
-        | "username-changed"
-        | "password-changed"
-        | "resource-usage-billing-transaction-summary",
+      type: EmailTemplateType,
       data: UpdateEmailTemplateDto,
       params: RequestParams = {},
     ) =>
@@ -8313,6 +9062,325 @@ export class Api<
         query: query,
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name ListProjectMembers
+     * @summary List project members
+     * @request GET:/api/projects/{id}/members
+     * @secure
+     */
+    listProjectMembers: (id: number, params: RequestParams = {}) =>
+      this.request<ListProjectMembersData, void>({
+        path: `/api/projects/${id}/members`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name RemoveProjectMember
+     * @summary Remove a project member
+     * @request DELETE:/api/projects/{id}/members/{memberId}
+     * @secure
+     */
+    removeProjectMember: (
+      id: number,
+      memberId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<RemoveProjectMemberData, void>({
+        path: `/api/projects/${id}/members/${memberId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name ListProjectInvitations
+     * @summary List project invitations
+     * @request GET:/api/projects/{id}/invitations
+     * @secure
+     */
+    listProjectInvitations: (id: number, params: RequestParams = {}) =>
+      this.request<ListProjectInvitationsData, void>({
+        path: `/api/projects/${id}/invitations`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name CreateProjectInvitation
+     * @summary Create a project invitation
+     * @request POST:/api/projects/{id}/invitations
+     * @secure
+     */
+    createProjectInvitation: (
+      id: number,
+      data: CreateProjectInvitationDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateProjectInvitationData, void>({
+        path: `/api/projects/${id}/invitations`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name ResendProjectInvitation
+     * @summary Resend a project invitation
+     * @request POST:/api/projects/{id}/invitations/{invitationId}/resend
+     * @secure
+     */
+    resendProjectInvitation: (
+      id: number,
+      invitationId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResendProjectInvitationData, void>({
+        path: `/api/projects/${id}/invitations/${invitationId}/resend`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name CancelProjectInvitation
+     * @summary Cancel a project invitation
+     * @request DELETE:/api/projects/{id}/invitations/{invitationId}
+     * @secure
+     */
+    cancelProjectInvitation: (
+      id: number,
+      invitationId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<CancelProjectInvitationData, void>({
+        path: `/api/projects/${id}/invitations/${invitationId}`,
+        method: "DELETE",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  projectInvitations = {
+    /**
+     * No description
+     *
+     * @tags Project Invitations
+     * @name ListMyProjectInvitations
+     * @summary List pending project invitations for the authenticated user
+     * @request GET:/api/project-invitations
+     * @secure
+     */
+    listMyProjectInvitations: (params: RequestParams = {}) =>
+      this.request<ListMyProjectInvitationsData, void>({
+        path: `/api/project-invitations`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Project Invitations
+     * @name AcceptProjectInvitation
+     * @summary Accept a project invitation
+     * @request POST:/api/project-invitations/{invitationId}/accept
+     * @secure
+     */
+    acceptProjectInvitation: (
+      invitationId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<AcceptProjectInvitationData, void>({
+        path: `/api/project-invitations/${invitationId}/accept`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Project Invitations
+     * @name DeclineProjectInvitation
+     * @summary Decline a project invitation
+     * @request POST:/api/project-invitations/{invitationId}/decline
+     * @secure
+     */
+    declineProjectInvitation: (
+      invitationId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<DeclineProjectInvitationData, void>({
+        path: `/api/project-invitations/${invitationId}/decline`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  resourceForms = {
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsList
+     * @summary List forms for a resource
+     * @request GET:/api/resources/{resourceId}/forms
+     * @secure
+     */
+    resourceFormsList: (resourceId: number, params: RequestParams = {}) =>
+      this.request<ResourceFormsListData, void>({
+        path: `/api/resources/${resourceId}/forms`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsCreate
+     * @summary Create a form
+     * @request POST:/api/resources/{resourceId}/forms
+     * @secure
+     */
+    resourceFormsCreate: (
+      resourceId: number,
+      data: CreateFormDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFormsCreateData, void>({
+        path: `/api/resources/${resourceId}/forms`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsGetRequirements
+     * @summary Get required forms for a resource action
+     * @request GET:/api/resources/{resourceId}/forms/requirements
+     * @secure
+     */
+    resourceFormsGetRequirements: (
+      { resourceId, ...query }: ResourceFormsGetRequirementsParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFormsGetRequirementsData, void>({
+        path: `/api/resources/${resourceId}/forms/requirements`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsGetOne
+     * @summary Get a form by id
+     * @request GET:/api/resources/{resourceId}/forms/{formId}
+     * @secure
+     */
+    resourceFormsGetOne: (
+      resourceId: number,
+      formId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFormsGetOneData, void>({
+        path: `/api/resources/${resourceId}/forms/${formId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsUpdate
+     * @summary Update a form
+     * @request PUT:/api/resources/{resourceId}/forms/{formId}
+     * @secure
+     */
+    resourceFormsUpdate: (
+      resourceId: number,
+      formId: number,
+      data: UpdateFormDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFormsUpdateData, void>({
+        path: `/api/resources/${resourceId}/forms/${formId}`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resource Forms
+     * @name ResourceFormsDelete
+     * @summary Delete a form
+     * @request DELETE:/api/resources/{resourceId}/forms/{formId}
+     * @secure
+     */
+    resourceFormsDelete: (
+      resourceId: number,
+      formId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceFormsDeleteData, void>({
+        path: `/api/resources/${resourceId}/forms/${formId}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
   };

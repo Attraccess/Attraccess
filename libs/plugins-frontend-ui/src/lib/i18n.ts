@@ -36,6 +36,27 @@ export const useTranslationState = create<TranslationState>((set) => ({
 export type TFunction = (key: string, data?: Record<string, unknown>) => string;
 export type TExists = (key: string) => boolean;
 
+// Pluralization helpers
+interface PluralObject {
+  one: string;
+  many: string;
+}
+
+const isPluralObject = (value: unknown): value is PluralObject => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'one' in value &&
+    'many' in value &&
+    typeof (value as Record<string, unknown>).one === 'string' &&
+    typeof (value as Record<string, unknown>).many === 'string'
+  );
+};
+
+const resolvePlural = (value: PluralObject, count: number): string => {
+  return count === 1 ? value.one : value.many;
+};
+
 interface UseTranslationsResponse {
   t: TFunction;
   tExists: TExists;
@@ -67,34 +88,31 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
     [activeTranslations, fallbackTranslations],
   );
 
-  const getTranslationTemplate = useCallback(
-    (key: string) => {
-      const translation = getTranslationRaw(key);
-      if (translation === undefined) {
-        return undefined;
-      }
-      return Handlebars.compile(translation);
-    },
-    [getTranslationRaw],
-  );
-
   const t = useCallback(
     (key: string, data?: Record<string, unknown>) => {
       const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
-      const translationTemplate = getTranslationTemplate(key);
-      if (translationTemplate === undefined) {
+      let translation = getTranslationRaw(key);
+
+      // Handle pluralization
+      if (isPluralObject(translation) && data && typeof data.count === 'number') {
+        translation = resolvePlural(translation, data.count);
+      }
+
+      if (translation === undefined || typeof translation !== 'string') {
         console.error(`Missing translation for key: ${key}`);
         return ABSOLUTE_FALLBACK_TRANSLATION;
       }
-      return translationTemplate(data);
+
+      const template = Handlebars.compile(translation);
+      return template(data);
     },
-    [getTranslationTemplate],
+    [getTranslationRaw],
   );
 
   const tExists = useCallback(
     (key: string) => {
       const translation = getTranslationRaw(key);
-      return translation !== undefined;
+      return translation !== undefined && (typeof translation === 'string' || isPluralObject(translation));
     },
     [getTranslationRaw],
   );
@@ -106,8 +124,8 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       Object.entries(current).forEach(([key, value]) => {
         const path = prefix ? `${prefix}.${key}` : key;
 
-        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-          // Recurse into nested objects; arrays are treated as leaves to avoid index-based keys
+        if (value !== null && typeof value === 'object' && !Array.isArray(value) && !isPluralObject(value)) {
+          // Recurse into nested objects; arrays and plural objects are treated as leaves
           walk(value as Record<string, unknown>, path);
         } else {
           keys.push(path);

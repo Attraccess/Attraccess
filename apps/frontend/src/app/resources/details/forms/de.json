@@ -11,7 +11,10 @@
       "takeover": "Bei Übernahme",
       "end": "Beim Beenden"
     },
-    "fieldCount": "{{count}} Felder"
+    "fieldCount": {
+      "one": "{{count}} Feld",
+      "many": "{{count}} Felder"
+    }
   },
   "editor": {
     "createTitle": "Formular erstellen",
@@ -44,7 +47,7 @@
     "required": "Pflichtfeld",
     "description": "Beschreibung",
     "placeholder": {
-      "label": "z. B. Sicherheitsbrille getragen?",
+      "label": "-- Bitte Beschriftung eingeben --",
       "description": "Wird unterhalb der Beschriftung angezeigt"
     },
     "optionsTitle": "Feldoptionen",
@@ -58,9 +61,11 @@
         "max": "Maximaler Wert",
         "step": "Schrittweite"
       },
-      "datetime": {
-        "earliest": "Frühestes Datum",
-        "latest": "Spätestes Datum"
+      "select": {
+        "description": "Definiere die Optionen, aus denen Nutzer wählen können.",
+        "optionPlaceholder": "Optionswert",
+        "addOption": "Option hinzufügen",
+        "maxOptions": "Maximale Anzahl von Optionen erreicht"
       },
       "boolean": {
         "trueLabel": "Bezeichnung für „Ja“",
@@ -70,14 +75,14 @@
     "types": {
       "text": "Text",
       "number": "Zahl",
-      "datetime": "Datum & Uhrzeit",
+      "select": "Einzelauswahl",
       "boolean": "Ja / Nein"
     }
   },
   "preview": {
     "booleanYes": "Ja",
     "booleanNo": "Nein",
+    "selectPlaceholder": "Eine Option auswählen",
     "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
   }
 }
-
