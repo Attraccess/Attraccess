@@ -78,3 +78,4 @@ export * from './1764101287776-forms';
 export * from './1764105833243-forms-resource-usage';
 export * from './1764368253546-form-submission-action';
 export * from './1764368253547-forms-select-input-field';
+export * from './1764503783778-delete-revoked-token-table';
