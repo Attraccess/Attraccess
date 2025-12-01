@@ -1520,7 +1520,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
    lv_label_set_text(resourceNameLabel, resourceName.c_str());
    lv_obj_set_style_text_color(resourceNameLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
+   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
 
    if (!this->formsModalRequest)
       return;
@@ -1544,7 +1544,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_label_set_text(formTitle, form.name.c_str());
       lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_SCROLL);
+      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
       lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
 
       for (uint8_t f = 0; f < form.fieldCount && this->formFieldWidgetCount < API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM; ++f)
@@ -1567,6 +1567,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
          lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
 
          if (field.description.length() > 0)
          {
@@ -1574,6 +1576,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
             lv_label_set_text(desc, field.description.c_str());
             lv_obj_set_style_text_color(desc, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_font(desc, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
          }
 
          FormFieldWidget &widget = this->formFieldWidgets[this->formFieldWidgetCount++];
@@ -1599,6 +1603,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
                lv_label_set_text(info, boolLabels.c_str());
                lv_obj_set_style_text_color(info, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
          }
          else if (field.type == API::ResourceUsageFormFieldType::SELECT)
@@ -1624,6 +1630,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
                lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
                lv_obj_set_style_text_color(info, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
             else
             {
@@ -1641,7 +1649,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
-                  lv_label_set_long_mode(optLabel, LV_LABEL_LONG_SCROLL);
+                  lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   // Store option index and widget pointer in user data

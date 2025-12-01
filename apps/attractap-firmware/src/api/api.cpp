@@ -1,6 +1,7 @@
 #include "api.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <memory>
 
 constexpr size_t API::MAX_PROJECTS_PER_PAGE;
 
@@ -482,15 +483,35 @@ void API::sendMessage(const char *type, JsonObject payload)
         eventPayload[p.key()] = p.value();
     }
 
-    char json[JSON_OUTBUF_SMALL];
-    size_t n = serializeJson(event, json, sizeof(json));
-    if (n == 0)
+    const size_t requiredBytes = measureJson(event) + 1; // include terminator
+    if (requiredBytes <= JSON_OUTBUF_SMALL)
     {
-        this->logger.error("Failed to serialize event to buffer (small)");
+        char json[JSON_OUTBUF_SMALL];
+        size_t n = serializeJson(event, json, sizeof(json));
+        if (n == 0)
+        {
+            this->logger.error("Failed to serialize event to buffer (small)");
+            return;
+        }
+        this->logger.info((String("sending message to websocket: ") + String(json)).c_str());
+        this->websocket.sendMessage(json, n);
         return;
     }
-    this->logger.info((String("sending message to websocket: ") + String(json)).c_str());
-    this->websocket.sendMessage(json, n);
+
+    std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
+    if (!json)
+    {
+        this->logger.error("Failed to allocate buffer for outgoing event");
+        return;
+    }
+    size_t n = serializeJson(event, json.get(), requiredBytes);
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize event to dynamically allocated buffer");
+        return;
+    }
+    this->logger.info((String("sending message to websocket: ") + String(json.get())).c_str());
+    this->websocket.sendMessage(json.get(), n);
 }
 
 void API::sendAuthenticationRequest()
