@@ -66,8 +66,7 @@
         "maxOptions": "Maximum number of options reached"
       },
       "boolean": {
-        "trueLabel": "Label for \"yes\"",
-        "falseLabel": "Label for \"no\""
+        "description": "Boolean fields use a yes/no switch and do not have additional options."
       }
     },
     "types": {
@@ -80,6 +79,7 @@
   "preview": {
     "booleanYes": "Yes",
     "booleanNo": "No",
+    "booleanLabel": "Boolean field preview",
     "selectPlaceholder": "Select an option",
     "empty": "Add fields to see the preview."
   }

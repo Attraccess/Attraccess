@@ -21,7 +21,6 @@ import {
   FieldOptions,
   TextFieldOptions,
   NumberFieldOptions,
-  BooleanFieldOptions,
 } from '../../details/forms/types';
 import en from '../translations/en.json';
 import de from '../translations/de.json';
@@ -200,7 +199,7 @@ function renderFieldInput(
     case FormFieldType.NUMBER:
       return renderNumberInput(options as NumberFieldOptions, value, onChange, error);
     case FormFieldType.BOOLEAN:
-      return renderBooleanInput(options as BooleanFieldOptions, value, onChange, error, t);
+      return renderBooleanInput(value, onChange, error, t);
     case FormFieldType.SELECT:
       return renderSelectInput(selectOptions ?? [], value, onChange, error, t);
     default:
@@ -317,29 +316,26 @@ function renderNumberInput(
 }
 
 function renderBooleanInput(
-  options: BooleanFieldOptions,
   value: FieldValue | undefined,
   onChange: (value: FieldValue) => void,
   error: string | null | undefined,
   t: (key: string) => string,
 ) {
-  const trueLabel = options.trueLabel?.trim() || t('modal.booleanYes');
-  const falseLabel = options.falseLabel?.trim() || t('modal.booleanNo');
+  const isChecked = value === true;
 
   return (
-    <div className="space-y-2">
-      <Switch
-        isSelected={(value as boolean) ?? false}
-        onValueChange={(checked) => onChange(checked)}
-        color={error ? 'danger' : 'primary'}
-      >
-        {trueLabel}
-      </Switch>
-      {error ? (
-        <p className="text-xs text-danger-500">{error}</p>
-      ) : (
-        <p className="text-xs text-default-400">{falseLabel}</p>
-      )}
+    <div className="space-y-1">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-default-500">{t('modal.booleanNo')}</span>
+        <Switch
+          isSelected={isChecked}
+          onValueChange={(checked) => onChange(checked)}
+          color={error ? 'danger' : 'primary'}
+          aria-label={t('modal.booleanLabel')}
+        />
+        <span className="text-xs text-default-500">{t('modal.booleanYes')}</span>
+      </div>
+      {error && <p className="text-xs text-danger-500">{error}</p>}
     </div>
   );
 }

@@ -18,7 +18,6 @@ import { SessionStrategy } from './strategies/session.strategy';
 import {
   User,
   AuthenticationDetail,
-  RevokedToken,
   SSOProviderOIDCConfiguration,
   SSOProvider,
   Session,
@@ -37,15 +36,7 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      User,
-      AuthenticationDetail,
-      RevokedToken,
-      SSOProvider,
-      SSOProviderOIDCConfiguration,
-      Session,
-      Setting,
-    ]),
+    TypeOrmModule.forFeature([User, AuthenticationDetail, SSOProvider, SSOProviderOIDCConfiguration, Session, Setting]),
     PassportModule,
     EmailModule,
     LicenseModule,

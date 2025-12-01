@@ -1,12 +1,6 @@
 import { Card, CardBody, CardHeader, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
 import { FormFieldType } from '@attraccess/react-query-client';
-import {
-  EditableFormField,
-  TextFieldOptions,
-  NumberFieldOptions,
-  SelectFieldOptions,
-  BooleanFieldOptions,
-} from '../types';
+import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
 interface FormPreviewProps {
   fields: EditableFormField[];
@@ -51,7 +45,7 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
     case FormFieldType.SELECT:
       return renderPreviewSelect(field.options as SelectFieldOptions, t);
     case FormFieldType.BOOLEAN:
-      return renderPreviewBoolean(field.options as BooleanFieldOptions, t);
+      return renderPreviewBoolean(t);
     default:
       return <Input placeholder="…" />;
   }
@@ -84,14 +78,12 @@ function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => st
   );
 }
 
-function renderPreviewBoolean(options: BooleanFieldOptions, t: (key: string) => string) {
-  const yesLabel = options.trueLabel?.trim() || t('preview.booleanYes');
-  const noLabel = options.falseLabel?.trim() || t('preview.booleanNo');
-
+function renderPreviewBoolean(t: (key: string) => string) {
   return (
     <div className="flex items-center gap-3">
-      <Switch defaultSelected>{yesLabel}</Switch>
-      <Switch>{noLabel}</Switch>
+      <span className="text-xs text-default-500">{t('preview.booleanNo')}</span>
+      <Switch aria-label={t('preview.booleanLabel')} />
+      <span className="text-xs text-default-500">{t('preview.booleanYes')}</span>
     </div>
   );
 }
