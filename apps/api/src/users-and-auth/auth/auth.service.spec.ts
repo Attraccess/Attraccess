@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { AuthenticationDetail, AuthenticationType, User, RevokedToken } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
@@ -12,7 +12,6 @@ jest.mock('bcrypt', () => ({
 }));
 
 const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
-const RevokedTokenRepository = getRepositoryToken(RevokedToken);
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -42,13 +41,6 @@ describe('AuthService', () => {
           provide: EmailService,
           useValue: {
             sendVerificationEmail: jest.fn(),
-          },
-        },
-        {
-          provide: RevokedTokenRepository,
-          useValue: {
-            save: jest.fn(),
-            findOne: jest.fn(),
           },
         },
         {

@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { Repository } from 'typeorm';
-import { User, RevokedToken, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
+import { User, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
 import { addDays } from 'date-fns';
@@ -43,28 +43,10 @@ export class AuthService {
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
-    @InjectRepository(RevokedToken)
-    private revokedTokenRepository: Repository<RevokedToken>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {
     this.logger.debug('AuthService initialized');
-    // Clean up expired revoked tokens periodically
-    setInterval(
-      () =>
-        this.cleanupExpiredTokens().catch((e) =>
-          this.logger.error('Failed to cleanup expired tokens', e.message, e.stack),
-        ),
-      24 * 60 * 60 * 1000,
-    ); // Run daily
-  }
-
-  private async cleanupExpiredTokens() {
-    await this.revokedTokenRepository
-      .createQueryBuilder()
-      .delete()
-      .where('expiresAt < :now', { now: new Date() })
-      .execute();
   }
 
   private async getAuthenticationDetail(
