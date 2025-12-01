@@ -68,8 +68,7 @@
         "maxOptions": "Maximale Anzahl von Optionen erreicht"
       },
       "boolean": {
-        "trueLabel": "Bezeichnung für „Ja“",
-        "falseLabel": "Bezeichnung für „Nein“"
+        "description": "Ja/Nein-Felder verwenden einen Schalter und benötigen keine weiteren Optionen."
       }
     },
     "types": {
@@ -82,6 +81,7 @@
   "preview": {
     "booleanYes": "Ja",
     "booleanNo": "Nein",
+    "booleanLabel": "Ja/Nein-Feld Vorschau",
     "selectPlaceholder": "Eine Option auswählen",
     "empty": "Füge Felder hinzu, um die Vorschau zu sehen."
   }

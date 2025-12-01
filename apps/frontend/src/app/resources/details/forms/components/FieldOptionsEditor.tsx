@@ -1,13 +1,7 @@
 import { Button, Input, Switch } from '@heroui/react';
 import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
-import {
-  EditableFormField,
-  TextFieldOptions,
-  NumberFieldOptions,
-  SelectFieldOptions,
-  BooleanFieldOptions,
-} from '../types';
+import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
 interface FieldOptionsEditorProps {
   field: EditableFormField;
@@ -124,23 +118,8 @@ function renderOptionsByType(
         </div>
       );
     }
-    case FormFieldType.BOOLEAN: {
-      const booleanOptions = options as BooleanFieldOptions;
-      return (
-        <div className="grid gap-3 md:grid-cols-2">
-          <Input
-            label={t('fields.options.boolean.trueLabel')}
-            value={booleanOptions.trueLabel ?? ''}
-            onChange={(event) => updateOptions({ trueLabel: event.target.value })}
-          />
-          <Input
-            label={t('fields.options.boolean.falseLabel')}
-            value={booleanOptions.falseLabel ?? ''}
-            onChange={(event) => updateOptions({ falseLabel: event.target.value })}
-          />
-        </div>
-      );
-    }
+    case FormFieldType.BOOLEAN:
+      return <p className="text-sm text-default-500">{t('fields.options.boolean.description')}</p>;
     default:
       return null;
   }
