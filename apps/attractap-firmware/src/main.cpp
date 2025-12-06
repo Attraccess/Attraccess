@@ -2,12 +2,29 @@
 #include "esp_err.h"
 #include "logger/logger.hpp"
 #include <Wire.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "application/application.hpp"
+
+SET_LOOP_TASK_STACK_SIZE(16 * 1024); // 16KB
 
 Application application;
 
 Logger mainLogger("Main");
+
+void logLoopStackUsage()
+{
+    static uint32_t lastPrint = 0;
+    if (millis() - lastPrint < 1000)
+        return;
+    lastPrint = millis();
+
+    UBaseType_t watermarkWords = uxTaskGetStackHighWaterMark(nullptr);
+    Logger logger("Stack");
+    logger.debugf("loopTask high watermark: %u words (~%u bytes)",
+                  watermarkWords, watermarkWords * sizeof(StackType_t));
+}
 
 void setup()
 {
@@ -30,7 +47,8 @@ void setup()
 
 void loop()
 {
+    logLoopStackUsage();
     application.loop();
     // Cooperatively yield to other tasks and drivers
-    delay(1);
+    // delay(1);
 }

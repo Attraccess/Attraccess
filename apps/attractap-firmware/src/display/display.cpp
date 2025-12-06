@@ -142,9 +142,11 @@ void Display::setup()
     Display::logger.info("Initializing");
 
     // Defer hardware object construction until setup time
-    Display::bus = new Arduino_SWSPI(
-        GFX_NOT_DEFINED /* DC */, 42 /* CS */,
-        2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+    // Display::bus = new Arduino_SWSPI(
+    //   GFX_NOT_DEFINED /* DC */, 42 /* CS */,
+    //   2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+
+    Display::bus = new Arduino_HWSPI(GFX_NOT_DEFINED /* DC */, 42 /* CS */, 2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
 
     Display::rgbpanel = new Arduino_ESP32RGBPanel(
         40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,

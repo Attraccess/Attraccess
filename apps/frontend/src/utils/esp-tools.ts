@@ -98,7 +98,7 @@ export class ESPTools {
   }
 
   private async useTransport<TResult = unknown>(
-    opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>
+    opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>,
   ): Promise<TResult> {
     let transport: Transport = this._transport as Transport;
 
@@ -272,7 +272,7 @@ export class ESPTools {
           await esploader.main();
           await esploader.flashId();
 
-          const ERASE_FIRST = true;
+          const ERASE_FIRST = false;
 
           if (ERASE_FIRST) {
             await esploader.eraseFlash();
