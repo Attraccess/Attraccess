@@ -2,6 +2,7 @@ import { Button, Input, Switch } from '@heroui/react';
 import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
+import { useEffect, useRef, useState } from 'react';
 
 interface FieldOptionsEditorProps {
   field: EditableFormField;
@@ -14,10 +15,20 @@ export function FieldOptionsEditor({ field, onChange, t }: FieldOptionsEditorPro
     onChange({ ...field, options: { ...field.options, ...nextOptions } });
   };
 
+  const lastOptionInputRef = useRef<HTMLInputElement>(null);
+  const [optionAdded, setOptionAdded] = useState(false);
+
+  useEffect(() => {
+    if (optionAdded && lastOptionInputRef.current) {
+      lastOptionInputRef.current.focus();
+      setOptionAdded(false);
+    }
+  }, [optionAdded]);
+
   return (
     <div className="rounded-lg border border-default-200 dark:border-default-100 p-4 space-y-3">
       <p className="text-sm font-semibold text-default-600">{t('fields.optionsTitle')}</p>
-      {renderOptionsByType(field.type, field.options, updateOptions, t)}
+      {renderOptionsByType(field.type, field.options, updateOptions, t, lastOptionInputRef, setOptionAdded)}
     </div>
   );
 }
@@ -27,6 +38,8 @@ function renderOptionsByType(
   options: EditableFormField['options'],
   updateOptions: (options: EditableFormField['options']) => void,
   t: (key: string) => string,
+  lastOptionInputRef: React.RefObject<HTMLInputElement>,
+  setOptionAdded: (value: boolean) => void,
 ) {
   switch (type) {
     case FormFieldType.TEXT: {
@@ -78,6 +91,7 @@ function renderOptionsByType(
 
       const handleAddOption = () => {
         updateOptions({ options: [...currentOptions, ''] });
+        setOptionAdded(true);
       };
 
       const handleRemoveOption = (index: number) => {
@@ -100,6 +114,7 @@ function renderOptionsByType(
                 placeholder={t('fields.options.select.optionPlaceholder')}
                 onChange={(e) => handleOptionChange(index, e.target.value)}
                 size="sm"
+                ref={index === currentOptions.length - 1 ? lastOptionInputRef : undefined}
               />
               <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => handleRemoveOption(index)}>
                 <X className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -123,6 +123,9 @@ export function FormEditorPage() {
     },
   });
 
+  const lastLabelInputRef = useRef<HTMLInputElement>(null);
+  const [fieldAdded, setFieldAdded] = useState(false);
+
   const addField = () => {
     const temporaryId = Date.now().toString();
     setForm((prev) => ({
@@ -140,7 +143,15 @@ export function FormEditorPage() {
       ],
     }));
     setExpandedFieldKey(new Set([`field-${temporaryId}`]));
+    setFieldAdded(true);
   };
+
+  useEffect(() => {
+    if (fieldAdded && lastLabelInputRef.current) {
+      lastLabelInputRef.current.focus();
+      setFieldAdded(false);
+    }
+  }, [fieldAdded]);
 
   const updateField = (index: number, field: EditableFormField) => {
     setForm((prev) => {
@@ -258,13 +269,6 @@ export function FormEditorPage() {
 
             <Divider />
 
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-default-700">{t('editor.fieldsTitle')}</h2>
-              <Button size="sm" variant="flat" onPress={addField}>
-                {t('editor.addField')}
-              </Button>
-            </div>
-
             {form.fields.length === 0 && (
               <div className="rounded-lg border border-dashed border-default-200 p-6 text-center">
                 <p className="font-medium text-default-600">{t('editor.emptyFieldsTitle')}</p>
@@ -297,15 +301,22 @@ export function FormEditorPage() {
                   >
                     <FormFieldEditor
                       field={field}
-                      index={index}
                       onChange={(value) => updateField(index, value)}
                       onRemove={() => removeField(index)}
                       t={t}
+                      labelInputRef={index === form.fields.length - 1 ? lastLabelInputRef : undefined}
                     />
                   </AccordionItem>
                 );
               })}
             </Accordion>
+
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-default-700">{t('editor.fieldsTitle')}</h2>
+              <Button size="sm" variant="flat" onPress={addField}>
+                {t('editor.addField')}
+              </Button>
+            </div>
 
             <div className="flex items-center justify-between pt-2">
               {hasUnsavedChanges && <span className="text-sm text-warning-500">{t('editor.unsaved')}</span>}

@@ -1581,6 +1581,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
          }
 
          FormFieldWidget &widget = this->formFieldWidgets[this->formFieldWidgetCount++];
+         widget.widgetIndex = this->formFieldWidgetCount - 1;
          widget.formId = form.id;
          widget.fieldId = field.id;
          widget.type = field.type;
@@ -1589,6 +1590,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
          widget.errorLabel = nullptr;
          widget.definition = &field;
          widget.owner = this;
+         widget.selectOptionEventCount = 0;
 
          if (field.type == API::ResourceUsageFormFieldType::BOOLEAN)
          {
@@ -1652,10 +1654,18 @@ void ResourceDetailsScreen::rebuildFormsModal()
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-                  // Store option index and widget pointer in user data
-                  SelectOptionEventData *evtData = new SelectOptionEventData{this, &widget, (uint8_t)(optIndex + 1)};
-                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, evtData);
-                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionDelete, LV_EVENT_DELETE, evtData);
+                  if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
+                  {
+                     this->logger.error("Select option event overflow");
+                     continue;
+                  }
+
+                  SelectOptionEventData &evtData = widget.selectOptionEvents[widget.selectOptionEventCount++];
+                  evtData.self = this;
+                  evtData.widgetIndex = widget.widgetIndex;
+                  evtData.optionIndex = static_cast<uint8_t>(optIndex + 1);
+
+                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, &evtData);
                }
                this->updateSelectOptionLayout(widget);
             }
@@ -2002,31 +2012,30 @@ void ResourceDetailsScreen::onFormsKeyboardEvent(lv_event_t *e)
 void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
 {
    auto *evtData = static_cast<SelectOptionEventData *>(lv_event_get_user_data(e));
-   if (!evtData || !evtData->self || !evtData->widget)
+   if (!evtData || !evtData->self)
    {
       return;
    }
 
-   // Toggle: if same option clicked again, deselect it
-   if (evtData->widget->selectedOptionIndex == evtData->optionIndex)
+   auto *self = evtData->self;
+   if (evtData->widgetIndex >= self->formFieldWidgetCount)
    {
-      evtData->widget->selectedOptionIndex = 0;
+      return;
+   }
+
+   FormFieldWidget &widget = self->formFieldWidgets[evtData->widgetIndex];
+
+   // Toggle: if same option clicked again, deselect it
+   if (widget.selectedOptionIndex == evtData->optionIndex)
+   {
+      widget.selectedOptionIndex = 0;
    }
    else
    {
-      evtData->widget->selectedOptionIndex = evtData->optionIndex;
+      widget.selectedOptionIndex = evtData->optionIndex;
    }
 
-   evtData->self->updateSelectButtonStyles(*evtData->widget);
-}
-
-void ResourceDetailsScreen::onSelectOptionDelete(lv_event_t *e)
-{
-   auto *evtData = static_cast<SelectOptionEventData *>(lv_event_get_user_data(e));
-   if (evtData)
-   {
-      delete evtData;
-   }
+   self->updateSelectButtonStyles(widget);
 }
 
 void ResourceDetailsScreen::onSelectContainerSizeChanged(lv_event_t *e)
@@ -2083,8 +2092,6 @@ void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
       return;
    }
 
-   lv_obj_update_layout(widget.input);
-
    lv_coord_t containerWidth = lv_obj_get_width(widget.input);
    lv_coord_t padLeft = lv_obj_get_style_pad_left(widget.input, LV_PART_MAIN);
    lv_coord_t padRight = lv_obj_get_style_pad_right(widget.input, LV_PART_MAIN);
@@ -2109,9 +2116,11 @@ void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
       {
          continue;
       }
-      lv_obj_set_width(btn, widthPerButton);
+      if (lv_obj_get_width(btn) != widthPerButton)
+      {
+         lv_obj_set_width(btn, widthPerButton);
+      }
    }
 
-   lv_obj_mark_layout_as_dirty(widget.input);
-   lv_obj_update_layout(widget.input);
+   lv_obj_invalidate(widget.input);
 }

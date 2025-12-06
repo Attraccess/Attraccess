@@ -30,6 +30,7 @@
     "emptyFieldsDescription": "Füge mindestens ein Feld hinzu, damit Mitglieder etwas ausfüllen können.",
     "save": "Formular speichern",
     "delete": "Formular löschen",
+    "deleteField": "Feld löschen",
     "previewTitle": "Live-Vorschau",
     "unsaved": "Nicht gespeicherte Änderungen",
     "createSuccess": "Formular erstellt",

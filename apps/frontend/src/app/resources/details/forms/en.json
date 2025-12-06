@@ -28,6 +28,7 @@
     "emptyFieldsDescription": "Add at least one field so members have something to answer.",
     "save": "Save form",
     "delete": "Delete form",
+    "deleteField": "Delete field",
     "previewTitle": "Live preview",
     "unsaved": "Unsaved changes",
     "createSuccess": "Form created",
