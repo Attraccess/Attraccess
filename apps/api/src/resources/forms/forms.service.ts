@@ -159,7 +159,7 @@ export class ResourceFormsService {
     userId: number;
     resourceUsageId: number;
     manager: EntityManager;
-  }): Promise<void> {
+  }): Promise<FormSubmission[]> {
     const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
 
     if (!forms.length) {
@@ -172,6 +172,8 @@ export class ResourceFormsService {
     }
 
     const submissionRepo = options.manager.getRepository(FormSubmission);
+
+    const submissionEntities: FormSubmission[] = [];
 
     for (const form of forms) {
       const submissionsForForm = options.submissions?.filter((item) => item.formId === form.id) ?? [];
@@ -188,14 +190,19 @@ export class ResourceFormsService {
 
       const data = this.buildSubmissionData(form, submission);
 
-      await submissionRepo.insert({
+      const submissionEntity = await submissionRepo.save({
         formId: form.id,
+        form,
         resourceUsageId: options.resourceUsageId,
         userId: options.userId,
         data,
         action: options.action,
       });
+
+      submissionEntities.push(submissionEntity);
     }
+
+    return submissionEntities;
   }
 
   private async ensureResourceExists(resourceId: number): Promise<Resource> {
