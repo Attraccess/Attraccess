@@ -168,7 +168,7 @@ export class ResourceFormsService {
           `Received ${options.submissions.length} form submissions for action ${options.action} on resource #${options.resourceId} without required forms. Ignoring.`,
         );
       }
-      return;
+      return [];
     }
 
     const submissionRepo = options.manager.getRepository(FormSubmission);
