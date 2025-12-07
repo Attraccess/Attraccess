@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
-import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In } from 'typeorm';
+import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In, DeepPartial } from 'typeorm';
 import { SystemPermissions, User } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
@@ -178,7 +178,7 @@ export class UsersService {
   }
 
   async updateOne(id: number, updateData: Partial<User>): Promise<User> {
-    const updates = {
+    const updates: DeepPartial<User> = {
       username: updateData.username?.trim() ?? undefined,
       email: updateData.email?.trim() ?? undefined,
       externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
@@ -187,6 +187,16 @@ export class UsersService {
 
     if (updates.username !== undefined) {
       this.validateUsernameOrThrow(updates.username);
+    }
+
+    if (updateData.lastUsernameChangeAt !== undefined) {
+      updates.lastUsernameChangeAt = updateData.lastUsernameChangeAt;
+    }
+
+    if (updateData.systemPermissions !== undefined) {
+      updates.systemPermissions = {
+        ...updateData.systemPermissions,
+      } as DeepPartial<SystemPermissions>;
     }
 
     // If email is being updated, check for uniqueness
