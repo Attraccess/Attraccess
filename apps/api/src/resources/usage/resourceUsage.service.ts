@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException, Logger } from '@ne
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
 import {
+  FormSubmission,
   Resource,
   ResourceFlowNodeType,
   ResourceType,
@@ -146,6 +147,56 @@ export class ResourceUsageService {
     return resource;
   }
 
+  private getResourceUsageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?: FormSubmission[]) {
+    const normalizedFormSubmissions = formSubmissions ?? [];
+    const mappedFormSubmissions: {
+      [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
+    } = {};
+
+    normalizedFormSubmissions.forEach((submission) => {
+      mappedFormSubmissions[submission.form.id] = {
+        formName: submission.form.name,
+        answers: Object.fromEntries(
+          Object.values(submission.data).map((field) => [
+            field.fieldDefinition.id,
+            { value: field.value, name: field.fieldDefinition.name },
+          ]),
+        ),
+      };
+    });
+
+    const usageUser =
+      resourceUsage.user ??
+      (resourceUsage.userId != null ? ({ id: resourceUsage.userId } as Pick<User, 'id'> & Partial<User>) : undefined);
+
+    const sanitizedUser: (Partial<User> & Pick<User, 'id'>) | undefined = usageUser
+      ? {
+          id: usageUser.id,
+          username: usageUser.username,
+          email: usageUser.email,
+          systemPermissions: usageUser.systemPermissions,
+          createdAt: usageUser.createdAt,
+          updatedAt: usageUser.updatedAt,
+          billingFactor: usageUser.billingFactor,
+          creditBalance: usageUser.creditBalance,
+        }
+      : undefined;
+
+    const flowPayload = {
+      ...resourceUsage,
+      resource: {
+        ...resourceUsage.resource,
+        documentationMarkdown: undefined,
+        documentationUrl: undefined,
+        documentationType: undefined,
+      } as Partial<Resource>,
+      user: sanitizedUser,
+      formSubmissions: mappedFormSubmissions,
+    };
+
+    return flowPayload;
+  }
+
   async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -241,7 +292,7 @@ export class ResourceUsageService {
         order: {
           startTime: 'DESC',
         },
-        relations: ['resource', 'user'],
+        relations: ['resource', 'user', 'project'],
       });
 
       if (!createdSession) {
@@ -253,9 +304,10 @@ export class ResourceUsageService {
         `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
       );
 
+      let formSubmissions: FormSubmission[] = [];
       if (resource.type === ResourceType.Machine) {
         const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
-        await this.resourceFormsService.saveRequiredSubmissions({
+        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
           resourceId,
           action,
           submissions: dto.formSubmissions,
@@ -273,7 +325,12 @@ export class ResourceUsageService {
         await this.flowExecutorService.runFlow(
           existingActiveSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-          { ...existingActiveSession, takeOverTime: now, newUser: user, oldUser: existingActiveSession.user },
+          {
+            ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+            takeOverTime: now,
+            newUser: user,
+            oldUser: existingActiveSession.user,
+          },
           transactionalEntityManager,
         );
 
@@ -289,7 +346,7 @@ export class ResourceUsageService {
         await this.flowExecutorService.runFlow(
           createdSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-          createdSession,
+          this.getResourceUsageFlowPayload(createdSession, formSubmissions),
           transactionalEntityManager,
         );
       }
@@ -347,7 +404,7 @@ export class ResourceUsageService {
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
-
+    let formSubmissions: FormSubmission[] = [];
     const updatedUsage = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       const updateData = {
         endTime,
@@ -355,7 +412,7 @@ export class ResourceUsageService {
       };
 
       if (activeSession.resource?.type === ResourceType.Machine) {
-        await this.resourceFormsService.saveRequiredSubmissions({
+        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
           resourceId,
           action: ResourceFormAction.END,
           submissions: dto.formSubmissions,
@@ -369,10 +426,7 @@ export class ResourceUsageService {
       await this.flowExecutorService.runFlow(
         activeSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        {
-          ...activeSession,
-          ...updateData,
-        },
+        { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
         transactionalEntityManager,
       );
 
