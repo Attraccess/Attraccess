@@ -49,6 +49,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
 
     const oidcUserId = profile.id;
 
+    const externalIdentifier = `SSO:OIDC:${this.config.ssoProviderId}:${oidcUserId}`;
+
     if (!oidcUserId) {
       this.logger.error('No user ID found in SSO profile');
       throw new BadRequestException('No user ID found in SSO profile');
@@ -78,7 +80,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
 
     // Step 1: Check if user exists by external ID
     this.logger.debug(`Checking if user exists with external ID: ${oidcUserId}`);
-    let user = await usersService.findOne({ externalIdentifier: oidcUserId }).catch(() => null);
+    let user = await usersService.findOne({ externalIdentifier }).catch(() => null);
 
     if (user) {
       this.logger.log(`Found existing user with external ID: ${oidcUserId}`);
@@ -122,7 +124,13 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
     const username = resolvedUsername || profile.username || email;
     this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
-    user = await usersService.createOne({ username, email, externalIdentifier: oidcUserId });
+    user = await usersService.createOne({
+      username,
+      email,
+      externalIdentifier,
+      isEmailVerified: true,
+      skipUsernameSanitization: true,
+    });
 
     if (!user) {
       this.logger.error('Failed to create user after SSO authentication');

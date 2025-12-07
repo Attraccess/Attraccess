@@ -5,6 +5,7 @@ import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/data
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
+import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt', () => ({
@@ -48,6 +49,12 @@ describe('AuthService', () => {
           useValue: {
             findOne: jest.fn(),
             update: jest.fn(),
+          },
+        },
+        {
+          provide: SSOService,
+          useValue: {
+            getProviderById: jest.fn(),
           },
         },
       ],

@@ -91,15 +91,24 @@ export class UsersService {
     return user || null;
   }
 
-  async createOne(userData: { username: string; email: string; externalIdentifier: string | null }): Promise<User> {
+  async createOne(userData: {
+    username: string;
+    email: string;
+    externalIdentifier: string | null;
+    isEmailVerified?: boolean;
+    skipUsernameSanitization?: boolean;
+  }): Promise<User> {
     const data = {
       username: userData.username.trim(),
       email: userData.email.trim(),
       externalIdentifier: userData.externalIdentifier?.trim() ?? null,
+      isEmailVerified: userData.isEmailVerified ?? false,
     };
     this.logger.debug(`Creating new user - username: ${data.username}, email: ${data.email}`);
 
-    this.validateUsernameOrThrow(data.username);
+    if (!userData.skipUsernameSanitization) {
+      this.validateUsernameOrThrow(data.username);
+    }
 
     // verifying usage limits
     const currentAmountOfUsers = await this.userRepository.count();
