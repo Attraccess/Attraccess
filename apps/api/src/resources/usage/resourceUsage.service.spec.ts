@@ -830,11 +830,7 @@ describe('ResourceUsageService', () => {
       const result = await service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
-      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
-        mockActiveSession.resourceId,
-        managerUser.id,
-        true,
-      );
+      expect(resourceIntroducersService.isIntroducer).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
