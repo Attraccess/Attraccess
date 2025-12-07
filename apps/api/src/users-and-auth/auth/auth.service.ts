@@ -6,6 +6,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
 import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
+import { SSOService } from './sso/sso.service';
+import { SSOProviderNotFoundException } from './sso/errors';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
@@ -45,6 +47,7 @@ export class AuthService {
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private ssoService: SSOService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -195,10 +198,42 @@ export class AuthService {
   }
 
   async changePassword(user: User, password: string): Promise<void> {
-    const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id);
+    const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id).catch(
+      (error) => {
+        if (error instanceof NotFoundException) {
+          return null;
+        }
+        throw error;
+      },
+    );
 
-    authenticationDetail.password = await this.hashPassword(password);
-    await this.authenticationDetailRepository.save(authenticationDetail);
+    if (authenticationDetail) {
+      authenticationDetail.password = await this.hashPassword(password);
+      await this.authenticationDetailRepository.save(authenticationDetail);
+    } else {
+      if (!user.externalIdentifier.startsWith('SSO:')) {
+        const [, providerType, providerId] = user.externalIdentifier.split(':');
+        const provider = await this.ssoService.getProviderById(Number(providerId)).catch((error) => {
+          if (error instanceof SSOProviderNotFoundException) {
+            return null;
+          }
+          throw error;
+        });
+
+        if (provider?.type !== providerType) {
+          throw new ForbiddenException('You cannot change the password of an SSO user');
+        }
+
+        throw new ForbiddenException('You cannot change the password of an SSO user');
+      }
+
+      await this.addAuthenticationDetails(user.id, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: {
+          password,
+        },
+      });
+    }
 
     // Notify user about password change
     await this.emailService.sendPasswordChangedEmail(user);

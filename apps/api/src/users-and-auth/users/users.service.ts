@@ -96,6 +96,7 @@ export class UsersService {
     email: string;
     externalIdentifier: string | null;
     isEmailVerified?: boolean;
+    skipUsernameSanitization?: boolean;
   }): Promise<User> {
     const data = {
       username: userData.username.trim(),
@@ -105,7 +106,9 @@ export class UsersService {
     };
     this.logger.debug(`Creating new user - username: ${data.username}, email: ${data.email}`);
 
-    this.validateUsernameOrThrow(data.username);
+    if (!userData.skipUsernameSanitization) {
+      this.validateUsernameOrThrow(data.username);
+    }
 
     // verifying usage limits
     const currentAmountOfUsers = await this.userRepository.count();
