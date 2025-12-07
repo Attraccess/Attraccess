@@ -204,6 +204,35 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { username: 'test' })).rejects.toThrow(UserNotFoundException);
     });
+
+    it('should persist system permission updates', async () => {
+      const user = {
+        id: 1,
+        systemPermissions: {
+          canManageResources: true,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+      } as User;
+      const permissionsUpdate = {
+        canManageResources: true,
+        canManageSystemConfiguration: true,
+        canManageUsers: false,
+        canManageBilling: false,
+      };
+      jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+
+      await service.updateOne(1, { systemPermissions: permissionsUpdate });
+
+      expect(userRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          systemPermissions: permissionsUpdate,
+        }),
+      );
+    });
   });
 
   describe('findMany', () => {
