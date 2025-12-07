@@ -122,7 +122,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
     const username = resolvedUsername || profile.username || email;
     this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
-    user = await usersService.createOne({ username, email, externalIdentifier: oidcUserId });
+    user = await usersService.createOne({
+      username,
+      email,
+      externalIdentifier: oidcUserId,
+      isEmailVerified: true,
+    });
 
     if (!user) {
       this.logger.error('Failed to create user after SSO authentication');
