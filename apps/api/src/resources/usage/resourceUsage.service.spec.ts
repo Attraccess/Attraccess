@@ -793,6 +793,151 @@ describe('ResourceUsageService', () => {
         new BadRequestException('No active session found'),
       );
     });
+
+    it('allows users with canManageResources to end sessions owned by others', async () => {
+      const dto: EndUsageSessionDto = { notes: 'Manual stop' };
+      const sessionOwner = { id: 77, username: 'member' } as User;
+      const managerUser = {
+        id: 88,
+        username: 'manager',
+        systemPermissions: { canManageResources: true },
+      } as User;
+      const mockActiveSession = {
+        id: 5,
+        resourceId: 12,
+        userId: sessionOwner.id,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const prefixedNotes = `[By #${managerUser.id} - ${managerUser.username}] ${dto.notes}`;
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: prefixedNotes,
+      };
+
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.endSession(mockActiveSession.resourceId, managerUser, dto);
+
+      expect(result).toBe(mockUpdatedSession);
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        managerUser.id,
+        true,
+      );
+      expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
+      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: prefixedNotes }),
+        expect.anything(),
+      );
+    });
+
+    it('allows resource introducers to end sessions owned by others', async () => {
+      const dto: EndUsageSessionDto = { notes: 'Introducer stop' };
+      const sessionOwner = { id: 31, username: 'member' } as User;
+      const introducerUser = { id: 44, username: 'resource-introducer' } as User;
+      const mockActiveSession = {
+        id: 6,
+        resourceId: 22,
+        userId: sessionOwner.id,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const prefixedNotes = `[By #${introducerUser.id} - ${introducerUser.username}] ${dto.notes}`;
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: prefixedNotes,
+      };
+
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.endSession(mockActiveSession.resourceId, introducerUser, dto);
+
+      expect(result).toBe(mockUpdatedSession);
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        introducerUser.id,
+        true,
+      );
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: prefixedNotes }),
+        expect.anything(),
+      );
+    });
+
+    it('allows group introducers to end sessions owned by others', async () => {
+      const dto: EndUsageSessionDto = { notes: 'Group introducer stop' };
+      const sessionOwner = { id: 51, username: 'owner' } as User;
+      const groupIntroducer = { id: 91, username: 'group-introducer' } as User;
+      const mockActiveSession = {
+        id: 7,
+        resourceId: 33,
+        userId: sessionOwner.id,
+        startTime: new Date(),
+        user: sessionOwner,
+      } as ResourceUsage;
+      const prefixedNotes = `[By #${groupIntroducer.id} - ${groupIntroducer.username}] ${dto.notes}`;
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: prefixedNotes,
+      };
+
+      resourceIntroducersService.isIntroducer.mockImplementation(async (_resId, _userId, includeGroupIntroducers) =>
+        includeGroupIntroducers ? true : false,
+      );
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.endSession(mockActiveSession.resourceId, groupIntroducer, dto);
+
+      expect(result).toBe(mockUpdatedSession);
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        groupIntroducer.id,
+        true,
+      );
+      await expect(resourceIntroducersService.isIntroducer.mock.results.at(-1)?.value).resolves.toBe(true);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: prefixedNotes }),
+        expect.anything(),
+      );
+    });
   });
 
   describe('door actions', () => {

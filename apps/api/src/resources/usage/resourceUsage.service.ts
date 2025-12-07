@@ -383,9 +383,10 @@ export class ResourceUsageService {
 
     // Check if the user is authorized to end the session
     const canManageResources = user.systemPermissions?.canManageResources || false;
-    const isSessionOwner = activeSession.user.id === user.id; // Use loaded user ID
+    const isSessionOwner = activeSession.user.id === user.id;
+    const isIntroducer = await this.resourceIntroducersService.isIntroducer(activeSession.resourceId, user.id, true);
 
-    if (!isSessionOwner && !canManageResources) {
+    if (!isSessionOwner && !canManageResources && !isIntroducer) {
       this.logger.warn(
         `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
       );
