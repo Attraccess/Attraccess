@@ -61,6 +61,10 @@ export class UsersService {
     }
   }
 
+  private cleanupUsername(username: string): string {
+    return username.trim().toLowerCase();
+  }
+
   async findOne(options: FindOneOptions, relations?: string[]): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
@@ -72,7 +76,7 @@ export class UsersService {
     }
 
     if (validatedOptions.username !== undefined) {
-      whereCondition.username = ILike(validatedOptions.username);
+      whereCondition.username = this.cleanupUsername(validatedOptions.username);
     }
 
     if (validatedOptions.email !== undefined) {
@@ -99,7 +103,7 @@ export class UsersService {
     skipUsernameSanitization?: boolean;
   }): Promise<User> {
     const data = {
-      username: userData.username.trim(),
+      username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
       externalIdentifier: userData.externalIdentifier?.trim() ?? null,
       isEmailVerified: userData.isEmailVerified ?? false,
@@ -178,8 +182,18 @@ export class UsersService {
   }
 
   async updateOne(id: number, updateData: Partial<User>): Promise<User> {
+    let username = updateData.username;
+    if (username) {
+      username = this.cleanupUsername(username);
+
+      if (username === '') {
+        username = undefined;
+      }
+    }
+
     const updates: DeepPartial<User> = {
-      username: updateData.username?.trim() ?? undefined,
+      ...updateData,
+      username,
       email: updateData.email?.trim() ?? undefined,
       externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
     };
@@ -187,10 +201,6 @@ export class UsersService {
 
     if (updates.username !== undefined) {
       this.validateUsernameOrThrow(updates.username);
-    }
-
-    if (updateData.lastUsernameChangeAt !== undefined) {
-      updates.lastUsernameChangeAt = updateData.lastUsernameChangeAt;
     }
 
     if (updateData.systemPermissions !== undefined) {
@@ -239,7 +249,7 @@ export class UsersService {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
-    newUsername = newUsername.trim();
+    newUsername = this.cleanupUsername(newUsername);
     if (newUsername.length === 0) {
       throw new BadRequestException('Username cannot be empty');
     }
