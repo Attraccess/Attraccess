@@ -17,7 +17,7 @@ const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
 describe('AuthService', () => {
   let authService: AuthService;
   let authenticationDetailRepository: Repository<AuthenticationDetail>;
-  let userRepository: Repository<User>;
+  let usersService: UsersService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -28,7 +28,7 @@ describe('AuthService', () => {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
-            updateUser: jest.fn(),
+            updateOne: jest.fn(),
           },
         },
         {
@@ -45,13 +45,6 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: getRepositoryToken(User),
-          useValue: {
-            findOne: jest.fn(),
-            update: jest.fn(),
-          },
-        },
-        {
           provide: SSOService,
           useValue: {
             getProviderById: jest.fn(),
@@ -62,7 +55,7 @@ describe('AuthService', () => {
 
     authService = module.get<AuthService>(AuthService);
     authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    usersService = module.get<UsersService>(UsersService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -90,7 +83,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
 
     const authenticationDetail: Partial<AuthenticationDetail> = {
       userId: 1,
@@ -131,7 +124,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
 
     jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
       id: 1,
@@ -153,7 +146,7 @@ describe('AuthService', () => {
   });
 
   it('should not authenticate a non-existent user', async () => {
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(null);
 
     const isAuthenticated = await authService.getUserByUsernameAndAuthenticationDetails('nonexistentuser', {
       type: AuthenticationType.LOCAL_PASSWORD,

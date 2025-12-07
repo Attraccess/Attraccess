@@ -8,6 +8,7 @@ import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
 import { SSOService } from './sso/sso.service';
 import { SSOProviderNotFoundException } from './sso/errors';
+import { UsersService } from '../users/users.service';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
@@ -45,9 +46,8 @@ export class AuthService {
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
     private ssoService: SSOService,
+    private usersService: UsersService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -119,7 +119,7 @@ export class AuthService {
     username: string,
     options: AuthenticationOptions<T>,
   ): Promise<User | null> {
-    const user = await this.userRepository.findOne({ where: { username } });
+    const user = await this.usersService.findOne({ username });
 
     if (!user) {
       this.logger.debug(`No user found with username: ${username}`);
@@ -144,7 +144,7 @@ export class AuthService {
     const token = nanoid();
 
     this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
-    await this.userRepository.update(user.id, {
+    await this.usersService.updateOne(user.id, {
       emailVerificationToken: token,
       emailVerificationTokenExpiresAt: addDays(new Date(), 3),
     });
@@ -155,7 +155,7 @@ export class AuthService {
 
   async verifyEmail(email: string, token: string): Promise<void> {
     this.logger.debug(`Verifying email: ${email} with token: ${token.substring(0, 5)}...`);
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.usersService.findOne({ email });
 
     if (!user) {
       this.logger.debug(`No user found with email: ${email}`);
@@ -173,7 +173,7 @@ export class AuthService {
     }
 
     this.logger.debug(`Marking email as verified for user ID: ${user.id}`);
-    await this.userRepository.update(user.id, {
+    await this.usersService.updateOne(user.id, {
       isEmailVerified: true,
       emailVerificationToken: null,
       emailVerificationTokenExpiresAt: null,
@@ -182,14 +182,14 @@ export class AuthService {
   }
 
   async generatePasswordResetToken(email: string): Promise<string> {
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.usersService.findOne({ email });
     if (!user) {
       this.logger.debug(`No user found with email: ${email}`);
       return null;
     }
 
     const token = nanoid();
-    await this.userRepository.update(user.id, {
+    await this.usersService.updateOne(user.id, {
       passwordResetToken: token,
       passwordResetTokenExpiresAt: addDays(new Date(), 1),
     });
