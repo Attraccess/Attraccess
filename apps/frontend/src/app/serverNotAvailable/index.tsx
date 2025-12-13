@@ -31,9 +31,9 @@ export function ServerNotAvailable() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const reload = useCallback(() => {
+  const reload = useCallback(async () => {
     setIsLoading(true);
-    queryClient.invalidateQueries();
+    await queryClient.invalidateQueries();
     setIsLoading(false);
   }, [queryClient]);
 
