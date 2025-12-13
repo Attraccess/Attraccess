@@ -7,9 +7,9 @@ IdP, validate the returned response, and mint an Attraccess session token.
 
 ## Supported provider types
 
-| Type | Use cases | Required data |
-| ---- | --------- | ------------- |
-| **OIDC** | Authentik, Keycloak, Azure AD, etc. | Issuer, authorization/token/user-info URLs, client credentials, optional scopes & claim hints |
+| Type     | Use cases                                                     | Required data                                                                                                   |
+| -------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **OIDC** | Authentik, Keycloak, Azure AD, etc.                           | Issuer, authorization/token/user-info URLs, client credentials, optional scopes & claim hints                   |
 | **SAML** | Legacy enterprise IdPs (Keycloak SAML clients, ADFS, Okta, …) | Entry point URL, SP issuer, ACS override (optional), IdP signing certificate, optional audience & signing flags |
 
 ## Creating a provider
@@ -24,7 +24,7 @@ IdP, validate the returned response, and mint an Attraccess session token.
 
 - Use the **Auto-Discovery** menu to fetch metadata from Authentik or Keycloak – issuer and
   endpoint URLs are filled automatically.
-- `Scopes`, `Username claim paths`, and `Email claim paths` accept comma separated lists and
+- `Scopes`, `Username claim paths`, and `Email claim paths` accept comma-separated lists and
   are evaluated in order. They allow you to prioritise custom claim names if your IdP does
   not populate the defaults (`preferred_username`, `email`, `sub`, …).
 
@@ -40,11 +40,11 @@ IdP, validate the returned response, and mint an Attraccess session token.
 - **Audience**: optional restriction that must match the `Audience` inside assertions. Leave
   empty to accept the default (`issuer`).
 - **Signing flags**:
-  - *Sign AuthnRequests*: future-proof switch (requests are still sent unsigned unless a SP
+  - _Sign AuthnRequests_: future-proof switch (requests are still sent unsigned unless a SP
     key is configured).
-  - *Require signed assertions / responses*: mirror your IdP behaviour; leave responses signed
+  - _Require signed assertions / responses_: mirror your IdP behaviour; leave responses signed
     for production.
-  - *Force re-authentication*: sets the `ForceAuthn` flag so the IdP cannot reuse an existing
+  - _Force re-authentication_: sets the `ForceAuthn` flag so the IdP cannot reuse an existing
     session.
 
 After saving, users see a “Login with {provider name}” button on the Unauthorized screen.
