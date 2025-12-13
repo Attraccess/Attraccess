@@ -589,7 +589,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     data-cy="sso-provider-form-type-select"
                   />
 
-                  {formValues.type === 'OIDC' && (
+                  {formValues.type === SSOProviderType.OIDC && (
                     <>
                       <Divider className="my-4" />
                       <div className="flex items-center justify-between mb-2">
@@ -730,7 +730,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       />
                     </>
                   )}
-                  {formValues.type === 'SAML' && (
+                  {formValues.type === SSOProviderType.SAML && (
                     <>
                       <Divider className="my-4" />
                       <div className="flex items-center gap-2 mb-2">
