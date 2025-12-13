@@ -178,10 +178,18 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
     }
 
     const username = this.resolveDisplayName(profile, email);
-    user = await usersService.createOne({ username, email, externalIdentifier: samlUserId }).catch((error: Error) => {
-      this.logger.error('Failed to create user after SAML authentication', error.stack);
-      return null;
-    });
+    user = await usersService
+      .createOne({
+        username,
+        email,
+        externalIdentifier: samlUserId,
+        skipUsernameSanitization: true,
+        isEmailVerified: true,
+      })
+      .catch((error: Error) => {
+        this.logger.error('Failed to create user after SAML authentication', error.stack);
+        return null;
+      });
 
     if (!user) {
       throw new UnauthorizedException();

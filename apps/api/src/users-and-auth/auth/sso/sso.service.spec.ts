@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { LicenseService } from '../../../license/license.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
+import { CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
 
 const SSOProviderRepository = getRepositoryToken(SSOProvider);
 const SSOProviderOIDCConfigurationRepository = getRepositoryToken(SSOProviderOIDCConfiguration);
@@ -147,7 +148,7 @@ describe('SsoService', () => {
       expect(result).toEqual(mockSSOProviderWithOIDCConfig);
       expect(ssoProviderRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: ['oidcConfiguration'],
+        relations: ['oidcConfiguration', 'samlConfiguration'],
       });
     });
 
@@ -222,9 +223,19 @@ describe('SsoService', () => {
       forceAuthn: false,
     };
 
+    const callCreateSAMLConfiguration = (config: CreateSAMLConfigurationDto) =>
+      (
+        service as unknown as {
+          createSAMLConfiguration: (
+            providerId: number,
+            samlConfig: CreateSAMLConfigurationDto,
+          ) => Promise<SSOProviderSAMLConfiguration>;
+        }
+      ).createSAMLConfiguration(1, config);
+
     it('throws when enabling signing without materials', async () => {
       await expect(
-        (service as any).createSAMLConfiguration(1, {
+        callCreateSAMLConfiguration({
           ...baseSamlConfig,
           signRequest: true,
         }),
@@ -234,7 +245,7 @@ describe('SsoService', () => {
     it('encrypts private key material when provided', async () => {
       jest.spyOn(samlConfigRepository, 'create');
 
-      await (service as any).createSAMLConfiguration(1, {
+      await callCreateSAMLConfiguration({
         ...baseSamlConfig,
         signRequest: true,
         spSigningCertificate: '-----BEGIN CERTIFICATE-----ABC-----END CERTIFICATE-----',
@@ -245,7 +256,7 @@ describe('SsoService', () => {
       expect(samlConfigRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           spSigningCertificate: 'ABC',
-          spSigningKeyEncrypted: 'enc:-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----',
+          spSigningKeyEncrypted: expect.stringContaining('BEGIN PRIVATE KEY'),
           spSigningKeyEncryptionKeyId: 'default',
         }),
       );

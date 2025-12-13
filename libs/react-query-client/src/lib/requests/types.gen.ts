@@ -3195,6 +3195,7 @@ export type SamlLoginCallbackData = {
      */
     providerId: string;
     redirectTo: string;
+    relayState: string;
 };
 
 export type SamlLoginCallbackResponse = CreateSessionResponse;

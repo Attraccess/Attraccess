@@ -310,10 +310,12 @@ export const useAuthenticationServiceLinkUserToExternalAccount = <TData = Common
 export const useAuthenticationServiceSamlLoginCallback = <TData = Common.AuthenticationServiceSamlLoginCallbackMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   providerId: string;
   redirectTo: string;
+  relayState: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   providerId: string;
   redirectTo: string;
-}, TContext>({ mutationFn: ({ providerId, redirectTo }) => AuthenticationService.samlLoginCallback({ providerId, redirectTo }) as unknown as Promise<TData>, ...options });
+  relayState: string;
+}, TContext>({ mutationFn: ({ providerId, redirectTo, relayState }) => AuthenticationService.samlLoginCallback({ providerId, redirectTo, relayState }) as unknown as Promise<TData>, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerPreviewMjml = <TData = Common.EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: PreviewMjmlDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

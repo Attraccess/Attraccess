@@ -173,7 +173,9 @@ export class SSOService {
 
     this.ensureSigningMaterialAvailability(shouldSignRequests, normalizedSpSigningCertificate, encryptedPrivateKey);
 
-    const { spSigningCertificate: _ignoredCert, spSigningPrivateKey: _ignoredKey, ...persistableConfig } = config;
+    const { spSigningCertificate: unusedSpCert, spSigningPrivateKey: unusedSpKey, ...persistableConfig } = config;
+    void unusedSpCert;
+    void unusedSpKey;
 
     const newConfig = this.samlConfigRepository.create({
       ...persistableConfig,
@@ -241,15 +243,15 @@ export class SSOService {
     }
 
     const nextSignRequest =
-      typeof payload.signRequest !== 'undefined' ? payload.signRequest : existing.signRequest ?? false;
+      typeof payload.signRequest !== 'undefined' ? payload.signRequest : (existing.signRequest ?? false);
     const nextSigningCert =
       typeof payload.spSigningCertificate !== 'undefined'
         ? payload.spSigningCertificate
-        : existing.spSigningCertificate ?? null;
+        : (existing.spSigningCertificate ?? null);
     const nextSigningKey =
       typeof payload.spSigningKeyEncrypted !== 'undefined'
         ? payload.spSigningKeyEncrypted
-        : existing.spSigningKeyEncrypted ?? null;
+        : (existing.spSigningKeyEncrypted ?? null);
 
     this.ensureSigningMaterialAvailability(Boolean(nextSignRequest), nextSigningCert, nextSigningKey);
 

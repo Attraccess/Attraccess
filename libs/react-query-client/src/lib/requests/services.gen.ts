@@ -764,6 +764,7 @@ export class AuthenticationService {
      * Callback for SAML login
      * @param data The data for the request.
      * @param data.redirectTo
+     * @param data.relayState
      * @param data.providerId The ID of the SSO provider
      * @returns CreateSessionResponse The user has been logged in
      * @throws ApiError
@@ -776,7 +777,8 @@ export class AuthenticationService {
                 providerId: data.providerId
             },
             query: {
-                redirectTo: data.redirectTo
+                redirectTo: data.redirectTo,
+                RelayState: data.relayState
             }
         });
     }

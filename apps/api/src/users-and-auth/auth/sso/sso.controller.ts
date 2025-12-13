@@ -34,6 +34,8 @@ import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
 import { SSOSamlGuard } from './saml/saml.guard';
+import { ConfigService } from '@nestjs/config';
+import { AppConfigType } from '../../../config/app.config';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -45,7 +47,8 @@ export class SSOController {
     private readonly sessionService: SessionService,
     private readonly usersService: UsersService,
     private readonly ssoService: SSOService,
-    private readonly cookieConfigService: CookieConfigService
+    private readonly cookieConfigService: CookieConfigService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get('providers')
@@ -312,7 +315,7 @@ export class SSOController {
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectTo: string,
-    @Res({ passthrough: true }) response: Response
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
     return this.finalizeLogin(request, response, redirectTo);
   }
@@ -361,16 +364,19 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectTo: string,
     @Body('RelayState') relayState: string,
-    @Res({ passthrough: true }) response: Response
+    @Query('RelayState') relayStateQuery: string,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
-    const target = redirectTo || relayState;
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const defaultRedirect = appConfig?.ATTRACCESS_FRONTEND_URL;
+    const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
     return this.finalizeLogin(request, response, target);
   }
 
   private async finalizeLogin(
     request: AuthenticatedRequest,
     response: Response,
-    redirectTo?: string
+    redirectTo?: string,
   ): Promise<CreateSessionResponse | void> {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],

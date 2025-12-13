@@ -753,7 +753,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         name="samlConfiguration.issuer"
                         value={formValues.samlConfiguration?.issuer ?? ''}
                         onChange={handleInputChange}
-                        placeholder={location.origin}
+                        placeholder={window.location.origin ?? ''}
                         isRequired
                         data-cy="sso-provider-form-saml-issuer-input"
                       />
@@ -775,7 +775,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         name="samlConfiguration.audience"
                         value={formValues.samlConfiguration?.audience ?? ''}
                         onChange={handleInputChange}
-                        placeholder={location.origin}
+                        placeholder={window.location.origin ?? ''}
                         data-cy="sso-provider-form-saml-audience-input"
                       />
 

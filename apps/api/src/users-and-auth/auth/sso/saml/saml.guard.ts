@@ -50,7 +50,7 @@ export class SSOSamlGuard implements CanActivate {
 
     const requestURL = new URL(appConfig.ATTRACCESS_FRONTEND_URL + req.url);
     const urlPathParts = requestURL.pathname.split('/');
-    const [routeAction, providerIdString, ssoType] = urlPathParts.reverse();
+    const [, providerIdString, ssoType] = urlPathParts.reverse();
     const providerId = parseInt(providerIdString, 10);
 
     if (isNaN(providerId)) {
@@ -66,23 +66,27 @@ export class SSOSamlGuard implements CanActivate {
       throw new SSOProviderNotFoundException();
     }
 
-    if (!requestURL.searchParams.has('redirectTo')) {
-      throw new BadRequestException('No redirectTo found in query params');
+    const rawRedirect = requestURL.searchParams.get('redirectTo');
+    let redirectTo: string;
+
+    try {
+      redirectTo = rawRedirect
+        ? new URL(rawRedirect, appConfig.ATTRACCESS_FRONTEND_URL).toString()
+        : appConfig.ATTRACCESS_FRONTEND_URL;
+    } catch {
+      this.logger.warn(`Invalid redirectTo provided: ${rawRedirect ?? 'undefined'}`);
+      throw new BadRequestException('Invalid redirectTo parameter');
     }
-    const redirectTo = requestURL.searchParams.get('redirectTo');
 
     const callbackURL = new URL(appConfig.ATTRACCESS_URL);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
-    // callbackURL.searchParams.set('redirectTo', redirectTo ?? '');
 
     // Persist RelayState for passport-saml to round-trip the redirect target
-    if (redirectTo) {
-      const queryBag = req.query as Record<string, unknown> | undefined;
-      if (queryBag && typeof queryBag === 'object') {
-        (queryBag as Record<string, string>).RelayState = redirectTo;
-      } else {
-        this.logger.warn('Unable to attach RelayState; missing request query container.');
-      }
+    const queryBag = req.query as Record<string, unknown> | undefined;
+    if (queryBag && typeof queryBag === 'object') {
+      (queryBag as Record<string, string>).RelayState = redirectTo;
+    } else {
+      this.logger.warn('Unable to attach RelayState; missing request query container.');
     }
 
     new SSOSamlStrategy(this.moduleRef, provider.samlConfiguration, callbackURL.toString());

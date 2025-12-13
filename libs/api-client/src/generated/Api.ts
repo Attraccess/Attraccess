@@ -509,6 +509,12 @@ export interface SSOProviderSAMLConfiguration {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** PEM encoded Service Provider certificate used when signing AuthnRequests */
+  spSigningCertificate?: string | null;
+  /** Encrypted Service Provider private key used for signing AuthnRequests */
+  spSigningKeyEncrypted?: string | null;
+  /** Identifier for the encryption key used to protect the signing private key */
+  spSigningKeyEncryptionKeyId?: string | null;
   /**
    * When the configuration was created
    * @format date-time
@@ -659,6 +665,10 @@ export interface CreateSAMLConfigurationDto {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** PEM encoded Service Provider certificate used when signing requests */
+  spSigningCertificate?: string;
+  /** PEM encoded Service Provider private key used for signing requests (stored encrypted) */
+  spSigningPrivateKey?: string;
 }
 
 export interface CreateSSOProviderDto {
@@ -750,6 +760,10 @@ export interface UpdateSAMLConfigurationDto {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** PEM encoded Service Provider certificate used when signing requests */
+  spSigningCertificate?: string;
+  /** PEM encoded Service Provider private key used for signing requests (stored encrypted) */
+  spSigningPrivateKey?: string;
 }
 
 export interface UpdateSSOProviderDto {
@@ -3041,6 +3055,7 @@ export type LoginWithSamlData = any;
 
 export interface SamlLoginCallbackParams {
   redirectTo: string;
+  RelayState: string;
   /** The ID of the SSO provider */
   providerId: string;
 }
@@ -4193,6 +4208,7 @@ export namespace Authentication {
     };
     export type RequestQuery = {
       redirectTo: string;
+      RelayState: string;
     };
     export type RequestBody = never;
     export type RequestHeaders = {};
@@ -6781,7 +6797,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
