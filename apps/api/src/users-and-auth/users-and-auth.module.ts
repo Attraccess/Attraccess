@@ -19,6 +19,7 @@ import {
   User,
   AuthenticationDetail,
   SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
   SSOProvider,
   Session,
   Setting,
@@ -33,12 +34,24 @@ import { AppConfigType } from '../config/app.config';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
+import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthenticationDetail, SSOProvider, SSOProviderOIDCConfiguration, Session, Setting]),
+    TypeOrmModule.forFeature([
+      User,
+      AuthenticationDetail,
+      SSOProvider,
+      SSOProviderOIDCConfiguration,
+      SSOProviderSAMLConfiguration,
+      Session,
+      Setting,
+    ]),
     PassportModule,
     EmailModule,
+    EncryptionModule,
     LicenseModule,
   ],
   providers: [
@@ -50,6 +63,7 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
     SSOService,
     CookieConfigService,
     SSOOIDCGuard,
+    SSOSamlGuard,
     {
       provide: SSOOIDCStrategy,
       useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {
@@ -70,6 +84,29 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
         const callbackURL = appConfig.ATTRACCESS_FRONTEND_URL + '/api/sso/OIDC/callback';
 
         return new SSOOIDCStrategy(moduleRef, config, callbackURL);
+      },
+      inject: [ModuleRef, ConfigService],
+    },
+    {
+      provide: SSOSamlStrategy,
+      useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {
+        const config = new SSOProviderSAMLConfiguration();
+        config.entryPoint = 'https://placeholder';
+        config.issuer = 'placeholder';
+        config.certificate = 'PLACEHOLDER_CERT';
+        config.wantAssertionsSigned = false;
+        config.wantAuthnResponseSigned = true;
+        config.forceAuthn = false;
+        config.signRequest = false;
+        config.ssoProviderId = 0;
+
+        const appConfig = configService.get<AppConfigType>('app');
+        if (!appConfig) {
+          throw new Error("App configuration ('app') not found.");
+        }
+        const callbackURL = appConfig.ATTRACCESS_FRONTEND_URL + '/api/sso/SAML/callback';
+
+        return new SSOSamlStrategy(moduleRef, config, callbackURL);
       },
       inject: [ModuleRef, ConfigService],
     },

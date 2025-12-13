@@ -1,18 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SSOService } from './sso.service';
-import { SSOProvider, SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/database-entities';
+import {
+  SSOProvider,
+  SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
+  SSOProviderType,
+} from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { LicenseService } from '../../../license/license.service';
+import { EncryptionService } from '../../../encryption/encryption.service';
 
 const SSOProviderRepository = getRepositoryToken(SSOProvider);
 const SSOProviderOIDCConfigurationRepository = getRepositoryToken(SSOProviderOIDCConfiguration);
+const SSOProviderSAMLConfigurationRepository = getRepositoryToken(SSOProviderSAMLConfiguration);
 
 describe('SsoService', () => {
   let service: SSOService;
   let ssoProviderRepository: Repository<SSOProvider>;
   let oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>;
+  let samlConfigRepository: Repository<SSOProviderSAMLConfiguration>;
+  let encryptionService: EncryptionService;
 
   const mockOIDCConfig = {
     id: 1,
@@ -72,12 +81,41 @@ describe('SsoService', () => {
             update: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: SSOProviderSAMLConfigurationRepository,
+          useValue: {
+            create: jest.fn().mockReturnValue({}),
+            save: jest.fn().mockResolvedValue({}),
+            findOne: jest.fn().mockResolvedValue({
+              id: 99,
+              ssoProviderId: 1,
+              entryPoint: 'https://idp',
+              issuer: 'https://sp',
+              certificate: 'CERT',
+              signRequest: false,
+              wantAssertionsSigned: false,
+              wantAuthnResponseSigned: true,
+              forceAuthn: false,
+            }),
+            update: jest.fn().mockResolvedValue(undefined),
+            delete: jest.fn().mockResolvedValue({ affected: 1 }),
+          },
+        },
+        {
+          provide: EncryptionService,
+          useValue: {
+            encrypt: jest.fn((value: string) => `enc:${value}`),
+            decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<SSOService>(SSOService);
     ssoProviderRepository = module.get<Repository<SSOProvider>>(SSOProviderRepository);
     oidcConfigRepository = module.get<Repository<SSOProviderOIDCConfiguration>>(SSOProviderOIDCConfigurationRepository);
+    samlConfigRepository = module.get<Repository<SSOProviderSAMLConfiguration>>(SSOProviderSAMLConfigurationRepository);
+    encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
   it('should be defined', () => {
@@ -170,6 +208,47 @@ describe('SsoService', () => {
       jest.spyOn(ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
 
       await expect(service.deleteProvider(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('SAML configuration helpers', () => {
+    const baseSamlConfig = {
+      entryPoint: 'https://idp.example.com/sso',
+      issuer: 'https://app.example.com',
+      certificate: '-----BEGIN CERTIFICATE-----MIIC-----END CERTIFICATE-----',
+      signRequest: false,
+      wantAssertionsSigned: false,
+      wantAuthnResponseSigned: true,
+      forceAuthn: false,
+    };
+
+    it('throws when enabling signing without materials', async () => {
+      await expect(
+        (service as any).createSAMLConfiguration(1, {
+          ...baseSamlConfig,
+          signRequest: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('encrypts private key material when provided', async () => {
+      jest.spyOn(samlConfigRepository, 'create');
+
+      await (service as any).createSAMLConfiguration(1, {
+        ...baseSamlConfig,
+        signRequest: true,
+        spSigningCertificate: '-----BEGIN CERTIFICATE-----ABC-----END CERTIFICATE-----',
+        spSigningPrivateKey: '-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----',
+      });
+
+      expect(encryptionService.encrypt).toHaveBeenCalledWith(expect.stringContaining('BEGIN PRIVATE KEY'));
+      expect(samlConfigRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spSigningCertificate: 'ABC',
+          spSigningKeyEncrypted: 'enc:-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----',
+          spSigningKeyEncryptionKeyId: 'default',
+        }),
+      );
     });
   });
 });

@@ -113,7 +113,7 @@
 
 - fallback for legacy env vars did not work ([#6](https://github.com/Attraccess/Attraccess/pull/6))
 - maintenance is now editable ([#79](https://github.com/Attraccess/Attraccess/pull/79))
-- **GH-10:** re-added nojekyll file to prevent GH from ignoring files starting with _ ([#11](https://github.com/Attraccess/Attraccess/pull/11))
+- **GH-10:** re-added nojekyll file to prevent GH from ignoring files starting with \_ ([#11](https://github.com/Attraccess/Attraccess/pull/11))
 
 ### ❤️ Thank You
 

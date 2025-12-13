@@ -230,7 +230,8 @@ export type CreateSessionResponse = {
  * The type of the provider
  */
 export enum SSOProviderType {
-    OIDC = 'OIDC'
+    OIDC = 'OIDC',
+    SAML = 'SAML'
 }
 
 export type SSOProviderOIDCConfiguration = {
@@ -288,6 +289,73 @@ export type SSOProviderOIDCConfiguration = {
     updatedAt: string;
 };
 
+export type SSOProviderSAMLConfiguration = {
+    /**
+     * The unique identifier of the SAML configuration
+     */
+    id: number;
+    /**
+     * The ID of the parent SSO provider
+     */
+    ssoProviderId: number;
+    /**
+     * The Identity Provider entry point (SSO URL)
+     */
+    entryPoint: string;
+    /**
+     * The Service Provider issuer URL presented to the IdP
+     */
+    issuer: string;
+    /**
+     * PEM encoded IdP signing certificate (without BEGIN/END markers)
+     */
+    certificate: string;
+    /**
+     * Optional audience restriction to validate within assertions
+     */
+    audience?: string | null;
+    /**
+     * Whether AuthnRequests should be signed by Attraccess
+     */
+    signRequest: boolean;
+    /**
+     * Whether SAML Assertions must include their own signature
+     */
+    wantAssertionsSigned: boolean;
+    /**
+     * Whether the SAML Response must be signed
+     */
+    wantAuthnResponseSigned: boolean;
+    /**
+     * Force the IdP to re-authenticate the user
+     */
+    forceAuthn: boolean;
+    /**
+     * Optional list of attribute keys (ordered) to resolve user emails from SAML assertions
+     */
+    emailAttributeKeys?: Array<(string)>;
+    /**
+     * PEM encoded Service Provider certificate used when signing AuthnRequests
+     */
+    spSigningCertificate?: string | null;
+    /**
+     * Encrypted Service Provider private key used for signing AuthnRequests
+     */
+    spSigningKeyEncrypted?: string | null;
+    /**
+     * Identifier for the encryption key used to protect the signing private key
+     */
+    spSigningKeyEncryptionKeyId?: string | null;
+    /**
+     * When the configuration was created
+     */
+    createdAt: string;
+    /**
+     * When the configuration was last updated
+     */
+    updatedAt: string;
+};
+
 export type SSOProvider = {
     /**
      * The unique identifier of the provider
@@ -312,7 +380,11 @@ export type SSOProvider = {
     /**
      * The OIDC configuration of the provider
      */
-    oidcConfiguration: SSOProviderOIDCConfiguration;
+    oidcConfiguration?: SSOProviderOIDCConfiguration;
+    /**
+     * The SAML configuration of the provider
+     */
+    samlConfiguration?: SSOProviderSAMLConfiguration;
 };
 
 export type LinkUserToExternalAccountRequestDto = {
@@ -369,6 +441,53 @@ export type CreateOIDCConfigurationDto = {
     emailClaimPaths?: Array<(string)>;
 };
 
+export type CreateSAMLConfigurationDto = {
+    /**
+     * Identity Provider SSO entry point URL
+     */
+    entryPoint: string;
+    /**
+     * Service Provider issuer that IdP expects
+     */
+    issuer: string;
+    /**
+     * Base64 encoded IdP certificate without PEM boundaries
+     */
+    certificate: string;
+    /**
+     * Audience restriction to validate against, defaults to issuer when omitted
+     */
+    audience?: string;
+    /**
+     * Whether AuthnRequests should be signed by Attraccess
+     */
+    signRequest: boolean;
+    /**
+     * Require signed assertions inside the response
+     */
+    wantAssertionsSigned: boolean;
+    /**
+     * Require the overall response to be signed
+     */
+    wantAuthnResponseSigned: boolean;
+    /**
+     * Force IdP to re-authenticate the subject
+     */
+    forceAuthn: boolean;
+    /**
+     * Ordered list of attribute keys to resolve email addresses from (first match wins)
+     */
+    emailAttributeKeys?: Array<(string)>;
+    /**
+     * PEM encoded Service Provider certificate used when signing requests
+     */
+    spSigningCertificate?: string;
+    /**
+     * PEM encoded Service Provider private key used for signing requests (stored encrypted)
+     */
+    spSigningPrivateKey?: string;
+};
+
 export type CreateSSOProviderDto = {
     /**
      * The name of the SSO provider
@@ -382,6 +501,10 @@ export type CreateSSOProviderDto = {
      * The OIDC configuration for the provider
      */
     oidcConfiguration?: CreateOIDCConfigurationDto;
+    /**
+     * The SAML configuration for the provider
+     */
+    samlConfiguration?: CreateSAMLConfigurationDto;
 };
 
 export type UpdateOIDCConfigurationDto = {
@@ -423,6 +546,57 @@ export type UpdateOIDCConfigurationDto = {
     emailClaimPaths?: Array<(string)>;
 };
 
+export type UpdateSAMLConfigurationDto = {
+    /**
+     * Identity Provider SSO entry point URL
+     */
+    entryPoint?: string;
+    /**
+     * Service Provider issuer that IdP expects
+     */
+    issuer?: string;
+    /**
+     * Optional Assertion Consumer Service override
+     */
+    callbackUrl?: string;
+    /**
+     * Base64 encoded IdP certificate without PEM boundaries
+     */
+    certificate?: string;
+    /**
+     * Audience restriction to validate against
+     */
+    audience?: string;
+    /**
+     * Whether AuthnRequests should be signed by Attraccess
+     */
+    signRequest?: boolean;
+    /**
+     * Require signed assertions inside the response
+     */
+    wantAssertionsSigned?: boolean;
+    /**
+     * Require the overall response to be signed
+     */
+    wantAuthnResponseSigned?: boolean;
+    /**
+     * Force IdP to re-authenticate the subject
+     */
+    forceAuthn?: boolean;
+    /**
+     * Ordered list of attribute keys to resolve email addresses from (first match wins)
+     */
+    emailAttributeKeys?: Array<(string)>;
+    /**
+     * PEM encoded Service Provider certificate used when signing requests
+     */
+    spSigningCertificate?: string;
+    /**
+     * PEM encoded Service Provider private key used for signing requests (stored encrypted)
+     */
+    spSigningPrivateKey?: string;
+};
+
 export type UpdateSSOProviderDto = {
     /**
      * The name of the SSO provider
@@ -432,6 +606,10 @@ export type UpdateSSOProviderDto = {
      * The OIDC configuration for the provider
      */
     oidcConfiguration?: UpdateOIDCConfigurationDto;
+    /**
+     * The SAML configuration for the provider
+     */
+    samlConfiguration?: UpdateSAMLConfigurationDto;
 };
 
 export type PreviewMjmlDto = {
@@ -2998,6 +3176,29 @@ export type OidcLoginCallbackData = {
 
 export type OidcLoginCallbackResponse = CreateSessionResponse;
 
+export type LoginWithSamlData = {
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    /**
+     * URL that should receive the resulting session payload after authentication succeeds.
+     */
+    redirectTo?: unknown;
+};
+
+export type LoginWithSamlResponse = unknown;
+
+export type SamlLoginCallbackData = {
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    redirectTo: string;
+};
+
+export type SamlLoginCallbackResponse = CreateSessionResponse;
+
 export type EmailTemplateControllerPreviewMjmlData = {
     requestBody: PreviewMjmlDto;
 };
@@ -4558,6 +4759,28 @@ export type $OpenApiTs = {
     '/api/auth/sso/OIDC/{providerId}/callback': {
         get: {
             req: OidcLoginCallbackData;
+            res: {
+                /**
+                 * The user has been logged in
+                 */
+                200: CreateSessionResponse;
+            };
+        };
+    };
+    '/api/auth/sso/SAML/{providerId}/login': {
+        get: {
+            req: LoginWithSamlData;
+            res: {
+                /**
+                 * SAML authentication initiated
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/auth/sso/SAML/{providerId}/callback': {
+        post: {
+            req: SamlLoginCallbackData;
             res: {
                 /**
                  * The user has been logged in

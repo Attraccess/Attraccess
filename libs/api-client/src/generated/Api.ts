@@ -136,6 +136,7 @@ export enum EmailTemplateType {
 /** The type of the provider */
 export enum SSOProviderType {
   OIDC = "OIDC",
+  SAML = "SAML",
 }
 
 export enum PermissionFilter {
@@ -458,6 +459,68 @@ export interface SSOProviderOIDCConfiguration {
   updatedAt: string;
 }
 
+export interface SSOProviderSAMLConfiguration {
+  /**
+   * The unique identifier of the SAML configuration
+   * @example 1
+   */
+  id: number;
+  /**
+   * The ID of the parent SSO provider
+   * @example 3
+   */
+  ssoProviderId: number;
+  /**
+   * The Identity Provider entry point (SSO URL)
+   * @example "https://login.example.com/realms/master/protocol/saml"
+   */
+  entryPoint: string;
+  /**
+   * The Service Provider issuer URL presented to the IdP
+   * @example "https://app.attraccess.org"
+   */
+  issuer: string;
+  /** PEM encoded IdP signing certificate (without BEGIN/END markers) */
+  certificate: string;
+  /** Optional audience restriction to validate within assertions */
+  audience?: string | null;
+  /**
+   * Whether AuthnRequests should be signed by Attraccess
+   * @default false
+   */
+  signRequest: boolean;
+  /**
+   * Whether SAML Assertions must include their own signature
+   * @default false
+   */
+  wantAssertionsSigned: boolean;
+  /**
+   * Whether the SAML Response must be signed
+   * @default true
+   */
+  wantAuthnResponseSigned: boolean;
+  /**
+   * Force the IdP to re-authenticate the user
+   * @default false
+   */
+  forceAuthn: boolean;
+  /**
+   * Optional list of attribute keys (ordered) to resolve user emails from SAML assertions
+   * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
+   */
+  emailAttributeKeys?: string[];
+  /**
+   * When the configuration was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the configuration was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+}
+
 export interface SSOProvider {
   /**
    * The unique identifier of the provider
@@ -485,7 +548,9 @@ export interface SSOProvider {
    */
   updatedAt: string;
   /** The OIDC configuration of the provider */
-  oidcConfiguration: SSOProviderOIDCConfiguration;
+  oidcConfiguration?: SSOProviderOIDCConfiguration;
+  /** The SAML configuration of the provider */
+  samlConfiguration?: SSOProviderSAMLConfiguration;
 }
 
 export interface LinkUserToExternalAccountRequestDto {
@@ -554,6 +619,48 @@ export interface CreateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 }
 
+export interface CreateSAMLConfigurationDto {
+  /**
+   * Identity Provider SSO entry point URL
+   * @example "https://idp.example.com/realms/master/protocol/saml"
+   */
+  entryPoint: string;
+  /**
+   * Service Provider issuer that IdP expects
+   * @example "https://api.attraccess.org"
+   */
+  issuer: string;
+  /** Base64 encoded IdP certificate without PEM boundaries */
+  certificate: string;
+  /** Audience restriction to validate against, defaults to issuer when omitted */
+  audience?: string;
+  /**
+   * Whether AuthnRequests should be signed by Attraccess
+   * @default false
+   */
+  signRequest: boolean;
+  /**
+   * Require signed assertions inside the response
+   * @default false
+   */
+  wantAssertionsSigned: boolean;
+  /**
+   * Require the overall response to be signed
+   * @default true
+   */
+  wantAuthnResponseSigned: boolean;
+  /**
+   * Force IdP to re-authenticate the subject
+   * @default false
+   */
+  forceAuthn: boolean;
+  /**
+   * Ordered list of attribute keys to resolve email addresses from (first match wins)
+   * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
+   */
+  emailAttributeKeys?: string[];
+}
+
 export interface CreateSSOProviderDto {
   /**
    * The name of the SSO provider
@@ -567,6 +674,8 @@ export interface CreateSSOProviderDto {
   type: SSOProviderType;
   /** The OIDC configuration for the provider */
   oidcConfiguration?: CreateOIDCConfigurationDto;
+  /** The SAML configuration for the provider */
+  samlConfiguration?: CreateSAMLConfigurationDto;
 }
 
 export interface UpdateOIDCConfigurationDto {
@@ -617,6 +726,32 @@ export interface UpdateOIDCConfigurationDto {
   emailClaimPaths?: string[];
 }
 
+export interface UpdateSAMLConfigurationDto {
+  /** Identity Provider SSO entry point URL */
+  entryPoint?: string;
+  /** Service Provider issuer that IdP expects */
+  issuer?: string;
+  /** Optional Assertion Consumer Service override */
+  callbackUrl?: string;
+  /** Base64 encoded IdP certificate without PEM boundaries */
+  certificate?: string;
+  /** Audience restriction to validate against */
+  audience?: string;
+  /** Whether AuthnRequests should be signed by Attraccess */
+  signRequest?: boolean;
+  /** Require signed assertions inside the response */
+  wantAssertionsSigned?: boolean;
+  /** Require the overall response to be signed */
+  wantAuthnResponseSigned?: boolean;
+  /** Force IdP to re-authenticate the subject */
+  forceAuthn?: boolean;
+  /**
+   * Ordered list of attribute keys to resolve email addresses from (first match wins)
+   * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
+   */
+  emailAttributeKeys?: string[];
+}
+
 export interface UpdateSSOProviderDto {
   /**
    * The name of the SSO provider
@@ -625,6 +760,8 @@ export interface UpdateSSOProviderDto {
   name?: string;
   /** The OIDC configuration for the provider */
   oidcConfiguration?: UpdateOIDCConfigurationDto;
+  /** The SAML configuration for the provider */
+  samlConfiguration?: UpdateSAMLConfigurationDto;
 }
 
 export interface PreviewMjmlDto {
@@ -2893,6 +3030,23 @@ export interface OidcLoginCallbackParams {
 
 export type OidcLoginCallbackData = CreateSessionResponse;
 
+export interface LoginWithSamlParams {
+  /** URL that should receive the resulting session payload after authentication succeeds. */
+  redirectTo?: any;
+  /** The ID of the SSO provider */
+  providerId: string;
+}
+
+export type LoginWithSamlData = any;
+
+export interface SamlLoginCallbackParams {
+  redirectTo: string;
+  /** The ID of the SSO provider */
+  providerId: string;
+}
+
+export type SamlLoginCallbackData = CreateSessionResponse;
+
 export type EmailTemplateControllerPreviewMjmlData = PreviewMjmlResponseDto;
 
 export type EmailTemplateControllerFindAllData = EmailTemplate[];
@@ -4002,6 +4156,47 @@ export namespace Authentication {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = OidcLoginCallbackData;
+  }
+
+  /**
+   * @description Initiate a SAML authentication request. Redirect the resulting browser request back to the callback endpoint to mint an API session token.
+   * @tags Authentication
+   * @name LoginWithSaml
+   * @summary Login with SAML
+   * @request GET:/api/auth/sso/SAML/{providerId}/login
+   */
+  export namespace LoginWithSaml {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {
+      /** URL that should receive the resulting session payload after authentication succeeds. */
+      redirectTo?: any;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = LoginWithSamlData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SamlLoginCallback
+   * @summary Callback for SAML login
+   * @request POST:/api/auth/sso/SAML/{providerId}/callback
+   */
+  export namespace SamlLoginCallback {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {
+      redirectTo: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SamlLoginCallbackData;
   }
 }
 
@@ -7302,6 +7497,45 @@ export class Api<
       this.request<OidcLoginCallbackData, any>({
         path: `/api/auth/sso/OIDC/${providerId}/callback`,
         method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Initiate a SAML authentication request. Redirect the resulting browser request back to the callback endpoint to mint an API session token.
+     *
+     * @tags Authentication
+     * @name LoginWithSaml
+     * @summary Login with SAML
+     * @request GET:/api/auth/sso/SAML/{providerId}/login
+     */
+    loginWithSaml: (
+      { providerId, ...query }: LoginWithSamlParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<LoginWithSamlData, any>({
+        path: `/api/auth/sso/SAML/${providerId}/login`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SamlLoginCallback
+     * @summary Callback for SAML login
+     * @request POST:/api/auth/sso/SAML/{providerId}/callback
+     */
+    samlLoginCallback: (
+      { providerId, ...query }: SamlLoginCallbackParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<SamlLoginCallbackData, any>({
+        path: `/api/auth/sso/SAML/${providerId}/callback`,
+        method: "POST",
         query: query,
         format: "json",
         ...params,

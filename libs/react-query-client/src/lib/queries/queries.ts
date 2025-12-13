@@ -52,6 +52,10 @@ export const useAuthenticationServiceOidcLoginCallback = <TData = Common.Authent
   sessionState: unknown;
   state: unknown;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }, queryKey), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) as TData, ...options });
+export const useAuthenticationServiceLoginWithSaml = <TData = Common.AuthenticationServiceLoginWithSamlDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ providerId, redirectTo }: {
+  providerId: string;
+  redirectTo?: unknown;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceLoginWithSamlKeyFn({ providerId, redirectTo }, queryKey), queryFn: () => AuthenticationService.loginWithSaml({ providerId, redirectTo }) as TData, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerFindAll = <TData = Common.EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(queryKey), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() as TData, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerFindOne = <TData = Common.EmailTemplatesServiceEmailTemplateControllerFindOneDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ type }: {
   type: EmailTemplateType;
@@ -303,6 +307,13 @@ export const useAuthenticationServiceLinkUserToExternalAccount = <TData = Common
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: LinkUserToExternalAccountRequestDto;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthenticationService.linkUserToExternalAccount({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSamlLoginCallback = <TData = Common.AuthenticationServiceSamlLoginCallbackMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  providerId: string;
+  redirectTo: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  providerId: string;
+  redirectTo: string;
+}, TContext>({ mutationFn: ({ providerId, redirectTo }) => AuthenticationService.samlLoginCallback({ providerId, redirectTo }) as unknown as Promise<TData>, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerPreviewMjml = <TData = Common.EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: PreviewMjmlDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
