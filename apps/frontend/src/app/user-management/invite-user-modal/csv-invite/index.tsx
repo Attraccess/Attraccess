@@ -15,6 +15,7 @@ import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Select } from '../../../../components/select';
+import { parse as parseCsv } from 'csv-parse/browser/esm';
 import {
   CsvInviteUploadDto,
   SystemPermissions,
@@ -50,7 +51,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [previewLines, setPreviewLines] = useState<string[]>([]);
+  const [previewRows, setPreviewRows] = useState<string[][]>([]);
 
   const [emailKey, setEmailKey] = useState<string | undefined>(undefined);
   const [usernameKey, setUsernameKey] = useState<string | undefined>(undefined);
@@ -86,55 +87,59 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     file.click();
   }, [setSelectedFile]);
 
-  const readLinesFromFile = useCallback(async (file: File, lineCount: number) => {
-    const reader = file.stream().getReader();
-    const decoder = new TextDecoder();
-    const lines: string[] = [];
-    let buffer = '';
+  const readPreviewFromFile = useCallback(async (file: File, recordCount: number) => {
+    const fileText = await file.text();
 
-    try {
-      while (lines.length < lineCount) {
-        const { value, done } = await reader.read();
-        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
-
-        let newlineIndex = buffer.indexOf('\n');
-        while (lines.length < lineCount && newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex).replace(/\r$/, '');
-          lines.push(line);
-          buffer = buffer.slice(newlineIndex + 1);
-          newlineIndex = buffer.indexOf('\n');
-        }
-
-        if (done) {
-          if (buffer.length && lines.length < lineCount) {
-            lines.push(buffer.replace(/\r$/, ''));
+    return await new Promise<string[][]>((resolve, reject) => {
+      parseCsv(
+        fileText,
+        {
+          bom: true,
+          relax_column_count: true,
+          skip_empty_lines: false,
+          trim: false,
+          to_line: recordCount + 1, // only parse what we need for the preview
+        },
+        (error, output) => {
+          if (error) {
+            reject(error);
+            return;
           }
-          break;
-        }
-      }
-    } finally {
-      reader.cancel().catch(() => undefined);
-    }
 
-    return lines;
+          resolve(
+            (output ?? []).map((record) =>
+              (record as Array<string | number | null | undefined>).map((value) =>
+                typeof value === 'string' ? value.replace(/\r$/, '') : `${value ?? ''}`,
+              ),
+            ),
+          );
+        },
+      );
+    });
   }, []);
 
   useEffect(() => {
     if (!selectedFile) {
       setCsvHeaders([]);
-      setPreviewLines([]);
+      setPreviewRows([]);
       return;
     }
 
     let cancelled = false;
 
     const loadPreview = async () => {
-      const lines = await readLinesFromFile(selectedFile, PREVIEW_ROW_COUNT + 1);
-      if (cancelled) return;
+      try {
+        const rows = await readPreviewFromFile(selectedFile, PREVIEW_ROW_COUNT);
+        if (cancelled) return;
 
-      const [headerLine = '', ...rows] = lines;
-      setCsvHeaders(headerLine ? headerLine.split(',') : []);
-      setPreviewLines(rows);
+        const [headerRow = [], ...dataRows] = rows;
+        setCsvHeaders(headerRow);
+        setPreviewRows(dataRows);
+      } catch {
+        if (cancelled) return;
+        setCsvHeaders([]);
+        setPreviewRows([]);
+      }
     };
 
     loadPreview();
@@ -142,17 +147,16 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [selectedFile, readLinesFromFile]);
+  }, [selectedFile, readPreviewFromFile]);
 
   const previewUsers = useMemo(() => {
-    if (!csvHeaders.length && !previewLines.length) return [];
+    if (!csvHeaders.length && !previewRows.length) return [];
 
-    return previewLines.slice(0, PREVIEW_ROW_COUNT).map((row, index) => {
-      const columns = row.split(',');
+    return previewRows.slice(0, PREVIEW_ROW_COUNT).map((columns, index) => {
       const data: Record<string, string> = {};
 
-      columns.forEach((column, index) => {
-        const header = csvHeaders[index] ?? `_unknown_${index}`;
+      csvHeaders.forEach((header, headerIndex) => {
+        const column = columns[headerIndex] ?? '';
         data[header] = column;
       });
 
@@ -172,7 +176,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       return user;
     });
-  }, [csvHeaders, previewLines, usernameKey, emailKey, permissions]);
+  }, [csvHeaders, previewRows, usernameKey, emailKey, permissions]);
 
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const [ignoredRows, setIgnoredRows] = useState<number[]>([]);
@@ -245,7 +249,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Button onPress={selectFile} variant="flat">
+      <Button onPress={selectFile} variant="flat" color="primary">
         {selectedFile ? selectedFile.name : t('inputs.file')}
       </Button>
 
@@ -257,6 +261,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           label: header,
           key: header,
         }))}
+        isRequired
       />
 
       <Select
@@ -267,6 +272,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           label: header,
           key: header,
         }))}
+        isRequired
       />
 
       {Object.entries(permissions).map(([permission, mapping]) => (

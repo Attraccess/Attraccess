@@ -2844,11 +2844,7 @@ export type GetOneUserByIdError = UserNotFoundException;
 
 export type UpdatePermissionsData = User;
 
-export interface GetPermissionsData {
-  canManageResources?: boolean;
-  canManageSystemConfiguration?: boolean;
-  canManageUsers?: boolean;
-}
+export type GetPermissionsData = SystemPermissions;
 
 export type BulkUpdatePermissionsData = User[];
 

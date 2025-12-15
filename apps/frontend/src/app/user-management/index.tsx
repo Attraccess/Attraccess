@@ -26,6 +26,7 @@ import de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
 import { InviteUserModal } from './invite-user-modal';
+import { useNavigate } from 'react-router-dom';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -35,6 +36,8 @@ export const UserManagementPage: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const debouncedSearch = useDebounce(search, 500);
+
+  const navigate = useNavigate();
 
   const {
     data: searchResult,
@@ -91,7 +94,7 @@ export const UserManagementPage: React.FC = () => {
             onClear={() => setSearch('')}
           />
 
-          <Table removeWrapper aria-label={t('table.ariaLabel')}>
+          <Table removeWrapper aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
             <TableHeader>
               <TableColumn width="1" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}
@@ -108,11 +111,7 @@ export const UserManagementPage: React.FC = () => {
               loadingContent={<TableDataLoadingIndicator />}
             >
               {(user) => (
-                <TableRow
-                  key={user.id}
-                  href={`/users/${user.id}`}
-                  className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                >
+                <TableRow key={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
                   <TableCell className="hidden md:table-cell">
                     {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                   </TableCell>

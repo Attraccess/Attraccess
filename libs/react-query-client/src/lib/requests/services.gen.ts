@@ -352,7 +352,7 @@ export class UsersService {
      * Get a user's system permissions
      * @param data The data for the request.
      * @param data.id
-     * @returns unknown The user's permissions.
+     * @returns SystemPermissions The user's permissions.
      * @throws ApiError
      */
     public static getPermissions(data: GetPermissionsData): CancelablePromise<GetPermissionsResponse> {

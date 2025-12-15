@@ -55,7 +55,7 @@ import {
   CsvInviteRowErrorDto,
   CsvInviteUploadDto,
 } from './dtos/csvInvite.dto';
-import { createInterface } from 'readline';
+import { parse as parseCsv, type Info as CsvInfo } from 'csv-parse';
 import { Readable } from 'stream';
 import { plainToInstance } from 'class-transformer';
 import { validate, isEmail } from 'class-validator';
@@ -75,10 +75,6 @@ export class UsersController {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
   ) {}
-
-  private splitCsvLine(line: string): string[] {
-    return line.split(',').map((value) => value.replace(/\r$/, ''));
-  }
 
   private mapEmailSendError(error: unknown): never {
     const code = (error as { code?: string })?.code;
@@ -111,7 +107,7 @@ export class UsersController {
       .catch((error) => this.mapEmailSendError(error));
   }
 
-  private async parseCsvFile(
+  public async parseCsvFile(
     file: FileUpload | undefined,
     config: CsvInviteConfigDto,
   ): Promise<{
@@ -129,10 +125,23 @@ export class UsersController {
       throw new BadRequestException('Unable to read CSV file');
     }
 
-    const reader = createInterface({
-      input: inputStream,
-      crlfDelay: Infinity,
+    const parser = parseCsv({
+      bom: true,
+      columns: true,
+      relax_column_count: true,
+      skip_empty_lines: false,
+      trim: true,
     });
+
+    const normalizeColumns = (columns: CsvInfo['columns'] | undefined): string[] | null => {
+      if (!columns || typeof columns === 'boolean') {
+        return null;
+      }
+
+      return columns
+        .map((column) => (typeof column === 'string' ? column : (column?.name ?? '')))
+        .filter((value) => value !== '');
+    };
 
     let header: string[] | null = null;
     const candidates: Array<{
@@ -150,115 +159,113 @@ export class UsersController {
 
     let dataRowIndex = 0;
 
-    for await (const rawLine of reader) {
-      const line = rawLine.trimEnd();
+    try {
+      for await (const record of inputStream.pipe(parser)) {
+        header = header ?? normalizeColumns(parser.info?.columns) ?? Object.keys(record ?? {});
 
-      if (!header) {
-        if (line.trim() === '') {
+        dataRowIndex += 1;
+        const rowNumber = dataRowIndex;
+
+        if (ignoredRows.has(rowNumber)) {
           continue;
         }
-        header = this.splitCsvLine(line);
-        continue;
-      }
 
-      dataRowIndex += 1;
-      const rowNumber = dataRowIndex;
+        const rowData: Record<string, string> = {};
+        (header ?? []).forEach((headerLabel) => {
+          const rawValue = record?.[headerLabel];
+          rowData[headerLabel] = rawValue == null ? '' : String(rawValue).trim();
+        });
 
-      if (ignoredRows.has(rowNumber)) {
-        continue;
-      }
+        const isEmptyRow = Object.values(rowData).every((value) => value === '');
+        if (isEmptyRow) {
+          errors.push({ row: rowNumber, message: 'Row is empty' });
+          continue;
+        }
 
-      if (line.trim() === '') {
-        errors.push({ row: rowNumber, message: 'Row is empty' });
-        continue;
-      }
+        const rowErrors: CsvInviteRowErrorDto[] = [];
 
-      const columns = this.splitCsvLine(line);
-      const rowData: Record<string, string> = {};
-      header.forEach((headerLabel, index) => {
-        rowData[headerLabel] = (columns[index] ?? '').trim();
-      });
+        const email = (rowData[config.emailKey] ?? '').trim();
+        if (!email) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
+        } else if (!isEmail(email)) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
+        }
 
-      const rowErrors: CsvInviteRowErrorDto[] = [];
+        const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
+        let normalizedUsername = '';
+        if (!usernameOriginal) {
+          rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
+        } else {
+          normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
+          try {
+            this.usersService.validateUsernameOrThrow(normalizedUsername);
+          } catch (error) {
+            rowErrors.push({
+              row: rowNumber,
+              field: 'username',
+              message: (error as Error).message ?? 'INVALID',
+              value: usernameOriginal,
+            });
+          }
+        }
 
-      const email = (rowData[config.emailKey] ?? '').trim();
-      if (!email) {
-        rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
-      } else if (!isEmail(email)) {
-        rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
-      }
+        const emailKey = email.toLowerCase();
+        if (email && seenEmails.has(emailKey)) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
+        } else if (email) {
+          seenEmails.add(emailKey);
+          emailRowMap.set(emailKey, [...(emailRowMap.get(emailKey) ?? []), rowNumber]);
+        }
 
-      const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
-      let normalizedUsername = '';
-      if (!usernameOriginal) {
-        rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
-      } else {
-        normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
-        try {
-          this.usersService.validateUsernameOrThrow(normalizedUsername);
-        } catch (error) {
+        if (normalizedUsername && seenUsernames.has(normalizedUsername)) {
           rowErrors.push({
             row: rowNumber,
             field: 'username',
-            message: (error as Error).message ?? 'INVALID',
-            value: usernameOriginal,
+            message: 'DUPLICATE_IN_CSV',
+            value: normalizedUsername,
           });
+        } else if (normalizedUsername) {
+          seenUsernames.add(normalizedUsername);
+          usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
         }
-      }
 
-      const emailKey = email.toLowerCase();
-      if (email && seenEmails.has(emailKey)) {
-        rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
-      } else if (email) {
-        seenEmails.add(emailKey);
-        emailRowMap.set(emailKey, [...(emailRowMap.get(emailKey) ?? []), rowNumber]);
-      }
+        const systemPermissions: Partial<SystemPermissions> = {};
+        (
+          Object.entries(config.permissions ?? {}) as [
+            keyof SystemPermissions,
+            { keyMapping: string; yesValue: string },
+          ][]
+        )
+          .filter(([, mapping]) => !!mapping?.keyMapping)
+          .forEach(([permissionKey, mapping]) => {
+            const value = (rowData[mapping.keyMapping] ?? '').trim();
+            if (value === mapping.yesValue) {
+              systemPermissions[permissionKey] = true;
+            }
+          });
 
-      if (normalizedUsername && seenUsernames.has(normalizedUsername)) {
-        rowErrors.push({
+        if (rowErrors.length) {
+          errors.push(...rowErrors);
+          continue;
+        }
+
+        candidates.push({
+          username: normalizedUsername,
+          email,
+          systemPermissions,
           row: rowNumber,
-          field: 'username',
-          message: 'DUPLICATE_IN_CSV',
-          value: normalizedUsername,
         });
-      } else if (normalizedUsername) {
-        seenUsernames.add(normalizedUsername);
-        usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
       }
-
-      const systemPermissions: Partial<SystemPermissions> = {};
-      (
-        Object.entries(config.permissions ?? {}) as [
-          keyof SystemPermissions,
-          { keyMapping: string; yesValue: string },
-        ][]
-      )
-        .filter(([, mapping]) => !!mapping?.keyMapping)
-        .forEach(([permissionKey, mapping]) => {
-          const value = (rowData[mapping.keyMapping] ?? '').trim();
-          if (value === mapping.yesValue) {
-            systemPermissions[permissionKey] = true;
-          }
-        });
-
-      if (rowErrors.length) {
-        errors.push(...rowErrors);
-        continue;
-      }
-
-      candidates.push({
-        username: normalizedUsername,
-        email,
-        systemPermissions,
-        row: rowNumber,
-      });
+    } catch (error) {
+      this.logger.error('Failed to parse CSV', error as Error);
+      throw new BadRequestException('Invalid CSV file');
     }
 
-    if (!header) {
+    header = header ?? normalizeColumns(parser.info?.columns);
+    if (!header || header.every((value) => `${value}`.trim() === '')) {
       throw new BadRequestException('MISSING_HEADER_ROW');
     }
 
-    // Only email and username are strictly required columns; permission mappings are optional.
     const requiredColumns = new Set([config.emailKey, config.usernameKey]);
 
     requiredColumns.forEach((column) => {
@@ -886,14 +893,7 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: "The user's permissions.",
-    schema: {
-      type: 'object',
-      properties: {
-        canManageResources: { type: 'boolean' },
-        canManageSystemConfiguration: { type: 'boolean' },
-        canManageUsers: { type: 'boolean' },
-      },
-    },
+    type: SystemPermissions,
   })
   @ApiResponse({
     status: 403,

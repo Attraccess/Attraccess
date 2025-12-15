@@ -2889,11 +2889,7 @@ export type GetPermissionsData = {
     id: number;
 };
 
-export type GetPermissionsResponse = {
-    canManageResources?: boolean;
-    canManageSystemConfiguration?: boolean;
-    canManageUsers?: boolean;
-};
+export type GetPermissionsResponse = SystemPermissions;
 
 export type BulkUpdatePermissionsData = {
     requestBody: BulkUpdateUserPermissionsDto;
@@ -4317,11 +4313,7 @@ export type $OpenApiTs = {
                 /**
                  * The user's permissions.
                  */
-                200: {
-                    canManageResources?: boolean;
-                    canManageSystemConfiguration?: boolean;
-                    canManageUsers?: boolean;
-                };
+                200: SystemPermissions;
                 /**
                  * Unauthorized
                  */

@@ -7,6 +7,7 @@ import {
   useUsersServiceGetPermissions,
   useUsersServiceUpdatePermissions,
   UseUsersServiceFindManyKeyFn,
+  SystemPermissions,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -26,10 +27,11 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
   const { data: userPermissions, isLoading } = useUsersServiceGetPermissions({ id: user.id });
   const updatePermissions = useUsersServiceUpdatePermissions();
 
-  const [permissions, setPermissions] = useState({
+  const [permissions, setPermissions] = useState<Record<keyof SystemPermissions, boolean>>({
     canManageResources: false,
     canManageSystemConfiguration: false,
     canManageUsers: false,
+    canManageBilling: false,
   });
 
   // Update local state when permissions data is loaded
@@ -39,6 +41,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
         canManageResources: userPermissions.canManageResources ?? false,
         canManageSystemConfiguration: userPermissions.canManageSystemConfiguration ?? false,
         canManageUsers: userPermissions.canManageUsers ?? false,
+        canManageBilling: userPermissions.canManageBilling ?? false,
       });
     }
   }, [userPermissions]);
@@ -89,32 +92,16 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
       </CardHeader>
 
       <CardBody className="flex flex-col gap-2">
-        <Switch
-          isSelected={permissions.canManageResources}
-          onValueChange={handlePermissionChange('canManageResources')}
-          color="primary"
-          data-cy="user-permission-form-canManageResources-checkbox"
-        >
-          {t('permissions.canManageResources')}
-        </Switch>
-
-        <Switch
-          isSelected={permissions.canManageSystemConfiguration}
-          onValueChange={handlePermissionChange('canManageSystemConfiguration')}
-          color="primary"
-          data-cy="user-permission-form-canManageSystemConfiguration-checkbox"
-        >
-          {t('permissions.canManageSystemConfiguration')}
-        </Switch>
-
-        <Switch
-          isSelected={permissions.canManageUsers}
-          onValueChange={handlePermissionChange('canManageUsers')}
-          color="primary"
-          data-cy="user-permission-form-canManageUsers-checkbox"
-        >
-          {t('permissions.canManageUsers')}
-        </Switch>
+        {Object.keys(permissions).map((permission) => (
+          <Switch
+            isSelected={permissions[permission as keyof SystemPermissions]}
+            onValueChange={handlePermissionChange(permission as keyof SystemPermissions)}
+            color="primary"
+            data-cy={`user-permission-form-${permission}-checkbox`}
+          >
+            {t(`permissions.${permission}`)}
+          </Switch>
+        ))}
       </CardBody>
 
       <CardFooter className="flex justify-end">
