@@ -96,6 +96,63 @@ export type InviteUserDto = {
     email: string;
 };
 
+export type CsvInvitePermissionMappingDto = {
+    /**
+     * CSV column header that maps to this permission
+     */
+    keyMapping: string;
+    /**
+     * CSV value that represents a YES for this permission
+     */
+    yesValue: string;
+};
+
+export type CsvInvitePermissionsDto = {
+    canManageResources: CsvInvitePermissionMappingDto;
+    canManageSystemConfiguration: CsvInvitePermissionMappingDto;
+    canManageUsers: CsvInvitePermissionMappingDto;
+    canManageBilling: CsvInvitePermissionMappingDto;
+};
+
+export type CsvInviteConfigDto = {
+    /**
+     * CSV column header containing the email
+     */
+    emailKey: string;
+    /**
+     * CSV column header containing the username
+     */
+    usernameKey: string;
+    permissions: CsvInvitePermissionsDto;
+    /**
+     * 1-based row numbers (excluding header) to skip when importing
+     */
+    ignoredRows?: Array<(number)>;
+};
+
+export type CsvInviteUploadDto = {
+    file: (Blob | File);
+    /**
+     * JSON string or object describing how to map CSV columns to fields
+     */
+    config: CsvInviteConfigDto;
+};
+
+export type CsvInviteRowErrorDto = {
+    /**
+     * 1-based row number (excluding header)
+     */
+    row: number;
+    field?: string;
+    message: string;
+    value?: string;
+};
+
+export type CsvInviteErrorResponseDto = {
+    message: string;
+    errors: Array<CsvInviteRowErrorDto>;
+};
+
 export type BooleanDto = {
     /**
      * The boolean value
@@ -2772,6 +2829,12 @@ export type InviteUserData = {
 
 export type InviteUserResponse = User;
 
+export type InviteUsersFromCsvData = {
+    formData: CsvInviteUploadDto;
+};
+
+export type InviteUsersFromCsvResponse = Array<User>;
+
 export type IsLocalSignupEnabledResponse = BooleanDto;
 
 export type VerifyEmailData = {
@@ -4072,6 +4135,25 @@ export type $OpenApiTs = {
                  * Invalid input data.
                  */
                 400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/invite-csv': {
+        post: {
+            req: InviteUsersFromCsvData;
+            res: {
+                /**
+                 * Users have been successfully invited.
+                 */
+                200: Array<User>;
+                /**
+                 * Invalid CSV or input data.
+                 */
+                400: CsvInviteErrorResponseDto;
                 /**
                  * Unauthorized
                  */
