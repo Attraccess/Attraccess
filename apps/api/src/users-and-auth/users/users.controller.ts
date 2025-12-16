@@ -429,7 +429,7 @@ export class UsersController {
 
       return invited;
     } catch (error) {
-      this.mapEmailSendError(error);
+      throw this.mapEmailSendError(error);
     }
   }
 
@@ -514,7 +514,7 @@ export class UsersController {
       const invitedUsers = await this.inviteUsersTransactional(candidates, { grantAllPermissionsToFirst: true });
       return invitedUsers;
     } catch (error) {
-      this.mapEmailSendError(error);
+      throw this.mapEmailSendError(error);
     }
   }
 

@@ -94,6 +94,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
       <CardBody className="flex flex-col gap-2">
         {Object.keys(permissions).map((permission) => (
           <Switch
+            key={permission}
             isSelected={permissions[permission as keyof SystemPermissions]}
             onValueChange={handlePermissionChange(permission as keyof SystemPermissions)}
             color="primary"
