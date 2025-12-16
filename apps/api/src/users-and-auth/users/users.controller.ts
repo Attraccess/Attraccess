@@ -481,7 +481,7 @@ export class UsersController {
       });
     }
 
-    const existingUsers = await this.usersService.findExistingByEmailsOrUsernames(
+    const existingUsers = await this.usersService.findByEmailsOrUsernames(
       candidates.map((candidate) => candidate.email),
       candidates.map((candidate) => candidate.username),
     );

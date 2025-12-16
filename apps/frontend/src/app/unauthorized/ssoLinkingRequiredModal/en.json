@@ -9,5 +9,13 @@
   },
   "actions": {
     "link": "Link account"
+  },
+  "errors": {
+    "passwordRequired": "A password is required to link this account. Please sign in locally first.",
+    "alreadyLinked": "This account is already linked to SSO.",
+    "subjectTaken": "This SSO identity is already linked to another account.",
+    "invalidToken": "This linking request is no longer valid. Please restart SSO login.",
+    "invalidPassword": "Invalid password. Please try again.",
+    "unknown": "Linking failed. Please try again or contact support."
   }
 }

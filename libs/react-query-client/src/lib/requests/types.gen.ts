@@ -374,17 +374,13 @@ export type SSOProvider = {
 
 export type LinkUserToExternalAccountRequestDto = {
     /**
-     * The email of the user
-     */
-    email: string;
-    /**
      * The password of the user
      */
     password: string;
     /**
-     * The external identifier of the user
+     * The short-lived token issued by the backend during SSO linking
      */
-    externalId: string;
+    linkToken: string;
 };
 
 export type CreateOIDCConfigurationDto = {
@@ -2971,7 +2967,7 @@ export type LinkUserToExternalAccountData = {
 
 export type LinkUserToExternalAccountResponse = {
     /**
-     * Whether the account has been linked to the external identifier
+     * Whether the account has been linked to the SSO identity
      */
     OK?: boolean;
 };
@@ -4504,11 +4500,11 @@ export type $OpenApiTs = {
             req: LinkUserToExternalAccountData;
             res: {
                 /**
-                 * The account has been linked to the external identifier
+                 * The account has been linked to the SSO identity
                  */
                 200: {
                     /**
-                     * Whether the account has been linked to the external identifier
+                     * Whether the account has been linked to the SSO identity
                      */
                     OK?: boolean;
                 };

@@ -615,23 +615,18 @@ export const $SSOProvider = {
 export const $LinkUserToExternalAccountRequestDto = {
     type: 'object',
     properties: {
-        email: {
-            type: 'string',
-            description: 'The email of the user',
-            example: 'john.doe@example.com'
-        },
         password: {
             type: 'string',
             description: 'The password of the user',
             example: 'password'
         },
-        externalId: {
+        linkToken: {
             type: 'string',
-            description: 'The external identifier of the user',
-            example: '1234567890'
+            description: 'The short-lived token issued by the backend during SSO linking',
+            example: 'eyJhbGciOi...signed'
         }
     },
-    required: ['email', 'password', 'externalId']
+    required: ['password', 'linkToken']
 } as const;
 
 export const $CreateOIDCConfigurationDto = {

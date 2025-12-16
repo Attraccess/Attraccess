@@ -1,15 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class LinkUserToExternalAccountRequestDto {
-  @ApiProperty({
-    description: 'The email of the user',
-    example: 'john.doe@example.com',
-  })
-  @IsEmail()
-  @IsNotEmpty()
-  email!: string;
-
   @ApiProperty({
     description: 'The password of the user',
     example: 'password',
@@ -19,10 +11,10 @@ export class LinkUserToExternalAccountRequestDto {
   password!: string;
 
   @ApiProperty({
-    description: 'The external identifier of the user',
-    example: '1234567890',
+    description: 'The short-lived token issued by the backend during SSO linking',
+    example: 'eyJhbGciOi...signed',
   })
   @IsString()
   @IsNotEmpty()
-  externalId!: string;
+  linkToken!: string;
 }

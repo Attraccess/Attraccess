@@ -7,6 +7,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
+import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -173,42 +174,53 @@ describe('UsersService', () => {
   });
 
   describe('updateUser', () => {
-    it('should update a user', async () => {
-      const user = {
+    it('should update allowed fields and trim values', async () => {
+      const updatedUser = {
         id: 1,
-        username: 'test',
-        email: 'test@example.com',
+        externalIdentifier: 'ext-updated',
       } as User;
       jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(updatedUser);
 
-      const result = await service.updateOne(1, { username: 'updated' });
-      expect(result).toEqual(user);
+      const result = await service.updateOne(1, { externalIdentifier: '  ext-updated  ' });
+
+      expect(userRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ externalIdentifier: 'ext-updated' }),
+      );
+      expect(result).toEqual(updatedUser);
     });
 
-    it('should check email uniqueness on update', async () => {
-      const existingUsers = [{ id: 2, email: 'existing@example.com' } as User];
-      jest.spyOn(userRepository, 'find').mockResolvedValue(existingUsers);
-
-      await expect(service.updateOne(1, { email: 'existing@example.com' })).rejects.toThrow(BadRequestException);
-    });
-
-    it('should allow updating to same email', async () => {
-      const user = { id: 1, email: 'test@example.com' } as User;
-      const existingUsers = [user];
-      jest.spyOn(userRepository, 'find').mockResolvedValue(existingUsers);
+    it('should update verification tokens', async () => {
+      const updatedUser = {
+        id: 1,
+        emailVerificationToken: 'token',
+        emailVerificationTokenExpiresAt: new Date(),
+      } as User;
       jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+      jest.spyOn(userRepository, 'findOne').mockResolvedValue(updatedUser);
 
-      const result = await service.updateOne(1, { email: 'test@example.com' });
-      expect(result).toEqual(user);
+      const tokenExpiry = new Date();
+      const result = await service.updateOne(1, {
+        emailVerificationToken: '  token  ',
+        emailVerificationTokenExpiresAt: tokenExpiry,
+      });
+
+      expect(userRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          emailVerificationToken: 'token',
+          emailVerificationTokenExpiresAt: tokenExpiry,
+        }),
+      );
+      expect(result).toEqual(updatedUser);
     });
 
-    it('should throw if user not found', async () => {
+    it('should throw if user not found after update', async () => {
       jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
 
-      await expect(service.updateOne(1, { username: 'test' })).rejects.toThrow(UserNotFoundException);
+      await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
 
     it('should persist system permission updates', async () => {
@@ -340,6 +352,10 @@ describe('UsersService', () => {
   });
 
   describe('changeUsername', () => {
+    beforeEach(() => {
+      jest.spyOn(service, 'isSSOUser').mockResolvedValue(false);
+    });
+
     const baseUser = (overrides: Partial<User> = {}): User =>
       ({
         id: 1,
@@ -398,13 +414,13 @@ describe('UsersService', () => {
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
 
       const updated = { ...me, username: 'newuser', lastUsernameChangeAt: new Date() } as User;
-      const updateSpy = jest.spyOn(service, 'updateOne').mockResolvedValueOnce(updated);
+      const saveSpy = jest.spyOn(userRepository, 'save').mockResolvedValueOnce(updated);
 
       const result = await service.changeUsername(10, 'newuser', me);
 
-      expect(updateSpy).toHaveBeenCalledWith(
-        10,
+      expect(saveSpy).toHaveBeenCalledWith(
         expect.objectContaining({
+          id: 10,
           username: 'newuser',
           lastUsernameChangeAt: expect.any(Date),
         }),
@@ -427,14 +443,17 @@ describe('UsersService', () => {
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(target);
 
       const updated = { ...target, username: 'new_admin_set' } as User;
-      const updateSpy = jest.spyOn(service, 'updateOne').mockResolvedValueOnce(updated);
+      const saveSpy = jest.spyOn(userRepository, 'save').mockResolvedValueOnce(updated);
 
       const result = await service.changeUsername(20, 'new_admin_set', admin);
 
-      expect(updateSpy).toHaveBeenCalledWith(20, {
-        username: 'new_admin_set',
-        lastUsernameChangeAt: null,
-      });
+      expect(saveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 20,
+          username: 'new_admin_set',
+          lastUsernameChangeAt: null,
+        }),
+      );
       expect(emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'target');
       expect(result).toBe(updated);
     });
@@ -444,6 +463,14 @@ describe('UsersService', () => {
       jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
 
       await expect(service.changeUsername(10, 'x', me)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should forbid changing username for SSO users', async () => {
+      const me = baseUser({ id: 5 });
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
+      jest.spyOn(service, 'isSSOUser').mockResolvedValueOnce(true);
+
+      await expect(service.changeUsername(5, 'newuser', me)).rejects.toThrow(SSOUsernameChangeForbiddenException);
     });
   });
 });
