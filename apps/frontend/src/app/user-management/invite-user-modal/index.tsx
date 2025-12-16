@@ -5,8 +5,9 @@ import {
   Modal,
   ModalBody,
   ModalContent,
-  ModalFooter,
   ModalHeader,
+  Tab,
+  Tabs,
   useDisclosure,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -19,6 +20,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import { CsvInvite } from './csv-invite';
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
@@ -82,50 +84,69 @@ export function InviteUserModal(props: Props) {
     });
   }, [inviteUser, username, email]);
 
+  const [tab, setTab] = useState<'single' | 'csv'>('single');
+
   return (
     <>
       {children(onOpen)}
-      <Modal isOpen={isOpen} onClose={onClose}>
+      <Modal isOpen={isOpen} onClose={onClose} size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
         <ModalContent>
           <ModalHeader>
             <PageHeader title={t('title')} noMargin />
           </ModalHeader>
 
           <ModalBody>
-            <Form
-              ref={formRef}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmit();
-              }}
-              className="flex flex-col gap-4"
-            >
-              <Input
-                label={t('inputs.username.label')}
-                name="username"
-                isRequired
-                required
-                value={username}
-                onValueChange={setUsername}
-              />
-              <Input
-                label={t('inputs.email.label')}
-                name="email"
-                type="email"
-                isRequired
-                required
-                value={email}
-                onValueChange={setEmail}
-              />
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+            <Tabs onSelectionChange={(key) => setTab(key as 'single' | 'csv')} selectedKey={tab}>
+              <Tab key="single" title={t('tabs.single')}>
+                <Form
+                  ref={formRef}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    onSubmit();
+                  }}
+                  className="flex flex-col gap-4"
+                >
+                  <Input
+                    label={t('inputs.username.label')}
+                    name="username"
+                    isRequired
+                    required
+                    value={username}
+                    onValueChange={setUsername}
+                  />
+                  <Input
+                    label={t('inputs.email.label')}
+                    name="email"
+                    type="email"
+                    isRequired
+                    required
+                    value={email}
+                    onValueChange={setEmail}
+                  />
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isPending}>
-              {t('actions.invite')}
-            </Button>
-          </ModalFooter>
+                  <div className="flex justify-end w-full">
+                    <Button color="primary" type="submit" isLoading={isPending}>
+                      {t('actions.invite')}
+                    </Button>
+                  </div>
+                </Form>
+              </Tab>
+
+              <Tab key="csv" title={t('tabs.csv')}>
+                <CsvInvite
+                  onSuccess={onClose}
+                  onError={(error) =>
+                    toast.apiError({
+                      error: error as ApiError,
+                      t,
+                      tExists,
+                      baseTranslationKey: 'api',
+                    })
+                  }
+                />
+              </Tab>
+            </Tabs>
+          </ModalBody>
         </ModalContent>
       </Modal>
     </>

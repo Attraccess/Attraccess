@@ -1,0 +1,51 @@
+{
+  "inputs": {
+    "file": "Select file",
+    "yesValue": "Value meaning yes",
+    "fieldMapping": {
+      "email": "Email",
+      "username": "Username",
+      "canManageResources": "Manage resources",
+      "canManageSystemConfiguration": "Manage system configuration",
+      "canManageUsers": "Manage users",
+      "canManageBilling": "Manage billing"
+    }
+  },
+  "preview": {
+    "columns": {
+      "index": "Index",
+      "username": "Username",
+      "email": "Email",
+      "permissions": {
+        "label": "Permissions",
+        "values": {
+          "canManageResources": "Manage resources",
+          "canManageSystemConfiguration": "Manage system configuration",
+          "canManageUsers": "Manage users",
+          "canManageBilling": "Manage billing"
+        }
+      }
+    }
+  },
+  "actions": {
+    "invite": "Invite",
+    "inviteIgnore": "Invite skipping failed rows"
+  },
+  "errors": {
+    "title": "Import errors",
+    "columns": {
+      "row": "Row",
+      "field": "Field",
+      "message": "Reason",
+      "value": "Value"
+    },
+    "missingConfig": {
+      "title": "Missing configuration",
+      "description": "Select a CSV file and map email and username columns."
+    }
+  },
+  "success": {
+    "title": "Invitations sent",
+    "description": "All selected users have been invited."
+  }
+}

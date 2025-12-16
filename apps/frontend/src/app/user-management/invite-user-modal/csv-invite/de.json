@@ -1,0 +1,51 @@
+{
+  "inputs": {
+    "file": "Datei auswählen",
+    "yesValue": "Wert für Ja",
+    "fieldMapping": {
+      "email": "E-Mail",
+      "username": "Benutzername",
+      "canManageResources": "Ressourcen verwalten",
+      "canManageSystemConfiguration": "Systemkonfiguration verwalten",
+      "canManageUsers": "Benutzer verwalten",
+      "canManageBilling": "Zahlungen verwalten"
+    }
+  },
+  "preview": {
+    "columns": {
+      "index": "Index",
+      "username": "Benutzername",
+      "email": "E-Mail",
+      "permissions": {
+        "label": "Berechtigungen",
+        "values": {
+          "canManageResources": "Ressourcen verwalten",
+          "canManageSystemConfiguration": "Systemkonfiguration verwalten",
+          "canManageUsers": "Benutzer verwalten",
+          "canManageBilling": "Rechnungen verwalten"
+        }
+      }
+    }
+  },
+  "actions": {
+    "invite": "Einladen",
+    "inviteIgnore": "Fehlgeschlagene Zeilen überspringen und einladen"
+  },
+  "errors": {
+    "title": "Import-Fehler",
+    "columns": {
+      "row": "Zeile",
+      "field": "Feld",
+      "message": "Grund",
+      "value": "Wert"
+    },
+    "missingConfig": {
+      "title": "Konfiguration fehlt",
+      "description": "Bitte CSV-Datei auswählen und E-Mail- sowie Benutzername-Spalten zuordnen."
+    }
+  },
+  "success": {
+    "title": "Einladungen gesendet",
+    "description": "Alle ausgewählten Nutzer wurden eingeladen."
+  }
+}

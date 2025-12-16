@@ -141,6 +141,121 @@ export const $InviteUserDto = {
     required: ['username', 'email']
 } as const;
 
+export const $CsvInvitePermissionMappingDto = {
+    type: 'object',
+    properties: {
+        keyMapping: {
+            type: 'string',
+            description: 'CSV column header that maps to this permission'
+        },
+        yesValue: {
+            type: 'string',
+            description: 'CSV value that represents a YES for this permission'
+        }
+    },
+    required: ['keyMapping', 'yesValue']
+} as const;
+
+export const $CsvInvitePermissionsDto = {
+    type: 'object',
+    properties: {
+        canManageResources: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageSystemConfiguration: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageUsers: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageBilling: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        }
+    },
+    required: ['canManageResources', 'canManageSystemConfiguration', 'canManageUsers', 'canManageBilling']
+} as const;
+
+export const $CsvInviteConfigDto = {
+    type: 'object',
+    properties: {
+        emailKey: {
+            type: 'string',
+            description: 'CSV column header containing the email'
+        },
+        usernameKey: {
+            type: 'string',
+            description: 'CSV column header containing the username'
+        },
+        permissions: {
+            '$ref': '#/components/schemas/CsvInvitePermissionsDto'
+        },
+        ignoredRows: {
+            description: '1-based row numbers (excluding header) to skip when importing',
+            type: 'array',
+            items: {
+                type: 'number'
+            }
+        }
+    },
+    required: ['emailKey', 'usernameKey', 'permissions']
+} as const;
+
+export const $CsvInviteUploadDto = {
+    type: 'object',
+    properties: {
+        file: {
+            type: 'string',
+            format: 'binary'
+        },
+        config: {
+            description: 'JSON string or object describing how to map CSV columns to fields',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/CsvInviteConfigDto'
+                }
+            ]
+        }
+    },
+    required: ['file', 'config']
+} as const;
+
+export const $CsvInviteRowErrorDto = {
+    type: 'object',
+    properties: {
+        row: {
+            type: 'number',
+            description: '1-based row number (excluding header)'
+        },
+        field: {
+            type: 'string'
+        },
+        message: {
+            type: 'string'
+        },
+        value: {
+            type: 'string'
+        }
+    },
+    required: ['row', 'message']
+} as const;
+
+export const $CsvInviteErrorResponseDto = {
+    type: 'object',
+    properties: {
+        message: {
+            type: 'string',
+            default: 'CSV import failed'
+        },
+        errors: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/CsvInviteRowErrorDto'
+            }
+        }
+    },
+    required: ['message', 'errors']
+} as const;
+
 export const $BooleanDto = {
     type: 'object',
     properties: {

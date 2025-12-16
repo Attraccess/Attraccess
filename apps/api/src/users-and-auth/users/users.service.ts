@@ -1,5 +1,13 @@
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
-import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In, DeepPartial } from 'typeorm';
+import {
+  Repository,
+  ILike,
+  FindOneOptions as TypeormFindOneOptions,
+  FindOptionsWhere,
+  In,
+  DeepPartial,
+  EntityManager,
+} from 'typeorm';
 import { SystemPermissions, User } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
@@ -8,6 +16,7 @@ import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
+import { DataSource } from 'typeorm';
 
 const FindOneOptionsSchema = z
   .object({
@@ -44,9 +53,10 @@ export class UsersService {
     private userRepository: Repository<User>,
     private licenseService: LicenseService,
     private emailService: EmailService,
+    private dataSource: DataSource,
   ) {}
 
-  private validateUsernameOrThrow(username: string): void {
+  public validateUsernameOrThrow(username: string): void {
     const trimmed = (username ?? '').trim();
     // Centralized username validation rules
     const minLength = 3;
@@ -61,11 +71,11 @@ export class UsersService {
     }
   }
 
-  private cleanupUsername(username: string): string {
+  public cleanupUsername(username: string): string {
     return username.trim().toLowerCase();
   }
 
-  async findOne(options: FindOneOptions, relations?: string[]): Promise<User | null> {
+  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
     // Build a where condition that uses case-insensitive comparison for username
@@ -87,7 +97,8 @@ export class UsersService {
       whereCondition.externalIdentifier = validatedOptions.externalIdentifier;
     }
 
-    const user = await this.userRepository.findOne({
+    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+    const user = await userRepo.findOne({
       where: whereCondition,
       relations,
     });
@@ -181,7 +192,7 @@ export class UsersService {
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
-  async updateOne(id: number, updateData: Partial<User>): Promise<User> {
+  async updateOne(id: number, updateData: Partial<User>, manager?: EntityManager): Promise<User> {
     let username = updateData.username;
     if (username) {
       username = this.cleanupUsername(username);
@@ -210,9 +221,10 @@ export class UsersService {
     }
 
     // If email is being updated, check for uniqueness
+    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
     if (updates.email) {
       this.logger.debug(`Checking uniqueness for new email: ${updates.email}`);
-      const existingEmails = await this.userRepository.find({
+      const existingEmails = await userRepo.find({
         where: { email: updates.email },
       });
 
@@ -225,9 +237,13 @@ export class UsersService {
     // If username is being updated, check for case-insensitive uniqueness
     if (updates.username) {
       this.logger.debug(`Checking uniqueness for new username: ${updates.username}`);
-      const existingUsername = await this.findOne({
-        username: updates.username,
-      });
+      const existingUsername = await this.findOne(
+        {
+          username: updates.username,
+        },
+        undefined,
+        manager,
+      );
       if (existingUsername && existingUsername.id !== id) {
         this.logger.debug(`Username already in use by another user: ${updates.username}`);
         throw new UserUsernameAlreadyInUseException();
@@ -235,10 +251,10 @@ export class UsersService {
     }
 
     this.logger.debug(`Performing update for user ID: ${id}`);
-    await this.userRepository.update(id, updates);
+    await userRepo.update(id, updates);
 
     this.logger.debug(`Fetching updated user from database, ID: ${id}`);
-    const updatedUser = await this.findOne({ id });
+    const updatedUser = await this.findOne({ id }, undefined, manager);
     if (!updatedUser) {
       this.logger.error(`User not found after update, ID: ${id}`);
       throw new UserNotFoundException(id);
@@ -396,5 +412,114 @@ export class UsersService {
 
     const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
     return updated;
+  }
+
+  async countUsers(): Promise<number> {
+    return this.userRepository.count();
+  }
+
+  async findExistingByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
+    const normalizedEmails = Array.from(new Set(emails.map((email) => email.trim()).filter((email) => email !== '')));
+    const normalizedUsernames = Array.from(
+      new Set(usernames.map((username) => this.cleanupUsername(username)).filter((username) => username !== '')),
+    );
+
+    const where: FindOptionsWhere<User>[] = [];
+
+    if (normalizedEmails.length) {
+      where.push({ email: In(normalizedEmails) });
+    }
+
+    if (normalizedUsernames.length) {
+      where.push({ username: In(normalizedUsernames) });
+    }
+
+    if (!where.length) {
+      return [];
+    }
+
+    return this.userRepository.find({ where });
+  }
+
+  async ensureLicenseForNewUsers(newUsersCount: number): Promise<void> {
+    if (newUsersCount <= 0) {
+      return;
+    }
+
+    const currentAmountOfUsers = await this.userRepository.count();
+    await this.licenseService.verifyLicense({
+      usageLimits: {
+        users: currentAmountOfUsers + newUsersCount,
+      },
+    });
+  }
+
+  async createMany(
+    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
+  ): Promise<User[]> {
+    if (users.length === 0) {
+      return [];
+    }
+
+    const normalized = users.map((userData) => ({
+      username: this.cleanupUsername(userData.username),
+      email: userData.email.trim(),
+      systemPermissions: userData.systemPermissions ?? {},
+    }));
+
+    const run = async (manager: EntityManager) => {
+      const repo = manager.getRepository(User);
+      const totalExisting = await repo.count();
+
+      const entities = normalized.map((data, index) => {
+        this.validateUsernameOrThrow(data.username);
+        if (!data.email) {
+          throw new BadRequestException('Email is required');
+        }
+
+        const user = repo.create();
+        user.username = data.username;
+        user.email = data.email;
+        user.externalIdentifier = null;
+
+        const systemPermissions: SystemPermissions = {
+          canManageResources: data.systemPermissions.canManageResources ?? false,
+          canManageSystemConfiguration: data.systemPermissions.canManageSystemConfiguration ?? false,
+          canManageUsers: data.systemPermissions.canManageUsers ?? false,
+          canManageBilling: data.systemPermissions.canManageBilling ?? false,
+        };
+
+        if (options?.grantAllPermissionsToFirst && totalExisting === 0 && index === 0) {
+          systemPermissions.canManageResources = true;
+          systemPermissions.canManageSystemConfiguration = true;
+          systemPermissions.canManageUsers = true;
+          systemPermissions.canManageBilling = true;
+        }
+
+        user.systemPermissions = systemPermissions;
+        return user;
+      });
+
+      return repo.save(entities);
+    };
+
+    if (options?.manager) {
+      return run(options.manager);
+    }
+
+    return this.userRepository.manager.transaction(run);
+  }
+
+  async deleteMany(ids: number[]): Promise<void> {
+    if (!ids.length) {
+      return;
+    }
+
+    await this.userRepository.delete(ids);
+  }
+
+  async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {
+    return this.dataSource.transaction(handler);
   }
 }

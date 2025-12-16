@@ -3,7 +3,8 @@
   "permissions": {
     "canManageResources": "Manage resources",
     "canManageSystemConfiguration": "Manage system configuration",
-    "canManageUsers": "Manage users"
+    "canManageUsers": "Manage users",
+    "canManageBilling": "Manage billing"
   },
   "actions": {
     "save": "Save"

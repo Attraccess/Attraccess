@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { nanoid } from 'nanoid';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { User, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
@@ -140,14 +140,18 @@ export class AuthService {
     return user;
   }
 
-  async generateEmailVerificationToken(user: User): Promise<string> {
+  async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
     const token = nanoid();
 
     this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
-    await this.usersService.updateOne(user.id, {
-      emailVerificationToken: token,
-      emailVerificationTokenExpiresAt: addDays(new Date(), 3),
-    });
+    await this.usersService.updateOne(
+      user.id,
+      {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: addDays(new Date(), 3),
+      },
+      manager,
+    );
 
     this.logger.debug(`Email verification token set for user ID: ${user.id}`);
     return token;
