@@ -254,6 +254,51 @@ export interface InviteUserDto {
   email: string;
 }
 
+export interface CsvInvitePermissionMappingDto {
+  /** CSV column header that maps to this permission */
+  keyMapping: string;
+  /** CSV value that represents a YES for this permission */
+  yesValue: string;
+}
+
+export interface CsvInvitePermissionsDto {
+  canManageResources: CsvInvitePermissionMappingDto;
+  canManageSystemConfiguration: CsvInvitePermissionMappingDto;
+  canManageUsers: CsvInvitePermissionMappingDto;
+  canManageBilling: CsvInvitePermissionMappingDto;
+}
+
+export interface CsvInviteConfigDto {
+  /** CSV column header containing the email */
+  emailKey: string;
+  /** CSV column header containing the username */
+  usernameKey: string;
+  permissions: CsvInvitePermissionsDto;
+  /** 1-based row numbers (excluding header) to skip when importing */
+  ignoredRows?: number[];
+}
+
+export interface CsvInviteUploadDto {
+  /** @format binary */
+  file: File;
+  /** JSON string or object describing how to map CSV columns to fields */
+  config: CsvInviteConfigDto;
+}
+
+export interface CsvInviteRowErrorDto {
+  /** 1-based row number (excluding header) */
+  row: number;
+  field?: string;
+  message: string;
+  value?: string;
+}
+
+export interface CsvInviteErrorResponseDto {
+  /** @default "CSV import failed" */
+  message: string;
+  errors: CsvInviteRowErrorDto[];
+}
+
 export interface BooleanDto {
   /**
    * The boolean value
@@ -490,20 +535,15 @@ export interface SSOProvider {
 
 export interface LinkUserToExternalAccountRequestDto {
   /**
-   * The email of the user
-   * @example "john.doe@example.com"
-   */
-  email: string;
-  /**
    * The password of the user
    * @example "password"
    */
   password: string;
   /**
-   * The external identifier of the user
-   * @example "1234567890"
+   * The short-lived token issued by the backend during SSO linking
+   * @example "eyJhbGciOi...signed"
    */
-  externalId: string;
+  linkToken: string;
 }
 
 export interface CreateOIDCConfigurationDto {
@@ -2772,6 +2812,10 @@ export type FindManyData = PaginatedUsersResponseDto;
 
 export type InviteUserData = User;
 
+export type InviteUsersFromCsvData = User[];
+
+export type InviteUsersFromCsvError = CsvInviteErrorResponseDto;
+
 export type IsLocalSignupEnabledData = BooleanDto;
 
 export interface VerifyEmailData {
@@ -2795,11 +2839,7 @@ export type GetOneUserByIdError = UserNotFoundException;
 
 export type UpdatePermissionsData = User;
 
-export interface GetPermissionsData {
-  canManageResources?: boolean;
-  canManageSystemConfiguration?: boolean;
-  canManageUsers?: boolean;
-}
+export type GetPermissionsData = SystemPermissions;
 
 export type BulkUpdatePermissionsData = User[];
 
@@ -2844,7 +2884,7 @@ export type GetAllSsoProvidersData = SSOProvider[];
 export type CreateOneSsoProviderData = SSOProvider;
 
 export interface LinkUserToExternalAccountData {
-  /** Whether the account has been linked to the external identifier */
+  /** Whether the account has been linked to the SSO identity */
   OK?: boolean;
 }
 
@@ -3510,6 +3550,22 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name InviteUsersFromCsv
+   * @summary Invite multiple users from a CSV file
+   * @request POST:/api/users/invite-csv
+   * @secure
+   */
+  export namespace InviteUsersFromCsv {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CsvInviteUploadDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = InviteUsersFromCsvData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name IsLocalSignupEnabled
    * @summary Check if local signup is enabled
    * @request GET:/api/users/local-signup-enabled
@@ -3849,7 +3905,7 @@ export namespace Authentication {
    * No description
    * @tags Authentication
    * @name LinkUserToExternalAccount
-   * @summary Link an account to an external identifier
+   * @summary Link an account to an SSO identity via a signed token
    * @request POST:/api/auth/sso/link-account
    */
   export namespace LinkUserToExternalAccount {
@@ -6586,7 +6642,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -6739,6 +6795,29 @@ export class Api<
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name InviteUsersFromCsv
+     * @summary Invite multiple users from a CSV file
+     * @request POST:/api/users/invite-csv
+     * @secure
+     */
+    inviteUsersFromCsv: (
+      data: CsvInviteUploadDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<InviteUsersFromCsvData, InviteUsersFromCsvError>({
+        path: `/api/users/invite-csv`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.FormData,
         format: "json",
         ...params,
       }),
@@ -7151,7 +7230,7 @@ export class Api<
      *
      * @tags Authentication
      * @name LinkUserToExternalAccount
-     * @summary Link an account to an external identifier
+     * @summary Link an account to an SSO identity via a signed token
      * @request POST:/api/auth/sso/link-account
      */
     linkUserToExternalAccount: (

@@ -146,6 +146,8 @@ void Display::setup()
         GFX_NOT_DEFINED /* DC */, 42 /* CS */,
         2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
 
+    // Display::bus = new Arduino_HWSPI(GFX_NOT_DEFINED /* DC */, 42 /* CS */, 2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+
     Display::rgbpanel = new Arduino_ESP32RGBPanel(
         40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
         46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,

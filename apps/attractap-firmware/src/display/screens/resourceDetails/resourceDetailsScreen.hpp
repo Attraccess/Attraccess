@@ -126,6 +126,13 @@ private:
     lv_obj_t *formsModalErrorLabel = nullptr;
     lv_obj_t *formsKeyboard = nullptr;
     const API::ResourceUsageFormRequest *formsModalRequest = nullptr;
+    struct SelectOptionEventData
+    {
+        ResourceDetailsScreen *self;
+        uint16_t widgetIndex = 0;
+        uint8_t optionIndex = 0; // 1-based (0 = none)
+    };
+
     struct FormFieldWidget
     {
         uint32_t formId;
@@ -137,14 +144,11 @@ private:
         const API::ResourceUsageFormField *definition = nullptr;
         uint8_t selectedOptionIndex = 0; // For SELECT: 0 = no selection, 1+ = option index
         ResourceDetailsScreen *owner = nullptr;
+        uint16_t widgetIndex = 0;
+        SelectOptionEventData selectOptionEvents[API::MAX_SELECT_OPTIONS];
+        uint8_t selectOptionEventCount = 0;
     };
 
-    struct SelectOptionEventData
-    {
-        ResourceDetailsScreen *self;
-        FormFieldWidget *widget;
-        uint8_t optionIndex; // 1-based (0 = none)
-    };
     FormFieldWidget formFieldWidgets[API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM];
     uint16_t formFieldWidgetCount = 0;
     API::FormSubmissionList formSubmissionScratch;
@@ -178,7 +182,6 @@ private:
     static void onFormFieldFocus(lv_event_t *e);
     static void onFormsKeyboardEvent(lv_event_t *e);
     static void onSelectOptionClick(lv_event_t *e);
-    static void onSelectOptionDelete(lv_event_t *e);
     static void onSelectContainerSizeChanged(lv_event_t *e);
     void updateSelectButtonStyles(FormFieldWidget &widget);
     void updateSelectOptionLayout(FormFieldWidget &widget);

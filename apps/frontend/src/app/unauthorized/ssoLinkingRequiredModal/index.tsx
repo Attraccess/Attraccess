@@ -2,11 +2,16 @@ import { Alert, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
+import { useToastMessage } from '../../../components/toastProvider';
+import {
+  ApiError,
+  useAuthenticationServiceLinkUserToExternalAccount,
+  SSOProviderType,
+} from '@attraccess/react-query-client';
 
 import de from './de.json';
 import en from './en.json';
 import { useCallback, useMemo, useState } from 'react';
-import { SSOProviderType, useAuthenticationServiceLinkUserToExternalAccount } from '@attraccess/react-query-client';
 import { useCallbackURL } from '../use-sso-callback-url';
 
 interface Props {
@@ -16,18 +21,38 @@ interface Props {
 export function SSOLinkingRequiredModal(props: Props) {
   const { show } = props;
 
-  const { t } = useTranslations({
+  const { t, tExists } = useTranslations({
     de,
     en,
   });
+  const toast = useToastMessage();
 
   const query = useUrlQuery();
-  const { email, externalId, ssoProviderId, ssoProviderType } = useMemo(() => {
+  const { email, linkToken, tokenPayload } = useMemo(() => {
+    const rawLinkToken = query.get('ssoLinkToken');
+    let parsedPayload: {
+      email?: string;
+      providerId?: number;
+      providerType?: SSOProviderType;
+    } | null = null;
+
+    if (rawLinkToken) {
+      try {
+        const [encodedPayload] = rawLinkToken.split('.');
+        if (encodedPayload) {
+          const padded = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+          const decoded = atob(padded.padEnd(padded.length + ((4 - (padded.length % 4)) % 4), '='));
+          parsedPayload = JSON.parse(decoded);
+        }
+      } catch {
+        parsedPayload = null;
+      }
+    }
+
     return {
-      email: query.get('email'),
-      externalId: query.get('externalId'),
-      ssoProviderId: query.get('ssoProviderId'),
-      ssoProviderType: query.get('ssoProviderType'),
+      email: query.get('email') ?? parsedPayload?.email ?? undefined,
+      linkToken: rawLinkToken ?? undefined,
+      tokenPayload: parsedPayload,
     };
   }, [query]);
 
@@ -37,15 +62,15 @@ export function SSOLinkingRequiredModal(props: Props) {
     const url = new URL(window.location.href);
     url.searchParams.delete('accountLinking');
     url.searchParams.delete('email');
-    url.searchParams.delete('externalId');
-    url.searchParams.delete('ssoProviderId');
+    url.searchParams.delete('ssoLinkToken');
+    url.searchParams.delete('ssoProviderType');
 
     return url.toString();
   }, []);
 
   const callbackURL = useCallbackURL(
-    ssoProviderId ? parseInt(ssoProviderId, 10) : -1,
-    ssoProviderType as SSOProviderType,
+    tokenPayload?.providerId ?? -1,
+    (tokenPayload?.providerType as SSOProviderType) ?? SSOProviderType.OIDC,
     cleanHref,
   );
 
@@ -53,25 +78,23 @@ export function SSOLinkingRequiredModal(props: Props) {
     onSuccess: () => {
       window.location.href = callbackURL;
     },
+    onError: (err: unknown) => {
+      toast.apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'errors', fallbackKey: 'unknown' });
+    },
   });
 
   const linkUser = useCallback(() => {
-    if (!externalId) {
-      return;
-    }
-
-    if (!email) {
+    if (!linkToken) {
       return;
     }
 
     linkMutation({
       requestBody: {
-        email,
-        externalId,
+        linkToken,
         password,
       },
     });
-  }, [email, externalId, linkMutation, password]);
+  }, [linkToken, linkMutation, password]);
 
   return (
     <Modal isOpen={show} isDismissable={false}>
