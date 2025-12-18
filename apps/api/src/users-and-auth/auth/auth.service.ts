@@ -263,6 +263,11 @@ export class AuthService {
   }
 
   async changePassword(user: User, password: string): Promise<void> {
+    const isSSOUser = await this.usersService.isSSOUser(user.id);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot change the password of an SSO user');
+    }
+
     const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id).catch(
       (error) => {
         if (error instanceof NotFoundException) {
@@ -276,11 +281,6 @@ export class AuthService {
       authenticationDetail.password = await this.hashPassword(password);
       await this.authenticationDetailRepository.save(authenticationDetail);
     } else {
-      const isSSOUser = await this.usersService.isSSOUser(user.id);
-      if (isSSOUser) {
-        throw new ForbiddenException('You cannot change the password of an SSO user');
-      }
-
       await this.addAuthenticationDetails(user.id, {
         type: AuthenticationType.LOCAL_PASSWORD,
         details: {

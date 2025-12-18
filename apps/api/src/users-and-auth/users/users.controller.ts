@@ -608,6 +608,11 @@ export class UsersController {
       return { message: 'OK' };
     }
 
+    const isSSOUser = this.usersService.isSSOUser(user.id);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot reset the password of an SSO user');
+    }
+
     await this.emailService.sendPasswordResetEmail(user, token);
     this.logger.debug(`Password reset e-mail sent to: ${body.email}`);
 
@@ -631,6 +636,11 @@ export class UsersController {
     if (!user) {
       this.logger.debug(`User not found with ID: ${userId}`);
       throw new UserNotFoundException(userId);
+    }
+
+    const isSSOUser = this.usersService.isSSOUser(userId);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
 
     if (user.passwordResetToken !== body.token) {
