@@ -1,9 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { AuthenticationType } from '../types/authenticationType.enum';
+import { SSOProviderType } from './ssoProvider.entity';
 
 @Entity()
+@Index(['userId', 'type'], { unique: true })
+@Index(['providerType', 'providerId', 'ssoSubject'], { unique: true, where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL' })
 export class AuthenticationDetail {
   @PrimaryGeneratedColumn()
   @ApiProperty({
@@ -37,6 +40,33 @@ export class AuthenticationDetail {
     required: false,
   })
   password?: string;
+
+  @Column({
+    type: 'simple-enum',
+    enum: SSOProviderType,
+    nullable: true,
+  })
+  @ApiProperty({
+    description: 'The SSO provider type (for SSO authentication)',
+    enum: SSOProviderType,
+    enumName: 'SSOProviderType',
+    required: false,
+  })
+  providerType?: SSOProviderType | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The SSO provider ID (for SSO authentication)',
+    required: false,
+  })
+  providerId?: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'The SSO subject/ID from the provider',
+    required: false,
+  })
+  ssoSubject?: string | null;
 
   @ManyToOne(() => User, (user) => user.authenticationDetails, {
     onDelete: 'CASCADE',

@@ -535,20 +535,15 @@ export interface SSOProvider {
 
 export interface LinkUserToExternalAccountRequestDto {
   /**
-   * The email of the user
-   * @example "john.doe@example.com"
-   */
-  email: string;
-  /**
    * The password of the user
    * @example "password"
    */
   password: string;
   /**
-   * The external identifier of the user
-   * @example "1234567890"
+   * The short-lived token issued by the backend during SSO linking
+   * @example "eyJhbGciOi...signed"
    */
-  externalId: string;
+  linkToken: string;
 }
 
 export interface CreateOIDCConfigurationDto {
@@ -2889,7 +2884,7 @@ export type GetAllSsoProvidersData = SSOProvider[];
 export type CreateOneSsoProviderData = SSOProvider;
 
 export interface LinkUserToExternalAccountData {
-  /** Whether the account has been linked to the external identifier */
+  /** Whether the account has been linked to the SSO identity */
   OK?: boolean;
 }
 
@@ -3910,7 +3905,7 @@ export namespace Authentication {
    * No description
    * @tags Authentication
    * @name LinkUserToExternalAccount
-   * @summary Link an account to an external identifier
+   * @summary Link an account to an SSO identity via a signed token
    * @request POST:/api/auth/sso/link-account
    */
   export namespace LinkUserToExternalAccount {
@@ -7235,7 +7230,7 @@ export class Api<
      *
      * @tags Authentication
      * @name LinkUserToExternalAccount
-     * @summary Link an account to an external identifier
+     * @summary Link an account to an SSO identity via a signed token
      * @request POST:/api/auth/sso/link-account
      */
     linkUserToExternalAccount: (

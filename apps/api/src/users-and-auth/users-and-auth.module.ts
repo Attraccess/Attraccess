@@ -33,6 +33,8 @@ import { AppConfigType } from '../config/app.config';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOLinkTokenService } from './auth/sso/link-token.service';
+import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
     SSOService,
     CookieConfigService,
     SSOOIDCGuard,
+    SSOLinkTokenService,
+    AccountLinkingExceptionFilter,
     {
       provide: SSOOIDCStrategy,
       useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {

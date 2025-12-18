@@ -577,10 +577,10 @@ export class AuthenticationService {
     }
     
     /**
-     * Link an account to an external identifier
+     * Link an account to an SSO identity via a signed token
      * @param data The data for the request.
      * @param data.requestBody
-     * @returns unknown The account has been linked to the external identifier
+     * @returns unknown The account has been linked to the SSO identity
      * @throws ApiError
      */
     public static linkUserToExternalAccount(data: LinkUserToExternalAccountData): CancelablePromise<LinkUserToExternalAccountResponse> {

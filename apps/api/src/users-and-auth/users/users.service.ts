@@ -8,7 +8,7 @@ import {
   DeepPartial,
   EntityManager,
 } from 'typeorm';
-import { SystemPermissions, User } from '@attraccess/database-entities';
+import { AuthenticationType, SystemPermissions, User, SSOProviderType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
@@ -17,6 +17,21 @@ import { UserNotFoundException } from '../../exceptions/user.notFound.exception'
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
 import { DataSource } from 'typeorm';
+import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+
+type UpdateUserData = Partial<
+  Pick<
+    User,
+    | 'externalIdentifier'
+    | 'emailVerificationToken'
+    | 'emailVerificationTokenExpiresAt'
+    | 'isEmailVerified'
+    | 'passwordResetToken'
+    | 'passwordResetTokenExpiresAt'
+  > & {
+    systemPermissions: Partial<SystemPermissions>;
+  }
+>;
 
 const FindOneOptionsSchema = z
   .object({
@@ -31,18 +46,6 @@ const FindOneOptionsSchema = z
   });
 
 type FindOneOptions = z.infer<typeof FindOneOptionsSchema>;
-
-class UserEmailAlreadyInUseException extends BadRequestException {
-  constructor() {
-    super('UserEmailAlreadyInUseException');
-  }
-}
-
-class UserUsernameAlreadyInUseException extends BadRequestException {
-  constructor() {
-    super('UserUsernameAlreadyInUseException');
-  }
-}
 
 @Injectable()
 export class UsersService {
@@ -192,27 +195,41 @@ export class UsersService {
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
-  async updateOne(id: number, updateData: Partial<User>, manager?: EntityManager): Promise<User> {
-    let username = updateData.username;
-    if (username) {
-      username = this.cleanupUsername(username);
+  public async isSSOUser(userId: number): Promise<boolean> {
+    const ssoUser = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.id = :id', { id: userId })
+      .leftJoin('user.authenticationDetails', 'authenticationDetails')
+      .andWhere('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
+      .getOne();
 
-      if (username === '') {
-        username = undefined;
-      }
-    }
+    return !!ssoUser;
+  }
 
-    const updates: DeepPartial<User> = {
-      ...updateData,
-      username,
-      email: updateData.email?.trim() ?? undefined,
+  public async findOneBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<User | null> {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails')
+      .where('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
+      .andWhere('authenticationDetails.providerType = :providerType', { providerType })
+      .andWhere('authenticationDetails.providerId = :providerId', { providerId })
+      .andWhere('authenticationDetails.ssoSubject = :subject', { subject })
+      .getOne();
+
+    return user ?? null;
+  }
+
+  async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+    const updates: UpdateUserData = {
       externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
+      emailVerificationToken: updateData.emailVerificationToken?.trim() ?? undefined,
+      emailVerificationTokenExpiresAt: updateData.emailVerificationTokenExpiresAt ?? undefined,
+      isEmailVerified: updateData.isEmailVerified ?? undefined,
+      passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
+      passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
+      systemPermissions: updateData.systemPermissions ?? undefined,
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
-
-    if (updates.username !== undefined) {
-      this.validateUsernameOrThrow(updates.username);
-    }
 
     if (updateData.systemPermissions !== undefined) {
       updates.systemPermissions = {
@@ -222,33 +239,6 @@ export class UsersService {
 
     // If email is being updated, check for uniqueness
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;
-    if (updates.email) {
-      this.logger.debug(`Checking uniqueness for new email: ${updates.email}`);
-      const existingEmails = await userRepo.find({
-        where: { email: updates.email },
-      });
-
-      if (existingEmails.some((user) => user.id !== id)) {
-        this.logger.debug(`Email already in use by another user: ${updates.email}`);
-        throw new UserEmailAlreadyInUseException();
-      }
-    }
-
-    // If username is being updated, check for case-insensitive uniqueness
-    if (updates.username) {
-      this.logger.debug(`Checking uniqueness for new username: ${updates.username}`);
-      const existingUsername = await this.findOne(
-        {
-          username: updates.username,
-        },
-        undefined,
-        manager,
-      );
-      if (existingUsername && existingUsername.id !== id) {
-        this.logger.debug(`Username already in use by another user: ${updates.username}`);
-        throw new UserUsernameAlreadyInUseException();
-      }
-    }
 
     this.logger.debug(`Performing update for user ID: ${id}`);
     await userRepo.update(id, updates);
@@ -265,6 +255,11 @@ export class UsersService {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+    const isSSOUser = await this.isSSOUser(targetUserId);
+    if (isSSOUser) {
+      throw new SSOUsernameChangeForbiddenException();
+    }
+
     newUsername = this.cleanupUsername(newUsername);
     if (newUsername.length === 0) {
       throw new BadRequestException('Username cannot be empty');
@@ -297,10 +292,18 @@ export class UsersService {
     }
 
     const oldUsername = targetUser.username;
-    const updated = await this.updateOne(targetUserId, {
+
+    const lastUsernameChangeAt = isSelf ? new Date() : undefined;
+
+    await this.userRepository.update(targetUserId, {
       username: newUsername,
-      lastUsernameChangeAt: isSelf ? new Date() : targetUser.lastUsernameChangeAt,
+      ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
     });
+
+    const updated = await this.findOne({ id: targetUserId });
+    if (!updated) {
+      throw new UserNotFoundException(targetUserId);
+    }
 
     try {
       await this.emailService.sendUsernameChangedEmail(updated, oldUsername);
@@ -410,15 +413,21 @@ export class UsersService {
       throw new BadRequestException('Billing factor must be at least 0');
     }
 
-    const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
-    return updated;
+    await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
+
+    const updatedUser = await this.findOne({ id: targetUserId });
+    if (!updatedUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    return updatedUser;
   }
 
   async countUsers(): Promise<number> {
     return this.userRepository.count();
   }
 
-  async findExistingByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
+  async findByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
     const normalizedEmails = Array.from(new Set(emails.map((email) => email.trim()).filter((email) => email !== '')));
     const normalizedUsernames = Array.from(
       new Set(usernames.map((username) => this.cleanupUsername(username)).filter((username) => username !== '')),
