@@ -248,7 +248,7 @@ describe('SsoController', () => {
       const authService = module.get<AuthService>(AuthService);
       const usersService = module.get<UsersService>(UsersService);
 
-      (linkTokenService.verify as jest.Mock).mockReturnValue(linkPayload);
+      (linkTokenService.verify as jest.Mock).mockResolvedValue(linkPayload);
       (authService.userHasSSOAuthentication as jest.Mock | undefined)?.mockResolvedValue(hasSSO);
       (authService.validateAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(passwordOk);
       (authService.findUserIdBySSO as jest.Mock | undefined)?.mockResolvedValue(

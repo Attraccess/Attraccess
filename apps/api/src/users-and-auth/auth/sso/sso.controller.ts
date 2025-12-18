@@ -79,7 +79,7 @@ export class SSOController {
     },
   })
   public async linkUserToExternalAccount(@Body() body: LinkUserToExternalAccountRequestDto): Promise<{ OK: boolean }> {
-    const linkPayload = this.linkTokenService.verify(body.linkToken);
+    const linkPayload = await this.linkTokenService.verify(body.linkToken);
     const user = await this.usersService.findOne({ email: linkPayload.email }, ['authenticationDetails']);
     if (!user) {
       throw new UnauthorizedException();

@@ -293,9 +293,17 @@ export class UsersService {
 
     const oldUsername = targetUser.username;
 
-    targetUser.username = newUsername;
-    targetUser.lastUsernameChangeAt = isSelf ? new Date() : targetUser.lastUsernameChangeAt;
-    const updated = await this.userRepository.save(targetUser);
+    const lastUsernameChangeAt = isSelf ? new Date() : undefined;
+
+    await this.userRepository.update(targetUserId, {
+      username: newUsername,
+      ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
+    });
+
+    const updated = await this.findOne({ id: targetUserId });
+    if (!updated) {
+      throw new UserNotFoundException(targetUserId);
+    }
 
     try {
       await this.emailService.sendUsernameChangedEmail(updated, oldUsername);
@@ -405,9 +413,14 @@ export class UsersService {
       throw new BadRequestException('Billing factor must be at least 0');
     }
 
-    targetUser.billingFactor = newBillingFactor;
-    const updated = await this.userRepository.save(targetUser);
-    return updated;
+    await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
+
+    const updatedUser = await this.findOne({ id: targetUserId });
+    if (!updatedUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    return updatedUser;
   }
 
   async countUsers(): Promise<number> {

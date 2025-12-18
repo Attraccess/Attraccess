@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../../../config/app.config';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SSOProviderType, Setting } from '@attraccess/database-entities';
 
 export interface SSOLinkTokenPayload {
   email: string;
@@ -17,13 +17,21 @@ export interface SSOLinkTokenPayload {
 export class SSOLinkTokenService {
   private readonly logger = new Logger(SSOLinkTokenService.name);
   private readonly defaultTtlMs = 10 * 60 * 1000; // 10 minutes
+  private readonly secretParent = 'auth';
+  private readonly secretKey = 'sso_link_token_secret';
+  private readonly secretRefreshMs = 5 * 60 * 1000; // 5 minutes
+  private cachedSecret: string | null = null;
+  private lastFetchedAt = 0;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    @InjectRepository(Setting)
+    private readonly settingRepository: Repository<Setting>,
+  ) {}
 
-  issue(
+  async issue(
     payload: Pick<SSOLinkTokenPayload, 'email' | 'providerId' | 'providerType' | 'ssoSubject'>,
     ttlMs = this.defaultTtlMs,
-  ): string {
+  ): Promise<string> {
     const now = Date.now();
     const tokenPayload: SSOLinkTokenPayload = {
       ...payload,
@@ -32,19 +40,19 @@ export class SSOLinkTokenService {
     };
 
     const encodedPayload = Buffer.from(JSON.stringify(tokenPayload)).toString('base64url');
-    const signature = this.sign(encodedPayload);
+    const signature = await this.sign(encodedPayload);
 
     return `${encodedPayload}.${signature}`;
   }
 
-  verify(token: string): SSOLinkTokenPayload {
+  async verify(token: string): Promise<SSOLinkTokenPayload> {
     const [encodedPayload, signature] = token?.split('.') ?? [];
 
     if (!encodedPayload || !signature) {
       throw new BadRequestException('INVALID_LINK_TOKEN');
     }
 
-    const expectedSignature = this.sign(encodedPayload);
+    const expectedSignature = await this.sign(encodedPayload);
     const actual = Buffer.from(signature);
     const expected = Buffer.from(expectedSignature);
 
@@ -68,15 +76,56 @@ export class SSOLinkTokenService {
     return payload;
   }
 
-  private sign(encodedPayload: string): string {
-    const secret = this.configService.get<AppConfigType>('app')?.AUTH_SESSION_SECRET;
-
-    if (!secret) {
-      this.logger.error('AUTH_SESSION_SECRET is not configured');
-      throw new UnauthorizedException('Server misconfiguration');
-    }
+  private async sign(encodedPayload: string): Promise<string> {
+    const secret = await this.getSecret();
 
     return createHmac('sha256', secret).update(encodedPayload).digest('base64url');
   }
-}
 
+  private async getSecret(): Promise<string> {
+    const now = Date.now();
+
+    if (this.cachedSecret && now - this.lastFetchedAt < this.secretRefreshMs) {
+      return this.cachedSecret;
+    }
+
+    const existing = await this.settingRepository.findOneBy({
+      parent: this.secretParent,
+      key: this.secretKey,
+    });
+
+    if (existing?.value) {
+      this.cachedSecret = existing.value;
+      this.lastFetchedAt = now;
+      return existing.value;
+    }
+
+    const generated = randomBytes(64).toString('base64url');
+
+    try {
+      await this.settingRepository.insert({
+        parent: this.secretParent,
+        key: this.secretKey,
+        value: generated,
+      });
+      this.cachedSecret = generated;
+      this.lastFetchedAt = now;
+      return generated;
+    } catch (error) {
+      this.logger.warn('Race detected when creating SSO link token secret, retrying fetch', error as Error);
+      const afterInsert = await this.settingRepository.findOneBy({
+        parent: this.secretParent,
+        key: this.secretKey,
+      });
+
+      if (afterInsert?.value) {
+        this.cachedSecret = afterInsert.value;
+        this.lastFetchedAt = now;
+        return afterInsert.value;
+      }
+
+      this.logger.error('SSO link token secret could not be created or retrieved', error as Error);
+      throw new UnauthorizedException('Server misconfiguration');
+    }
+  }
+}

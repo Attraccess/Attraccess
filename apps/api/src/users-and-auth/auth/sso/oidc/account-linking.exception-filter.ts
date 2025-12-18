@@ -9,7 +9,7 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
 
   constructor(private readonly linkTokenService: SSOLinkTokenService) {}
 
-  catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
+  async catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest() as Request;
@@ -25,7 +25,7 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
       const frontendUrl = new URL(redirectTo);
       // Clear any existing parameters and set account linking parameters
       frontendUrl.search = '';
-      const linkToken = this.linkTokenService.issue({
+      const linkToken = await this.linkTokenService.issue({
         email: exception.email,
         providerId: exception.providerId,
         providerType: exception.providerType,
@@ -41,7 +41,7 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
     }
 
     // Fallback: return JSON if no redirect URL
-    const linkToken = this.linkTokenService.issue({
+    const linkToken = await this.linkTokenService.issue({
       email: exception.email,
       providerId: exception.providerId,
       providerType: exception.providerType,

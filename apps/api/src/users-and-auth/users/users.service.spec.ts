@@ -411,16 +411,15 @@ describe('UsersService', () => {
 
     it('should allow self-change and update lastUsernameChangeAt and send email', async () => {
       const me = baseUser({ id: 10, username: 'me' });
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me);
-
       const updated = { ...me, username: 'newuser', lastUsernameChangeAt: new Date() } as User;
-      const saveSpy = jest.spyOn(userRepository, 'save').mockResolvedValueOnce(updated);
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(me).mockResolvedValueOnce(updated);
+      const updateSpy = jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
 
       const result = await service.changeUsername(10, 'newuser', me);
 
-      expect(saveSpy).toHaveBeenCalledWith(
+      expect(updateSpy).toHaveBeenCalledWith(
+        10,
         expect.objectContaining({
-          id: 10,
           username: 'newuser',
           lastUsernameChangeAt: expect.any(Date),
         }),
@@ -440,18 +439,16 @@ describe('UsersService', () => {
           canManageBilling: false,
         },
       });
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce(target);
-
-      const updated = { ...target, username: 'new_admin_set' } as User;
-      const saveSpy = jest.spyOn(userRepository, 'save').mockResolvedValueOnce(updated);
+      const updated = { ...target, username: 'new_admin_set', lastUsernameChangeAt: null } as User;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
+      const updateSpy = jest.spyOn(userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
 
       const result = await service.changeUsername(20, 'new_admin_set', admin);
 
-      expect(saveSpy).toHaveBeenCalledWith(
+      expect(updateSpy).toHaveBeenCalledWith(
+        20,
         expect.objectContaining({
-          id: 20,
           username: 'new_admin_set',
-          lastUsernameChangeAt: null,
         }),
       );
       expect(emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'target');
