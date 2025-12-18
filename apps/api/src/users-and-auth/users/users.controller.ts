@@ -608,7 +608,7 @@ export class UsersController {
       return { message: 'OK' };
     }
 
-    const isSSOUser = this.usersService.isSSOUser(user.id);
+    const isSSOUser = await this.usersService.isSSOUser(user.id);
     if (isSSOUser) {
       throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
@@ -638,7 +638,7 @@ export class UsersController {
       throw new UserNotFoundException(userId);
     }
 
-    const isSSOUser = this.usersService.isSSOUser(userId);
+    const isSSOUser = await this.usersService.isSSOUser(userId);
     if (isSSOUser) {
       throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
