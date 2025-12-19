@@ -621,7 +621,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const resourcesWithUsageSession = await Promise.all(
       resources.map(async (resource) => ({
         ...resource,
-        activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id),
+        activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
       })),
     );
 

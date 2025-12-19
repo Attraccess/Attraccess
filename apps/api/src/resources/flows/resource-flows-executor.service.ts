@@ -821,7 +821,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, false, transactionManager);
 
     if (!activeUsage) {
       throw new NoUsageSessionError();
@@ -850,7 +850,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
-    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
+    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId, false);
 
     if (
       !executingUserId ||
@@ -881,7 +881,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const activeUsageSession = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+    const activeUsageSession = await this.resourceUsageService.getActiveSession(
+      node.resourceId,
+      false,
+      transactionManager,
+    );
 
     if (!activeUsageSession) {
       throw new NoUsageSessionError();

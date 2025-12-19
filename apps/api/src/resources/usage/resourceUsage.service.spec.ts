@@ -51,6 +51,7 @@ describe('ResourceUsageService', () => {
     createQueryBuilder: jest.Mock;
     getRepository: jest.Mock;
     findOne: jest.Mock;
+    update: jest.Mock;
   };
 
   const mockRepository = () => ({
@@ -234,6 +235,7 @@ describe('ResourceUsageService', () => {
         values: jest.fn().mockReturnThis(),
         execute: jest.fn().mockResolvedValue({}),
       })),
+      update: jest.fn().mockResolvedValue(undefined),
       // Ensure code paths that use getRepository(Entity).findOne work in tests
       getRepository: jest.fn((entity) => {
         if (entity === Resource) {
@@ -254,7 +256,7 @@ describe('ResourceUsageService', () => {
         }
         return null;
       }),
-    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock };
+    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock; update: jest.Mock };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {
@@ -315,23 +317,25 @@ describe('ResourceUsageService', () => {
       resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+        startTime: new Date(),
+        isFinalized: false,
+        user: { id: 1 } as User,
+        resource: { id: 1 } as Resource,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
       // Mock getActiveSession to return null (no active session)
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(null) // 1) getActiveSession
-        .mockResolvedValueOnce({
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          usageAction: ResourceUsageAction.Usage,
-          endTime: null,
-        } as ResourceUsage) // 2) fetch newly created session
-        .mockResolvedValueOnce({
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          usageAction: ResourceUsageAction.Usage,
-          endTime: null,
-        } as ResourceUsage); // 3) emitUsageEvent fetch by id
+        .mockResolvedValueOnce(createdSession) // 2) fetch newly created session
+        .mockResolvedValueOnce(finalizedSession) // 3) fetch finalized session for return
+        .mockResolvedValueOnce(finalizedSession); // 4) emitUsageEvent fetch by id
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       // Service uses transactionalEntityManager.createQueryBuilder, not repo
@@ -359,6 +363,7 @@ describe('ResourceUsageService', () => {
         startTime: expect.any(Date),
         endTime: null,
         endNotes: null,
+        isFinalized: false,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
@@ -372,6 +377,7 @@ describe('ResourceUsageService', () => {
         userId: 1,
         usageAction: ResourceUsageAction.Usage,
         endTime: null,
+        isFinalized: true,
       });
     });
 
@@ -464,15 +470,27 @@ describe('ResourceUsageService', () => {
         endTime: new Date(),
         endNotes: 'Session ended due to takeover by user 1',
       } as ResourceUsage;
-      const mockNewUsage = { id: 2, resourceId: 1, userId: 1 } as ResourceUsage;
+      const mockNewUsage = {
+        id: 2,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+        user: { id: 1 } as User,
+      } as ResourceUsage;
+      const finalizedNewUsage = { ...mockNewUsage, isFinalized: true };
 
       // Mock getActiveSession to return an active session, then mock findOne for new session
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
         .mockResolvedValueOnce(updatedEndedSession) // 2) fetch updated ended session (in-transaction)
         .mockResolvedValueOnce(mockNewUsage) // 3) fetch newly created session (in-transaction)
-        .mockResolvedValueOnce(updatedEndedSession) // 4) emitUsageEvent fetch for ended session (after commit)
-        .mockResolvedValueOnce(mockNewUsage); // 5) emitUsageEvent fetch for newly created session (after commit)
+        .mockResolvedValueOnce(finalizedNewUsage) // 4) fetch finalized new session (in-transaction)
+        .mockResolvedValueOnce(updatedEndedSession) // 5) emitUsageEvent fetch for ended session (after commit)
+        .mockResolvedValueOnce(finalizedNewUsage) // 6) emitUsageEvent fetch for newly created session (after commit)
+        .mockResolvedValueOnce(finalizedNewUsage); // 7) safeguard for any additional fetches
 
       const mockUpdateQueryBuilder = createMockQueryBuilder(null);
       const mockInsertQueryBuilder = createMockQueryBuilder(null);
@@ -484,7 +502,7 @@ describe('ResourceUsageService', () => {
 
       const result = await service.startSession(1, mockUser, dto);
 
-      expect(result).toBe(mockNewUsage);
+      expect(result).toBe(finalizedNewUsage);
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(mockUpdateQueryBuilder.set).toHaveBeenCalledWith({
         endTime: expect.any(Date),
@@ -623,10 +641,23 @@ describe('ResourceUsageService', () => {
       resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
 
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
       // Mock getActiveSession to return null (no active session)
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(null) // For getActiveSession
-        .mockResolvedValueOnce({ id: 1, resourceId: 1, userId: 1 } as ResourceUsage); // For finding new session
+        .mockResolvedValueOnce(createdSession) // For finding new session
+        .mockResolvedValueOnce(finalizedSession) // Fetch finalized session for return
+        .mockResolvedValueOnce(finalizedSession); // Emit event after commit
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
@@ -635,7 +666,7 @@ describe('ResourceUsageService', () => {
 
       const result = await service.startSession(1, mockUser, dto);
 
-      expect(result).toEqual({ id: 1, resourceId: 1, userId: 1 });
+      expect(result).toEqual(finalizedSession);
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
     });
@@ -694,15 +725,22 @@ describe('ResourceUsageService', () => {
 
       billingService.handleResourceUsageStart.mockResolvedValue(undefined);
 
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(null) // For getActiveSession
-        .mockResolvedValueOnce({
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          usageAction: ResourceUsageAction.Usage,
-          endTime: null,
-        } as ResourceUsage); // For finding new session
+        .mockResolvedValueOnce(createdSession) // For finding new session
+        .mockResolvedValueOnce(finalizedSession) // For fetching finalized session to return
+        .mockResolvedValueOnce(finalizedSession); // For emitUsageEvent
 
       const mockQueryBuilder = createMockQueryBuilder(null);
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
@@ -711,7 +749,7 @@ describe('ResourceUsageService', () => {
 
       const result = await service.startSession(1, { id: 1 } as User, dto);
 
-      expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null });
+      expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null, isFinalized: true });
       expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
@@ -723,13 +761,14 @@ describe('ResourceUsageService', () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
       resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
 
-      const result = await service.getActiveSession(1);
+      const result = await service.getActiveSession(1, true);
 
       expect(result).toBe(mockActiveSession);
       expect(resourceUsageRepository.findOne).toHaveBeenCalledWith({
         where: {
           resourceId: 1,
           endTime: IsNull(),
+          isFinalized: true,
         },
         relations: ['user', 'resource', 'billingTransaction', 'project'],
       });
@@ -738,7 +777,7 @@ describe('ResourceUsageService', () => {
     it('should return null when no active session exists', async () => {
       resourceUsageRepository.findOne.mockResolvedValue(null);
 
-      const result = await service.getActiveSession(1);
+      const result = await service.getActiveSession(1, true);
 
       expect(result).toBeNull();
     });
