@@ -13,10 +13,12 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
   INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
+  INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
+  OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
@@ -87,9 +89,19 @@ export const BillingTransactionItemCreateSchema = z.object({
   }),
 });
 
+export const ResourceActivityTrackActivityNodeDataSchema = z.object({});
+
 export const MqttMessageReceivedNodeDataSchema = z.object({
   topic: z.string().min(1, 'Topic is required'),
   serverId: MqttServerIdSchema,
+});
+
+export const InputResourceActivityNoActivityNodeDataSchema = z.object({
+  minInactivityMinutes: z
+    .number()
+    .int()
+    .positive()
+    .describe('Duration in minutes that the resource needs to be inactive before this node is triggered'),
 });
 
 export const SetPayloadNodeDataSchema = z.object({
@@ -144,6 +156,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
       return MqttMessageReceivedNodeDataSchema;
 
+    case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+      return InputResourceActivityNoActivityNodeDataSchema;
+
     case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
 
@@ -170,6 +185,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
       return ResourceUsageEndSessionNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+      return ResourceActivityTrackActivityNodeDataSchema;
 
     default: {
       const exhaustiveCheck: never = nodeType;

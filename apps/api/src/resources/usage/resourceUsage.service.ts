@@ -54,10 +54,7 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    this.logger.debug(`Checking if user ${user.id} can control resource ${resourceId}`);
-
     if (user.systemPermissions?.canManageResources) {
-      this.logger.debug(`User ${user.id} has system permissions to manage resources`);
       return true;
     }
 
@@ -352,6 +349,7 @@ export class ResourceUsageService {
         );
       }
 
+      this.flowExecutorService.trackResourceActivity(createdSession.resourceId);
       await transactionalEntityManager.update(ResourceUsage, createdSession.id, { isFinalized: true });
       return await transactionalEntityManager.findOne(ResourceUsage, {
         where: { id: createdSession.id },
@@ -376,7 +374,12 @@ export class ResourceUsageService {
     return newSession;
   }
 
-  async endSession(resourceId: number, user: User, dto: EndUsageSessionDto): Promise<ResourceUsage> {
+  async endSession(
+    resourceId: number,
+    user: User,
+    dto: EndUsageSessionDto,
+    skipFormSubmissions = false,
+  ): Promise<ResourceUsage> {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session
@@ -418,7 +421,7 @@ export class ResourceUsageService {
         endNotes,
       };
 
-      if (activeSession.resource?.type === ResourceType.Machine) {
+      if (!skipFormSubmissions && activeSession.resource?.type === ResourceType.Machine) {
         formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
           resourceId,
           action: ResourceFormAction.END,
