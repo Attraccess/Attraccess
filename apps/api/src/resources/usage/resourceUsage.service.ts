@@ -219,7 +219,7 @@ export class ResourceUsageService {
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, undefined, transactionalEntityManager);
+      const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -546,7 +546,7 @@ export class ResourceUsageService {
 
   async getActiveSession(
     resourceId: number,
-    isFinalized: boolean | undefined,
+    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -557,7 +557,7 @@ export class ResourceUsageService {
       where: {
         resourceId,
         endTime: IsNull(),
-        isFinalized: isFinalized ? true : undefined,
+        isFinalized: onlyFinalized ? true : undefined,
       },
       relations: ['user', 'resource', 'billingTransaction', 'project'],
     });
