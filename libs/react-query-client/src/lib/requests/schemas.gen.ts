@@ -1474,9 +1474,13 @@ export const $ResourceUsage = {
             items: {
                 '$ref': '#/components/schemas/FormSubmission'
             }
+        },
+        isFinalized: {
+            type: 'boolean',
+            description: 'Whether the resource usage is finalized'
         }
     },
-    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes', 'formSubmissions']
+    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes', 'formSubmissions', 'isFinalized']
 } as const;
 
 export const $FormSubmission = {
@@ -2953,7 +2957,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
     description: 'The name of the node type'
 } as const;
 

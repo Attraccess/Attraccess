@@ -978,6 +978,10 @@ export type ResourceUsage = {
      * The form submissions that belong to this resource usage
      */
     formSubmissions: Array<FormSubmission>;
+    /**
+     * Whether the resource usage is finalized
+     */
+    isFinalized: boolean;
 };
 
 export type FormSubmission = {
@@ -1940,10 +1944,12 @@ export enum ResourceFlowNodeType {
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
     INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
+    INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
+    OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
     PROCESSING_WAIT = 'processing.wait',
     PROCESSING_IF = 'processing.if',
     PROCESSING_SET_PAYLOAD = 'processing.set-payload',

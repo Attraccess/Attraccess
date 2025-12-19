@@ -53,6 +53,23 @@
             }
           }
         },
+        "activity": {
+          "no-activity": {
+            "title": "Ressource ist inaktiv",
+            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
+            "outputs": {
+              "output": "Ausgabe"
+            },
+            "preview": {
+              "minInactivityMinutes": "Mindestinaktivität (Minuten)"
+            },
+            "config": {
+              "minInactivityMinutes": {
+                "label": "Mindestinaktivität (Minuten)"
+              }
+            }
+          }
+        },
         "door": {
           "locked": {
             "title": "Tür verriegelt",
@@ -356,6 +373,15 @@
                   "label": "Externe Referenz"
                 }
               }
+            }
+          }
+        },
+        "activity": {
+          "track-activity": {
+            "title": "Ressource war aktiv",
+            "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+            "outputs": {
+              "output": "Ausgabe"
             }
           }
         }

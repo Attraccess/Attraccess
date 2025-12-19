@@ -36,6 +36,14 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         return [];
 
+      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+        return [
+          {
+            label: t('nodes.input.resource.activity.no-activity.preview.minInactivityMinutes'),
+            value: nodeData?.data.minInactivityMinutes as string,
+          },
+        ];
+
       case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
         return [
           {
@@ -129,6 +137,9 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
             value: nodeData?.data.notes as string,
           },
         ];
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+        return [];
 
       default: {
         const exhaustiveCheck: never = schema.type;
