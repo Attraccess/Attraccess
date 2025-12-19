@@ -52,6 +52,23 @@
             }
           }
         },
+        "activity": {
+          "no-activity": {
+            "title": "Resource is inactive",
+            "description": "This node is triggered when a resource is inactive for a certain time.",
+            "outputs": {
+              "output": "Output"
+            },
+            "preview": {
+              "minInactivityMinutes": "Minimum inactivity (minutes)"
+            },
+            "config": {
+              "minInactivityMinutes": {
+                "label": "Minimum inactivity (minutes)"
+              }
+            }
+          }
+        },
         "door": {
           "locked": {
             "title": "Door locked",
@@ -341,6 +358,16 @@
                   "label": "External reference"
                 }
               }
+            }
+          }
+        },
+
+        "activity": {
+          "track-activity": {
+            "title": "Resource was active",
+            "description": "Use this node to indicate that the resource was active.",
+            "outputs": {
+              "output": "Output"
             }
           }
         }

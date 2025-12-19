@@ -1,7 +1,7 @@
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -61,6 +61,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     initialNodes = [];
     edgesBySourceAndHandle = {};
 
+    const defaultQueryBuilder = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      distinct: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    } as unknown as SelectQueryBuilder<ResourceFlowNode>;
+
     flowNodeRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
@@ -71,6 +78,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       findOne: jest.fn(async ({ where }: any) => {
         return nodesById[where.id] ?? null;
       }),
+      createQueryBuilder: jest.fn(() => defaultQueryBuilder),
     };
 
     flowEdgeRepository = {
@@ -293,6 +301,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       {
         notes: 'Ended by bob',
       },
+      true,
     );
   });
 
@@ -310,6 +319,66 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toBeInstanceOf(
       NoUsageSessionError,
     );
+  });
+
+  it('updates resource activity when track-activity node executes and passes payload through', async () => {
+    const resourceId = 5;
+    const inputNode = createNode({ id: 'in-activity', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+    const trackNode = createNode({
+      id: 'track-activity',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY,
+      resourceId,
+    });
+    nodesById[inputNode.id] = inputNode;
+    nodesById[trackNode.id] = trackNode;
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: trackNode.id }];
+    edgesBySourceAndHandle[`${trackNode.id}|`] = [];
+
+    const payload = { foo: 'bar' };
+
+    const resourceActivity = (service as unknown as { resourceActivity: Map<number, Date> }).resourceActivity;
+
+    expect(resourceActivity.get(resourceId)).toBeUndefined();
+
+    const result = await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, payload);
+
+    expect(result).toEqual([payload]);
+    const lastActivity = resourceActivity.get(resourceId);
+    expect(lastActivity).toBeInstanceOf(Date);
+  });
+
+  it('triggers inactivity flow when resource exceeds configured inactivity minutes', async () => {
+    const resourceId = 9;
+    const inactivityNode = createNode({
+      id: 'inactive-1',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY,
+      resourceId,
+      data: { minInactivityMinutes: 5 },
+    });
+
+    const qb = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      distinct: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([inactivityNode]),
+    } as unknown as SelectQueryBuilder<ResourceFlowNode>;
+    const flowNodeRepoWithQueryBuilder = flowNodeRepository as { createQueryBuilder: jest.Mock };
+    flowNodeRepoWithQueryBuilder.createQueryBuilder = jest.fn(() => qb);
+
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const resourceActivity = (service as unknown as { resourceActivity: Map<number, Date> }).resourceActivity;
+    resourceActivity.set(resourceId, tenMinutesAgo);
+
+    const serviceWithStartFlow = service as unknown as { startFlow: jest.Mock };
+    const startFlowSpy = jest.spyOn(serviceWithStartFlow, 'startFlow').mockResolvedValue([]);
+
+    await service.checkResourceActivity();
+
+    expect(startFlowSpy).toHaveBeenCalledWith(inactivityNode, { payload: {} });
+    const updatedActivity = resourceActivity.get(resourceId) as Date;
+    expect(updatedActivity).toBeInstanceOf(Date);
+    expect(updatedActivity.getTime()).toBeGreaterThan(tenMinutesAgo.getTime());
   });
 });
 
