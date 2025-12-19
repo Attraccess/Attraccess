@@ -45,7 +45,7 @@ describe('ResourceUsageService', () => {
   let eventEmitter: jest.Mocked<EventEmitter2>;
   let billingService: jest.Mocked<BillingService>;
   let projectsService: jest.Mocked<ProjectsService>;
-  let flowExecutorService: { runFlow: jest.Mock };
+  let flowExecutorService: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
   // Expose transactional entity manager for assertions
   let transactionalEntityManager: {
     createQueryBuilder: jest.Mock;
@@ -201,6 +201,7 @@ describe('ResourceUsageService', () => {
           provide: require('../flows/resource-flows-executor.service').ResourceFlowsExecutorService,
           useValue: {
             runFlow: jest.fn().mockResolvedValue([]),
+            trackResourceActivity: jest.fn(),
           },
         },
         {
@@ -222,7 +223,10 @@ describe('ResourceUsageService', () => {
     eventEmitter = module.get(EventEmitter2);
     billingService = module.get(BillingService);
     projectsService = module.get(ProjectsService);
-    flowExecutorService = module.get(ResourceFlowsExecutorService) as unknown as { runFlow: jest.Mock };
+    flowExecutorService = module.get(ResourceFlowsExecutorService) as unknown as {
+      runFlow: jest.Mock;
+      trackResourceActivity: jest.Mock;
+    };
 
     // Provide transaction-capable manager on the repository
     transactionalEntityManager = {
@@ -379,6 +383,8 @@ describe('ResourceUsageService', () => {
         endTime: null,
         isFinalized: true,
       });
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -544,6 +550,8 @@ describe('ResourceUsageService', () => {
         (c) => c[0]?.id,
       );
       expect(chargedIds).not.toContain(mockNewUsage.id);
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
     });
 
     it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {
@@ -605,6 +613,8 @@ describe('ResourceUsageService', () => {
         (c) => c[0]?.id,
       );
       expect(chargedIds).not.toContain(mockNewUsage.id);
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
     });
 
     it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
@@ -669,6 +679,7 @@ describe('ResourceUsageService', () => {
       expect(result).toEqual(finalizedSession);
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
     });
 
     it('should reject start when billing is enabled and balance is insufficient', async () => {
@@ -753,6 +764,7 @@ describe('ResourceUsageService', () => {
       expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
     });
   });
 

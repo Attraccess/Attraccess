@@ -14,10 +14,15 @@
   "passwordLabel": "Password (Optional)",
   "passwordPlaceholder": "••••••••",
   "useTls": "Use TLS/SSL",
-  "defaultPublishQosLabel": "Default publish QoS (0-2)",
+  "defaultPublishQosLabel": "Default publish QoS",
   "defaultPublishRetainLabel": "Retain published messages by default",
-  "defaultSubscribeQosLabel": "Default subscription QoS (0-2)",
+  "defaultSubscribeQosLabel": "Default subscription QoS",
   "qosPlaceholder": "0, 1 or 2",
+  "qosOption": {
+    "0": "0 - At most once (fire and forget)",
+    "1": "1 - At least once (acknowledged)",
+    "2": "2 - Exactly once (two-phase handshake)"
+  },
   "cancel": "Cancel",
   "update": "Update Server",
   "serverUpdated": "MQTT Server Updated",
@@ -25,4 +30,4 @@
   "errorGeneric": "Error",
   "errorLoading": "Error loading MQTT server details.",
   "failedToUpdate": "Failed to update MQTT server."
-} 
+}
