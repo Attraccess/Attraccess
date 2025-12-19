@@ -1,6 +1,4 @@
 import { useState, useCallback } from 'react';
-import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
-import { PlayIcon, ChevronDownIcon, LockIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
@@ -24,9 +22,10 @@ import { getTranslationKeyForApiError } from '../../../../../utils/apiError';
 import { InsufficientBalanceModal } from './insufficientBalanceModal';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { ResourceFormAction } from '../../../details/forms/types';
+import { DoorControls } from './DoorControls';
+import { MachineStartControls } from './MachineStartControls';
 
 interface StartSessionControlsProps {
   resourceId: number;
@@ -130,40 +129,32 @@ export function StartSessionControls(
     [t, toast, resource, tExists],
   );
 
-  const startSession = useResourcesServiceResourceUsageStartSession({
-    onSuccess: () => {
-      onStartSuccess();
-    },
-    onError: (err) => {
-      onStartError(err as ApiError);
-    },
-  });
-  const startIsPending = startSession.isPending;
+  const { mutate: startUsageSessionMutate, isPending: startUsageSessionIsPending } =
+    useResourcesServiceResourceUsageStartSession({
+      onSuccess: onStartSuccess,
+      onError: (error) => {
+        onStartError(error as ApiError);
+      },
+    });
 
-  const { mutate: unlockDoor, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
-    onSuccess: () => {
-      onStartSuccess();
-    },
-    onError: (err) => {
-      onStartError(err as ApiError);
+  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
     },
   });
 
-  const { mutate: lockDoor, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
-    onSuccess: () => {
-      onStartSuccess();
-    },
-    onError: (err) => {
-      onStartError(err as ApiError);
+  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
     },
   });
 
-  const { mutate: unlatchDoor, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
-    onSuccess: () => {
-      onStartSuccess();
-    },
-    onError: (err) => {
-      onStartError(err as ApiError);
+  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
+    onSuccess: onStartSuccess,
+    onError: (error) => {
+      onStartError(error as ApiError);
     },
   });
 
@@ -183,7 +174,9 @@ export function StartSessionControls(
     const rawMessage = (error.body as { message?: string | string[] })?.message ?? error.message;
     const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
 
-    return typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit');
+    return (
+      typeof message === 'string' && message.toLowerCase().includes('form') && message.toLowerCase().includes('submit')
+    );
   }, []);
 
   const gatherFormSubmissions = useCallback(
@@ -200,33 +193,33 @@ export function StartSessionControls(
     [requestForms],
   );
 
-  const executeStartMutation = useCallback(
-    async (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
-      try {
-        await startSession.mutateAsync({
-          resourceId,
-          requestBody,
-        });
-      } catch (error) {
-        if (!isFormsMissingError(error)) {
-          throw error;
-        }
+  const submitStartSessionWithRetry = useCallback(
+    (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
+      startUsageSessionMutate(
+        { resourceId, requestBody },
+        {
+          onError: async (error) => {
+            if (!isFormsMissingError(error)) {
+              return;
+            }
 
-        const retrySubmissions = await gatherFormSubmissions(action);
-        if (!retrySubmissions) {
-          return;
-        }
+            const retrySubmissions = await gatherFormSubmissions(action);
+            if (!retrySubmissions) {
+              return;
+            }
 
-        await startSession.mutateAsync({
-          resourceId,
-          requestBody: {
-            ...requestBody,
-            formSubmissions: retrySubmissions,
+            startUsageSessionMutate({
+              resourceId,
+              requestBody: {
+                ...requestBody,
+                formSubmissions: retrySubmissions,
+              },
+            });
           },
-        });
-      }
+        },
+      );
     },
-    [gatherFormSubmissions, isFormsMissingError, resourceId, startSession],
+    [gatherFormSubmissions, isFormsMissingError, resourceId, startUsageSessionMutate],
   );
 
   const handleStartSession = useCallback(
@@ -237,90 +230,47 @@ export function StartSessionControls(
         return;
       }
 
-      await executeStartMutation(action, {
+      submitStartSessionWithRetry(action, {
         ...(opts ?? {}),
         projectId: selectedProjectId,
         formSubmissions,
       });
     },
-    [executeStartMutation, gatherFormSubmissions, selectedProjectId],
+    [gatherFormSubmissions, selectedProjectId, submitStartSessionWithRetry],
   );
 
   const handleOpenStartSessionModal = () => {
     setIsNotesModalOpen(true);
   };
 
+  const handleLockDoor = useCallback(() => lockDoorMutate({ resourceId }), [lockDoorMutate, resourceId]);
+  const handleUnlockDoor = useCallback(() => unlockDoorMutate({ resourceId }), [resourceId, unlockDoorMutate]);
+  const handleUnlatchDoor = useCallback(() => unlatchDoorMutate({ resourceId }), [resourceId, unlatchDoorMutate]);
+
   return (
     <div {...divProps}>
       <div className="space-y-4">
         {resource?.type === 'door' && (
-          <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
-            <Button
-              className="flex-1"
-              isLoading={lockDoorIsPending}
-              startContent={<LockIcon className="w-4 h-4" />}
-              onPress={() => lockDoor({ resourceId })}
-              color="danger"
-            >
-              {t('door.lock')}
-            </Button>
-            <Button
-              className="flex-1"
-              isLoading={unlockDoorIsPending}
-              startContent={<LockIcon className="w-4 h-4" />}
-              onPress={() => unlockDoor({ resourceId })}
-              color="primary"
-            >
-              {t('door.unlock')}
-            </Button>
-            {resource.separateUnlockAndUnlatch && (
-              <Button
-                className="flex-1"
-                isLoading={unlatchDoorIsPending}
-                startContent={<LockIcon className="w-4 h-4" />}
-                onPress={() => unlatchDoor({ resourceId })}
-                color="secondary"
-              >
-                {t('door.unlatch')}
-              </Button>
-            )}
-          </div>
+          <DoorControls
+            t={t}
+            onLock={handleLockDoor}
+            onUnlock={handleUnlockDoor}
+            onUnlatch={resource.separateUnlockAndUnlatch ? handleUnlatchDoor : undefined}
+            lockIsPending={lockDoorIsPending}
+            unlockIsPending={unlockDoorIsPending}
+            unlatchIsPending={unlatchDoorIsPending}
+            separateUnlockAndUnlatch={resource.separateUnlockAndUnlatch}
+          />
         )}
         {resource?.type === 'machine' && (
-          <>
-            <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
-            <ProjectsSelect
-              value={selectedProjectId}
-              onValueChange={setSelectedProjectId}
-              label={t('machine.project.label')}
-              placeholder={t('machine.project.placeholder')}
-            />
-            <ButtonGroup fullWidth color="primary">
-              <Button
-                isLoading={startIsPending}
-                startContent={<PlayIcon className="w-4 h-4" />}
-                onPress={() => void handleStartSession()}
-              >
-                {t('machine.startSession')}
-              </Button>
-              <Dropdown placement="bottom-end">
-                <DropdownTrigger>
-                  <Button isIconOnly>
-                    <ChevronDownIcon />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu disallowEmptySelection aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
-                  <DropdownItem
-                    key="startWithNotes"
-                    description={t('machine.alternativeStartSessionOptionsMenu.startWithNotes.description')}
-                    onPress={handleOpenStartSessionModal}
-                  >
-                    {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
-                  </DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </ButtonGroup>
-          </>
+          <MachineStartControls
+            t={t}
+            selectedProjectId={selectedProjectId}
+            onProjectChange={setSelectedProjectId}
+            onStart={() => void handleStartSession()}
+            onStartWithNotes={handleOpenStartSessionModal}
+            isStarting={startUsageSessionIsPending}
+          />
         )}
       </div>
 
@@ -329,7 +279,7 @@ export function StartSessionControls(
         onClose={() => setIsNotesModalOpen(false)}
         onConfirm={(notes) => void handleStartSession({ notes, forceTakeOver: false })}
         mode={SessionModalMode.START}
-        isSubmitting={startIsPending}
+        isSubmitting={startUsageSessionIsPending}
       />
 
       <InsufficientBalanceModal

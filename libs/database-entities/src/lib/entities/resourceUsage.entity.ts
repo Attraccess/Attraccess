@@ -144,4 +144,8 @@ export class ResourceUsage {
     isArray: true,
   })
   formSubmissions!: FormSubmission[];
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({ description: 'Whether the resource usage is finalized' })
+  isFinalized!: boolean;
 }

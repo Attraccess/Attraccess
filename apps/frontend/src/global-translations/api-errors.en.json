@@ -4,7 +4,7 @@
     "description": "An error occurred. Please try again."
   },
   "FLOW_EXECUTION_ERROR": {
-    "title": "Failed to end all sessions. Some sessions may still be active.",
+    "title": "Error during execution",
     "description": "{{error}}"
   },
   "ResourceInUseError": {
