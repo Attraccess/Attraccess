@@ -82,3 +82,4 @@ export * from './1764503783778-delete-revoked-token-table';
 export * from './1765137500352-sso-email-auto-verified';
 export * from './1765143247814-cleanup-usernames';
 export * from './1765925113481-improved-sso-linking';
+export * from './1766141166000-resource-usage-session-finalization';

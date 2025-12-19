@@ -219,7 +219,7 @@ export class ResourceUsageService {
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
+      const existingActiveSession = await this.getActiveSession(resourceId, undefined, transactionalEntityManager);
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -271,6 +271,7 @@ export class ResourceUsageService {
         startNotes: dto.notes,
         endTime: null,
         endNotes: null,
+        isFinalized: false,
       };
 
       if (dto.projectId !== undefined) {
@@ -351,8 +352,11 @@ export class ResourceUsageService {
         );
       }
 
-      // Return the created session to the caller; events will be emitted after commit
-      return createdSession;
+      await transactionalEntityManager.update(ResourceUsage, createdSession.id, { isFinalized: true });
+      return await transactionalEntityManager.findOne(ResourceUsage, {
+        where: { id: createdSession.id },
+        relations: ['resource', 'user', 'project'],
+      });
     });
 
     // Emit events after the transaction committed to ensure readers can observe DB state
@@ -376,7 +380,7 @@ export class ResourceUsageService {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session
-    const activeSession = await this.getActiveSession(resourceId);
+    const activeSession = await this.getActiveSession(resourceId, true);
     if (!activeSession) {
       throw new BadRequestException('No active session found');
     }
@@ -542,6 +546,7 @@ export class ResourceUsageService {
 
   async getActiveSession(
     resourceId: number,
+    isFinalized: boolean | undefined,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -552,6 +557,7 @@ export class ResourceUsageService {
       where: {
         resourceId,
         endTime: IsNull(),
+        isFinalized: isFinalized ? true : undefined,
       },
       relations: ['user', 'resource', 'billingTransaction', 'project'],
     });
