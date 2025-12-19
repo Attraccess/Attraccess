@@ -892,10 +892,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
         const { minInactivityMinutes } = parsedData.data;
 
-        if (!minInactivityMinutes || isNaN(minInactivityMinutes)) {
-          return;
-        }
-
         const lastActivity = this.resourceActivity.get(node.resourceId);
         if (!lastActivity) {
           this.resourceActivity.set(node.resourceId, now);
