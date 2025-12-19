@@ -6,6 +6,7 @@ import {
   Card,
   CardBody,
   CardFooter,
+  Chip,
   Input,
   Pagination,
   Table,
@@ -14,8 +15,17 @@ import {
   TableColumn,
   TableHeader,
   TableRow,
+  Tooltip,
 } from '@heroui/react';
-import { Users, ShieldOffIcon, ShieldCheckIcon, Settings2Icon, UserPlusIcon } from 'lucide-react';
+import {
+  Users,
+  ShieldOffIcon,
+  ShieldCheckIcon,
+  Settings2Icon,
+  UserPlusIcon,
+  WrenchIcon,
+  CreditCardIcon,
+} from 'lucide-react';
 import { useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
@@ -102,6 +112,7 @@ export const UserManagementPage: React.FC = () => {
               <TableColumn width="1">{t('table.columns.id')}</TableColumn>
               <TableColumn>{t('table.columns.username')}</TableColumn>
               <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
+              <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
             </TableHeader>
 
             <TableBody
@@ -120,6 +131,56 @@ export const UserManagementPage: React.FC = () => {
                     <AttraccessUser user={user} />
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {[
+                        {
+                          key: 'canManageResources',
+                          enabled: user.systemPermissions?.canManageResources,
+                          label: t('table.columns.canManageResources'),
+                          icon: <WrenchIcon className="w-3.5 h-3.5" />,
+                        },
+                        {
+                          key: 'canManageSystemConfiguration',
+                          enabled: user.systemPermissions?.canManageSystemConfiguration,
+                          label: t('table.columns.canManageSystemConfiguration'),
+                          icon: <Settings2Icon className="w-3.5 h-3.5" />,
+                        },
+                        {
+                          key: 'canManageUsers',
+                          enabled: user.systemPermissions?.canManageUsers,
+                          label: t('table.columns.canManageUsers'),
+                          icon: <Users className="w-3.5 h-3.5" />,
+                        },
+                        {
+                          key: 'canManageBilling',
+                          enabled: user.systemPermissions?.canManageBilling,
+                          label: t('table.columns.canManageBilling'),
+                          icon: <CreditCardIcon className="w-3.5 h-3.5" />,
+                        },
+                      ]
+                        .filter((permission) => permission.enabled)
+                        .map((permission) => (
+                          <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
+                            <Chip
+                              size="sm"
+                              variant="flat"
+                              color="primary"
+                              className="min-w-0 px-2"
+                              data-cy={`user-permission-chip-${permission.key}`}
+                            >
+                              {permission.icon}
+                            </Chip>
+                          </Tooltip>
+                        ))}
+                      {![
+                        user.systemPermissions?.canManageResources,
+                        user.systemPermissions?.canManageSystemConfiguration,
+                        user.systemPermissions?.canManageUsers,
+                        user.systemPermissions?.canManageBilling,
+                      ].some(Boolean) && <span className="text-default-400 text-sm">{t('table.noPermissions')}</span>}
+                    </div>
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
