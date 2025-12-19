@@ -10,7 +10,8 @@
     },
     "unsupportedForResourceType": "von dieser Ressource nicht unterstützt",
     "genericConfig": {
-      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}"
+      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}",
+      "createMqttServer": "MQTT-Server erstellen"
     },
     "input": {
       "button": {
@@ -148,7 +149,14 @@
             "serverId": { "label": "Server" },
             "topic": { "label": "Thema (unterstützt + und #)" },
             "timeoutSeconds": { "label": "Timeout (Sekunden)" },
-            "subscribeQos": { "label": "QoS (effektiv ist min(publish, subscribe))" }
+            "subscribeQos": {
+              "label": "QoS (effektiv ist min(publish, subscribe))",
+              "enum": {
+                "0": "0 - Höchstens einmal (Fire-and-Forget)",
+                "1": "1 - Mindestens einmal (Bestätigung)",
+                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            }
           }
         }
       },
@@ -293,7 +301,14 @@
             "payload": {
               "label": "Nutzlast"
             },
-            "qos": { "label": "QoS" },
+            "qos": {
+              "label": "QoS",
+              "enum": {
+                "0": "0 - Höchstens einmal (Fire-and-Forget)",
+                "1": "1 - Mindestens einmal (Bestätigung)",
+                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            },
             "retain": { "label": "Nachricht behalten (retain)" }
           }
         }
