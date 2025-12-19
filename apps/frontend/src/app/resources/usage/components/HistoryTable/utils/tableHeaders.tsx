@@ -16,7 +16,7 @@ export function generateHeaderColumns(
 
   // Only show user column if we're showing all users (requires canManageResources)
   if (canManageResources && showAllUsers) {
-    headers.push(<TableColumn key="user">{t('user')}</TableColumn>);
+    headers.push(<TableColumn key="user">{t('headers.user')}</TableColumn>);
   }
 
   if (resource.type === 'machine') {
