@@ -13,6 +13,11 @@
   "actions": {
     "topUp": "Topup {{amount}} {{currency}}"
   },
+  "loading": "Loading...",
+  "unavailable": {
+    "title": "Top-up unavailable",
+    "description": "Card-based top-ups are not available right now. Please contact an administrator."
+  },
   "topUpInstructions": {
     "title": "How to continue?",
     "description": "After clicking \"Topup\", please go to the card reader and follow the instructions on the screen of the reader. \nOnce the transaction is complete, it may take up to 60 seconds \nuntil the balance appears on your account. \nYou can check the current status in the transaction history."
