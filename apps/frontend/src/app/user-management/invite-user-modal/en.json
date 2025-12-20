@@ -1,5 +1,9 @@
 {
   "title": "Invite User",
+  "tabs": {
+    "single": "Single",
+    "csv": "CSV import"
+  },
   "inputs": {
     "username": {
       "label": "Username"

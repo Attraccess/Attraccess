@@ -380,6 +380,9 @@
           "track-activity": {
             "title": "Ressource war aktiv",
             "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+            "inputs": {
+              "input": "Eingabe"
+            },
             "outputs": {
               "output": "Ausgabe"
             }
