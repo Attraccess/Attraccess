@@ -381,6 +381,9 @@
           "track-activity": {
             "title": "Resource was active",
             "description": "Use this node to indicate that the resource was active.",
+            "inputs": {
+              "input": "Input"
+            },
             "outputs": {
               "output": "Output"
             }
