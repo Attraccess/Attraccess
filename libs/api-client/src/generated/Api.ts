@@ -29,10 +29,12 @@ export enum ResourceFlowNodeType {
   InputResourceDoorLocked = "input.resource.door.locked",
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
+  InputResourceActivityNoActivity = "input.resource.activity.no-activity",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
   OutputResourceUsageEndSession = "output.resource.usage.end-session",
+  OutputResourceActivityTrackActivity = "output.resource.activity.track-activity",
   ProcessingWait = "processing.wait",
   ProcessingIf = "processing.if",
   ProcessingSetPayload = "processing.set-payload",
@@ -1066,6 +1068,8 @@ export interface ResourceUsage {
   project?: Project;
   /** The form submissions that belong to this resource usage */
   formSubmissions: FormSubmission[];
+  /** Whether the resource usage is finalized */
+  isFinalized: boolean;
 }
 
 export interface FormSubmission {
