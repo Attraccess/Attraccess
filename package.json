@@ -138,7 +138,7 @@
     "@nx/plugin": "21.1.2",
     "@nx/react": "21.1.2",
     "@nx/rollup": "21.1.2",
-    "@nx/vite": "21.1.2",
+    "@nx/vite": "22.3.3",
     "@nx/web": "21.1.2",
     "@nx/webpack": "21.1.2",
     "@nx/workspace": "21.1.2",
