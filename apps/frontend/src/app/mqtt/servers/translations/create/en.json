@@ -14,14 +14,19 @@
   "passwordLabel": "Password (Optional)",
   "passwordPlaceholder": "••••••••",
   "useTls": "Use TLS/SSL",
-  "defaultPublishQosLabel": "Default publish QoS (0-2)",
+  "defaultPublishQosLabel": "Default publish QoS",
   "defaultPublishRetainLabel": "Retain published messages by default",
-  "defaultSubscribeQosLabel": "Default subscription QoS (0-2)",
+  "defaultSubscribeQosLabel": "Default subscription QoS",
   "qosPlaceholder": "0, 1 or 2",
+  "qosOption": {
+    "0": "0 - At most once (fire and forget)",
+    "1": "1 - At least once (acknowledged)",
+    "2": "2 - Exactly once (two-phase handshake)"
+  },
   "cancel": "Cancel",
   "create": "Create Server",
   "serverCreated": "MQTT Server Created",
   "serverCreatedDesc": "A new MQTT server has been successfully created.",
   "errorGeneric": "Error",
   "failedToCreate": "Failed to create MQTT server."
-} 
+}

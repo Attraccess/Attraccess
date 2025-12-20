@@ -3,8 +3,8 @@ import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
-import { NotFoundException } from '@nestjs/common';
+import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
@@ -15,12 +15,14 @@ import type { Response } from 'express';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { LicenseService } from '../../../license/license.service';
+import { SSOLinkTokenService } from './link-token.service';
 
 describe('SsoController', () => {
   let controller: SSOController;
   let ssoService: SSOService;
   let module: TestingModule;
   let cookieConfigService: CookieConfigService;
+  let linkTokenService: SSOLinkTokenService;
 
   const mockSSOProvider: SSOProvider = {
     id: 1,
@@ -48,7 +50,13 @@ describe('SsoController', () => {
       providers: [
         {
           provide: AuthService,
-          useValue: {},
+          useValue: {
+            userHasSSOAuthentication: jest.fn(),
+            validateAuthenticationDetails: jest.fn(),
+            findUserIdBySSO: jest.fn(),
+            addAuthenticationDetails: jest.fn(),
+            removeAuthenticationDetails: jest.fn(),
+          },
         },
         {
           provide: SessionService,
@@ -69,7 +77,10 @@ describe('SsoController', () => {
         },
         {
           provide: UsersService,
-          useValue: {},
+          useValue: {
+            findOne: jest.fn(),
+            updateOne: jest.fn(),
+          },
         },
         {
           provide: CookieConfigService,
@@ -122,6 +133,13 @@ describe('SsoController', () => {
             }),
           },
         },
+        {
+          provide: SSOLinkTokenService,
+          useValue: {
+            verify: jest.fn(),
+            issue: jest.fn(),
+          },
+        },
         SSOOIDCGuard,
       ],
       controllers: [SSOController],
@@ -130,6 +148,7 @@ describe('SsoController', () => {
     controller = module.get<SSOController>(SSOController);
     ssoService = module.get<SSOService>(SSOService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
+    linkTokenService = module.get<SSOLinkTokenService>(SSOLinkTokenService);
   });
 
   it('should be defined', () => {
@@ -200,6 +219,101 @@ describe('SsoController', () => {
     });
   });
 
+  describe('linkUserToExternalAccount', () => {
+    const linkPayload = {
+      email: 'user@example.com',
+      providerId: 1,
+      providerType: SSOProviderType.OIDC,
+      ssoSubject: 'sub-123',
+      iat: Date.now(),
+      exp: Date.now() + 600000,
+    };
+
+    const baseUser = {
+      id: 42,
+      authenticationDetails: [
+        {
+          id: 10,
+          type: AuthenticationType.LOCAL_PASSWORD,
+        } as AuthenticationDetail,
+      ],
+    };
+
+    function setupLinkMocks({
+      hasSSO = false,
+      passwordOk = true,
+      ssoSubjectExistsForOtherUser = false,
+      hasLocalPassword = true,
+    } = {}) {
+      const authService = module.get<AuthService>(AuthService);
+      const usersService = module.get<UsersService>(UsersService);
+
+      (linkTokenService.verify as jest.Mock).mockResolvedValue(linkPayload);
+      (authService.userHasSSOAuthentication as jest.Mock | undefined)?.mockResolvedValue(hasSSO);
+      (authService.validateAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(passwordOk);
+      (authService.findUserIdBySSO as jest.Mock | undefined)?.mockResolvedValue(
+        ssoSubjectExistsForOtherUser ? 999 : null,
+      );
+      (authService.addAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(undefined);
+      (authService.removeAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(undefined);
+      (usersService.updateOne as jest.Mock | undefined)?.mockResolvedValue(undefined);
+
+      const user = {
+        ...baseUser,
+        authenticationDetails: hasLocalPassword ? baseUser.authenticationDetails : [],
+      };
+      (usersService.findOne as jest.Mock | undefined)?.mockResolvedValue(user);
+
+      return { authService, usersService };
+    }
+
+    it('links when password is valid, no prior SSO, and removes local password', async () => {
+      const { authService, usersService } = setupLinkMocks();
+
+      const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+
+      expect(result).toEqual({ OK: true });
+      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(baseUser.id, {
+        type: AuthenticationType.SSO,
+        details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'sub-123' },
+      });
+      expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
+      expect(usersService.updateOne).toHaveBeenCalledWith(baseUser.id, { externalIdentifier: null });
+    });
+
+    it('rejects when user already has SSO binding', async () => {
+      setupLinkMocks({ hasSSO: true });
+
+      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects when no local password is present', async () => {
+      setupLinkMocks({ hasLocalPassword: false });
+
+      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects when password verification fails', async () => {
+      setupLinkMocks({ passwordOk: false });
+
+      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('rejects when SSO subject is already linked to another user', async () => {
+      setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
+
+      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
   describe('oidcLoginCallback', () => {
     let mockRequest: {
       user: { id: number; username: string; email: string };
@@ -233,7 +347,7 @@ describe('SsoController', () => {
       const result = await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
-        mockResponse as unknown as Response
+        mockResponse as unknown as Response,
       );
 
       expect(sessionService.createSession).toHaveBeenCalledWith(mockRequest.user, {
@@ -257,7 +371,7 @@ describe('SsoController', () => {
       const result = await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         undefined,
-        mockResponse as unknown as Response
+        mockResponse as unknown as Response,
       );
 
       expect(sessionService.createSession).toHaveBeenCalledWith(mockRequest.user, {
@@ -279,12 +393,12 @@ describe('SsoController', () => {
       await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
-        mockResponse as unknown as Response
+        mockResponse as unknown as Response,
       );
 
       expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user)))
+        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user))),
       );
     });
 
@@ -298,12 +412,12 @@ describe('SsoController', () => {
       await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
         redirectTo,
-        mockResponse as unknown as Response
+        mockResponse as unknown as Response,
       );
 
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user)))
+        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user))),
       );
     });
   });

@@ -9,5 +9,13 @@
   },
   "actions": {
     "link": "Konto verknüpfen"
+  },
+  "errors": {
+    "passwordRequired": "Zum Verknüpfen wird ein Passwort benötigt. Bitte melde dich zuerst lokal an.",
+    "alreadyLinked": "Dieses Konto ist bereits mit SSO verknüpft.",
+    "subjectTaken": "Diese SSO-Identität ist bereits mit einem anderen Konto verknüpft.",
+    "invalidToken": "Diese Verknüpfung ist nicht mehr gültig. Bitte starte den SSO-Login erneut.",
+    "invalidPassword": "Ungültiges Passwort. Bitte erneut versuchen.",
+    "unknown": "Verknüpfung fehlgeschlagen. Bitte erneut versuchen oder Support kontaktieren."
   }
 }

@@ -12,6 +12,10 @@ import {
   ParseIntPipe,
   Logger,
   Patch,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
@@ -26,7 +30,7 @@ import {
   Setting,
   AuthenticationType,
 } from '@attraccess/database-entities';
-import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
@@ -44,6 +48,19 @@ import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.e
 import { BooleanDto } from '../../types/boolean.dto';
 import { InviteUserDto } from './dtos/inviteUser.dto';
 import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  CsvInviteConfigDto,
+  CsvInviteErrorResponseDto,
+  CsvInviteRowErrorDto,
+  CsvInviteUploadDto,
+} from './dtos/csvInvite.dto';
+import { parse as parseCsv, type Info as CsvInfo } from 'csv-parse';
+import { Readable } from 'stream';
+import { plainToInstance } from 'class-transformer';
+import { validate, isEmail } from 'class-validator';
+import { FileUpload } from '../../common/types/file-upload.types';
+import { EntityManager } from 'typeorm';
 
 @ApiTags('Users')
 @Controller('users')
@@ -58,6 +75,207 @@ export class UsersController {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
   ) {}
+
+  private mapEmailSendError(error: unknown): never {
+    const code = (error as { code?: string })?.code;
+    if (code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === 'ECONNRESET') {
+      throw new ServiceUnavailableException('EmailSendFailed');
+    }
+    throw error;
+  }
+
+  private async inviteUsersTransactional(
+    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    options?: { grantAllPermissionsToFirst?: boolean },
+  ): Promise<User[]> {
+    await this.usersService.ensureLicenseForNewUsers(candidates.length);
+
+    return this.usersService
+      .withTransaction(async (manager: EntityManager) => {
+        const createdUsers = await this.usersService.createMany(candidates, {
+          grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
+          manager,
+        });
+
+        for (const user of createdUsers) {
+          const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
+          await this.emailService.sendUserInvitationEmail(user, verificationToken, manager);
+        }
+
+        return createdUsers;
+      })
+      .catch((error) => this.mapEmailSendError(error));
+  }
+
+  public async parseCsvFile(
+    file: FileUpload | undefined,
+    config: CsvInviteConfigDto,
+  ): Promise<{
+    candidates: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions>; row: number }>;
+    errors: CsvInviteRowErrorDto[];
+    emailRowMap: Map<string, number[]>;
+    usernameRowMap: Map<string, number[]>;
+  }> {
+    if (!file) {
+      throw new BadRequestException('CSV file is required');
+    }
+
+    const inputStream = file.buffer ? Readable.from(file.buffer) : undefined;
+    if (!inputStream) {
+      throw new BadRequestException('Unable to read CSV file');
+    }
+
+    const parser = parseCsv({
+      bom: true,
+      columns: true,
+      relax_column_count: true,
+      skip_empty_lines: false,
+      trim: true,
+    });
+
+    const normalizeColumns = (columns: CsvInfo['columns'] | undefined): string[] | null => {
+      if (!columns || typeof columns === 'boolean') {
+        return null;
+      }
+
+      return columns
+        .map((column) => (typeof column === 'string' ? column : (column?.name ?? '')))
+        .filter((value) => value !== '');
+    };
+
+    let header: string[] | null = null;
+    const candidates: Array<{
+      username: string;
+      email: string;
+      systemPermissions: Partial<SystemPermissions>;
+      row: number;
+    }> = [];
+    const errors: CsvInviteRowErrorDto[] = [];
+    const ignoredRows = new Set(config.ignoredRows ?? []);
+    const seenEmails = new Set<string>();
+    const seenUsernames = new Set<string>();
+    const emailRowMap = new Map<string, number[]>();
+    const usernameRowMap = new Map<string, number[]>();
+
+    let dataRowIndex = 0;
+
+    try {
+      for await (const record of inputStream.pipe(parser)) {
+        header = header ?? normalizeColumns(parser.info?.columns) ?? Object.keys(record ?? {});
+
+        dataRowIndex += 1;
+        const rowNumber = dataRowIndex;
+
+        if (ignoredRows.has(rowNumber)) {
+          continue;
+        }
+
+        const rowData: Record<string, string> = {};
+        (header ?? []).forEach((headerLabel) => {
+          const rawValue = record?.[headerLabel];
+          rowData[headerLabel] = rawValue == null ? '' : String(rawValue).trim();
+        });
+
+        const isEmptyRow = Object.values(rowData).every((value) => value === '');
+        if (isEmptyRow) {
+          errors.push({ row: rowNumber, message: 'Row is empty' });
+          continue;
+        }
+
+        const rowErrors: CsvInviteRowErrorDto[] = [];
+
+        const email = (rowData[config.emailKey] ?? '').trim();
+        if (!email) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'REQUIRED' });
+        } else if (!isEmail(email)) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'INVALID', value: email });
+        }
+
+        const usernameOriginal = (rowData[config.usernameKey] ?? '').trim();
+        let normalizedUsername = '';
+        if (!usernameOriginal) {
+          rowErrors.push({ row: rowNumber, field: 'username', message: 'REQUIRED' });
+        } else {
+          normalizedUsername = this.usersService.cleanupUsername(usernameOriginal);
+          try {
+            this.usersService.validateUsernameOrThrow(normalizedUsername);
+          } catch (error) {
+            rowErrors.push({
+              row: rowNumber,
+              field: 'username',
+              message: (error as Error).message ?? 'INVALID',
+              value: usernameOriginal,
+            });
+          }
+        }
+
+        const emailKey = email.toLowerCase();
+        if (email && seenEmails.has(emailKey)) {
+          rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
+        } else if (email) {
+          seenEmails.add(emailKey);
+          emailRowMap.set(emailKey, [...(emailRowMap.get(emailKey) ?? []), rowNumber]);
+        }
+
+        if (normalizedUsername && seenUsernames.has(normalizedUsername)) {
+          rowErrors.push({
+            row: rowNumber,
+            field: 'username',
+            message: 'DUPLICATE_IN_CSV',
+            value: normalizedUsername,
+          });
+        } else if (normalizedUsername) {
+          seenUsernames.add(normalizedUsername);
+          usernameRowMap.set(normalizedUsername, [...(usernameRowMap.get(normalizedUsername) ?? []), rowNumber]);
+        }
+
+        const systemPermissions: Partial<SystemPermissions> = {};
+        (
+          Object.entries(config.permissions ?? {}) as [
+            keyof SystemPermissions,
+            { keyMapping: string; yesValue: string },
+          ][]
+        )
+          .filter(([, mapping]) => !!mapping?.keyMapping)
+          .forEach(([permissionKey, mapping]) => {
+            const value = (rowData[mapping.keyMapping] ?? '').trim();
+            if (value === mapping.yesValue) {
+              systemPermissions[permissionKey] = true;
+            }
+          });
+
+        if (rowErrors.length) {
+          errors.push(...rowErrors);
+          continue;
+        }
+
+        candidates.push({
+          username: normalizedUsername,
+          email,
+          systemPermissions,
+          row: rowNumber,
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to parse CSV', error as Error);
+      throw new BadRequestException('Invalid CSV file');
+    }
+
+    header = header ?? normalizeColumns(parser.info?.columns);
+    if (!header || header.every((value) => `${value}`.trim() === '')) {
+      throw new BadRequestException('MISSING_HEADER_ROW');
+    }
+
+    const requiredColumns = new Set([config.emailKey, config.usernameKey]);
+
+    requiredColumns.forEach((column) => {
+      if (column && !header?.includes(column)) {
+        errors.push({ row: 0, field: column, message: 'REQUIRED' });
+      }
+    });
+
+    return { candidates, errors, emailRowMap, usernameRowMap };
+  }
 
   /**
    * Validates that a user can grant the specified permissions
@@ -197,27 +415,107 @@ export class UsersController {
   })
   @Auth('canManageUsers')
   async inviteUser(@Body() body: InviteUserDto): Promise<User> {
-    const user = await this.usersService.createOne({
-      username: body.username,
-      email: body.email,
-      externalIdentifier: null,
-    });
-    this.logger.debug(`User created with ID: ${user.id}`);
-
     try {
-      this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-      const verificationToken = await this.authService.generateEmailVerificationToken(user);
-      this.logger.debug(`Sending verification email to user ID: ${user.id}`);
-      await this.emailService.sendUserInvitationEmail(user, verificationToken);
-      this.logger.debug(`Verification email sent to user ID: ${user.id}`);
-    } catch (e) {
-      this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
-      await this.usersService.deleteOne(user.id);
-      throw e;
+      const [invited] = await this.inviteUsersTransactional(
+        [
+          {
+            username: body.username,
+            email: body.email,
+            systemPermissions: {},
+          },
+        ],
+        { grantAllPermissionsToFirst: true },
+      );
+
+      return invited;
+    } catch (error) {
+      throw this.mapEmailSendError(error);
+    }
+  }
+
+  @Post('/invite-csv')
+  @Auth('canManageUsers')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Invite multiple users from a CSV file', operationId: 'inviteUsersFromCsv' })
+  @ApiBody({ type: CsvInviteUploadDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Users have been successfully invited.',
+    type: User,
+    isArray: true,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid CSV or input data.',
+    type: CsvInviteErrorResponseDto,
+  })
+  async inviteUsersFromCsv(
+    @UploadedFile() file: FileUpload | undefined,
+    @Body('config') rawConfig: string | CsvInviteConfigDto,
+  ): Promise<User[]> {
+    let configPayload: CsvInviteConfigDto | string;
+    try {
+      configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+    } catch {
+      throw new BadRequestException('Invalid config payload');
+    }
+    const config = plainToInstance(CsvInviteConfigDto, configPayload);
+    const validationErrors = await validate(config, { whitelist: true, forbidNonWhitelisted: true });
+    if (validationErrors.length) {
+      throw new BadRequestException(validationErrors);
     }
 
-    this.logger.debug(`User invitation completed successfully for ID: ${user.id}`);
-    return user;
+    const { candidates, errors, emailRowMap, usernameRowMap } = await this.parseCsvFile(file, config);
+    if (errors.length) {
+      throw new BadRequestException({
+        message: 'INVALID_CSV',
+        errors,
+      });
+    }
+
+    if (candidates.length === 0) {
+      throw new BadRequestException({
+        message: 'NO_CANDIDATES_IN_CSV',
+        errors: [{ row: 0, message: 'NO_VALID_ROWS_FOUND_IN_CSV' }],
+      });
+    }
+
+    const existingUsers = await this.usersService.findByEmailsOrUsernames(
+      candidates.map((candidate) => candidate.email),
+      candidates.map((candidate) => candidate.username),
+    );
+
+    const duplicateErrors: CsvInviteRowErrorDto[] = [];
+    existingUsers.forEach((user) => {
+      const emailRows = emailRowMap.get(user.email.trim().toLowerCase());
+      if (emailRows?.length) {
+        emailRows.forEach((row) =>
+          duplicateErrors.push({ row, field: 'email', message: 'DUPLICATE_IN_DB', value: user.email }),
+        );
+      }
+
+      const usernameRows = usernameRowMap.get(user.username.trim().toLowerCase());
+      if (usernameRows?.length) {
+        usernameRows.forEach((row) =>
+          duplicateErrors.push({ row, field: 'username', message: 'DUPLICATE_IN_DB', value: user.username }),
+        );
+      }
+    });
+
+    if (duplicateErrors.length) {
+      throw new BadRequestException({
+        message: 'DUPLICATE_IN_DB',
+        errors: duplicateErrors,
+      });
+    }
+
+    try {
+      const invitedUsers = await this.inviteUsersTransactional(candidates, { grantAllPermissionsToFirst: true });
+      return invitedUsers;
+    } catch (error) {
+      throw this.mapEmailSendError(error);
+    }
   }
 
   @Get('local-signup-enabled')
@@ -310,6 +608,11 @@ export class UsersController {
       return { message: 'OK' };
     }
 
+    const isSSOUser = await this.usersService.isSSOUser(user.id);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot reset the password of an SSO user');
+    }
+
     await this.emailService.sendPasswordResetEmail(user, token);
     this.logger.debug(`Password reset e-mail sent to: ${body.email}`);
 
@@ -333,6 +636,11 @@ export class UsersController {
     if (!user) {
       this.logger.debug(`User not found with ID: ${userId}`);
       throw new UserNotFoundException(userId);
+    }
+
+    const isSSOUser = await this.usersService.isSSOUser(userId);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
 
     if (user.passwordResetToken !== body.token) {
@@ -595,14 +903,7 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: "The user's permissions.",
-    schema: {
-      type: 'object',
-      properties: {
-        canManageResources: { type: 'boolean' },
-        canManageSystemConfiguration: { type: 'boolean' },
-        canManageUsers: { type: 'boolean' },
-      },
-    },
+    type: SystemPermissions,
   })
   @ApiResponse({
     status: 403,

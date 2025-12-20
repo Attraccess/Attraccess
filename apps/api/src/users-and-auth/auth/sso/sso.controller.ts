@@ -33,7 +33,7 @@ import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
-
+import { SSOLinkTokenService } from './link-token.service';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 export class SSOController {
@@ -44,7 +44,8 @@ export class SSOController {
     private readonly sessionService: SessionService,
     private readonly usersService: UsersService,
     private readonly ssoService: SSOService,
-    private readonly cookieConfigService: CookieConfigService
+    private readonly cookieConfigService: CookieConfigService,
+    private readonly linkTokenService: SSOLinkTokenService,
   ) {}
 
   @Get('providers')
@@ -60,25 +61,38 @@ export class SSOController {
   }
 
   @Post('/link-account')
-  @ApiOperation({ summary: 'Link an account to an external identifier', operationId: 'linkUserToExternalAccount' })
+  @ApiOperation({
+    summary: 'Link an account to an SSO identity via a signed token',
+    operationId: 'linkUserToExternalAccount',
+  })
   @ApiResponse({
     status: 200,
-    description: 'The account has been linked to the external identifier',
+    description: 'The account has been linked to the SSO identity',
     schema: {
       type: 'object',
       properties: {
         OK: {
           type: 'boolean',
-          description: 'Whether the account has been linked to the external identifier',
+          description: 'Whether the account has been linked to the SSO identity',
         },
       },
     },
   })
   public async linkUserToExternalAccount(@Body() body: LinkUserToExternalAccountRequestDto): Promise<{ OK: boolean }> {
-    const user = await this.usersService.findOne({ email: body.email });
-
+    const linkPayload = await this.linkTokenService.verify(body.linkToken);
+    const user = await this.usersService.findOne({ email: linkPayload.email }, ['authenticationDetails']);
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    const hasSSO = await this.authService.userHasSSOAuthentication(user.id);
+    if (hasSSO) {
+      throw new BadRequestException('SSO_ALREADY_LINKED');
+    }
+
+    const localAuth = user.authenticationDetails?.find((detail) => detail.type === AuthenticationType.LOCAL_PASSWORD);
+    if (!localAuth) {
+      throw new BadRequestException('PASSWORD_REQUIRED');
     }
 
     const isAuthenticated = await this.authService.validateAuthenticationDetails(user.id, {
@@ -92,7 +106,27 @@ export class SSOController {
       throw new UnauthorizedException();
     }
 
-    await this.usersService.updateOne(user.id, { externalIdentifier: body.externalId });
+    const existingSSOUserId = await this.authService.findUserIdBySSO(
+      linkPayload.providerType,
+      linkPayload.providerId,
+      linkPayload.ssoSubject,
+    );
+    if (existingSSOUserId && existingSSOUserId !== user.id) {
+      throw new BadRequestException('SSO_SUBJECT_ALREADY_LINKED');
+    }
+
+    await this.authService.addAuthenticationDetails(user.id, {
+      type: AuthenticationType.SSO,
+      details: {
+        providerType: linkPayload.providerType,
+        providerId: linkPayload.providerId,
+        subject: linkPayload.ssoSubject,
+      },
+    });
+
+    // Remove local password to enforce SSO-only after linking
+    await this.authService.removeAuthenticationDetails(localAuth.id);
+    await this.usersService.updateOne(user.id, { externalIdentifier: null });
 
     return { OK: true };
   }
@@ -311,7 +345,7 @@ export class SSOController {
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectTo: string,
-    @Res({ passthrough: true }) response: Response
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
     // Create session token using SessionService
     const sessionToken = await this.sessionService.createSession(request.user, {
@@ -330,9 +364,7 @@ export class SSOController {
       const urlWithAuth = new URL(redirectTo);
       urlWithAuth.searchParams.delete('accountLinking');
       urlWithAuth.searchParams.delete('email');
-      urlWithAuth.searchParams.delete('externalId');
-      urlWithAuth.searchParams.delete('ssoProviderId');
-      urlWithAuth.searchParams.delete('ssoProviderType');
+      urlWithAuth.searchParams.delete('ssoLinkToken');
 
       urlWithAuth.searchParams.set('user', JSON.stringify(auth.user));
 

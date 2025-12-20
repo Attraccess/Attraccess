@@ -96,6 +96,63 @@ export type InviteUserDto = {
     email: string;
 };
 
+export type CsvInvitePermissionMappingDto = {
+    /**
+     * CSV column header that maps to this permission
+     */
+    keyMapping: string;
+    /**
+     * CSV value that represents a YES for this permission
+     */
+    yesValue: string;
+};
+
+export type CsvInvitePermissionsDto = {
+    canManageResources: CsvInvitePermissionMappingDto;
+    canManageSystemConfiguration: CsvInvitePermissionMappingDto;
+    canManageUsers: CsvInvitePermissionMappingDto;
+    canManageBilling: CsvInvitePermissionMappingDto;
+};
+
+export type CsvInviteConfigDto = {
+    /**
+     * CSV column header containing the email
+     */
+    emailKey: string;
+    /**
+     * CSV column header containing the username
+     */
+    usernameKey: string;
+    permissions: CsvInvitePermissionsDto;
+    /**
+     * 1-based row numbers (excluding header) to skip when importing
+     */
+    ignoredRows?: Array<(number)>;
+};
+
+export type CsvInviteUploadDto = {
+    file: (Blob | File);
+    /**
+     * JSON string or object describing how to map CSV columns to fields
+     */
+    config: CsvInviteConfigDto;
+};
+
+export type CsvInviteRowErrorDto = {
+    /**
+     * 1-based row number (excluding header)
+     */
+    row: number;
+    field?: string;
+    message: string;
+    value?: string;
+};
+
+export type CsvInviteErrorResponseDto = {
+    message: string;
+    errors: Array<CsvInviteRowErrorDto>;
+};
+
 export type BooleanDto = {
     /**
      * The boolean value
@@ -317,17 +374,13 @@ export type SSOProvider = {
 
 export type LinkUserToExternalAccountRequestDto = {
     /**
-     * The email of the user
-     */
-    email: string;
-    /**
      * The password of the user
      */
     password: string;
     /**
-     * The external identifier of the user
+     * The short-lived token issued by the backend during SSO linking
      */
-    externalId: string;
+    linkToken: string;
 };
 
 export type CreateOIDCConfigurationDto = {
@@ -925,6 +978,10 @@ export type ResourceUsage = {
      * The form submissions that belong to this resource usage
      */
     formSubmissions: Array<FormSubmission>;
+    /**
+     * Whether the resource usage is finalized
+     */
+    isFinalized: boolean;
 };
 
 export type FormSubmission = {
@@ -1887,10 +1944,12 @@ export enum ResourceFlowNodeType {
     INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
     INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
+    INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
+    OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
     PROCESSING_WAIT = 'processing.wait',
     PROCESSING_IF = 'processing.if',
     PROCESSING_SET_PAYLOAD = 'processing.set-payload',
@@ -2772,6 +2831,12 @@ export type InviteUserData = {
 
 export type InviteUserResponse = User;
 
+export type InviteUsersFromCsvData = {
+    formData: CsvInviteUploadDto;
+};
+
+export type InviteUsersFromCsvResponse = Array<User>;
+
 export type IsLocalSignupEnabledResponse = BooleanDto;
 
 export type VerifyEmailData = {
@@ -2826,11 +2891,7 @@ export type GetPermissionsData = {
     id: number;
 };
 
-export type GetPermissionsResponse = {
-    canManageResources?: boolean;
-    canManageSystemConfiguration?: boolean;
-    canManageUsers?: boolean;
-};
+export type GetPermissionsResponse = SystemPermissions;
 
 export type BulkUpdatePermissionsData = {
     requestBody: BulkUpdateUserPermissionsDto;
@@ -2912,7 +2973,7 @@ export type LinkUserToExternalAccountData = {
 
 export type LinkUserToExternalAccountResponse = {
     /**
-     * Whether the account has been linked to the external identifier
+     * Whether the account has been linked to the SSO identity
      */
     OK?: boolean;
 };
@@ -4079,6 +4140,25 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/invite-csv': {
+        post: {
+            req: InviteUsersFromCsvData;
+            res: {
+                /**
+                 * Users have been successfully invited.
+                 */
+                200: Array<User>;
+                /**
+                 * Invalid CSV or input data.
+                 */
+                400: CsvInviteErrorResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users/local-signup-enabled': {
         get: {
             res: {
@@ -4235,11 +4315,7 @@ export type $OpenApiTs = {
                 /**
                  * The user's permissions.
                  */
-                200: {
-                    canManageResources?: boolean;
-                    canManageSystemConfiguration?: boolean;
-                    canManageUsers?: boolean;
-                };
+                200: SystemPermissions;
                 /**
                  * Unauthorized
                  */
@@ -4430,11 +4506,11 @@ export type $OpenApiTs = {
             req: LinkUserToExternalAccountData;
             res: {
                 /**
-                 * The account has been linked to the external identifier
+                 * The account has been linked to the SSO identity
                  */
                 200: {
                     /**
-                     * Whether the account has been linked to the external identifier
+                     * Whether the account has been linked to the SSO identity
                      */
                     OK?: boolean;
                 };

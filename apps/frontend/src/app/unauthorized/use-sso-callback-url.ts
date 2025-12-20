@@ -6,8 +6,10 @@ export function useCallbackURL(providerId: number, providerType: SSOProviderType
   return useMemo(() => {
     const apiBaseUrl = getBaseUrl();
     const encodedCallbackURL = encodeURIComponent(window.location.href);
-    return `${apiBaseUrl}/api/auth/sso/${providerType}/${providerId}/login?redirectTo=${
+    const result = `${apiBaseUrl}/api/auth/sso/${providerType}/${providerId}/login?redirectTo=${
       redirectTo ?? encodedCallbackURL
     }`;
+
+    return result;
   }, [providerId, providerType, redirectTo]);
 }

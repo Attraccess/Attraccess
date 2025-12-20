@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException, Logger } from '@ne
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
 import {
+  FormSubmission,
   Resource,
   ResourceFlowNodeType,
   ResourceType,
@@ -53,10 +54,7 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    this.logger.debug(`Checking if user ${user.id} can control resource ${resourceId}`);
-
     if (user.systemPermissions?.canManageResources) {
-      this.logger.debug(`User ${user.id} has system permissions to manage resources`);
       return true;
     }
 
@@ -146,6 +144,56 @@ export class ResourceUsageService {
     return resource;
   }
 
+  private getResourceUsageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?: FormSubmission[]) {
+    const normalizedFormSubmissions = formSubmissions ?? [];
+    const mappedFormSubmissions: {
+      [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
+    } = {};
+
+    normalizedFormSubmissions.forEach((submission) => {
+      mappedFormSubmissions[submission.form.id] = {
+        formName: submission.form.name,
+        answers: Object.fromEntries(
+          Object.values(submission.data).map((field) => [
+            field.fieldDefinition.id,
+            { value: field.value, name: field.fieldDefinition.name },
+          ]),
+        ),
+      };
+    });
+
+    const usageUser =
+      resourceUsage.user ??
+      (resourceUsage.userId != null ? ({ id: resourceUsage.userId } as Pick<User, 'id'> & Partial<User>) : undefined);
+
+    const sanitizedUser: (Partial<User> & Pick<User, 'id'>) | undefined = usageUser
+      ? {
+          id: usageUser.id,
+          username: usageUser.username,
+          email: usageUser.email,
+          systemPermissions: usageUser.systemPermissions,
+          createdAt: usageUser.createdAt,
+          updatedAt: usageUser.updatedAt,
+          billingFactor: usageUser.billingFactor,
+          creditBalance: usageUser.creditBalance,
+        }
+      : undefined;
+
+    const flowPayload = {
+      ...resourceUsage,
+      resource: {
+        ...resourceUsage.resource,
+        documentationMarkdown: undefined,
+        documentationUrl: undefined,
+        documentationType: undefined,
+      } as Partial<Resource>,
+      user: sanitizedUser,
+      formSubmissions: mappedFormSubmissions,
+    };
+
+    return flowPayload;
+  }
+
   async startSession(resourceId: number, user: User, dto: StartUsageSessionDto): Promise<ResourceUsage> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -168,7 +216,7 @@ export class ResourceUsageService {
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
+      const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -220,6 +268,7 @@ export class ResourceUsageService {
         startNotes: dto.notes,
         endTime: null,
         endNotes: null,
+        isFinalized: false,
       };
 
       if (dto.projectId !== undefined) {
@@ -241,7 +290,7 @@ export class ResourceUsageService {
         order: {
           startTime: 'DESC',
         },
-        relations: ['resource', 'user'],
+        relations: ['resource', 'user', 'project'],
       });
 
       if (!createdSession) {
@@ -253,9 +302,10 @@ export class ResourceUsageService {
         `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
       );
 
+      let formSubmissions: FormSubmission[] = [];
       if (resource.type === ResourceType.Machine) {
         const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
-        await this.resourceFormsService.saveRequiredSubmissions({
+        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
           resourceId,
           action,
           submissions: dto.formSubmissions,
@@ -273,7 +323,12 @@ export class ResourceUsageService {
         await this.flowExecutorService.runFlow(
           existingActiveSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-          { ...existingActiveSession, takeOverTime: now, newUser: user, oldUser: existingActiveSession.user },
+          {
+            ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+            takeOverTime: now,
+            newUser: user,
+            oldUser: existingActiveSession.user,
+          },
           transactionalEntityManager,
         );
 
@@ -289,13 +344,17 @@ export class ResourceUsageService {
         await this.flowExecutorService.runFlow(
           createdSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-          createdSession,
+          this.getResourceUsageFlowPayload(createdSession, formSubmissions),
           transactionalEntityManager,
         );
       }
 
-      // Return the created session to the caller; events will be emitted after commit
-      return createdSession;
+      this.flowExecutorService.trackResourceActivity(createdSession.resourceId);
+      await transactionalEntityManager.update(ResourceUsage, createdSession.id, { isFinalized: true });
+      return await transactionalEntityManager.findOne(ResourceUsage, {
+        where: { id: createdSession.id },
+        relations: ['resource', 'user', 'project'],
+      });
     });
 
     // Emit events after the transaction committed to ensure readers can observe DB state
@@ -315,24 +374,32 @@ export class ResourceUsageService {
     return newSession;
   }
 
-  async endSession(resourceId: number, user: User, dto: EndUsageSessionDto): Promise<ResourceUsage> {
+  async endSession(
+    resourceId: number,
+    user: User,
+    dto: EndUsageSessionDto,
+    skipFormSubmissions = false,
+  ): Promise<ResourceUsage> {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session
-    const activeSession = await this.getActiveSession(resourceId);
+    const activeSession = await this.getActiveSession(resourceId, true);
     if (!activeSession) {
       throw new BadRequestException('No active session found');
     }
 
     // Check if the user is authorized to end the session
     const canManageResources = user.systemPermissions?.canManageResources || false;
-    const isSessionOwner = activeSession.user.id === user.id; // Use loaded user ID
+    const isSessionOwner = activeSession.user.id === user.id;
 
     if (!isSessionOwner && !canManageResources) {
-      this.logger.warn(
-        `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
-      );
-      throw new ForbiddenException('You are not authorized to end this session');
+      const isIntroducer = await this.resourceIntroducersService.isIntroducer(activeSession.resourceId, user.id, true);
+      if (!isIntroducer) {
+        this.logger.warn(
+          `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,
+        );
+        throw new ForbiddenException('You are not authorized to end this session');
+      }
     }
 
     const endTime = new Date();
@@ -347,15 +414,15 @@ export class ResourceUsageService {
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
-
+    let formSubmissions: FormSubmission[] = [];
     const updatedUsage = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
       const updateData = {
         endTime,
         endNotes,
       };
 
-      if (activeSession.resource?.type === ResourceType.Machine) {
-        await this.resourceFormsService.saveRequiredSubmissions({
+      if (!skipFormSubmissions && activeSession.resource?.type === ResourceType.Machine) {
+        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
           resourceId,
           action: ResourceFormAction.END,
           submissions: dto.formSubmissions,
@@ -369,10 +436,7 @@ export class ResourceUsageService {
       await this.flowExecutorService.runFlow(
         activeSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        {
-          ...activeSession,
-          ...updateData,
-        },
+        { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
         transactionalEntityManager,
       );
 
@@ -485,6 +549,7 @@ export class ResourceUsageService {
 
   async getActiveSession(
     resourceId: number,
+    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -495,6 +560,7 @@ export class ResourceUsageService {
       where: {
         resourceId,
         endTime: IsNull(),
+        isFinalized: onlyFinalized ? true : undefined,
       },
       relations: ['user', 'resource', 'billingTransaction', 'project'],
     });

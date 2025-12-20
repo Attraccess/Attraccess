@@ -141,6 +141,121 @@ export const $InviteUserDto = {
     required: ['username', 'email']
 } as const;
 
+export const $CsvInvitePermissionMappingDto = {
+    type: 'object',
+    properties: {
+        keyMapping: {
+            type: 'string',
+            description: 'CSV column header that maps to this permission'
+        },
+        yesValue: {
+            type: 'string',
+            description: 'CSV value that represents a YES for this permission'
+        }
+    },
+    required: ['keyMapping', 'yesValue']
+} as const;
+
+export const $CsvInvitePermissionsDto = {
+    type: 'object',
+    properties: {
+        canManageResources: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageSystemConfiguration: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageUsers: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        },
+        canManageBilling: {
+            '$ref': '#/components/schemas/CsvInvitePermissionMappingDto'
+        }
+    },
+    required: ['canManageResources', 'canManageSystemConfiguration', 'canManageUsers', 'canManageBilling']
+} as const;
+
+export const $CsvInviteConfigDto = {
+    type: 'object',
+    properties: {
+        emailKey: {
+            type: 'string',
+            description: 'CSV column header containing the email'
+        },
+        usernameKey: {
+            type: 'string',
+            description: 'CSV column header containing the username'
+        },
+        permissions: {
+            '$ref': '#/components/schemas/CsvInvitePermissionsDto'
+        },
+        ignoredRows: {
+            description: '1-based row numbers (excluding header) to skip when importing',
+            type: 'array',
+            items: {
+                type: 'number'
+            }
+        }
+    },
+    required: ['emailKey', 'usernameKey', 'permissions']
+} as const;
+
+export const $CsvInviteUploadDto = {
+    type: 'object',
+    properties: {
+        file: {
+            type: 'string',
+            format: 'binary'
+        },
+        config: {
+            description: 'JSON string or object describing how to map CSV columns to fields',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/CsvInviteConfigDto'
+                }
+            ]
+        }
+    },
+    required: ['file', 'config']
+} as const;
+
+export const $CsvInviteRowErrorDto = {
+    type: 'object',
+    properties: {
+        row: {
+            type: 'number',
+            description: '1-based row number (excluding header)'
+        },
+        field: {
+            type: 'string'
+        },
+        message: {
+            type: 'string'
+        },
+        value: {
+            type: 'string'
+        }
+    },
+    required: ['row', 'message']
+} as const;
+
+export const $CsvInviteErrorResponseDto = {
+    type: 'object',
+    properties: {
+        message: {
+            type: 'string',
+            default: 'CSV import failed'
+        },
+        errors: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/CsvInviteRowErrorDto'
+            }
+        }
+    },
+    required: ['message', 'errors']
+} as const;
+
 export const $BooleanDto = {
     type: 'object',
     properties: {
@@ -500,23 +615,18 @@ export const $SSOProvider = {
 export const $LinkUserToExternalAccountRequestDto = {
     type: 'object',
     properties: {
-        email: {
-            type: 'string',
-            description: 'The email of the user',
-            example: 'john.doe@example.com'
-        },
         password: {
             type: 'string',
             description: 'The password of the user',
             example: 'password'
         },
-        externalId: {
+        linkToken: {
             type: 'string',
-            description: 'The external identifier of the user',
-            example: '1234567890'
+            description: 'The short-lived token issued by the backend during SSO linking',
+            example: 'eyJhbGciOi...signed'
         }
     },
-    required: ['email', 'password', 'externalId']
+    required: ['password', 'linkToken']
 } as const;
 
 export const $CreateOIDCConfigurationDto = {
@@ -1364,9 +1474,13 @@ export const $ResourceUsage = {
             items: {
                 '$ref': '#/components/schemas/FormSubmission'
             }
+        },
+        isFinalized: {
+            type: 'boolean',
+            description: 'Whether the resource usage is finalized'
         }
     },
-    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes', 'formSubmissions']
+    required: ['id', 'usageAction', 'resourceId', 'startTime', 'usageInMinutes', 'formSubmissions', 'isFinalized']
 } as const;
 
 export const $FormSubmission = {
@@ -2843,7 +2957,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
     description: 'The name of the node type'
 } as const;
 

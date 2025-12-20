@@ -38,7 +38,7 @@ export class ResourceUsageController {
   async startSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: StartUsageSessionDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return this.resourceUsageService.startSession(resourceId, req.user, dto);
   }
@@ -66,7 +66,7 @@ export class ResourceUsageController {
   async endSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: EndUsageSessionDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return this.resourceUsageService.endSession(resourceId, req.user, dto);
   }
@@ -93,7 +93,7 @@ export class ResourceUsageController {
   })
   async lockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return await this.resourceUsageService.lockDoor(resourceId, req.user);
   }
@@ -120,7 +120,7 @@ export class ResourceUsageController {
   })
   async unlockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return await this.resourceUsageService.unlockDoor(resourceId, req.user);
   }
@@ -147,7 +147,7 @@ export class ResourceUsageController {
   })
   async unlatchDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return await this.resourceUsageService.unlatchDoor(resourceId, req.user);
   }
@@ -175,7 +175,7 @@ export class ResourceUsageController {
   async getHistory(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: GetResourceHistoryQueryDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
     // Allow users to see their own history, or admins to see all history
     const canManageResources = req.user.systemPermissions?.canManageResources === true;
@@ -195,7 +195,7 @@ export class ResourceUsageController {
       resourceId,
       query.page,
       query.limit,
-      query.userId
+      query.userId,
     );
 
     return {
@@ -223,7 +223,7 @@ export class ResourceUsageController {
     description: 'Resource not found',
   })
   async getActiveSession(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<GetActiveUsageSessionDto> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
+    const activeSession = await this.resourceUsageService.getActiveSession(resourceId, true);
     return { usage: activeSession || null };
   }
 
@@ -237,7 +237,7 @@ export class ResourceUsageController {
   })
   async canControl(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<CanControlResponseDto> {
     return {
       canControl: await this.resourceUsageService.canControllResource(resourceId, req.user),
