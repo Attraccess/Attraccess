@@ -4,7 +4,7 @@
     "description": "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
   },
   "FLOW_EXECUTION_ERROR": {
-    "title": "Fehler beim Beenden der Sitzung",
+    "title": "Fehler bei der Durchführung",
     "description": "{{error}}"
   },
   "ResourceInUseError": {
@@ -42,5 +42,9 @@
   "UnkownUserOrPasswordException": {
     "title": "Unbekannter Benutzer oder Passwort",
     "description": "Der Benutzer oder das Passwort ist ungültig."
+  },
+  "EmailSendFailed": {
+    "title": "E-Mail konnte nicht gesendet werden",
+    "description": "Die Einladung konnte nicht versendet werden. Bitte Mailserver-Konfiguration prüfen und erneut versuchen."
   }
 }

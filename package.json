@@ -33,7 +33,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.0",
     "@nestjs/platform-ws": "^11.1.0",
-    "@nestjs/schedule": "^5.0.1",
+    "@nestjs/schedule": "^6.0.1",
     "@nestjs/schematics": "^11.0.5",
     "@nestjs/serve-static": "^5.0.3",
     "@nestjs/swagger": "^11.2.0",
@@ -44,7 +44,7 @@
     "@react-stately/data": "^3.12.3",
     "@rollup/plugin-replace": "^6.0.2",
     "@sumup/sdk": "^0.0.4",
-    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.75.5",
     "@types/decompress": "^4.2.7",
     "@types/multer": "^2.0.0",
@@ -60,6 +60,8 @@
     "class-validator": "^0.14.2",
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
+    "csv": "^6.4.1",
+    "csv-parse": "^6.1.0",
     "date-fns": "^4.1.0",
     "decompress": "^4.2.1",
     "docsify-cli": "^4.4.4",
@@ -207,7 +209,7 @@
     "vite-plugin-dts": "4.5.4",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^1.6.1",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^6.0.1"
   },
   "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0",
   "engines": {

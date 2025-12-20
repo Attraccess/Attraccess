@@ -10,8 +10,14 @@
       "isEmailVerified": "Email verified",
       "id": "ID",
       "username": "Username",
-      "externalIdentifier": "External ID"
-    }
+      "externalIdentifier": "External ID",
+      "permissions": "Permissions",
+      "canManageResources": "Configure resources",
+      "canManageSystemConfiguration": "Configure system",
+      "canManageUsers": "User configuration",
+      "canManageBilling": "Manage billing"
+    },
+    "noPermissions": "No permissions"
   },
   "actions": {
     "editAllowedSignupDomains": "Edit signup domains",

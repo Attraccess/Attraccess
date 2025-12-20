@@ -109,9 +109,9 @@ void Websocket::connectWebSocket()
     websocket_cfg.port = serverPort;
 
     // Configure buffer sizes to prevent ENOBUFS errors
+    websocket_cfg.task_stack = 9830;  // Increase task stack size for stability
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
-    websocket_cfg.task_stack = 16384; // Increase task stack size for stability
-    websocket_cfg.task_prio = 5;      // Set appropriate task priority
+    // websocket_cfg.task_prio = 5;      // Set appropriate task priority
 
     if (apiConfig.useSSL)
     {

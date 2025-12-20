@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { AuthenticationDetail, AuthenticationType, User, RevokedToken } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
+import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt', () => ({
@@ -12,12 +13,11 @@ jest.mock('bcrypt', () => ({
 }));
 
 const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
-const RevokedTokenRepository = getRepositoryToken(RevokedToken);
 
 describe('AuthService', () => {
   let authService: AuthService;
   let authenticationDetailRepository: Repository<AuthenticationDetail>;
-  let userRepository: Repository<User>;
+  let usersService: UsersService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -28,7 +28,8 @@ describe('AuthService', () => {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
-            updateUser: jest.fn(),
+            updateOne: jest.fn(),
+            isSSOUser: jest.fn().mockResolvedValue(false),
           },
         },
         {
@@ -45,17 +46,9 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: RevokedTokenRepository,
+          provide: SSOService,
           useValue: {
-            save: jest.fn(),
-            findOne: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: {
-            findOne: jest.fn(),
-            update: jest.fn(),
+            getProviderById: jest.fn(),
           },
         },
       ],
@@ -63,7 +56,7 @@ describe('AuthService', () => {
 
     authService = module.get<AuthService>(AuthService);
     authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    usersService = module.get<UsersService>(UsersService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -91,7 +84,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
 
     const authenticationDetail: Partial<AuthenticationDetail> = {
       userId: 1,
@@ -132,7 +125,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
 
     jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
       id: 1,
@@ -154,7 +147,7 @@ describe('AuthService', () => {
   });
 
   it('should not authenticate a non-existent user', async () => {
-    jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
+    jest.spyOn(usersService, 'findOne').mockResolvedValue(null);
 
     const isAuthenticated = await authService.getUserByUsernameAndAuthenticationDetails('nonexistentuser', {
       type: AuthenticationType.LOCAL_PASSWORD,

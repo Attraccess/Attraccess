@@ -1,4 +1,6 @@
 #include "logger.hpp"
+#include <memory>
+#include <new>
 // Ensure we can safely convert macro values to strings
 #ifndef STRINGIFY
 #define STRINGIFY_HELPER(x) #x
@@ -175,13 +177,45 @@ void Logger::logf(const char *message, LogLevel level, va_list args)
         return;
     }
 
-    char buffer[512];
-    vsnprintf(buffer, sizeof(buffer), message, args);
+    va_list measureArgs;
+    va_copy(measureArgs, args);
+    int required = vsnprintf(nullptr, 0, message, measureArgs);
+    va_end(measureArgs);
+    if (required < 0)
+    {
+        return;
+    }
+
+    size_t bufferSize = static_cast<size_t>(required) + 1;
+    std::unique_ptr<char[]> heapBuffer(new (std::nothrow) char[bufferSize]);
+
+    if (heapBuffer)
+    {
+        va_list formatArgs;
+        va_copy(formatArgs, args);
+        vsnprintf(heapBuffer.get(), bufferSize, message, formatArgs);
+        va_end(formatArgs);
+
+        Serial.print("[");
+        Serial.print(name);
+        Serial.print("] ");
+        Serial.print(getLogLevelString(level));
+        Serial.print(": ");
+        Serial.println(heapBuffer.get());
+        return;
+    }
+
+    // Fallback to a small stack buffer if heap allocation fails
+    char fallback[128];
+    va_list fallbackArgs;
+    va_copy(fallbackArgs, args);
+    vsnprintf(fallback, sizeof(fallback), message, fallbackArgs);
+    va_end(fallbackArgs);
 
     Serial.print("[");
     Serial.print(name);
     Serial.print("] ");
     Serial.print(getLogLevelString(level));
     Serial.print(": ");
-    Serial.println(buffer);
+    Serial.println(fallback);
 }

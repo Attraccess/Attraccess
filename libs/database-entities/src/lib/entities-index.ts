@@ -13,7 +13,6 @@ import {
 } from './entities/resourceIntroductionHistoryItem.entity';
 import { ResourceIntroducer } from './entities/resourceIntroducer.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
-import { RevokedToken } from './entities/revokedToken.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
@@ -35,6 +34,8 @@ import {
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -60,7 +61,6 @@ export {
   IntroductionHistoryAction,
   ResourceIntroducer,
   ResourceUsage,
-  RevokedToken,
   SSOProvider,
   SSOProviderType,
   SSOProviderOIDCConfiguration,
@@ -108,13 +108,14 @@ export {
   FormSubmission,
   FormFieldType,
   ResourceFormAction,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
 };
 
 // Export the entities object
 export const entities = {
   User,
   AuthenticationDetail,
-  RevokedToken,
   Session,
   Resource,
   ResourceGroup,

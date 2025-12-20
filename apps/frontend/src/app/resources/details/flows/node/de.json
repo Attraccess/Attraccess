@@ -10,7 +10,8 @@
     },
     "unsupportedForResourceType": "von dieser Ressource nicht unterstützt",
     "genericConfig": {
-      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}"
+      "overridableByInput": "Überschreibbar durch Eingabe: {{fieldName}}",
+      "createMqttServer": "MQTT-Server erstellen"
     },
     "input": {
       "button": {
@@ -49,6 +50,23 @@
             "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
+            }
+          }
+        },
+        "activity": {
+          "no-activity": {
+            "title": "Ressource ist inaktiv",
+            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
+            "outputs": {
+              "output": "Ausgabe"
+            },
+            "preview": {
+              "minInactivityMinutes": "Mindestinaktivität (Minuten)"
+            },
+            "config": {
+              "minInactivityMinutes": {
+                "label": "Mindestinaktivität (Minuten)"
+              }
             }
           }
         },
@@ -148,7 +166,14 @@
             "serverId": { "label": "Server" },
             "topic": { "label": "Thema (unterstützt + und #)" },
             "timeoutSeconds": { "label": "Timeout (Sekunden)" },
-            "subscribeQos": { "label": "QoS (effektiv ist min(publish, subscribe))" }
+            "subscribeQos": {
+              "label": "QoS (effektiv ist min(publish, subscribe))",
+              "enum": {
+                "0": "0 - Höchstens einmal (Fire-and-Forget)",
+                "1": "1 - Mindestens einmal (Bestätigung)",
+                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            }
           }
         }
       },
@@ -293,7 +318,14 @@
             "payload": {
               "label": "Nutzlast"
             },
-            "qos": { "label": "QoS" },
+            "qos": {
+              "label": "QoS",
+              "enum": {
+                "0": "0 - Höchstens einmal (Fire-and-Forget)",
+                "1": "1 - Mindestens einmal (Bestätigung)",
+                "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            },
             "retain": { "label": "Nachricht behalten (retain)" }
           }
         }
@@ -341,6 +373,15 @@
                   "label": "Externe Referenz"
                 }
               }
+            }
+          }
+        },
+        "activity": {
+          "track-activity": {
+            "title": "Ressource war aktiv",
+            "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+            "outputs": {
+              "output": "Ausgabe"
             }
           }
         }

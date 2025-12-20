@@ -6,10 +6,10 @@ import { FieldOptionsEditor } from './FieldOptionsEditor';
 
 interface FormFieldEditorProps {
   field: EditableFormField;
-  index: number;
   onChange: (field: EditableFormField) => void;
   onRemove: () => void;
   t: (key: string, vars?: Record<string, unknown>) => string;
+  labelInputRef?: React.RefObject<HTMLInputElement>;
 }
 
 const FIELD_TYPE_OPTIONS: { value: FormFieldType; labelKey: string }[] = [
@@ -19,7 +19,9 @@ const FIELD_TYPE_OPTIONS: { value: FormFieldType; labelKey: string }[] = [
   { value: FormFieldType.BOOLEAN, labelKey: 'fields.types.boolean' },
 ];
 
-export function FormFieldEditor({ field, index, onChange, onRemove, t }: FormFieldEditorProps) {
+export function FormFieldEditor(props: FormFieldEditorProps) {
+  const { field, onChange, onRemove, t, labelInputRef } = props;
+
   const handleTypeChange = (nextType: FormFieldType | undefined) => {
     if (!nextType) {
       return;
@@ -40,6 +42,7 @@ export function FormFieldEditor({ field, index, onChange, onRemove, t }: FormFie
           value={field.name}
           onChange={(event) => onChange({ ...field, name: event.target.value })}
           isRequired
+          ref={labelInputRef}
         />
 
         <Select
@@ -67,7 +70,7 @@ export function FormFieldEditor({ field, index, onChange, onRemove, t }: FormFie
           startContent={<Trash2 className="w-4 h-4" />}
           onPress={onRemove}
         >
-          {t('editor.delete')}
+          {t('editor.deleteField')}
         </Button>
       </div>
 
