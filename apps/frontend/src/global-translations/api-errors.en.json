@@ -4,7 +4,7 @@
     "description": "An error occurred. Please try again."
   },
   "FLOW_EXECUTION_ERROR": {
-    "title": "Failed to end all sessions. Some sessions may still be active.",
+    "title": "Error during execution",
     "description": "{{error}}"
   },
   "ResourceInUseError": {
@@ -42,5 +42,9 @@
   "UnkownUserOrPasswordException": {
     "title": "Unknown user or password",
     "description": "The user or password is invalid."
+  },
+  "EmailSendFailed": {
+    "title": "Email delivery failed",
+    "description": "We could not send the invitation email. Please check the mail server configuration and try again."
   }
 }

@@ -2,10 +2,11 @@ import { Profile, Strategy } from 'passport-openidconnect';
 import { get } from 'lodash-es';
 import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
+import { AuthService } from '../../auth.service';
 
 @Injectable()
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
@@ -54,7 +55,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
       throw new BadRequestException('No user ID found in SSO profile');
     }
 
-    const usersService = await this.moduleRef.get(UsersService);
+    const usersService = await this.moduleRef.get(UsersService, { strict: false });
+    const authService = await this.moduleRef.get(AuthService, { strict: false });
 
     // Build candidate sources to resolve claims from
     const claimSources: unknown[] = [profile];
@@ -76,12 +78,17 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
       throw new BadRequestException('No email found in SSO profile');
     }
 
-    // Step 1: Check if user exists by external ID
-    this.logger.debug(`Checking if user exists with external ID: ${oidcUserId}`);
-    let user = await usersService.findOne({ externalIdentifier: oidcUserId }).catch(() => null);
+    // Step 1: Check if user exists by SSO auth detail
+    this.logger.debug(`Checking if user exists with SSO binding: ${oidcUserId}`);
+    const existingUserId = await authService.findUserIdBySSO(
+      SSOProviderType.OIDC,
+      this.config.ssoProviderId,
+      oidcUserId,
+    );
+    let user = existingUserId ? await usersService.findOne({ id: existingUserId }) : null;
 
     if (user) {
-      this.logger.log(`Found existing user with external ID: ${oidcUserId}`);
+      this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
       return user;
     }
 
@@ -90,21 +97,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
 
     if (user) {
-      if (user.authenticationDetails.length === 0) {
-        this.logger.log(`User with email ${email} has no auth details, no need to provide password.`);
-        return await usersService.updateOne(user.id, { externalIdentifier: oidcUserId });
-      }
-
-      // Step 3: User exists with email but no external ID
-      // This requires user to authenticate with password to link accounts
-      this.logger.log(`Found user with email ${email} but no external ID. Account linking required.`);
-
-      // Here you'll need to implement a flow to:
-      // 1. Redirect to a password verification page
-      // 2. Store pending OIDC data in session/temporary storage
-      // 3. After password verification, set external ID and complete login
-
-      // For now, throw an exception that triggers the linking flow
+      // Step 3: User exists with email but no SSO binding - require linking flow
+      this.logger.log(`Found user with email ${email} but no SSO binding. Account linking required.`);
       throw new AccountLinkingRequiredException({
         email,
         externalId: oidcUserId,
@@ -122,14 +116,29 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
     const username = resolvedUsername || profile.username || email;
     this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
-    user = await usersService.createOne({ username, email, externalIdentifier: oidcUserId });
+    user = await usersService.createOne({
+      username,
+      email,
+      externalIdentifier: null,
+      isEmailVerified: true,
+      skipUsernameSanitization: true,
+    });
 
     if (!user) {
       this.logger.error('Failed to create user after SSO authentication');
       throw new UnauthorizedException();
     }
 
-    this.logger.log(`New user (ID: ${user.id}) created successfully with external ID: ${oidcUserId}`);
+    await authService.addAuthenticationDetails(user.id, {
+      type: AuthenticationType.SSO,
+      details: {
+        providerId: this.config.ssoProviderId,
+        providerType: SSOProviderType.OIDC,
+        subject: oidcUserId,
+      },
+    });
+
+    this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
     return user;
   }
 }

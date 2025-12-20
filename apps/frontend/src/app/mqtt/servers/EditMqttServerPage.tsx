@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, Input, Checkbox, Spinner, Switch } from '@heroui/react';
+import { Button, Card, CardHeader, Input, Checkbox, Spinner, Switch, Select, SelectItem } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -88,6 +88,8 @@ export function EditMqttServerPage() {
       [name]: newValue,
     }));
   };
+
+  const qosOptions = [0, 1, 2] as const;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,20 +248,21 @@ export function EditMqttServerPage() {
               </div>
 
               <div>
-                <Input
+                <Select
                   label={t('defaultPublishQosLabel')}
-                  id="defaultPublishQos"
-                  name="defaultPublishQos"
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={1}
-                  placeholder={t('qosPlaceholder')}
-                  value={String(formValues.defaultPublishQos ?? 0)}
-                  onChange={handleInputChange}
-                  fullWidth
+                  selectedKeys={new Set([String(formValues.defaultPublishQos ?? 0)])}
+                  onSelectionChange={(keys) => {
+                    if (keys === 'all') return;
+                    const key = Array.from(keys)[0];
+                    setFormValues((prev) => ({ ...prev, defaultPublishQos: Number(key) }));
+                  }}
+                  disallowEmptySelection
                   data-cy="edit-mqtt-server-form-default-publish-qos-input"
-                />
+                >
+                  {qosOptions.map((option) => (
+                    <SelectItem key={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
+                  ))}
+                </Select>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -275,20 +278,21 @@ export function EditMqttServerPage() {
               </div>
 
               <div>
-                <Input
+                <Select
                   label={t('defaultSubscribeQosLabel')}
-                  id="defaultSubscribeQos"
-                  name="defaultSubscribeQos"
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={1}
-                  placeholder={t('qosPlaceholder')}
-                  value={String(formValues.defaultSubscribeQos ?? 0)}
-                  onChange={handleInputChange}
-                  fullWidth
+                  selectedKeys={new Set([String(formValues.defaultSubscribeQos ?? 0)])}
+                  onSelectionChange={(keys) => {
+                    if (keys === 'all') return;
+                    const key = Array.from(keys)[0];
+                    setFormValues((prev) => ({ ...prev, defaultSubscribeQos: Number(key) }));
+                  }}
+                  disallowEmptySelection
                   data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
-                />
+                >
+                  {qosOptions.map((option) => (
+                    <SelectItem key={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
+                  ))}
+                </Select>
               </div>
             </div>
 

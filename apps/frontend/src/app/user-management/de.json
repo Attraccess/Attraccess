@@ -10,8 +10,14 @@
       "isEmailVerified": "Email bestätigt",
       "id": "ID",
       "username": "Benutzername",
-      "externalIdentifier": "Externe ID"
-    }
+      "externalIdentifier": "Externe ID",
+      "permissions": "Berechtigungen",
+      "canManageResources": "Ressourcen konfigurieren",
+      "canManageSystemConfiguration": "System konfigurieren",
+      "canManageUsers": "Benutzerkonfiguration",
+      "canManageBilling": "Abrechnung verwalten"
+    },
+    "noPermissions": "Keine Berechtigungen"
   },
   "actions": {
     "editAllowedSignupDomains": "Registrierungs-Domains bearbeiten",

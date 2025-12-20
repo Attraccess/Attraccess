@@ -58,11 +58,6 @@ def main():
                 extra_flags = [
                     '-D LOG_LEVEL_NUM=0',                 # compile-time numeric level (0=ERROR)
                     '-D CORE_DEBUG_LEVEL=0',              # silence Arduino core
-                    '-D ARDUHAL_LOG_LEVEL_NONE',          # silence ESP-IDF/Arduino HAL logs
-                    '-ffunction-sections',                # enable sectioning
-                    '-fdata-sections',                    # enable sectioning
-                    '-Wl,--gc-sections',                  # drop unused sections
-                    '-g0',                                # strip debug symbols
                 ]
 
                 for flag in extra_flags:
