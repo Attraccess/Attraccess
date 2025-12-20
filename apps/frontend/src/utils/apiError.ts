@@ -16,15 +16,16 @@ export function getTranslationKeyForApiError(props: Props) {
 
   let errorMessageTranslationKey = errorMessage;
 
-  const fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
-  let translationExists = props.tExists(fullKey);
+  let fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
 
   if (errorMessage.startsWith('FLOW_EXECUTION_ERROR: ')) {
     errorMessageTranslationKey = 'FLOW_EXECUTION_ERROR';
     errorMessage = errorMessage.replace('FLOW_EXECUTION_ERROR: ', '');
 
-    translationExists = props.tExists(props.baseTranslationKey + '.' + errorMessageTranslationKey + '.title');
+    fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
   }
+
+  const translationExists = props.tExists(fullKey, { succeedIfKeyIsObject: true });
 
   const fullBaseKey = translationExists
     ? props.baseTranslationKey + '.' + errorMessageTranslationKey
