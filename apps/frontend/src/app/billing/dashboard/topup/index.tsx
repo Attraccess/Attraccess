@@ -1,7 +1,19 @@
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { Alert, Button, Card, CardBody, CardFooter, CardHeader, CardProps, cn, Form, NumberInput } from '@heroui/react';
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  CardProps,
+  Spinner,
+  cn,
+  Form,
+  NumberInput,
+} from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {
@@ -48,7 +60,11 @@ export function BillingDashboardTopupCard(props: Props) {
   const [topUpTransaction, setTopUpTransaction] = useState<BillingTransaction | null>(null);
 
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: sumUpConfiguration } = useBillingServiceGetSumUpConfiguration();
+  const {
+    data: sumUpConfiguration,
+    isLoading: isLoadingSumUpConfiguration,
+    isError: isSumUpConfigurationError,
+  } = useBillingServiceGetSumUpConfiguration();
   const { data: readers } = useBillingServiceGetSumUpReaders();
   const { mutate: topUpWithSumUpReader, isPending: isPendingTopUpWithSumUpReader } =
     useBillingServiceTopUpWithSumUpReader({
@@ -111,8 +127,36 @@ export function BillingDashboardTopupCard(props: Props) {
 
   const formatNumber = useNumberFormatter();
 
-  if (!sumUpConfiguration?.enabled) {
-    return null;
+  if (isLoadingSumUpConfiguration) {
+    return (
+      <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
+        <CardHeader>
+          <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
+        </CardHeader>
+        <CardBody className="flex justify-center py-8">
+          <Spinner label={t('loading')} />
+        </CardBody>
+      </Card>
+    );
+  }
+
+  if (isSumUpConfigurationError || !sumUpConfiguration?.enabled) {
+    return (
+      <Card {...cardProps} className={cn('max-w-full', cardProps.className)}>
+        <CardHeader>
+          <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
+        </CardHeader>
+        <CardBody>
+          <Alert
+            color={isSumUpConfigurationError ? 'danger' : 'warning'}
+            variant="flat"
+            title={t('unavailable.title')}
+          >
+            <p className="text-sm">{t('unavailable.description')}</p>
+          </Alert>
+        </CardBody>
+      </Card>
+    );
   }
 
   if (topUpTransaction) {
