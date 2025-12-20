@@ -7,18 +7,23 @@ import {
   CardBody,
   Input,
   NumberInput,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalHeader,
   Switch,
   Textarea,
 } from '@heroui/react';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
+import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
-  enum?: string[];
+  enum?: Array<string | number>;
   default?: TValue;
   additionalProperties?: {
     type: Property<unknown>['type'];
@@ -78,6 +83,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     [onChange, schema, configuration],
   );
 
+  const propertyKey = name.split('.').pop();
+  const isQosField = propertyKey === 'qos' || propertyKey === 'subscribeQos';
+  const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
+
   if (!configuration && schema.isCurrency) {
     return (
       <Input
@@ -93,13 +102,52 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
   if (schema.selectFromEntity === 'mqttServer') {
     return (
-      <MqttServerSelect
-        selectedId={value as number}
-        onSelectionChange={(newValue) => onChange(newValue as TValue)}
-        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        isRequired={isRequired}
-        description={description}
-      />
+      <>
+        <div className="flex gap-2 w-full items-center">
+          <div className="flex-grow min-w-0">
+            <MqttServerSelect
+              selectedId={value as number}
+              onSelectionChange={(newValue) => onChange(newValue as TValue)}
+              label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+              isRequired={isRequired}
+              description={description}
+              className="w-full"
+            />
+          </div>
+          <Button
+            variant="flat"
+            color="primary"
+            onPress={() => setIsCreateServerOpen(true)}
+            data-cy="mqtt-server-select-create-button"
+            isIconOnly
+            className="h-full min-h-[48px] aspect-square"
+          >
+            <PlusIcon size={18} />
+          </Button>
+        </div>
+
+        <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} scrollBehavior="inside">
+          <ModalContent>
+            {(onClose) => (
+              <>
+                <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
+                <ModalBody>
+                  <CreateMqttServerForm
+                    onSuccess={(server) => {
+                      onChange(server.id as TValue);
+                      setIsCreateServerOpen(false);
+                    }}
+                    onCancel={() => {
+                      setIsCreateServerOpen(false);
+                      onClose();
+                    }}
+                  />
+                </ModalBody>
+              </>
+            )}
+          </ModalContent>
+        </Modal>
+      </>
     );
   }
 
@@ -150,7 +198,37 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         />
       );
     case 'integer':
-    case 'number':
+    case 'number': {
+      const enumValues = schema.enum ?? (isQosField ? [0, 1, 2] : undefined);
+
+      if (enumValues) {
+        const selectedKey =
+          value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
+
+        return (
+          <Autocomplete
+            isRequired={isRequired}
+            defaultSelectedKey={selectedKey}
+            onSelectionChange={(newValue) => {
+              if (newValue === null) {
+                return;
+              }
+
+              const parsedValue = typeof newValue === 'number' ? newValue : Number(newValue);
+              setValue(parsedValue as TValue);
+            }}
+            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            description={description}
+          >
+            {enumValues.map((enumValue) => (
+              <AutocompleteItem key={String(enumValue)}>
+                {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
+              </AutocompleteItem>
+            ))}
+          </Autocomplete>
+        );
+      }
+
       return (
         <NumberInput
           isRequired={isRequired}
@@ -163,6 +241,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           description={description}
         />
       );
+    }
 
     case 'object':
       if (schema.additionalProperties) {

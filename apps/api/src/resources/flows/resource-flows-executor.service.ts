@@ -31,11 +31,12 @@ import {
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
 import { nanoid } from 'nanoid';
@@ -95,6 +96,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private readonly logger = new Logger(ResourceFlowsExecutorService.name);
   private readonly logTTLDays: number;
   private keepAliveInterval: NodeJS.Timeout;
+
+  private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
 
   public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
 
@@ -459,6 +462,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
         case ResourceFlowNodeType.INPUT_BUTTON:
         case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+        case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
           responseOfNode = {
             payload: resultOfPreviousNode.payload,
           };
@@ -498,6 +502,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
             resultOfPreviousNode.payload,
             transactionManager,
           );
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+          responseOfNode = await this.processActivityTrackActivityNode(node, resultOfPreviousNode.payload);
           break;
 
         case ResourceFlowNodeType.PROCESSING_IF:
@@ -821,7 +829,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, false, transactionManager);
 
     if (!activeUsage) {
       throw new NoUsageSessionError();
@@ -839,9 +847,72 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
     }
 
-    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes });
+    await this.resourceUsageService.endSession(node.resourceId, activeUsage.user, { notes: finalNotes }, true);
 
     return { payload: input };
+  }
+
+  public trackResourceActivity(resourceId: number) {
+    this.resourceActivity.set(resourceId, new Date());
+  }
+
+  private async processActivityTrackActivityNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const { resourceId } = node;
+
+    this.resourceActivity.set(resourceId, new Date());
+
+    return { payload: input };
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  public async checkResourceActivity() {
+    const now = new Date();
+
+    const onResourceInactivityNodes = await this.flowNodeRepository
+      .createQueryBuilder('node')
+      .innerJoin(
+        ResourceUsage,
+        'usage',
+        'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
+        { usageAction: ResourceUsageAction.Usage },
+      )
+      .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
+      .distinct(true)
+      .getMany();
+
+    await Promise.all(
+      onResourceInactivityNodes.map(async (node) => {
+        const parsedData = InputResourceActivityNoActivityNodeDataSchema.safeParse(node.data);
+        if (!parsedData.success) {
+          this.logger.warn(
+            `Skipping resource inactivity node ${node.id} for resource flow of resource ${node.resourceId} because of invalid data: ${parsedData.error.message}`,
+          );
+          return;
+        }
+
+        const { minInactivityMinutes } = parsedData.data;
+
+        const lastActivity = this.resourceActivity.get(node.resourceId);
+        if (!lastActivity) {
+          this.resourceActivity.set(node.resourceId, now);
+          return;
+        }
+
+        const millisSinceLastActivity = now.getTime() - lastActivity.getTime();
+        const minutesSinceLastActivity = millisSinceLastActivity / 1000 / 60;
+
+        if (minutesSinceLastActivity < minInactivityMinutes) {
+          return;
+        }
+
+        this.logger.debug(
+          `Resource ${node.resourceId} has been inactive for ${minutesSinceLastActivity} minutes, triggering inactivity node`,
+        );
+        await this.startFlow(node, { payload: {} });
+
+        this.resourceActivity.set(node.resourceId, now);
+      }),
+    );
   }
 
   private compileTemplate(template: string, data: object): string {
@@ -850,7 +921,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
-    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
+    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId, false);
 
     if (
       !executingUserId ||
@@ -881,7 +952,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     input: object,
     transactionManager?: EntityManager,
   ): Promise<NodeProcessingResult> {
-    const activeUsageSession = await this.resourceUsageService.getActiveSession(node.resourceId, transactionManager);
+    const activeUsageSession = await this.resourceUsageService.getActiveSession(
+      node.resourceId,
+      false,
+      transactionManager,
+    );
 
     if (!activeUsageSession) {
       throw new NoUsageSessionError();

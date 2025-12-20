@@ -1,15 +1,30 @@
 import { ModuleRef } from '@nestjs/core';
 import { Profile } from 'passport-openidconnect';
 import { SSOOIDCStrategy } from './oidc.strategy';
-import { SSOProvider, SSOProviderOIDCConfiguration, User } from '@attraccess/database-entities';
+import { AuthService } from '../../auth.service';
+import {
+  AuthenticationType,
+  SSOProvider,
+  SSOProviderOIDCConfiguration,
+  SSOProviderType,
+  User,
+} from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {
   const callbackURL = 'http://localhost/cb';
 
-  function createStrategy(config: Partial<SSOProviderOIDCConfiguration>, usersServiceMock: Partial<UsersService>) {
+  function createStrategy(
+    config: Partial<SSOProviderOIDCConfiguration>,
+    usersServiceMock: Partial<UsersService>,
+    authServiceMock: Partial<AuthService>,
+  ) {
     const moduleRef = {
-      get: jest.fn(async () => usersServiceMock),
+      get: jest.fn(async (token: unknown) => {
+        if (token === UsersService) return usersServiceMock;
+        if (token === AuthService) return authServiceMock;
+        throw new Error('Unexpected dependency request');
+      }),
     } as unknown as ModuleRef;
 
     const baseConfig: SSOProviderOIDCConfiguration = {
@@ -47,11 +62,17 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       ),
     };
 
+    const authService = {
+      findUserIdBySSO: jest.fn(async () => null),
+      addAuthenticationDetails: jest.fn(),
+    };
+
     const strategy = createStrategy(
       {
         usernameClaimPaths: ['customUser'],
       },
       usersService,
+      authService,
     );
 
     const profile = {
@@ -64,6 +85,10 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     expect(user.username).toBe('preferred.user');
     expect(user.email).toBe('user@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
+    expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(123, {
+      type: AuthenticationType.SSO,
+      details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'ext-1' },
+    });
   });
 
   it('resolves email using configured emailClaimPaths', async () => {
@@ -81,11 +106,17 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       ),
     };
 
+    const authService = {
+      findUserIdBySSO: jest.fn(async () => null),
+      addAuthenticationDetails: jest.fn(),
+    };
+
     const strategy = createStrategy(
       {
         emailClaimPaths: ['mail'],
       },
       usersService,
+      authService,
     );
 
     const profile = {

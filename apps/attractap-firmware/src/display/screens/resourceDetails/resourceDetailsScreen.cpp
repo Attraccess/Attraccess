@@ -1520,7 +1520,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
    lv_label_set_text(resourceNameLabel, resourceName.c_str());
    lv_obj_set_style_text_color(resourceNameLabel, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
+   lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
 
    if (!this->formsModalRequest)
       return;
@@ -1544,7 +1544,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
       lv_label_set_text(formTitle, form.name.c_str());
       lv_obj_set_style_text_font(formTitle, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_text_color(formTitle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_SCROLL);
+      lv_label_set_long_mode(formTitle, LV_LABEL_LONG_WRAP);
       lv_obj_set_style_width(formTitle, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
 
       for (uint8_t f = 0; f < form.fieldCount && this->formFieldWidgetCount < API::MAX_FORMS_PER_REQUEST * API::MAX_FORM_FIELDS_PER_FORM; ++f)
@@ -1567,6 +1567,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
          lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
 
          if (field.description.length() > 0)
          {
@@ -1574,9 +1576,12 @@ void ResourceDetailsScreen::rebuildFormsModal()
             lv_label_set_text(desc, field.description.c_str());
             lv_obj_set_style_text_color(desc, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_font(desc, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
          }
 
          FormFieldWidget &widget = this->formFieldWidgets[this->formFieldWidgetCount++];
+         widget.widgetIndex = this->formFieldWidgetCount - 1;
          widget.formId = form.id;
          widget.fieldId = field.id;
          widget.type = field.type;
@@ -1585,6 +1590,7 @@ void ResourceDetailsScreen::rebuildFormsModal()
          widget.errorLabel = nullptr;
          widget.definition = &field;
          widget.owner = this;
+         widget.selectOptionEventCount = 0;
 
          if (field.type == API::ResourceUsageFormFieldType::BOOLEAN)
          {
@@ -1599,6 +1605,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
                lv_label_set_text(info, boolLabels.c_str());
                lv_obj_set_style_text_color(info, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
          }
          else if (field.type == API::ResourceUsageFormFieldType::SELECT)
@@ -1624,6 +1632,8 @@ void ResourceDetailsScreen::rebuildFormsModal()
                lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
                lv_obj_set_style_text_color(info, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
             else
             {
@@ -1641,13 +1651,21 @@ void ResourceDetailsScreen::rebuildFormsModal()
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
-                  lv_label_set_long_mode(optLabel, LV_LABEL_LONG_SCROLL);
+                  lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-                  // Store option index and widget pointer in user data
-                  SelectOptionEventData *evtData = new SelectOptionEventData{this, &widget, (uint8_t)(optIndex + 1)};
-                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, evtData);
-                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionDelete, LV_EVENT_DELETE, evtData);
+                  if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
+                  {
+                     this->logger.error("Select option event overflow");
+                     continue;
+                  }
+
+                  SelectOptionEventData &evtData = widget.selectOptionEvents[widget.selectOptionEventCount++];
+                  evtData.self = this;
+                  evtData.widgetIndex = widget.widgetIndex;
+                  evtData.optionIndex = static_cast<uint8_t>(optIndex + 1);
+
+                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, &evtData);
                }
                this->updateSelectOptionLayout(widget);
             }
@@ -1994,31 +2012,30 @@ void ResourceDetailsScreen::onFormsKeyboardEvent(lv_event_t *e)
 void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
 {
    auto *evtData = static_cast<SelectOptionEventData *>(lv_event_get_user_data(e));
-   if (!evtData || !evtData->self || !evtData->widget)
+   if (!evtData || !evtData->self)
    {
       return;
    }
 
-   // Toggle: if same option clicked again, deselect it
-   if (evtData->widget->selectedOptionIndex == evtData->optionIndex)
+   auto *self = evtData->self;
+   if (evtData->widgetIndex >= self->formFieldWidgetCount)
    {
-      evtData->widget->selectedOptionIndex = 0;
+      return;
+   }
+
+   FormFieldWidget &widget = self->formFieldWidgets[evtData->widgetIndex];
+
+   // Toggle: if same option clicked again, deselect it
+   if (widget.selectedOptionIndex == evtData->optionIndex)
+   {
+      widget.selectedOptionIndex = 0;
    }
    else
    {
-      evtData->widget->selectedOptionIndex = evtData->optionIndex;
+      widget.selectedOptionIndex = evtData->optionIndex;
    }
 
-   evtData->self->updateSelectButtonStyles(*evtData->widget);
-}
-
-void ResourceDetailsScreen::onSelectOptionDelete(lv_event_t *e)
-{
-   auto *evtData = static_cast<SelectOptionEventData *>(lv_event_get_user_data(e));
-   if (evtData)
-   {
-      delete evtData;
-   }
+   self->updateSelectButtonStyles(widget);
 }
 
 void ResourceDetailsScreen::onSelectContainerSizeChanged(lv_event_t *e)
@@ -2075,8 +2092,6 @@ void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
       return;
    }
 
-   lv_obj_update_layout(widget.input);
-
    lv_coord_t containerWidth = lv_obj_get_width(widget.input);
    lv_coord_t padLeft = lv_obj_get_style_pad_left(widget.input, LV_PART_MAIN);
    lv_coord_t padRight = lv_obj_get_style_pad_right(widget.input, LV_PART_MAIN);
@@ -2101,9 +2116,11 @@ void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
       {
          continue;
       }
-      lv_obj_set_width(btn, widthPerButton);
+      if (lv_obj_get_width(btn) != widthPerButton)
+      {
+         lv_obj_set_width(btn, widthPerButton);
+      }
    }
 
-   lv_obj_mark_layout_as_dirty(widget.input);
-   lv_obj_update_layout(widget.input);
+   lv_obj_invalidate(widget.input);
 }
