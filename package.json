@@ -40,7 +40,7 @@
     "@nestjs/testing": "^11.1.8",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.0",
-    "@nx/devkit": "21.1.2",
+    "@nx/devkit": "22.3.3",
     "@react-stately/data": "^3.12.3",
     "@rollup/plugin-replace": "^6.0.2",
     "@sumup/sdk": "^0.0.4",
