@@ -10,8 +10,19 @@
   },
   "modal.title": "End all your active sessions",
   "modal.description": "We will end the session for each resource below.",
+  "modal.successListTitle": "Ended {{count}} session(s)",
   "modal.loadingList": "Loading active sessions...",
   "modal.cancel": "Cancel",
   "modal.confirm": "End all now",
-  "modal.completedTitle": "All sessions ended"
+  "modal.completedTitle": "All sessions ended",
+  "apiErrors": {
+    "MissingFormSubmissionException": {
+      "title": "End of session requires Form",
+      "description": "In order to end the session, you must submit the required form for this resource. Please end this session in the resources detail screen."
+    },
+    "No active session found": {
+      "title": "No active session found",
+      "description": "There are no active sessions for this resource."
+    }
+  }
 }

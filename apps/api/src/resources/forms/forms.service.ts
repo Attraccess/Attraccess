@@ -13,6 +13,7 @@ import {
 } from './dto';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { parseFieldOptions, parseFieldValue } from './forms.validation';
+import { MissingFormSubmissionException } from './errors/missingFormSubmission.exception';
 
 @Injectable()
 export class ResourceFormsService {
@@ -185,7 +186,7 @@ export class ResourceFormsService {
       const submission = submissionsForForm[0];
 
       if (!submission) {
-        throw new BadRequestException(`Form "${form.name}" must be submitted before proceeding.`);
+        throw new MissingFormSubmissionException(form.name);
       }
 
       const data = this.buildSubmissionData(form, submission);
