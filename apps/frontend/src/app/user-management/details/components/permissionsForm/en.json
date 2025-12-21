@@ -8,5 +8,11 @@
   },
   "actions": {
     "save": "Save"
+  },
+  "messages": {
+    "updated": "Permissions updated"
+  },
+  "errors": {
+    "updateFailed": "Unable to update permissions"
   }
 }

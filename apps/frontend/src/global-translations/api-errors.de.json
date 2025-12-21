@@ -50,5 +50,9 @@
   "EmailSendFailed": {
     "title": "E-Mail konnte nicht gesendet werden",
     "description": "Die Einladung konnte nicht versendet werden. Bitte Mailserver-Konfiguration prüfen und erneut versuchen."
+  },
+  "You cannot update your own permissions": {
+    "title": "Eigene Berechtigungen können nicht geändert werden",
+    "description": "Sie können Ihre eigenen Berechtigungen nicht ändern. Bitten Sie einen anderen Administrator, diese anzupassen."
   }
 }

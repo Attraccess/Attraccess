@@ -50,5 +50,9 @@
   "EmailSendFailed": {
     "title": "Email delivery failed",
     "description": "We could not send the invitation email. Please check the mail server configuration and try again."
+  },
+  "You cannot update your own permissions": {
+    "title": "Cannot update own permissions",
+    "description": "You cannot change your own permissions. Ask another administrator to adjust them."
   }
 }
