@@ -39,6 +39,10 @@
     "title": "Domain nicht erlaubt",
     "description": "Die Domain der E-Mail-Adresse ist nicht erlaubt."
   },
+  "UserEmailNotVerifiedException": {
+    "title": "E-Mail nicht verifiziert",
+    "description": "Bitte verifiziere deine E-Mail, bevor du dich anmeldest. Pruefe dein Postfach auf den Verifizierungslink oder bitte einen Administrator, ihn erneut zu senden."
+  },
   "UnkownUserOrPasswordException": {
     "title": "Unbekannter Benutzer oder Passwort",
     "description": "Der Benutzer oder das Passwort ist ungültig."
