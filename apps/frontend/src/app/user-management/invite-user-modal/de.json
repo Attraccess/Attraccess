@@ -6,7 +6,12 @@
   },
   "inputs": {
     "username": {
-      "label": "Benutzername"
+      "label": "Benutzername",
+      "description": "3-32 Zeichen. Erlaubt: Buchstaben, Zahlen, Unterstrich, Bindestrich und Punkt.",
+      "validation": {
+        "length": "Der Benutzername muss zwischen {{min}} und {{max}} Zeichen lang sein.",
+        "format": "Nur Buchstaben, Zahlen, Unterstrich, Bindestrich und Punkt sind erlaubt."
+      }
     },
     "email": {
       "label": "E-Mail"

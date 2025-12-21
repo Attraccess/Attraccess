@@ -35,6 +35,14 @@
     "title": "Password too short",
     "description": "Password must be at least 8 characters long."
   },
+  "Invalid username format": {
+    "title": "Invalid username",
+    "description": "Only letters, numbers, underscores, hyphens, and dots are allowed."
+  },
+  "Invalid username length": {
+    "title": "Invalid username",
+    "description": "Username must be between 3 and 32 characters."
+  },
   "ForbiddenSignupDomainException": {
     "title": "Forbidden signup domain",
     "description": "The domain of the email address is not allowed."

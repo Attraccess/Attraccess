@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+// Ensure React uses the non-production build in tests so act() is available
+process.env.NODE_ENV = 'test';
+
 // Mock Web Serial API globally for all tests
 const mockSerialPort = {
   readable: null,
