@@ -39,6 +39,10 @@
     "title": "Forbidden signup domain",
     "description": "The domain of the email address is not allowed."
   },
+  "UserEmailNotVerifiedException": {
+    "title": "Email not verified",
+    "description": "Please verify your email before signing in. Check your inbox for the verification email or ask an administrator to resend it."
+  },
   "UnkownUserOrPasswordException": {
     "title": "Unknown user or password",
     "description": "The user or password is invalid."
