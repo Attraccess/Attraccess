@@ -8,5 +8,11 @@
   },
   "actions": {
     "save": "Speichern"
+  },
+  "messages": {
+    "updated": "Berechtigungen aktualisiert"
+  },
+  "errors": {
+    "updateFailed": "Berechtigungen konnten nicht aktualisiert werden"
   }
 }
