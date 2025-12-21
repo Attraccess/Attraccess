@@ -5,6 +5,7 @@ import { Button } from '@heroui/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
+import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {
@@ -39,6 +40,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const toast = useToastMessage();
 
+  const [username, setUsername] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string | null>(null);
   const [passwordConfirmation, setPasswordConfirmation] = useState<string | null>(null);
 
@@ -57,6 +60,34 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
 
     return password.length < 8;
   }, [password]);
+
+  const usernameValidationMessages = useMemo(
+    () => ({
+      length: t('usernameValidation.length', {
+        min: USERNAME_RULES.minLength,
+        max: USERNAME_RULES.maxLength,
+      }),
+      format: t('usernameValidation.format'),
+    }),
+    [t],
+  );
+
+  const { trimmed: trimmedUsername, isValid: isUsernameValid } = useUsernameValidation(
+    username,
+    usernameValidationMessages,
+  );
+  const trimmedEmail = useMemo(() => email.trim(), [email]);
+
+  const canSubmit = useMemo(
+    () =>
+      isUsernameValid &&
+      !!trimmedEmail &&
+      password !== null &&
+      passwordConfirmation !== null &&
+      !passwordTooShort &&
+      !passwordsDontMatch,
+    [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordTooShort, passwordsDontMatch],
+  );
 
   const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
     onSuccess: () => {
@@ -78,31 +109,22 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const handleSubmit: React.FormEventHandler = useCallback(
     async (event) => {
       event.preventDefault();
-      const formData = new FormData(event.currentTarget as HTMLFormElement);
-      const username = formData.get('username');
-      const password = formData.get('password');
-      const passwordConfirmation = formData.get('password_confirmation');
-      const email = formData.get('email');
 
-      if (password !== passwordConfirmation) {
+      if (!canSubmit || password === null) {
         return;
       }
 
-      if (typeof username !== 'string' || typeof password !== 'string' || typeof email !== 'string') {
-        return;
-      }
-
-      setRegisteredEmail(email);
+      setRegisteredEmail(trimmedEmail);
       createUserMutate({
         requestBody: {
-          username,
+          username: trimmedUsername,
           password,
-          email,
+          email: trimmedEmail,
           strategy: AuthenticationType.LOCAL_PASSWORD,
         },
       });
     },
-    [createUserMutate],
+    [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
   );
 
   return (
@@ -118,11 +140,17 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       </div>
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit} data-cy="registration-form">
-        <Input
+        <UsernameInput
           id="username"
           name="username"
-          type="text"
           label={t('username')}
+          description={t('usernameDescription', {
+            min: USERNAME_RULES.minLength,
+            max: USERNAME_RULES.maxLength,
+          })}
+          validationMessages={usernameValidationMessages}
+          value={username}
+          onValueChange={setUsername}
           required
           variant="underlined"
           data-cy="registration-form-username-input"
@@ -138,6 +166,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           variant="underlined"
           data-cy="registration-form-email-input"
           isRequired
+          value={email}
+          onValueChange={setEmail}
         />
 
         <PasswordInput
@@ -184,6 +214,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           type="submit"
           endContent={<ArrowRight className="group-hover:translate-x-1 transition-transform" />}
           isLoading={isPending}
+          isDisabled={!canSubmit}
           data-cy="registration-form-create-account-button"
         >
           {isPending ? t('creatingAccount') : t('createAccountButton')}
