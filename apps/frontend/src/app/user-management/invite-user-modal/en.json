@@ -6,7 +6,12 @@
   },
   "inputs": {
     "username": {
-      "label": "Username"
+      "label": "Username",
+      "description": "3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.",
+      "validation": {
+        "length": "Username must be between {{min}} and {{max}} characters.",
+        "format": "Only letters, numbers, underscores, hyphens, and dots are allowed."
+      }
     },
     "email": {
       "label": "Email"

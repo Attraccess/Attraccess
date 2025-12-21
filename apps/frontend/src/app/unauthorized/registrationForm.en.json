@@ -4,6 +4,11 @@
   "hasAccount": "Already using our machines?",
   "signInButton": "Sign in here",
   "username": "Pick a username",
+  "usernameDescription": "3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.",
+  "usernameValidation": {
+    "length": "Username must be between {{min}} and {{max}} characters.",
+    "format": "Only letters, numbers, underscores, hyphens, and dots are allowed."
+  },
   "email": "Your email address",
   "password": "Create your password",
   "passwordConfirmation": "Confirm your password",
