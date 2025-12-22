@@ -2,13 +2,11 @@ import {
   BookOpenIcon,
   BugIcon,
   CogIcon,
-  ComputerIcon,
   CreditCardIcon,
   DatabaseIcon,
   FileIcon,
   FolderIcon,
   GiftIcon,
-  KeyIcon,
   LightbulbIcon,
   LucideProps,
   MailIcon,
@@ -61,56 +59,23 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         path: '/projects',
         icon: FolderIcon,
       },
+      {
+        translationKey: 'attractap',
+        path: '/attractap/nfc-cards',
+        icon: NfcIcon,
+      },
+      {
+        path: '/billing',
+        translationKey: 'billing',
+        icon: CreditCardIcon,
+        licenseModule: 'billing',
+      },
+      {
+        path: '/users',
+        translationKey: 'userManagement',
+        icon: UsersIcon,
+      },
     ];
-
-    items.push({
-      translationKey: 'attractap',
-      isGroup: true,
-      icon: ComputerIcon,
-      licenseModule: 'attractap',
-      items: [
-        {
-          path: '/nfc-cards',
-          translationKey: 'nfcCards',
-          icon: NfcIcon,
-        },
-        {
-          path: '/attractap',
-          translationKey: 'readers',
-          icon: ComputerIcon,
-        },
-      ],
-    });
-
-    items.push({
-      path: '/billing',
-      translationKey: 'billing',
-      icon: CreditCardIcon,
-      licenseModule: 'billing',
-    });
-
-    // Auth group
-    const authGroup: SidebarItemGroup = {
-      translationKey: 'auth',
-      isGroup: true,
-      icon: KeyIcon,
-      items: [
-        {
-          path: '/users',
-          translationKey: 'userManagement',
-          icon: UsersIcon,
-        },
-      ],
-    };
-
-    authGroup.items.unshift({
-      path: '/sso/providers',
-      translationKey: 'ssoProviders',
-      icon: KeyIcon,
-      licenseModule: 'sso',
-    });
-
-    items.push(authGroup);
 
     // System group
     const systemGroup: SidebarItemGroup = {

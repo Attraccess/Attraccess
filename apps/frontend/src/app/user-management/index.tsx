@@ -7,6 +7,10 @@ import {
   CardBody,
   CardFooter,
   Chip,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Input,
   Pagination,
   Table,
@@ -25,6 +29,8 @@ import {
   UserPlusIcon,
   WrenchIcon,
   CreditCardIcon,
+  MoreVerticalIcon,
+  KeyIcon,
 } from 'lucide-react';
 import { useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
@@ -74,14 +80,6 @@ export const UserManagementPage: React.FC = () => {
         data-cy="user-management-page-header"
         actions={
           <>
-            <AllowedSignupDomainsEditorModal>
-              {(onOpen) => (
-                <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
-                  {t('actions.editAllowedSignupDomains')}
-                </Button>
-              )}
-            </AllowedSignupDomainsEditorModal>
-
             <InviteUserModal>
               {(onOpen) => (
                 <Button variant="light" onPress={onOpen} startContent={<UserPlusIcon className="w-4 h-4" />} size="md">
@@ -89,6 +87,35 @@ export const UserManagementPage: React.FC = () => {
                 </Button>
               )}
             </InviteUserModal>
+            <AllowedSignupDomainsEditorModal>
+              {(onOpen) => (
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Button variant="light" endContent={<MoreVerticalIcon className="w-4 h-4" />}>
+                      {t('actions.menu')}
+                    </Button>
+                  </DropdownTrigger>
+
+                  <DropdownMenu>
+                    <DropdownItem
+                      key="editAllowedSignupDomains"
+                      onPress={onOpen}
+                      startContent={<Settings2Icon className="w-4 h-4" />}
+                    >
+                      {t('actions.editAllowedSignupDomains')}
+                    </DropdownItem>
+
+                    <DropdownItem
+                      key="sso"
+                      onPress={() => navigate('/sso/providers')}
+                      startContent={<KeyIcon className="w-4 h-4" />}
+                    >
+                      {t('actions.sso')}
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              )}
+            </AllowedSignupDomainsEditorModal>
           </>
         }
       />
