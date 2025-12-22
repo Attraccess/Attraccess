@@ -2,6 +2,7 @@
 
 void IOExpander::setup()
 {
+    return;
     // Configure TCA9554: set desired pins as outputs, others as inputs
     // Read current configuration
     uint8_t cfg = 0xFF; // default all inputs

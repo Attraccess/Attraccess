@@ -324,9 +324,6 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    const char *hostText = lv_textarea_get_text(self->serverHostname);
    const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
 
-   bool ssidValid = !isEmpty(ssidText);
-   bool passwordValid = !isEmpty(passwordText);
-
    String hostValue = String(hostText ? hostText : "");
    if (hostValue.startsWith("https://"))
    {
@@ -344,18 +341,6 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    bool devicePinValid = pinLooksValid(devicePinText);
 
    // Update label colors
-   if (self->labelForWifiSSID)
-   {
-      lv_obj_set_style_text_color(self->labelForWifiSSID,
-                                  ssidValid ? self->labelForWifiSSIDDefaultColor : lv_color_hex(0xFF0000),
-                                  LV_PART_MAIN | LV_STATE_DEFAULT);
-   }
-   if (self->labelForWifiPassword)
-   {
-      lv_obj_set_style_text_color(self->labelForWifiPassword,
-                                  passwordValid ? self->labelForWifiPasswordDefaultColor : lv_color_hex(0xFF0000),
-                                  LV_PART_MAIN | LV_STATE_DEFAULT);
-   }
    if (self->labelForServerHostname)
    {
       lv_obj_set_style_text_color(self->labelForServerHostname,
@@ -370,20 +355,6 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    }
 
    // Focus first invalid input and ensure visible
-   if (!ssidValid)
-   {
-      lv_keyboard_set_textarea(self->keyboard, self->wifiSSID);
-      self->showKeyboardFor(self->wifiSSID);
-      lv_obj_scroll_to_view_recursive(self->wifiSSID, LV_ANIM_ON);
-      return;
-   }
-   if (!passwordValid)
-   {
-      lv_keyboard_set_textarea(self->keyboard, self->wifiPassword);
-      self->showKeyboardFor(self->wifiPassword);
-      lv_obj_scroll_to_view_recursive(self->wifiPassword, LV_ANIM_ON);
-      return;
-   }
    if (!hostValid)
    {
       // Switch to API tab, focus server hostname

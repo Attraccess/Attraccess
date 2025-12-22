@@ -360,9 +360,8 @@ void Application::processState()
         return;
     }
 
-    NetworkConfig networkConfig = Settings::getNetworkConfig();
     AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-    bool connectionIsConfigured = !networkConfig.ssid.isEmpty() && networkConfig.ssid != "" && !attraccessApiConfig.hostname.isEmpty() && attraccessApiConfig.hostname != "" && attraccessApiConfig.port > 0;
+    bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() && attraccessApiConfig.hostname != "" && attraccessApiConfig.port > 0;
 
     if (!connectionIsConfigured)
     {
