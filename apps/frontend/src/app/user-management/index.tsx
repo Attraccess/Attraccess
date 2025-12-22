@@ -32,7 +32,7 @@ import {
   MoreVerticalIcon,
   KeyIcon,
 } from 'lucide-react';
-import { useUsersServiceFindMany } from '@attraccess/react-query-client';
+import { useLicenseServiceGetLicenseInformation, useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
@@ -70,6 +70,8 @@ export const UserManagementPage: React.FC = () => {
     return Math.ceil(searchResult.total / limit);
   }, [searchResult?.total, limit]);
 
+  const { data: license } = useLicenseServiceGetLicenseInformation();
+
   return (
     <div data-cy="user-management-page">
       <PageHeader
@@ -105,13 +107,15 @@ export const UserManagementPage: React.FC = () => {
                       {t('actions.editAllowedSignupDomains')}
                     </DropdownItem>
 
-                    <DropdownItem
-                      key="sso"
-                      onPress={() => navigate('/sso/providers')}
-                      startContent={<KeyIcon className="w-4 h-4" />}
-                    >
-                      {t('actions.sso')}
-                    </DropdownItem>
+                    {license?.modules.includes('sso') ? (
+                      <DropdownItem
+                        key="sso"
+                        onPress={() => navigate('/sso/providers')}
+                        startContent={<KeyIcon className="w-4 h-4" />}
+                      >
+                        {t('actions.sso')}
+                      </DropdownItem>
+                    ) : null}
                   </DropdownMenu>
                 </Dropdown>
               )}

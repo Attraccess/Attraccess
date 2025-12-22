@@ -59,23 +59,27 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
         path: '/projects',
         icon: FolderIcon,
       },
-      {
-        translationKey: 'attractap',
-        path: '/attractap/nfc-cards',
-        icon: NfcIcon,
-      },
-      {
-        path: '/billing',
-        translationKey: 'billing',
-        icon: CreditCardIcon,
-        licenseModule: 'billing',
-      },
-      {
-        path: '/users',
-        translationKey: 'userManagement',
-        icon: UsersIcon,
-      },
     ];
+
+    items.push({
+      translationKey: 'attractap',
+      path: '/attractap/nfc-cards',
+      icon: NfcIcon,
+      licenseModule: 'attractap',
+    });
+
+    items.push({
+      path: '/billing',
+      translationKey: 'billing',
+      icon: CreditCardIcon,
+      licenseModule: 'billing',
+    });
+
+    items.push({
+      path: '/users',
+      translationKey: 'userManagement',
+      icon: UsersIcon,
+    });
 
     // System group
     const systemGroup: SidebarItemGroup = {
@@ -106,18 +110,17 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       ],
     };
 
-    if (license?.modules.includes('balena')) {
-      systemGroup.items.push({
-        path: '/balena',
-        translationKey: 'balena',
-        icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
-      });
-    }
+    systemGroup.items.push({
+      path: '/balena',
+      translationKey: 'balena',
+      icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
+      licenseModule: 'balena',
+    });
 
     items.push(systemGroup);
 
     return items;
-  }, [license]);
+  }, []);
 
   return useMemo(() => {
     if (!license) {
