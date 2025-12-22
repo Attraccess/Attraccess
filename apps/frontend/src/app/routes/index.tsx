@@ -134,7 +134,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/attractap/readers',
     element: <AttractapList />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'canManageResources',
   },
   {
     path: '/billing',
