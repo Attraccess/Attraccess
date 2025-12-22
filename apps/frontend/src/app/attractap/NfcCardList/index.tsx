@@ -5,8 +5,6 @@ import {
   TableColumn,
   TableCell,
   TableRow,
-  CardBody,
-  CardHeader,
   Button,
   Modal,
   ModalHeader,
@@ -14,7 +12,6 @@ import {
   ModalFooter,
   ModalContent,
   Alert,
-  Card,
   cn,
 } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -36,7 +33,10 @@ import de from './de.json';
 import en from './en.json';
 import { NfcCardDeactivateModal } from './deactivate';
 import { NfcCardActivateModal } from './activate';
-import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { CheckIcon, PlusIcon, ServerIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { PageHeader } from '../../../components/pageHeader';
+import { useAuth } from '../../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface DeleteModalProps {
   show: boolean;
@@ -203,7 +203,12 @@ const EnrollNfcCardButton = () => {
 
   return (
     <>
-      <Button color="primary" onPress={() => setShow(true)} data-cy="enroll-nfc-card-button-trigger">
+      <Button
+        variant="light"
+        onPress={() => setShow(true)}
+        data-cy="enroll-nfc-card-button-trigger"
+        startContent={<PlusIcon />}
+      >
         {t('enroll')}
       </Button>
       <Modal isOpen={show} onClose={() => setShow(false)} scrollBehavior="inside" data-cy="enroll-nfc-card-modal">
@@ -270,51 +275,61 @@ export function NfcCardList() {
 
   const [cardToDeleteId, setCardToDeleteId] = useState<number | null>(null);
 
+  const { hasPermission } = useAuth();
+  const navigate = useNavigate();
+
   return (
     <>
-      <Alert color="danger" className="mb-4">
+      <PageHeader
+        title={t('nfcCards')}
+        actions={
+          <>
+            <EnrollNfcCardButton />
+            {hasPermission('canManageResources') && (
+              <Button variant="light" onPress={() => navigate('/attractap/readers')} startContent={<ServerIcon />}>
+                {t('readers')}
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <Alert color="warning" className="mb-4">
         {t('workInProgress')}
       </Alert>
-      <Card data-cy="nfc-card-list-card">
-        <CardHeader className="flex justify-between items-center">
-          <h1>{t('nfcCards')}</h1>
-          <EnrollNfcCardButton />
-        </CardHeader>
-        <CardBody>
-          <NfcCardDeleteModal
-            show={cardToDeleteId !== null}
-            close={() => setCardToDeleteId(null)}
-            cardId={cardToDeleteId}
-          />
 
-          <Table aria-label={t('nfcCards')} removeWrapper data-cy="nfc-card-list-table">
-            <TableHeader>
-              {headers.map((header) => (
-                <TableColumn key={header}>{t('nfcCardsTable.headers.' + header)}</TableColumn>
-              ))}
-            </TableHeader>
-            <TableBody
-              items={cards ?? []}
-              loadingState={loadingState}
-              loadingContent={<TableDataLoadingIndicator />}
-              emptyContent={<EmptyState />}
+      <NfcCardDeleteModal
+        show={cardToDeleteId !== null}
+        close={() => setCardToDeleteId(null)}
+        cardId={cardToDeleteId}
+      />
+
+      <Table aria-label={t('nfcCards')} data-cy="nfc-card-list-table">
+        <TableHeader>
+          {headers.map((header) => (
+            <TableColumn key={header}>{t('nfcCardsTable.headers.' + header)}</TableColumn>
+          ))}
+        </TableHeader>
+        <TableBody
+          items={cards ?? []}
+          loadingState={loadingState}
+          loadingContent={<TableDataLoadingIndicator />}
+          emptyContent={<EmptyState />}
+        >
+          {(card) => (
+            <TableRow
+              key={card.id}
+              className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
             >
-              {(card) => (
-                <TableRow
-                  key={card.id}
-                  className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
-                >
-                  {headers.map((header) => (
-                    <TableCell key={header}>
-                      <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardBody>
-      </Card>
+              {headers.map((header) => (
+                <TableCell key={header}>
+                  <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />
+                </TableCell>
+              ))}
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </>
   );
 }

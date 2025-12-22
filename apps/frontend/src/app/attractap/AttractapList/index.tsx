@@ -91,6 +91,7 @@ export function AttractapList() {
     <>
       <PageHeader
         title={t('page.title')}
+        backTo="/attractap"
         actions={
           <AttractapHardwareSetup
             openDeviceSettings={(deviceId) => {
