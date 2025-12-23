@@ -20,7 +20,9 @@
     "noPermissions": "Keine Berechtigungen"
   },
   "actions": {
+    "menu": "Einstellungen",
     "editAllowedSignupDomains": "Registrierungs-Domains bearbeiten",
-    "inviteUser": "Benutzer einladen"
+    "inviteUser": "Benutzer einladen",
+    "sso": "SSO Anbieter verwalten"
   }
 }

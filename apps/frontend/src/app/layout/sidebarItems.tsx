@@ -2,13 +2,11 @@ import {
   BookOpenIcon,
   BugIcon,
   CogIcon,
-  ComputerIcon,
   CreditCardIcon,
   DatabaseIcon,
   FileIcon,
   FolderIcon,
   GiftIcon,
-  KeyIcon,
   LightbulbIcon,
   LucideProps,
   MailIcon,
@@ -65,21 +63,9 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
 
     items.push({
       translationKey: 'attractap',
-      isGroup: true,
-      icon: ComputerIcon,
+      path: '/attractap/nfc-cards',
+      icon: NfcIcon,
       licenseModule: 'attractap',
-      items: [
-        {
-          path: '/nfc-cards',
-          translationKey: 'nfcCards',
-          icon: NfcIcon,
-        },
-        {
-          path: '/attractap',
-          translationKey: 'readers',
-          icon: ComputerIcon,
-        },
-      ],
     });
 
     items.push({
@@ -89,28 +75,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       licenseModule: 'billing',
     });
 
-    // Auth group
-    const authGroup: SidebarItemGroup = {
-      translationKey: 'auth',
-      isGroup: true,
-      icon: KeyIcon,
-      items: [
-        {
-          path: '/users',
-          translationKey: 'userManagement',
-          icon: UsersIcon,
-        },
-      ],
-    };
-
-    authGroup.items.unshift({
-      path: '/sso/providers',
-      translationKey: 'ssoProviders',
-      icon: KeyIcon,
-      licenseModule: 'sso',
+    items.push({
+      path: '/users',
+      translationKey: 'userManagement',
+      icon: UsersIcon,
     });
-
-    items.push(authGroup);
 
     // System group
     const systemGroup: SidebarItemGroup = {
@@ -141,18 +110,17 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
       ],
     };
 
-    if (license?.modules.includes('balena')) {
-      systemGroup.items.push({
-        path: '/balena',
-        translationKey: 'balena',
-        icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
-      });
-    }
+    systemGroup.items.push({
+      path: '/balena',
+      translationKey: 'balena',
+      icon: (props: React.SVGProps<SVGSVGElement>) => <BalenaIcon {...props} width={16} height={16} />,
+      licenseModule: 'balena',
+    });
 
     items.push(systemGroup);
 
     return items;
-  }, [license]);
+  }, []);
 
   return useMemo(() => {
     if (!license) {
