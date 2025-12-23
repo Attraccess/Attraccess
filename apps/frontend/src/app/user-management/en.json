@@ -20,7 +20,9 @@
     "noPermissions": "No permissions"
   },
   "actions": {
+    "menu": "Settings",
     "editAllowedSignupDomains": "Edit signup domains",
-    "inviteUser": "Invite user"
+    "inviteUser": "Invite user",
+    "sso": "SSO Providers"
   }
 }

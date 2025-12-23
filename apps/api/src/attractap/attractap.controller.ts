@@ -38,7 +38,7 @@ export class AttractapController {
     @Inject(WebsocketService)
     private readonly websocketService: WebsocketService,
     @Inject(AttractapService)
-    private readonly attractapService: AttractapService
+    private readonly attractapService: AttractapService,
   ) {}
 
   @Post('enroll-nfc-card')
@@ -52,7 +52,7 @@ export class AttractapController {
   })
   async enrollNfcCard(
     @Body() enrollData: EnrollNfcCardDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<EnrollNfcCardResponseDto> {
     await this.attractapGateway.startEnrollOfNewNfcCard({
       readerId: enrollData.readerId,
@@ -75,7 +75,7 @@ export class AttractapController {
   })
   async resetNfcCard(
     @Body() resetData: ResetNfcCardDto,
-    @Req() req: AuthenticatedRequest
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResetNfcCardResponseDto> {
     await this.attractapGateway.startResetOfNfcCard({
       readerId: resetData.readerId,
@@ -89,7 +89,7 @@ export class AttractapController {
   }
 
   @Patch(':readerId')
-  @Auth('canManageSystemConfiguration')
+  @Auth('canManageResources')
   @ApiOperation({ summary: 'Update reader name and connected resources', operationId: 'updateReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to update', example: 1 })
   @ApiBody({ type: UpdateReaderDto })
@@ -101,7 +101,7 @@ export class AttractapController {
   @ApiResponse({ status: 404, description: 'Reader not found' })
   async updateReader(
     @Param('readerId', ParseIntPipe) readerId: number,
-    @Body() updateData: UpdateReaderDto
+    @Body() updateData: UpdateReaderDto,
   ): Promise<UpdateReaderResponseDto> {
     this.logger.debug(`Updating reader ${readerId} with data: ${JSON.stringify(updateData)}`);
     try {
@@ -146,7 +146,7 @@ export class AttractapController {
   }
 
   @Delete(':readerId')
-  @Auth('canManageSystemConfiguration')
+  @Auth('canManageResources')
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
