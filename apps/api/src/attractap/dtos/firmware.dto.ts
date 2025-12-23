@@ -48,4 +48,28 @@ export class AttractapFirmware {
     example: 'attractap_eth.bin.zz',
   })
   filenameOTA: string;
+
+  @ApiProperty({
+    description: 'The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)',
+    example: 'esp32s3',
+  })
+  chip: string;
+
+  @ApiProperty({
+    description: 'The flash mode for programming (qio, qout, dio, dout)',
+    example: 'dio',
+  })
+  flashMode: string;
+
+  @ApiProperty({
+    description: 'The flash frequency for programming (80m, 40m, 26m, 20m)',
+    example: '80m',
+  })
+  flashFreq: string;
+
+  @ApiProperty({
+    description: 'The flash size (4MB, 8MB, 16MB, etc.)',
+    example: '16MB',
+  })
+  flashSize: string;
 }

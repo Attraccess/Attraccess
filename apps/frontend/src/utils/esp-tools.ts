@@ -223,8 +223,11 @@ export class ESPTools {
     firmware: Blob;
     terminal?: IEspLoaderTerminal;
     onProgress?: (progressPct: number) => unknown;
+    flashMode?: 'qio' | 'qout' | 'dio' | 'dout';
+    flashFreq?: '80m' | '40m' | '26m' | '20m';
+    flashSize?: string;
   }): Promise<ESPToolsResult<void>> {
-    const { firmware, terminal, onProgress } = options;
+    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize } = options;
 
     let firmwareDataString: string;
     try {
@@ -283,9 +286,9 @@ export class ESPTools {
 
           await esploader.writeFlash({
             fileArray: [{ data: firmwareDataString, address: 0 }],
-            flashSize: 'keep',
-            flashMode: 'keep',
-            flashFreq: 'keep',
+            flashSize: flashSize || 'keep',
+            flashMode: flashMode || 'dio',
+            flashFreq: flashFreq || '80m',
             eraseAll: false,
             compress: true,
             reportProgress: (_fileIndex: number, written: number, total: number) => {

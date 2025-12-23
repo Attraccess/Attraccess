@@ -1,16 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../logger/logger.hpp"
 #include <vector>
-
 #include <lvgl.h>
-#include "Arduino_GFX_Library.h"
 #include "lv_conf.h"
-#include "HWCDC.h"
-#include "TouchDrvGT911.hpp"
-#include <Wire.h>
-#include <SPI.h>
 #include "../logger/logger.hpp"
 #include "../state/state.hpp"
 #include "screens/IScreen.hpp"
@@ -24,6 +17,7 @@
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "driver/display_driver.hpp"
 
 class Display
 {
@@ -64,12 +58,7 @@ private:
     static std::function<void()> onTransitionComplete;
     static IScreen *activeScreen;
     static Logger logger;
-    static Arduino_DataBus *bus;
-    static Arduino_ESP32RGBPanel *rgbpanel;
-    static Arduino_RGB_Display *gfx;
-    static TouchDrvGT911 GT911;
-    static int16_t x[5];
-    static int16_t y[5];
+    static IDisplayDriver *driver;
     static uint32_t screenWidth;
     static uint32_t screenHeight;
     static lv_display_t *disp;

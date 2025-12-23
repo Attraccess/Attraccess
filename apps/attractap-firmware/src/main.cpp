@@ -37,7 +37,13 @@ void setup()
 
     mainLogger.info("Serial initialized");
 
+#if defined(DISPLAY_DRIVER_QUALIA)
+    // Use board default I2C pins for the Qualia driver so the PCA expander/touch are reachable
+    Wire.begin(SDA, SCL);
+#else
+    // GT911 hardware uses dedicated I2C lines on the devkit
     Wire.begin(15, 7);
+#endif
     // Prevent potential I2C stalls on touch controller reads
     Wire.setTimeOut(50);
 

@@ -1,12 +1,17 @@
 #include "display.hpp"
 
+#if defined(DISPLAY_DRIVER_GT911)
+#include "driver/gt911/rgb_gt911_driver.hpp"
+#endif
+#if defined(DISPLAY_DRIVER_QUALIA)
+#include "driver/qualia/qualia_ft_cst_driver.hpp"
+#endif
+
 // Static member definitions
 Logger Display::logger("Display");
 uint32_t Display::screenWidth = 0;
 uint32_t Display::screenHeight = 0;
-TouchDrvGT911 Display::GT911;
-int16_t Display::x[5] = {0};
-int16_t Display::y[5] = {0};
+IDisplayDriver *Display::driver = nullptr;
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
 IScreen *Display::activeScreen = NULL;
@@ -31,11 +36,6 @@ FirmwareUpdateScreen Display::firmwareUpdateScreen;
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
 lv_timer_t *Display::popupAutoCloseTimer = nullptr;
-
-Arduino_DataBus *Display::bus = NULL;
-
-Arduino_ESP32RGBPanel *Display::rgbpanel = NULL;
-Arduino_RGB_Display *Display::gfx = NULL;
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -77,58 +77,36 @@ void Display::increase_reboot(void *arg)
 /* Display flushing (LVGL v9 signature) */
 void Display::flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
-
-    /* LVGL v9 provides px_map as a byte pointer in the configured color format.
-       We assume LV_COLOR_DEPTH == 16 (RGB565). */
-    Display::gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
-
+    if (Display::driver)
+    {
+        Display::driver->flush(area, px_map);
+    }
     lv_display_flush_ready(disp);
 }
 
 /* Read the touchpad (LVGL v9 signature) */
 void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
 {
-    uint8_t touched = Display::GT911.getPoint(Display::x, Display::y, Display::GT911.getSupportTouchPoint());
-
-    if (touched <= 0)
+    if (!Display::driver)
     {
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
 
-    for (int i = 0; i < touched; ++i)
+    TouchPoint point;
+    if (!Display::driver->readTouch(point) || !point.pressed)
     {
-        int16_t touchX = Display::x[i];
-        int16_t touchY = Display::y[i];
-        switch (Display::gfx->getRotation())
-        {
-        case 0:
-            break;
-        case 1:
-            touchX = Display::y[i];
-            touchY = Display::gfx->height() - x[i];
-            break;
-        case 2:
-            touchX = Display::gfx->width() - x[i];
-            touchY = Display::gfx->height() - y[i];
-            break;
-        case 3:
-            touchX = Display::gfx->width() - y[i];
-            touchY = Display::x[i];
-            break;
-        }
-        data->state = LV_INDEV_STATE_PRESSED;
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
 
-        /*Set the coordinates*/
-        data->point.x = touchX;
-        data->point.y = touchY;
+    data->state = LV_INDEV_STATE_PRESSED;
+    data->point.x = point.x;
+    data->point.y = point.y;
 
-        if (Display::touchCallback)
-        {
-            Display::touchCallback(touchX, touchY);
-        }
+    if (Display::touchCallback)
+    {
+        Display::touchCallback(point.x, point.y);
     }
 }
 
@@ -141,45 +119,25 @@ void Display::setup()
 {
     Display::logger.info("Initializing");
 
-    // Defer hardware object construction until setup time
-    Display::bus = new Arduino_SWSPI(
-        GFX_NOT_DEFINED /* DC */, 42 /* CS */,
-        2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+#if defined(DISPLAY_DRIVER_GT911)
+    Display::driver = new RgbGt911Driver(Display::logger);
+#elif defined(DISPLAY_DRIVER_QUALIA)
+    Display::driver = new QualiaFtCstDriver(Display::logger);
+#else
+    Display::driver = nullptr;
+#endif
 
-    // Display::bus = new Arduino_HWSPI(GFX_NOT_DEFINED /* DC */, 42 /* CS */, 2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
-
-    Display::rgbpanel = new Arduino_ESP32RGBPanel(
-        40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
-        46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
-        14 /* G0 */, 13 /* G1 */, 12 /* G2 */, 11 /* G3 */, 10 /* G4 */, 9 /* G5 */,
-        5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */,
-        1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
-        1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
-
-    Display::gfx = new Arduino_RGB_Display(
-        480 /* width */, 480 /* height */, Display::rgbpanel, 2 /* rotation */, true /* auto_flush */,
-        Display::bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
-
-    Display::GT911.setPins(-1, 16);
-    if (!Display::GT911.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7))
+    if (!Display::driver || !Display::driver->begin())
     {
+        Display::logger.error("Display driver init failed");
         while (1)
         {
-            Display::logger.error("Failed to find GT911 - check your wiring!");
             delay(1000);
         }
     }
-    Display::logger.info("Init GT911 Sensor success!");
 
-    Display::GT911.setHomeButtonCallback([](void *user_data)
-                                         { Display::logger.info("Home button pressed!"); },
-                                         NULL);
-    Display::GT911.setMaxTouchPoint(1); // max is 5
-
-    Display::gfx->begin();
-
-    Display::screenWidth = Display::gfx->width();
-    Display::screenHeight = Display::gfx->height();
+    Display::screenWidth = Display::driver->width();
+    Display::screenHeight = Display::driver->height();
 
     lv_init();
 
