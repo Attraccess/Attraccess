@@ -5,7 +5,6 @@ uint8_t NFC::NEW_KEY[16] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01
 
 void NFC::setup()
 {
-    return;
     this->logger.info("Initializing PN532");
     this->pn532.begin();
 
@@ -51,7 +50,6 @@ void NFC::disableCardDetection()
 
 void NFC::loop()
 {
-    return;
     this->checkHardware();
     this->handleCardDetection();
 }

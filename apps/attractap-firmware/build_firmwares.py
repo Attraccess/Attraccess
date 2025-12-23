@@ -88,27 +88,29 @@ def main():
             
         print(f"Found environments: {environments}")
         
-        # Get base firmware information from the first environment
+        # Get base firmware information from [env] section and/or first environment
+        # Values can be in the base [env] section or in environment-specific sections
+        base_build_flags = config['env'].get('build_flags', '') if 'env' in config else ''
         first_env_section = f'env:{environments[0]}'
-        if 'build_flags' not in config[first_env_section]:
-            print(f"Error: build_flags is missing in first environment [{first_env_section}] of platformio.ini")
-            sys.exit(1)
-            
-        env_build_flags = config[first_env_section]['build_flags']
-        firmware_name = extract_define_value(env_build_flags, 'FIRMWARE_NAME')
-        firmware_friendly_name = extract_define_value(env_build_flags, 'FIRMWARE_FRIENDLY_NAME')
-        firmware_version = extract_define_value(env_build_flags, 'FIRMWARE_VERSION')
+        first_env_build_flags = config[first_env_section].get('build_flags', '')
+        
+        # Combine flags for extraction (env-specific can override base)
+        combined_flags = base_build_flags + '\n' + first_env_build_flags
+        
+        firmware_name = extract_define_value(combined_flags, 'FIRMWARE_NAME')
+        firmware_friendly_name = extract_define_value(combined_flags, 'FIRMWARE_FRIENDLY_NAME')
+        firmware_version = extract_define_value(combined_flags, 'FIRMWARE_VERSION')
         
         if not firmware_name:
-            print(f"Error: FIRMWARE_NAME is not defined in build_flags of [{first_env_section}] section")
+            print(f"Error: FIRMWARE_NAME is not defined in build_flags of [env] or [{first_env_section}] section")
             sys.exit(1)
             
         if not firmware_version:
-            print(f"Error: FIRMWARE_VERSION is not defined in build_flags of [{first_env_section}] section")
+            print(f"Error: FIRMWARE_VERSION is not defined in build_flags of [env] or [{first_env_section}] section")
             sys.exit(1)
             
         if not firmware_friendly_name:
-            print(f"Error: FIRMWARE_FRIENDLY_NAME is not defined in build_flags of [{first_env_section}] section")
+            print(f"Error: FIRMWARE_FRIENDLY_NAME is not defined in build_flags of [env] or [{first_env_section}] section")
             sys.exit(1)
             
         print(f"Base firmware name: {firmware_name}")
@@ -135,16 +137,13 @@ def main():
             
             env_section = f'env:{env}'
             
-            # Check if build_flags is present
-            if 'build_flags' not in config[env_section]:
-                print(f"Error: 'build_flags' is missing for environment '{env}' in platformio.ini")
-                sys.exit(1)
-                
-            # Extract values from build flags
-            env_build_flags = config[env_section]['build_flags']
-            firmware_variant = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT')
-            firmware_variant_friendly_name = extract_define_value(env_build_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
-            board_family = extract_define_value(env_build_flags, 'BOARD_FAMILY')
+            # Extract values from build flags (combine base [env] with environment-specific)
+            env_build_flags = config[env_section].get('build_flags', '')
+            combined_env_flags = base_build_flags + '\n' + env_build_flags
+            
+            firmware_variant = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT')
+            firmware_variant_friendly_name = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
+            board_family = extract_define_value(combined_env_flags, 'BOARD_FAMILY')
 
             if not firmware_variant:
                 print(f"Error: FIRMWARE_VARIANT is not defined in build_flags for environment '{env}'")
@@ -157,12 +156,15 @@ def main():
             # Derive chip from the PlatformIO 'board' setting, not from BOARD_FAMILY define
             board = config[env_section].get('board', '')
             board_l = board.lower()
-            if 'esp32c3' in board_l or 'esp32-c3' in board_l:
+            if 'esp32c3' in board_l or 'esp32-c3' in board_l or '_c3_' in board_l or '_c3' in board_l:
                 chip = 'esp32c3'
                 board_family_auto = 'ESP32-C3'
-            elif 'esp32-s3' in board_l or 'esp32s3' in board_l:
+            elif 'esp32-s3' in board_l or 'esp32s3' in board_l or '_s3_' in board_l or '_s3' in board_l:
                 chip = 'esp32s3'
                 board_family_auto = 'ESP32-S3'
+            elif 'esp32-s2' in board_l or 'esp32s2' in board_l or '_s2_' in board_l or '_s2' in board_l:
+                chip = 'esp32s2'
+                board_family_auto = 'ESP32-S2'
             else:
                 chip = 'esp32'
                 board_family_auto = 'ESP32'
@@ -301,6 +303,25 @@ def main():
                 print(f"Error: Failed to copy OTA image for environment '{env}': {e}")
                 sys.exit(1)
 
+            # Determine flash parameters based on chip type and board configuration
+            # Default flash parameters for each chip type
+            if chip == 'esp32s3':
+                flash_mode = 'dio'  # DIO is safer/more compatible for ESP32-S3
+                flash_freq = '80m'
+                flash_size = '16MB'
+            elif chip == 'esp32s2':
+                flash_mode = 'dio'
+                flash_freq = '80m'
+                flash_size = '4MB'
+            elif chip == 'esp32c3':
+                flash_mode = 'dio'
+                flash_freq = '80m'
+                flash_size = '4MB'
+            else:  # esp32
+                flash_mode = 'dio'
+                flash_freq = '40m'
+                flash_size = '4MB'
+
             firmware_info.append({
                 "name": firmware_name,
                 "friendlyName": firmware_friendly_name,
@@ -309,7 +330,11 @@ def main():
                 "version": firmware_version,
                 "boardFamily": board_family if board_family else board_family_auto,
                 "filename": firmware_filename,
-                "filenameOTA": ota_filename
+                "filenameOTA": ota_filename,
+                "chip": chip,
+                "flashMode": flash_mode,
+                "flashFreq": flash_freq,
+                "flashSize": flash_size
             })
         
         # Create single consolidated firmware manifest

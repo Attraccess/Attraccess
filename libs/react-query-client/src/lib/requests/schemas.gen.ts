@@ -4383,7 +4383,27 @@ export const $AttractapFirmware = {
             type: 'string',
             description: 'The filename of the firmware for OTA updates (zlib compressed)',
             example: 'attractap_eth.bin.zz'
+        },
+        chip: {
+            type: 'string',
+            description: 'The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)',
+            example: 'esp32s3'
+        },
+        flashMode: {
+            type: 'string',
+            description: 'The flash mode for programming (qio, qout, dio, dout)',
+            example: 'dio'
+        },
+        flashFreq: {
+            type: 'string',
+            description: 'The flash frequency for programming (80m, 40m, 26m, 20m)',
+            example: '80m'
+        },
+        flashSize: {
+            type: 'string',
+            description: 'The flash size (4MB, 8MB, 16MB, etc.)',
+            example: '16MB'
         }
     },
-    required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA']
+    required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA', 'chip', 'flashMode', 'flashFreq', 'flashSize']
 } as const;

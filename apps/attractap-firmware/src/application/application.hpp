@@ -7,8 +7,8 @@
 #include "settings/settings.hpp"
 #include "../network/network.hpp"
 #include "../api/api.hpp"
-#include "../ioexpander/ioexpander.hpp"
 #include "../utils.hpp"
+#include "../beeper/beeper.hpp"
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
 
@@ -35,7 +35,7 @@ private:
     NFC nfc;
     Logger logger;
     API api;
-    IOExpander ioExpander;
+    Beeper beeper;
 
     enum ExternalStates_t
     {

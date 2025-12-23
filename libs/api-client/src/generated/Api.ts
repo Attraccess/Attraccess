@@ -2780,6 +2780,26 @@ export interface AttractapFirmware {
    * @example "attractap_eth.bin.zz"
    */
   filenameOTA: string;
+  /**
+   * The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)
+   * @example "esp32s3"
+   */
+  chip: string;
+  /**
+   * The flash mode for programming (qio, qout, dio, dout)
+   * @example "dio"
+   */
+  flashMode: string;
+  /**
+   * The flash frequency for programming (80m, 40m, 26m, 20m)
+   * @example "80m"
+   */
+  flashFreq: string;
+  /**
+   * The flash size (4MB, 8MB, 16MB, etc.)
+   * @example "16MB"
+   */
+  flashSize: string;
 }
 
 export interface InfoData {
@@ -6646,7 +6666,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab

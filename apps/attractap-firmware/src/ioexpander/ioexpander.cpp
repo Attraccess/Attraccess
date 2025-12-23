@@ -24,45 +24,24 @@ void IOExpander::setup()
     initialized = true;
 }
 
-void IOExpander::errorBeep()
-{
-    if (!Settings::getDeviceConfig().beeperEnabled)
-    {
-        return;
-    }
-
-    this->singleBeep();
-    delay(100);
-    this->singleBeep();
-    delay(100);
-    this->singleBeep();
-}
-
-void IOExpander::successBeep()
-{
-    if (!Settings::getDeviceConfig().beeperEnabled)
-    {
-        return;
-    }
-
-    this->singleBeep();
-}
-
-void IOExpander::singleBeep()
+void IOExpander::beeperOn()
 {
     if (!initialized)
     {
         return;
     }
 
-    if (!Settings::getDeviceConfig().beeperEnabled)
+    outputState |= (uint8_t(1 << BEEPER_PIN));
+    writeRegister(TCA9554_REG_OUTPUT, outputState);
+}
+
+void IOExpander::beeperOff()
+{
+    if (!initialized)
     {
         return;
     }
 
-    outputState |= (uint8_t(1 << BEEPER_PIN));
-    writeRegister(TCA9554_REG_OUTPUT, outputState);
-    delay(100);
     outputState &= ~(uint8_t(1 << BEEPER_PIN));
     writeRegister(TCA9554_REG_OUTPUT, outputState);
 }

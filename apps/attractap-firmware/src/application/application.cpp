@@ -28,7 +28,7 @@ void Application::setup()
 
     Settings::setup();
     Network::setup();
-    this->ioExpander.setup();
+    this->beeper.setup();
     Display::setup();
     this->nfc.setup();
     this->api.setup();
@@ -51,7 +51,7 @@ void Application::setup()
                                                                if (response.error.length() > 0)
                                                                {
                                                                    this->logger.errorf("Authentication failed: %s", response.error.c_str());
-                                                                   this->ioExpander.errorBeep();
+                                                                   this->beeper.errorBeep();
                                                                    this->nfc.enableCardDetection();
                                                                    this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
                                                                    return;
@@ -60,7 +60,7 @@ void Application::setup()
                                                                if (response.keyLen != 16)
                                                                {
                                                                    this->logger.error("Invalid key bytes provided");
-                                                                   this->ioExpander.errorBeep();
+                                                                   this->beeper.errorBeep();
                                                                    this->nfc.enableCardDetection();
                                                                    this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
                                                                    return;
@@ -79,7 +79,7 @@ void Application::setup()
     // Insufficient balance special-case (with SumUp capability flag)
     this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled)
                                              {
-                                                 this->ioExpander.errorBeep();
+                                                 this->beeper.errorBeep();
                                                  
                                                  struct Payload { Application *self; bool enabled; };
                                                  Payload *pl = new Payload{this, sumUpEnabled}; if (!pl) return;
@@ -100,7 +100,7 @@ void Application::setup()
     // Generic error fallback for all other errors
     this->api.setErrorCallback([this](const char *title, const char *message)
                                {
-                                   this->ioExpander.errorBeep();
+                                   this->beeper.errorBeep();
 
                                    if (this->state == APPLICATION_STATE_LOCKED) {
                                        this->nfc.enableCardDetection();
@@ -283,12 +283,12 @@ void Application::setup()
 
             if (success)
             {
-                this->ioExpander.successBeep();
+                this->beeper.successBeep();
                 this->externalState = EXTERNAL_STATE_NONE;
             }
             else
             {
-                this->ioExpander.errorBeep();
+                this->beeper.errorBeep();
             }
 
             this->api.sendEnrollNewCard(success);
@@ -643,7 +643,7 @@ void Application::processCardAuthenticationData()
     if (this->cardAuthenticationData.keyLen != 16)
     {
         this->logger.error("Invalid key bytes provided");
-        this->ioExpander.errorBeep();
+        this->beeper.errorBeep();
         this->nfc.enableCardDetection();
         this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         return;
@@ -654,13 +654,13 @@ void Application::processCardAuthenticationData()
     if (!authenticated)
     {
         this->logger.error("Authentication failed");
-        this->ioExpander.errorBeep();
+        this->beeper.errorBeep();
         this->nfc.enableCardDetection();
         this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         return;
     }
 
-    this->ioExpander.successBeep();
+    this->beeper.successBeep();
     this->logger.info("Authentication successful");
 
     this->externalState = EXTERNAL_STATE_NONE;
