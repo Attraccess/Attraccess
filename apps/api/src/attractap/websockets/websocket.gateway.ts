@@ -681,6 +681,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       throw new Error(`Reader not found: ${data.readerId}`);
     }
 
+    if (!reader.firmware.capabilities.cardEnrollment) {
+      throw new Error(`Reader does not support card enrollment: ${data.readerId}`);
+    }
+
     const user = await this.usersService.findOne({ id: data.userId });
 
     if (!user) {

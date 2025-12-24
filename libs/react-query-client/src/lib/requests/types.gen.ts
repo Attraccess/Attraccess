@@ -2651,8 +2651,38 @@ export type UpdateReaderDto = {
     connectedResourceIds: Array<(number)>;
 };
 
+export type AttractapCapabilities = {
+    /**
+     * Whether the reader can choose from many linked resources or can only handle one
+     */
+    resourceSelection: boolean;
+    /**
+     * Whether the reader has interface options for triggering resource actions, if not a actions is triggered immediately upon scanning a nfc card
+     */
+    resourceActionSelection: boolean;
+    /**
+     * Whether the reader can enroll new cards
+     */
+    cardEnrollment: boolean;
+};
+
 export type AttractapFirmwareVersion = {
-    [key: string]: unknown;
+    /**
+     * The name of the firmware
+     */
+    name: string | null;
+    /**
+     * The variant of the firmware
+     */
+    variant: string | null;
+    /**
+     * The version of the firmware
+     */
+    version: string | null;
+    /**
+     * The capabilities of the reader
+     */
+    capabilities: AttractapCapabilities;
 };
 
 export type Attractap = {

@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include "../serial/serialCommandHandler.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #endif
@@ -27,24 +28,36 @@ void Application::setup()
     }
 
     Settings::setup();
+    SerialCommandHandler::setup();
     Network::setup();
     this->beeper.setup();
+
+#ifdef HAS_LVGL_DISPLAY
     Display::setup();
+#endif
+
     this->nfc.setup();
     this->api.setup();
 
+#ifdef HAS_LVGL_DISPLAY
     this->api.onDeviceName([this](String deviceName)
                            { Display::setDeviceName(deviceName); });
-
+#endif
     this->api.setResourceListUpdateCallback([this](const API::ResourceList &resourceList)
                                             {
+#ifdef HAS_LVGL_DISPLAY
                                                 struct ResourceListAsyncPayload
                                                 {
                                                     Application *self;
                                                     API::ResourceList list;
                                                 };
 
-                                                this->handleResourceListUpdate(resourceList); });
+                                                this->handleResourceListUpdate(resourceList);
+#else
+                                                this->selectedResourceId = resourceList.items[0].id;
+                                                this->resourceIsDoor = resourceList.items[0].type == 1;
+#endif
+                                            });
 
     this->api.setCardAuthenticationDetailsResponseCallback([this](API::CardAuthenticationDetailsResponse response)
                                                            {
@@ -67,15 +80,18 @@ void Application::setup()
                                                                }
 
                                                                this->cardAuthenticationData = response;
+#ifdef HAS_LVGL_DISPLAY
                                                            if (this->currentProjectsUser != response.username)
                                                            {
                                                                this->clearProjectSelection();
                                                            }
                                                            this->currentProjectsUser = response.username;
                                                            this->requestProjectsPage(1);
+#endif
 
                                                                this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD; });
 
+#ifdef HAS_LVGL_DISPLAY
     // Insufficient balance special-case (with SumUp capability flag)
     this->api.setInsufficientBalanceCallback([this](bool sumUpEnabled)
                                              {
@@ -96,22 +112,38 @@ void Application::setup()
                                                      }
                                                      delete p;
                                                  }, pl); });
+#endif
 
     // Generic error fallback for all other errors
     this->api.setErrorCallback([this](const char *title, const char *message)
                                {
                                    this->beeper.errorBeep();
 
-                                   if (this->state == APPLICATION_STATE_LOCKED) {
+#ifdef HAS_LVGL_DISPLAY
+                                   if (this->state == APPLICATION_STATE_LOCKED)
+#else
+                                   if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
+#endif
+                                   {
                                        this->nfc.enableCardDetection();
                                    }
 
+#ifdef HAS_LVGL_DISPLAY
                                    // Ensure UI operations on LVGL thread
-                                   struct ErrPayload { Application *self; String t; String m; };
+                                   struct ErrPayload
+                                   {
+                                       Application *self;
+                                       String t;
+                                       String m;
+                                   };
                                    ErrPayload *p = new ErrPayload();
-                                   if (!p) return;
-                                   p->self = this; p->t = String(title); p->m = String(message);
-                                   lv_async_call([](void *u){
+                                   if (!p)
+                                       return;
+                                   p->self = this;
+                                   p->t = String(title);
+                                   p->m = String(message);
+                                   lv_async_call([](void *u)
+                                                 {
                                        auto *pl = (ErrPayload *)u;
                                        if (!pl || !pl->self) { if (pl) delete pl; return; }
                                        pl->self->endActionPause();
@@ -123,9 +155,11 @@ void Application::setup()
                                            pl->self->hasPendingFormRequest = false;
                                            Display::resourceDetailsScreen.hideFormsModal();
                                        }
-                                       delete pl;
-                                   }, p); });
+                                       delete pl; }, p);
+#endif
+                               });
 
+#ifdef HAS_LVGL_DISPLAY
     // Generic action result handling: stop overlay and show success toast
     this->api.setActionResultCallback([this](const char *type, bool success)
                                       {
@@ -167,6 +201,7 @@ void Application::setup()
                                                             delete pl;
                                                         } },
                                                     p); });
+#endif
 
     this->api.setFirmwareUpdateMetaCallback([this](String availableVersion)
                                             { 
@@ -179,8 +214,10 @@ void Application::setup()
                                                     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
                                                     this->firmwareUpdateProgressPct = percent; });
 
+#ifdef HAS_LVGL_DISPLAY
     Display::resourceDetailsScreen.setButtonClickCallback([this](ResourceDetailsScreen::ButtonClickEventData evt)
                                                           { this->handleResourceDetailsButtonClick(evt); });
+
     Display::resourceDetailsScreen.setProjectsPageRequestCallback([this](uint32_t page)
                                                                   { this->requestProjectsPage(page); });
     Display::resourceDetailsScreen.setProjectSelectionCallback(
@@ -191,6 +228,31 @@ void Application::setup()
         { this->handleFormsSubmit(submissions); });
     Display::resourceDetailsScreen.setFormsCancelCallback([this]()
                                                           { this->handleFormsCancel(); });
+
+    Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
+                                                    { Settings::setDevicePin(pin); });
+
+    Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]()
+                                                                      { 
+    Display::transitionToScreen(&Display::initScreen);
+    this->state = APPLICATION_STATE_BOOT;
+    this->api.enableConnectionAttempts(); });
+
+    Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
+                                                             { this->handleConnectionConfigurationSave(cfg); });
+
+    Display::initScreen.setOnOpenSettingsCallback([this]()
+                                                  {
+    this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+    this->api.disableConnectionAttempts();
+    Display::connectionConfigurationScreen.enablePinLock();
+    Display::transitionToScreen(&Display::connectionConfigurationScreen); });
+
+    Display::resourceListScreen.setResourceSelectionCallback([this](const API::ResourceBrief &resource)
+                                                             { this->selectResource(resource); });
+
+    Display::setTouchCallback([this](int16_t x, int16_t y)
+                              { this->handleTouch(x, y); });
 
     this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username)
                                                         {
@@ -212,30 +274,6 @@ void Application::setup()
 
                                            this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD; });
 
-    Display::setPinScreen.setOnPinConfirmedCallback([this](String pin)
-                                                    { Settings::setDevicePin(pin); });
-
-    Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]()
-                                                                      { 
-                                           Display::transitionToScreen(&Display::initScreen);
-                                           this->state = APPLICATION_STATE_BOOT;
-                                           this->api.enableConnectionAttempts(); });
-
-    Display::connectionConfigurationScreen.setOnSaveCallback([this](const ConnectionConfigurationScreen::ConnectionConfig &cfg)
-                                                             { this->handleConnectionConfigurationSave(cfg);
-                                                       this->state = APPLICATION_STATE_BOOT;
-                                                       this->api.enableConnectionAttempts(); });
-
-    Display::initScreen.setOnOpenSettingsCallback([this]()
-                                                  {
-                                           this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-                                           this->api.disableConnectionAttempts();
-                                           Display::connectionConfigurationScreen.enablePinLock();
-                                           Display::transitionToScreen(&Display::connectionConfigurationScreen); });
-
-    Display::resourceListScreen.setResourceSelectionCallback([this](const API::ResourceBrief &resource)
-                                                             { this->selectResource(resource); });
-
     this->api.setProjectsOfUserResponseCallback([this](const API::ProjectsOfUserResponse &projectsOfUserResponse)
                                                 {
                                                     this->projectsOfUserResponse = projectsOfUserResponse;
@@ -243,6 +281,7 @@ void Application::setup()
                                                     this->projectsTotalCount = projectsOfUserResponse.total;
                                                     this->projectsHasMore = projectsOfUserResponse.hasMore;
                                                     this->projectsOfUserResponseUpdated = true; });
+
     this->api.setResourceFormsRequestCallback([this](const API::ResourceUsageFormRequest &request)
                                               {
                                                   // DO NOT copy the large struct here - websocket task has limited stack/heap.
@@ -261,17 +300,30 @@ void Application::setup()
                                                                         self->handleFormsRequest(self->pendingFormRequest);
                                                                     } },
                                                                 this); });
+#endif
 
     auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength)
     {
         this->logger.infof("Card detected: %s", hexToString(uid, uidLength).c_str());
 
+#ifndef HAS_LVGL_DISPLAY
+        this->cardDetected = true;
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
         if (this->state == APPLICATION_STATE_LOCKED)
+#else
+        if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
+#endif
         {
-            this->api.requestCardAuthenticationData(uid, uidLength, this->selectedResourceId);
+            this->api.requestCardAuthenticationData(
+                uid,
+                uidLength,
+                this->selectedResourceId);
             return;
         }
 
+#ifdef HAS_LVGL_DISPLAY
         if (this->state == APPLICATION_STATE_ENROLLMENT)
         {
 
@@ -296,6 +348,7 @@ void Application::setup()
             this->externalState = EXTERNAL_STATE_NONE;
             return;
         }
+#endif
 
         if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
         {
@@ -305,17 +358,37 @@ void Application::setup()
     };
     this->nfc.setCardDetectionCallback(cardDetectionCallback);
 
+#ifndef HAS_LVGL_DISPLAY
+    this->nfc.setCardRemovalCallback([this](uint32_t presentationTimeMs)
+                                     {
+                                        this->beeper.singleBeep();
+                                        this->logger.debugf("Card removed after %d ms", presentationTimeMs); 
+                                        this->cardRemoved = true;
+                                        this->cardPresentationTimeMs = presentationTimeMs;
+
+                                        // log inmportant vars (cardDetected, cardRemoved, cardPresentationTimeMs, state)
+                                        this->logger.debugf("cardDetected: %d", this->cardDetected);
+                                        this->logger.debugf("cardRemoved: %d", this->cardRemoved);
+                                        this->logger.debugf("unlocked: %d", this->unlocked);
+                                        this->logger.debugf("cardPresentationTimeMs: %d", this->cardPresentationTimeMs);
+                                        this->logger.debugf("state: %d", this->state); });
+#endif
+
     xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr, tskIDLE_PRIORITY, nullptr);
 
-    Display::setTouchCallback([this](int16_t x, int16_t y)
-                              { this->handleTouch(x, y); });
-
+#ifdef HAS_LVGL_DISPLAY
     this->bootTime = millis();
+#endif
 }
 
 void Application::loop()
 {
+    SerialCommandHandler::loop();
+
+#ifdef HAS_LVGL_DISPLAY
     Display::loop();
+#endif
+
     nfc.loop();
     this->api.loop();
 
@@ -324,16 +397,32 @@ void Application::loop()
 
 void Application::processState()
 {
+    AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
+    bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() && attraccessApiConfig.hostname != "" && attraccessApiConfig.port > 0;
+
+    if (!connectionIsConfigured)
+    {
+        this->logger.debug("Connection is not configured, showing connection configuration screen");
+        if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED)
+        {
+            this->logger.debug("Connection is not configured, showing connection configuration screen");
+            this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+
+#ifdef HAS_LVGL_DISPLAY
+            Display::connectionConfigurationScreen.disablePinLock();
+            Display::transitionToScreen(&Display::connectionConfigurationScreen);
+#endif
+        }
+
+        return;
+    }
+
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
-        return;
+        this->api.enableConnectionAttempts();
     }
 
-    if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE)
-    {
-        return;
-    }
-
+#ifdef HAS_LVGL_DISPLAY
     if (!this->bootDone && millis() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION)
     {
         this->logger.debug("Boot screen duration reached, hiding boot screen");
@@ -359,30 +448,16 @@ void Application::processState()
         Display::transitionToScreen(&Display::setPinScreen);
         return;
     }
-
-    AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
-    bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() && attraccessApiConfig.hostname != "" && attraccessApiConfig.port > 0;
-
-    if (!connectionIsConfigured)
-    {
-        if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
-        {
-            return;
-        }
-
-        this->logger.debug("Connection is not configured, showing connection configuration screen");
-        this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-        Display::connectionConfigurationScreen.disablePinLock();
-        Display::transitionToScreen(&Display::connectionConfigurationScreen);
-        return;
-    }
+#endif
 
     State::ApiState apiState = State::getApiState();
     State::NetworkState networkState = State::getNetworkState();
     State::WebsocketState websocketState = State::getWebsocketState();
     if (!apiState.authenticated || (!networkState.ethernet_connected && !networkState.wifi_connected) || !websocketState.connected)
     {
+#ifdef HAS_LVGL_DISPLAY
         this->resetSessionOnDisconnect();
+#endif
         if (this->state == APPLICATION_STATE_INIT)
         {
             return;
@@ -391,10 +466,13 @@ void Application::processState()
         this->logger.debug("API state is not authenticated, network state is not connected, websocket state is not connected, showing init screen");
         this->state = APPLICATION_STATE_INIT;
 
+#ifdef HAS_LVGL_DISPLAY
         Display::transitionToScreen(&Display::initScreen);
+#endif
         return;
     }
 
+#ifdef HAS_LVGL_DISPLAY
     if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO)
     {
         if (this->state == APPLICATION_STATE_ENROLLMENT)
@@ -421,10 +499,14 @@ void Application::processState()
         }
 
         this->nfc.disableCardDetection();
+#ifdef HAS_LVGL_DISPLAY
         Display::enrollmentScreen.setUserName(this->apiEnrollNewCardGetAvailableKeyNoData.username);
+#endif
         this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+#ifdef HAS_LVGL_DISPLAY
         Display::enrollmentScreen.setEnrollmentTimeoutTime(this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
         Display::transitionToScreen(&Display::enrollmentScreen);
+#endif
 
         this->state = APPLICATION_STATE_ENROLLMENT;
 
@@ -442,20 +524,73 @@ void Application::processState()
         this->state = APPLICATION_STATE_ENROLLMENT;
         return;
     }
+#endif
 
     if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD)
     {
         if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
         {
+
+#ifndef HAS_LVGL_DISPLAY
+
+            if (this->cardDetected)
+            {
+                if (!this->cardRemoved)
+                {
+                    this->logger.debug("Card detected but not removed, returning");
+                    return;
+                }
+
+                if (!this->unlocked)
+                {
+                    this->logger.debug("Card detected but not unlocked, returning");
+                    return;
+                }
+
+                this->logger.debug("Card detected and removed and unlocked, processing");
+
+                this->unlocked = false;
+                this->cardDetected = false;
+                this->cardRemoved = false;
+                this->cardPresentationTimeMs = 0;
+
+                bool isLongPresentation = this->cardPresentationTimeMs > NFC_CARD_LONG_PRESENTATION_TIME_MS;
+
+                if (this->resourceIsDoor)
+                {
+                    if (isLongPresentation)
+                    {
+                        this->api.lockDoor(this->selectedResourceId);
+                    }
+                    else
+                    {
+                        this->api.unlockDoor(this->selectedResourceId);
+                    }
+                }
+                else
+                {
+                    if (isLongPresentation)
+                    {
+                        this->api.startResourceUsageSession(this->selectedResourceId);
+                    }
+                    else
+                    {
+                        this->api.stopResourceUsageSession(this->selectedResourceId);
+                    }
+                }
+            }
+#endif
             return;
         }
 
+#ifdef HAS_LVGL_DISPLAY
         Display::resourceDetailsScreen.setUserDetails(
             ResourceDetailsScreen::UserDetails{
                 .username = this->cardAuthenticationData.username,
                 .canManageResource = this->cardAuthenticationData.canManageResource,
                 .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
                 .isIntroducer = this->cardAuthenticationData.isIntroducer});
+#endif
 
         this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
         this->nfc.enableCardDetection();
@@ -467,16 +602,21 @@ void Application::processState()
         if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE)
         {
             this->logger.debugf("Updating firmware update progress %d", this->firmwareUpdateProgressPct);
+#ifdef HAS_LVGL_DISPLAY
             Display::firmwareUpdateScreen.setProgress(this->firmwareUpdateProgressPct);
             Display::firmwareUpdateScreen.setAvailableVersion(this->availableFirmwareVersion);
+#endif
             return;
         }
 
+#ifdef HAS_LVGL_DISPLAY
         Display::transitionToScreen(&Display::firmwareUpdateScreen);
+#endif
         this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
         return;
     }
 
+#ifdef HAS_LVGL_DISPLAY
     if (this->resourceCount == 0)
     {
         if (this->state == APPLICATION_STATE_NO_RESOURCES)
@@ -486,6 +626,7 @@ void Application::processState()
 
         this->logger.debug("Resource count is 0, showing no resources screen");
         this->state = APPLICATION_STATE_NO_RESOURCES;
+
         Display::transitionToScreen(&Display::noResourcesScreen);
         return;
     }
@@ -501,8 +642,10 @@ void Application::processState()
     {
         if (this->resourceListUpdated)
         {
-            // Update UI with the list
+// Update UI with the list
+#ifdef HAS_LVGL_DISPLAY
             Display::resourceListScreen.setResourceList(this->resourceList);
+#endif
             this->resourceListUpdated = false;
         }
 
@@ -513,7 +656,9 @@ void Application::processState()
 
         this->logger.debug("Resource count is greater than 0 and resource is not selected, showing resource list");
         this->state = APPLICATION_STATE_RESOURCE_LIST;
+#ifdef HAS_LVGL_DISPLAY
         Display::transitionToScreen(&Display::resourceListScreen);
+#endif
         return;
     }
 
@@ -553,10 +698,14 @@ void Application::processState()
 
         this->logger.debug("Card is not detected, showing lockscreen");
         this->state = APPLICATION_STATE_LOCKED;
+#ifdef HAS_LVGL_DISPLAY
         Display::transitionToScreen(&Display::lockscreen, [this]()
                                     { 
                                         this->logger.debug("Lockscreen transition complete, enabling card detection");
                                         this->nfc.enableCardDetection(); });
+#else
+        this->nfc.enableCardDetection();
+#endif
         return;
     }
 
@@ -581,8 +730,10 @@ void Application::processState()
 
         if (this->projectsOfUserResponseUpdated)
         {
+#ifdef HAS_LVGL_DISPLAY
             Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
             Display::resourceDetailsScreen.setSelectedProject(this->selectedProjectId, this->selectedProjectName.c_str());
+#endif
             this->projectsOfUserResponseUpdated = false;
         }
 
@@ -592,9 +743,21 @@ void Application::processState()
     this->logger.debug("Resource is unlocked, showing resource details screen");
     this->state = APPLICATION_STATE_UNLOCKED;
     this->restartSessionTimeout();
+
     Display::transitionToScreen(&Display::resourceDetailsScreen);
+#else
+
+    if (this->state != APPLICATION_STATE_WAIT_FOR_CARD)
+    {
+        this->logger.debug("Waiting for card detection");
+        this->state = APPLICATION_STATE_WAIT_FOR_CARD;
+        this->nfc.enableCardDetection();
+        return;
+    }
+#endif
 }
 
+#ifdef HAS_LVGL_DISPLAY
 void Application::handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg)
 {
     // split cfg.host into hostname and port (if no port present, use 443)
@@ -636,6 +799,7 @@ void Application::handleResourceListUpdate(const API::ResourceList &resourceList
         }
     }
 }
+#endif
 
 void Application::processCardAuthenticationData()
 {
@@ -664,9 +828,11 @@ void Application::processCardAuthenticationData()
     this->logger.info("Authentication successful");
 
     this->externalState = EXTERNAL_STATE_NONE;
+
     this->unlocked = true;
 }
 
+#ifdef HAS_LVGL_DISPLAY
 void Application::selectResource(const API::ResourceBrief &resource)
 {
     this->logger.infof("Resource selected: %s", resource.name);
@@ -927,3 +1093,4 @@ void Application::resetSessionOnDisconnect()
     this->externalState = EXTERNAL_STATE_NONE;
     this->nfc.enableCardDetection();
 }
+#endif

@@ -175,6 +175,10 @@ export class AttractapService {
         this.logger.debug('resources from db', resources);
       }
 
+      if (reader.firmware.capabilities.resourceSelection && resources.length > 1) {
+        resources = [resources[0]];
+      }
+
       this.logger.debug('resources for reader', resources);
       reader.resources = resources;
     }

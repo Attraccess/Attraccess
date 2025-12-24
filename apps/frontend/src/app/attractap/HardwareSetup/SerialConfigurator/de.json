@@ -9,8 +9,11 @@
     }
   },
   "tabs": {
-    "main": "Hauptkonfiguration",
-    "keypad": "Tastatur",
-    "checkingKeypad": "Suche nach Tastatur..."
+    "wifi": {
+      "title": "WiFi"
+    },
+    "api": {
+      "title": "API"
+    }
   }
 }

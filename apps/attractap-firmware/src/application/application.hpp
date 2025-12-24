@@ -2,13 +2,18 @@
 
 #include <Arduino.h>
 #include "../nfc/nfc.hpp"
-#include "../display/display.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
 #include "../network/network.hpp"
 #include "../api/api.hpp"
 #include "../utils.hpp"
 #include "../beeper/beeper.hpp"
+
+#ifdef HAS_LVGL_DISPLAY
+#include "../display/display.hpp"
+#else
+#define NFC_CARD_LONG_PRESENTATION_TIME_MS 5000
+#endif
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
 
@@ -17,14 +22,17 @@ class Application
 public:
     Application() : logger("Application"),
                     api(),
-                    unlocked(false),
+                    externalState(EXTERNAL_STATE_NONE),
+                    firmwareUpdateProgressPct(0),
+                    unlocked(false)
+#ifdef HAS_LVGL_DISPLAY
+                    ,
                     resourceCount(0),
                     resourceIsSelected(false),
                     bootDone(false),
-                    externalState(EXTERNAL_STATE_NONE),
                     resourceListUpdated(false),
-                    selectedResourceChanged(false),
-                    firmwareUpdateProgressPct(0)
+                    selectedResourceChanged(false)
+#endif
     {
     }
 
@@ -40,13 +48,17 @@ private:
     enum ExternalStates_t
     {
         EXTERNAL_STATE_NONE,
+#ifdef HAS_LVGL_DISPLAY
         EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
         EXTERNAL_STATE_ENROLL_NEW_CARD,
+#endif
         EXTERNAL_STATE_AUTHENTICATE_CARD,
         EXTERNAL_STATE_FIRMWARE_UPDATE,
     };
 
     ExternalStates_t externalState;
+
+#ifdef HAS_LVGL_DISPLAY
     struct ApiEnrollNewCardGetAvailableKeyNoData_t
     {
         String username;
@@ -60,6 +72,7 @@ private:
         uint8_t keyBytes[16];
     };
     ApiEnrollNewCardData_t apiEnrollNewCardData;
+#endif
 
     API::CardAuthenticationDetailsResponse cardAuthenticationData;
 
@@ -71,13 +84,19 @@ private:
     networkTask(void *parameter);
 
     void processState();
+
+#ifdef HAS_LVGL_DISPLAY
     void handleConnectionConfigurationSave(const ConnectionConfigurationScreen::ConnectionConfig &cfg);
+
     void handleTouch(int16_t x, int16_t y);
 
     uint32_t bootTime;
     bool bootDone;
 
+#endif
     bool unlocked;
+#ifdef HAS_LVGL_DISPLAY
+
     uint32_t timeOfUnlockedMs;
     const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
     void restartSessionTimeout();
@@ -90,7 +109,18 @@ private:
 
     uint8_t resourceCount;
     bool resourceIsSelected;
+#else
+    bool resourceIsDoor = false;
+#endif
     uint32_t selectedResourceId;
+
+#ifndef HAS_LVGL_DISPLAY
+    bool cardDetected = false;
+    bool cardRemoved = false;
+    uint32_t cardPresentationTimeMs = 0;
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
     bool selectedResourceChanged;
     // Own a persistent copy of the latest resource list to avoid dangling references
     API::ResourceList resourceList;
@@ -121,6 +151,7 @@ private:
     API::FormSubmissionList formSubmissionBuffer;
 
     void selectResource(const API::ResourceBrief &resource);
+
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();
     void handleProjectSelection(uint32_t projectId, const String &projectName);
@@ -128,27 +159,39 @@ private:
     void handleFormsSubmit(const API::FormSubmissionList &submissions);
     void handleFormsCancel();
     void onActionResult(const String &eventType);
+#endif
 
     enum applicationState_t
     {
+#ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_BOOT,
         APPLICATION_STATE_PIN_NOT_SET,
+#endif
         APPLICATION_STATE_CONFIGURATION_REQUIRED,
         APPLICATION_STATE_INIT,
         APPLICATION_STATE_CUSTOM,
+#ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_LOCKED,
+#endif
         APPLICATION_STATE_AUTHENTICATE_CARD,
         APPLICATION_STATE_NO_RESOURCES,
+#ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_RESOURCE_LIST,
         APPLICATION_STATE_UNLOCKED,
         APPLICATION_STATE_ENROLLMENT,
+#else
+        APPLICATION_STATE_WAIT_FOR_CARD,
+#endif
         APPLICATION_STATE_FIRMWARE_UPDATE
     };
     applicationState_t state;
 
+#ifdef HAS_LVGL_DISPLAY
     void handleResourceListUpdate(const API::ResourceList &resourceList);
+#endif
     void processCardAuthenticationData();
 
+#ifdef HAS_LVGL_DISPLAY
     void handleResourceDetailsButtonClick(ResourceDetailsScreen::ButtonClickEventData evt);
 
     // Action pause tracking (while server actions are running)
@@ -158,4 +201,5 @@ private:
     uint32_t pauseStartMs = 0;
     uint32_t accumulatedPauseMs = 0;
     uint16_t actionInProgressCount = 0;
+#endif
 };

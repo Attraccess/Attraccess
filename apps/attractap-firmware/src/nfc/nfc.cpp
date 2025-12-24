@@ -1,7 +1,6 @@
 #include "nfc.hpp"
 
 uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-uint8_t NFC::NEW_KEY[16] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
 
 void NFC::setup()
 {
@@ -61,27 +60,43 @@ void NFC::handleCardDetection()
         return;
     }
 
-    uint8_t cardDetectedUid[7] = {0};
-    uint8_t cardDetectedUidLength = 0;
-
-    bool foundCard = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 50);
-    if (!foundCard)
+    if (this->foundCard)
     {
+        // just try to comminucate with card in any way to check if it is still present
+        bool authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
+        this->logger.debugf("Card authentication successful: %d", authSuccess);
+        if (!authSuccess)
+        {
+            // card removed, call callback
+            this->logger.debug("Card removed");
+            // this->disableCardDetection();
+            this->foundCard = false;
+            uint32_t presentationTimeMs = millis() - this->foundCardTimeMs;
 
+            this->logger.debugf("Calling card detection callback with presentation time: %d ms", presentationTimeMs);
+            if (this->cardRemovalCallback != nullptr)
+            {
+                this->cardRemovalCallback(presentationTimeMs);
+            }
+        }
+
+        // card still present, wait till removed
         return;
     }
 
-    this->disableCardDetection();
+    bool foundCardUpdate = this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, cardDetectedUid, &cardDetectedUidLength, 100);
 
-    if (this->cardDetectionCallback == nullptr)
+    if (foundCardUpdate)
     {
-        this->logger.error("Card detection callback is null");
-        return;
-    }
+        this->foundCard = true;
+        this->foundCardTimeMs = millis();
+        this->logger.debug("Card detected");
 
-    this->logger.info("Calling card detection callback");
-    this->cardDetectionCallback(cardDetectedUid, cardDetectedUidLength);
-    this->logger.info("Card detection callback returned");
+        if (this->cardDetectionCallback != nullptr)
+        {
+            this->cardDetectionCallback(cardDetectedUid, cardDetectedUidLength);
+        }
+    }
 }
 
 bool NFC::waitForCard(uint32_t timeoutMs)
@@ -219,4 +234,9 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
 bool NFC::isCardDetectionEnabled()
 {
     return this->cardDetectionEnabled;
+}
+
+void NFC::setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback)
+{
+    this->cardRemovalCallback = callback;
 }

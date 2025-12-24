@@ -1,0 +1,54 @@
+{
+  "title": "API",
+  "actions": {
+    "refreshStatus": "Refresh status"
+  },
+  "status": {
+    "connected": {
+      "title": "Attraccess connected",
+      "description": "Attempting authentication..."
+    },
+    "authenticated": {
+      "title": "Connected & authenticated",
+      "description": "Device ID: {{deviceId}}",
+      "openDeviceSettings": {
+        "button": "Open device settings"
+      }
+    },
+    "connecting_tcp": {
+      "title": "Establishing TCP connection",
+      "description": "Connecting to Attraccess Server ({{hostname}}:{{port}} {{protocolEmoji}})..."
+    },
+    "connecting_websocket": {
+      "title": "Establishing WebSocket",
+      "description": "Connecting to Attraccess Server ({{hostname}}:{{port}} {{protocolEmoji}})..."
+    },
+    "disconnected": {
+      "title": "API disconnected",
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
+    },
+    "error_failed": {
+      "title": "Connection failed",
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
+    },
+    "error_timed_out": {
+      "title": "Connection timed out",
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
+    },
+    "error_invalid_server": {
+      "title": "Invalid Attraccess server",
+      "description": "Hostname: {{hostname}}, Port: {{port}}, {{protocolEmoji}}"
+    }
+  },
+  "statusNotYetFetched": {
+    "title": "Status is loading...",
+    "description": "This may take a few seconds..."
+  },
+  "apiDataDoesNotMatchesServer": {
+    "alert": {
+      "title": "API data does not match server",
+      "description": "The data from the reader does not match the server data. Please update the data.",
+      "button": "Update data"
+    }
+  }
+}

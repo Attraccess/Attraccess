@@ -141,6 +141,14 @@ def main():
             env_build_flags = config[env_section].get('build_flags', '')
             combined_env_flags = base_build_flags + '\n' + env_build_flags
             
+            # Extract firmware name for this specific environment (can override base)
+            env_firmware_name = extract_define_value(combined_env_flags, 'FIRMWARE_NAME')
+            env_firmware_friendly_name = extract_define_value(combined_env_flags, 'FIRMWARE_FRIENDLY_NAME')
+            
+            # Use environment-specific values if defined, otherwise fall back to base
+            current_firmware_name = env_firmware_name if env_firmware_name else firmware_name
+            current_firmware_friendly_name = env_firmware_friendly_name if env_firmware_friendly_name else firmware_friendly_name
+            
             firmware_variant = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT')
             firmware_variant_friendly_name = extract_define_value(combined_env_flags, 'FIRMWARE_VARIANT_FRIENDLY_NAME')
             board_family = extract_define_value(combined_env_flags, 'BOARD_FAMILY')
@@ -169,7 +177,7 @@ def main():
                 chip = 'esp32'
                 board_family_auto = 'ESP32'
 
-            print(f"  Firmware name: {firmware_name}")
+            print(f"  Firmware name: {current_firmware_name}")
             print(f"  Firmware variant: {firmware_variant}")
             print(f"  Firmware variant friendly name: {firmware_variant_friendly_name}")
             print(f"  Firmware version: {firmware_version}")
@@ -264,7 +272,7 @@ def main():
 
             # Create merged firmware bin using esptool
             # Name the file after the firmware_name and variant
-            firmware_filename = f"{firmware_name}_{firmware_variant}.bin"
+            firmware_filename = f"{current_firmware_name}_{firmware_variant}.bin"
             merged_bin_path = os.path.join(output_dir, firmware_filename)
             try:
                 print(f"Creating merged firmware for {env}...")
@@ -294,7 +302,7 @@ def main():
                 sys.exit(1)
 
             # Also export the app-only OTA image (do not merge bootloader/partitions)
-            ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+            ota_filename = f"{current_firmware_name}_{firmware_variant}_ota.bin"
             ota_bin_path = os.path.join(output_dir, ota_filename)
             try:
                 shutil.copyfile(firmware_path, ota_bin_path)
@@ -323,8 +331,8 @@ def main():
                 flash_size = '4MB'
 
             firmware_info.append({
-                "name": firmware_name,
-                "friendlyName": firmware_friendly_name,
+                "name": current_firmware_name,
+                "friendlyName": current_firmware_friendly_name,
                 "variant": firmware_variant,
                 "variantFriendlyName": firmware_variant_friendly_name,
                 "version": firmware_version,

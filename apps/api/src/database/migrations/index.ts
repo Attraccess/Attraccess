@@ -84,3 +84,4 @@ export * from './1765143247814-cleanup-usernames';
 export * from './1765925113481-improved-sso-linking';
 export * from './1766141166000-resource-usage-session-finalization';
 export * from './1766157134415-resource-inactivity-tracking';
+export * from './1766580562460-attractap-capabilities';

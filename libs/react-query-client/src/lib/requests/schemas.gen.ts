@@ -4200,9 +4200,62 @@ export const $UpdateReaderDto = {
     required: ['name', 'connectedResourceIds']
 } as const;
 
+export const $AttractapCapabilities = {
+    type: 'object',
+    properties: {
+        resourceSelection: {
+            type: 'boolean',
+            description: 'Whether the reader can choose from many linked resources or can only handle one',
+            example: true,
+            default: true
+        },
+        resourceActionSelection: {
+            type: 'boolean',
+            description: 'Whether the reader has interface options for triggering resource actions, if not a actions is triggered immediately upon scanning a nfc card',
+            example: true,
+            default: true
+        },
+        cardEnrollment: {
+            type: 'boolean',
+            description: 'Whether the reader can enroll new cards',
+            example: true,
+            default: true
+        }
+    },
+    required: ['resourceSelection', 'resourceActionSelection', 'cardEnrollment']
+} as const;
+
 export const $AttractapFirmwareVersion = {
     type: 'object',
-    properties: {}
+    properties: {
+        name: {
+            type: 'string',
+            description: 'The name of the firmware',
+            example: 'Attractap',
+            nullable: true
+        },
+        variant: {
+            type: 'string',
+            description: 'The variant of the firmware',
+            example: 'eth',
+            nullable: true
+        },
+        version: {
+            type: 'string',
+            description: 'The version of the firmware',
+            example: '1.0.0',
+            nullable: true
+        },
+        capabilities: {
+            description: 'The capabilities of the reader',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/AttractapCapabilities'
+                }
+            ]
+        }
+    },
+    required: ['name', 'variant', 'version', 'capabilities']
 } as const;
 
 export const $Attractap = {

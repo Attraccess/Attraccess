@@ -38,6 +38,7 @@ void Beeper::successBeep()
 
 void Beeper::singleBeep()
 {
+    this->logger.debug("BEEP");
 #ifdef HAS_IO_EXPANDER_TCA9554
     this->ioExpander.beeperOn();
 #endif

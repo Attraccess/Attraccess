@@ -163,6 +163,7 @@ export function AttractapList() {
               >
                 <TableHeader>
                   <TableColumn>{t('table.columns.name')}</TableColumn>
+                  <TableColumn>{t('table.columns.type')}</TableColumn>
                   <TableColumn>{t('table.columns.lastConnection')}</TableColumn>
                   <TableColumn>{t('table.columns.actions')}</TableColumn>
                 </TableHeader>
@@ -174,7 +175,12 @@ export function AttractapList() {
                 >
                   {(reader) => (
                     <TableRow key={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
-                      <TableCell className="w-full">{reader.name}</TableCell>
+                      <TableCell>{reader.name}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {reader.firmware.name} ({reader.firmware.variant})
+                        <br />
+                        <small>{reader.firmware.version}</small>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                       <TableCell className="flex-row flex">
                         <Button

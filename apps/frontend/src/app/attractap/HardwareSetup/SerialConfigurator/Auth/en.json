@@ -1,0 +1,30 @@
+{
+  "title": "Device PIN",
+  "loading": "Checking device PIN...",
+  "enterPin": {
+    "submit": "Unlock"
+  },
+  "setPin": {
+    "title": "Set PIN",
+    "description": "Create a 4-digit PIN to secure configuration commands.",
+    "submit": "Set PIN"
+  },
+  "changePin": {
+    "title": "Change PIN",
+    "submit": "Update PIN"
+  },
+  "fields": {
+    "pin": "PIN",
+    "currentPin": "Current PIN",
+    "newPin": "New PIN",
+    "confirmPin": "Confirm new PIN"
+  },
+  "actions": {
+    "logout": "Forget PIN"
+  },
+  "errors": {
+    "invalid": "PIN must be 4 digits.",
+    "mismatch": "PINs do not match.",
+    "auth": "Invalid PIN. Please try again."
+  }
+}

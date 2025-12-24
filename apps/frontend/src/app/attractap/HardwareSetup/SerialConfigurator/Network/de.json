@@ -6,6 +6,10 @@
   "password": {
     "label": "Passwort"
   },
+  "actions": {
+    "refreshStatus": "Status aktualisieren",
+    "refreshWifi": "WLAN-Liste aktualisieren"
+  },
   "wifi": {
     "connected": {
       "title": "WiFi verbunden",
