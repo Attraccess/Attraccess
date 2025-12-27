@@ -308,6 +308,9 @@ void Application::setup()
 
 #ifndef HAS_LVGL_DISPLAY
         this->cardDetected = true;
+        this->cardRemoved = false;
+        this->cardPresentationWasLong = false;
+        this->cardDetectionTimeMs = millis();
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
@@ -364,13 +367,11 @@ void Application::setup()
                                         this->beeper.singleBeep();
                                         this->logger.debugf("Card removed after %d ms", presentationTimeMs); 
                                         this->cardRemoved = true;
-                                        this->cardPresentationTimeMs = presentationTimeMs;
 
                                         // log inmportant vars (cardDetected, cardRemoved, cardPresentationTimeMs, state)
                                         this->logger.debugf("cardDetected: %d", this->cardDetected);
                                         this->logger.debugf("cardRemoved: %d", this->cardRemoved);
                                         this->logger.debugf("unlocked: %d", this->unlocked);
-                                        this->logger.debugf("cardPresentationTimeMs: %d", this->cardPresentationTimeMs);
                                         this->logger.debugf("state: %d", this->state); });
 #endif
 
@@ -526,60 +527,22 @@ void Application::processState()
     }
 #endif
 
+#ifndef HAS_LVGL_DISPLAY
+    if (this->cardDetected && !this->cardRemoved)
+    {
+        unsigned long currentPresentationDurationMs = millis() - this->cardDetectionTimeMs;
+        if (currentPresentationDurationMs > NFC_CARD_LONG_PRESENTATION_TIME_MS)
+        {
+            this->beeper.indicateBeep();
+            this->cardPresentationWasLong = true;
+        }
+    }
+#endif
+
     if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD)
     {
         if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
         {
-
-#ifndef HAS_LVGL_DISPLAY
-
-            if (this->cardDetected)
-            {
-                if (!this->cardRemoved)
-                {
-                    this->logger.debug("Card detected but not removed, returning");
-                    return;
-                }
-
-                if (!this->unlocked)
-                {
-                    this->logger.debug("Card detected but not unlocked, returning");
-                    return;
-                }
-
-                this->logger.debug("Card detected and removed and unlocked, processing");
-
-                this->unlocked = false;
-                this->cardDetected = false;
-                this->cardRemoved = false;
-                this->cardPresentationTimeMs = 0;
-
-                bool isLongPresentation = this->cardPresentationTimeMs > NFC_CARD_LONG_PRESENTATION_TIME_MS;
-
-                if (this->resourceIsDoor)
-                {
-                    if (isLongPresentation)
-                    {
-                        this->api.lockDoor(this->selectedResourceId);
-                    }
-                    else
-                    {
-                        this->api.unlockDoor(this->selectedResourceId);
-                    }
-                }
-                else
-                {
-                    if (isLongPresentation)
-                    {
-                        this->api.startResourceUsageSession(this->selectedResourceId);
-                    }
-                    else
-                    {
-                        this->api.stopResourceUsageSession(this->selectedResourceId);
-                    }
-                }
-            }
-#endif
             return;
         }
 
@@ -593,7 +556,14 @@ void Application::processState()
 #endif
 
         this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+
+#ifndef HAS_LVGL_DISPLAY
+        // For non-display mode, process authentication immediately since the card is still present
+        // and won't trigger another detection event
+        this->processCardAuthenticationData();
+#else
         this->nfc.enableCardDetection();
+#endif
         return;
     }
 
@@ -747,6 +717,60 @@ void Application::processState()
     Display::transitionToScreen(&Display::resourceDetailsScreen);
 #else
 
+    // Process unlocked card actions for non-display mode
+    if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD)
+    {
+        if (!this->cardDetected)
+        {
+            return;
+        }
+
+        if (!this->unlocked)
+        {
+            return;
+        }
+
+        if (!this->cardRemoved)
+        {
+            return;
+        }
+
+        this->logger.debug("Card detected and removed and unlocked, processing");
+
+        // Reset state flags before triggering action
+        this->unlocked = false;
+        this->cardDetected = false;
+        this->cardRemoved = false;
+
+        if (this->resourceIsDoor)
+        {
+            if (this->cardPresentationWasLong)
+            {
+                this->api.lockDoor(this->selectedResourceId);
+            }
+            else
+            {
+                this->api.unlockDoor(this->selectedResourceId);
+            }
+        }
+        else
+        {
+            if (this->cardPresentationWasLong)
+            {
+                this->api.startResourceUsageSession(this->selectedResourceId);
+            }
+            else
+            {
+                this->api.stopResourceUsageSession(this->selectedResourceId);
+            }
+        }
+
+        // Reset state back to waiting for card
+        this->state = APPLICATION_STATE_WAIT_FOR_CARD;
+        this->nfc.enableCardDetection();
+        return;
+    }
+
     if (this->state != APPLICATION_STATE_WAIT_FOR_CARD)
     {
         this->logger.debug("Waiting for card detection");
@@ -830,6 +854,11 @@ void Application::processCardAuthenticationData()
     this->externalState = EXTERNAL_STATE_NONE;
 
     this->unlocked = true;
+
+#ifndef HAS_LVGL_DISPLAY
+    // Enable card detection to detect card removal in non-display mode
+    this->nfc.enableCardDetection();
+#endif
 }
 
 #ifdef HAS_LVGL_DISPLAY

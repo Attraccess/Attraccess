@@ -12,7 +12,7 @@
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
 #else
-#define NFC_CARD_LONG_PRESENTATION_TIME_MS 5000
+#define NFC_CARD_LONG_PRESENTATION_TIME_MS 1500
 #endif
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
@@ -117,7 +117,8 @@ private:
 #ifndef HAS_LVGL_DISPLAY
     bool cardDetected = false;
     bool cardRemoved = false;
-    uint32_t cardPresentationTimeMs = 0;
+    unsigned long cardDetectionTimeMs = 0;
+    bool cardPresentationWasLong = false;
 #endif
 
 #ifdef HAS_LVGL_DISPLAY

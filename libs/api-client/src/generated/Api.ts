@@ -2657,7 +2657,46 @@ export interface UpdateReaderDto {
   connectedResourceIds: number[];
 }
 
-export type AttractapFirmwareVersion = object;
+export interface AttractapCapabilities {
+  /**
+   * Whether the reader can choose from many linked resources or can only handle one
+   * @default true
+   * @example true
+   */
+  resourceSelection: boolean;
+  /**
+   * Whether the reader has interface options for triggering resource actions, if not a actions is triggered immediately upon scanning a nfc card
+   * @default true
+   * @example true
+   */
+  resourceActionSelection: boolean;
+  /**
+   * Whether the reader can enroll new cards
+   * @default true
+   * @example true
+   */
+  cardEnrollment: boolean;
+}
+
+export interface AttractapFirmwareVersion {
+  /**
+   * The name of the firmware
+   * @example "Attractap"
+   */
+  name: string | null;
+  /**
+   * The variant of the firmware
+   * @example "eth"
+   */
+  variant: string | null;
+  /**
+   * The version of the firmware
+   * @example "1.0.0"
+   */
+  version: string | null;
+  /** The capabilities of the reader */
+  capabilities: AttractapCapabilities;
+}
 
 export interface Attractap {
   /** The ID of the reader */
@@ -6666,7 +6705,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab

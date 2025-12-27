@@ -26,6 +26,13 @@ void Beeper::errorBeep()
     this->singleBeep();
 }
 
+void Beeper::indicateBeep()
+{
+    this->singleBeep();
+    delay(100);
+    this->singleBeep();
+}
+
 void Beeper::successBeep()
 {
     if (!Settings::getDeviceConfig().beeperEnabled)

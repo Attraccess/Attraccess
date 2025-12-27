@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Card, CardBody, CircularProgress, Input } from '@heroui/react';
+import { Alert, Button, CircularProgress, Input } from '@heroui/react';
 import {
   createContext,
   useCallback,
@@ -89,30 +89,7 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
       throw new Error('NO_RESPONSE');
     }
 
-    let data: { pinIsSet?: boolean };
-    try {
-      data = JSON.parse(response) as { pinIsSet?: boolean };
-    } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/8d8f110e-d9bf-429b-9f48-118afc4b0754', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'initial',
-          hypothesisId: 'H2',
-          location: 'Auth/index.tsx:refreshPinStatus:parseError',
-          message: 'Failed to parse auth.status.get response',
-          data: {
-            error: err instanceof Error ? err.message : String(err),
-            responsePreview: response.slice(0, 200),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      throw err;
-    }
+    const data = JSON.parse(response) as { pinIsSet?: boolean };
 
     const isSet = Boolean(data?.pinIsSet);
     setPinIsSet(isSet);
@@ -283,5 +260,5 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
     );
   }
 
-  return <>{children}</>;
+  return children;
 }

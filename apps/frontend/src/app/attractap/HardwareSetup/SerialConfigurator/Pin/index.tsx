@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Card, CardBody, Input, cn } from '@heroui/react';
+import { Alert, Button, Input, cn } from '@heroui/react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';

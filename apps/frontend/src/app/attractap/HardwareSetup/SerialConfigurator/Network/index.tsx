@@ -19,8 +19,8 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
   const [wifiPassword, setWifiPassword] = useState<string | null>(null);
   const [isWifiConnecting, setIsWifiConnecting] = useState(false);
 
-  const status = configuration?.networkStatus ?? null;
-  const wifiNetworks = configuration?.wifiNetworks ?? [];
+  const status = useMemo(() => configuration?.networkStatus ?? null, [configuration?.networkStatus]);
+  const wifiNetworks = useMemo(() => configuration?.wifiNetworks ?? [], [configuration?.wifiNetworks]);
 
   const networkSelectItems = useMemo(() => {
     return wifiNetworks

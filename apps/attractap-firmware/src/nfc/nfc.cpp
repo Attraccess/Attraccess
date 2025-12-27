@@ -64,7 +64,6 @@ void NFC::handleCardDetection()
     {
         // just try to comminucate with card in any way to check if it is still present
         bool authSuccess = this->pn532.ntag424_Authenticate(NFC::FACTORY_KEY, 0, 0x71);
-        this->logger.debugf("Card authentication successful: %d", authSuccess);
         if (!authSuccess)
         {
             // card removed, call callback

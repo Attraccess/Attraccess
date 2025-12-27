@@ -33,7 +33,7 @@ export function AttractapSelect(props: Props) {
           ([key, value]) => r.firmware.capabilities[key as keyof AttractapCapabilities] === value,
         );
       });
-  }, [readers, now]);
+  }, [readers, now, props.requiredCapabilities]);
 
   return (
     <Select

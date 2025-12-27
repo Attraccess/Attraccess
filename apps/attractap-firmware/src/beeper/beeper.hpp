@@ -16,6 +16,7 @@ public:
     void errorBeep();
     void successBeep();
     void singleBeep();
+    void indicateBeep();
 
 private:
     Logger logger;
