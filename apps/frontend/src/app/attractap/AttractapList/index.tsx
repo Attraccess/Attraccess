@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
@@ -15,13 +15,18 @@ import {
   Card,
   CardHeader,
   CardBody,
+  Chip,
 } from '@heroui/react';
-import { CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
+import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
 import { EmptyState } from '../../../components/emptyState';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
-import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
+import {
+  Attractap,
+  useAttractapServiceGetFirmwares,
+  useAttractapServiceGetReaders,
+} from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PageHeader } from '../../../components/pageHeader';
 import { AttractapHardwareSetup } from '../HardwareSetup';
@@ -38,6 +43,8 @@ export function AttractapList() {
     de,
     en,
   });
+
+  const { data: firmwares } = useAttractapServiceGetFirmwares();
 
   const {
     data: allReaders,
@@ -86,6 +93,29 @@ export function AttractapList() {
     }
     return { stale, active };
   }, [allReaders, now]);
+
+  const firmwareUpdateChip = useCallback(
+    (reader: Attractap) => {
+      const latestFirmware = firmwares?.find((firmware) => {
+        return firmware.name === reader.firmware.name && firmware.variant === reader.firmware.variant;
+      });
+
+      const isSame = reader.firmware.version === latestFirmware?.version;
+
+      if (isSame) {
+        return <Chip>v{reader.firmware.version}</Chip>;
+      }
+
+      return (
+        <Chip color="warning">
+          <span className="whitespace-nowrap">
+            v{reader.firmware.version} <ArrowRightIcon size={14} className="inline" /> v{latestFirmware?.version}
+          </span>
+        </Chip>
+      );
+    },
+    [firmwares],
+  );
 
   return (
     <>
@@ -179,7 +209,7 @@ export function AttractapList() {
                       <TableCell className="whitespace-nowrap">
                         {reader.firmware.name} ({reader.firmware.variant})
                         <br />
-                        <small>{reader.firmware.version}</small>
+                        {firmwareUpdateChip(reader)}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                       <TableCell className="flex-row flex">
