@@ -35,7 +35,7 @@ export function Toolbar({
 
   return (
     <div>
-      <div className="mb-6 flex flex-row w-full items-center justify-between gap-4 rounded-full bg-white p-2 shadow-sm dark:bg-zinc-800">
+      <div className="mb-6 flex flex-row w-full items-center justify-between gap-4 rounded-full p-2 shadow-medium bg-content1">
         <div className="relative flex-grow">
           <Input
             radius="full"
