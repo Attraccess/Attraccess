@@ -7,6 +7,7 @@ import federation from '@originjs/vite-plugin-federation';
 import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   root: __dirname,
@@ -21,6 +22,7 @@ export default defineConfig({
     host: '0.0.0.0',
   },
   plugins: [
+    tailwindcss(),
     react(),
     nxViteTsPaths(),
     nxCopyAssetsPlugin([]),

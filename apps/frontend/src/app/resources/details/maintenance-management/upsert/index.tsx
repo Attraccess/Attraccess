@@ -17,7 +17,7 @@ import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parseAbsolute, ZonedDateTime } from '@internationalized/date';
+import { parseAbsolute, type DateValue, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
 import {
   useResourceMaintenancesServiceCreateMaintenance,
@@ -50,8 +50,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const now = useNow();
 
   const timezoneOfBrowser = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const [startTime, setStartTime] = useState<ZonedDateTime | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
-  const [endTime, setEndTime] = useState<ZonedDateTime | null>(null);
+  const [startTime, setStartTime] = useState<DateValue | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
+  const [endTime, setEndTime] = useState<DateValue | null>(null);
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
 
@@ -90,6 +90,22 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     [existingMaintenance, timezoneOfBrowser, now],
   );
 
+  const dateValueToAbsoluteString = useCallback(
+    (value: DateValue | null): string | null | undefined => {
+      if (!value) return null;
+
+      // If it's already a ZonedDateTime, use toAbsoluteString
+      if ('toAbsoluteString' in value) {
+        return value.toAbsoluteString();
+      }
+
+      // Otherwise, convert to ZonedDateTime first
+      const zonedValue = toZoned(value, timezoneOfBrowser);
+      return zonedValue.toAbsoluteString();
+    },
+    [timezoneOfBrowser],
+  );
+
   const onSaveSuccess = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
@@ -119,13 +135,20 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
       return;
     }
 
+    const startTimeStr = dateValueToAbsoluteString(startTime);
+    const endTimeStr = hasEndDate ? dateValueToAbsoluteString(endTime) : null;
+
+    if (!startTimeStr) {
+      return;
+    }
+
     if (maintenanceId !== undefined) {
       updateMaintenanceMutation({
         resourceId,
         maintenanceId,
         requestBody: {
-          startTime: startTime.toAbsoluteString(),
-          endTime: hasEndDate ? endTime?.toAbsoluteString() : null,
+          startTime: startTimeStr,
+          endTime: endTimeStr,
           reason,
         },
       });
@@ -133,8 +156,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
       createMaintenanceMutation({
         resourceId,
         requestBody: {
-          startTime: startTime.toAbsoluteString(),
-          endTime: hasEndDate ? endTime?.toAbsoluteString() : undefined,
+          startTime: startTimeStr,
+          endTime: endTimeStr ?? undefined,
           reason,
         },
       });
@@ -148,6 +171,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     maintenanceId,
     updateMaintenanceMutation,
     hasEndDate,
+    dateValueToAbsoluteString,
   ]);
 
   return (
@@ -166,7 +190,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 value={startTime}
                 isRequired
                 hideTimeZone
-                onChange={(value) => setStartTime(value)}
+                onChange={setStartTime}
               />
 
               <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
@@ -178,7 +202,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                   value={endTime}
                   isRequired
                   hideTimeZone
-                  onChange={(value) => setEndTime(value)}
+                  onChange={setEndTime}
                 />
               )}
 
