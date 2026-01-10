@@ -1,4 +1,21 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@plugin './hero.ts';
+
+/* Note: You may need to change the path to fit your project structure */
+@source '../../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Custom keyframes */
+  --animation-draw: draw 2s ease-in-out forwards;
+  
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+      stroke-dasharray: 0;
+    }
+  }
+}
+
 /* You can add global styles to this file, and also import other style files */

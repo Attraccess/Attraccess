@@ -137,10 +137,10 @@ export const UserManagementPage: React.FC = () => {
 
           <Table removeWrapper aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
             <TableHeader>
-              <TableColumn width="1" className="hidden md:table-cell">
+              <TableColumn width="0" className="hidden md:table-cell">
                 {t('table.columns.isEmailVerified')}
               </TableColumn>
-              <TableColumn width="1">{t('table.columns.id')}</TableColumn>
+              <TableColumn width="0">{t('table.columns.id')}</TableColumn>
               <TableColumn>{t('table.columns.username')}</TableColumn>
               <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
               <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
