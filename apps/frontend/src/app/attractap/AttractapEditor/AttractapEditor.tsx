@@ -107,6 +107,7 @@ export function AttractapEditor(props: Readonly<Props>) {
                   selection={connectedResourceIds}
                   onSelectionChange={(selection) => setConnectedResourceIds(selection)}
                   data-cy="attractap-editor-resource-selector"
+                  multiple={reader?.firmware.capabilities.resourceSelection ?? true}
                 />
               </ModalBody>
               <ModalFooter>

@@ -9,8 +9,11 @@
     }
   },
   "tabs": {
-    "main": "Main",
-    "keypad": "Keypad",
-    "checkingKeypad": "Checking for keypad..."
+    "wifi": {
+      "title": "WiFi"
+    },
+    "api": {
+      "title": "API"
+    }
   }
 }

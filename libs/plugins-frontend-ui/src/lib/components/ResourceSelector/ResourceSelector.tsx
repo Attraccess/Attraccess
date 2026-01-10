@@ -8,13 +8,15 @@ import en from './ResourceSelector.en.json';
 interface Props {
   selection: number[];
   onSelectionChange: (selection: number[]) => void;
+  multiple?: boolean;
 }
 
 export const ListboxWrapper = ({ children }: PropsWithChildren) => (
   <div className="border-small px-1 py-2 rounded-small border-default-200 dark:border-default-100">{children}</div>
 );
 
-export function ResourceSelector(props: Props) {
+export function ResourceSelector(props: Readonly<Props>) {
+  const { selection, onSelectionChange, multiple = true } = props;
   const [search, setSearch] = useState('');
 
   const { t } = useTranslations({
@@ -41,9 +43,9 @@ export function ResourceSelector(props: Props) {
       />
       <Table
         aria-label={t('table.ariaLabel')}
-        selectedKeys={props.selection.map((id) => id.toString())}
-        onSelectionChange={(keys) => props.onSelectionChange(Array.from(keys as Set<number>).map((key) => Number(key)))}
-        selectionMode="multiple"
+        selectedKeys={selection.map((id) => id.toString())}
+        onSelectionChange={(keys) => onSelectionChange(Array.from(keys as Set<number>).map((key) => Number(key)))}
+        selectionMode={multiple ? 'multiple' : 'single'}
         color="primary"
         removeWrapper
       >

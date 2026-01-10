@@ -3,24 +3,70 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { Resource } from './resource.entity';
 
+class AttractapCapabilities {
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: true,
+  })
+  @ApiProperty({
+    description: 'Whether the reader can choose from many linked resources or can only handle one',
+    example: true,
+    default: true,
+  })
+  resourceSelection!: boolean;
+
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @ApiProperty({
+    description:
+      'Whether the reader has interface options for triggering resource actions, if not a actions is triggered immediately upon scanning a nfc card',
+    example: true,
+    default: true,
+  })
+  resourceActionSelection!: boolean;
+
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: true,
+  })
+  @ApiProperty({
+    description: 'Whether the reader can enroll new cards',
+    example: true,
+    default: true,
+  })
+  cardEnrollment!: boolean;
+}
+
 export class AttractapFirmwareVersion {
   @Column({
     type: 'text',
     nullable: true,
   })
+  @ApiProperty({ description: 'The name of the firmware', example: 'Attractap', nullable: true })
   name!: string | null;
 
   @Column({
     type: 'text',
     nullable: true,
   })
+  @ApiProperty({ description: 'The variant of the firmware', example: 'eth', nullable: true })
   variant!: string | null;
 
   @Column({
     type: 'text',
     nullable: true,
   })
+  @ApiProperty({ description: 'The version of the firmware', example: '1.0.0', nullable: true })
   version!: string | null;
+
+  @Column(() => AttractapCapabilities, { prefix: 'capabilities' })
+  @ApiProperty({ description: 'The capabilities of the reader', type: () => AttractapCapabilities })
+  capabilities!: AttractapCapabilities;
 }
 
 @Entity()
