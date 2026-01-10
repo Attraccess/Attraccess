@@ -91,7 +91,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   );
 
   const dateValueToAbsoluteString = useCallback(
-    (value: DateValue | null): string | null | undefined => {
+    (value: DateValue | null): string | null => {
       if (!value) return null;
 
       // If it's already a ZonedDateTime, use toAbsoluteString
