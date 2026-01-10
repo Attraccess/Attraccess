@@ -13,6 +13,7 @@ Application application;
 
 Logger mainLogger("Main");
 
+#ifdef LOG_MEMORY_DEBUG
 void logLoopStackUsage()
 {
     static uint32_t lastPrint = 0;
@@ -25,6 +26,7 @@ void logLoopStackUsage()
     logger.debugf("loopTask high watermark: %u words (~%u bytes)",
                   watermarkWords, watermarkWords * sizeof(StackType_t));
 }
+#endif
 
 void setup()
 {
@@ -37,13 +39,12 @@ void setup()
 
     mainLogger.info("Serial initialized");
 
-#if defined(DISPLAY_DRIVER_QUALIA)
-    // Use board default I2C pins for the Qualia driver so the PCA expander/touch are reachable
-    Wire.begin(SDA, SCL);
+#if defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 #else
-    // GT911 hardware uses dedicated I2C lines on the devkit
-    Wire.begin(15, 7);
+    Wire.begin(SDA, SCL); // SDA, SCL
 #endif
+
     // Prevent potential I2C stalls on touch controller reads
     Wire.setTimeOut(50);
 
@@ -53,8 +54,9 @@ void setup()
 
 void loop()
 {
+#ifdef LOG_MEMORY_DEBUG
     logLoopStackUsage();
+#endif
+
     application.loop();
-    // Cooperatively yield to other tasks and drivers
-    // delay(1);
 }

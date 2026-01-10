@@ -579,6 +579,19 @@ void API::sendFirmwareInfo()
     event["data"]["payload"]["name"] = FIRMWARE_NAME;
     event["data"]["payload"]["variant"] = FIRMWARE_VARIANT;
     event["data"]["payload"]["version"] = FIRMWARE_VERSION;
+    event["data"]["payload"]["capabilities"]["resourceSelection"] =
+#ifdef HAS_LVGL_DISPLAY
+        true;
+#else
+        false;
+#endif
+    event["data"]["payload"]["capabilities"]["cardEnrollment"] =
+#ifdef HAS_LVGL_DISPLAY
+        true;
+#else
+        false;
+#endif
+
     char json[JSON_OUTBUF_SMALL];
     size_t n = serializeJson(event, json, sizeof(json));
     if (n == 0)

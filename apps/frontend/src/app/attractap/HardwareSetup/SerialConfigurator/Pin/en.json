@@ -1,0 +1,18 @@
+{
+  "title": "Device PIN",
+  "fields": {
+    "currentPin": "Current PIN",
+    "newPin": "New PIN",
+    "confirmPin": "Confirm new PIN"
+  },
+  "submit": "Update PIN",
+  "actions": {
+    "logout": "Forget PIN"
+  },
+  "errors": {
+    "invalid": "PIN must be 4 digits.",
+    "mismatch": "PINs do not match.",
+    "auth": "Invalid PIN. Please try again."
+  }
+}
+

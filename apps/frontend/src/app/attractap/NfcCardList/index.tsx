@@ -224,6 +224,7 @@ const EnrollNfcCardButton = () => {
               selection={readerId}
               onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
               data-cy="enroll-nfc-card-modal-reader-select"
+              requiredCapabilities={{ cardEnrollment: true }}
             />
           </ModalBody>
           <ModalFooter>
