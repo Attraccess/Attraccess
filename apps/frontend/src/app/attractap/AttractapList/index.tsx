@@ -102,14 +102,14 @@ export function AttractapList() {
 
       const isSame = reader.firmware.version === latestFirmware?.version;
 
-      if (isSame) {
+      if (isSame || !latestFirmware) {
         return <Chip>v{reader.firmware.version}</Chip>;
       }
 
       return (
         <Chip color="warning">
           <span className="whitespace-nowrap">
-            v{reader.firmware.version} <ArrowRightIcon size={14} className="inline" /> v{latestFirmware?.version}
+            v{reader.firmware.version} <ArrowRightIcon size={14} className="inline" /> v{latestFirmware.version}
           </span>
         </Chip>
       );

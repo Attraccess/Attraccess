@@ -54,8 +54,11 @@ void Application::setup()
 
                                                 this->handleResourceListUpdate(resourceList);
 #else
-                                                this->selectedResourceId = resourceList.items[0].id;
-                                                this->resourceIsDoor = resourceList.items[0].type == 1;
+                                                if (resourceList.count > 0)
+                                                {
+                                                    this->selectedResourceId = resourceList.items[0].id;
+                                                    this->resourceIsDoor = resourceList.items[0].type == 1;
+                                                }
 #endif
                                             });
 

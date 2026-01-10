@@ -175,7 +175,10 @@ export class AttractapService {
         this.logger.debug('resources from db', resources);
       }
 
-      if (reader.firmware.capabilities.resourceSelection && resources.length > 1) {
+      if (!reader.firmware.capabilities.resourceSelection && resources.length > 1) {
+        this.logger.warn(
+          'More than one resource selected for reader, but resource selection is not supported by the firmware, selecting only the first one',
+        );
         resources = [resources[0]];
       }
 
