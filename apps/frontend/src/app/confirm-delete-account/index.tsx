@@ -1,21 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { useUrlQuery, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
 import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn, ApiError } from '@attraccess/react-query-client';
+import {
+  useUsersServiceConfirmDeleteAccount,
+  UseUsersServiceGetCurrentKeyFn,
+  ApiError,
+} from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
+import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 
-export function VerifyEmail() {
+export function ConfirmDeleteAccount() {
   const query = useUrlQuery();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [allowRetry, setAllowRetry] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { t, tExists } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, apiErrors: { ...API_ERROR_TRANSLATIONS_EN, ...en.apiErrors } },
+    de: { ...de, apiErrors: { ...API_ERROR_TRANSLATIONS_DE, ...de.apiErrors } },
+  });
 
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
@@ -23,7 +32,8 @@ export function VerifyEmail() {
   const queryClient = useQueryClient();
   const didSendRequest = useRef(false);
 
-  const verifyEmail = useUsersServiceVerifyEmail({
+  const confirmDelete = useUsersServiceConfirmDeleteAccount({
+    retry: false,
     onSuccess: () => {
       setIsSuccess(true);
       setError(null);
@@ -41,13 +51,12 @@ export function VerifyEmail() {
       });
       const translation = t(key, { error: errorMessage });
       setError(translation);
-      // Reset the ref so user can try again
-      didSendRequest.current = false;
+      setAllowRetry(true);
     },
   });
 
-  const activateEmail = useCallback(() => {
-    if (didSendRequest.current) {
+  const confirm = useCallback((force = false) => {
+    if (didSendRequest.current && !force) {
       return;
     }
 
@@ -58,41 +67,38 @@ export function VerifyEmail() {
     }
 
     didSendRequest.current = true;
-    verifyEmail.mutate({ requestBody: { token, email } });
-  }, [token, email, t, verifyEmail]);
+    setAllowRetry(false);
+    confirmDelete.mutate({ requestBody: { token, email } });
+  }, [confirmDelete, email, token, t]);
 
   useEffect(() => {
-    // Only activate if we have both token and email
     if (token && email) {
-      activateEmail();
+      confirm();
     } else if (token !== null && email !== null) {
-      // Both are defined but one is empty - show error immediately
       setError(t('apiErrors.invalidLink'));
       didSendRequest.current = true;
     }
-  }, [activateEmail, token, email, t]);
+  }, [confirm, email, token, t]);
 
-  // Fallback: if mutation completes but state isn't updated, show error
   useEffect(() => {
-    if (!didSendRequest.current || verifyEmail.isPending || isSuccess || error) {
+    if (!didSendRequest.current || confirmDelete.isPending || isSuccess || error) {
       return;
     }
 
-    // If mutation is not pending, not successful, and no error after 3 seconds, something went wrong
     const timeout = setTimeout(() => {
-      if (!verifyEmail.isPending && !isSuccess && !error && didSendRequest.current) {
+      if (!confirmDelete.isPending && !isSuccess && !error && didSendRequest.current) {
         setError(t('apiErrors.unexpectedError'));
-        didSendRequest.current = false; // Allow retry
+        didSendRequest.current = false;
       }
     }, 3000);
 
     return () => clearTimeout(timeout);
-  }, [verifyEmail.isPending, isSuccess, error, t]);
+  }, [confirmDelete.isPending, isSuccess, error, t]);
 
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="verify-email-success-card">
+        <Card className="max-w-md w-full" data-cy="confirm-delete-success-card">
           <CardHeader className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
           </CardHeader>
@@ -100,8 +106,8 @@ export function VerifyEmail() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </CardBody>
           <CardFooter>
-            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
-              {t('success.goToLogin')}
+            <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
+              {t('success.backToLogin')}
             </Button>
           </CardFooter>
         </Card>
@@ -112,25 +118,20 @@ export function VerifyEmail() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="verify-email-error-card">
+        <Card className="max-w-md w-full" data-cy="confirm-delete-error-card">
           <CardHeader className="text-center">
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </CardHeader>
           <CardBody>
-            <Alert
-              color="danger"
-              title={t('error.errorTitle')}
-              description={error}
-              data-cy="verify-email-error-alert"
-            />
+            <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="confirm-delete-error-alert" />
           </CardBody>
           <CardFooter>
             <Button
               fullWidth
               color="primary"
-              onPress={activateEmail}
-              isDisabled={verifyEmail.isPending}
-              data-cy="verify-email-error-try-again-button"
+              onPress={() => confirm(true)}
+              isDisabled={confirmDelete.isPending || !allowRetry}
+              data-cy="confirm-delete-error-try-again-button"
             >
               {t('error.tryAgain')}
             </Button>
@@ -139,7 +140,7 @@ export function VerifyEmail() {
               fullWidth
               variant="bordered"
               onPress={() => navigate('/')}
-              data-cy="verify-email-error-back-to-login-button"
+              data-cy="confirm-delete-error-back-button"
             >
               {t('error.backToLogin')}
             </Button>
@@ -147,6 +148,10 @@ export function VerifyEmail() {
         </Card>
       </div>
     );
+  }
+
+  if (confirmDelete.isPending) {
+    return <Loading />;
   }
 
   return <Loading />;

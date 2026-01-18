@@ -1,4 +1,177 @@
-This repository is a NX monorepo (https://nx.dev) with pnpm as its package manager.
-When executing tasks, use pnpm nx run <project>:<task> to run them.
-When installing packages, use pnpm.
-When in doubt, take a look at the online documentation of any tool you want to use/develop with.
+# Attraccess Project - Cursor Rules
+
+This repository is an NX monorepo (https://nx.dev) with pnpm as its package manager.
+
+## Package Management
+
+- **Always use pnpm** for installing packages: `pnpm add <package>`
+- **Always use NX** for running tasks: `pnpm nx run <project>:<task>`
+- When in doubt, take a look at the online documentation of any tool you want to use/develop with.
+
+## Project Structure
+
+- **Backend**: NestJS application in `apps/api/`
+- **Frontend**: React application in `apps/frontend/`
+- **Libraries**: Shared code in `libs/`
+- **Database**: SQLite with TypeORM
+- **API Documentation**: Swagger/OpenAPI with `@nestjs/swagger`
+
+## ⚠️ CRITICAL RULES
+
+### 1. Frontend API Client - NEVER Edit Manually
+
+**DO NOT manually edit the frontend API client code!**
+
+The frontend API client (`libs/react-query-client/`) is **auto-generated** from the backend's Swagger/OpenAPI annotations.
+
+**Workflow:**
+1. Make changes to backend API endpoints in `apps/api/src/`
+2. Update Swagger/OpenAPI annotations using `@nestjs/swagger` decorators:
+   - `@ApiTags()` for controller grouping
+   - `@ApiOperation()` for endpoint descriptions
+   - `@ApiResponse()` for response schemas
+   - `@ApiBody()`, `@ApiParam()`, `@ApiQuery()` for request parameters
+   - Use DTOs with proper decorators for type safety
+3. Generate the API client by running:
+   ```bash
+   pnpm nx run react-query-client:build --skipNxCache
+   ```
+   This command will:
+   - Build the swagger schema from the backend
+   - Generate the React Query client from the OpenAPI spec
+   - Update all type definitions automatically
+
+**Why this matters:**
+- Ensures type safety between frontend and backend
+- Prevents manual sync errors
+- Keeps API documentation in sync with code
+- Single source of truth (backend annotations)
+
+### 2. Database Migrations - Auto-Generate First
+
+**DO NOT write custom migrations from scratch if possible!**
+
+Always auto-generate migrations first, then inspect and adapt them.
+
+**Workflow:**
+1. Make changes to TypeORM entities in `libs/database-entities/` or `apps/api/src/`
+2. Auto-generate a migration:
+   ```bash
+   pnpm nx run api:migration-generate --skipNxCache --name=<migration-name>
+   ```
+   Example:
+   ```bash
+   pnpm nx run api:migration-generate --skipNxCache --name=add-user-email-field
+   ```
+3. **Inspect the generated migration file** in `apps/api/src/database/migrations/`
+4. **Review and adapt** the migration:
+   - Remove unrelated changes (TypeORM sometimes includes unintended diffs)
+   - Ensure SQLite-compatible syntax (see SQLite Best Practices below)
+   - Add any custom logic needed (data transformations, etc.)
+   - Verify the `up()` and `down()` methods are correct
+5. Test the migration locally before committing
+
+**SQLite Best Practices:**
+- **Column Types**: Use SQLite-compatible types:
+  - `TEXT` for strings
+  - `INTEGER` for numbers and booleans
+  - `REAL` for floats
+  - `BLOB` for binary data
+- **ALTER TABLE Limitations**: SQLite has limited `ALTER TABLE` support:
+  - Can add columns: `ALTER TABLE table_name ADD COLUMN column_name TYPE`
+  - Cannot drop columns directly (requires table recreation)
+  - Cannot rename columns directly (requires table recreation)
+  - Cannot change column types directly
+- **For Complex Changes**: If you need to drop/rename columns or change types:
+  1. Create a new table with the desired schema
+  2. Copy data from old table to new table
+  3. Drop old table
+  4. Rename new table to original name
+- **Foreign Keys**: Ensure foreign key constraints are properly defined
+- **Indexes**: Add indexes for frequently queried columns
+- **Data Migrations**: For data transformations, use raw SQL queries with proper error handling
+
+**Migration Commands:**
+- Generate: `pnpm nx run api:migration-generate --name=<name>`
+- Run: `pnpm nx run api:migrations-run`
+- Revert: `pnpm nx run api:migration-revert`
+
+## General Best Practices
+
+### Code Style
+- Follow the existing code style and patterns
+- Use TypeScript strict mode
+- Prefer explicit types over `any`
+- Use ESLint and Prettier (configured in the project)
+
+### Testing
+- Write unit tests for new features
+- Write e2e tests for critical user flows
+- Run tests before committing: `pnpm nx run <project>:test`
+
+### Git Workflow (only if users asks you to execute git operations on your own)
+- Create feature branches for new work
+- Write clear, descriptive commit messages
+- Ensure all tests pass before pushing
+- The pre-commit hook runs linting and type checking
+
+### API Development
+- Use NestJS decorators for routing and validation
+- Use DTOs (Data Transfer Objects) for request/response validation
+- Document all endpoints with Swagger annotations
+- Use class-validator for input validation
+- Use class-transformer for output serialization
+
+### Frontend Development
+- Use React Query hooks from `@attraccess/react-query-client` for API calls
+- Follow React best practices (hooks, component composition)
+- Use TypeScript for type safety
+- Keep components small and focused
+
+### Database Development
+- Define entities in `libs/database-entities/`
+- Use TypeORM decorators for entity definitions
+- Always create migrations for schema changes
+- Never use `synchronize: true` in production
+
+### Error Handling
+- Use proper HTTP status codes
+- Return meaningful error messages
+- Log errors appropriately
+- Handle edge cases gracefully
+
+## Common Commands
+
+### Development
+- Start API: `pnpm nx run api:serve`
+- Start Frontend: `pnpm nx run frontend:serve`
+- Build all: `pnpm nx run-many -t build`
+
+### Code Quality
+- Lint: `pnpm nx run <project>:lint`
+- Type check: `pnpm nx run <project>:typecheck`
+- Format: Prettier runs automatically on save (if configured)
+
+### Database
+- Generate migration: `pnpm nx run api:migration-generate --name=<name>`
+- Run migrations: `pnpm nx run api:migrations-run`
+- Revert migration: `pnpm nx run api:migration-revert`
+
+### API Client
+- Regenerate client: `pnpm nx run react-query-client:build --skipNxCache`
+
+## Project-Specific Notes
+
+- The project uses SQLite as the database (not PostgreSQL/MySQL)
+- The project supports multiple authentication methods (JWT, OIDC, etc.)
+- The project uses WebSockets for real-time features
+- The project uses Docker for containerization
+
+## When in Doubt
+
+1. Check existing code for patterns
+2. Read the documentation in `docs/`
+3. Check NX documentation: https://nx.dev
+4. Check NestJS documentation: https://docs.nestjs.com
+5. Check TypeORM documentation: https://typeorm.io
+6. Check React Query documentation: https://tanstack.com/query

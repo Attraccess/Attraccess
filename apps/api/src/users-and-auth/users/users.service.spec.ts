@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
+import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { DataSource, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
@@ -44,6 +44,24 @@ describe('UsersService', () => {
             save: jest.fn(),
             update: jest.fn(),
             findAndCount: jest.fn(),
+            count: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(AuthenticationDetail),
+          useValue: {
+            delete: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(Session),
+          useValue: {
+            delete: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ResourceUsage),
+          useValue: {
             count: jest.fn(),
           },
         },
@@ -274,6 +292,10 @@ describe('UsersService', () => {
           passwordResetToken: null,
           passwordResetTokenExpiresAt: null,
           lastUsernameChangeAt: null,
+          deleteAccountToken: null,
+          deleteAccountTokenExpiresAt: null,
+          deleteAccountRequestedAt: null,
+          deletedAt: null,
           resourceIntroductions: [],
           resourceUsages: [],
           resourceIntroducers: [],
@@ -312,6 +334,10 @@ describe('UsersService', () => {
           passwordResetToken: null,
           passwordResetTokenExpiresAt: null,
           lastUsernameChangeAt: null,
+          deleteAccountToken: null,
+          deleteAccountTokenExpiresAt: null,
+          deleteAccountRequestedAt: null,
+          deletedAt: null,
           resourceIntroductions: [],
           resourceUsages: [],
           resourceIntroducers: [],

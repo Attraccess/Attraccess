@@ -152,7 +152,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           value={username}
           onValueChange={setUsername}
           required
-          variant="underlined"
+
           data-cy="registration-form-username-input"
           isRequired
         />
@@ -163,7 +163,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           type="email"
           label={t('email')}
           required
-          variant="underlined"
+
           data-cy="registration-form-email-input"
           isRequired
           value={email}
@@ -175,7 +175,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           name="password"
           label={t('password')}
           required
-          variant="underlined"
           data-cy="registration-form-password-input"
           autoComplete="new-password"
           isRequired
@@ -194,7 +193,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           name="password_confirmation"
           label={t('passwordConfirmation')}
           required
-          variant="underlined"
           data-cy="registration-form-password-confirmation-input"
           autoComplete="new-password"
           isRequired

@@ -3,6 +3,7 @@ import { useTranslations } from '../../i18n';
 import { User as UserComponent, UserProps } from '@heroui/react';
 import { toSvg } from 'jdenticon';
 import { useMemo } from 'react';
+import { AlertTriangleIcon } from 'lucide-react';
 import en from './en.json';
 import de from './de.json';
 
@@ -16,21 +17,32 @@ export function AttraccessUser(props: AttraccessUserProps & Omit<UserProps, 'ava
 
   const { t } = useTranslations({ en, de });
 
+  const isDeleted = !user || !!user?.deletedAt;
+
   const avatarIcon = useMemo(() => {
+    if (isDeleted) {
+      return undefined;
+    }
+
     const svg = toSvg(user?.id || 'unknown', 100);
     const svgBase64 = btoa(svg);
     const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
     return dataUrl;
-  }, [user]);
+  }, [isDeleted, user]);
+
+  const name = user?.username || t('unknown');
 
   return (
     <UserComponent
       {...userComponentProps}
       avatarProps={{
         src: avatarIcon,
+        icon: isDeleted ? <AlertTriangleIcon className="w-4 h-4" /> : undefined,
+        showFallback: isDeleted,
+        color: isDeleted ? 'warning' : undefined,
       }}
-      description={description}
-      name={user?.username || t('unknown')}
+      description={isDeleted ? <del>{description}</del> : description}
+      name={isDeleted ? <del>{name}</del> : name}
     />
   );
 }
