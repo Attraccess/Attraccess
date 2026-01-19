@@ -15,6 +15,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { UsernameForm } from './username';
+import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
@@ -59,7 +60,8 @@ export default function AccountPage() {
           <CardHeader>
             <PageHeader title={t('sections.profile')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-2">
+          <CardBody className="flex flex-col gap-6">
+            <EmailForm />
             <UsernameForm />
           </CardBody>
         </Card>

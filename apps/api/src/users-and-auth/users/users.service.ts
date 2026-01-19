@@ -21,6 +21,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
 import { z } from 'zod';
+import { isEmail } from 'class-validator';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
@@ -345,6 +346,59 @@ export class UsersService {
       this.logger.error('Failed to send username changed email', (e as Error).stack);
     }
     return updated;
+  }
+
+  async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
+    const trimmedEmail = (newEmail ?? '').trim();
+    if (!trimmedEmail) {
+      throw new BadRequestException('Email cannot be empty');
+    }
+    if (!isEmail(trimmedEmail)) {
+      throw new BadRequestException('Invalid email');
+    }
+
+    const targetUser = await this.findOne({ id: targetUserId });
+    if (!targetUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    const isSelf = executingUser.id === targetUserId;
+    const canManageUsers = !!executingUser.systemPermissions?.canManageUsers;
+
+    if (!isSelf && !canManageUsers) {
+      throw new ForbiddenException("You do not have permission to change this user's email");
+    }
+
+    if (targetUser.email.trim() === trimmedEmail) {
+      return targetUser;
+    }
+
+    const existingEmail = await this.findOne({ email: trimmedEmail });
+    if (existingEmail && existingEmail.id !== targetUserId) {
+      throw new BadRequestException('Email already exists');
+    }
+
+    const token = nanoid();
+    const expiresAt = addDays(new Date(), 3);
+
+    return await this.dataSource.transaction(async (manager) => {
+      const userRepo = manager.getRepository(User);
+
+      await userRepo.update(targetUserId, {
+        email: trimmedEmail,
+        isEmailVerified: false,
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: expiresAt,
+      });
+
+      const updated = await this.findOne({ id: targetUserId }, undefined, manager);
+      if (!updated) {
+        throw new UserNotFoundException(targetUserId);
+      }
+
+      await this.emailService.sendVerificationEmail(updated, token);
+      return updated;
+    });
   }
 
   async findMany(options: PaginationOptions & { search?: string; ids?: number[] }): Promise<PaginatedResponse<User>> {

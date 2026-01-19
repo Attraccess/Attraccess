@@ -363,6 +363,18 @@ export const $ChangeUsernameDto = {
     required: ['username']
 } as const;
 
+export const $ChangeEmailDto = {
+    type: 'object',
+    properties: {
+        email: {
+            type: 'string',
+            description: 'The new email address',
+            example: 'new.email@example.com'
+        }
+    },
+    required: ['email']
+} as const;
+
 export const $UserNotFoundException = {
     type: 'object',
     properties: {}
