@@ -140,6 +140,13 @@ export enum SSOProviderType {
   OIDC = "OIDC",
 }
 
+/** The configured 2FA policy */
+export enum TwoFactorPolicy {
+  Optional = "optional",
+  RequiredForPrivileged = "required_for_privileged",
+  RequiredForAll = "required_for_all",
+}
+
 export enum PermissionFilter {
   CanManageResources = "canManageResources",
   CanManageSystemConfiguration = "canManageSystemConfiguration",
@@ -149,56 +156,6 @@ export enum PermissionFilter {
 /** The authentication strategy to use */
 export enum AuthenticationType {
   LocalPassword = "local_password",
-  Sso = "sso",
-  Totp = "totp",
-}
-
-/** The 2FA policy to enforce */
-export enum TwoFactorPolicy {
-  Optional = "optional",
-  RequiredForPrivileged = "required_for_privileged",
-  RequiredForAll = "required_for_all",
-}
-
-export interface TwoFactorStatusDto {
-  /**
-   * Whether TOTP is enabled for the current user
-   * @example true
-   */
-  enabled: boolean;
-  /**
-   * Whether TOTP is required for the current user
-   * @example false
-   */
-  required: boolean;
-  /** The configured 2FA policy */
-  policy: TwoFactorPolicy;
-}
-
-export interface TwoFactorSetupResponseDto {
-  /**
-   * The shared secret for the authenticator app
-   * @example "JBSWY3DPEHPK3PXP"
-   */
-  secret: string;
-  /**
-   * The otpauth URL for QR code generation
-   * @example "otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess"
-   */
-  otpauthUrl: string;
-}
-
-export interface TwoFactorCodeDto {
-  /**
-   * The current code from the authenticator app
-   * @example "123456"
-   */
-  code: string;
-}
-
-export interface TwoFactorPolicyDto {
-  /** The 2FA policy to enforce */
-  policy: TwoFactorPolicy;
 }
 
 export interface CreateUserDto {
@@ -221,7 +178,7 @@ export interface CreateUserDto {
    * The authentication strategy to use
    * @example "local_password"
    */
-  strategy: AuthenticationType.LocalPassword;
+  strategy: AuthenticationType;
 }
 
 export interface SystemPermissions {
@@ -484,6 +441,47 @@ export interface CreateSessionResponse {
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
    */
   authToken: string;
+}
+
+export interface TwoFactorStatusDto {
+  /**
+   * Whether TOTP is enabled for the current user
+   * @example true
+   */
+  enabled: boolean;
+  /**
+   * Whether TOTP is required for the current user
+   * @example false
+   */
+  required: boolean;
+  /** The configured 2FA policy */
+  policy: TwoFactorPolicy;
+}
+
+export interface TwoFactorSetupResponseDto {
+  /**
+   * The shared secret for the authenticator app
+   * @example "JBSWY3DPEHPK3PXP"
+   */
+  secret: string;
+  /**
+   * The otpauth URL for QR code generation
+   * @example "otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess"
+   */
+  otpauthUrl: string;
+}
+
+export interface TwoFactorCodeDto {
+  /**
+   * The current code from the authenticator app
+   * @example "123456"
+   */
+  code: string;
+}
+
+export interface TwoFactorPolicyDto {
+  /** The 2FA policy to enforce */
+  policy: TwoFactorPolicy;
 }
 
 export interface SSOProviderOIDCConfiguration {
@@ -2998,7 +2996,7 @@ export type SetupTwoFactorData = TwoFactorSetupResponseDto;
 
 export type VerifyTwoFactorData = TwoFactorStatusDto;
 
-export type DisableTwoFactorData = object;
+export type DisableTwoFactorData = any;
 
 export type GetTwoFactorPolicyData = TwoFactorPolicyDto;
 
@@ -3997,102 +3995,6 @@ export namespace Authentication {
 
   /**
    * No description
-   * @tags Two-Factor Authentication
-   * @name GetTwoFactorStatus
-   * @summary Get 2FA status for the current user
-   * @request GET:/api/auth/two-factor
-   * @secure
-   */
-  export namespace GetTwoFactorStatus {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = GetTwoFactorStatusData;
-  }
-
-  /**
-   * No description
-   * @tags Two-Factor Authentication
-   * @name SetupTwoFactor
-   * @summary Start 2FA setup for the current user
-   * @request POST:/api/auth/two-factor/setup
-   * @secure
-   */
-  export namespace SetupTwoFactor {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = SetupTwoFactorData;
-  }
-
-  /**
-   * No description
-   * @tags Two-Factor Authentication
-   * @name VerifyTwoFactor
-   * @summary Verify and enable 2FA for the current user
-   * @request POST:/api/auth/two-factor/verify
-   * @secure
-   */
-  export namespace VerifyTwoFactor {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = TwoFactorCodeDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = VerifyTwoFactorData;
-  }
-
-  /**
-   * No description
-   * @tags Two-Factor Authentication
-   * @name DisableTwoFactor
-   * @summary Disable 2FA for the current user
-   * @request POST:/api/auth/two-factor/disable
-   * @secure
-   */
-  export namespace DisableTwoFactor {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = TwoFactorCodeDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = DisableTwoFactorData;
-  }
-
-  /**
-   * No description
-   * @tags Two-Factor Authentication
-   * @name GetTwoFactorPolicy
-   * @summary Get the configured 2FA policy
-   * @request GET:/api/auth/two-factor/policy
-   * @secure
-   */
-  export namespace GetTwoFactorPolicy {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = GetTwoFactorPolicyData;
-  }
-
-  /**
-   * No description
-   * @tags Two-Factor Authentication
-   * @name SetTwoFactorPolicy
-   * @summary Set the configured 2FA policy
-   * @request POST:/api/auth/two-factor/policy
-   * @secure
-   */
-  export namespace SetTwoFactorPolicy {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = TwoFactorPolicyDto;
-    export type RequestHeaders = {};
-    export type ResponseBody = SetTwoFactorPolicyData;
-  }
-
-  /**
-   * No description
    * @tags Authentication
    * @name GetAllSsoProviders
    * @summary Get all SSO providers
@@ -4279,6 +4181,104 @@ export namespace Authentication {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = OidcLoginCallbackData;
+  }
+}
+
+export namespace TwoFactorAuthentication {
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorStatus
+   * @summary Get 2FA status for the current user
+   * @request GET:/api/auth/two-factor
+   * @secure
+   */
+  export namespace GetTwoFactorStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetupTwoFactor
+   * @summary Start 2FA setup for the current user
+   * @request POST:/api/auth/two-factor/setup
+   * @secure
+   */
+  export namespace SetupTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetupTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name VerifyTwoFactor
+   * @summary Verify and enable 2FA for the current user
+   * @request POST:/api/auth/two-factor/verify
+   * @secure
+   */
+  export namespace VerifyTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = VerifyTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name DisableTwoFactor
+   * @summary Disable 2FA for the current user
+   * @request POST:/api/auth/two-factor/disable
+   * @secure
+   */
+  export namespace DisableTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = DisableTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorPolicy
+   * @summary Get the configured 2FA policy
+   * @request GET:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace GetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetTwoFactorPolicy
+   * @summary Set the configured 2FA policy
+   * @request POST:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace SetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetTwoFactorPolicyData;
   }
 }
 
@@ -7410,120 +7410,6 @@ export class Api<
     /**
      * No description
      *
-     * @tags Two-Factor Authentication
-     * @name GetTwoFactorStatus
-     * @summary Get 2FA status for the current user
-     * @request GET:/api/auth/two-factor
-     * @secure
-     */
-    getTwoFactorStatus: (params: RequestParams = {}) =>
-      this.request<GetTwoFactorStatusData, void>({
-        path: `/api/auth/two-factor`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Two-Factor Authentication
-     * @name SetupTwoFactor
-     * @summary Start 2FA setup for the current user
-     * @request POST:/api/auth/two-factor/setup
-     * @secure
-     */
-    setupTwoFactor: (params: RequestParams = {}) =>
-      this.request<SetupTwoFactorData, void>({
-        path: `/api/auth/two-factor/setup`,
-        method: "POST",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Two-Factor Authentication
-     * @name VerifyTwoFactor
-     * @summary Verify and enable 2FA for the current user
-     * @request POST:/api/auth/two-factor/verify
-     * @secure
-     */
-    verifyTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
-      this.request<VerifyTwoFactorData, void>({
-        path: `/api/auth/two-factor/verify`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Two-Factor Authentication
-     * @name DisableTwoFactor
-     * @summary Disable 2FA for the current user
-     * @request POST:/api/auth/two-factor/disable
-     * @secure
-     */
-    disableTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
-      this.request<DisableTwoFactorData, void>({
-        path: `/api/auth/two-factor/disable`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Two-Factor Authentication
-     * @name GetTwoFactorPolicy
-     * @summary Get the configured 2FA policy
-     * @request GET:/api/auth/two-factor/policy
-     * @secure
-     */
-    getTwoFactorPolicy: (params: RequestParams = {}) =>
-      this.request<GetTwoFactorPolicyData, void>({
-        path: `/api/auth/two-factor/policy`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Two-Factor Authentication
-     * @name SetTwoFactorPolicy
-     * @summary Set the configured 2FA policy
-     * @request POST:/api/auth/two-factor/policy
-     * @secure
-     */
-    setTwoFactorPolicy: (data: TwoFactorPolicyDto, params: RequestParams = {}) =>
-      this.request<SetTwoFactorPolicyData, void>({
-        path: `/api/auth/two-factor/policy`,
-        method: "POST",
-        body: data,
-        secure: true,
-        type: ContentType.Json,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
      * @tags Authentication
      * @name GetAllSsoProviders
      * @summary Get all SSO providers
@@ -7717,6 +7603,123 @@ export class Api<
         path: `/api/auth/sso/OIDC/${providerId}/callback`,
         method: "GET",
         query: query,
+        format: "json",
+        ...params,
+      }),
+  };
+  twoFactorAuthentication = {
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorStatus
+     * @summary Get 2FA status for the current user
+     * @request GET:/api/auth/two-factor
+     * @secure
+     */
+    getTwoFactorStatus: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorStatusData, void>({
+        path: `/api/auth/two-factor`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetupTwoFactor
+     * @summary Start 2FA setup for the current user
+     * @request POST:/api/auth/two-factor/setup
+     * @secure
+     */
+    setupTwoFactor: (params: RequestParams = {}) =>
+      this.request<SetupTwoFactorData, void>({
+        path: `/api/auth/two-factor/setup`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name VerifyTwoFactor
+     * @summary Verify and enable 2FA for the current user
+     * @request POST:/api/auth/two-factor/verify
+     * @secure
+     */
+    verifyTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<VerifyTwoFactorData, void>({
+        path: `/api/auth/two-factor/verify`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name DisableTwoFactor
+     * @summary Disable 2FA for the current user
+     * @request POST:/api/auth/two-factor/disable
+     * @secure
+     */
+    disableTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<DisableTwoFactorData, void>({
+        path: `/api/auth/two-factor/disable`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorPolicy
+     * @summary Get the configured 2FA policy
+     * @request GET:/api/auth/two-factor/policy
+     * @secure
+     */
+    getTwoFactorPolicy: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetTwoFactorPolicy
+     * @summary Set the configured 2FA policy
+     * @request POST:/api/auth/two-factor/policy
+     * @secure
+     */
+    setTwoFactorPolicy: (
+      data: TwoFactorPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

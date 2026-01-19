@@ -5,10 +5,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import {
   TwoFactorSetupResponseDto,
-  useAuthenticationServiceDisableTwoFactor,
-  useAuthenticationServiceGetTwoFactorStatus,
-  useAuthenticationServiceSetupTwoFactor,
-  useAuthenticationServiceVerifyTwoFactor,
+  useTwoFactorAuthenticationServiceDisableTwoFactor,
+  useTwoFactorAuthenticationServiceGetTwoFactorStatus,
+  useTwoFactorAuthenticationServiceSetupTwoFactor,
+  useTwoFactorAuthenticationServiceVerifyTwoFactor,
 } from '@attraccess/react-query-client';
 
 import en from './en.json';
@@ -17,15 +17,15 @@ import de from './de.json';
 export function TwoFactorCard() {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
-  const { data: status, isLoading, refetch } = useAuthenticationServiceGetTwoFactorStatus();
+  const { data: status, isLoading, refetch } = useTwoFactorAuthenticationServiceGetTwoFactorStatus();
 
   const [setupData, setSetupData] = useState<TwoFactorSetupResponseDto | null>(null);
   const [setupCode, setSetupCode] = useState('');
   const [disableCode, setDisableCode] = useState('');
 
-  const { mutateAsync: startSetup, isPending: isSettingUp } = useAuthenticationServiceSetupTwoFactor();
-  const { mutateAsync: verifySetup, isPending: isVerifying } = useAuthenticationServiceVerifyTwoFactor();
-  const { mutateAsync: disableTwoFactor, isPending: isDisabling } = useAuthenticationServiceDisableTwoFactor();
+  const { mutateAsync: startSetup, isPending: isSettingUp } = useTwoFactorAuthenticationServiceSetupTwoFactor();
+  const { mutateAsync: verifySetup, isPending: isVerifying } = useTwoFactorAuthenticationServiceVerifyTwoFactor();
+  const { mutateAsync: disableTwoFactor, isPending: isDisabling } = useTwoFactorAuthenticationServiceDisableTwoFactor();
 
   const refreshStatus = useCallback(async () => {
     await refetch();
