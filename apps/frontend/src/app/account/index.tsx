@@ -6,6 +6,7 @@ import de from './de.json';
 import { UsernameForm } from './username';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
+import { TwoFactorCard } from './two-factor';
 
 export default function AccountPage() {
   const { t } = useTranslations({ en, de });
@@ -30,7 +31,10 @@ export default function AccountPage() {
           <CardHeader>
             <PageHeader title={t('sections.security')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-2">{me && <SetPasswordForm userId={me.id} />} </CardBody>
+          <CardBody className="flex flex-col gap-6">
+            {me && <SetPasswordForm userId={me.id} />}
+            {me && <TwoFactorCard />}
+          </CardBody>
         </Card>
       </div>
     </div>

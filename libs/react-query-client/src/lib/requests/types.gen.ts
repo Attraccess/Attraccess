@@ -5,7 +5,17 @@
  */
 export enum AuthenticationType {
     LOCAL_PASSWORD = 'local_password',
-    SSO = 'sso'
+    SSO = 'sso',
+    TOTP = 'totp'
+}
+
+/**
+ * The 2FA policy to enforce
+ */
+export enum TwoFactorPolicy {
+    OPTIONAL = 'optional',
+    REQUIRED_FOR_PRIVILEGED = 'required_for_privileged',
+    REQUIRED_FOR_ALL = 'required_for_all'
 }
 
 export type CreateUserDto = {
@@ -24,7 +34,7 @@ export type CreateUserDto = {
     /**
      * The authentication strategy to use
      */
-    strategy: AuthenticationType;
+    strategy: AuthenticationType.LOCAL_PASSWORD;
 };
 
 export type SystemPermissions = {
@@ -83,6 +93,46 @@ export type User = {
      * The percentage rate the user to actually pay for activities that cost credits
      */
     billingFactor: number;
+};
+
+export type TwoFactorStatusDto = {
+    /**
+     * Whether TOTP is enabled for the current user
+     */
+    enabled: boolean;
+    /**
+     * Whether TOTP is required for the current user
+     */
+    required: boolean;
+    /**
+     * The configured 2FA policy
+     */
+    policy: TwoFactorPolicy;
+};
+
+export type TwoFactorSetupResponseDto = {
+    /**
+     * The shared secret for the authenticator app
+     */
+    secret: string;
+    /**
+     * The otpauth URL for QR code generation
+     */
+    otpauthUrl: string;
+};
+
+export type TwoFactorCodeDto = {
+    /**
+     * The current code from the authenticator app
+     */
+    code: string;
+};
+
+export type TwoFactorPolicyDto = {
+    /**
+     * The 2FA policy to enforce
+     */
+    policy: TwoFactorPolicy;
 };
 
 export type InviteUserDto = {
@@ -2989,6 +3039,7 @@ export type CreateSessionData = {
     requestBody: {
         username?: string;
         password?: string;
+        twoFactorCode?: string;
         tokenLocation?: 'cookie' | 'body';
     };
 };
@@ -3004,6 +3055,32 @@ export type RefreshSessionResponse = CreateSessionResponse;
 export type EndSessionResponse = {
     [key: string]: unknown;
 };
+
+export type GetTwoFactorStatusResponse = TwoFactorStatusDto;
+
+export type SetupTwoFactorResponse = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type VerifyTwoFactorResponse = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type DisableTwoFactorResponse = {
+    [key: string]: unknown;
+};
+
+export type GetTwoFactorPolicyResponse = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = {
+    requestBody: TwoFactorPolicyDto;
+};
+
+export type SetTwoFactorPolicyResponse = TwoFactorPolicyDto;
 
 export type GetAllSsoProvidersResponse = Array<SSOProvider>;
 

@@ -54,6 +54,14 @@ export const useAuthenticationServiceRefreshSessionKey = "AuthenticationServiceR
 export const UseAuthenticationServiceRefreshSessionKeyFn = ({ tokenLocation }: {
   tokenLocation: string;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceRefreshSessionKey, ...(queryKey ?? [{ tokenLocation }])];
+export type AuthenticationServiceGetTwoFactorStatusDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getTwoFactorStatus>>;
+export type AuthenticationServiceGetTwoFactorStatusQueryResult<TData = AuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthenticationServiceGetTwoFactorStatusKey = "AuthenticationServiceGetTwoFactorStatus";
+export const UseAuthenticationServiceGetTwoFactorStatusKeyFn = (queryKey?: Array<unknown>) => [useAuthenticationServiceGetTwoFactorStatusKey, ...(queryKey ?? [])];
+export type AuthenticationServiceGetTwoFactorPolicyDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getTwoFactorPolicy>>;
+export type AuthenticationServiceGetTwoFactorPolicyQueryResult<TData = AuthenticationServiceGetTwoFactorPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthenticationServiceGetTwoFactorPolicyKey = "AuthenticationServiceGetTwoFactorPolicy";
+export const UseAuthenticationServiceGetTwoFactorPolicyKeyFn = (queryKey?: Array<unknown>) => [useAuthenticationServiceGetTwoFactorPolicyKey, ...(queryKey ?? [])];
 export type AuthenticationServiceGetAllSsoProvidersDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getAllSsoProviders>>;
 export type AuthenticationServiceGetAllSsoProvidersQueryResult<TData = AuthenticationServiceGetAllSsoProvidersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceGetAllSsoProvidersKey = "AuthenticationServiceGetAllSsoProviders";
@@ -468,6 +476,10 @@ export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<Retu
 export type UsersServiceBulkUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.bulkUpdatePermissions>>;
 export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeof UsersService.setUserPassword>>;
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
+export type AuthenticationServiceSetupTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.setupTwoFactor>>;
+export type AuthenticationServiceVerifyTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.verifyTwoFactor>>;
+export type AuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.disableTwoFactor>>;
+export type AuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof AuthenticationService.setTwoFactorPolicy>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
