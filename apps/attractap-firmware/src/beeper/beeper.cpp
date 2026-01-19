@@ -14,11 +14,6 @@ void Beeper::setup()
 
 void Beeper::errorBeep()
 {
-    if (!Settings::getDeviceConfig().beeperEnabled)
-    {
-        return;
-    }
-
     this->singleBeep();
     delay(100);
     this->singleBeep();
@@ -28,11 +23,6 @@ void Beeper::errorBeep()
 
 void Beeper::indicateBeep()
 {
-    if (!Settings::getDeviceConfig().beeperEnabled)
-    {
-        return;
-    }
-
     this->singleBeep();
     delay(100);
     this->singleBeep();
@@ -40,16 +30,17 @@ void Beeper::indicateBeep()
 
 void Beeper::successBeep()
 {
-    if (!Settings::getDeviceConfig().beeperEnabled)
-    {
-        return;
-    }
 
     this->singleBeep();
 }
 
 void Beeper::singleBeep()
 {
+    if (!Settings::getDeviceConfig().beeperEnabled)
+    {
+        return;
+    }
+
     this->logger.debug("BEEP");
 #ifdef HAS_IO_EXPANDER_TCA9554
     this->ioExpander.beeperOn();
