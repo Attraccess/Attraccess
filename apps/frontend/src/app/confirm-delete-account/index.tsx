@@ -126,16 +126,20 @@ export function ConfirmDeleteAccount() {
             <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="confirm-delete-error-alert" />
           </CardBody>
           <CardFooter>
-            <Button
-              fullWidth
-              color="primary"
-              onPress={() => confirm(true)}
-              isDisabled={confirmDelete.isPending || !allowRetry}
-              data-cy="confirm-delete-error-try-again-button"
-            >
-              {t('error.tryAgain')}
-            </Button>
-            <Spacer y={2} />
+          {allowRetry && (
+            <>
+              <Button
+                fullWidth
+                color="primary"
+                onPress={() => confirm(true)}
+                isDisabled={confirmDelete.isPending}
+                data-cy="confirm-delete-error-try-again-button"
+              >
+                {t('error.tryAgain')}
+              </Button>
+              <Spacer y={2} />
+            </>
+          )}
             <Button
               fullWidth
               variant="bordered"
