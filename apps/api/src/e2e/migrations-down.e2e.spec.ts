@@ -383,6 +383,11 @@ const getMigrationCount = async (dataSource: DataSource) => {
   return Number(rows[0]?.count ?? 0);
 };
 
+const getLastMigrationName = async (dataSource: DataSource) => {
+  const rows = await dataSource.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1');
+  return rows[0]?.name as string | undefined;
+};
+
 describe('Migrations down/up with data (e2e)', () => {
   let dataSource: DataSource;
 
@@ -415,7 +420,13 @@ describe('Migrations down/up with data (e2e)', () => {
       let remaining = await getMigrationCount(dataSource);
 
       while (remaining > 0) {
-        await dataSource.undoLastMigration();
+        const migrationName = await getLastMigrationName(dataSource);
+        try {
+          await dataSource.undoLastMigration();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new Error(`Failed to undo migration ${migrationName ?? 'unknown'}: ${message}`);
+        }
         remaining = await getMigrationCount(dataSource);
       }
     } finally {
