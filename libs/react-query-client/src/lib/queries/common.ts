@@ -509,9 +509,7 @@ export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<Re
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
 export type ResourcesServiceResourceUsageEndSessionMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageEndSession>>;
-export type ResourcesServiceResourceUsageUpdateSessionProjectMutationResult = Awaited<
-  ReturnType<typeof ResourcesService.resourceUsageUpdateSessionProject>
->;
+export type ResourcesServiceResourceUsageUpdateSessionProjectMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceUsageUpdateSessionProject>>;
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited<ReturnType<typeof ResourceMaintenancesService.updateMaintenance>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;

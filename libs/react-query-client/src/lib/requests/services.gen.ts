@@ -1217,7 +1217,7 @@ export class ResourcesService {
             errors: {
                 400: 'Bad Request - Invalid input data or session is active',
                 401: 'Unauthorized',
-                403: 'Forbidden',
+                403: 'Forbidden - User is not authorized to update this session',
                 404: 'Resource or session not found'
             }
         });

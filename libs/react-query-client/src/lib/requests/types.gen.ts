@@ -5042,7 +5042,7 @@ export type $OpenApiTs = {
                  */
                 401: unknown;
                 /**
-                 * Forbidden
+                 * Forbidden - User is not authorized to update this session
                  */
                 403: unknown;
                 /**
