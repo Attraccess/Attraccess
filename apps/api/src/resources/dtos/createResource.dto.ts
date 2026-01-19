@@ -84,7 +84,7 @@ export class CreateResourceDto {
   @ApiProperty({
     description: 'Custom metadata key-value pairs configured for this resource',
     required: false,
-    type: 'object',
+    type: Object,
     example: {
       location: 'lab-1',
       template: 'door-access',
