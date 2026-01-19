@@ -796,6 +796,11 @@ export interface CreateResourceDto {
    */
   documentationUrl?: string;
   /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, string>;
+  /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @default false
    * @example false
@@ -905,6 +910,11 @@ export interface Resource {
    * @example false
    */
   allowTakeOver: boolean;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, string>;
   /**
    * When the resource was created
    * @format date-time
@@ -1190,6 +1200,11 @@ export interface UpdateResourceDto {
    * @example "https://example.com/documentation"
    */
   documentationUrl?: string;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, string>;
   /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @example false

@@ -994,6 +994,17 @@ This is a markdown documentation for the resource.`
             description: 'URL to external documentation',
             example: 'https://example.com/documentation'
         },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata key-value pairs configured for this resource',
+            example: {
+                location: 'lab-1',
+                template: 'door-access'
+            },
+            additionalProperties: {
+                type: 'string'
+            }
+        },
         allowTakeOver: {
             type: 'boolean',
             description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
@@ -1159,6 +1170,17 @@ This is a markdown documentation for the resource.`
             description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',
             example: false,
             default: false
+        },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata key-value pairs configured for this resource',
+            example: {
+                location: 'lab-1',
+                template: 'door-access'
+            },
+            additionalProperties: {
+                type: 'string'
+            }
         },
         createdAt: {
             format: 'date-time',
@@ -1692,6 +1714,17 @@ This is a markdown documentation for the resource.`
             type: 'string',
             description: 'URL to external documentation',
             example: 'https://example.com/documentation'
+        },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata key-value pairs configured for this resource',
+            example: {
+                location: 'lab-1',
+                template: 'door-access'
+            },
+            additionalProperties: {
+                type: 'string'
+            }
         },
         allowTakeOver: {
             type: 'boolean',

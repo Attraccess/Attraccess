@@ -635,6 +635,12 @@ export type CreateResourceDto = {
      */
     documentationUrl?: string;
     /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: (string);
+    };
+    /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
@@ -761,6 +767,12 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: (string);
+    };
     /**
      * When the resource was created
      */
@@ -1133,6 +1145,12 @@ export type UpdateResourceDto = {
      * URL to external documentation
      */
     documentationUrl?: string;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: (string);
+    };
     /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */

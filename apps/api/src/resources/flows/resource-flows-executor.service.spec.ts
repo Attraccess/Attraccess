@@ -493,6 +493,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
       flowLogRepository as Repository<ResourceFlowLog>,
+      resourceRepository as Repository<Resource>,
       configService as ConfigService,
       mqttClientService,
       resourceUsageService,
