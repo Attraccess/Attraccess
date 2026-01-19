@@ -229,9 +229,9 @@ const seedDatabase = async (dataSource: DataSource) => {
 
   const flowNode = await ensureEntity(flowNodeRepo, () => ({
     id: `seed-node-${seedTag}`,
-    type: ResourceFlowNodeType.INPUT_BUTTON,
+    type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     position: { x: 10, y: 10 },
-    data: { label: 'Seed Button' },
+    data: {},
     resourceId: resource.id,
   }));
 
