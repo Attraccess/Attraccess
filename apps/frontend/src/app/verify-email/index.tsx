@@ -72,23 +72,6 @@ export function VerifyEmail() {
     }
   }, [activateEmail, token, email, t]);
 
-  // Fallback: if mutation completes but state isn't updated, show error
-  useEffect(() => {
-    if (!didSendRequest.current || verifyEmail.isPending || isSuccess || error) {
-      return;
-    }
-
-    // If mutation is not pending, not successful, and no error after 3 seconds, something went wrong
-    const timeout = setTimeout(() => {
-      if (!verifyEmail.isPending && !isSuccess && !error && didSendRequest.current) {
-        setError(t('apiErrors.unexpectedError'));
-        didSendRequest.current = false; // Allow retry
-      }
-    }, 3000);
-
-    return () => clearTimeout(timeout);
-  }, [verifyEmail.isPending, isSuccess, error, t]);
-
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
