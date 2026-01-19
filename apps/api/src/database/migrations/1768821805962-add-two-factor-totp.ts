@@ -1,108 +1,43 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddTwoFactorTotp1768821805962 implements MigrationInterface {
-    name = 'AddTwoFactorTotp1768821805962'
+  name = 'AddTwoFactorTotp1768821805962';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE TABLE "temporary_project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT "UQ_326b2a901eb18ac24eabc9b0581" UNIQUE ("projectId", "userId"), CONSTRAINT "FK_08d1346ff91abba68e5a637cfdb" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_d19892d8f03928e5bfc7313780c" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "project_members"`);
-        await queryRunner.query(`DROP TABLE "project_members"`);
-        await queryRunner.query(`ALTER TABLE "temporary_project_members" RENAME TO "project_members"`);
-        await queryRunner.query(`CREATE TABLE "temporary_attractap" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "apiTokenHash" text NOT NULL, "lastConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firstConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firmwareName" text, "firmwareVariant" text, "firmwareVersion" text, "firmwareCapabilitiesResourceselection" boolean NOT NULL DEFAULT (1))`);
-        await queryRunner.query(`INSERT INTO "temporary_attractap"("id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection") SELECT "id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection" FROM "attractap"`);
-        await queryRunner.query(`DROP TABLE "attractap"`);
-        await queryRunner.query(`ALTER TABLE "temporary_attractap" RENAME TO "attractap"`);
-        await queryRunner.query(`CREATE TABLE "temporary_attractap" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "apiTokenHash" text NOT NULL, "lastConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firstConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firmwareName" text, "firmwareVariant" text, "firmwareVersion" text, "firmwareCapabilitiesResourceselection" boolean NOT NULL DEFAULT (1), "firmwareCapabilitiesResourceactionselection" boolean NOT NULL DEFAULT (0), "firmwareCapabilitiesCardenrollment" boolean NOT NULL DEFAULT (1))`);
-        await queryRunner.query(`INSERT INTO "temporary_attractap"("id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection") SELECT "id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection" FROM "attractap"`);
-        await queryRunner.query(`DROP TABLE "attractap"`);
-        await queryRunner.query(`ALTER TABLE "temporary_attractap" RENAME TO "attractap"`);
-        await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
-        await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
-        await queryRunner.query(`CREATE TABLE "temporary_authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, "totpSecret" text, "totpEnabledAt" datetime, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject" FROM "authentication_detail"`);
-        await queryRunner.query(`DROP TABLE "authentication_detail"`);
-        await queryRunner.query(`ALTER TABLE "temporary_authentication_detail" RENAME TO "authentication_detail"`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`);
-        await queryRunner.query(`CREATE TABLE "temporary_email_templates" ("type" varchar CHECK( "type" IN ('verify-email','user-invitation','reset-password','username-changed','password-changed','resource-usage-billing-transaction-summary','project-invitation') ) PRIMARY KEY NOT NULL, "subject" varchar(255) NOT NULL, "body" text NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "variables" text NOT NULL)`);
-        await queryRunner.query(`INSERT INTO "temporary_email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "email_templates"`);
-        await queryRunner.query(`DROP TABLE "email_templates"`);
-        await queryRunner.query(`ALTER TABLE "temporary_email_templates" RENAME TO "email_templates"`);
-        await queryRunner.query(`CREATE TABLE "temporary_project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT "UQ_326b2a901eb18ac24eabc9b0581" UNIQUE ("projectId", "userId"), CONSTRAINT "FK_08d1346ff91abba68e5a637cfdb" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_d19892d8f03928e5bfc7313780c" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "project_members"`);
-        await queryRunner.query(`DROP TABLE "project_members"`);
-        await queryRunner.query(`ALTER TABLE "temporary_project_members" RENAME TO "project_members"`);
-        await queryRunner.query(`CREATE TABLE "temporary_project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), CONSTRAINT "FK_0cd3b1b5700b87dab2f2c4848b9" FOREIGN KEY ("invitedUserId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_fec031ecae4c834159164616812" FOREIGN KEY ("inviterId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_55c8a93fcb3af8430c930e3a26a" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "project_invitations"`);
-        await queryRunner.query(`DROP TABLE "project_invitations"`);
-        await queryRunner.query(`ALTER TABLE "temporary_project_invitations" RENAME TO "project_invitations"`);
-        await queryRunner.query(`CREATE TABLE "temporary_resource_usage" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "resourceId" integer NOT NULL, "userId" integer, "startTime" datetime NOT NULL DEFAULT (datetime('now')), "startNotes" text, "endTime" datetime, "endNotes" text, "usageInMinutes" integer NOT NULL AS (CASE 
-      WHEN "endTime" IS NULL THEN -1
-      ELSE (julianday("endTime") - julianday("startTime")) * 1440
-    END) STORED, "usageAction" varchar CHECK( "usageAction" IN ('usage','door.lock','door.unlock','door.unlatch') ) NOT NULL, "projectId" integer, "isFinalized" boolean NOT NULL DEFAULT (0), CONSTRAINT "FK_2f4b0bc57bf05dd031831965d43" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_8177b2b424a6d31c533d57b95cc" FOREIGN KEY ("resourceId") REFERENCES "resource" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_6f80e3fc0cf8bfce60e25a6805f" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_resource_usage"("id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageAction", "projectId", "isFinalized") SELECT "id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageAction", "projectId", "isFinalized" FROM "resource_usage"`);
-        await queryRunner.query(`DROP TABLE "resource_usage"`);
-        await queryRunner.query(`ALTER TABLE "temporary_resource_usage" RENAME TO "resource_usage"`);
-        await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
-        await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
-        await queryRunner.query(`CREATE TABLE "temporary_authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso','totp') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, "totpSecret" text, "totpEnabledAt" datetime, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject", "totpSecret", "totpEnabledAt") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject", "totpSecret", "totpEnabledAt" FROM "authentication_detail"`);
-        await queryRunner.query(`DROP TABLE "authentication_detail"`);
-        await queryRunner.query(`ALTER TABLE "temporary_authentication_detail" RENAME TO "authentication_detail"`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`);
-        await queryRunner.query(`CREATE INDEX "IDX_project_invitation_unique_by_user_and_status" ON "project_invitations" ("invitedUserId", "status") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `);
-    }
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
+    await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
+    await queryRunner.query(
+      `CREATE TABLE "temporary_authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso','totp') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, "totpSecret" text, "totpEnabledAt" datetime, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`,
+    );
+    await queryRunner.query(
+      `INSERT INTO "temporary_authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject" FROM "authentication_detail"`,
+    );
+    await queryRunner.query(`DROP TABLE "authentication_detail"`);
+    await queryRunner.query(`ALTER TABLE "temporary_authentication_detail" RENAME TO "authentication_detail"`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `,
+    );
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
-        await queryRunner.query(`DROP INDEX "IDX_project_invitation_unique_by_user_and_status"`);
-        await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
-        await queryRunner.query(`ALTER TABLE "authentication_detail" RENAME TO "temporary_authentication_detail"`);
-        await queryRunner.query(`CREATE TABLE "authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, "totpSecret" text, "totpEnabledAt" datetime, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject", "totpSecret", "totpEnabledAt") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject", "totpSecret", "totpEnabledAt" FROM "temporary_authentication_detail"`);
-        await queryRunner.query(`DROP TABLE "temporary_authentication_detail"`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `);
-        await queryRunner.query(`ALTER TABLE "resource_usage" RENAME TO "temporary_resource_usage"`);
-        await queryRunner.query(`CREATE TABLE "resource_usage" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "resourceId" integer NOT NULL, "userId" integer, "startTime" datetime NOT NULL DEFAULT (datetime('now')), "startNotes" text, "endTime" datetime, "endNotes" text, "usageInMinutes" integer NOT NULL AS (CASE 
-      WHEN "endTime" IS NULL THEN -1
-      ELSE (julianday("endTime") - julianday("startTime")) * 1440
-    END) STORED, "usageAction" varchar CHECK( "usageAction" IN ('usage','door.lock','door.unlock','door.unlatch') ) NOT NULL, "projectId" integer, "isFinalized" boolean NOT NULL DEFAULT (false), CONSTRAINT "FK_2f4b0bc57bf05dd031831965d43" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_8177b2b424a6d31c533d57b95cc" FOREIGN KEY ("resourceId") REFERENCES "resource" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_6f80e3fc0cf8bfce60e25a6805f" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "resource_usage"("id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageAction", "projectId", "isFinalized") SELECT "id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes", "usageAction", "projectId", "isFinalized" FROM "temporary_resource_usage"`);
-        await queryRunner.query(`DROP TABLE "temporary_resource_usage"`);
-        await queryRunner.query(`ALTER TABLE "project_invitations" RENAME TO "temporary_project_invitations"`);
-        await queryRunner.query(`CREATE TABLE "project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), CONSTRAINT "FK_0cd3b1b5700b87dab2f2c4848b9" FOREIGN KEY ("invitedUserId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_fec031ecae4c834159164616812" FOREIGN KEY ("inviterId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_55c8a93fcb3af8430c930e3a26a" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "temporary_project_invitations"`);
-        await queryRunner.query(`DROP TABLE "temporary_project_invitations"`);
-        await queryRunner.query(`ALTER TABLE "project_members" RENAME TO "temporary_project_members"`);
-        await queryRunner.query(`CREATE TABLE "project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT "UQ_326b2a901eb18ac24eabc9b0581" UNIQUE ("projectId", "userId"), CONSTRAINT "FK_08d1346ff91abba68e5a637cfdb" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_d19892d8f03928e5bfc7313780c" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "temporary_project_members"`);
-        await queryRunner.query(`DROP TABLE "temporary_project_members"`);
-        await queryRunner.query(`ALTER TABLE "email_templates" RENAME TO "temporary_email_templates"`);
-        await queryRunner.query(`CREATE TABLE "email_templates" ("type" varchar CHECK( "type" IN ('verify-email','user-invitation','reset-password','username-changed','password-changed','resource-usage-billing-transaction-summary','project-invitation') ) PRIMARY KEY NOT NULL, "subject" varchar(255) NOT NULL, "body" text NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "variables" text NOT NULL)`);
-        await queryRunner.query(`INSERT INTO "email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "temporary_email_templates"`);
-        await queryRunner.query(`DROP TABLE "temporary_email_templates"`);
-        await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
-        await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
-        await queryRunner.query(`ALTER TABLE "authentication_detail" RENAME TO "temporary_authentication_detail"`);
-        await queryRunner.query(`CREATE TABLE "authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject" FROM "temporary_authentication_detail"`);
-        await queryRunner.query(`DROP TABLE "temporary_authentication_detail"`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `);
-        await queryRunner.query(`ALTER TABLE "attractap" RENAME TO "temporary_attractap"`);
-        await queryRunner.query(`CREATE TABLE "attractap" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "apiTokenHash" text NOT NULL, "lastConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firstConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firmwareName" text, "firmwareVariant" text, "firmwareVersion" text, "firmwareCapabilitiesResourceselection" boolean NOT NULL DEFAULT (1))`);
-        await queryRunner.query(`INSERT INTO "attractap"("id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection") SELECT "id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection" FROM "temporary_attractap"`);
-        await queryRunner.query(`DROP TABLE "temporary_attractap"`);
-        await queryRunner.query(`ALTER TABLE "attractap" RENAME TO "temporary_attractap"`);
-        await queryRunner.query(`CREATE TABLE "attractap" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "apiTokenHash" text NOT NULL, "lastConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firstConnection" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP), "firmwareName" text, "firmwareVariant" text, "firmwareVersion" text, "firmwareCapabilitiesResourceselection" boolean NOT NULL DEFAULT (1), "firmwareCapabilitiesResourceActionSelection" boolean NOT NULL DEFAULT (0), "firmwareCapabilitiesCardEnrollment" boolean NOT NULL DEFAULT (1))`);
-        await queryRunner.query(`INSERT INTO "attractap"("id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection") SELECT "id", "name", "apiTokenHash", "lastConnection", "firstConnection", "firmwareName", "firmwareVariant", "firmwareVersion", "firmwareCapabilitiesResourceselection" FROM "temporary_attractap"`);
-        await queryRunner.query(`DROP TABLE "temporary_attractap"`);
-        await queryRunner.query(`ALTER TABLE "project_members" RENAME TO "temporary_project_members"`);
-        await queryRunner.query(`CREATE TABLE "project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT "UQ_326b2a901eb18ac24eabc9b0581" UNIQUE ("projectId", "userId"), CONSTRAINT "FK_08d1346ff91abba68e5a637cfdb" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_d19892d8f03928e5bfc7313780c" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "temporary_project_members"`);
-        await queryRunner.query(`DROP TABLE "temporary_project_members"`);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "IDX_7df721b6f867aa8e2a15016076"`);
+    await queryRunner.query(`DROP INDEX "IDX_10b2a0a24286319842c8dd0dc8"`);
+    await queryRunner.query(`ALTER TABLE "authentication_detail" RENAME TO "temporary_authentication_detail"`);
+    await queryRunner.query(
+      `CREATE TABLE "authentication_detail" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "userId" integer NOT NULL, "type" varchar CHECK( "type" IN ('local_password','sso') ) NOT NULL, "password" text, "providerType" varchar CHECK( "providerType" IN ('OIDC') ), "providerId" integer, "ssoSubject" text, CONSTRAINT "FK_65a0cb4c981b2ebe57d4c546fda" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`,
+    );
+    await queryRunner.query(
+      `INSERT INTO "authentication_detail"("id", "userId", "type", "password", "providerType", "providerId", "ssoSubject") SELECT "id", "userId", "type", "password", "providerType", "providerId", "ssoSubject" FROM "temporary_authentication_detail"`,
+    );
+    await queryRunner.query(`DROP TABLE "temporary_authentication_detail"`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_10b2a0a24286319842c8dd0dc8" ON "authentication_detail" ("providerType", "providerId", "ssoSubject") WHERE "providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_7df721b6f867aa8e2a15016076" ON "authentication_detail" ("userId", "type") `,
+    );
+  }
 }
