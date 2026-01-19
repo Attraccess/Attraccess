@@ -1,4 +1,4 @@
-ARG NODE_VERSION=22.17.1
+ARG NODE_VERSION=24.13.0
 
 FROM node:${NODE_VERSION}-bookworm AS builder
 
