@@ -749,12 +749,10 @@ void Application::processState()
             if (this->cardPresentationWasLong)
             {
                 this->api.lockDoor(this->selectedResourceId);
-                // this->beeper.successBeep();
             }
             else
             {
                 this->api.unlockDoor(this->selectedResourceId);
-                // this->beeper.indicateBeep();
             }
         }
         else
@@ -762,12 +760,10 @@ void Application::processState()
             if (this->cardPresentationWasLong)
             {
                 this->api.stopResourceUsageSession(this->selectedResourceId);
-                // this->beeper.indicateBeep();
             }
             else
             {
                 this->api.startResourceUsageSession(this->selectedResourceId);
-                // this->beeper.successBeep();
             }
         }
 
