@@ -5,6 +5,7 @@
 - Node version: `22.17.1` (from `.nvmrc`).
 - Run commands from the repo root.
 - Prefer `pnpm nx` targets; avoid long-running dev servers unless asked.
+- Firmware is in `apps/attractap-firmware` and uses PlatformIO (not Nx).
 
 ## Setup
 1. Install dependencies:
@@ -15,6 +16,12 @@
    - `pnpm nx run api:migrations-run`
 
 If you need to start the API locally, set `LICENSE_KEY` as described in `README.md`.
+
+## Pre-commit / CI Notes
+- Husky runs `pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e`.
+- Ensure dependencies are installed and required env vars are set before running
+  full checks.
+- Firmware build is separate from Nx and requires PlatformIO (see below).
 
 ## Common Commands
 - Show available targets for a project:
@@ -35,3 +42,32 @@ If you need to start the API locally, set `LICENSE_KEY` as described in `README.
 - Firmware lives in `apps/attractap-firmware` and uses PlatformIO.
 - React Query client regeneration:
   - `pnpm nx build react-query-client --skipNxCache`
+
+## Firmware Toolchain (Attractap)
+Location: `apps/attractap-firmware` (ESP32-C3 firmware).
+
+### Requirements
+- Python 3 and `pip`
+- PlatformIO Core
+- `esptool` (for manual flashing)
+
+### Install (recommended)
+- `python3 -m pip install --user -U platformio esptool`
+- Ensure `~/.local/bin` is in `PATH` (Linux)
+
+### Verify
+- `pio --version`
+- `esptool.py --help`
+
+### Build
+- `cd apps/attractap-firmware`
+- `pio run -e attractap`
+
+### Upload (device connected)
+- `pio run -e attractap -t upload`
+
+### Manual flash
+- `esptool.py --chip esp32c3 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 merged-firmware.bin`
+  - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
+  - macOS: `/dev/tty.usbserial-*`
+  - Windows: `COM3`, `COM4`, etc.
