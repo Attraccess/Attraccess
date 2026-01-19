@@ -50,12 +50,14 @@ import {
 
 jest.setTimeout(120_000);
 
+type NoInfer<T> = [T][T extends unknown ? 0 : never];
+
 const createTempStorageRoot = async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'attraccess-migrations-e2e-'));
   return dir;
 };
 
-const ensureEntity = async <T>(repo: Repository<T>, builder: () => DeepPartial<T>): Promise<T> => {
+const ensureEntity = async <T>(repo: Repository<T>, builder: () => DeepPartial<NoInfer<T>>): Promise<T> => {
   const [existing] = await repo.find({ take: 1 });
   if (existing) {
     return existing;
