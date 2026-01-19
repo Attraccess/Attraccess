@@ -31,6 +31,28 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 @Injectable()
 export class ResourceUsageService {
   private readonly logger = new Logger(ResourceUsageService.name);
+  private sqliteEndSessionChain: Promise<unknown> = Promise.resolve();
+
+  private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
+    const type = manager?.connection?.options?.type;
+    if (!type) {
+      return false;
+    }
+    return type === 'sqlite' || type === 'better-sqlite3' || type === 'sqljs';
+  }
+
+  private async runSerializedIfSqlite<T>(manager: EntityManager | undefined, task: () => Promise<T>): Promise<T> {
+    if (!this.isSqliteDriver(manager)) {
+      return task();
+    }
+
+    // Queue tasks sequentially to avoid nested transactions on sqlite's single connection
+    const next = this.sqliteEndSessionChain.then(task);
+    this.sqliteEndSessionChain = next.catch((error) => {
+      this.logger.warn('Serial endSession chain failed; continuing queue', error);
+    });
+    return next;
+  }
 
   constructor(
     @InjectRepository(Resource)
@@ -54,10 +76,7 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    this.logger.debug(`Checking if user ${user.id} can control resource ${resourceId}`);
-
     if (user.systemPermissions?.canManageResources) {
-      this.logger.debug(`User ${user.id} has system permissions to manage resources`);
       return true;
     }
 
@@ -219,7 +238,7 @@ export class ResourceUsageService {
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
+      const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -271,6 +290,7 @@ export class ResourceUsageService {
         startNotes: dto.notes,
         endTime: null,
         endNotes: null,
+        isFinalized: false,
       };
 
       if (dto.projectId !== undefined) {
@@ -351,8 +371,12 @@ export class ResourceUsageService {
         );
       }
 
-      // Return the created session to the caller; events will be emitted after commit
-      return createdSession;
+      this.flowExecutorService.trackResourceActivity(createdSession.resourceId);
+      await transactionalEntityManager.update(ResourceUsage, createdSession.id, { isFinalized: true });
+      return await transactionalEntityManager.findOne(ResourceUsage, {
+        where: { id: createdSession.id },
+        relations: ['resource', 'user', 'project'],
+      });
     });
 
     // Emit events after the transaction committed to ensure readers can observe DB state
@@ -372,11 +396,16 @@ export class ResourceUsageService {
     return newSession;
   }
 
-  async endSession(resourceId: number, user: User, dto: EndUsageSessionDto): Promise<ResourceUsage> {
+  async endSession(
+    resourceId: number,
+    user: User,
+    dto: EndUsageSessionDto,
+    skipFormSubmissions = false,
+  ): Promise<ResourceUsage> {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Find active session
-    const activeSession = await this.getActiveSession(resourceId);
+    const activeSession = await this.getActiveSession(resourceId, true);
     if (!activeSession) {
       throw new BadRequestException('No active session found');
     }
@@ -408,56 +437,59 @@ export class ResourceUsageService {
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
-    const updatedUsage = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
-      const updateData = {
-        endTime,
-        endNotes,
-      };
+    const executeEndSession = async () =>
+      await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+        const updateData = {
+          endTime,
+          endNotes,
+        };
 
-      if (activeSession.resource?.type === ResourceType.Machine) {
-        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
-          resourceId,
-          action: ResourceFormAction.END,
-          submissions: dto.formSubmissions,
-          userId: user.id,
-          resourceUsageId: activeSession.id,
-          manager: transactionalEntityManager,
+        if (!skipFormSubmissions && activeSession.resource?.type === ResourceType.Machine) {
+          formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
+            resourceId,
+            action: ResourceFormAction.END,
+            submissions: dto.formSubmissions,
+            userId: user.id,
+            resourceUsageId: activeSession.id,
+            manager: transactionalEntityManager,
+          });
+        }
+
+        this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
+        await this.flowExecutorService.runFlow(
+          activeSession.resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+          { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
+          transactionalEntityManager,
+        );
+
+        this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
+
+        // Update session with end time and notes - using explicit update to avoid the generated column
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .update(ResourceUsage)
+          .set(updateData)
+          .where('id = :id', { id: activeSession.id })
+          .execute();
+
+        this.logger.debug(`Successfully ended session ${activeSession.id}`);
+
+        const updatedUsage = await transactionalEntityManager.getRepository(ResourceUsage).findOne({
+          where: { id: activeSession.id },
+          relations: ['resource', 'user'],
         });
-      }
 
-      this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
-      await this.flowExecutorService.runFlow(
-        activeSession.resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
-        transactionalEntityManager,
-      );
+        await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
 
-      this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
+        // Defer event after successful save until after commit
+        endedUsageIdToEmit = activeSession.id;
 
-      // Update session with end time and notes - using explicit update to avoid the generated column
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .update(ResourceUsage)
-        .set(updateData)
-        .where('id = :id', { id: activeSession.id })
-        .execute();
-
-      this.logger.debug(`Successfully ended session ${activeSession.id}`);
-
-      const updatedUsage = await transactionalEntityManager.getRepository(ResourceUsage).findOne({
-        where: { id: activeSession.id },
-        relations: ['resource', 'user'],
+        // Fetch the updated record
+        return updatedUsage;
       });
 
-      await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
-
-      // Defer event after successful save until after commit
-      endedUsageIdToEmit = activeSession.id;
-
-      // Fetch the updated record
-      return updatedUsage;
-    });
+    const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {
@@ -542,6 +574,7 @@ export class ResourceUsageService {
 
   async getActiveSession(
     resourceId: number,
+    onlyFinalized: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceUsage | null> {
     const resourceUsageRepository = transactionalEntityManager
@@ -552,6 +585,7 @@ export class ResourceUsageService {
       where: {
         resourceId,
         endTime: IsNull(),
+        isFinalized: onlyFinalized ? true : undefined,
       },
       relations: ['user', 'resource', 'billingTransaction', 'project'],
     });

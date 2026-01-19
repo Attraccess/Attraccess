@@ -1,6 +1,7 @@
 #include "ethernet.hpp"
 #include <Arduino.h>
 #include "esp_system.h"
+#include "esp_mac.h"
 
 // Static member definitions
 Ethernet::EthernetState Ethernet::_state = ETHERNET_STATE_INIT;
@@ -388,7 +389,9 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
 
     // Set MAC address - generate a local unicast MAC address based on ESP32 chip ID
     uint8_t mac_addr[6];
-    esp_netif_get_mac(eth_netif, mac_addr);
+
+    // Get the base MAC address from ESP32's eFuse (this doesn't require netif)
+    esp_efuse_mac_get_default(mac_addr);
 
     // Ensure it's a locally administered unicast address
     mac_addr[0] = (mac_addr[0] & 0xFC) | 0x02; // Set locally administered bit, clear multicast bit

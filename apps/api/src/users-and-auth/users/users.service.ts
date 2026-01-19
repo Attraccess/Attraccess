@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
-import { Repository, ILike, FindOneOptions as TypeormFindOneOptions, FindOptionsWhere, In, DeepPartial } from 'typeorm';
-import { SystemPermissions, User } from '@attraccess/database-entities';
+import {
+  Repository,
+  ILike,
+  FindOneOptions as TypeormFindOneOptions,
+  FindOptionsWhere,
+  In,
+  DeepPartial,
+  EntityManager,
+} from 'typeorm';
+import { AuthenticationType, SystemPermissions, User, SSOProviderType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
@@ -8,6 +16,22 @@ import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
+import { DataSource } from 'typeorm';
+import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+
+type UpdateUserData = Partial<
+  Pick<
+    User,
+    | 'externalIdentifier'
+    | 'emailVerificationToken'
+    | 'emailVerificationTokenExpiresAt'
+    | 'isEmailVerified'
+    | 'passwordResetToken'
+    | 'passwordResetTokenExpiresAt'
+  > & {
+    systemPermissions: Partial<SystemPermissions>;
+  }
+>;
 
 const FindOneOptionsSchema = z
   .object({
@@ -23,18 +47,6 @@ const FindOneOptionsSchema = z
 
 type FindOneOptions = z.infer<typeof FindOneOptionsSchema>;
 
-class UserEmailAlreadyInUseException extends BadRequestException {
-  constructor() {
-    super('UserEmailAlreadyInUseException');
-  }
-}
-
-class UserUsernameAlreadyInUseException extends BadRequestException {
-  constructor() {
-    super('UserUsernameAlreadyInUseException');
-  }
-}
-
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -44,9 +56,10 @@ export class UsersService {
     private userRepository: Repository<User>,
     private licenseService: LicenseService,
     private emailService: EmailService,
+    private dataSource: DataSource,
   ) {}
 
-  private validateUsernameOrThrow(username: string): void {
+  public validateUsernameOrThrow(username: string): void {
     const trimmed = (username ?? '').trim();
     // Centralized username validation rules
     const minLength = 3;
@@ -61,11 +74,11 @@ export class UsersService {
     }
   }
 
-  private cleanupUsername(username: string): string {
+  public cleanupUsername(username: string): string {
     return username.trim().toLowerCase();
   }
 
-  async findOne(options: FindOneOptions, relations?: string[]): Promise<User | null> {
+  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
     // Build a where condition that uses case-insensitive comparison for username
@@ -87,7 +100,8 @@ export class UsersService {
       whereCondition.externalIdentifier = validatedOptions.externalIdentifier;
     }
 
-    const user = await this.userRepository.findOne({
+    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+    const user = await userRepo.findOne({
       where: whereCondition,
       relations,
     });
@@ -181,27 +195,41 @@ export class UsersService {
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
-  async updateOne(id: number, updateData: Partial<User>): Promise<User> {
-    let username = updateData.username;
-    if (username) {
-      username = this.cleanupUsername(username);
+  public async isSSOUser(userId: number): Promise<boolean> {
+    const ssoUser = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.id = :id', { id: userId })
+      .leftJoin('user.authenticationDetails', 'authenticationDetails')
+      .andWhere('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
+      .getOne();
 
-      if (username === '') {
-        username = undefined;
-      }
-    }
+    return !!ssoUser;
+  }
 
-    const updates: DeepPartial<User> = {
-      ...updateData,
-      username,
-      email: updateData.email?.trim() ?? undefined,
+  public async findOneBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<User | null> {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails')
+      .where('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
+      .andWhere('authenticationDetails.providerType = :providerType', { providerType })
+      .andWhere('authenticationDetails.providerId = :providerId', { providerId })
+      .andWhere('authenticationDetails.ssoSubject = :subject', { subject })
+      .getOne();
+
+    return user ?? null;
+  }
+
+  async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+    const updates: UpdateUserData = {
       externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
+      emailVerificationToken: updateData.emailVerificationToken?.trim() ?? undefined,
+      emailVerificationTokenExpiresAt: updateData.emailVerificationTokenExpiresAt ?? undefined,
+      isEmailVerified: updateData.isEmailVerified ?? undefined,
+      passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
+      passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
+      systemPermissions: updateData.systemPermissions ?? undefined,
     };
     this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
-
-    if (updates.username !== undefined) {
-      this.validateUsernameOrThrow(updates.username);
-    }
 
     if (updateData.systemPermissions !== undefined) {
       updates.systemPermissions = {
@@ -210,35 +238,13 @@ export class UsersService {
     }
 
     // If email is being updated, check for uniqueness
-    if (updates.email) {
-      this.logger.debug(`Checking uniqueness for new email: ${updates.email}`);
-      const existingEmails = await this.userRepository.find({
-        where: { email: updates.email },
-      });
-
-      if (existingEmails.some((user) => user.id !== id)) {
-        this.logger.debug(`Email already in use by another user: ${updates.email}`);
-        throw new UserEmailAlreadyInUseException();
-      }
-    }
-
-    // If username is being updated, check for case-insensitive uniqueness
-    if (updates.username) {
-      this.logger.debug(`Checking uniqueness for new username: ${updates.username}`);
-      const existingUsername = await this.findOne({
-        username: updates.username,
-      });
-      if (existingUsername && existingUsername.id !== id) {
-        this.logger.debug(`Username already in use by another user: ${updates.username}`);
-        throw new UserUsernameAlreadyInUseException();
-      }
-    }
+    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
 
     this.logger.debug(`Performing update for user ID: ${id}`);
-    await this.userRepository.update(id, updates);
+    await userRepo.update(id, updates);
 
     this.logger.debug(`Fetching updated user from database, ID: ${id}`);
-    const updatedUser = await this.findOne({ id });
+    const updatedUser = await this.findOne({ id }, undefined, manager);
     if (!updatedUser) {
       this.logger.error(`User not found after update, ID: ${id}`);
       throw new UserNotFoundException(id);
@@ -249,6 +255,11 @@ export class UsersService {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+    const isSSOUser = await this.isSSOUser(targetUserId);
+    if (isSSOUser) {
+      throw new SSOUsernameChangeForbiddenException();
+    }
+
     newUsername = this.cleanupUsername(newUsername);
     if (newUsername.length === 0) {
       throw new BadRequestException('Username cannot be empty');
@@ -281,10 +292,18 @@ export class UsersService {
     }
 
     const oldUsername = targetUser.username;
-    const updated = await this.updateOne(targetUserId, {
+
+    const lastUsernameChangeAt = isSelf ? new Date() : undefined;
+
+    await this.userRepository.update(targetUserId, {
       username: newUsername,
-      lastUsernameChangeAt: isSelf ? new Date() : targetUser.lastUsernameChangeAt,
+      ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
     });
+
+    const updated = await this.findOne({ id: targetUserId });
+    if (!updated) {
+      throw new UserNotFoundException(targetUserId);
+    }
 
     try {
       await this.emailService.sendUsernameChangedEmail(updated, oldUsername);
@@ -394,7 +413,122 @@ export class UsersService {
       throw new BadRequestException('Billing factor must be at least 0');
     }
 
-    const updated = await this.updateOne(targetUserId, { billingFactor: newBillingFactor });
-    return updated;
+    await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
+
+    const updatedUser = await this.findOne({ id: targetUserId });
+    if (!updatedUser) {
+      throw new UserNotFoundException(targetUserId);
+    }
+
+    return updatedUser;
+  }
+
+  async countUsers(): Promise<number> {
+    return this.userRepository.count();
+  }
+
+  async findByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
+    const normalizedEmails = Array.from(new Set(emails.map((email) => email.trim()).filter((email) => email !== '')));
+    const normalizedUsernames = Array.from(
+      new Set(usernames.map((username) => this.cleanupUsername(username)).filter((username) => username !== '')),
+    );
+
+    const where: FindOptionsWhere<User>[] = [];
+
+    if (normalizedEmails.length) {
+      where.push({ email: In(normalizedEmails) });
+    }
+
+    if (normalizedUsernames.length) {
+      where.push({ username: In(normalizedUsernames) });
+    }
+
+    if (!where.length) {
+      return [];
+    }
+
+    return this.userRepository.find({ where });
+  }
+
+  async ensureLicenseForNewUsers(newUsersCount: number): Promise<void> {
+    if (newUsersCount <= 0) {
+      return;
+    }
+
+    const currentAmountOfUsers = await this.userRepository.count();
+    await this.licenseService.verifyLicense({
+      usageLimits: {
+        users: currentAmountOfUsers + newUsersCount,
+      },
+    });
+  }
+
+  async createMany(
+    users: Array<{ username: string; email: string; systemPermissions: Partial<SystemPermissions> }>,
+    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager },
+  ): Promise<User[]> {
+    if (users.length === 0) {
+      return [];
+    }
+
+    const normalized = users.map((userData) => ({
+      username: this.cleanupUsername(userData.username),
+      email: userData.email.trim(),
+      systemPermissions: userData.systemPermissions ?? {},
+    }));
+
+    const run = async (manager: EntityManager) => {
+      const repo = manager.getRepository(User);
+      const totalExisting = await repo.count();
+
+      const entities = normalized.map((data, index) => {
+        this.validateUsernameOrThrow(data.username);
+        if (!data.email) {
+          throw new BadRequestException('Email is required');
+        }
+
+        const user = repo.create();
+        user.username = data.username;
+        user.email = data.email;
+        user.externalIdentifier = null;
+
+        const systemPermissions: SystemPermissions = {
+          canManageResources: data.systemPermissions.canManageResources ?? false,
+          canManageSystemConfiguration: data.systemPermissions.canManageSystemConfiguration ?? false,
+          canManageUsers: data.systemPermissions.canManageUsers ?? false,
+          canManageBilling: data.systemPermissions.canManageBilling ?? false,
+        };
+
+        if (options?.grantAllPermissionsToFirst && totalExisting === 0 && index === 0) {
+          systemPermissions.canManageResources = true;
+          systemPermissions.canManageSystemConfiguration = true;
+          systemPermissions.canManageUsers = true;
+          systemPermissions.canManageBilling = true;
+        }
+
+        user.systemPermissions = systemPermissions;
+        return user;
+      });
+
+      return repo.save(entities);
+    };
+
+    if (options?.manager) {
+      return run(options.manager);
+    }
+
+    return this.userRepository.manager.transaction(run);
+  }
+
+  async deleteMany(ids: number[]): Promise<void> {
+    if (!ids.length) {
+      return;
+    }
+
+    await this.userRepository.delete(ids);
+  }
+
+  async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {
+    return this.dataSource.transaction(handler);
   }
 }

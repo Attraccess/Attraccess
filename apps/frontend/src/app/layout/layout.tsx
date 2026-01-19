@@ -56,7 +56,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-screen bg-white dark:bg-gray-800">
       {/* Sidebar */}
       <Sidebar isOpen={isOpen} toggleSidebar={toggleSidebar} />
 

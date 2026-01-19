@@ -1,23 +1,33 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
 import { nanoid } from 'nanoid';
-import { Repository } from 'typeorm';
-import { User, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
+import { EntityManager, Repository } from 'typeorm';
+import { User, AuthenticationDetail, AuthenticationType, SSOProviderType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
 import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
-import { SSOService } from './sso/sso.service';
-import { SSOProviderNotFoundException } from './sso/errors';
 import { UsersService } from '../users/users.service';
+import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
 }
 
-export interface AuthenticationOptions<T extends AuthenticationType> {
-  type: T;
-  details: T extends AuthenticationType.LOCAL_PASSWORD ? LocalPasswordAuthenticationOptions : never;
+export interface SSOAuthenticationOptions {
+  providerType: SSOProviderType;
+  providerId: number;
+  subject: string;
 }
+
+export type AuthenticationOptions =
+  | {
+      type: AuthenticationType.LOCAL_PASSWORD;
+      details: LocalPasswordAuthenticationOptions;
+    }
+  | {
+      type: AuthenticationType.SSO;
+      details: SSOAuthenticationOptions;
+    };
 
 class UserEmailNotVerifiedException extends ForbiddenException {
   constructor() {
@@ -46,7 +56,6 @@ export class AuthService {
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
-    private ssoService: SSOService,
     private usersService: UsersService,
   ) {
     this.logger.debug('AuthService initialized');
@@ -68,21 +77,42 @@ export class AuthService {
     return details;
   }
 
-  async validateAuthenticationDetails<T extends AuthenticationType>(
-    userId: number,
-    options: AuthenticationOptions<T>,
-  ): Promise<boolean> {
-    const authenticationDetails = await this.getAuthenticationDetail(options.type, userId);
+  async validateAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<boolean> {
+    const authenticationDetails = await this.getAuthenticationDetail(options.type, userId).catch((error) => {
+      if (error instanceof NotFoundException) {
+        return null;
+      }
+      throw error;
+    });
+
+    if (!authenticationDetails) {
+      this.logger.debug(`No authentication details of type ${options.type} found for user ID: ${userId}`);
+      return false;
+    }
 
     let isValid = false;
     switch (options.type) {
-      case AuthenticationType.LOCAL_PASSWORD:
+      case AuthenticationType.LOCAL_PASSWORD: {
+        const isSSOUser = await this.usersService.isSSOUser(userId);
+        if (isSSOUser) {
+          throw new LocalLoginForSSOForbiddenException();
+        }
         isValid = await bcrypt.compare(options.details.password, authenticationDetails.password || '');
         break;
+      }
 
-      default:
-        this.logger.debug(`Unsupported authentication type: ${options.type}`);
-        isValid = false;
+      case AuthenticationType.SSO: {
+        isValid =
+          authenticationDetails.providerType === options.details.providerType &&
+          authenticationDetails.providerId === options.details.providerId &&
+          authenticationDetails.ssoSubject === options.details.subject;
+        break;
+      }
+
+      default: {
+        const exhaustiveCheck: never = options;
+        throw new Error(`Invalid authentication type: ${exhaustiveCheck}`);
+      }
     }
 
     return isValid;
@@ -92,10 +122,7 @@ export class AuthService {
     return await bcrypt.hash(password, this.SALT_ROUNDS);
   }
 
-  async addAuthenticationDetails<T extends AuthenticationType>(
-    userId: number,
-    options: AuthenticationOptions<T>,
-  ): Promise<AuthenticationDetail> {
+  async addAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<AuthenticationDetail> {
     const authenticationDetail = new AuthenticationDetail();
     authenticationDetail.userId = userId;
     authenticationDetail.type = options.type;
@@ -103,10 +130,44 @@ export class AuthService {
     if (options.type === AuthenticationType.LOCAL_PASSWORD) {
       this.logger.debug(`Hashing password for user ID: ${userId}`);
       authenticationDetail.password = await this.hashPassword(options.details.password);
+    } else if (options.type === AuthenticationType.SSO) {
+      authenticationDetail.providerType = options.details.providerType;
+      authenticationDetail.providerId = options.details.providerId;
+      authenticationDetail.ssoSubject = options.details.subject;
     }
 
     const saved = await this.authenticationDetailRepository.save(authenticationDetail);
     return saved;
+  }
+
+  async findUserIdBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<number | null> {
+    const detail = await this.authenticationDetailRepository.findOne({
+      where: {
+        type: AuthenticationType.SSO,
+        providerType,
+        providerId,
+        ssoSubject: subject,
+      },
+    });
+
+    return detail?.userId ?? null;
+  }
+
+  async userHasSSOAuthentication(userId: number): Promise<boolean> {
+    const count = await this.authenticationDetailRepository.count({
+      where: { userId, type: AuthenticationType.SSO },
+    });
+    return count > 0;
+  }
+
+  async removeLocalPasswordAuthentication(userId: number): Promise<void> {
+    const detail = await this.authenticationDetailRepository.findOne({
+      where: { userId, type: AuthenticationType.LOCAL_PASSWORD },
+    });
+
+    if (detail) {
+      await this.removeAuthenticationDetails(detail.id);
+    }
   }
 
   async removeAuthenticationDetails(authenticationDetailsId: number): Promise<void> {
@@ -115,9 +176,9 @@ export class AuthService {
     });
   }
 
-  async getUserByUsernameAndAuthenticationDetails<T extends AuthenticationType>(
+  async getUserByUsernameAndAuthenticationDetails(
     username: string,
-    options: AuthenticationOptions<T>,
+    options: AuthenticationOptions,
   ): Promise<User | null> {
     const user = await this.usersService.findOne({ username });
 
@@ -140,14 +201,18 @@ export class AuthService {
     return user;
   }
 
-  async generateEmailVerificationToken(user: User): Promise<string> {
+  async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
     const token = nanoid();
 
     this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
-    await this.usersService.updateOne(user.id, {
-      emailVerificationToken: token,
-      emailVerificationTokenExpiresAt: addDays(new Date(), 3),
-    });
+    await this.usersService.updateOne(
+      user.id,
+      {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiresAt: addDays(new Date(), 3),
+      },
+      manager,
+    );
 
     this.logger.debug(`Email verification token set for user ID: ${user.id}`);
     return token;
@@ -198,6 +263,11 @@ export class AuthService {
   }
 
   async changePassword(user: User, password: string): Promise<void> {
+    const isSSOUser = await this.usersService.isSSOUser(user.id);
+    if (isSSOUser) {
+      throw new ForbiddenException('You cannot change the password of an SSO user');
+    }
+
     const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id).catch(
       (error) => {
         if (error instanceof NotFoundException) {
@@ -211,22 +281,6 @@ export class AuthService {
       authenticationDetail.password = await this.hashPassword(password);
       await this.authenticationDetailRepository.save(authenticationDetail);
     } else {
-      if (!user.externalIdentifier.startsWith('SSO:')) {
-        const [, providerType, providerId] = user.externalIdentifier.split(':');
-        const provider = await this.ssoService.getProviderById(Number(providerId)).catch((error) => {
-          if (error instanceof SSOProviderNotFoundException) {
-            return null;
-          }
-          throw error;
-        });
-
-        if (provider?.type !== providerType) {
-          throw new ForbiddenException('You cannot change the password of an SSO user');
-        }
-
-        throw new ForbiddenException('You cannot change the password of an SSO user');
-      }
-
       await this.addAuthenticationDetails(user.id, {
         type: AuthenticationType.LOCAL_PASSWORD,
         details: {

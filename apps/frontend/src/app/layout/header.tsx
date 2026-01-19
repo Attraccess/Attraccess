@@ -8,7 +8,7 @@ interface HeaderProps {
 
 export function Header({ toggleSidebar }: HeaderProps) {
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm h-16 flex items-center justify-between px-4 md:hidden">
+    <header className="bg-white dark:bg-gray-800 shadow-xs h-16 flex items-center justify-between px-4 md:hidden">
       <Button
         variant="light"
         aria-label="Menu"

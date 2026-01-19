@@ -10,11 +10,19 @@
       "isEmailVerified": "Email verified",
       "id": "ID",
       "username": "Username",
-      "externalIdentifier": "External ID"
-    }
+      "externalIdentifier": "External ID",
+      "permissions": "Permissions",
+      "canManageResources": "Configure resources",
+      "canManageSystemConfiguration": "Configure system",
+      "canManageUsers": "User configuration",
+      "canManageBilling": "Manage billing"
+    },
+    "noPermissions": "No permissions"
   },
   "actions": {
+    "menu": "Settings",
     "editAllowedSignupDomains": "Edit signup domains",
-    "inviteUser": "Invite user"
+    "inviteUser": "Invite user",
+    "sso": "SSO Providers"
   }
 }

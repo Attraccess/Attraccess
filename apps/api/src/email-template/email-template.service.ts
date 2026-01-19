@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
 
@@ -10,15 +10,16 @@ export class EmailTemplateService {
   constructor(
     @InjectRepository(EmailTemplate)
     private readonly emailTemplateRepository: Repository<EmailTemplate>,
-    private readonly mjmlService: MjmlService
+    private readonly mjmlService: MjmlService,
   ) {}
 
   async findAll(): Promise<EmailTemplate[]> {
     return this.emailTemplateRepository.find();
   }
 
-  async findOne(type: EmailTemplateType): Promise<EmailTemplate> {
-    const template = await this.emailTemplateRepository.findOneBy({ type });
+  async findOne(type: EmailTemplateType, manager?: EntityManager): Promise<EmailTemplate> {
+    const templateRepo = manager ? manager.getRepository(EmailTemplate) : this.emailTemplateRepository;
+    const template = await templateRepo.findOneBy({ type });
 
     if (!template) {
       throw new NotFoundException(`Email template "${type}" not found`);
@@ -39,7 +40,7 @@ export class EmailTemplateService {
       {
         body: updateEmailTemplateDto.body,
         subject: updateEmailTemplateDto.subject,
-      }
+      },
     );
 
     return this.findOne(type);

@@ -29,10 +29,12 @@ export enum ResourceFlowNodeType {
   InputResourceDoorLocked = "input.resource.door.locked",
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
+  InputResourceActivityNoActivity = "input.resource.activity.no-activity",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
   OutputResourceUsageEndSession = "output.resource.usage.end-session",
+  OutputResourceActivityTrackActivity = "output.resource.activity.track-activity",
   ProcessingWait = "processing.wait",
   ProcessingIf = "processing.if",
   ProcessingSetPayload = "processing.set-payload",
@@ -253,6 +255,51 @@ export interface InviteUserDto {
    * @example "john.doe@example.com"
    */
   email: string;
+}
+
+export interface CsvInvitePermissionMappingDto {
+  /** CSV column header that maps to this permission */
+  keyMapping: string;
+  /** CSV value that represents a YES for this permission */
+  yesValue: string;
+}
+
+export interface CsvInvitePermissionsDto {
+  canManageResources: CsvInvitePermissionMappingDto;
+  canManageSystemConfiguration: CsvInvitePermissionMappingDto;
+  canManageUsers: CsvInvitePermissionMappingDto;
+  canManageBilling: CsvInvitePermissionMappingDto;
+}
+
+export interface CsvInviteConfigDto {
+  /** CSV column header containing the email */
+  emailKey: string;
+  /** CSV column header containing the username */
+  usernameKey: string;
+  permissions: CsvInvitePermissionsDto;
+  /** 1-based row numbers (excluding header) to skip when importing */
+  ignoredRows?: number[];
+}
+
+export interface CsvInviteUploadDto {
+  /** @format binary */
+  file: File;
+  /** JSON string or object describing how to map CSV columns to fields */
+  config: CsvInviteConfigDto;
+}
+
+export interface CsvInviteRowErrorDto {
+  /** 1-based row number (excluding header) */
+  row: number;
+  field?: string;
+  message: string;
+  value?: string;
+}
+
+export interface CsvInviteErrorResponseDto {
+  /** @default "CSV import failed" */
+  message: string;
+  errors: CsvInviteRowErrorDto[];
 }
 
 export interface BooleanDto {
@@ -561,20 +608,15 @@ export interface SSOProvider {
 
 export interface LinkUserToExternalAccountRequestDto {
   /**
-   * The email of the user
-   * @example "john.doe@example.com"
-   */
-  email: string;
-  /**
    * The password of the user
    * @example "password"
    */
   password: string;
   /**
-   * The external identifier of the user
-   * @example "1234567890"
+   * The short-lived token issued by the backend during SSO linking
+   * @example "eyJhbGciOi...signed"
    */
-  externalId: string;
+  linkToken: string;
 }
 
 export interface CreateOIDCConfigurationDto {
@@ -1177,6 +1219,8 @@ export interface ResourceUsage {
   project?: Project;
   /** The form submissions that belong to this resource usage */
   formSubmissions: FormSubmission[];
+  /** Whether the resource usage is finalized */
+  isFinalized: boolean;
 }
 
 export interface FormSubmission {
@@ -2764,7 +2808,46 @@ export interface UpdateReaderDto {
   connectedResourceIds: number[];
 }
 
-export type AttractapFirmwareVersion = object;
+export interface AttractapCapabilities {
+  /**
+   * Whether the reader can choose from many linked resources or can only handle one
+   * @default true
+   * @example true
+   */
+  resourceSelection: boolean;
+  /**
+   * Whether the reader has interface options for triggering resource actions, if not a actions is triggered immediately upon scanning a nfc card
+   * @default true
+   * @example true
+   */
+  resourceActionSelection: boolean;
+  /**
+   * Whether the reader can enroll new cards
+   * @default true
+   * @example true
+   */
+  cardEnrollment: boolean;
+}
+
+export interface AttractapFirmwareVersion {
+  /**
+   * The name of the firmware
+   * @example "Attractap"
+   */
+  name: string | null;
+  /**
+   * The variant of the firmware
+   * @example "eth"
+   */
+  variant: string | null;
+  /**
+   * The version of the firmware
+   * @example "1.0.0"
+   */
+  version: string | null;
+  /** The capabilities of the reader */
+  capabilities: AttractapCapabilities;
+}
 
 export interface Attractap {
   /** The ID of the reader */
@@ -2887,6 +2970,26 @@ export interface AttractapFirmware {
    * @example "attractap_eth.bin.zz"
    */
   filenameOTA: string;
+  /**
+   * The ESP chip type (esp32, esp32s2, esp32s3, esp32c3)
+   * @example "esp32s3"
+   */
+  chip: string;
+  /**
+   * The flash mode for programming (qio, qout, dio, dout)
+   * @example "dio"
+   */
+  flashMode: string;
+  /**
+   * The flash frequency for programming (80m, 40m, 26m, 20m)
+   * @example "80m"
+   */
+  flashFreq: string;
+  /**
+   * The flash size (4MB, 8MB, 16MB, etc.)
+   * @example "16MB"
+   */
+  flashSize: string;
 }
 
 export interface InfoData {
@@ -2923,6 +3026,10 @@ export type FindManyData = PaginatedUsersResponseDto;
 
 export type InviteUserData = User;
 
+export type InviteUsersFromCsvData = User[];
+
+export type InviteUsersFromCsvError = CsvInviteErrorResponseDto;
+
 export type IsLocalSignupEnabledData = BooleanDto;
 
 export interface VerifyEmailData {
@@ -2946,11 +3053,7 @@ export type GetOneUserByIdError = UserNotFoundException;
 
 export type UpdatePermissionsData = User;
 
-export interface GetPermissionsData {
-  canManageResources?: boolean;
-  canManageSystemConfiguration?: boolean;
-  canManageUsers?: boolean;
-}
+export type GetPermissionsData = SystemPermissions;
 
 export type BulkUpdatePermissionsData = User[];
 
@@ -2995,7 +3098,7 @@ export type GetAllSsoProvidersData = SSOProvider[];
 export type CreateOneSsoProviderData = SSOProvider;
 
 export interface LinkUserToExternalAccountData {
-  /** Whether the account has been linked to the external identifier */
+  /** Whether the account has been linked to the SSO identity */
   OK?: boolean;
 }
 
@@ -3679,6 +3782,22 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name InviteUsersFromCsv
+   * @summary Invite multiple users from a CSV file
+   * @request POST:/api/users/invite-csv
+   * @secure
+   */
+  export namespace InviteUsersFromCsv {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CsvInviteUploadDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = InviteUsersFromCsvData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name IsLocalSignupEnabled
    * @summary Check if local signup is enabled
    * @request GET:/api/users/local-signup-enabled
@@ -4018,7 +4137,7 @@ export namespace Authentication {
    * No description
    * @tags Authentication
    * @name LinkUserToExternalAccount
-   * @summary Link an account to an external identifier
+   * @summary Link an account to an SSO identity via a signed token
    * @request POST:/api/auth/sso/link-account
    */
   export namespace LinkUserToExternalAccount {
@@ -6958,6 +7077,29 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name InviteUsersFromCsv
+     * @summary Invite multiple users from a CSV file
+     * @request POST:/api/users/invite-csv
+     * @secure
+     */
+    inviteUsersFromCsv: (
+      data: CsvInviteUploadDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<InviteUsersFromCsvData, InviteUsersFromCsvError>({
+        path: `/api/users/invite-csv`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name IsLocalSignupEnabled
      * @summary Check if local signup is enabled
      * @request GET:/api/users/local-signup-enabled
@@ -7362,7 +7504,7 @@ export class Api<
      *
      * @tags Authentication
      * @name LinkUserToExternalAccount
-     * @summary Link an account to an external identifier
+     * @summary Link an account to an SSO identity via a signed token
      * @request POST:/api/auth/sso/link-account
      */
     linkUserToExternalAccount: (

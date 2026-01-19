@@ -158,12 +158,12 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
           onRowAction={(key) => navigate(`/resources/${key}`)}
         >
           <TableHeader>
-            <TableColumn width="48">{t('columns.image')}</TableColumn>
+            <TableColumn width="0">{t('columns.image')}</TableColumn>
             <TableColumn>{t('columns.name')}</TableColumn>
-            <TableColumn width="150" className="text-right">
+            <TableColumn width="0" className="text-left">
               {t('columns.status')}
             </TableColumn>
-            <TableColumn width="4">{''}</TableColumn>
+            <TableColumn width="0">{''}</TableColumn>
           </TableHeader>
           <TableBody
             items={resources?.data ?? []}

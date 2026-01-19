@@ -1,12 +1,15 @@
 import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
+import { SSOLinkTokenService } from '../link-token.service';
 
 @Catch(AccountLinkingRequiredException)
 export class AccountLinkingExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(AccountLinkingExceptionFilter.name);
 
-  catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
+  constructor(private readonly linkTokenService: SSOLinkTokenService) {}
+
+  async catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest() as Request;
@@ -22,22 +25,33 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
       const frontendUrl = new URL(redirectTo);
       // Clear any existing parameters and set account linking parameters
       frontendUrl.search = '';
-      frontendUrl.searchParams.set('ssoProviderId', exception.providerId.toString());
-      frontendUrl.searchParams.set('ssoProviderType', exception.providerType);
+      const linkToken = await this.linkTokenService.issue({
+        email: exception.email,
+        providerId: exception.providerId,
+        providerType: exception.providerType,
+        ssoSubject: exception.externalId,
+      });
       frontendUrl.searchParams.set('accountLinking', 'required');
+      frontendUrl.searchParams.set('ssoLinkToken', linkToken);
+      // Email is provided only for UX display and must not be trusted by the client
       frontendUrl.searchParams.set('email', exception.email);
-      frontendUrl.searchParams.set('externalId', exception.externalId);
 
       this.logger.log(`Redirecting to frontend for account linking: ${frontendUrl.toString()}`);
       return response.redirect(frontendUrl.toString());
     }
 
     // Fallback: return JSON if no redirect URL
+    const linkToken = await this.linkTokenService.issue({
+      email: exception.email,
+      providerId: exception.providerId,
+      providerType: exception.providerType,
+      ssoSubject: exception.externalId,
+    });
     response.status(400).json({
       error: 'AccountLinkingRequired',
       message: 'Account linking required',
       email: exception.email,
-      externalId: exception.externalId,
+      linkToken,
     });
   }
 }

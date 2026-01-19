@@ -34,7 +34,10 @@ export const useTranslationState = create<TranslationState>((set) => ({
 }));
 
 export type TFunction = (key: string, data?: Record<string, unknown>) => string;
-export type TExists = (key: string) => boolean;
+interface TExistsOptions {
+  succeedIfKeyIsObject?: boolean;
+}
+export type TExists = (key: string, options?: TExistsOptions) => boolean;
 
 // Pluralization helpers
 interface PluralObject {
@@ -110,12 +113,17 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
   );
 
   const tExists = useCallback(
-    (key: string) => {
+    (key: string, options?: TExistsOptions) => {
       const translation = getTranslationRaw(key);
-      return translation !== undefined && (typeof translation === 'string' || isPluralObject(translation));
+      return (
+        translation !== undefined &&
+        (typeof translation === 'string' ||
+          isPluralObject(translation) ||
+          (options?.succeedIfKeyIsObject && typeof translation === 'object'))
+      );
     },
     [getTranslationRaw],
-  );
+  ) as TExists;
 
   const nestedObjectToDotNotatedKeys = (obj: Record<string, unknown>): string[] => {
     const keys: string[] = [];

@@ -122,14 +122,19 @@ const coreRoutes: RouteConfig[] = [
     authRequired: 'canManageUsers',
   },
   {
-    path: '/nfc-cards',
+    path: '/attractap',
+    element: <Navigate to="/attractap/nfc-cards" replace />,
+    authRequired: true,
+  },
+  {
+    path: '/attractap/nfc-cards',
     element: <NfcCardList />,
     authRequired: true,
   },
   {
-    path: '/attractap',
+    path: '/attractap/readers',
     element: <AttractapList />,
-    authRequired: 'canManageSystemConfiguration',
+    authRequired: 'canManageResources',
   },
   {
     path: '/billing',

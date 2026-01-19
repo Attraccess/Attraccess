@@ -1,0 +1,30 @@
+{
+  "title": "Geräte-PIN",
+  "loading": "Geräte-PIN wird geprüft...",
+  "enterPin": {
+    "submit": "Entsperren"
+  },
+  "setPin": {
+    "title": "PIN setzen",
+    "description": "Lege eine 4-stellige PIN fest, um Konfigurationsbefehle zu sichern.",
+    "submit": "PIN setzen"
+  },
+  "changePin": {
+    "title": "PIN ändern",
+    "submit": "PIN aktualisieren"
+  },
+  "fields": {
+    "pin": "PIN",
+    "currentPin": "Aktuelle PIN",
+    "newPin": "Neue PIN",
+    "confirmPin": "Neue PIN bestätigen"
+  },
+  "actions": {
+    "logout": "PIN vergessen"
+  },
+  "errors": {
+    "invalid": "PIN muss 4-stellig sein.",
+    "mismatch": "PINs stimmen nicht überein.",
+    "auth": "Ungültige PIN. Bitte versuche es erneut."
+  }
+}

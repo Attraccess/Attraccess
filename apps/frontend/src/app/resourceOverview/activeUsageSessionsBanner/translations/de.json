@@ -10,8 +10,19 @@
   },
   "modal.title": "Alle aktiven Sitzungen beenden",
   "modal.description": "Wir beenden die Sitzung für jede Ressource unten.",
+  "modal.successListTitle": "{{count}} Sitzung(en) beendet",
   "modal.loadingList": "Aktive Sitzungen werden geladen...",
   "modal.cancel": "Abbrechen",
   "modal.confirm": "Jetzt alle beenden",
-  "modal.completedTitle": "Alle Sitzungen beendet"
+  "modal.completedTitle": "Alle Sitzungen beendet",
+  "apiErrors": {
+    "MissingFormSubmissionException": {
+      "title": "Ende der Sitzung erfordert Formular",
+      "description": "Um die Sitzung zu beenden, müssen Sie das erforderliche Formular für diese Ressource ausfüllen. Bitte beenden Sie diese Sitzung im Ressourcen-Detail-Bildschirm."
+    },
+    "No active session found": {
+      "title": "Keine aktive Sitzung gefunden",
+      "description": "Es gibt keine aktive Sitzungen für diese Ressource."
+    }
+  }
 }

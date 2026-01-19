@@ -14,14 +14,19 @@
   "passwordLabel": "Passwort (Optional)",
   "passwordPlaceholder": "••••••••",
   "useTls": "TLS/SSL verwenden",
-  "defaultPublishQosLabel": "Standard-QoS für Veröffentlichungen (0-2)",
+  "defaultPublishQosLabel": "Standard-QoS für Veröffentlichungen",
   "defaultPublishRetainLabel": "Veröffentlichungen standardmäßig beibehalten",
-  "defaultSubscribeQosLabel": "Standard-QoS für Abonnements (0-2)",
+  "defaultSubscribeQosLabel": "Standard-QoS für Abonnements",
   "qosPlaceholder": "0, 1 oder 2",
+  "qosOption": {
+    "0": "0 - Höchstens einmal (Fire-and-Forget)",
+    "1": "1 - Mindestens einmal (Bestätigung)",
+    "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+  },
   "cancel": "Abbrechen",
   "create": "Server erstellen",
   "serverCreated": "MQTT-Server erstellt",
   "serverCreatedDesc": "Ein neuer MQTT-Server wurde erfolgreich erstellt.",
   "errorGeneric": "Fehler",
   "failedToCreate": "Fehler beim Erstellen des MQTT-Servers."
-} 
+}

@@ -35,6 +35,8 @@ import {
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
 } from './entities/resourceFlowNode';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
@@ -108,6 +110,8 @@ export {
   FormSubmission,
   FormFieldType,
   ResourceFormAction,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
 };
 
 // Export the entities object

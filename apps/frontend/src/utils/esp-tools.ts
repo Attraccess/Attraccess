@@ -20,7 +20,6 @@ export interface ESPToolsResult<T = unknown> {
 }
 
 export interface Command {
-  type: 'GET' | 'SET';
   topic: string;
   payload?: string;
 }
@@ -223,8 +222,11 @@ export class ESPTools {
     firmware: Blob;
     terminal?: IEspLoaderTerminal;
     onProgress?: (progressPct: number) => unknown;
+    flashMode?: 'qio' | 'qout' | 'dio' | 'dout';
+    flashFreq?: '80m' | '40m' | '26m' | '20m';
+    flashSize?: string;
   }): Promise<ESPToolsResult<void>> {
-    const { firmware, terminal, onProgress } = options;
+    const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize } = options;
 
     let firmwareDataString: string;
     try {
@@ -283,9 +285,9 @@ export class ESPTools {
 
           await esploader.writeFlash({
             fileArray: [{ data: firmwareDataString, address: 0 }],
-            flashSize: 'keep',
-            flashMode: 'keep',
-            flashFreq: 'keep',
+            flashSize: flashSize || 'keep',
+            flashMode: flashMode || 'dio',
+            flashFreq: flashFreq || '80m',
             eraseAll: false,
             compress: true,
             reportProgress: (_fileIndex: number, written: number, total: number) => {
@@ -430,14 +432,15 @@ export class ESPTools {
     return await this.useTransport({
       blocking: true,
       fn: async (transport, release) => {
-        let commandString = `CMND ${command.type} ${command.topic}`;
+        let commandString = `CMND ${command.topic}`;
         if (command.payload) {
           commandString += ` ${command.payload}`;
         }
 
         commandString += '\n';
 
-        const commandBuffer = new TextEncoder().encode(commandString);
+        const commandBuffer = new TextEncoder().encode(commandString + '\n');
+        console.debug(`Sending command: "${commandString}"`);
         await transport.write(commandBuffer);
 
         if (!waitForResponse) {
@@ -479,29 +482,25 @@ export class ESPTools {
             // real text on serial lines.
             const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
 
-            // Check if line matches expected RESP format: RESP <type?> <topic> <payload>
-            // New firmware emits: RESP <get|set> <topic> <payload>
-            // Old firmware emitted: RESP <topic> <payload>
-            let respMatch = cleaned.match(/^RESP\s+(get|set)\s+(\S+)\s+(.+)$/i);
+            console.debug('Cleaned line:', cleaned);
+
+            // Check if line matches expected RESP format: RESP <topic> <payload>
+            // Firmware emits: RESP <topic> <payload>
+            const respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
             let responseTopic: string | undefined;
             let payload: string | undefined;
             if (respMatch) {
-              responseTopic = respMatch[2];
-              payload = respMatch[3];
+              responseTopic = respMatch[1];
+              console.debug('Response topic:', responseTopic);
+              payload = respMatch[2];
             } else {
-              // Try legacy format
-              respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
-              if (respMatch) {
-                responseTopic = respMatch[1];
-                payload = respMatch[2];
-              }
-            }
-            if (!respMatch) {
+              console.debug('No response match');
               continue;
             }
 
             // Check if the response topic matches our command topic
             if (responseTopic !== command.topic) {
+              console.debug('Response topic does not match command topic:', responseTopic, '!==', command.topic);
               continue;
             }
 

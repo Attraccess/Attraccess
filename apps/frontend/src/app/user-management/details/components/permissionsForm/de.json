@@ -3,9 +3,16 @@
   "permissions": {
     "canManageResources": "Ressourcen verwalten",
     "canManageSystemConfiguration": "Systemkonfiguration verwalten",
-    "canManageUsers": "Benutzer verwalten"
+    "canManageUsers": "Benutzer verwalten",
+    "canManageBilling": "Zahlungen verwalten"
   },
   "actions": {
     "save": "Speichern"
+  },
+  "messages": {
+    "updated": "Berechtigungen aktualisiert"
+  },
+  "errors": {
+    "updateFailed": "Berechtigungen konnten nicht aktualisiert werden"
   }
 }

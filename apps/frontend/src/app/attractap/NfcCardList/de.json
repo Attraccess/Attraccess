@@ -1,6 +1,7 @@
 {
   "workInProgress": "Dieses Feature ist noch in Arbeit, benutzung auf eigene Gefahr!",
   "nfcCards": "NFC-Karten",
+  "readers": "Attractap-Reader",
   "noNfcCardsFound": "Keine NFC-Karten gefunden",
   "nfcCardsTable": {
     "headers": {

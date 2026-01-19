@@ -21,6 +21,8 @@ import {
   MqttWaitForMessageNodeDataSchema,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
+  InputResourceActivityNoActivityNodeDataSchema,
+  ResourceActivityTrackActivityNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -347,6 +349,12 @@ export class ResourceFlowsService {
           schema.supportedByResource = true;
           break;
 
+        case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+          schema.configSchema = z.toJSONSchema(InputResourceActivityNoActivityNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          break;
+
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
           schema.inputs = ['input'];
@@ -364,7 +372,6 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
           schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema);
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
@@ -372,7 +379,13 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
           schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema);
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+          schema.configSchema = z.toJSONSchema(ResourceActivityTrackActivityNodeDataSchema);
+          schema.inputs = ['input'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
@@ -408,7 +421,6 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.PROCESSING_ERROR:
           schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema);
           schema.inputs = ['input'];
-          schema.outputs = [];
           schema.supportedByResource = true;
           break;
 

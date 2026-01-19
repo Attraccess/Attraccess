@@ -15,6 +15,7 @@ import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { AppConfigType } from '../config/app.config';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class EmailService {
@@ -52,9 +53,14 @@ export class EmailService {
     };
   }
 
-  private async sendEmail(user: User, templateType: EmailTemplateType, context: Record<string, unknown>) {
+  private async sendEmail(
+    user: User,
+    templateType: EmailTemplateType,
+    context: Record<string, unknown>,
+    manager?: EntityManager,
+  ) {
     try {
-      const dbTemplate = await this.emailTemplateService.findOne(templateType);
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = this.convertTemplate(dbTemplate, context);
 
@@ -101,7 +107,7 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
-  async sendUserInvitationEmail(user: User, verificationToken: string) {
+  async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
     const verificationUrl = `${this.frontendUrl}/accept-invitation?email=${encodeURIComponent(
       user.email,
     )}&token=${verificationToken}`;
@@ -111,7 +117,7 @@ export class EmailService {
       url: verificationUrl,
     };
 
-    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context);
+    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, manager);
   }
 
   async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {

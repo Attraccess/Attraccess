@@ -10,7 +10,8 @@
     },
     "unsupportedForResourceType": "not supported by this resource",
     "genericConfig": {
-      "overridableByInput": "Overridable by input: {{fieldName}}"
+      "overridableByInput": "Overridable by input: {{fieldName}}",
+      "createMqttServer": "Create MQTT server"
     },
     "input": {
       "button": {
@@ -49,6 +50,23 @@
             "description": "This node is triggered when a resource is taken over.",
             "outputs": {
               "output": "Output"
+            }
+          }
+        },
+        "activity": {
+          "no-activity": {
+            "title": "Resource is inactive",
+            "description": "This node is triggered when a resource is inactive for a certain time.",
+            "outputs": {
+              "output": "Output"
+            },
+            "preview": {
+              "minInactivityMinutes": "Minimum inactivity (minutes)"
+            },
+            "config": {
+              "minInactivityMinutes": {
+                "label": "Minimum inactivity (minutes)"
+              }
             }
           }
         },
@@ -148,7 +166,14 @@
             "serverId": { "label": "Server" },
             "topic": { "label": "Topic (supports + and #)" },
             "timeoutSeconds": { "label": "Timeout (seconds)" },
-            "subscribeQos": { "label": "QoS (effective is min(publish, subscribe))" }
+            "subscribeQos": {
+              "label": "QoS (effective is min(publish, subscribe))",
+              "enum": {
+                "0": "0 - At most once (fire and forget)",
+                "1": "1 - At least once (acknowledged)",
+                "2": "2 - Exactly once (two-phase handshake)"
+              }
+            }
           }
         }
       },
@@ -293,7 +318,14 @@
             "payload": {
               "label": "Payload"
             },
-            "qos": { "label": "QoS" },
+            "qos": {
+              "label": "QoS",
+              "enum": {
+                "0": "0 - At most once (fire and forget)",
+                "1": "1 - At least once (acknowledged)",
+                "2": "2 - Exactly once (two-phase handshake)"
+              }
+            },
             "retain": { "label": "Retain message" }
           }
         }
@@ -341,6 +373,19 @@
                   "label": "External reference"
                 }
               }
+            }
+          }
+        },
+
+        "activity": {
+          "track-activity": {
+            "title": "Resource was active",
+            "description": "Use this node to indicate that the resource was active.",
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
             }
           }
         }

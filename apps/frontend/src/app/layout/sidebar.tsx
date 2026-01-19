@@ -12,6 +12,7 @@ import {
   Accordion,
   AccordionItem,
   LinkProps,
+  Divider,
 } from '@heroui/react';
 import { useAllRoutes } from '../routes';
 import { SystemPermissions } from '@attraccess/react-query-client';
@@ -155,12 +156,12 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg transform ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-100 dark:bg-gray-900 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between h-16 px-4">
           <Logo data-cy="sidebar-home-link" />
 
           <Button
@@ -174,6 +175,8 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
             <X className="h-6 w-6" />
           </Button>
         </div>
+
+        <Divider />
 
         {/* Sidebar Navigation */}
         <div className="flex-grow overflow-y-auto py-4">
@@ -249,8 +252,10 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
           </nav>
         </div>
 
+        <Divider />
+
         {/* User section at bottom */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+        <div className="p-4">
           {user && (
             <div className="flex items-center justify-between">
               <div className="flex items-center text-sm">

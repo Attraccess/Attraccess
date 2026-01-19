@@ -29,6 +29,7 @@ describe('AuthService', () => {
           useValue: {
             findOne: jest.fn(),
             updateOne: jest.fn(),
+            isSSOUser: jest.fn().mockResolvedValue(false),
           },
         },
         {

@@ -1570,10 +1570,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     offset++;
   }
   apdusize = offset;
-  // #ifdef NTAG424DEBUG
+#ifdef NTAG424DEBUG
   PN532DEBUGPRINT.print(F("PCD->PICC:"));
   Adafruit_PN532::PrintHexChar(apdu + 2, apdusize - 2);
-  // #endif
+#endif
   if (!sendCommandCheckAck((uint8_t *)apdu, apdusize))
   {
 #ifdef NTAG424DEBUG
@@ -1584,12 +1584,12 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
   /* Read the response packet */
   // readdata(pn532_packetbuffer, 41);
   readdata(pn532_packetbuffer, response_le);
-  // #ifdef NTAG424DEBUG
+#ifdef NTAG424DEBUG
   PN532DEBUGPRINT.print(F("PCD<-PICC: "));
   // Adafruit_PN532::PrintHexChar(pn532_packetbuffer + 8, 5 +
   // pn532_packetbuffer[3] - 8);
   Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 5 + pn532_packetbuffer[3]);
-  // #endif
+#endif
   //  increase cmd_counter
   ntag424_Session.cmd_counter += 1;
 
@@ -2357,12 +2357,12 @@ uint8_t Adafruit_PN532::ntag424_Authenticate(uint8_t *key, uint8_t keyno,
   }
   /* Read the response packet */
   readdata(pn532_packetbuffer, 42);
-  // #ifdef NTAG424DEBUG
+#ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("> AUTH 2 - PCD encrypted answer: "));
   Adafruit_PN532::PrintHexChar(apdu, apdusize);
   PN532DEBUGPRINT.print(F("Received: "));
   Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 42);
-  // #endif
+#endif
   if (pn532_packetbuffer[7] != 0x00 || pn532_packetbuffer[40] != 0x91 ||
       pn532_packetbuffer[41] != 0x00)
   {
@@ -3004,6 +3004,10 @@ uint8_t Adafruit_PN532::ntag424_GetVersion()
   {
     return 1;
   }
+
+#ifdef NTAG424DEBUG
+  PN532DEBUGPRINT.println(F("Card is not an NTAG424"));
+#endif
   return 0;
 }
 

@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  ResourcesService,
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceUsageEndSession,
   useResourcesServiceGetAllResourcesKey,
@@ -11,6 +10,7 @@ import {
   ApiError,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
+import { getTranslationKeyForApiError } from '../../../utils/apiError';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
@@ -21,22 +21,30 @@ type ActiveUsageSessionsBannerProps = {
   onShowMySessions: () => void;
 };
 
+const ACTIVE_RESOURCES_PAGE_SIZE = 50;
+
 export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
+      api: {
+        ...API_ERROR_TRANSLATIONS_EN,
+        ...en.apiErrors,
+      },
     },
     de: {
       ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
+      api: {
+        ...API_ERROR_TRANSLATIONS_DE,
+        ...de.apiErrors,
+      },
     },
   });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
   // Fetch just the total count (1 item per page is sufficient)
-  const { data, isLoading, isFetching } = useResourcesServiceGetAllResources({
+  const { data, isLoading, isFetching, refetch } = useResourcesServiceGetAllResources({
     onlyInUseByMe: true,
     page: 1,
     limit: 1,
@@ -53,68 +61,105 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
     },
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [resourcesInUse, setResourcesInUse] = useState<Array<{ id: number; name: string }>>([]);
-  const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [endStatuses, setEndStatuses] = useState<Record<number, 'pending' | 'ending' | 'done' | 'error'>>({});
+  const [endErrors, setEndErrors] = useState<Record<number, { title: string; description: string }>>({});
   const [allCompleted, setAllCompleted] = useState(false);
+  const [cachedResources, setCachedResources] = useState<Array<{ id: number; name: string }>>([]);
 
-  const openConfirmModal = useCallback(async () => {
+  const {
+    data: activeResourcesResponse,
+    isLoading: isLoadingActiveResources,
+    isFetching: isFetchingActiveResources,
+  } = useResourcesServiceGetAllResources(
+    { onlyInUseByMe: true, limit: ACTIVE_RESOURCES_PAGE_SIZE, page: 1 },
+    undefined,
+    {
+      enabled: isModalOpen,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const activeResources = useMemo(() => activeResourcesResponse?.data ?? [], [activeResourcesResponse]);
+  const successfulResources = useMemo(
+    () => cachedResources.filter((resource) => endStatuses[resource.id] === 'done'),
+    [cachedResources, endStatuses],
+  );
+
+  const isLoadingResources =
+    isModalOpen && (isLoadingActiveResources || (!cachedResources.length && isFetchingActiveResources));
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    if (!activeResources.length) return;
+
+    setCachedResources((prev) => {
+      const seen = new Set(prev.map((r) => r.id));
+      const merged = [...prev];
+      activeResources.forEach((r) => {
+        if (!seen.has(r.id)) {
+          merged.push({ id: r.id, name: r.name });
+        }
+      });
+      return merged;
+    });
+
+    setEndStatuses((prev) => {
+      const next: typeof prev = { ...prev };
+      activeResources.forEach((resource) => {
+        if (!next[resource.id]) {
+          next[resource.id] = 'pending';
+        }
+      });
+      return next;
+    });
+  }, [activeResources, isModalOpen]);
+
+  const openConfirmModal = useCallback(() => {
     if (activeCount === 0) return;
     setIsModalOpen(true);
     setAllCompleted(false);
     setEndStatuses({});
-    setResourcesInUse([]);
-    setIsLoadingResources(true);
-    try {
-      // Load all resources currently in use by me
-      const pageSize = 50;
-      let page = 1;
-      const collected: Array<{ id: number; name: string }> = [];
-      while (true) {
-        const resp = await ResourcesService.getAllResources({
-          onlyInUseByMe: true,
-          page,
-          limit: pageSize,
-        });
-        const items = resp.data ?? [];
-        collected.push(...items.map((r) => ({ id: r.id, name: r.name })));
-        if (items.length < pageSize) break;
-        page += 1;
-      }
-      setResourcesInUse(collected);
-      // Initialize statuses as pending
-      setEndStatuses(collected.reduce((acc, r) => ({ ...acc, [r.id]: 'pending' }), {}));
-    } catch (e) {
-      console.error(e);
-      toast.apiError({
-        baseTranslationKey: 'api',
-        error: e as ApiError,
-        t,
-        tExists,
-      });
-    } finally {
-      setIsLoadingResources(false);
-    }
-  }, [activeCount, tExists, t, toast]);
+    setEndErrors({});
+    setCachedResources([]);
+  }, [activeCount]);
 
   const confirmEndAll = useCallback(async () => {
-    if (isEndingAll || resourcesInUse.length === 0) return;
+    if (isEndingAll || isLoadingResources || cachedResources.length === 0) return;
     setIsEndingAll(true);
+    setEndErrors({});
     // Mark all as ending
     setEndStatuses((prev) => {
       const updated: typeof prev = { ...prev };
-      resourcesInUse.forEach((r) => (updated[r.id] = 'ending'));
+      cachedResources.forEach((r) => (updated[r.id] = 'ending'));
       return updated;
     });
     try {
       const results = await Promise.allSettled(
-        resourcesInUse.map(async (r) => {
+        cachedResources.map(async (r) => {
           try {
             await endSession({ resourceId: r.id, requestBody: {} });
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'done' }));
+            setEndErrors((prev) => {
+              if (!(r.id in prev)) return prev;
+              const { [r.id]: _removed, ...rest } = prev;
+              return rest;
+            });
           } catch (err) {
             console.error('Failed to end session for resource', r.id, err);
+            const { key, errorMessage } = getTranslationKeyForApiError({
+              baseTranslationKey: 'api',
+              error: err as ApiError,
+              t,
+              tExists,
+            });
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'error' }));
+            setEndErrors((prev) => ({
+              ...prev,
+              [r.id]: {
+                title: t(`${key}.title`),
+                description: t(`${key}.description`, { error: errorMessage }),
+              },
+            }));
             throw err;
           }
         }),
@@ -124,23 +169,17 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       await queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
 
       // If all succeeded -> show completion state and auto-close
-      const rejectedResult = results.find((r) => r.status === 'rejected');
-      if (!rejectedResult) {
+      const rejectedResults = results.filter((r) => r.status === 'rejected');
+      if (rejectedResults.length === 0) {
         setAllCompleted(true);
         toast.success({ title: t('endedAll.success') });
         setTimeout(() => setIsModalOpen(false), 1000);
-      } else {
-        toast.apiError({
-          error: rejectedResult.reason as ApiError,
-          t,
-          tExists,
-          baseTranslationKey: 'api',
-        });
       }
     } finally {
       setIsEndingAll(false);
+      refetch();
     }
-  }, [endSession, isEndingAll, queryClient, resourcesInUse, toast, t, tExists]);
+  }, [cachedResources, endSession, isEndingAll, isLoadingResources, queryClient, refetch, t, tExists, toast]);
 
   if (isLoading || isFetching) {
     return (
@@ -207,15 +246,35 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                 ) : (
                   <div className="space-y-2">
                     <div className="text-sm text-default-500">{t('modal.description')}</div>
-                    <ul className="space-y-1">
-                      {resourcesInUse.map((r) => {
+                    {successfulResources.length > 0 && (
+                      <Alert
+                        color="success"
+                        variant="flat"
+                        title={t('modal.successListTitle', { count: successfulResources.length })}
+                        className="text-sm"
+                      >
+                        <div className="text-xs text-success-600">
+                          {successfulResources.map((r) => r.name).join(', ')}
+                        </div>
+                      </Alert>
+                    )}
+                    <ul className="space-y-2">
+                      {activeResources.map((r) => {
                         const status = endStatuses[r.id] ?? 'pending';
+                        const errorInfo = endErrors[r.id];
                         return (
-                          <li key={r.id} className="flex items-center gap-2">
-                            {status === 'ending' && <Loader2 className="h-4 w-4 animate-spin text-warning" />}
-                            {status === 'done' && <Check className="h-4 w-4 text-success" />}
-                            {status === 'error' && <XCircle className="h-4 w-4 text-danger" />}
-                            <span>{r.name}</span>
+                          <li key={r.id} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              {status === 'ending' && <Loader2 className="h-4 w-4 animate-spin text-warning" />}
+                              {status === 'done' && <Check className="h-4 w-4 text-success" />}
+                              {status === 'error' && <XCircle className="h-4 w-4 text-danger" />}
+                              <span>{r.name}</span>
+                            </div>
+                            {status === 'error' && errorInfo && (
+                              <Alert color="danger" variant="flat" title={errorInfo.title} className="text-sm">
+                                <div className="text-xs text-danger-500">{errorInfo.description}</div>
+                              </Alert>
+                            )}
                           </li>
                         );
                       })}
@@ -228,7 +287,12 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                   <Button variant="light" onPress={onClose} isDisabled={isEndingAll}>
                     {t('modal.cancel')}
                   </Button>
-                  <Button color="danger" isLoading={isEndingAll} onPress={confirmEndAll}>
+                  <Button
+                    color="danger"
+                    isLoading={isEndingAll}
+                    isDisabled={isLoadingResources || activeResources.length === 0}
+                    onPress={confirmEndAll}
+                  >
                     {t('modal.confirm')}
                   </Button>
                 </ModalFooter>

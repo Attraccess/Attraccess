@@ -11,29 +11,8 @@
       "items": {
         "resources": "Resources",
         "projects": "Projects",
-        "billing": "Billing"
-      }
-    },
-    "attractap": {
-      "label": "Attractap",
-      "items": {
-        "readers": "Readers",
-        "nfcCards": "NFC-Cards"
-      }
-    },
-    "billing": {
-      "label": "Billing",
-      "items": {
-        "dashboard": "Overview",
-        "administration": "Administration",
-        "csvExport": "CSV Export",
-        "sumup": "SumUp"
-      }
-    },
-    "auth": {
-      "label": "Authentication",
-      "items": {
-        "ssoProviders": "SSO Providers",
+        "billing": "Billing",
+        "attractap": "NFC-Cards",
         "userManagement": "User Management"
       }
     },

@@ -621,7 +621,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const resourcesWithUsageSession = await Promise.all(
       resources.map(async (resource) => ({
         ...resource,
-        activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id),
+        activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
       })),
     );
 
@@ -679,6 +679,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     if (!reader) {
       throw new Error(`Reader not found: ${data.readerId}`);
+    }
+
+    if (!reader.firmware.capabilities.cardEnrollment) {
+      throw new Error(`Reader does not support card enrollment: ${data.readerId}`);
     }
 
     const user = await this.usersService.findOne({ id: data.userId });

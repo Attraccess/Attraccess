@@ -37,6 +37,8 @@ import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
 import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
+import { SSOLinkTokenService } from './auth/sso/link-token.service';
+import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { EncryptionModule } from '../encryption/encryption.module';
     CookieConfigService,
     SSOOIDCGuard,
     SSOSamlGuard,
+    SSOLinkTokenService,
+    AccountLinkingExceptionFilter,
     {
       provide: SSOOIDCStrategy,
       useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {

@@ -467,6 +467,7 @@ export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof 
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
 export type UsersServiceCreateOneUserMutationResult = Awaited<ReturnType<typeof UsersService.createOneUser>>;
 export type UsersServiceInviteUserMutationResult = Awaited<ReturnType<typeof UsersService.inviteUser>>;
+export type UsersServiceInviteUsersFromCsvMutationResult = Awaited<ReturnType<typeof UsersService.inviteUsersFromCsv>>;
 export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof UsersService.verifyEmail>>;
 export type UsersServiceAcceptInvitationMutationResult = Awaited<ReturnType<typeof UsersService.acceptInvitation>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;

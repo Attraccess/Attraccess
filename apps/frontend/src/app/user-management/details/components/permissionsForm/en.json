@@ -3,9 +3,16 @@
   "permissions": {
     "canManageResources": "Manage resources",
     "canManageSystemConfiguration": "Manage system configuration",
-    "canManageUsers": "Manage users"
+    "canManageUsers": "Manage users",
+    "canManageBilling": "Manage billing"
   },
   "actions": {
     "save": "Save"
+  },
+  "messages": {
+    "updated": "Permissions updated"
+  },
+  "errors": {
+    "updateFailed": "Unable to update permissions"
   }
 }

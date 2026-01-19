@@ -1,3 +1,42 @@
+## 1.3.0 (2025-12-21)
+
+### 🚀 Features
+
+- balena device controls ([465500c](https://github.com/Attraccess/Attraccess/commit/465500c))
+- **ATT-127:** include form submissions and project in flow payloads ([#346](https://github.com/Attraccess/Attraccess/pull/346))
+- **ATT-163:** admins can invite users ([#299](https://github.com/Attraccess/Attraccess/pull/299))
+- **ATT-164:** prevent sso users from changing/setting their password ([#357](https://github.com/Attraccess/Attraccess/pull/357))
+- **ATT-170:** project monitoring and details page/dashboard ([#320](https://github.com/Attraccess/Attraccess/pull/320))
+- **ATT-171:** share/invite other users into your projects ([#322](https://github.com/Attraccess/Attraccess/pull/322))
+- **ATT-192:** QoS as select and allow mqtt server creation from mqtt send node ([#365](https://github.com/Attraccess/Attraccess/pull/365))
+- **ATT-198:** set email verified to true for sso users ([#347](https://github.com/Attraccess/Attraccess/pull/347))
+- **ATT-203:** resource inactivity tracking and automation ([#366](https://github.com/Attraccess/Attraccess/pull/366))
+- **ATT-215:** add success and error messages for permissions update in user management ([#383](https://github.com/Attraccess/Attraccess/pull/383))
+- **ATT-216:** enhance registration and invite user forms with username validation and guidance ([#382](https://github.com/Attraccess/Attraccess/pull/382))
+- **ATT-25:** show user permissions in user list ([#364](https://github.com/Attraccess/Attraccess/pull/364))
+- **ATT-40:** invite users via csv upload ([#355](https://github.com/Attraccess/Attraccess/pull/355))
+- **ATT-40:** disable password login and username change for sso user… ([#356](https://github.com/Attraccess/Attraccess/pull/356))
+
+### 🩹 Fixes
+
+- rename BALENA_API_TOKEN to MY_BALENA_API_TOKEN because balena forbids setting envs with BALENA prefix ([1368131](https://github.com/Attraccess/Attraccess/commit/1368131))
+- attractap failing to start resource ([#345](https://github.com/Attraccess/Attraccess/pull/345))
+- usage session and flows no longer create a race condition ([#359](https://github.com/Attraccess/Attraccess/pull/359))
+- end all resource sessions component was broken ([#375](https://github.com/Attraccess/Attraccess/pull/375))
+- **ATT-173:** case insensitive usernames ([#352](https://github.com/Attraccess/Attraccess/pull/352))
+- **ATT-187:** remove unused column references expiresAt ([#330](https://github.com/Attraccess/Attraccess/pull/330))
+- **ATT-188:** allow introducers of a resource to stop other users ses… ([#351](https://github.com/Attraccess/Attraccess/pull/351))
+- **ATT-189:** forms boolean fields render as one switch in frontend ([#332](https://github.com/Attraccess/Attraccess/pull/332))
+- **ATT-190:** attractap not updating and ssl with forms/projects OOM ([#334](https://github.com/Attraccess/Attraccess/pull/334))
+- **ATT-197:** ensure user permissions are updated from admin ui ([#350](https://github.com/Attraccess/Attraccess/pull/350))
+- **ATT-207:** ensure topup dialog popsup when user reaches INSUFFICIENT_BALANCE error ([#374](https://github.com/Attraccess/Attraccess/pull/374))
+- **ATT-214:** add translations for UserEmailNotVerifiedException and implement corresponding unit test ([#381](https://github.com/Attraccess/Attraccess/pull/381))
+- **Attractap:** increase version number ([#343](https://github.com/Attraccess/Attraccess/pull/343))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.2.0 (2025-11-12)
 
 ### 🚀 Features
