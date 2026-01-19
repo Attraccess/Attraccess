@@ -21,6 +21,7 @@ import {
   SSOProviderOIDCConfiguration,
   SSOProvider,
   Session,
+  ResourceUsage,
   Setting,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
@@ -38,7 +39,15 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthenticationDetail, SSOProvider, SSOProviderOIDCConfiguration, Session, Setting]),
+    TypeOrmModule.forFeature([
+      User,
+      AuthenticationDetail,
+      SSOProvider,
+      SSOProviderOIDCConfiguration,
+      Session,
+      ResourceUsage,
+      Setting,
+    ]),
     PassportModule,
     EmailModule,
     LicenseModule,

@@ -7,7 +7,8 @@
     "typeorm": "typeorm-ts-node-commonjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
-    "precommit": "pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e"
+    "precommit": "pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e",
+    "services": "node --experimental-strip-types scripts/services-compose.mts"
   },
   "private": true,
   "dependencies": {
@@ -187,6 +188,7 @@
     "eslint-plugin-react-hooks": "5.0.0",
     "happy-dom": "^18.0.1",
     "husky": "^9.1.7",
+    "ink": "^4.4.1",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-environment-node": "^29.7.0",

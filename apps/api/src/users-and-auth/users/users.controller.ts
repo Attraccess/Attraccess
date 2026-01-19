@@ -16,6 +16,7 @@ import {
   UploadedFile,
   BadRequestException,
   ServiceUnavailableException,
+  Delete,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
@@ -61,6 +62,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate, isEmail } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { EntityManager } from 'typeorm';
+import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -675,6 +677,35 @@ export class UsersController {
   }
 
   @Auth()
+  @Post('me/delete-request')
+  @ApiOperation({ summary: 'Request account deletion email', operationId: 'requestDeleteAccount' })
+  @ApiResponse({
+    status: 200,
+    description: 'Delete account confirmation email sent.',
+  })
+  async requestDeleteAccount(@Req() request: AuthenticatedRequest): Promise<void> {
+    try {
+      await this.usersService.requestSelfDeletion(request.user.id);
+    } catch (error) {
+      throw this.mapEmailSendError(error);
+    }
+  }
+
+  @Post('me/delete-confirm')
+  @ApiOperation({ summary: 'Confirm account deletion via email token', operationId: 'confirmDeleteAccount' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account deleted.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  async confirmDeleteAccount(@Body() body: DeleteAccountConfirmDto): Promise<void> {
+    await this.usersService.confirmSelfDeletion(body.email, body.token);
+  }
+
+  @Auth()
   @Patch('me/username')
   @ApiOperation({ summary: 'Change current user username (limit once per day)', operationId: 'changeMyUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
@@ -717,6 +748,25 @@ export class UsersController {
     }
 
     return user;
+  }
+
+  @Delete(':id')
+  @Auth('canManageUsers')
+  @ApiOperation({ summary: 'Delete a user', operationId: 'deleteUser' })
+  @ApiResponse({
+    status: 200,
+    description: 'User deleted.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User does not have permission to delete users.',
+  })
+  async deleteOne(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<void> {
+    if (request.user.id === id) {
+      throw new BadRequestException('DeleteAccountUseSelfEndpoint');
+    }
+
+    await this.usersService.deleteOne(id);
   }
 
   @Get()

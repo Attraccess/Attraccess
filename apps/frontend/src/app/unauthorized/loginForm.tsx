@@ -136,7 +136,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         name="username"
         type="text"
         label={t('username')}
-        variant="underlined"
+
         required
         isDisabled={isPending}
         data-cy="login-form-username-input"
@@ -146,7 +146,6 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         id="password"
         name="password"
         label={t('password')}
-        variant="underlined"
         required
         isDisabled={isPending}
         data-cy="login-form-password-input"

@@ -105,6 +105,11 @@ export const $User = {
             type: 'string',
             description: 'When the user was last updated'
         },
+        deletedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the user was soft-deleted'
+        },
         externalIdentifier: {
             type: 'string',
             description: 'The external (origin) identifier of the user, if the user is authenticated via SSO',
@@ -327,6 +332,23 @@ export const $ChangePasswordDto = {
         }
     },
     required: ['password', 'token']
+} as const;
+
+export const $DeleteAccountConfirmDto = {
+    type: 'object',
+    properties: {
+        token: {
+            type: 'string',
+            description: 'The delete account confirmation token',
+            example: '1234567890'
+        },
+        email: {
+            type: 'string',
+            description: 'The email to delete',
+            example: 'john.doe@example.com'
+        }
+    },
+    required: ['token', 'email']
 } as const;
 
 export const $ChangeUsernameDto = {
@@ -834,7 +856,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation'],
     description: 'Template type/key used by the system'
 } as const;
 

@@ -62,5 +62,21 @@
   "You cannot update your own permissions": {
     "title": "Eigene Berechtigungen können nicht geändert werden",
     "description": "Sie können Ihre eigenen Berechtigungen nicht ändern. Bitten Sie einen anderen Administrator, diese anzupassen."
+  },
+  "DeleteAccountTokenInvalidException": {
+    "title": "Ungültiger Bestätigungslink",
+    "description": "Der Bestätigungslink zum Löschen des Kontos ist ungültig oder wurde bereits verwendet."
+  },
+  "DeleteAccountTokenExpiredException": {
+    "title": "Bestätigungslink abgelaufen",
+    "description": "Der Bestätigungslink zum Löschen des Kontos ist abgelaufen. Bitte fordere einen neuen an."
+  },
+  "DeleteAccountUseSelfEndpoint": {
+    "title": "Eigenes Konto kann nicht gelöscht werden",
+    "description": "Bitte lösche dein Konto über die Kontoeinstellungen."
+  },
+  "UserHasActiveUsageSessions": {
+    "title": "Benutzer hat aktive Sitzungen",
+    "description": "Dieser Benutzer hat noch aktive Nutzungssitzungen. Beende diese, bevor das Konto gelöscht wird."
   }
 }

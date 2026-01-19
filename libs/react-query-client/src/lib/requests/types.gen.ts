@@ -72,6 +72,10 @@ export type User = {
      */
     updatedAt: string;
     /**
+     * When the user was soft-deleted
+     */
+    deletedAt?: string;
+    /**
      * The external (origin) identifier of the user, if the user is authenticated via SSO
      */
     externalIdentifier?: string | null;
@@ -199,6 +203,17 @@ export type ChangePasswordDto = {
      * The token for the user
      */
     token: string;
+};
+
+export type DeleteAccountConfirmDto = {
+    /**
+     * The delete account confirmation token
+     */
+    token: string;
+    /**
+     * The email to delete
+     */
+    email: string;
 };
 
 export type ChangeUsernameDto = {
@@ -519,7 +534,8 @@ export enum EmailTemplateType {
     USERNAME_CHANGED = 'username-changed',
     PASSWORD_CHANGED = 'password-changed',
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
-    PROJECT_INVITATION = 'project-invitation'
+    PROJECT_INVITATION = 'project-invitation',
+    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation'
 }
 
 export type EmailTemplate = {
@@ -2914,6 +2930,14 @@ export type ChangePasswordViaResetTokenResponse = unknown;
 
 export type GetCurrentResponse = User;
 
+export type RequestDeleteAccountResponse = unknown;
+
+export type ConfirmDeleteAccountData = {
+    requestBody: DeleteAccountConfirmDto;
+};
+
+export type ConfirmDeleteAccountResponse = unknown;
+
 export type ChangeMyUsernameData = {
     requestBody: ChangeUsernameDto;
 };
@@ -2925,6 +2949,12 @@ export type GetOneUserByIdData = {
 };
 
 export type GetOneUserByIdResponse = User;
+
+export type DeleteUserData = {
+    id: number;
+};
+
+export type DeleteUserResponse = unknown;
 
 export type UpdatePermissionsData = {
     id: number;
@@ -4291,6 +4321,35 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/me/delete-request': {
+        post: {
+            res: {
+                /**
+                 * Delete account confirmation email sent.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/me/delete-confirm': {
+        post: {
+            req: ConfirmDeleteAccountData;
+            res: {
+                /**
+                 * Account deleted.
+                 */
+                200: unknown;
+                /**
+                 * Invalid input data.
+                 */
+                400: unknown;
+            };
+        };
+    };
     '/api/users/me/username': {
         patch: {
             req: ChangeMyUsernameData;
@@ -4326,6 +4385,23 @@ export type $OpenApiTs = {
                  * User not found.
                  */
                 404: UserNotFoundException;
+            };
+        };
+        delete: {
+            req: DeleteUserData;
+            res: {
+                /**
+                 * User deleted.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to delete users.
+                 */
+                403: unknown;
             };
         };
     };

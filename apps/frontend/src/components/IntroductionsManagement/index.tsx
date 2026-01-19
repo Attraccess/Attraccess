@@ -56,7 +56,9 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
   const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
 
   const usersWithIntroductions = useMemo(() => {
-    return (introductions ?? []).map((introduction) => introduction.receiverUser);
+    return (introductions ?? [])
+      .map((introduction) => introduction.receiverUser)
+      .filter((user): user is User => !!user);
   }, [introductions]);
 
   const userHasValidIntroduction = useHasValidIntroduction({ introductions });
