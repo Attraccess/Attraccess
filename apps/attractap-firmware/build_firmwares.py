@@ -277,7 +277,7 @@ def main():
             try:
                 print(f"Creating merged firmware for {env}...")
                 merge_cmd = [
-                    'python', '-m', 'esptool', '--chip', chip, 'merge_bin',
+                    sys.executable, '-m', 'esptool', '--chip', chip, 'merge_bin',
                     '-o', merged_bin_path,
                 ]
                 
