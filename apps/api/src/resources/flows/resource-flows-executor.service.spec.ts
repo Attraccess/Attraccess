@@ -582,7 +582,13 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     }, 50);
 
     const results = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
-    expect(results).toEqual([{ topic: 'devices/abc/state', payload: { on: true } }]);
+    expect(results).toEqual([
+      {
+        topic: 'devices/abc/state',
+        payload: { on: true },
+        resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
+      },
+    ]);
     expect(mqttClientService.subscribe).toHaveBeenCalledWith(7, 'devices/+/state', undefined);
   });
 
