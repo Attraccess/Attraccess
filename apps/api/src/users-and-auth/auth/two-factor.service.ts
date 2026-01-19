@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { authenticator } from 'otplib';
 import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
 import { TwoFactorPolicy } from './two-factor.dto';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +12,7 @@ export class TwoFactorService {
   private readonly policyParent = 'auth';
   private readonly policyKey = 'two_factor_policy';
   private readonly issuer: string;
+  private otplibPromise: Promise<typeof import('otplib')> | null = null;
 
   constructor(
     @InjectRepository(AuthenticationDetail)
@@ -21,7 +21,6 @@ export class TwoFactorService {
     private readonly settingRepository: Repository<Setting>,
     private readonly configService: ConfigService,
   ) {
-    authenticator.options = { window: 1 };
     this.issuer = this.resolveIssuer();
   }
 
@@ -90,9 +89,15 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorAlreadyEnabled');
     }
 
-    const secret = authenticator.generateSecret();
+    const { generateSecret, generateURI } = await this.loadOtplib();
+    const secret = generateSecret();
     const accountName = user.email ?? user.username;
-    const otpauthUrl = authenticator.keyuri(accountName, this.issuer, secret);
+    const otpauthUrl = generateURI({
+      secret,
+      label: accountName,
+      issuer: this.issuer,
+      strategy: 'totp',
+    });
 
     if (existing) {
       existing.totpSecret = secret;
@@ -119,7 +124,7 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorAlreadyEnabled');
     }
 
-    if (!this.isCodeValid(detail.totpSecret, code)) {
+    if (!(await this.isCodeValid(detail.totpSecret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
 
@@ -133,7 +138,7 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorNotEnabled');
     }
 
-    if (!this.isCodeValid(detail.totpSecret, code)) {
+    if (!(await this.isCodeValid(detail.totpSecret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
 
@@ -156,7 +161,7 @@ export class TwoFactorService {
       throw new UnauthorizedException('TwoFactorRequired');
     }
 
-    if (!this.isCodeValid(detail.totpSecret, code)) {
+    if (!(await this.isCodeValid(detail.totpSecret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
   }
@@ -186,9 +191,23 @@ export class TwoFactorService {
     return Object.values(user.systemPermissions).some((value) => value === true);
   }
 
-  private isCodeValid(secret: string, code: string): boolean {
+  private async isCodeValid(secret: string, code: string): Promise<boolean> {
     const trimmed = this.normalizeCode(code);
-    return authenticator.check(trimmed, secret);
+    const { verify } = await this.loadOtplib();
+    const result = await verify({
+      secret,
+      token: trimmed,
+      strategy: 'totp',
+      epochTolerance: 30,
+    });
+    return typeof result === 'boolean' ? result : result.valid;
+  }
+
+  private async loadOtplib(): Promise<typeof import('otplib')> {
+    if (!this.otplibPromise) {
+      this.otplibPromise = import('otplib');
+    }
+    return this.otplibPromise;
   }
 
   private normalizeCode(code: string): string {

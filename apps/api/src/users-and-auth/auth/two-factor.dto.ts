@@ -48,7 +48,9 @@ export class TwoFactorCodeDto {
     example: '123456',
   })
   @IsString()
-  @Matches(/^\d{6}$/, { message: 'Invalid two-factor code format' })
+  @Matches(/^\s*\d(?:\s*\d){5}\s*$/, {
+    message: 'Invalid two-factor code format. Use 6 digits; spaces are allowed.',
+  })
   code: string;
 }
 

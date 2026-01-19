@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -54,14 +54,6 @@ export const useAuthenticationServiceRefreshSessionKey = "AuthenticationServiceR
 export const UseAuthenticationServiceRefreshSessionKeyFn = ({ tokenLocation }: {
   tokenLocation: string;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceRefreshSessionKey, ...(queryKey ?? [{ tokenLocation }])];
-export type AuthenticationServiceGetTwoFactorStatusDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getTwoFactorStatus>>;
-export type AuthenticationServiceGetTwoFactorStatusQueryResult<TData = AuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAuthenticationServiceGetTwoFactorStatusKey = "AuthenticationServiceGetTwoFactorStatus";
-export const UseAuthenticationServiceGetTwoFactorStatusKeyFn = (queryKey?: Array<unknown>) => [useAuthenticationServiceGetTwoFactorStatusKey, ...(queryKey ?? [])];
-export type AuthenticationServiceGetTwoFactorPolicyDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getTwoFactorPolicy>>;
-export type AuthenticationServiceGetTwoFactorPolicyQueryResult<TData = AuthenticationServiceGetTwoFactorPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAuthenticationServiceGetTwoFactorPolicyKey = "AuthenticationServiceGetTwoFactorPolicy";
-export const UseAuthenticationServiceGetTwoFactorPolicyKeyFn = (queryKey?: Array<unknown>) => [useAuthenticationServiceGetTwoFactorPolicyKey, ...(queryKey ?? [])];
 export type AuthenticationServiceGetAllSsoProvidersDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.getAllSsoProviders>>;
 export type AuthenticationServiceGetAllSsoProvidersQueryResult<TData = AuthenticationServiceGetAllSsoProvidersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAuthenticationServiceGetAllSsoProvidersKey = "AuthenticationServiceGetAllSsoProviders";
@@ -104,6 +96,14 @@ export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, prov
   sessionState: unknown;
   state: unknown;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state }])];
+export type TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse = Awaited<ReturnType<typeof TwoFactorAuthenticationService.getTwoFactorStatus>>;
+export type TwoFactorAuthenticationServiceGetTwoFactorStatusQueryResult<TData = TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useTwoFactorAuthenticationServiceGetTwoFactorStatusKey = "TwoFactorAuthenticationServiceGetTwoFactorStatus";
+export const UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn = (queryKey?: Array<unknown>) => [useTwoFactorAuthenticationServiceGetTwoFactorStatusKey, ...(queryKey ?? [])];
+export type TwoFactorAuthenticationServiceGetTwoFactorPolicyDefaultResponse = Awaited<ReturnType<typeof TwoFactorAuthenticationService.getTwoFactorPolicy>>;
+export type TwoFactorAuthenticationServiceGetTwoFactorPolicyQueryResult<TData = TwoFactorAuthenticationServiceGetTwoFactorPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useTwoFactorAuthenticationServiceGetTwoFactorPolicyKey = "TwoFactorAuthenticationServiceGetTwoFactorPolicy";
+export const UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn = (queryKey?: Array<unknown>) => [useTwoFactorAuthenticationServiceGetTwoFactorPolicyKey, ...(queryKey ?? [])];
 export type EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerFindAll>>;
 export type EmailTemplatesServiceEmailTemplateControllerFindAllQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindAllKey = "EmailTemplatesServiceEmailTemplateControllerFindAll";
@@ -476,12 +476,12 @@ export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<Retu
 export type UsersServiceBulkUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.bulkUpdatePermissions>>;
 export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeof UsersService.setUserPassword>>;
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
-export type AuthenticationServiceSetupTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.setupTwoFactor>>;
-export type AuthenticationServiceVerifyTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.verifyTwoFactor>>;
-export type AuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof AuthenticationService.disableTwoFactor>>;
-export type AuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof AuthenticationService.setTwoFactorPolicy>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
+export type TwoFactorAuthenticationServiceSetupTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setupTwoFactor>>;
+export type TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.verifyTwoFactor>>;
+export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.disableTwoFactor>>;
+export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setTwoFactorPolicy>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
