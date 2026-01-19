@@ -276,13 +276,20 @@ def main():
             merged_bin_path = os.path.join(output_dir, firmware_filename)
             try:
                 print(f"Creating merged firmware for {env}...")
-                platformio_home = os.environ.get('PLATFORMIO_HOME_DIR') or os.path.join(
-                    os.path.expanduser('~'), '.platformio'
-                )
-                esptool_script = os.path.join(platformio_home, 'packages', 'tool-esptoolpy', 'esptool.py')
+                candidate_platformio_homes = [
+                    os.environ.get('PLATFORMIO_HOME_DIR'),
+                    os.path.join(os.path.expanduser('~'), '.platformio'),
+                    os.path.join(os.getcwd(), '.platformio'),
+                    '/home/ubuntu/.platformio',
+                    '/root/.platformio',
+                ]
+
                 esptool_cmd = [sys.executable, '-m', 'esptool']
-                if os.path.exists(esptool_script):
-                    esptool_cmd = [sys.executable, esptool_script]
+                for platformio_home in dict.fromkeys(filter(None, candidate_platformio_homes)):
+                    esptool_script = os.path.join(platformio_home, 'packages', 'tool-esptoolpy', 'esptool.py')
+                    if os.path.exists(esptool_script):
+                        esptool_cmd = [sys.executable, esptool_script]
+                        break
 
                 merge_cmd = [
                     *esptool_cmd,
