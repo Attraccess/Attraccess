@@ -1478,6 +1478,13 @@ export type EndUsageSessionDto = {
     formSubmissions?: Array<FormSubmissionRequestDto>;
 };
 
+export type UpdateUsageSessionProjectDto = {
+    /**
+     * The project to assign this usage session to. Set to null to clear the assignment.
+     */
+    projectId?: number | null;
+};
+
 export type GetResourceHistoryResponseDto = {
     total: number;
     page: number;
@@ -3276,6 +3283,14 @@ export type ResourceUsageEndSessionData = {
 
 export type ResourceUsageEndSessionResponse = ResourceUsage;
 
+export type ResourceUsageUpdateSessionProjectData = {
+    requestBody: UpdateUsageSessionProjectDto;
+    resourceId: number;
+    usageId: number;
+};
+
+export type ResourceUsageUpdateSessionProjectResponse = ResourceUsage;
+
 export type LockDoorData = {
     resourceId: number;
 };
@@ -5003,6 +5018,33 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+                /**
+                 * Resource or session not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/usage/sessions/{usageId}/project': {
+        put: {
+            req: ResourceUsageUpdateSessionProjectData;
+            res: {
+                /**
+                 * Usage session project updated successfully.
+                 */
+                200: ResourceUsage;
+                /**
+                 * Bad Request - Invalid input data or session is active
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
                 /**
                  * Resource or session not found
                  */
