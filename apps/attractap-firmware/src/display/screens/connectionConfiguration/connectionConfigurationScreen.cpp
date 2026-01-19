@@ -1,5 +1,11 @@
 #include "connectionConfigurationScreen.hpp"
 #include <cstring>
+#include "../../../network/wifi/wifi.hpp"
+
+static const char *WIFI_DROPDOWN_LOADING = "Suche WLANs...";
+static const char *WIFI_DROPDOWN_EMPTY = "Keine Netzwerke gefunden";
+static const char *WIFI_DROPDOWN_SCAN_FAILED = "WLAN Scan fehlgeschlagen";
+static const uint32_t WIFI_SCAN_TIMEOUT_MS = 10000;
 
 void ConnectionConfigurationScreen::init()
 {
@@ -41,14 +47,13 @@ void ConnectionConfigurationScreen::init()
    lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
    lv_obj_set_style_text_color(labelForWifiSelectNetwork, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *wifiSelectNetwork = lv_dropdown_create(wifiTab);
-   // TODO: insert available networks
-   // TODO: when selection is changed, set the ssid field to the selection
-   lv_dropdown_set_options(wifiSelectNetwork, "Option 1\nOption 2\nOption 3");
-   lv_obj_set_width(wifiSelectNetwork, lv_pct(100));
-   lv_obj_set_height(wifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(wifiSelectNetwork, LV_ALIGN_CENTER);
-   lv_obj_add_flag(wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
+   lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_LOADING);
+   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
+   lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
 
    this->labelForWifiSSID = lv_label_create(wifiTab);
    lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
@@ -87,6 +92,8 @@ void ConnectionConfigurationScreen::init()
 
    lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
    this->createSaveButton(containerForSaveButtonWifi);
+
+   this->startWifiScan();
 
    lv_obj_t *apiTab = lv_tabview_add_tab(this->tabs, "API");
    lv_obj_set_flex_flow(apiTab, LV_FLEX_FLOW_COLUMN);
@@ -224,6 +231,7 @@ void ConnectionConfigurationScreen::init()
    }
 }
 
+
 lv_obj_t *ConnectionConfigurationScreen::getScreen()
 {
    return this->screen;
@@ -231,6 +239,108 @@ lv_obj_t *ConnectionConfigurationScreen::getScreen()
 
 void ConnectionConfigurationScreen::loop()
 {
+   if (!this->wifiSelectNetwork || !this->wifiScanRequested || this->wifiScanCompleted)
+   {
+      return;
+   }
+
+   if (Wifi::isScanning())
+   {
+      if (this->wifiScanStartMs > 0 && (millis() - this->wifiScanStartMs) > WIFI_SCAN_TIMEOUT_MS)
+      {
+         this->wifiScanCompleted = true;
+         this->wifiDropdownHasNetworks = false;
+         lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_SCAN_FAILED);
+      }
+      return;
+   }
+
+   this->wifiScanCompleted = true;
+   this->populateWifiDropdown();
+}
+
+void ConnectionConfigurationScreen::startWifiScan()
+{
+   if (!this->wifiSelectNetwork)
+   {
+      return;
+   }
+
+   this->wifiScanRequested = true;
+   this->wifiScanCompleted = false;
+   this->wifiScanStartMs = millis();
+   this->wifiDropdownHasNetworks = false;
+   lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_LOADING);
+   Wifi::startScan();
+}
+
+void ConnectionConfigurationScreen::populateWifiDropdown()
+{
+   if (!this->wifiSelectNetwork)
+   {
+      return;
+   }
+
+   Wifi::WifiScanResult scan = Wifi::getKnownWifiNetworks();
+   String options = "";
+   String savedSSID = Settings::getNetworkConfig().ssid;
+   uint8_t selectedIndex = 0;
+   bool selectedFound = false;
+
+   String uniqueSsids[Wifi::MAX_KNOWN_WIFI_NETWORKS];
+   uint8_t uniqueCount = 0;
+
+   for (uint8_t i = 0; i < scan.count; i++)
+   {
+      const String &ssid = scan.networks[i].ssid;
+      if (ssid.length() == 0)
+      {
+         continue;
+      }
+
+      bool isDuplicate = false;
+      for (uint8_t j = 0; j < uniqueCount; j++)
+      {
+         if (uniqueSsids[j] == ssid)
+         {
+            isDuplicate = true;
+            break;
+         }
+      }
+      if (isDuplicate)
+      {
+         continue;
+      }
+
+      uniqueSsids[uniqueCount] = ssid;
+      uniqueCount++;
+
+      if (options.length() > 0)
+      {
+         options += "\n";
+      }
+      options += ssid;
+
+      if (!selectedFound && savedSSID.length() > 0 && ssid == savedSSID)
+      {
+         selectedIndex = uniqueCount - 1;
+         selectedFound = true;
+      }
+   }
+
+   if (options.length() == 0)
+   {
+      this->wifiDropdownHasNetworks = false;
+      lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_EMPTY);
+      return;
+   }
+
+   this->wifiDropdownHasNetworks = true;
+   lv_dropdown_set_options(this->wifiSelectNetwork, options.c_str());
+   if (selectedFound)
+   {
+      lv_dropdown_set_selected(this->wifiSelectNetwork, selectedIndex);
+   }
 }
 
 void ConnectionConfigurationScreen::onTextAreaEvent(lv_event_t *e)
@@ -245,6 +355,35 @@ void ConnectionConfigurationScreen::onTextAreaEvent(lv_event_t *e)
    {
       self->showKeyboardFor(target);
    }
+}
+
+void ConnectionConfigurationScreen::onWifiDropdownEvent(lv_event_t *e)
+{
+   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
+   if (!self || !self->wifiSelectNetwork || !self->wifiSSID)
+   {
+      return;
+   }
+
+   lv_event_code_t code = lv_event_get_code(e);
+   if (code != LV_EVENT_VALUE_CHANGED)
+   {
+      return;
+   }
+
+   if (!self->wifiDropdownHasNetworks)
+   {
+      return;
+   }
+
+   char selected[64] = {0};
+   lv_dropdown_get_selected_str(self->wifiSelectNetwork, selected, sizeof(selected));
+   if (selected[0] == '\0')
+   {
+      return;
+   }
+
+   lv_textarea_set_text(self->wifiSSID, selected);
 }
 
 void ConnectionConfigurationScreen::onKeyboardEvent(lv_event_t *e)
@@ -537,6 +676,7 @@ void ConnectionConfigurationScreen::destroy()
    this->keyboard = nullptr;
    this->wifiSSID = nullptr;
    this->wifiPassword = nullptr;
+   this->wifiSelectNetwork = nullptr;
    this->serverHostname = nullptr;
    this->labelForWifiSSID = nullptr;
    this->labelForWifiPassword = nullptr;
@@ -546,4 +686,8 @@ void ConnectionConfigurationScreen::destroy()
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
+   this->wifiScanRequested = false;
+   this->wifiScanCompleted = false;
+   this->wifiDropdownHasNetworks = false;
+   this->wifiScanStartMs = 0;
 }
