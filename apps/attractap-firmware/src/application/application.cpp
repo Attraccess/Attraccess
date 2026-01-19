@@ -367,7 +367,6 @@ void Application::setup()
 #ifndef HAS_LVGL_DISPLAY
     this->nfc.setCardRemovalCallback([this](uint32_t presentationTimeMs)
                                      {
-                                        this->beeper.singleBeep();
                                         this->logger.debugf("Card removed after %d ms", presentationTimeMs); 
                                         this->cardRemoved = true;
 
@@ -534,7 +533,7 @@ void Application::processState()
     if (this->cardDetected && !this->cardRemoved)
     {
         unsigned long currentPresentationDurationMs = millis() - this->cardDetectionTimeMs;
-        if (currentPresentationDurationMs > NFC_CARD_LONG_PRESENTATION_TIME_MS)
+        if (currentPresentationDurationMs > NFC_CARD_LONG_PRESENTATION_TIME_MS && !this->cardPresentationWasLong)
         {
             this->beeper.indicateBeep();
             this->cardPresentationWasLong = true;
@@ -760,11 +759,11 @@ void Application::processState()
         {
             if (this->cardPresentationWasLong)
             {
-                this->api.startResourceUsageSession(this->selectedResourceId);
+                this->api.stopResourceUsageSession(this->selectedResourceId);
             }
             else
             {
-                this->api.stopResourceUsageSession(this->selectedResourceId);
+                this->api.startResourceUsageSession(this->selectedResourceId);
             }
         }
 
