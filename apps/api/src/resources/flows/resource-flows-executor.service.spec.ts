@@ -419,6 +419,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
   let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let resourceRepository: Partial<Repository<Resource>>;
   let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
@@ -465,6 +466,16 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
       save: jest.fn(async (data) => data),
     } as unknown as Repository<ResourceFlowLog>;
+
+    resourceRepository = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      findOne: jest.fn(async ({ where }: any) => ({
+        id: where?.id ?? 1,
+        name: `Resource ${where?.id ?? 1}`,
+        type: ResourceType.Machine,
+        metadata: { zone: 'A' },
+      })),
+    } as unknown as Repository<Resource>;
 
     configService = {
       get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
