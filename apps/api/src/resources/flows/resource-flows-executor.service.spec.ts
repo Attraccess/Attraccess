@@ -3,11 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
+  Resource,
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceFlowLog,
   ResourceFlowEdge,
   BillingTransactionItem,
+  ResourceType,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
@@ -41,6 +43,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<Edge>>;
   let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let resourceRepository: Partial<Repository<Resource>>;
   let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
@@ -94,6 +97,16 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       save: jest.fn(async (data) => data),
     } as unknown as Repository<ResourceFlowLog>;
 
+    resourceRepository = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      findOne: jest.fn(async ({ where }: any) => ({
+        id: where?.id ?? 1,
+        name: `Resource ${where?.id ?? 1}`,
+        type: ResourceType.Machine,
+        metadata: { zone: 'A' },
+      })),
+    } as unknown as Repository<Resource>;
+
     configService = {
       get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
     } as unknown as ConfigService;
@@ -122,6 +135,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
       flowLogRepository as Repository<ResourceFlowLog>,
+      resourceRepository as Repository<Resource>,
       configService as ConfigService,
       mqttClientService,
       resourceUsageService,
@@ -151,7 +165,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     const initialData = { a: 1 };
     const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
-    expect(result).toEqual([initialData]);
+    expect(result).toEqual([
+      {
+        ...initialData,
+        resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
+      },
+    ]);
   });
 
   it('handles a simple linear path and returns the last node payload', async () => {
@@ -186,6 +205,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         externalReference: 'power',
         unitPrice: 1,
         quantity: 2,
+        resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
       },
     ]);
   });
@@ -252,6 +272,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       externalReference: 'flat',
       unitPrice: 1,
       quantity: 1,
+      resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
     });
     expect(result[1]).toEqual({
       name: 'session-fee',
@@ -259,6 +280,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       externalReference: 'flat',
       unitPrice: 1,
       quantity: 1,
+      resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
     });
   });
 
@@ -291,7 +313,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, initialData);
 
     // Assert leaf payload passthrough
-    expect(result).toEqual([initialData]);
+    expect(result).toEqual([
+      {
+        ...initialData,
+        resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
+      },
+    ]);
 
     // Assert endSession called with compiled notes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,7 +370,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     const result = await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, payload);
 
-    expect(result).toEqual([payload]);
+    expect(result).toEqual([
+      {
+        ...payload,
+        resource: { id: 5, name: 'Resource 5', type: ResourceType.Machine, metadata: { zone: 'A' } },
+      },
+    ]);
     const lastActivity = resourceActivity.get(resourceId);
     expect(lastActivity).toBeInstanceOf(Date);
   });

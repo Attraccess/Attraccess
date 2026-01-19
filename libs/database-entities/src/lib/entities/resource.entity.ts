@@ -107,6 +107,21 @@ export class Resource {
   })
   allowTakeOver!: boolean;
 
+  @Column({ type: 'json', nullable: true })
+  @ApiProperty({
+    description: 'Custom metadata key-value pairs configured for this resource',
+    required: false,
+    type: 'object',
+    example: {
+      location: 'lab-1',
+      template: 'door-access',
+    },
+    additionalProperties: {
+      type: 'string',
+    },
+  })
+  metadata!: Record<string, unknown> | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the resource was created',

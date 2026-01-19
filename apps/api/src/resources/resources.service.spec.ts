@@ -513,6 +513,7 @@ describe('ResourcesService', () => {
         documentationUrl: createDto.documentationUrl || null,
         allowTakeOver: createDto.allowTakeOver || false,
         separateUnlockAndUnlatch: false,
+        metadata: null,
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });
