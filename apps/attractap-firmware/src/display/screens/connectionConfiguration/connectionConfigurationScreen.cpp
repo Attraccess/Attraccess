@@ -231,6 +231,46 @@ lv_obj_t *ConnectionConfigurationScreen::getScreen()
 
 void ConnectionConfigurationScreen::loop()
 {
+   if (!this->serverHostname || !this->useSSLSwitch)
+   {
+      return;
+   }
+
+   const char *currentText = lv_textarea_get_text(this->serverHostname);
+   if (currentText && currentText[0] != '\0')
+   {
+      return;
+   }
+
+   AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
+   if (apiConfig.hostname.isEmpty() || apiConfig.port == 0)
+   {
+      return;
+   }
+
+   String fullHostname = apiConfig.hostname;
+   if (apiConfig.port != 0)
+   {
+      fullHostname += ":" + String(apiConfig.port);
+   }
+
+   lv_textarea_set_text(this->serverHostname, fullHostname.c_str());
+
+   if (apiConfig.useSSL)
+   {
+      lv_obj_add_state(this->useSSLSwitch, LV_STATE_CHECKED);
+   }
+   else
+   {
+      lv_obj_clear_state(this->useSSLSwitch, LV_STATE_CHECKED);
+   }
+
+   if (this->labelForServerHostname)
+   {
+      lv_obj_set_style_text_color(this->labelForServerHostname,
+                                  this->labelForServerHostnameDefaultColor,
+                                  LV_PART_MAIN | LV_STATE_DEFAULT);
+   }
 }
 
 void ConnectionConfigurationScreen::onTextAreaEvent(lv_event_t *e)

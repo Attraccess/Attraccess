@@ -1,6 +1,7 @@
 #include "network.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "mdnsDiscovery.hpp"
 #include <time.h>
 
 // Static member definitions
@@ -28,6 +29,8 @@ void Network::setup()
 
     logger.info("Configuring SNTP time server...");
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+
+    MdnsDiscovery::setup();
 
     logger.info("initialization complete");
 }
@@ -66,4 +69,5 @@ void Network::loop()
 {
     Wifi::loop();
     Ethernet::loop();
+    MdnsDiscovery::loop();
 }

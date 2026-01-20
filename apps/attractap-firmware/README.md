@@ -54,6 +54,18 @@ Replace `/dev/ttyUSB0` with the correct port for your device:
 - `lib/`: Libraries
 - `platformio.ini`: PlatformIO configuration file
 
+### Local Network Auto-Discovery (mDNS/Bonjour)
+
+When the reader has no API host configured, it will try to discover the Attraccess API on the local network using mDNS/DNS-SD.
+The API must advertise the service type `_attraccess._tcp` (enabled in the main Attraccess server).
+
+On success the reader automatically stores:
+- host
+- port
+- SSL flag (from the advertised `scheme`/`ssl` TXT records)
+
+If the API is configured with self-signed TLS certificates, the firmware may fail to connect because self-signed certs are not currently trusted.
+
 ### Building
 
 To build the firmware, run:
