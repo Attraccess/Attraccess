@@ -244,6 +244,60 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
+  it('evaluates IF nodes using resource metadata in payload', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const ifNode = createNode({
+      id: 'if-1',
+      type: ResourceFlowNodeType.PROCESSING_IF,
+      data: {
+        path: 'resource.metadata.zone',
+        comparisonOperator: '=',
+        comparisonValue: 'B',
+        comparisonValueIsPath: false,
+      },
+    });
+    const billingNode = createNode({
+      id: 'out-billing-1',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      data: {
+        name: 'zone-fee',
+        description: 'Zone specific',
+        externalReference: 'zone',
+        unitPrice: 3,
+        quantity: 1,
+      },
+    });
+
+    [inputNode, ifNode, billingNode].forEach((n) => (nodesById[n.id] = n));
+    initialNodes = [inputNode];
+
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: ifNode.id }];
+    edgesBySourceAndHandle[`${ifNode.id}|output-true`] = [
+      { source: ifNode.id, target: billingNode.id, sourceHandle: 'output-true' },
+    ];
+    edgesBySourceAndHandle[`${billingNode.id}|`] = [];
+
+    (resourceRepository.findOne as jest.Mock).mockResolvedValueOnce({
+      id: 1,
+      name: 'Resource 1',
+      type: ResourceType.Machine,
+      metadata: { zone: 'B' },
+    });
+
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+
+    expect(result).toEqual([
+      {
+        name: 'zone-fee',
+        description: 'Zone specific',
+        externalReference: 'zone',
+        unitPrice: 3,
+        quantity: 1,
+        resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'B' } },
+      },
+    ]);
+  });
+
   it('fan-outs when a node has multiple outgoing edges with the same handle and returns all leaf results', async () => {
     const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
     const ifNode = createNode({
