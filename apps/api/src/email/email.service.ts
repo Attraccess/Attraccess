@@ -155,6 +155,19 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.RESET_PASSWORD, context);
   }
 
+  async sendDeleteAccountConfirmationEmail(user: User, token: string) {
+    const confirmUrl = `${this.frontendUrl}/confirm-delete-account?email=${encodeURIComponent(
+      user.email,
+    )}&token=${encodeURIComponent(token)}`;
+
+    const context = {
+      ...this.getBaseContext(user),
+      url: confirmUrl,
+    };
+
+    await this.sendEmail(user, EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION, context);
+  }
+
   async sendUsernameChangedEmail(user: User, previousUsername: string) {
     const base = this.getBaseContext(user) as unknown as {
       user: { username: string; email: string; id: number };

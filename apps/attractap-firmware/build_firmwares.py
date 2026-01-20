@@ -7,6 +7,15 @@ import sys
 import shutil
 import re
 
+def resolve_python_command():
+    """Pick a Python executable with fallback."""
+    if sys.executable and os.path.exists(sys.executable):
+        return sys.executable
+    for cmd in ("python3", "python"):
+        if shutil.which(cmd):
+            return cmd
+    return "python3"
+
 def extract_define_value(flags, define_name):
     """Extract a -D define value from build_flags"""
     pattern = fr'-D\s*{define_name}=(["\']?)(.*?)\1(?:\s|$)'
@@ -276,8 +285,9 @@ def main():
             merged_bin_path = os.path.join(output_dir, firmware_filename)
             try:
                 print(f"Creating merged firmware for {env}...")
+                python_cmd = resolve_python_command()
                 merge_cmd = [
-                    'python', '-m', 'esptool', '--chip', chip, 'merge_bin',
+                    python_cmd, '-m', 'esptool', '--chip', chip, 'merge_bin',
                     '-o', merged_bin_path,
                 ]
                 

@@ -2,6 +2,23 @@
   "title": "Account",
   "sections": {
     "profile": "Profile",
-    "security": "Security"
+    "security": "Security",
+    "dangerZone": "Danger zone"
+  },
+  "deleteAccount": {
+    "description": "Request a deletion link to permanently remove your account.",
+    "actions": {
+      "request": "Delete account",
+      "confirm": "Send confirmation email",
+      "cancel": "Cancel"
+    },
+    "modal": {
+      "title": "Delete account",
+      "description": "We will send a confirmation link to your email address. Once confirmed, your account will be permanently removed."
+    },
+    "toast": {
+      "title": "Check your email",
+      "description": "We sent a confirmation link to delete your account."
+    }
   }
 }

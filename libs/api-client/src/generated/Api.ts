@@ -133,6 +133,7 @@ export enum EmailTemplateType {
   PasswordChanged = "password-changed",
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
+  DeleteAccountConfirmation = "delete-account-confirmation",
 }
 
 /** The type of the provider */
@@ -235,6 +236,11 @@ export interface User {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * When the user was soft-deleted
+   * @format date-time
+   */
+  deletedAt?: string;
   /**
    * The external (origin) identifier of the user, if the user is authenticated via SSO
    * @example "1234567890"
@@ -359,6 +365,19 @@ export interface ChangePasswordDto {
    * @example "1234567890"
    */
   token: string;
+}
+
+export interface DeleteAccountConfirmDto {
+  /**
+   * The delete account confirmation token
+   * @example "1234567890"
+   */
+  token: string;
+  /**
+   * The email to delete
+   * @example "john.doe@example.com"
+   */
+  email: string;
 }
 
 export interface ChangeUsernameDto {
@@ -2941,11 +2960,17 @@ export type ChangePasswordViaResetTokenData = any;
 
 export type GetCurrentData = User;
 
+export type RequestDeleteAccountData = any;
+
+export type ConfirmDeleteAccountData = any;
+
 export type ChangeMyUsernameData = User;
 
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
+
+export type DeleteUserData = any;
 
 export type UpdatePermissionsData = User;
 
@@ -3782,6 +3807,37 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name RequestDeleteAccount
+   * @summary Request account deletion email
+   * @request POST:/api/users/me/delete-request
+   * @secure
+   */
+  export namespace RequestDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = RequestDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ConfirmDeleteAccount
+   * @summary Confirm account deletion via email token
+   * @request POST:/api/users/me/delete-confirm
+   */
+  export namespace ConfirmDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = DeleteAccountConfirmDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ConfirmDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name ChangeMyUsername
    * @summary Change current user username (limit once per day)
    * @request PATCH:/api/users/me/username
@@ -3811,6 +3867,24 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetOneUserByIdData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name DeleteUser
+   * @summary Delete a user
+   * @request DELETE:/api/users/{id}
+   * @secure
+   */
+  export namespace DeleteUser {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteUserData;
   }
 
   /**
@@ -6863,7 +6937,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -7158,6 +7232,43 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name RequestDeleteAccount
+     * @summary Request account deletion email
+     * @request POST:/api/users/me/delete-request
+     * @secure
+     */
+    requestDeleteAccount: (params: RequestParams = {}) =>
+      this.request<RequestDeleteAccountData, void>({
+        path: `/api/users/me/delete-request`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ConfirmDeleteAccount
+     * @summary Confirm account deletion via email token
+     * @request POST:/api/users/me/delete-confirm
+     */
+    confirmDeleteAccount: (
+      data: DeleteAccountConfirmDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ConfirmDeleteAccountData, void>({
+        path: `/api/users/me/delete-confirm`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name ChangeMyUsername
      * @summary Change current user username (limit once per day)
      * @request PATCH:/api/users/me/username
@@ -7189,6 +7300,23 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name DeleteUser
+     * @summary Delete a user
+     * @request DELETE:/api/users/{id}
+     * @secure
+     */
+    deleteUser: (id: number, params: RequestParams = {}) =>
+      this.request<DeleteUserData, void>({
+        path: `/api/users/${id}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
 

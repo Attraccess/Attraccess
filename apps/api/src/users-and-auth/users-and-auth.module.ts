@@ -22,6 +22,7 @@ import {
   SSOProviderOIDCConfiguration,
   SSOProvider,
   Session,
+  ResourceUsage,
   Setting,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
@@ -40,7 +41,15 @@ import { TwoFactorService } from './auth/two-factor.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthenticationDetail, SSOProvider, SSOProviderOIDCConfiguration, Session, Setting]),
+    TypeOrmModule.forFeature([
+      User,
+      AuthenticationDetail,
+      SSOProvider,
+      SSOProviderOIDCConfiguration,
+      Session,
+      ResourceUsage,
+      Setting,
+    ]),
     PassportModule,
     EmailModule,
     LicenseModule,

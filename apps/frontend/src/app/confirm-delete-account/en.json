@@ -1,0 +1,20 @@
+{
+  "success": {
+    "title": "Account deleted",
+    "message": "Your account has been deleted and can no longer be used to sign in.",
+    "backToLogin": "Back to login"
+  },
+  "error": {
+    "title": "Unable to delete account",
+    "errorTitle": "Delete account failed",
+    "tryAgain": "Try again",
+    "backToLogin": "Back to login"
+  },
+  "apiErrors": {
+    "invalidLink": "The confirmation link is invalid.",
+    "DeleteAccountTokenInvalidException": "The confirmation link is invalid or already used.",
+    "DeleteAccountTokenExpiredException": "The confirmation link has expired. Please request a new one.",
+    "UserHasActiveUsageSessions": "Your account still has active usage sessions. End them before deleting your account.",
+    "unexpectedError": "Something went wrong. Please try again."
+  }
+}
