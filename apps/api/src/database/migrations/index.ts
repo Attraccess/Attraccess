@@ -85,3 +85,6 @@ export * from './1765925113481-improved-sso-linking';
 export * from './1766141166000-resource-usage-session-finalization';
 export * from './1766157134415-resource-inactivity-tracking';
 export * from './1766580562460-attractap-capabilities';
+export * from './1768741974728-add-user-soft-delete';
+export * from './1768742247837-add-delete-account-email-template';
+export * from './1768821805962-add-two-factor-totp';

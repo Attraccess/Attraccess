@@ -1,6 +1,7 @@
-ARG NODE_VERSION=22.17.1
+ARG NODE_VERSION=24.13.0
+ARG NODE_VERSION_NAME=trixie
 
-FROM node:${NODE_VERSION}-bookworm AS builder
+FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
 
 # System deps required for native Node modules and tooling
 # - python3/py3-pip: node-gyp and Python-based tooling

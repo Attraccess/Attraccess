@@ -20,31 +20,18 @@ export function VerifyEmail() {
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
 
-  const verifyEmail = useUsersServiceVerifyEmail();
   const queryClient = useQueryClient();
   const didSendRequest = useRef(false);
 
-  const activateEmail = useCallback(async () => {
-    if (didSendRequest.current) {
-      return;
-    }
-
-    didSendRequest.current = true;
-
-    if (!token || !email) {
-      setError(t('apiErrors.invalidLink'));
-      return;
-    }
-
-    try {
-      await verifyEmail.mutateAsync({ requestBody: { token, email } });
+  const verifyEmail = useUsersServiceVerifyEmail({
+    onSuccess: () => {
       setIsSuccess(true);
       setError(null);
-
       queryClient.invalidateQueries({
         queryKey: [UseUsersServiceGetCurrentKeyFn()[0]],
       });
-    } catch (error) {
+    },
+    onError: (error) => {
       const { key, errorMessage } = getTranslationKeyForApiError({
         error: error as ApiError,
         t,
@@ -52,20 +39,38 @@ export function VerifyEmail() {
         baseTranslationKey: 'apiErrors',
         fallbackKey: 'unexpectedError',
       });
-
       const translation = t(key, { error: errorMessage });
       setError(translation);
+      // Reset the ref so user can try again
+      didSendRequest.current = false;
+    },
+  });
+
+  const activateEmail = useCallback(() => {
+    if (didSendRequest.current) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, email, t, tExists, queryClient]);
+
+    if (!token || !email) {
+      setError(t('apiErrors.invalidLink'));
+      didSendRequest.current = true;
+      return;
+    }
+
+    didSendRequest.current = true;
+    verifyEmail.mutate({ requestBody: { token, email } });
+  }, [token, email, t, verifyEmail]);
 
   useEffect(() => {
-    activateEmail();
-  }, [activateEmail]);
-
-  if (verifyEmail.isPending) {
-    return <Loading />;
-  }
+    // Only activate if we have both token and email
+    if (token && email) {
+      activateEmail();
+    } else if (token !== null && email !== null) {
+      // Both are defined but one is empty - show error immediately
+      setError(t('apiErrors.invalidLink'));
+      didSendRequest.current = true;
+    }
+  }, [activateEmail, token, email, t]);
 
   if (isSuccess) {
     return (

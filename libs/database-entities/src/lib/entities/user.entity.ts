@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  DeleteDateColumn,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
@@ -114,9 +122,28 @@ export class User {
   })
   updatedAt!: Date;
 
+  @DeleteDateColumn({ type: 'datetime' })
+  @ApiProperty({
+    description: 'When the user was soft-deleted',
+    required: false,
+  })
+  deletedAt?: Date | null;
+
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   lastUsernameChangeAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  @Exclude()
+  deleteAccountToken!: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  deleteAccountTokenExpiresAt!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  deleteAccountRequestedAt!: Date | null;
 
   @OneToMany(() => ResourceIntroduction, (introduction) => introduction.receiverUser, {
     onDelete: 'CASCADE',

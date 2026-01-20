@@ -1,0 +1,33 @@
+{
+  "status": {
+    "label": "Two-factor authentication",
+    "enabled": "Enabled",
+    "disabled": "Not enabled"
+  },
+  "policy": {
+    "title": "2FA required",
+    "requiredWarning": "Your account must enable 2FA to meet the current policy."
+  },
+  "setup": {
+    "startButton": "Enable 2FA",
+    "regenerateButton": "Regenerate setup",
+    "scanHint": "Scan this code with your authenticator app.",
+    "secretLabel": "Manual setup key",
+    "secretHint": "Use this key if you cannot scan the QR code.",
+    "codeLabel": "Verification code",
+    "verifyButton": "Verify & enable"
+  },
+  "disable": {
+    "codeLabel": "Authenticator code",
+    "button": "Disable 2FA"
+  },
+  "success": {
+    "enabled": "Two-factor authentication enabled",
+    "disabled": "Two-factor authentication disabled"
+  },
+  "errors": {
+    "setupFailed": "Could not start 2FA setup",
+    "verifyFailed": "Verification failed",
+    "disableFailed": "Could not disable 2FA"
+  }
+}

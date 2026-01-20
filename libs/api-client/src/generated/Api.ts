@@ -133,11 +133,19 @@ export enum EmailTemplateType {
   PasswordChanged = "password-changed",
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
+  DeleteAccountConfirmation = "delete-account-confirmation",
 }
 
 /** The type of the provider */
 export enum SSOProviderType {
   OIDC = "OIDC",
+}
+
+/** The configured 2FA policy */
+export enum TwoFactorPolicy {
+  Optional = "optional",
+  RequiredForPrivileged = "required_for_privileged",
+  RequiredForAll = "required_for_all",
 }
 
 export enum PermissionFilter {
@@ -149,7 +157,6 @@ export enum PermissionFilter {
 /** The authentication strategy to use */
 export enum AuthenticationType {
   LocalPassword = "local_password",
-  Sso = "sso",
 }
 
 export interface CreateUserDto {
@@ -229,6 +236,11 @@ export interface User {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * When the user was soft-deleted
+   * @format date-time
+   */
+  deletedAt?: string;
   /**
    * The external (origin) identifier of the user, if the user is authenticated via SSO
    * @example "1234567890"
@@ -355,6 +367,19 @@ export interface ChangePasswordDto {
   token: string;
 }
 
+export interface DeleteAccountConfirmDto {
+  /**
+   * The delete account confirmation token
+   * @example "1234567890"
+   */
+  token: string;
+  /**
+   * The email to delete
+   * @example "john.doe@example.com"
+   */
+  email: string;
+}
+
 export interface ChangeUsernameDto {
   /**
    * The new username
@@ -435,6 +460,47 @@ export interface CreateSessionResponse {
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
    */
   authToken: string;
+}
+
+export interface TwoFactorStatusDto {
+  /**
+   * Whether TOTP is enabled for the current user
+   * @example true
+   */
+  enabled: boolean;
+  /**
+   * Whether TOTP is required for the current user
+   * @example false
+   */
+  required: boolean;
+  /** The configured 2FA policy */
+  policy: TwoFactorPolicy;
+}
+
+export interface TwoFactorSetupResponseDto {
+  /**
+   * The shared secret for the authenticator app
+   * @example "JBSWY3DPEHPK3PXP"
+   */
+  secret: string;
+  /**
+   * The otpauth URL for QR code generation
+   * @example "otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess"
+   */
+  otpauthUrl: string;
+}
+
+export interface TwoFactorCodeDto {
+  /**
+   * The current code from the authenticator app
+   * @example "123456"
+   */
+  code: string;
+}
+
+export interface TwoFactorPolicyDto {
+  /** The 2FA policy to enforce */
+  policy: TwoFactorPolicy;
 }
 
 export interface SSOProviderOIDCConfiguration {
@@ -2894,11 +2960,17 @@ export type ChangePasswordViaResetTokenData = any;
 
 export type GetCurrentData = User;
 
+export type RequestDeleteAccountData = any;
+
+export type ConfirmDeleteAccountData = any;
+
 export type ChangeMyUsernameData = User;
 
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
+
+export type DeleteUserData = any;
 
 export type UpdatePermissionsData = User;
 
@@ -2929,6 +3001,7 @@ export type ChangeUserBillingFactorData = User;
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
+  twoFactorCode?: string;
   tokenLocation?: "cookie" | "body";
 }
 
@@ -2941,6 +3014,18 @@ export interface RefreshSessionParams {
 export type RefreshSessionData = CreateSessionResponse;
 
 export type EndSessionData = object;
+
+export type GetTwoFactorStatusData = TwoFactorStatusDto;
+
+export type SetupTwoFactorData = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = any;
+
+export type GetTwoFactorPolicyData = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = TwoFactorPolicyDto;
 
 export type GetAllSsoProvidersData = SSOProvider[];
 
@@ -3722,6 +3807,37 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name RequestDeleteAccount
+   * @summary Request account deletion email
+   * @request POST:/api/users/me/delete-request
+   * @secure
+   */
+  export namespace RequestDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = RequestDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ConfirmDeleteAccount
+   * @summary Confirm account deletion via email token
+   * @request POST:/api/users/me/delete-confirm
+   */
+  export namespace ConfirmDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = DeleteAccountConfirmDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ConfirmDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name ChangeMyUsername
    * @summary Change current user username (limit once per day)
    * @request PATCH:/api/users/me/username
@@ -3751,6 +3867,24 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetOneUserByIdData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name DeleteUser
+   * @summary Delete a user
+   * @request DELETE:/api/users/{id}
+   * @secure
+   */
+  export namespace DeleteUser {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteUserData;
   }
 
   /**
@@ -4121,6 +4255,104 @@ export namespace Authentication {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = OidcLoginCallbackData;
+  }
+}
+
+export namespace TwoFactorAuthentication {
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorStatus
+   * @summary Get 2FA status for the current user
+   * @request GET:/api/auth/two-factor
+   * @secure
+   */
+  export namespace GetTwoFactorStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetupTwoFactor
+   * @summary Start 2FA setup for the current user
+   * @request POST:/api/auth/two-factor/setup
+   * @secure
+   */
+  export namespace SetupTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetupTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name VerifyTwoFactor
+   * @summary Verify and enable 2FA for the current user
+   * @request POST:/api/auth/two-factor/verify
+   * @secure
+   */
+  export namespace VerifyTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = VerifyTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name DisableTwoFactor
+   * @summary Disable 2FA for the current user
+   * @request POST:/api/auth/two-factor/disable
+   * @secure
+   */
+  export namespace DisableTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = DisableTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorPolicy
+   * @summary Get the configured 2FA policy
+   * @request GET:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace GetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetTwoFactorPolicy
+   * @summary Set the configured 2FA policy
+   * @request POST:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace SetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetTwoFactorPolicyData;
   }
 }
 
@@ -7000,6 +7232,43 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name RequestDeleteAccount
+     * @summary Request account deletion email
+     * @request POST:/api/users/me/delete-request
+     * @secure
+     */
+    requestDeleteAccount: (params: RequestParams = {}) =>
+      this.request<RequestDeleteAccountData, void>({
+        path: `/api/users/me/delete-request`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ConfirmDeleteAccount
+     * @summary Confirm account deletion via email token
+     * @request POST:/api/users/me/delete-confirm
+     */
+    confirmDeleteAccount: (
+      data: DeleteAccountConfirmDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ConfirmDeleteAccountData, void>({
+        path: `/api/users/me/delete-confirm`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name ChangeMyUsername
      * @summary Change current user username (limit once per day)
      * @request PATCH:/api/users/me/username
@@ -7031,6 +7300,23 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name DeleteUser
+     * @summary Delete a user
+     * @request DELETE:/api/users/{id}
+     * @secure
+     */
+    deleteUser: (id: number, params: RequestParams = {}) =>
+      this.request<DeleteUserData, void>({
+        path: `/api/users/${id}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
 
@@ -7445,6 +7731,123 @@ export class Api<
         path: `/api/auth/sso/OIDC/${providerId}/callback`,
         method: "GET",
         query: query,
+        format: "json",
+        ...params,
+      }),
+  };
+  twoFactorAuthentication = {
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorStatus
+     * @summary Get 2FA status for the current user
+     * @request GET:/api/auth/two-factor
+     * @secure
+     */
+    getTwoFactorStatus: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorStatusData, void>({
+        path: `/api/auth/two-factor`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetupTwoFactor
+     * @summary Start 2FA setup for the current user
+     * @request POST:/api/auth/two-factor/setup
+     * @secure
+     */
+    setupTwoFactor: (params: RequestParams = {}) =>
+      this.request<SetupTwoFactorData, void>({
+        path: `/api/auth/two-factor/setup`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name VerifyTwoFactor
+     * @summary Verify and enable 2FA for the current user
+     * @request POST:/api/auth/two-factor/verify
+     * @secure
+     */
+    verifyTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<VerifyTwoFactorData, void>({
+        path: `/api/auth/two-factor/verify`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name DisableTwoFactor
+     * @summary Disable 2FA for the current user
+     * @request POST:/api/auth/two-factor/disable
+     * @secure
+     */
+    disableTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<DisableTwoFactorData, void>({
+        path: `/api/auth/two-factor/disable`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorPolicy
+     * @summary Get the configured 2FA policy
+     * @request GET:/api/auth/two-factor/policy
+     * @secure
+     */
+    getTwoFactorPolicy: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetTwoFactorPolicy
+     * @summary Set the configured 2FA policy
+     * @request POST:/api/auth/two-factor/policy
+     * @secure
+     */
+    setTwoFactorPolicy: (
+      data: TwoFactorPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
