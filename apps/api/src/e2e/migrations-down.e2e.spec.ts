@@ -52,7 +52,11 @@ jest.setTimeout(120_000);
 
 type NoInfer<T> = [T][T extends unknown ? 0 : never];
 
-const createTempStorageRoot = async () => {
+const getTestStorageRoot = async () => {
+  if (process.env.STORAGE_ROOT) {
+    return process.env.STORAGE_ROOT;
+  }
+
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'attraccess-migrations-e2e-'));
   return dir;
 };
@@ -397,9 +401,13 @@ const getLastMigrationName = async (dataSource: DataSource) => {
 
 describe('Migrations down/up with data (e2e)', () => {
   let dataSource: DataSource;
+  let createdTempRoot: string | undefined;
 
   beforeAll(async () => {
-    const tmpRoot = await createTempStorageRoot();
+    const tmpRoot = await getTestStorageRoot();
+    if (!process.env.STORAGE_ROOT) {
+      createdTempRoot = tmpRoot;
+    }
     process.env.STORAGE_ROOT = tmpRoot;
 
     const dsModule = await import('../database/datasource');
@@ -419,6 +427,10 @@ describe('Migrations down/up with data (e2e)', () => {
   afterAll(async () => {
     if (dataSource && dataSource.isInitialized) {
       await dataSource.destroy();
+    }
+
+    if (createdTempRoot) {
+      await fs.rm(createdTempRoot, { recursive: true, force: true });
     }
   });
 
