@@ -216,14 +216,15 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     e.preventDefault();
                     onSubmit();
                   }}
-                  className="flex flex-row gap-2 w-full"
+                  className="flex flex-col gap-4 w-full lg:flex-row"
                 >
-                  <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex w-full flex-1 flex-col gap-2 min-w-0">
                     <SharedDataTab t={t} formData={formData} setField={setField} onImageSelected={onImageSelected} />
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex w-full flex-1 flex-col gap-2 min-w-0">
                     <Tabs
+                      className="w-full"
                       onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
                       selectedKey={formData.type}
                       destroyInactiveTabPanel={false}
