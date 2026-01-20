@@ -23,6 +23,7 @@ import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { MdnsAdvertiserService } from '../common/services/mdns-advertiser.service';
 
 @Module({
   imports: [
@@ -112,7 +113,7 @@ import { ProjectsModule } from '../projects/projects.module';
     ProjectsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, MdnsAdvertiserService],
 })
 export class AppModule implements OnModuleInit {
   constructor(private readonly licenseService: LicenseService) {}

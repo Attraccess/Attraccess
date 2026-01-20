@@ -97,6 +97,18 @@ docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMP
 > [!TIP]
 > Enable SSL for secure connections by setting `SSL_GENERATE_SELF_SIGNED_CERTIFICATES=true`. For detailed SSL configuration, custom certificates, and device trust instructions, see our [SSL Configuration Guide](setup/ssl-configuration.md).
 
+#### Local Network Discovery (mDNS/Bonjour)
+
+| Variable                       | Description                                            | Required | Default        |
+| ------------------------------ | ------------------------------------------------------ | -------- | -------------- |
+| `ATTRACCESS_MDNS_ENABLED`      | Advertise API via mDNS/Bonjour on local network        | No       | "false"        |
+| `ATTRACCESS_MDNS_SERVICE_NAME` | Service name shown in discovery tools                  | No       | "Attraccess API" |
+| `ATTRACCESS_MDNS_SERVICE_TYPE` | Service type (DNS-SD), without underscores             | No       | "attraccess"   |
+| `ATTRACCESS_MDNS_SERVICE_PORT` | Override advertised port (e.g. 443 with reverse proxy) | No       | -              |
+
+> [!NOTE]
+> mDNS relies on multicast UDP (5353). In Docker, this works best with `--network host` (Linux). If you use a reverse proxy, set `ATTRACCESS_MDNS_SERVICE_PORT` to the external port.
+
 #### Storage & File Management
 
 | Variable       | Description                                | Required | Default        |

@@ -141,6 +141,32 @@ or
 - ATTRACCESS_URL=http://your-server-ip:3000
 ```
 
+#### Local Network Auto-Discovery (mDNS/Bonjour)
+
+Attraccess can advertise the API on the local network so NFC readers can auto-discover the IP, port, and SSL settings.
+
+Enable it with:
+
+```yaml
+- ATTRACCESS_MDNS_ENABLED=true
+- ATTRACCESS_MDNS_SERVICE_NAME=Attraccess API
+- ATTRACCESS_MDNS_SERVICE_TYPE=attraccess
+# Optional override (useful when behind a reverse proxy on 443)
+- ATTRACCESS_MDNS_SERVICE_PORT=3000
+```
+
+The service advertises TXT keys such as `scheme`, `ssl`, `path`, `baseUrl`, `hostname`, and `version` (plus `selfSigned=1` when using generated certificates).
+
+> ⚠️ **Docker networking note**: mDNS uses multicast UDP (5353). In Docker, mDNS works best with host networking on Linux. If you enable host networking, remove `ports:` mappings:
+>
+> ```yaml
+> services:
+>   attraccess:
+>     network_mode: host
+> ```
+>
+> If host networking is not available (Docker Desktop), mDNS advertisement may not be visible outside the container.
+
 ### Step 5: Start Attraccess
 
 Once you've configured your `docker-compose.yml` file, start Attraccess with:
