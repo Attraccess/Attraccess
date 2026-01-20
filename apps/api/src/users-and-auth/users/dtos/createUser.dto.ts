@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthenticationType } from '@attraccess/database-entities';
 
@@ -27,10 +27,10 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'The authentication strategy to use',
-    enum: AuthenticationType,
+    enum: [AuthenticationType.LOCAL_PASSWORD],
     example: AuthenticationType.LOCAL_PASSWORD,
     enumName: 'AuthenticationType',
   })
-  @IsEnum(AuthenticationType)
+  @IsIn([AuthenticationType.LOCAL_PASSWORD])
   strategy: AuthenticationType.LOCAL_PASSWORD;
 }

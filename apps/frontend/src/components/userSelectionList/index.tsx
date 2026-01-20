@@ -87,13 +87,13 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     return Math.ceil((selectedUsers?.length ?? 0) / 10);
   }, [selectedUsers]);
 
-  const sortedUsers = useMemo(() => {
-    if (!selectedUsers) {
-      return [];
-    }
-
-    return [...selectedUsers].sort((a, b) => a.username.localeCompare(b.username));
+  const normalizedUsers = useMemo(() => {
+    return (selectedUsers ?? []).filter((user): user is TUser => !!user && typeof user.id === 'number');
   }, [selectedUsers]);
+
+  const sortedUsers = useMemo(() => {
+    return [...normalizedUsers].sort((a, b) => (a.username ?? '').localeCompare(b.username ?? ''));
+  }, [normalizedUsers]);
 
   const currentPage = useMemo(() => {
     return sortedUsers.slice((page - 1) * 10, page * 10);

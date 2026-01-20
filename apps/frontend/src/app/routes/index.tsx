@@ -21,6 +21,7 @@ import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
 import { FormEditorPage, FormListPage } from '../resources/details/forms';
 import AccountPage from '../account';
+import { ConfirmDeleteAccount } from '../confirm-delete-account';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { BillingDashboardPage } from '../billing/dashboard';
 import { BillingAdministrationPage } from '../billing/administration';
@@ -44,6 +45,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/dependencies',
     element: <Dependencies />,
+    authRequired: false,
+  },
+  {
+    path: '/confirm-delete-account',
+    element: <ConfirmDeleteAccount />,
     authRequired: false,
   },
   {

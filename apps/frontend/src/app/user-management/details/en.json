@@ -5,5 +5,23 @@
   },
   "profile": {
     "title": "Profile"
+  },
+  "delete": {
+    "title": "Delete user",
+    "description": "Deletes the user and anonymizes their personal data. This cannot be undone.",
+    "selfDisabled": "You cannot delete your own account from here.",
+    "actions": {
+      "open": "Delete user",
+      "confirm": "Delete user",
+      "cancel": "Cancel"
+    },
+    "modal": {
+      "title": "Confirm deletion",
+      "description": "Are you sure you want to delete this user? Their personal data will be anonymized."
+    },
+    "success": {
+      "title": "User deleted",
+      "description": "Deleted {{username}}."
+    }
   }
 }

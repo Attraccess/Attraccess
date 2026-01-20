@@ -1,0 +1,20 @@
+{
+  "success": {
+    "title": "Konto gelöscht",
+    "message": "Dein Konto wurde gelöscht und kann nicht mehr zum Anmelden verwendet werden.",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "error": {
+    "title": "Konto konnte nicht gelöscht werden",
+    "errorTitle": "Konto löschen fehlgeschlagen",
+    "tryAgain": "Erneut versuchen",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "apiErrors": {
+    "invalidLink": "Der Bestätigungslink ist ungültig.",
+    "DeleteAccountTokenInvalidException": "Der Bestätigungslink ist ungültig oder wurde bereits verwendet.",
+    "DeleteAccountTokenExpiredException": "Der Bestätigungslink ist abgelaufen. Bitte fordere einen neuen an.",
+    "UserHasActiveUsageSessions": "Dein Konto hat noch aktive Nutzungssitzungen. Beende diese, bevor du dein Konto löschst.",
+    "unexpectedError": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+  }
+}

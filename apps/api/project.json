@@ -131,7 +131,7 @@
       "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": ["typeorm -d dist/apps/migrations/main.js migration:generate {args.name}"]
+        "commands": ["typeorm -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/migrations/{args.name}"]
       }
     },
     "migrations-run": {

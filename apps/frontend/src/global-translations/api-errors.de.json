@@ -62,5 +62,45 @@
   "You cannot update your own permissions": {
     "title": "Eigene Berechtigungen können nicht geändert werden",
     "description": "Sie können Ihre eigenen Berechtigungen nicht ändern. Bitten Sie einen anderen Administrator, diese anzupassen."
+  },
+  "TwoFactorRequired": {
+    "title": "Zwei-Faktor-Code erforderlich",
+    "description": "Gib den Code aus deiner Authenticator-App ein, um fortzufahren."
+  },
+  "TwoFactorInvalidCode": {
+    "title": "Ungültiger Zwei-Faktor-Code",
+    "description": "Der Code ist ungültig oder abgelaufen. Bitte versuche es erneut."
+  },
+  "TwoFactorSetupRequired": {
+    "title": "Zwei-Faktor-Setup erforderlich",
+    "description": "Für dein Konto muss die Zwei-Faktor-Authentifizierung aktiviert werden, bevor du dich anmeldest."
+  },
+  "TwoFactorAlreadyEnabled": {
+    "title": "Zwei-Faktor bereits aktiviert",
+    "description": "Die Zwei-Faktor-Authentifizierung ist bereits aktiviert."
+  },
+  "TwoFactorNotInitialized": {
+    "title": "Zwei-Faktor nicht gestartet",
+    "description": "Starte zuerst den Setup-Prozess, bevor du den Code bestätigst."
+  },
+  "TwoFactorNotEnabled": {
+    "title": "Zwei-Faktor nicht aktiviert",
+    "description": "Die Zwei-Faktor-Authentifizierung ist für dein Konto nicht aktiviert."
+  },
+  "DeleteAccountTokenInvalidException": {
+    "title": "Ungültiger Bestätigungslink",
+    "description": "Der Bestätigungslink zum Löschen des Kontos ist ungültig oder wurde bereits verwendet."
+  },
+  "DeleteAccountTokenExpiredException": {
+    "title": "Bestätigungslink abgelaufen",
+    "description": "Der Bestätigungslink zum Löschen des Kontos ist abgelaufen. Bitte fordere einen neuen an."
+  },
+  "DeleteAccountUseSelfEndpoint": {
+    "title": "Eigenes Konto kann nicht gelöscht werden",
+    "description": "Bitte lösche dein Konto über die Kontoeinstellungen."
+  },
+  "UserHasActiveUsageSessions": {
+    "title": "Benutzer hat aktive Sitzungen",
+    "description": "Dieser Benutzer hat noch aktive Nutzungssitzungen. Beende diese, bevor das Konto gelöscht wird."
   }
 }

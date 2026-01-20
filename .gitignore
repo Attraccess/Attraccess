@@ -32,3 +32,5 @@ apps/api/src/assets/attractap-firmwares/
 apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/
+
+.autopilot.json

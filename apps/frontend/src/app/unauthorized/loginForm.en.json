@@ -5,6 +5,8 @@
   "signUpButton": "Get started here",
   "username": "Username",
   "password": "Password",
+  "twoFactorCode": "Authenticator code",
+  "twoFactorHelper": "Enter only if your account has 2FA enabled.",
   "rememberMe": "Keep me signed in",
   "forgotPassword": "Password slipped your mind?",
   "signInButton": "Start making",

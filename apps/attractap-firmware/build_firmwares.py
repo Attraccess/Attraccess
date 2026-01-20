@@ -7,6 +7,15 @@ import sys
 import shutil
 import re
 
+def resolve_python_command():
+    """Pick a Python executable with fallback."""
+    if sys.executable and os.path.exists(sys.executable):
+        return sys.executable
+    for cmd in ("python3", "python"):
+        if shutil.which(cmd):
+            return cmd
+    return "python3"
+
 def extract_define_value(flags, define_name):
     """Extract a -D define value from build_flags"""
     pattern = fr'-D\s*{define_name}=(["\']?)(.*?)\1(?:\s|$)'
@@ -276,6 +285,7 @@ def main():
             merged_bin_path = os.path.join(output_dir, firmware_filename)
             try:
                 print(f"Creating merged firmware for {env}...")
+                python_cmd = resolve_python_command()
                 candidate_platformio_homes = [
                     os.environ.get('PLATFORMIO_HOME_DIR'),
                     os.path.join(os.path.expanduser('~'), '.platformio'),
@@ -284,11 +294,11 @@ def main():
                     '/root/.platformio',
                 ]
 
-                esptool_cmd = [sys.executable, '-m', 'esptool']
+                esptool_cmd = [python_cmd, '-m', 'esptool']
                 for platformio_home in dict.fromkeys(filter(None, candidate_platformio_homes)):
                     esptool_script = os.path.join(platformio_home, 'packages', 'tool-esptoolpy', 'esptool.py')
                     if os.path.exists(esptool_script):
-                        esptool_cmd = [sys.executable, esptool_script]
+                        esptool_cmd = [python_cmd, esptool_script]
                         break
 
                 merge_cmd = [
