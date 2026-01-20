@@ -19,6 +19,27 @@
     "image": {
       "label": "Bild"
     },
+    "metadata": {
+      "label": "Metadaten",
+      "description": "Fügen Sie benutzerdefinierte Schlüssel/Wert-Paare für diese Ressource hinzu.",
+      "table": {
+        "ariaLabel": "Ressourcenmetadaten",
+        "columns": {
+          "key": "Schlüssel",
+          "value": "Wert",
+          "actions": "Aktionen"
+        },
+        "empty": "Noch keine Metadaten vorhanden."
+      },
+      "actions": {
+        "add": "Eintrag hinzufügen",
+        "remove": "Entfernen"
+      },
+      "placeholders": {
+        "key": "Schlüssel",
+        "value": "Wert"
+      }
+    },
     "machine": {
       "allowTakeOver": {
         "label": "Übernahme erlauben",

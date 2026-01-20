@@ -2,6 +2,7 @@ import { Input } from '@heroui/react';
 import { EditorTabProps } from './props';
 import { ImageUpload } from '../../../../components/imageUpload';
 import { filenameToUrl } from '../../../../api';
+import { ResourceMetadataEditor } from '../resourceMetadataEditor';
 
 interface Props {
   onImageSelected: (file: File | null) => void;
@@ -34,6 +35,12 @@ export function SharedDataTab(props: EditorTabProps & Props) {
         className="w-full"
         autoScale={{ maxWidth: 800, maxHeight: 800, output: 'auto' }}
         currentImageUrl={resource?.imageFilename ? filenameToUrl(resource?.imageFilename) : undefined}
+      />
+
+      <ResourceMetadataEditor
+        t={t}
+        metadata={formData.metadata}
+        onChange={(metadata) => setField('metadata', metadata)}
       />
 
       <button hidden type="submit" />

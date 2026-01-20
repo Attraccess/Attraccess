@@ -19,6 +19,27 @@
     "image": {
       "label": "Image"
     },
+    "metadata": {
+      "label": "Metadata",
+      "description": "Add custom key/value pairs for this resource.",
+      "table": {
+        "ariaLabel": "Resource metadata",
+        "columns": {
+          "key": "Key",
+          "value": "Value",
+          "actions": "Actions"
+        },
+        "empty": "No metadata entries yet."
+      },
+      "actions": {
+        "add": "Add entry",
+        "remove": "Remove"
+      },
+      "placeholders": {
+        "key": "Key",
+        "value": "Value"
+      }
+    },
     "machine": {
       "allowTakeOver": {
         "label": "Allow Takeover",

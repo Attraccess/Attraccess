@@ -683,6 +683,12 @@ export type CreateResourceDto = {
      */
     description?: string;
     /**
+     * Custom metadata for the resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
+    /**
      * Resource image file
      */
     image?: (Blob | File);
@@ -805,6 +811,12 @@ export type Resource = {
      * A detailed description of the resource
      */
     description?: string;
+    /**
+     * Custom metadata for the resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * The filename of the resource image
      */
@@ -1177,6 +1189,12 @@ export type UpdateResourceDto = {
      * A detailed description of the resource
      */
     description?: string;
+    /**
+     * Custom metadata for the resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * New resource image file
      */

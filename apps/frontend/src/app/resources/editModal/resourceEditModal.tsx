@@ -56,6 +56,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
     allowTakeOver: false,
     type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
+    metadata: {},
   });
 
   const setField = useCallback(
@@ -144,6 +145,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       allowTakeOver: resource?.allowTakeOver || false,
       type: resource?.type || ResourceType.MACHINE,
       separateUnlockAndUnlatch: resource?.separateUnlockAndUnlatch || false,
+      metadata: resource?.metadata ?? {},
     });
     setSelectedImage(null);
   }, [resource, setFormData, setSelectedImage]);
@@ -166,6 +168,10 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       return;
     }
 
+    const metadata = Object.fromEntries(
+      Object.entries(formData.metadata ?? {}).filter(([key]) => key.trim() !== ''),
+    ) as Record<string, unknown>;
+
     if (props.resourceId) {
       updateResource.mutate({
         id: props.resourceId,
@@ -177,6 +183,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           deleteImage,
           type: formData.type,
           separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+          metadata,
         },
       });
       return;
@@ -190,6 +197,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         image: selectedImage ?? undefined,
         type: formData.type as ResourceType,
         separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+        metadata,
       },
     });
   }, [formData, selectedImage, props.resourceId, updateResource, createResource, deleteImage]);

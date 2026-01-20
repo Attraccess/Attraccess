@@ -1065,6 +1065,11 @@ export const $CreateResourceDto = {
             description: 'A detailed description of the resource',
             example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle'
         },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata for the resource',
+            additionalProperties: true
+        },
         image: {
             type: 'string',
             description: 'Resource image file',
@@ -1224,6 +1229,11 @@ export const $Resource = {
             type: 'string',
             description: 'A detailed description of the resource',
             example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle'
+        },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata for the resource',
+            additionalProperties: true
         },
         imageFilename: {
             type: 'string',
@@ -1758,6 +1768,11 @@ export const $UpdateResourceDto = {
             type: 'string',
             description: 'A detailed description of the resource',
             example: 'Prusa i3 MK3S+ 3D printer with 0.4mm nozzle'
+        },
+        metadata: {
+            type: 'object',
+            description: 'Custom metadata for the resource',
+            additionalProperties: true
         },
         image: {
             type: 'string',
