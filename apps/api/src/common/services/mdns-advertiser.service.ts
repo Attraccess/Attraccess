@@ -61,9 +61,13 @@ export class MdnsAdvertiserService implements OnModuleInit, OnModuleDestroy {
   private buildServiceConfig(appConfig: AppConfigType): { serviceConfig: ServiceConfig; scheme: string } {
     const attraccessUrl = new URL(appConfig.ATTRACCESS_URL);
     const scheme = attraccessUrl.protocol.replace(':', '');
-    const advertisedPort = this.resolveAdvertisedPort(appConfig, attraccessUrl);
-    const serviceName = appConfig.ATTRACCESS_MDNS_SERVICE_NAME || 'Attraccess API';
-    const serviceType = appConfig.ATTRACCESS_MDNS_SERVICE_TYPE || 'attraccess';
+    const advertisedPort = attraccessUrl.port
+      ? Number(attraccessUrl.port)
+      : scheme === 'https'
+        ? 443
+        : 80;
+    const serviceName = 'Attraccess API';
+    const serviceType = 'attraccess';
     const apiPath = appConfig.GLOBAL_PREFIX ? `/${appConfig.GLOBAL_PREFIX}` : '/';
 
     const txt: MdnsTxtRecord = {
@@ -91,19 +95,4 @@ export class MdnsAdvertiserService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private resolveAdvertisedPort(appConfig: AppConfigType, attraccessUrl: URL): number {
-    const overridePort = appConfig.ATTRACCESS_MDNS_SERVICE_PORT;
-    if (typeof overridePort === 'number' && Number.isFinite(overridePort)) {
-      return overridePort;
-    }
-
-    if (attraccessUrl.port) {
-      const parsedPort = Number(attraccessUrl.port);
-      if (!Number.isNaN(parsedPort)) {
-        return parsedPort;
-      }
-    }
-
-    return appConfig.PORT;
-  }
 }

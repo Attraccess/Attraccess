@@ -99,15 +99,13 @@ docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMP
 
 #### Local Network Discovery (mDNS/Bonjour)
 
-| Variable                       | Description                                            | Required | Default        |
-| ------------------------------ | ------------------------------------------------------ | -------- | -------------- |
-| `ATTRACCESS_MDNS_ENABLED`      | Advertise API via mDNS/Bonjour on local network        | No       | "false"        |
-| `ATTRACCESS_MDNS_SERVICE_NAME` | Service name shown in discovery tools                  | No       | "Attraccess API" |
-| `ATTRACCESS_MDNS_SERVICE_TYPE` | Service type (DNS-SD), without underscores             | No       | "attraccess"   |
-| `ATTRACCESS_MDNS_SERVICE_PORT` | Override advertised port (e.g. 443 with reverse proxy) | No       | -              |
+| Variable                  | Description                                     | Required | Default |
+| ------------------------- | ----------------------------------------------- | -------- | ------- |
+| `ATTRACCESS_MDNS_ENABLED` | Advertise API via mDNS/Bonjour on local network | No       | "true"  |
 
 > [!NOTE]
-> mDNS relies on multicast UDP (5353). In Docker, this works best with `--network host` (Linux). If you use a reverse proxy, set `ATTRACCESS_MDNS_SERVICE_PORT` to the external port.
+> The mDNS service type is fixed to `_attraccess._tcp`, and the advertised port is taken from `ATTRACCESS_URL` (or defaults to 80/443 based on scheme).  
+> mDNS relies on multicast UDP (5353). In Docker, this works best with `--network host` (Linux).
 
 #### Storage & File Management
 
