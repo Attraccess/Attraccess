@@ -103,9 +103,7 @@ export class UpdateResourceDto {
       location: 'lab-1',
       template: 'door-access',
     },
-    additionalProperties: {
-      type: 'string',
-    },
+    additionalProperties: true,
   })
   @IsObject()
   @IsOptional()

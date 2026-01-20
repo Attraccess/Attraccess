@@ -1098,9 +1098,7 @@ This is a markdown documentation for the resource.`
                 location: 'lab-1',
                 template: 'door-access'
             },
-            additionalProperties: {
-                type: 'string'
-            }
+            additionalProperties: true
         },
         allowTakeOver: {
             type: 'boolean',
@@ -1275,9 +1273,7 @@ This is a markdown documentation for the resource.`
                 location: 'lab-1',
                 template: 'door-access'
             },
-            additionalProperties: {
-                type: 'string'
-            }
+            additionalProperties: true
         },
         createdAt: {
             format: 'date-time',
@@ -1819,9 +1815,7 @@ This is a markdown documentation for the resource.`
                 location: 'lab-1',
                 template: 'door-access'
             },
-            additionalProperties: {
-                type: 'string'
-            }
+            additionalProperties: true
         },
         allowTakeOver: {
             type: 'boolean',

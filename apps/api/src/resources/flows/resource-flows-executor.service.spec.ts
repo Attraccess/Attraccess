@@ -210,6 +210,40 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     ]);
   });
 
+  it('uses resource metadata in templated MQTT topics', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: {
+        serverId: 5,
+        topic: 'devices/{{resource.metadata.deviceId}}/state',
+        payload: 'ping',
+      },
+    });
+
+    nodesById[inputNode.id] = inputNode;
+    nodesById[mqttNode.id] = mqttNode;
+    initialNodes = [inputNode];
+
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    edgesBySourceAndHandle[`${mqttNode.id}|`] = [];
+
+    (resourceRepository.findOne as jest.Mock).mockResolvedValueOnce({
+      id: 1,
+      name: 'Resource 1',
+      type: ResourceType.Machine,
+      metadata: { deviceId: 'abc123' },
+    });
+
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+
+    expect(mqttClientService.publish).toHaveBeenCalledWith(5, 'devices/abc123/state', 'ping', {
+      qos: undefined,
+      retain: undefined,
+    });
+  });
+
   it('fan-outs when a node has multiple outgoing edges with the same handle and returns all leaf results', async () => {
     const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
     const ifNode = createNode({

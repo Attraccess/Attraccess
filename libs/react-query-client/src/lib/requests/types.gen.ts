@@ -702,7 +702,7 @@ export type CreateResourceDto = {
      * Custom metadata key-value pairs configured for this resource
      */
     metadata?: {
-        [key: string]: (string);
+        [key: string]: unknown;
     };
     /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
@@ -835,7 +835,7 @@ export type Resource = {
      * Custom metadata key-value pairs configured for this resource
      */
     metadata?: {
-        [key: string]: (string);
+        [key: string]: unknown;
     };
     /**
      * When the resource was created
@@ -1213,7 +1213,7 @@ export type UpdateResourceDto = {
      * Custom metadata key-value pairs configured for this resource
      */
     metadata?: {
-        [key: string]: (string);
+        [key: string]: unknown;
     };
     /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session

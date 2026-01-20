@@ -263,10 +263,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   private async withResourceContext(
     resourceId: number,
-    payload: object,
+    payload: unknown,
     transactionManager?: EntityManager,
     cache?: Map<number, FlowResourceContext>,
-  ): Promise<object> {
+  ): Promise<unknown> {
     if (!this.isPlainObject(payload)) {
       return payload;
     }
@@ -282,8 +282,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       return {
         ...payloadRecord,
         resource: {
-          ...context,
           ...(existingResource as Record<string, unknown>),
+          ...context,
           metadata,
         },
       };
@@ -518,12 +518,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     try {
       // Log the start of node processing
-      const input = await this.withResourceContext(
+      const input = (await this.withResourceContext(
         node.resourceId,
         resultOfPreviousNode.payload,
         transactionManager,
         resourceContextCache,
-      );
+      )) as object;
 
       await this.createFlowLog(
         {
@@ -600,12 +600,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       const processingTime = Date.now() - startTime;
       this.logger.debug(`Successfully processed flow node ID: ${node.id} (Type: ${node.type}) in ${processingTime}ms`);
 
-      responseOfNode.payload = await this.withResourceContext(
+      responseOfNode.payload = (await this.withResourceContext(
         node.resourceId,
         responseOfNode.payload,
         transactionManager,
         resourceContextCache,
-      );
+      )) as object;
 
       await this.createFlowLog(
         {

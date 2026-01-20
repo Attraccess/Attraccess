@@ -116,9 +116,7 @@ export class Resource {
       location: 'lab-1',
       template: 'door-access',
     },
-    additionalProperties: {
-      type: 'string',
-    },
+    additionalProperties: true,
   })
   metadata!: Record<string, unknown> | null;
 

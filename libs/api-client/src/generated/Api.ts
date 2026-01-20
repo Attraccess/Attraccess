@@ -865,7 +865,7 @@ export interface CreateResourceDto {
    * Custom metadata key-value pairs configured for this resource
    * @example {"location":"lab-1","template":"door-access"}
    */
-  metadata?: Record<string, string>;
+  metadata?: Record<string, any>;
   /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @default false
@@ -980,7 +980,7 @@ export interface Resource {
    * Custom metadata key-value pairs configured for this resource
    * @example {"location":"lab-1","template":"door-access"}
    */
-  metadata?: Record<string, string>;
+  metadata?: Record<string, any>;
   /**
    * When the resource was created
    * @format date-time
@@ -1270,7 +1270,7 @@ export interface UpdateResourceDto {
    * Custom metadata key-value pairs configured for this resource
    * @example {"location":"lab-1","template":"door-access"}
    */
-  metadata?: Record<string, string>;
+  metadata?: Record<string, any>;
   /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @example false
@@ -6952,7 +6952,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
