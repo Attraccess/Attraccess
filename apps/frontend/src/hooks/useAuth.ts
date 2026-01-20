@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 interface LoginCredentials {
   username: string;
   password: string;
+  twoFactorCode?: string;
   tokenLocation: 'cookie' | 'body';
 }
 
@@ -30,7 +31,12 @@ export function useLogin() {
     ...login,
     mutate: async (data: LoginCredentials) => {
       return login.mutate({
-        requestBody: { username: data.username, password: data.password, tokenLocation: data.tokenLocation },
+        requestBody: {
+          username: data.username,
+          password: data.password,
+          twoFactorCode: data.twoFactorCode,
+          tokenLocation: data.tokenLocation,
+        },
       });
     },
     mutateAsync: async (data: { username: string; password: string }) => {

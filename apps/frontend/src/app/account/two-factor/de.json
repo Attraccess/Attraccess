@@ -1,0 +1,33 @@
+{
+  "status": {
+    "label": "Zwei-Faktor-Authentifizierung",
+    "enabled": "Aktiviert",
+    "disabled": "Nicht aktiviert"
+  },
+  "policy": {
+    "title": "2FA erforderlich",
+    "requiredWarning": "Für dieses Konto ist 2FA gemäß aktueller Richtlinie erforderlich."
+  },
+  "setup": {
+    "startButton": "2FA aktivieren",
+    "regenerateButton": "Setup neu generieren",
+    "scanHint": "Scanne den Code mit deiner Authenticator-App.",
+    "secretLabel": "Manueller Schlüssel",
+    "secretHint": "Nutze diesen Schlüssel, wenn der QR-Code nicht funktioniert.",
+    "codeLabel": "Bestätigungscode",
+    "verifyButton": "Bestätigen & aktivieren"
+  },
+  "disable": {
+    "codeLabel": "Authenticator-Code",
+    "button": "2FA deaktivieren"
+  },
+  "success": {
+    "enabled": "Zwei-Faktor-Authentifizierung aktiviert",
+    "disabled": "Zwei-Faktor-Authentifizierung deaktiviert"
+  },
+  "errors": {
+    "setupFailed": "2FA-Setup konnte nicht gestartet werden",
+    "verifyFailed": "Bestätigung fehlgeschlagen",
+    "disableFailed": "2FA konnte nicht deaktiviert werden"
+  }
+}

@@ -2,7 +2,7 @@
 
 export const $AuthenticationType = {
     type: 'string',
-    enum: ['local_password', 'sso'],
+    enum: ['local_password'],
     description: 'The authentication strategy to use'
 } as const;
 
@@ -501,6 +501,81 @@ export const $CreateSessionResponse = {
         }
     },
     required: ['user', 'authToken']
+} as const;
+
+export const $TwoFactorPolicy = {
+    type: 'string',
+    enum: ['optional', 'required_for_privileged', 'required_for_all'],
+    description: 'The configured 2FA policy'
+} as const;
+
+export const $TwoFactorStatusDto = {
+    type: 'object',
+    properties: {
+        enabled: {
+            type: 'boolean',
+            description: 'Whether TOTP is enabled for the current user',
+            example: true
+        },
+        required: {
+            type: 'boolean',
+            description: 'Whether TOTP is required for the current user',
+            example: false
+        },
+        policy: {
+            description: 'The configured 2FA policy',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TwoFactorPolicy'
+                }
+            ]
+        }
+    },
+    required: ['enabled', 'required', 'policy']
+} as const;
+
+export const $TwoFactorSetupResponseDto = {
+    type: 'object',
+    properties: {
+        secret: {
+            type: 'string',
+            description: 'The shared secret for the authenticator app',
+            example: 'JBSWY3DPEHPK3PXP'
+        },
+        otpauthUrl: {
+            type: 'string',
+            description: 'The otpauth URL for QR code generation',
+            example: 'otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess'
+        }
+    },
+    required: ['secret', 'otpauthUrl']
+} as const;
+
+export const $TwoFactorCodeDto = {
+    type: 'object',
+    properties: {
+        code: {
+            type: 'string',
+            description: 'The current code from the authenticator app',
+            example: '123456'
+        }
+    },
+    required: ['code']
+} as const;
+
+export const $TwoFactorPolicyDto = {
+    type: 'object',
+    properties: {
+        policy: {
+            description: 'The 2FA policy to enforce',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TwoFactorPolicy'
+                }
+            ]
+        }
+    },
+    required: ['policy']
 } as const;
 
 export const $SSOProviderType = {
