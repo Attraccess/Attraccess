@@ -62,23 +62,9 @@ export class ResourceTypeDoors1757191106307 implements MigrationInterface {
       `INSERT INTO "email_templates"("type", "subject", "body", "createdAt", "updatedAt", "variables") SELECT "type", "subject", "body", "createdAt", "updatedAt", "variables" FROM "temporary_email_templates"`
     );
     await queryRunner.query(`DROP TABLE "temporary_email_templates"`);
-    await queryRunner.query(`ALTER TABLE "resource" RENAME TO "temporary_resource"`);
-    await queryRunner.query(
-      `CREATE TABLE "resource" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL, "description" text, "imageFilename" text, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "documentationType" text, "documentationMarkdown" text, "documentationUrl" text, "allowTakeOver" boolean NOT NULL DEFAULT (0))`
-    );
-    await queryRunner.query(
-      `INSERT INTO "resource"("id", "name", "description", "imageFilename", "createdAt", "updatedAt", "documentationType", "documentationMarkdown", "documentationUrl", "allowTakeOver") SELECT "id", "name", "description", "imageFilename", "createdAt", "updatedAt", "documentationType", "documentationMarkdown", "documentationUrl", "allowTakeOver" FROM "temporary_resource"`
-    );
-    await queryRunner.query(`DROP TABLE "temporary_resource"`);
-    await queryRunner.query(`ALTER TABLE "resource_usage" RENAME TO "temporary_resource_usage"`);
-    await queryRunner.query(`CREATE TABLE "resource_usage" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "resourceId" integer NOT NULL, "userId" integer, "startTime" datetime NOT NULL DEFAULT (datetime('now')), "startNotes" text, "endTime" datetime, "endNotes" text, "usageInMinutes" integer NOT NULL AS (CASE 
-      WHEN "endTime" IS NULL THEN -1
-      ELSE (julianday("endTime") - julianday("startTime")) * 1440
-    END) STORED, CONSTRAINT "FK_8177b2b424a6d31c533d57b95cc" FOREIGN KEY ("resourceId") REFERENCES "resource" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_6f80e3fc0cf8bfce60e25a6805f" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
-    await queryRunner.query(
-      `INSERT INTO "resource_usage"("id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes") SELECT "id", "resourceId", "userId", "startTime", "startNotes", "endTime", "endNotes" FROM "temporary_resource_usage"`
-    );
-    await queryRunner.query(`DROP TABLE "temporary_resource_usage"`);
+    await queryRunner.query(`ALTER TABLE "resource" DROP COLUMN "type"`);
+    await queryRunner.query(`ALTER TABLE "resource" DROP COLUMN "separateUnlockAndUnlatch"`);
+    await queryRunner.query(`ALTER TABLE "resource_usage" DROP COLUMN "usageAction"`);
 
     await queryRunner.query(
       `CREATE VIEW "resource_computed_view" AS SELECT "resource"."id" AS "id", COALESCE(SUM("usage"."usageInMinutes"), -1) AS "totalUsageMinutes" FROM "resource" "resource" LEFT JOIN "resource_usage" "usage" ON "usage"."resourceId" = "resource"."id" GROUP BY "resource"."id"`

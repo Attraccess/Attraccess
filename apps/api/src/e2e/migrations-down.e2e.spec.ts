@@ -383,6 +383,13 @@ const getMigrationCount = async (dataSource: DataSource) => {
   return Number(rows[0]?.count ?? 0);
 };
 
+const assertForeignKeysClean = async (dataSource: DataSource, context: string) => {
+  const violations = await dataSource.query('PRAGMA foreign_key_check');
+  if (violations.length > 0) {
+    throw new Error(`Foreign key violations after ${context}: ${JSON.stringify(violations)}`);
+  }
+};
+
 const getLastMigrationName = async (dataSource: DataSource) => {
   const rows = await dataSource.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1');
   return rows[0]?.name as string | undefined;
@@ -406,6 +413,7 @@ describe('Migrations down/up with data (e2e)', () => {
     await dataSource.runMigrations();
     await seedDatabase(dataSource);
     await assertAllEntitiesHaveRows(dataSource);
+    await assertForeignKeysClean(dataSource, 'initial seed');
   });
 
   afterAll(async () => {
@@ -415,24 +423,23 @@ describe('Migrations down/up with data (e2e)', () => {
   });
 
   it('reverts each migration and reapplies them', async () => {
-    await dataSource.query('PRAGMA foreign_keys = OFF');
-    try {
-      let remaining = await getMigrationCount(dataSource);
+    await dataSource.query('PRAGMA foreign_keys = ON');
+    let remaining = await getMigrationCount(dataSource);
 
-      while (remaining > 0) {
-        const migrationName = await getLastMigrationName(dataSource);
-        try {
-          await dataSource.undoLastMigration();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new Error(`Failed to undo migration ${migrationName ?? 'unknown'}: ${message}`);
-        }
-        remaining = await getMigrationCount(dataSource);
+    while (remaining > 0) {
+      const migrationName = await getLastMigrationName(dataSource);
+      try {
+        await dataSource.undoLastMigration();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to undo migration ${migrationName ?? 'unknown'}: ${message}`);
       }
-    } finally {
-      await dataSource.query('PRAGMA foreign_keys = ON');
+      remaining = await getMigrationCount(dataSource);
     }
 
     await dataSource.runMigrations();
+    await seedDatabase(dataSource);
+    await assertAllEntitiesHaveRows(dataSource);
+    await assertForeignKeysClean(dataSource, 'reapplied migrations');
   });
 });
