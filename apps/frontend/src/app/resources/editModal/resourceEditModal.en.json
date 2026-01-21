@@ -19,6 +19,23 @@
     "image": {
       "label": "Image"
     },
+    "metadata": {
+      "label": "Metadata",
+      "description": "Add custom key-value pairs that can be used in flows.",
+      "empty": "No metadata entries yet.",
+      "key": {
+        "label": "Key",
+        "placeholder": "e.g. location"
+      },
+      "value": {
+        "label": "Value",
+        "placeholder": "e.g. lab-1"
+      },
+      "actions": {
+        "add": "Add metadata",
+        "remove": "Remove"
+      }
+    },
     "machine": {
       "allowTakeOver": {
         "label": "Allow Takeover",

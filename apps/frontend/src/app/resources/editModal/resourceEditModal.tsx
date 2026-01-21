@@ -29,6 +29,11 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { SharedDataTab } from './tabs/shared';
 import { MachineTab } from './tabs/machine';
 import { DoorTab } from './tabs/door';
+import { ResourceMetadataEditor } from './resourceMetadataEditor';
+
+type ResourceFormData = Omit<UpdateResourceDto, 'metadata'> & {
+  metadata: Record<string, unknown>;
+};
 
 interface ResourceEditModalProps {
   resourceId?: Resource['id'];
@@ -50,16 +55,17 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
 
   const [deleteImage, setDeleteImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null | undefined>(undefined);
-  const [formData, setFormData] = useState<UpdateResourceDto>({
+  const [formData, setFormData] = useState<ResourceFormData>({
     name: '',
     description: '',
     allowTakeOver: false,
     type: ResourceType.MACHINE,
     separateUnlockAndUnlatch: false,
+    metadata: {} as Record<string, unknown>,
   });
 
   const setField = useCallback(
-    <T extends keyof UpdateResourceDto>(field: T, value: UpdateResourceDto[T]) => {
+    <T extends keyof ResourceFormData>(field: T, value: ResourceFormData[T]) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
     },
     [setFormData],
@@ -144,6 +150,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       allowTakeOver: resource?.allowTakeOver || false,
       type: resource?.type || ResourceType.MACHINE,
       separateUnlockAndUnlatch: resource?.separateUnlockAndUnlatch || false,
+      metadata: (resource?.metadata ?? {}) as Record<string, unknown>,
     });
     setSelectedImage(null);
   }, [resource, setFormData, setSelectedImage]);
@@ -177,6 +184,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
           deleteImage,
           type: formData.type,
           separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+          metadata: formData.metadata as Record<string, unknown>,
         },
       });
       return;
@@ -190,6 +198,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
         image: selectedImage ?? undefined,
         type: formData.type as ResourceType,
         separateUnlockAndUnlatch: formData.separateUnlockAndUnlatch,
+        metadata: formData.metadata as Record<string, unknown>,
       },
     });
   }, [formData, selectedImage, props.resourceId, updateResource, createResource, deleteImage]);
@@ -216,13 +225,24 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     e.preventDefault();
                     onSubmit();
                   }}
-                  className="flex flex-row gap-2 w-full"
+                  className="flex flex-col lg:flex-row gap-4 w-full"
                 >
-                  <div className="flex flex-1 flex-col gap-2">
-                    <SharedDataTab t={t} formData={formData} setField={setField} onImageSelected={onImageSelected} />
+                  <div className="flex flex-1 flex-col gap-2 w-full">
+                    <SharedDataTab
+                      t={t}
+                      formData={formData}
+                      setField={setField}
+                      onImageSelected={onImageSelected}
+                      resource={resource}
+                    />
+                    <ResourceMetadataEditor
+                      t={t}
+                      value={formData.metadata}
+                      onChange={(value) => setField('metadata', value)}
+                    />
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex flex-1 flex-col gap-2 w-full">
                     <Tabs
                       onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
                       selectedKey={formData.type}

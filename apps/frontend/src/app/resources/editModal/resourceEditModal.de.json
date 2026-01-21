@@ -19,6 +19,23 @@
     "image": {
       "label": "Bild"
     },
+    "metadata": {
+      "label": "Metadaten",
+      "description": "Fügen Sie benutzerdefinierte Schlüssel-Wert-Paare hinzu, die in Flows verwendet werden können.",
+      "empty": "Noch keine Metadaten-Einträge.",
+      "key": {
+        "label": "Schlüssel",
+        "placeholder": "z. B. ort"
+      },
+      "value": {
+        "label": "Wert",
+        "placeholder": "z. B. labor-1"
+      },
+      "actions": {
+        "add": "Metadaten hinzufügen",
+        "remove": "Entfernen"
+      }
+    },
     "machine": {
       "allowTakeOver": {
         "label": "Übernahme erlauben",
