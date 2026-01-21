@@ -54,6 +54,7 @@ type NoInfer<T> = [T][T extends unknown ? 0 : never];
 
 const getTestStorageRoot = async () => {
   if (process.env.STORAGE_ROOT) {
+    await fs.mkdir(process.env.STORAGE_ROOT, { recursive: true });
     return process.env.STORAGE_ROOT;
   }
 
