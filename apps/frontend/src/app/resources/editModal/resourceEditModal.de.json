@@ -21,7 +21,7 @@
     },
     "metadata": {
       "label": "Metadaten",
-      "description": "Fügen Sie benutzerdefinierte Schlüssel-Wert-Paare hinzu, die in Flows verwendet werden können.",
+      "description": "Fügen Sie Schlüssel-Wert-Paare hinzu, diese können für API Integrationen und auch in Flows verwendet werden.",
       "empty": "Noch keine Metadaten-Einträge.",
       "key": {
         "label": "Schlüssel",

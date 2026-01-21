@@ -21,7 +21,7 @@
     },
     "metadata": {
       "label": "Metadata",
-      "description": "Add custom key-value pairs that can be used in flows.",
+      "description": "Add key-value pairs, these can be used for API integrations and also in flows.",
       "empty": "No metadata entries yet.",
       "key": {
         "label": "Key",
