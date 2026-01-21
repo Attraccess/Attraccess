@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PNPM
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -80,7 +80,7 @@ jobs:
 
       # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -88,7 +88,7 @@ jobs:
 
       # Login to Docker Hub
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -106,7 +106,7 @@ jobs:
       # Build and push Docker image
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
         with:
           context: .
           push: true

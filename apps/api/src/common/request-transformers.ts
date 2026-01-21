@@ -27,6 +27,33 @@ export const ToBoolean = () => {
   };
 };
 
+export const ToJson = () => {
+  const toPlain = Transform(
+    ({ value }) => {
+      return value;
+    },
+    {
+      toPlainOnly: true,
+    },
+  );
+
+  const toClass = (target: unknown, key: string) => {
+    return Transform(
+      ({ obj }) => {
+        return valueToJson(obj[key]);
+      },
+      {
+        toClassOnly: true,
+      },
+    )(target, key);
+  };
+
+  return function (target: unknown, key: string) {
+    toPlain(target, key);
+    toClass(target, key);
+  };
+};
+
 export const valueToBoolean = (value: unknown): boolean | undefined => {
   if (value === null || value === undefined) {
     return value as undefined;
@@ -45,4 +72,24 @@ export const valueToBoolean = (value: unknown): boolean | undefined => {
   }
 
   return undefined;
+};
+
+export const valueToJson = (value: unknown): unknown => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  if (value.trim().length === 0) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 };

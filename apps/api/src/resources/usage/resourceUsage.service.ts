@@ -208,6 +208,7 @@ export class ResourceUsageService {
         documentationMarkdown: undefined,
         documentationUrl: undefined,
         documentationType: undefined,
+        metadata: resourceUsage.resource?.metadata ?? null,
       } as Partial<Resource>,
       user: sanitizedUser,
       formSubmissions: mappedFormSubmissions,
