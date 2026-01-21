@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe, ClassSerializerInterceptor, Logger, LogLevel } from '@nestjs/common';
@@ -17,6 +17,7 @@ import { createCA, createCert } from 'mkcert';
 import { join } from 'path';
 import { StorageConfigType } from './config/storage.config';
 import cookieParser from 'cookie-parser';
+import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -86,6 +87,8 @@ export async function bootstrap() {
     httpsOptions,
   });
   bootstrapLogger.log('Main application instance created.');
+
+  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
 
   app.use(cookieParser());
 
