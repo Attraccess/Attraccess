@@ -9,7 +9,11 @@ export function useHasValidIntroduction(props: Props) {
   const { introductions } = props;
 
   const userHasValidIntroduction = useCallback(
-    (user: User) => {
+    (user: User | null | undefined) => {
+      if (!user) {
+        return false;
+      }
+
       const introductionOfUser = introductions.find((intro) => intro.receiverUserId === user.id);
 
       if (!introductionOfUser) {

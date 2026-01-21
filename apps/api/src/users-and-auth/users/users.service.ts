@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import {
   Repository,
   ILike,
@@ -8,7 +8,15 @@ import {
   DeepPartial,
   EntityManager,
 } from 'typeorm';
-import { AuthenticationType, SystemPermissions, User, SSOProviderType } from '@attraccess/database-entities';
+import {
+  AuthenticationDetail,
+  AuthenticationType,
+  ResourceUsage,
+  Session,
+  SystemPermissions,
+  User,
+  SSOProviderType,
+} from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PaginatedResponse } from '../../types/response';
 import { PaginationOptions, PaginationOptionsSchema } from '../../types/request';
@@ -16,8 +24,28 @@ import { z } from 'zod';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+import { addDays } from 'date-fns';
+import { nanoid } from 'nanoid';
+
+class DeleteAccountTokenInvalidException extends BadRequestException {
+  constructor() {
+    super('DeleteAccountTokenInvalidException');
+  }
+}
+
+class DeleteAccountTokenExpiredException extends UnauthorizedException {
+  constructor() {
+    super('DeleteAccountTokenExpiredException');
+  }
+}
+
+class UserHasActiveUsageSessionsException extends BadRequestException {
+  constructor() {
+    super('UserHasActiveUsageSessions');
+  }
+}
 
 type UpdateUserData = Partial<
   Pick<
@@ -54,6 +82,12 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(AuthenticationDetail)
+    private authenticationDetailRepository: Repository<AuthenticationDetail>,
+    @InjectRepository(Session)
+    private sessionRepository: Repository<Session>,
+    @InjectRepository(ResourceUsage)
+    private resourceUsageRepository: Repository<ResourceUsage>,
     private licenseService: LicenseService,
     private emailService: EmailService,
     private dataSource: DataSource,
@@ -191,7 +225,7 @@ export class UsersService {
 
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
-    await this.userRepository.delete(id);
+    await this.anonymizeAndSoftDelete(id);
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
@@ -524,8 +558,102 @@ export class UsersService {
     if (!ids.length) {
       return;
     }
+    await this.userRepository.manager.transaction(async (manager) => {
+      for (const id of ids) {
+        await this.anonymizeAndSoftDelete(id, manager);
+      }
+    });
+  }
 
-    await this.userRepository.delete(ids);
+  async requestSelfDeletion(userId: number): Promise<void> {
+    const user = await this.findOne({ id: userId });
+    if (!user) {
+      throw new UserNotFoundException(userId);
+    }
+
+    const token = nanoid();
+    const expiresAt = addDays(new Date(), 1);
+
+    await this.userRepository.update(user.id, {
+      deleteAccountToken: token,
+      deleteAccountTokenExpiresAt: expiresAt,
+      deleteAccountRequestedAt: new Date(),
+    });
+
+    await this.emailService.sendDeleteAccountConfirmationEmail(user, token);
+  }
+
+  async confirmSelfDeletion(email: string, token: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { email },
+      withDeleted: true,
+    });
+
+    if (!user) {
+      throw new DeleteAccountTokenInvalidException();
+    }
+
+    if (user.deletedAt) {
+      throw new DeleteAccountTokenInvalidException();
+    }
+
+    if (user.deleteAccountToken !== token) {
+      throw new DeleteAccountTokenInvalidException();
+    }
+
+    if (!user.deleteAccountTokenExpiresAt || user.deleteAccountTokenExpiresAt < new Date()) {
+      throw new DeleteAccountTokenExpiredException();
+    }
+
+    await this.anonymizeAndSoftDelete(user.id);
+  }
+
+  private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
+    const repo = manager ? manager.getRepository(User) : this.userRepository;
+    const authRepo = manager ? manager.getRepository(AuthenticationDetail) : this.authenticationDetailRepository;
+    const sessionRepo = manager ? manager.getRepository(Session) : this.sessionRepository;
+    const usageRepo = manager ? manager.getRepository(ResourceUsage) : this.resourceUsageRepository;
+
+    const user = await repo.findOne({ where: { id }, withDeleted: true });
+    if (!user) {
+      throw new UserNotFoundException(id);
+    }
+
+    if (user.deletedAt) {
+      return;
+    }
+
+    const activeUsageSession = await usageRepo.findOne({
+      where: { userId: user.id, endTime: IsNull() },
+    });
+    if (activeUsageSession) {
+      throw new UserHasActiveUsageSessionsException();
+    }
+
+    const suffix = nanoid(8);
+    const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
+    const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
+
+    await authRepo.delete({ userId: user.id });
+    await sessionRepo.delete({ userId: user.id });
+
+    await repo.update(user.id, {
+      username: anonymizedUsername,
+      email: anonymizedEmail,
+      isEmailVerified: false,
+      emailVerificationToken: null,
+      emailVerificationTokenExpiresAt: null,
+      passwordResetToken: null,
+      passwordResetTokenExpiresAt: null,
+      externalIdentifier: null,
+      nfcKeySeedToken: null,
+      lastUsernameChangeAt: null,
+      deleteAccountToken: null,
+      deleteAccountTokenExpiresAt: null,
+      deleteAccountRequestedAt: null,
+    });
+
+    await repo.softDelete(user.id);
   }
 
   async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {

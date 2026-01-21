@@ -1,6 +1,7 @@
-ARG NODE_VERSION=22.17.1
+ARG NODE_VERSION=24.13.0
+ARG NODE_VERSION_NAME=trixie
 
-FROM node:${NODE_VERSION}-bookworm AS builder
+FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
 
 # System deps required for native Node modules and tooling
 # - python3/py3-pip: node-gyp and Python-based tooling
@@ -41,6 +42,9 @@ RUN pnpm nx run-many -t build --projects=api,frontend
 
 FROM node:${NODE_VERSION}-alpine
 
+# Create unprivileged user for runtime
+RUN addgroup -S appuser && adduser -S -G appuser -h /app appuser
+
 # Set working directory
 WORKDIR /app
 
@@ -68,6 +72,9 @@ WORKDIR /app/dist/apps/api
 RUN corepack enable && corepack prepare && \
     pnpm install # --frozen-lockfile (not enabled frozen lockfile since nx is fucking up the lockfile)
 
+# Ensure runtime files are owned by the unprivileged user
+RUN chown -R appuser:appuser /app
+
 # Back to app root for consistent starting dir
 WORKDIR /app
 
@@ -75,6 +82,9 @@ COPY package.json package.json
 
 # Expose the API port
 EXPOSE 3000
+
+# Drop privileges for runtime
+USER appuser
 
 # Start the API using the launch script
 CMD ["node", "dist/apps/api/main.js"]

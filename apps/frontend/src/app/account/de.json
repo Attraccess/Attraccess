@@ -2,6 +2,23 @@
   "title": "Konto",
   "sections": {
     "profile": "Profil",
-    "security": "Sicherheit"
+    "security": "Sicherheit",
+    "dangerZone": "Gefahrenzone"
+  },
+  "deleteAccount": {
+    "description": "Fordere einen Löschlink an, um dein Konto dauerhaft zu entfernen.",
+    "actions": {
+      "request": "Konto löschen",
+      "confirm": "Bestätigungs-E-Mail senden",
+      "cancel": "Abbrechen"
+    },
+    "modal": {
+      "title": "Konto löschen",
+      "description": "Wir senden einen Bestätigungslink an deine E-Mail-Adresse. Nach der Bestätigung wird dein Konto dauerhaft entfernt."
+    },
+    "toast": {
+      "title": "E-Mail prüfen",
+      "description": "Wir haben einen Bestätigungslink zum Löschen deines Kontos gesendet."
+    }
   }
 }

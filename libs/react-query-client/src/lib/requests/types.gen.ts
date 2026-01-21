@@ -4,8 +4,7 @@
  * The authentication strategy to use
  */
 export enum AuthenticationType {
-    LOCAL_PASSWORD = 'local_password',
-    SSO = 'sso'
+    LOCAL_PASSWORD = 'local_password'
 }
 
 export type CreateUserDto = {
@@ -71,6 +70,10 @@ export type User = {
      * When the user was last updated
      */
     updatedAt: string;
+    /**
+     * When the user was soft-deleted
+     */
+    deletedAt?: string;
     /**
      * The external (origin) identifier of the user, if the user is authenticated via SSO
      */
@@ -201,6 +204,17 @@ export type ChangePasswordDto = {
     token: string;
 };
 
+export type DeleteAccountConfirmDto = {
+    /**
+     * The delete account confirmation token
+     */
+    token: string;
+    /**
+     * The email to delete
+     */
+    email: string;
+};
+
 export type ChangeUsernameDto = {
     /**
      * The new username
@@ -281,6 +295,55 @@ export type CreateSessionResponse = {
      * The authentication token
      */
     authToken: string;
+};
+
+/**
+ * The configured 2FA policy
+ */
+export enum TwoFactorPolicy {
+    OPTIONAL = 'optional',
+    REQUIRED_FOR_PRIVILEGED = 'required_for_privileged',
+    REQUIRED_FOR_ALL = 'required_for_all'
+}
+
+export type TwoFactorStatusDto = {
+    /**
+     * Whether TOTP is enabled for the current user
+     */
+    enabled: boolean;
+    /**
+     * Whether TOTP is required for the current user
+     */
+    required: boolean;
+    /**
+     * The configured 2FA policy
+     */
+    policy: TwoFactorPolicy;
+};
+
+export type TwoFactorSetupResponseDto = {
+    /**
+     * The shared secret for the authenticator app
+     */
+    secret: string;
+    /**
+     * The otpauth URL for QR code generation
+     */
+    otpauthUrl: string;
+};
+
+export type TwoFactorCodeDto = {
+    /**
+     * The current code from the authenticator app
+     */
+    code: string;
+};
+
+export type TwoFactorPolicyDto = {
+    /**
+     * The 2FA policy to enforce
+     */
+    policy: TwoFactorPolicy;
 };
 
 /**
@@ -519,7 +582,8 @@ export enum EmailTemplateType {
     USERNAME_CHANGED = 'username-changed',
     PASSWORD_CHANGED = 'password-changed',
     RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
-    PROJECT_INVITATION = 'project-invitation'
+    PROJECT_INVITATION = 'project-invitation',
+    DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation'
 }
 
 export type EmailTemplate = {
@@ -634,6 +698,12 @@ export type CreateResourceDto = {
      * URL to external documentation
      */
     documentationUrl?: string;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
@@ -761,6 +831,12 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * When the resource was created
      */
@@ -1133,6 +1209,12 @@ export type UpdateResourceDto = {
      * URL to external documentation
      */
     documentationUrl?: string;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
@@ -2921,6 +3003,14 @@ export type ChangePasswordViaResetTokenResponse = unknown;
 
 export type GetCurrentResponse = User;
 
+export type RequestDeleteAccountResponse = unknown;
+
+export type ConfirmDeleteAccountData = {
+    requestBody: DeleteAccountConfirmDto;
+};
+
+export type ConfirmDeleteAccountResponse = unknown;
+
 export type ChangeMyUsernameData = {
     requestBody: ChangeUsernameDto;
 };
@@ -2932,6 +3022,12 @@ export type GetOneUserByIdData = {
 };
 
 export type GetOneUserByIdResponse = User;
+
+export type DeleteUserData = {
+    id: number;
+};
+
+export type DeleteUserResponse = unknown;
 
 export type UpdatePermissionsData = {
     id: number;
@@ -2996,6 +3092,7 @@ export type CreateSessionData = {
     requestBody: {
         username?: string;
         password?: string;
+        twoFactorCode?: string;
         tokenLocation?: 'cookie' | 'body';
     };
 };
@@ -3111,6 +3208,30 @@ export type OidcLoginCallbackData = {
 };
 
 export type OidcLoginCallbackResponse = CreateSessionResponse;
+
+export type GetTwoFactorStatusResponse = TwoFactorStatusDto;
+
+export type SetupTwoFactorResponse = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type VerifyTwoFactorResponse = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type DisableTwoFactorResponse = unknown;
+
+export type GetTwoFactorPolicyResponse = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = {
+    requestBody: TwoFactorPolicyDto;
+};
+
+export type SetTwoFactorPolicyResponse = TwoFactorPolicyDto;
 
 export type EmailTemplateControllerPreviewMjmlData = {
     requestBody: PreviewMjmlDto;
@@ -4306,6 +4427,35 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/me/delete-request': {
+        post: {
+            res: {
+                /**
+                 * Delete account confirmation email sent.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/me/delete-confirm': {
+        post: {
+            req: ConfirmDeleteAccountData;
+            res: {
+                /**
+                 * Account deleted.
+                 */
+                200: unknown;
+                /**
+                 * Invalid input data.
+                 */
+                400: unknown;
+            };
+        };
+    };
     '/api/users/me/username': {
         patch: {
             req: ChangeMyUsernameData;
@@ -4341,6 +4491,23 @@ export type $OpenApiTs = {
                  * User not found.
                  */
                 404: UserNotFoundException;
+            };
+        };
+        delete: {
+            req: DeleteUserData;
+            res: {
+                /**
+                 * User deleted.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to delete users.
+                 */
+                403: unknown;
             };
         };
     };
@@ -4700,6 +4867,91 @@ export type $OpenApiTs = {
                  * The user has been logged in
                  */
                 200: CreateSessionResponse;
+            };
+        };
+    };
+    '/api/auth/two-factor': {
+        get: {
+            res: {
+                /**
+                 * 2FA status for the current user
+                 */
+                200: TwoFactorStatusDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/setup': {
+        post: {
+            res: {
+                /**
+                 * 2FA setup details (secret and otpauth URL)
+                 */
+                200: TwoFactorSetupResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/verify': {
+        post: {
+            req: VerifyTwoFactorData;
+            res: {
+                /**
+                 * 2FA status after verification
+                 */
+                200: TwoFactorStatusDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/disable': {
+        post: {
+            req: DisableTwoFactorData;
+            res: {
+                /**
+                 * 2FA has been disabled
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/policy': {
+        get: {
+            res: {
+                /**
+                 * The configured 2FA policy
+                 */
+                200: TwoFactorPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: SetTwoFactorPolicyData;
+            res: {
+                /**
+                 * The configured 2FA policy has been updated
+                 */
+                200: TwoFactorPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };

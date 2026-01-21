@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -96,6 +96,14 @@ export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, prov
   sessionState: unknown;
   state: unknown;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state }])];
+export type TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse = Awaited<ReturnType<typeof TwoFactorAuthenticationService.getTwoFactorStatus>>;
+export type TwoFactorAuthenticationServiceGetTwoFactorStatusQueryResult<TData = TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useTwoFactorAuthenticationServiceGetTwoFactorStatusKey = "TwoFactorAuthenticationServiceGetTwoFactorStatus";
+export const UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn = (queryKey?: Array<unknown>) => [useTwoFactorAuthenticationServiceGetTwoFactorStatusKey, ...(queryKey ?? [])];
+export type TwoFactorAuthenticationServiceGetTwoFactorPolicyDefaultResponse = Awaited<ReturnType<typeof TwoFactorAuthenticationService.getTwoFactorPolicy>>;
+export type TwoFactorAuthenticationServiceGetTwoFactorPolicyQueryResult<TData = TwoFactorAuthenticationServiceGetTwoFactorPolicyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useTwoFactorAuthenticationServiceGetTwoFactorPolicyKey = "TwoFactorAuthenticationServiceGetTwoFactorPolicy";
+export const UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn = (queryKey?: Array<unknown>) => [useTwoFactorAuthenticationServiceGetTwoFactorPolicyKey, ...(queryKey ?? [])];
 export type EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerFindAll>>;
 export type EmailTemplatesServiceEmailTemplateControllerFindAllQueryResult<TData = EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useEmailTemplatesServiceEmailTemplateControllerFindAllKey = "EmailTemplatesServiceEmailTemplateControllerFindAll";
@@ -465,11 +473,17 @@ export type UsersServiceVerifyEmailMutationResult = Awaited<ReturnType<typeof Us
 export type UsersServiceAcceptInvitationMutationResult = Awaited<ReturnType<typeof UsersService.acceptInvitation>>;
 export type UsersServiceRequestPasswordResetMutationResult = Awaited<ReturnType<typeof UsersService.requestPasswordReset>>;
 export type UsersServiceChangePasswordViaResetTokenMutationResult = Awaited<ReturnType<typeof UsersService.changePasswordViaResetToken>>;
+export type UsersServiceRequestDeleteAccountMutationResult = Awaited<ReturnType<typeof UsersService.requestDeleteAccount>>;
+export type UsersServiceConfirmDeleteAccountMutationResult = Awaited<ReturnType<typeof UsersService.confirmDeleteAccount>>;
 export type UsersServiceBulkUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.bulkUpdatePermissions>>;
 export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeof UsersService.setUserPassword>>;
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
+export type TwoFactorAuthenticationServiceSetupTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setupTwoFactor>>;
+export type TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.verifyTwoFactor>>;
+export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.disableTwoFactor>>;
+export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setTwoFactorPolicy>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
@@ -522,6 +536,7 @@ export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnTy
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
+export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;
 export type AuthenticationServiceDeleteOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.deleteOneSsoProvider>>;
 export type ResourcesServiceDeleteOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.deleteOneResource>>;

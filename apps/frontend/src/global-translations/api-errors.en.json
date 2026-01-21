@@ -62,5 +62,45 @@
   "You cannot update your own permissions": {
     "title": "Cannot update own permissions",
     "description": "You cannot change your own permissions. Ask another administrator to adjust them."
+  },
+  "TwoFactorRequired": {
+    "title": "Two-factor code required",
+    "description": "Enter the code from your authenticator app to continue."
+  },
+  "TwoFactorInvalidCode": {
+    "title": "Invalid two-factor code",
+    "description": "The code is invalid or expired. Please try again."
+  },
+  "TwoFactorSetupRequired": {
+    "title": "Two-factor setup required",
+    "description": "Your account must enable two-factor authentication before signing in."
+  },
+  "TwoFactorAlreadyEnabled": {
+    "title": "Two-factor already enabled",
+    "description": "Two-factor authentication is already enabled for your account."
+  },
+  "TwoFactorNotInitialized": {
+    "title": "Two-factor not initialized",
+    "description": "Start the setup process before verifying your code."
+  },
+  "TwoFactorNotEnabled": {
+    "title": "Two-factor not enabled",
+    "description": "Two-factor authentication is not enabled for your account."
+  },
+  "DeleteAccountTokenInvalidException": {
+    "title": "Invalid confirmation link",
+    "description": "The delete account confirmation link is invalid or has already been used."
+  },
+  "DeleteAccountTokenExpiredException": {
+    "title": "Confirmation link expired",
+    "description": "The delete account confirmation link has expired. Please request a new one."
+  },
+  "DeleteAccountUseSelfEndpoint": {
+    "title": "Cannot delete own account",
+    "description": "Please delete your account from the account settings page."
+  },
+  "UserHasActiveUsageSessions": {
+    "title": "User has active sessions",
+    "description": "This user still has active usage sessions. End them before deleting the account."
   }
 }
