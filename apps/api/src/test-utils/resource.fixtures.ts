@@ -13,6 +13,7 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     documentationMarkdown: '# Test Documentation\n\nThis is a test documentation.',
     documentationUrl: null,
     allowTakeOver: false,
+    metadata: null,
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
