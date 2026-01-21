@@ -137,7 +137,7 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
 
   return (
     <div className="rounded-lg border border-default-200 dark:border-default-100 p-4 space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-default-600">{t('inputs.metadata.label')}</p>
           <p className="text-xs text-default-500">{t('inputs.metadata.description')}</p>
@@ -146,7 +146,7 @@ export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataE
           size="sm"
           variant="flat"
           startContent={<Plus className="w-4 h-4" />}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto whitespace-nowrap"
           onPress={handleAddEntry}
         >
           {t('inputs.metadata.actions.add')}

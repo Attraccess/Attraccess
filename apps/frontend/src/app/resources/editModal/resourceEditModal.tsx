@@ -225,9 +225,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                     e.preventDefault();
                     onSubmit();
                   }}
-                  className="flex flex-col lg:flex-row gap-4 w-full"
+                  className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full"
                 >
-                  <div className="flex flex-1 flex-col gap-2 w-full">
+                  <div className="flex flex-col gap-2 w-full">
                     <SharedDataTab
                       t={t}
                       formData={formData}
@@ -235,14 +235,9 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                       onImageSelected={onImageSelected}
                       resource={resource}
                     />
-                    <ResourceMetadataEditor
-                      t={t}
-                      value={formData.metadata}
-                      onChange={(value) => setField('metadata', value)}
-                    />
                   </div>
 
-                  <div className="flex flex-1 flex-col gap-2 w-full">
+                  <div className="flex flex-col gap-2 w-full">
                     <Tabs
                       onSelectionChange={(key) => setField('type', key as UpdateResourceDto['type'])}
                       selectedKey={formData.type}
@@ -255,6 +250,14 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
                         <DoorTab t={t} formData={formData} setField={setField} />
                       </Tab>
                     </Tabs>
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <ResourceMetadataEditor
+                      t={t}
+                      value={formData.metadata}
+                      onChange={(value) => setField('metadata', value)}
+                    />
                   </div>
                 </Form>
               </ModalBody>
