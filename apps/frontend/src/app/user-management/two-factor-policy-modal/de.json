@@ -1,0 +1,36 @@
+{
+  "title": "Zwei-Faktor-Richtlinie",
+  "subtitle": "Lege fest, wann 2FA erforderlich ist",
+  "warning": {
+    "title": "Gilt beim nächsten Login",
+    "description": "Wenn 2FA erforderlich ist, werden Nutzer ohne 2FA beim nächsten Anmelden zur Einrichtung aufgefordert."
+  },
+  "inputs": {
+    "policy": {
+      "label": "Anforderung"
+    }
+  },
+  "options": {
+    "optional": {
+      "label": "Optional",
+      "description": "Nutzer können 2FA in den Kontoeinstellungen aktivieren."
+    },
+    "privileged": {
+      "label": "Erforderlich für Admins",
+      "description": "2FA für Benutzer mit erweiterten Berechtigungen erzwingen."
+    },
+    "all": {
+      "label": "Erforderlich für alle Nutzer",
+      "description": "Alle müssen 2FA aktivieren, um fortzufahren."
+    }
+  },
+  "actions": {
+    "save": {
+      "label": "Richtlinie speichern",
+      "success": {
+        "title": "2FA-Richtlinie aktualisiert",
+        "description": "Die neue Anforderung gilt beim nächsten Login."
+      }
+    }
+  }
+}

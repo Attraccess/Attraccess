@@ -1,15 +1,19 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
 import { SessionService } from '../auth/session.service';
+import { TwoFactorService } from '../auth/two-factor.service';
 import { User } from '@attraccess/database-entities';
 
 @Injectable()
 export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   private readonly logger = new Logger(SessionStrategy.name);
 
-  constructor(private readonly sessionService: SessionService) {
+  constructor(
+    private readonly sessionService: SessionService,
+    private readonly twoFactorService: TwoFactorService,
+  ) {
     super();
   }
 
@@ -26,6 +30,14 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     if (!user) {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    if (!this.isTwoFactorSetupAllowedPath(req)) {
+      const status = await this.twoFactorService.getStatus(user);
+      if (status.required && !status.enabled) {
+        this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
+        throw new ForbiddenException('TwoFactorSetupRequired');
+      }
     }
 
     return user;
@@ -54,5 +66,35 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     }
 
     return null;
+  }
+
+  private isTwoFactorSetupAllowedPath(req: Request): boolean {
+    const rawPath = req.path || req.originalUrl || '';
+    const normalizedPath = this.normalizePath(rawPath);
+
+    if (!normalizedPath) {
+      return false;
+    }
+
+    return (
+      normalizedPath === '/users/me' ||
+      normalizedPath === '/auth/session' ||
+      normalizedPath === '/auth/session/refresh' ||
+      normalizedPath === '/auth/two-factor' ||
+      normalizedPath === '/auth/two-factor/setup' ||
+      normalizedPath === '/auth/two-factor/verify'
+    );
+  }
+
+  private normalizePath(rawPath: string): string {
+    if (!rawPath) {
+      return '';
+    }
+
+    const withoutQuery = rawPath.split('?')[0] ?? '';
+    const withoutPrefix = withoutQuery.startsWith('/api/') ? withoutQuery.slice(4) : withoutQuery;
+    const trimmed = withoutPrefix.replace(/\/+$/, '');
+
+    return trimmed || '/';
   }
 }

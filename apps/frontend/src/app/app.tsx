@@ -1,4 +1,4 @@
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { useTheme } from '@heroui/use-theme';
 import { PropsWithChildren, useEffect, useMemo } from 'react';
@@ -116,9 +116,36 @@ function AppLayout(props: PropsWithChildren) {
 }
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup, twoFactorStatus } = useAuth();
   const allRoutes = useAllRoutes();
   const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+  const location = useLocation();
+
+  const hasTwoFactorSetupIntent =
+    typeof window !== 'undefined' && sessionStorage.getItem('twoFactorSetupIntent') === 'true';
+
+  const shouldPromptTwoFactorSetup = hasTwoFactorSetupIntent && !twoFactorStatus?.enabled;
+  const shouldRedirectToAccount =
+    isAuthenticated && (needsTwoFactorSetup || shouldPromptTwoFactorSetup) && !location.pathname.startsWith('/account');
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') {
+      return;
+    }
+
+    if (location.pathname.startsWith('/account')) {
+      sessionStorage.removeItem('twoFactorSetupIntent');
+      return;
+    }
+
+    if (hasTwoFactorSetupIntent && twoFactorStatus?.enabled) {
+      sessionStorage.removeItem('twoFactorSetupIntent');
+    }
+  }, [hasTwoFactorSetupIntent, isAuthenticated, location.pathname, twoFactorStatus?.enabled]);
+
+  if (shouldRedirectToAccount) {
+    return <Navigate to="/account" replace />;
+  }
 
   return (
     <Routes>

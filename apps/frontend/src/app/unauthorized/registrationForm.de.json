@@ -23,5 +23,10 @@
     "message": "Wir haben eine Aktivierungs-E-Mail an {email} gesendet. Bitte überprüfe deinen Posteingang und klicke auf den Aktivierungslink, um deine Registrierung abzuschließen.",
     "closeButton": "Verstanden"
   },
+  "twoFactor": {
+    "title": "Zwei-Faktor-Authentifizierung einrichten",
+    "description": "Schütze dein Konto, indem du nach dem Anmelden eine Authenticator-App einrichtest.",
+    "action": "2FA nach dem Anmelden einrichten"
+  },
   "passwordConfirmationError": "Die Passwörter stimmen nicht überein"
 }

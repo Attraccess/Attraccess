@@ -73,7 +73,7 @@
   },
   "TwoFactorSetupRequired": {
     "title": "Zwei-Faktor-Setup erforderlich",
-    "description": "Für dein Konto muss die Zwei-Faktor-Authentifizierung aktiviert werden, bevor du dich anmeldest."
+    "description": "Für dein Konto muss die Zwei-Faktor-Authentifizierung aktiviert werden, bevor du fortfahren kannst."
   },
   "TwoFactorAlreadyEnabled": {
     "title": "Zwei-Faktor bereits aktiviert",

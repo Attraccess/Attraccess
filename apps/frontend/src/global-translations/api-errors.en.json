@@ -73,7 +73,7 @@
   },
   "TwoFactorSetupRequired": {
     "title": "Two-factor setup required",
-    "description": "Your account must enable two-factor authentication before signing in."
+    "description": "Your account must enable two-factor authentication before continuing."
   },
   "TwoFactorAlreadyEnabled": {
     "title": "Two-factor already enabled",

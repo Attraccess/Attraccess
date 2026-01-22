@@ -7,10 +7,6 @@ import {
   CardBody,
   CardFooter,
   Chip,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
   Input,
   Pagination,
   Table,
@@ -29,7 +25,6 @@ import {
   UserPlusIcon,
   WrenchIcon,
   CreditCardIcon,
-  MoreVerticalIcon,
   KeyIcon,
 } from 'lucide-react';
 import { useLicenseServiceGetLicenseInformation, useUsersServiceFindMany } from '@attraccess/react-query-client';
@@ -41,11 +36,15 @@ import en from './en.json';
 import de from './de.json';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor-modal';
+import { TwoFactorPolicyModal } from './two-factor-policy-modal';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
+  const { hasPermission } = useAuth();
+  const canManageSystemConfiguration = hasPermission('canManageSystemConfiguration');
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
@@ -89,37 +88,37 @@ export const UserManagementPage: React.FC = () => {
                 </Button>
               )}
             </InviteUserModal>
+            {canManageSystemConfiguration ? (
+              <TwoFactorPolicyModal>
+                {(onOpenTwoFactorPolicy) => (
+                  <Button
+                    variant="light"
+                    onPress={onOpenTwoFactorPolicy}
+                    startContent={<ShieldCheckIcon className="w-4 h-4" />}
+                    size="md"
+                  >
+                    {t('actions.twoFactorPolicy')}
+                  </Button>
+                )}
+              </TwoFactorPolicyModal>
+            ) : null}
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
-                <Dropdown>
-                  <DropdownTrigger>
-                    <Button variant="light" endContent={<MoreVerticalIcon className="w-4 h-4" />}>
-                      {t('actions.menu')}
-                    </Button>
-                  </DropdownTrigger>
-
-                  <DropdownMenu>
-                    <DropdownItem
-                      key="editAllowedSignupDomains"
-                      onPress={onOpen}
-                      startContent={<Settings2Icon className="w-4 h-4" />}
-                    >
-                      {t('actions.editAllowedSignupDomains')}
-                    </DropdownItem>
-
-                    {license?.modules.includes('sso') ? (
-                      <DropdownItem
-                        key="sso"
-                        onPress={() => navigate('/sso/providers')}
-                        startContent={<KeyIcon className="w-4 h-4" />}
-                      >
-                        {t('actions.sso')}
-                      </DropdownItem>
-                    ) : null}
-                  </DropdownMenu>
-                </Dropdown>
+                <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
+                  {t('actions.editAllowedSignupDomains')}
+                </Button>
               )}
             </AllowedSignupDomainsEditorModal>
+            <Button
+              variant="light"
+              onPress={() => navigate('/sso/providers')}
+              startContent={<KeyIcon className="w-4 h-4" />}
+              size="md"
+              isDisabled={!license?.modules.includes('sso')}
+              className={!license?.modules.includes('sso') ? 'hidden' : undefined}
+            >
+              {t('actions.sso')}
+            </Button>
           </>
         }
       />
