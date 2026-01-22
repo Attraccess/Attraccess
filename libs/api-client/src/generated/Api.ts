@@ -1628,6 +1628,14 @@ export interface EndUsageSessionDto {
   formSubmissions?: FormSubmissionRequestDto[];
 }
 
+export interface UpdateUsageSessionProjectDto {
+  /**
+   * The project to assign this usage session to. Set to null to clear the assignment.
+   * @example 35
+   */
+  projectId?: number | null;
+}
+
 export interface GetResourceHistoryResponseDto {
   total: number;
   page: number;
@@ -3192,6 +3200,8 @@ export type ResourceGroupIntroducersRevokeData = any;
 export type ResourceUsageStartSessionData = ResourceUsage;
 
 export type ResourceUsageEndSessionData = ResourceUsage;
+
+export type ResourceUsageUpdateSessionProjectData = ResourceUsage;
 
 export type LockDoorData = ResourceUsage;
 
@@ -4765,6 +4775,25 @@ export namespace Resources {
     export type RequestBody = EndUsageSessionDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceUsageEndSessionData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name ResourceUsageUpdateSessionProject
+   * @summary Update usage session project assignment
+   * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+   * @secure
+   */
+  export namespace ResourceUsageUpdateSessionProject {
+    export type RequestParams = {
+      resourceId: number;
+      usageId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateUsageSessionProjectDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceUsageUpdateSessionProjectData;
   }
 
   /**
@@ -8286,6 +8315,31 @@ export class Api<
     ) =>
       this.request<ResourceUsageEndSessionData, void>({
         path: `/api/resources/${resourceId}/usage/end`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name ResourceUsageUpdateSessionProject
+     * @summary Update usage session project assignment
+     * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+     * @secure
+     */
+    resourceUsageUpdateSessionProject: (
+      resourceId: number,
+      usageId: number,
+      data: UpdateUsageSessionProjectDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceUsageUpdateSessionProjectData, void>({
+        path: `/api/resources/${resourceId}/usage/sessions/${usageId}/project`,
         method: "PUT",
         body: data,
         secure: true,

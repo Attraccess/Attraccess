@@ -2315,6 +2315,18 @@ export const $EndUsageSessionDto = {
     }
 } as const;
 
+export const $UpdateUsageSessionProjectDto = {
+    type: 'object',
+    properties: {
+        projectId: {
+            type: 'number',
+            description: 'The project to assign this usage session to. Set to null to clear the assignment.',
+            nullable: true,
+            example: 35
+        }
+    }
+} as const;
+
 export const $GetResourceHistoryResponseDto = {
     type: 'object',
     properties: {
