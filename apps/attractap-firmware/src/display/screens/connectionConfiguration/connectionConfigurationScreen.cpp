@@ -249,6 +249,7 @@ void ConnectionConfigurationScreen::loop()
       if (this->wifiScanStartMs > 0 && (millis() - this->wifiScanStartMs) > WIFI_SCAN_TIMEOUT_MS)
       {
          this->wifiScanCompleted = true;
+         this->wifiScanRequested = false;
          this->wifiDropdownHasNetworks = false;
          lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_SCAN_FAILED);
       }
@@ -256,6 +257,7 @@ void ConnectionConfigurationScreen::loop()
    }
 
    this->wifiScanCompleted = true;
+   this->wifiScanRequested = false;
    this->populateWifiDropdown();
 }
 
@@ -310,6 +312,11 @@ void ConnectionConfigurationScreen::populateWifiDropdown()
       if (isDuplicate)
       {
          continue;
+      }
+
+      if (uniqueCount >= Wifi::MAX_KNOWN_WIFI_NETWORKS)
+      {
+         break;
       }
 
       uniqueSsids[uniqueCount] = ssid;
