@@ -333,7 +333,7 @@ export class UsersService {
             }
         });
     }
-
+    
     /**
      * Change current user email address
      * @param data The data for the request.
@@ -537,7 +537,7 @@ export class UsersService {
             }
         });
     }
-
+    
     /**
      * Admin: Change a user's email address
      * @param data The data for the request.
