@@ -6,7 +6,7 @@
   "username": "Username",
   "password": "Password",
   "twoFactorCode": "Authenticator code",
-  "twoFactorHelper": "Enter only if your account has 2FA enabled.",
+  "twoFactorHelper": "Enter the code if you already set up 2FA. Otherwise, leave it blank and you will be prompted after signing in.",
   "rememberMe": "Keep me signed in",
   "forgotPassword": "Password slipped your mind?",
   "signInButton": "Start making",

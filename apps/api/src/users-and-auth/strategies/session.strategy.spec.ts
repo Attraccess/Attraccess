@@ -1,13 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { SessionStrategy } from './session.strategy';
 import { SessionService } from '../auth/session.service';
+import { TwoFactorService } from '../auth/two-factor.service';
+import { TwoFactorPolicy } from '../auth/two-factor.dto';
 import { User } from '@attraccess/database-entities';
 
 describe('SessionStrategy', () => {
   let strategy: SessionStrategy;
   let sessionService: jest.Mocked<SessionService>;
+  let twoFactorService: jest.Mocked<TwoFactorService>;
 
   const mockUser: User = {
     id: 1,
@@ -19,6 +22,9 @@ describe('SessionStrategy', () => {
     const mockSessionService = {
       validateSession: jest.fn(),
     };
+    const mockTwoFactorService = {
+      getStatus: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,11 +33,21 @@ describe('SessionStrategy', () => {
           provide: SessionService,
           useValue: mockSessionService,
         },
+        {
+          provide: TwoFactorService,
+          useValue: mockTwoFactorService,
+        },
       ],
     }).compile();
 
     strategy = module.get<SessionStrategy>(SessionStrategy);
     sessionService = module.get(SessionService);
+    twoFactorService = module.get(TwoFactorService);
+    twoFactorService.getStatus.mockResolvedValue({
+      enabled: true,
+      required: false,
+      policy: TwoFactorPolicy.OPTIONAL,
+    });
   });
 
   describe('validate', () => {
@@ -41,6 +57,7 @@ describe('SessionStrategy', () => {
           authorization: 'Bearer valid-session-token',
         },
         cookies: {},
+        path: '/api/users/me',
       } as Request;
 
       sessionService.validateSession.mockResolvedValue(mockUser);
@@ -57,6 +74,7 @@ describe('SessionStrategy', () => {
         cookies: {
           'auth-session': 'valid-session-token',
         },
+        path: '/api/users/me',
       } as Request;
 
       sessionService.validateSession.mockResolvedValue(mockUser);
@@ -75,6 +93,7 @@ describe('SessionStrategy', () => {
         cookies: {
           'auth-session': 'cookie-token',
         },
+        path: '/api/users/me',
       } as Request;
 
       sessionService.validateSession.mockResolvedValue(mockUser);
@@ -104,6 +123,7 @@ describe('SessionStrategy', () => {
           authorization: 'Bearer invalid-token',
         },
         cookies: {},
+        path: '/api/users/me',
       } as Request;
 
       sessionService.validateSession.mockResolvedValue(null);
@@ -151,6 +171,7 @@ describe('SessionStrategy', () => {
           authorization: 'Bearer valid-token',
         },
         cookies: {},
+        path: '/api/users/me',
       } as Request;
 
       sessionService.validateSession.mockRejectedValue(new Error('Database error'));
@@ -158,6 +179,27 @@ describe('SessionStrategy', () => {
       await expect(strategy.validate(mockRequest)).rejects.toThrow('Database error');
 
       expect(sessionService.validateSession).toHaveBeenCalledWith('valid-token');
+    });
+
+    it('should block access when 2FA setup is required', async () => {
+      const mockRequest = {
+        headers: {
+          authorization: 'Bearer valid-token',
+        },
+        cookies: {},
+        path: '/api/resources',
+      } as Request;
+
+      sessionService.validateSession.mockResolvedValue(mockUser);
+      twoFactorService.getStatus.mockResolvedValue({
+        enabled: false,
+        required: true,
+        policy: TwoFactorPolicy.REQUIRED_FOR_ALL,
+      });
+
+      await expect(strategy.validate(mockRequest)).rejects.toThrow(
+        new ForbiddenException('TwoFactorSetupRequired')
+      );
     });
   });
 });

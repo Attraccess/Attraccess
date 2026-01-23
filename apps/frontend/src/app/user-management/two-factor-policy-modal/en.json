@@ -1,0 +1,36 @@
+{
+  "title": "Two-factor policy",
+  "subtitle": "Choose when users must set up 2FA",
+  "warning": {
+    "title": "Applies on next login",
+    "description": "When 2FA is required, users without it will be prompted to set it up the next time they sign in."
+  },
+  "inputs": {
+    "policy": {
+      "label": "Requirement"
+    }
+  },
+  "options": {
+    "optional": {
+      "label": "Optional",
+      "description": "Users can enable 2FA from their account settings."
+    },
+    "privileged": {
+      "label": "Required for admins",
+      "description": "Require 2FA for users with elevated permissions."
+    },
+    "all": {
+      "label": "Required for all users",
+      "description": "Everyone must enable 2FA to continue."
+    }
+  },
+  "actions": {
+    "save": {
+      "label": "Save policy",
+      "success": {
+        "title": "2FA policy updated",
+        "description": "The new requirement will apply on the next login."
+      }
+    }
+  }
+}

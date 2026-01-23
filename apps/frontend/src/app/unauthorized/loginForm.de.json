@@ -6,7 +6,7 @@
   "username": "Benutzername",
   "password": "Passwort",
   "twoFactorCode": "Authenticator-Code",
-  "twoFactorHelper": "Nur eingeben, wenn 2FA aktiviert ist.",
+  "twoFactorHelper": "Nur eingeben, wenn du 2FA bereits eingerichtet hast. Andernfalls leer lassen und nach der Anmeldung einrichten.",
   "rememberMe": "Angemeldet bleiben",
   "forgotPassword": "Passwort vergessen?",
   "signInButton": "Los geht's",

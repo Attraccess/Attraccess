@@ -4,6 +4,7 @@ import {
   SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
+  useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
   UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
@@ -76,6 +77,11 @@ export function useAuth() {
     enabled: isInitialized, // Only fetch when initialized
   });
 
+  const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
+    useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
+      enabled: isInitialized && !!currentUser,
+    });
+
   const { mutate: deleteSession } = useAuthenticationServiceEndSession({
     onSuccess: async () => {
       navigate('/', { replace: true });
@@ -92,6 +98,9 @@ export function useAuth() {
     isAuthenticated: !!currentUser,
     isInitialized,
     logout,
+    twoFactorStatus,
+    isTwoFactorStatusLoading,
+    needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
     hasPermission: (permission: keyof SystemPermissions) => {
       if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {
         return false;
