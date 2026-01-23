@@ -1,9 +1,3 @@
 {
-    "pullToRefresh": "Weiter ziehen um zu aktualisieren",
-    "twoFactorGate": {
-        "title": "Zwei-Faktor-Authentifizierung",
-        "requiredDescription": "Zwei-Faktor-Authentifizierung ist erforderlich, um fortzufahren. Richte sie unten ein, danach kannst du weiterarbeiten.",
-        "optionalDescription": "Du möchtest Zwei-Faktor-Authentifizierung einrichten. Schließe die Einrichtung unten ab oder überspringe sie vorerst.",
-        "skip": "Später"
-    }
+    "pullToRefresh": "Weiter ziehen um zu aktualisieren"
 }

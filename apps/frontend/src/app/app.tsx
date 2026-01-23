@@ -1,13 +1,13 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { useTheme } from '@heroui/use-theme';
-import { PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
+import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { Button, Card, CardBody, CardHeader, HeroUIProvider, Spinner } from '@heroui/react';
+import { HeroUIProvider, Spinner } from '@heroui/react';
 import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -25,7 +25,8 @@ import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { useReliableServerAvailability } from '../hooks/useReliableServerAvailability';
 import { AcceptInvitation } from './accept-invitation';
-import { TwoFactorCard } from './account/two-factor';
+import { TwoFactorGate } from './two-factor-gate';
+import { useTwoFactorGate } from '../hooks/useTwoFactorGate';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -117,66 +118,13 @@ function AppLayout(props: PropsWithChildren) {
 }
 
 function AppContent() {
-  const { isAuthenticated, needsTwoFactorSetup, twoFactorStatus, isTwoFactorStatusLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const allRoutes = useAllRoutes();
   const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
+  const twoFactorGate = useTwoFactorGate();
 
-  const { t } = useTranslations({ de, en });
-  const [hasTwoFactorSetupIntent, setHasTwoFactorSetupIntent] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      setHasTwoFactorSetupIntent(false);
-      return;
-    }
-
-    setHasTwoFactorSetupIntent(sessionStorage.getItem('twoFactorSetupIntent') === 'true');
-  }, [isAuthenticated]);
-
-  const clearTwoFactorSetupIntent = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('twoFactorSetupIntent');
-    }
-    setHasTwoFactorSetupIntent(false);
-  }, []);
-
-  useEffect(() => {
-    if (twoFactorStatus?.enabled && hasTwoFactorSetupIntent) {
-      clearTwoFactorSetupIntent();
-    }
-  }, [clearTwoFactorSetupIntent, hasTwoFactorSetupIntent, twoFactorStatus?.enabled]);
-
-  const shouldPromptTwoFactorSetup = hasTwoFactorSetupIntent && !twoFactorStatus?.enabled;
-  const shouldShowTwoFactorGate =
-    isAuthenticated && !isTwoFactorStatusLoading && (needsTwoFactorSetup || shouldPromptTwoFactorSetup);
-
-  if (shouldShowTwoFactorGate) {
-    return (
-      <div className="flex w-full justify-center">
-        <Card className="max-w-2xl w-full">
-          <CardHeader className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold">{t('twoFactorGate.title')}</h2>
-            <p className="text-sm text-default-500">
-              {needsTwoFactorSetup ? t('twoFactorGate.requiredDescription') : t('twoFactorGate.optionalDescription')}
-            </p>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-6">
-            <TwoFactorCard />
-            {!needsTwoFactorSetup && (
-              <div className="flex justify-end">
-                <Button variant="light" onPress={clearTwoFactorSetupIntent}>
-                  {t('twoFactorGate.skip')}
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    );
+  if (twoFactorGate.shouldShow) {
+    return <TwoFactorGate gate={twoFactorGate} />;
   }
 
   return (

@@ -1,9 +1,3 @@
 {
-    "pullToRefresh": "Pull further to refresh",
-    "twoFactorGate": {
-        "title": "Two-factor authentication",
-        "requiredDescription": "Two-factor authentication is required to continue. Set it up below and you can continue where you left off.",
-        "optionalDescription": "You chose to set up two-factor authentication. Complete the setup below, or skip for now and continue.",
-        "skip": "Skip for now"
-    }
+    "pullToRefresh": "Pull further to refresh"
 }

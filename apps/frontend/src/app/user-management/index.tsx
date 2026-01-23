@@ -39,12 +39,9 @@ import { AllowedSignupDomainsEditorModal } from './allowed-signup-domains-editor
 import { TwoFactorPolicyModal } from './two-factor-policy-modal';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
-  const { hasPermission } = useAuth();
-  const canManageUsers = hasPermission('canManageUsers');
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
@@ -88,20 +85,18 @@ export const UserManagementPage: React.FC = () => {
                 </Button>
               )}
             </InviteUserModal>
-            {canManageUsers ? (
-              <TwoFactorPolicyModal>
-                {(onOpenTwoFactorPolicy) => (
-                  <Button
-                    variant="light"
-                    onPress={onOpenTwoFactorPolicy}
-                    startContent={<ShieldCheckIcon className="w-4 h-4" />}
-                    size="md"
-                  >
-                    {t('actions.twoFactorPolicy')}
-                  </Button>
-                )}
-              </TwoFactorPolicyModal>
-            ) : null}
+            <TwoFactorPolicyModal>
+              {(onOpenTwoFactorPolicy) => (
+                <Button
+                  variant="light"
+                  onPress={onOpenTwoFactorPolicy}
+                  startContent={<ShieldCheckIcon className="w-4 h-4" />}
+                  size="md"
+                >
+                  {t('actions.twoFactorPolicy')}
+                </Button>
+              )}
+            </TwoFactorPolicyModal>
             <AllowedSignupDomainsEditorModal>
               {(onOpen) => (
                 <Button variant="light" onPress={onOpen} startContent={<Settings2Icon className="w-4 h-4" />} size="md">
