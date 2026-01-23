@@ -6,6 +6,8 @@ import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { User } from '@attraccess/database-entities';
 
+const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
+
 @Injectable()
 export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   private readonly logger = new Logger(SessionStrategy.name);
@@ -76,13 +78,8 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       return false;
     }
 
-    return (
-      normalizedPath === '/users/me' ||
-      normalizedPath === '/auth/session' ||
-      normalizedPath === '/auth/session/refresh' ||
-      normalizedPath === '/auth/two-factor' ||
-      normalizedPath === '/auth/two-factor/setup' ||
-      normalizedPath === '/auth/two-factor/verify'
+    return TWO_FACTOR_SETUP_ALLOWED_PREFIXES.some(
+      (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`),
     );
   }
 

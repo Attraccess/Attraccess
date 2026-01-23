@@ -44,7 +44,7 @@ import { useAuth } from '../../hooks/useAuth';
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const canManageSystemConfiguration = hasPermission('canManageSystemConfiguration');
+  const canManageUsers = hasPermission('canManageUsers');
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
@@ -88,7 +88,7 @@ export const UserManagementPage: React.FC = () => {
                 </Button>
               )}
             </InviteUserModal>
-            {canManageSystemConfiguration ? (
+            {canManageUsers ? (
               <TwoFactorPolicyModal>
                 {(onOpenTwoFactorPolicy) => (
                   <Button
@@ -109,16 +109,16 @@ export const UserManagementPage: React.FC = () => {
                 </Button>
               )}
             </AllowedSignupDomainsEditorModal>
-            <Button
-              variant="light"
-              onPress={() => navigate('/sso/providers')}
-              startContent={<KeyIcon className="w-4 h-4" />}
-              size="md"
-              isDisabled={!license?.modules.includes('sso')}
-              className={!license?.modules.includes('sso') ? 'hidden' : undefined}
-            >
-              {t('actions.sso')}
-            </Button>
+            {license?.modules.includes('sso') ? (
+              <Button
+                variant="light"
+                onPress={() => navigate('/sso/providers')}
+                startContent={<KeyIcon className="w-4 h-4" />}
+                size="md"
+              >
+                {t('actions.sso')}
+              </Button>
+            ) : null}
           </>
         }
       />

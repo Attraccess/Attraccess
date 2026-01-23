@@ -146,6 +146,8 @@ export class TwoFactorService {
   }
 
   async assertTwoFactorForLogin(user: User, code: string | undefined): Promise<void> {
+    // Only validate a code if the user has already enabled 2FA.
+    // Policy enforcement for users without 2FA happens at the session layer.
     const detail = await this.getTwoFactorDetail(user.id);
     const enabled = !!detail?.totpEnabledAt && !!detail?.totpSecret;
 

@@ -62,7 +62,7 @@ export class TwoFactorController {
     await this.twoFactorService.disable(request.user, body.code);
   }
 
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('canManageUsers')
   @Get('policy')
   @ApiOperation({ summary: 'Get the configured 2FA policy', operationId: 'getTwoFactorPolicy' })
   @ApiResponse({
@@ -75,7 +75,7 @@ export class TwoFactorController {
     return { policy };
   }
 
-  @Auth('canManageUsers', 'canManageSystemConfiguration')
+  @Auth('canManageUsers')
   @Post('policy')
   @ApiOperation({ summary: 'Set the configured 2FA policy', operationId: 'setTwoFactorPolicy' })
   @ApiResponse({
