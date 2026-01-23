@@ -18,6 +18,7 @@ import { UsernameForm } from './username';
 import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
+import { TwoFactorCard } from './two-factor';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -70,7 +71,10 @@ export default function AccountPage() {
           <CardHeader>
             <PageHeader title={t('sections.security')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-2">{me && <SetPasswordForm userId={me.id} />} </CardBody>
+          <CardBody className="flex flex-col gap-6">
+            {me && <SetPasswordForm userId={me.id} />}
+            {me && <TwoFactorCard />}
+          </CardBody>
         </Card>
 
         <Card className="max-w-md">

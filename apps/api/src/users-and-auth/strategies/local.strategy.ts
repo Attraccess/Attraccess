@@ -1,8 +1,10 @@
 import { Strategy } from 'passport-local';
 import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { AuthenticationType, User } from '@attraccess/database-entities';
+import { TwoFactorService } from '../auth/two-factor.service';
 
 class UnknownUserOrPasswordException extends UnauthorizedException {
   constructor() {
@@ -13,11 +15,14 @@ class UnknownUserOrPasswordException extends UnauthorizedException {
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
-  constructor(private authService: AuthService) {
-    super();
+  constructor(
+    private authService: AuthService,
+    private twoFactorService: TwoFactorService,
+  ) {
+    super({ passReqToCallback: true });
   }
 
-  async validate(username: string, password: string): Promise<User> {
+  async validate(request: Request, username: string, password: string): Promise<User> {
     username = username.trim();
     if (username.length === 0) {
       throw new BadRequestException('Username cannot be empty');
@@ -33,6 +38,8 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnknownUserOrPasswordException();
     }
+
+    await this.twoFactorService.assertTwoFactorForLogin(user, request?.body?.twoFactorCode);
 
     return user;
   }

@@ -14,6 +14,7 @@ import { useAuth } from '../../../../../hooks/useAuth';
 import { TableDataLoadingIndicator } from '../../../../../components/tableComponents';
 import { EmptyState } from '../../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
+import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
 
@@ -22,13 +23,58 @@ interface HistoryTableProps {
   showAllUsers?: boolean;
   canManageResources: boolean;
   onSessionClick: (session: ResourceUsage) => void;
+  projectPlaceholder: string;
+  resolveProjectId: (session: ResourceUsage) => number | null;
+  updatingSessionIds: Record<number, boolean>;
+  onProjectChange: (session: ResourceUsage, projectId: number | undefined) => void;
 }
+
+interface ProjectAssignmentCellProps {
+  session: ResourceUsage;
+  canEdit: boolean;
+  projectId: number | null;
+  isUpdating: boolean;
+  placeholder: string;
+  unassignedLabel: string;
+  onChange: (projectId: number | undefined) => void;
+}
+
+const ProjectAssignmentCell = ({
+  session,
+  canEdit,
+  projectId,
+  isUpdating,
+  placeholder,
+  unassignedLabel,
+  onChange,
+}: ProjectAssignmentCellProps) => {
+  if (!canEdit) {
+    return <span>{session.project?.name ?? placeholder}</span>;
+  }
+
+  return (
+    <div onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+      <ProjectsSelect
+        value={projectId ?? undefined}
+        onValueChange={onChange}
+        placeholder={placeholder}
+        includeUnassignedOption
+        unassignedLabel={unassignedLabel}
+        isDisabled={isUpdating}
+      />
+    </div>
+  );
+};
 
 export const HistoryTable = ({
   resourceId,
   showAllUsers = false,
   canManageResources,
   onSessionClick,
+  projectPlaceholder,
+  resolveProjectId,
+  updatingSessionIds,
+  onProjectChange,
 }: HistoryTableProps) => {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
@@ -123,7 +169,19 @@ export const HistoryTable = ({
             className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
             onClick={() => onSessionClick(session)}
           >
-            {resource ? generateRowCells(session, t, resource, showAllUsers, canManageResources) : []}
+            {resource
+              ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
+                  <ProjectAssignmentCell
+                    session={sessionToRender}
+                    canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
+                    projectId={resolveProjectId(sessionToRender)}
+                    isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
+                    placeholder={projectPlaceholder}
+                    unassignedLabel={projectPlaceholder}
+                    onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
+                  />
+                ))
+              : []}
           </TableRow>
         ))}
       </TableBody>

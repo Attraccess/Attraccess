@@ -4,7 +4,7 @@ import {
   SelectProps as HeroUiSelectProps,
   SharedSelection,
 } from '@heroui/react';
-import { ReactNode, useCallback, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 
 interface SelectItem {
   key: string;
@@ -29,6 +29,10 @@ export function Select(props: Props) {
 
   const [value, setValue] = useState(selectionToSet(selectedKey));
 
+  useEffect(() => {
+    setValue(selectionToSet(selectedKey));
+  }, [selectedKey, selectionToSet]);
+
   const handleSelectionChange = useCallback(
     (keys: SharedSelection) => {
       if (keys === 'all') {
@@ -36,7 +40,8 @@ export function Select(props: Props) {
       }
 
       setValue(keys as Set<string>);
-      onSelectionChange(keys.values().next().value as string);
+      const selected = keys.values().next().value as string | undefined;
+      onSelectionChange(selected ?? '');
     },
     [onSelectionChange],
   );

@@ -141,6 +141,13 @@ export enum SSOProviderType {
   OIDC = "OIDC",
 }
 
+/** The configured 2FA policy */
+export enum TwoFactorPolicy {
+  Optional = "optional",
+  RequiredForPrivileged = "required_for_privileged",
+  RequiredForAll = "required_for_all",
+}
+
 export enum PermissionFilter {
   CanManageResources = "canManageResources",
   CanManageSystemConfiguration = "canManageSystemConfiguration",
@@ -150,7 +157,6 @@ export enum PermissionFilter {
 /** The authentication strategy to use */
 export enum AuthenticationType {
   LocalPassword = "local_password",
-  Sso = "sso",
 }
 
 export interface CreateUserDto {
@@ -462,6 +468,47 @@ export interface CreateSessionResponse {
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
    */
   authToken: string;
+}
+
+export interface TwoFactorStatusDto {
+  /**
+   * Whether TOTP is enabled for the current user
+   * @example true
+   */
+  enabled: boolean;
+  /**
+   * Whether TOTP is required for the current user
+   * @example false
+   */
+  required: boolean;
+  /** The configured 2FA policy */
+  policy: TwoFactorPolicy;
+}
+
+export interface TwoFactorSetupResponseDto {
+  /**
+   * The shared secret for the authenticator app
+   * @example "JBSWY3DPEHPK3PXP"
+   */
+  secret: string;
+  /**
+   * The otpauth URL for QR code generation
+   * @example "otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess"
+   */
+  otpauthUrl: string;
+}
+
+export interface TwoFactorCodeDto {
+  /**
+   * The current code from the authenticator app
+   * @example "123456"
+   */
+  code: string;
+}
+
+export interface TwoFactorPolicyDto {
+  /** The 2FA policy to enforce */
+  policy: TwoFactorPolicy;
 }
 
 export interface SSOProviderOIDCConfiguration {
@@ -823,6 +870,11 @@ export interface CreateResourceDto {
    */
   documentationUrl?: string;
   /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
+  /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @default false
    * @example false
@@ -932,6 +984,11 @@ export interface Resource {
    * @example false
    */
   allowTakeOver: boolean;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
   /**
    * When the resource was created
    * @format date-time
@@ -1217,6 +1274,11 @@ export interface UpdateResourceDto {
    * @example "https://example.com/documentation"
    */
   documentationUrl?: string;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
   /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @example false
@@ -1572,6 +1634,14 @@ export interface EndUsageSessionDto {
   endTime?: string;
   /** Form submissions associated with ending the usage session */
   formSubmissions?: FormSubmissionRequestDto[];
+}
+
+export interface UpdateUsageSessionProjectDto {
+  /**
+   * The project to assign this usage session to. Set to null to clear the assignment.
+   * @example 35
+   */
+  projectId?: number | null;
 }
 
 export interface GetResourceHistoryResponseDto {
@@ -2966,6 +3036,7 @@ export type ChangeUserBillingFactorData = User;
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
+  twoFactorCode?: string;
   tokenLocation?: "cookie" | "body";
 }
 
@@ -2978,6 +3049,18 @@ export interface RefreshSessionParams {
 export type RefreshSessionData = CreateSessionResponse;
 
 export type EndSessionData = object;
+
+export type GetTwoFactorStatusData = TwoFactorStatusDto;
+
+export type SetupTwoFactorData = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = any;
+
+export type GetTwoFactorPolicyData = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = TwoFactorPolicyDto;
 
 export type GetAllSsoProvidersData = SSOProvider[];
 
@@ -3129,6 +3212,8 @@ export type ResourceGroupIntroducersRevokeData = any;
 export type ResourceUsageStartSessionData = ResourceUsage;
 
 export type ResourceUsageEndSessionData = ResourceUsage;
+
+export type ResourceUsageUpdateSessionProjectData = ResourceUsage;
 
 export type LockDoorData = ResourceUsage;
 
@@ -4244,6 +4329,104 @@ export namespace Authentication {
   }
 }
 
+export namespace TwoFactorAuthentication {
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorStatus
+   * @summary Get 2FA status for the current user
+   * @request GET:/api/auth/two-factor
+   * @secure
+   */
+  export namespace GetTwoFactorStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetupTwoFactor
+   * @summary Start 2FA setup for the current user
+   * @request POST:/api/auth/two-factor/setup
+   * @secure
+   */
+  export namespace SetupTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetupTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name VerifyTwoFactor
+   * @summary Verify and enable 2FA for the current user
+   * @request POST:/api/auth/two-factor/verify
+   * @secure
+   */
+  export namespace VerifyTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = VerifyTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name DisableTwoFactor
+   * @summary Disable 2FA for the current user
+   * @request POST:/api/auth/two-factor/disable
+   * @secure
+   */
+  export namespace DisableTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = DisableTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorPolicy
+   * @summary Get the configured 2FA policy
+   * @request GET:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace GetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetTwoFactorPolicy
+   * @summary Set the configured 2FA policy
+   * @request POST:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace SetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetTwoFactorPolicyData;
+  }
+}
+
 export namespace EmailTemplates {
   /**
    * No description
@@ -4638,6 +4821,25 @@ export namespace Resources {
     export type RequestBody = EndUsageSessionDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceUsageEndSessionData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name ResourceUsageUpdateSessionProject
+   * @summary Update usage session project assignment
+   * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+   * @secure
+   */
+  export namespace ResourceUsageUpdateSessionProject {
+    export type RequestParams = {
+      resourceId: number;
+      usageId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateUsageSessionProjectDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceUsageUpdateSessionProjectData;
   }
 
   /**
@@ -6825,7 +7027,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -7667,6 +7869,123 @@ export class Api<
         ...params,
       }),
   };
+  twoFactorAuthentication = {
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorStatus
+     * @summary Get 2FA status for the current user
+     * @request GET:/api/auth/two-factor
+     * @secure
+     */
+    getTwoFactorStatus: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorStatusData, void>({
+        path: `/api/auth/two-factor`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetupTwoFactor
+     * @summary Start 2FA setup for the current user
+     * @request POST:/api/auth/two-factor/setup
+     * @secure
+     */
+    setupTwoFactor: (params: RequestParams = {}) =>
+      this.request<SetupTwoFactorData, void>({
+        path: `/api/auth/two-factor/setup`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name VerifyTwoFactor
+     * @summary Verify and enable 2FA for the current user
+     * @request POST:/api/auth/two-factor/verify
+     * @secure
+     */
+    verifyTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<VerifyTwoFactorData, void>({
+        path: `/api/auth/two-factor/verify`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name DisableTwoFactor
+     * @summary Disable 2FA for the current user
+     * @request POST:/api/auth/two-factor/disable
+     * @secure
+     */
+    disableTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<DisableTwoFactorData, void>({
+        path: `/api/auth/two-factor/disable`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorPolicy
+     * @summary Get the configured 2FA policy
+     * @request GET:/api/auth/two-factor/policy
+     * @secure
+     */
+    getTwoFactorPolicy: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetTwoFactorPolicy
+     * @summary Set the configured 2FA policy
+     * @request POST:/api/auth/two-factor/policy
+     * @secure
+     */
+    setTwoFactorPolicy: (
+      data: TwoFactorPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
   emailTemplates = {
     /**
      * No description
@@ -8086,6 +8405,31 @@ export class Api<
     ) =>
       this.request<ResourceUsageEndSessionData, void>({
         path: `/api/resources/${resourceId}/usage/end`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name ResourceUsageUpdateSessionProject
+     * @summary Update usage session project assignment
+     * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+     * @secure
+     */
+    resourceUsageUpdateSessionProject: (
+      resourceId: number,
+      usageId: number,
+      data: UpdateUsageSessionProjectDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceUsageUpdateSessionProjectData, void>({
+        path: `/api/resources/${resourceId}/usage/sessions/${usageId}/project`,
         method: "PUT",
         body: data,
         secure: true,
