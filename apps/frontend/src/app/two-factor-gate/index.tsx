@@ -14,7 +14,7 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
   const gate = useTwoFactorGate();
 
   if (!gate.shouldShow) {
-    return <>{children}</>;
+    return <div className="contents">{children}</div>;
   }
 
   return (
