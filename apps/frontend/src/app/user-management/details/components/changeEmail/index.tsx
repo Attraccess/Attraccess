@@ -1,8 +1,8 @@
 import {
+  UseUsersServiceGetOneUserByIdKeyFn,
   useUsersServiceChangeUserEmail,
   useUsersServiceFindManyKey,
   useUsersServiceGetAllWithPermissionKey,
-  useUsersServiceGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
 import { Button, cn, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +21,8 @@ interface Props {
 export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttributes<HTMLDivElement>, 'children'>) {
   const [email, setEmail] = useState('');
   const queryClient = useQueryClient();
+  const trimmedEmail = email.trim();
+  const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
 
   const { t } = useTranslations({ en, de });
   const { success: showSuccess, error: showError } = useToastMessage();
@@ -28,13 +30,13 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
   const { mutate, isPending } = useUsersServiceChangeUserEmail({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetOneUserByIdKey],
+        queryKey: UseUsersServiceGetOneUserByIdKeyFn({ id: userId }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetAllWithPermissionKey],
+        predicate: (query) => query.queryKey[0] === useUsersServiceGetAllWithPermissionKey,
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        predicate: (query) => query.queryKey[0] === useUsersServiceFindManyKey,
       });
       showSuccess({ title: t('messages.updated') });
     },
@@ -54,19 +56,22 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
   });
 
   const onSubmit = useCallback(() => {
+    if (!isEmailValid) {
+      return;
+    }
     mutate({
       id: userId,
       requestBody: {
-        email,
+        email: trimmedEmail,
       },
     });
-  }, [mutate, email, userId]);
+  }, [isEmailValid, mutate, trimmedEmail, userId]);
 
   return (
     <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
       <Input type="email" label={t('email.label')} value={email} onValueChange={setEmail} />
       <div className="flex w-full justify-end">
-        <Button isLoading={isPending} onPress={onSubmit} color="primary">
+        <Button isLoading={isPending} onPress={onSubmit} color="primary" isDisabled={!isEmailValid || isPending}>
           {t('actions.save')}
         </Button>
       </div>

@@ -12,6 +12,8 @@ export function EmailForm() {
 
   const [email, setEmail] = useState('');
   const queryClient = useQueryClient();
+  const trimmedEmail = email.trim();
+  const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
   const { success: showSuccess, error: showError } = useToastMessage();
 
   const { mutate, isPending } = useUsersServiceChangeMyEmail({
@@ -37,15 +39,18 @@ export function EmailForm() {
   });
 
   const onSubmit = useCallback(() => {
+    if (!isEmailValid) {
+      return;
+    }
     mutate({
-      requestBody: { email },
+      requestBody: { email: trimmedEmail },
     });
-  }, [mutate, email]);
+  }, [isEmailValid, mutate, trimmedEmail]);
 
   return (
     <div className="flex flex-col gap-4">
       <Input type="email" label={t('email.label')} value={email} onValueChange={setEmail} />
-      <Button isLoading={isPending} onPress={onSubmit} color="primary">
+      <Button isLoading={isPending} onPress={onSubmit} color="primary" isDisabled={!isEmailValid || isPending}>
         {t('actions.save')}
       </Button>
     </div>
