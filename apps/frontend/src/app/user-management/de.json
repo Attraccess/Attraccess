@@ -23,6 +23,7 @@
     "menu": "Einstellungen",
     "editAllowedSignupDomains": "Registrierungs-Domains bearbeiten",
     "inviteUser": "Benutzer einladen",
-    "sso": "SSO Anbieter verwalten"
+    "sso": "SSO Anbieter verwalten",
+    "twoFactorPolicy": "Zwei-Faktor-Richtlinie"
   }
 }

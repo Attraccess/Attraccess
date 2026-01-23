@@ -37,7 +37,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
     setIsOpen(!isOpen);
   };
 
-  const { user: currentUser, isAuthenticated } = useAuth();
+  const { user: currentUser, isAuthenticated, needsTwoFactorSetup } = useAuth();
   const queryClient = useQueryClient();
 
   const onLiveTransactionUpdate = useCallback(() => {
@@ -50,7 +50,7 @@ export function Layout({ children, noLayout }: LayoutProps) {
   // Only connect to SSE when authenticated to avoid 401 errors on unauthenticated pages
   useLiveTransactionUpdates({
     onUpdate: onLiveTransactionUpdate,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !needsTwoFactorSetup,
   });
 
   if (noLayout) {

@@ -5,6 +5,7 @@ import { UserPermissionForm } from './components/permissionsForm';
 import { SetPasswordForm } from './components/setPasswordForm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ChangeUsernameForm } from './components/changeUsername';
+import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
@@ -79,6 +80,7 @@ export function UserManagementDetailsPage() {
               </CardHeader>
               <CardBody className="flex flex-col gap-8">
                 <ChangeUsernameForm userId={user.id} />
+                <ChangeEmailForm userId={user.id} />
                 <SetPasswordForm userId={user.id} />
               </CardBody>
             </Card>

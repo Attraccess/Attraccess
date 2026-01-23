@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
 import { AuthenticationType } from '../types/authenticationType.enum';
 import { SSOProviderType } from './ssoProvider.entity';
@@ -67,6 +68,22 @@ export class AuthenticationDetail {
     required: false,
   })
   ssoSubject?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @Exclude()
+  @ApiProperty({
+    description: 'The TOTP secret (for authenticator apps)',
+    required: false,
+  })
+  totpSecret?: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  @ApiProperty({
+    description: 'When TOTP was enabled for the user',
+    required: false,
+  })
+  totpEnabledAt?: Date | null;
 
   @ManyToOne(() => User, (user) => user.authenticationDetails, {
     onDelete: 'CASCADE',

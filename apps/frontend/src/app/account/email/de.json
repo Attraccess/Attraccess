@@ -1,0 +1,14 @@
+{
+  "messages": {
+    "updated": "Bestätigungs-E-Mail gesendet"
+  },
+  "errors": {
+    "updateFailed": "E-Mail konnte nicht aktualisiert werden"
+  },
+  "email": {
+    "label": "E-Mail"
+  },
+  "actions": {
+    "save": "Speichern"
+  }
+}

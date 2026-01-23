@@ -4,6 +4,7 @@ import {
   SystemPermissions,
   useAuthenticationServiceCreateSession,
   useAuthenticationServiceEndSession,
+  useTwoFactorAuthenticationServiceGetTwoFactorStatus,
   useUsersServiceGetCurrent,
   UseUsersServiceGetCurrentKeyFn,
 } from '@attraccess/react-query-client';
@@ -13,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 interface LoginCredentials {
   username: string;
   password: string;
+  twoFactorCode?: string;
   tokenLocation: 'cookie' | 'body';
 }
 
@@ -30,7 +32,12 @@ export function useLogin() {
     ...login,
     mutate: async (data: LoginCredentials) => {
       return login.mutate({
-        requestBody: { username: data.username, password: data.password, tokenLocation: data.tokenLocation },
+        requestBody: {
+          username: data.username,
+          password: data.password,
+          twoFactorCode: data.twoFactorCode,
+          tokenLocation: data.tokenLocation,
+        },
       });
     },
     mutateAsync: async (data: { username: string; password: string }) => {
@@ -70,6 +77,11 @@ export function useAuth() {
     enabled: isInitialized, // Only fetch when initialized
   });
 
+  const { data: twoFactorStatus, isLoading: isTwoFactorStatusLoading } =
+    useTwoFactorAuthenticationServiceGetTwoFactorStatus(undefined, {
+      enabled: isInitialized && !!currentUser,
+    });
+
   const { mutate: deleteSession } = useAuthenticationServiceEndSession({
     onSuccess: async () => {
       navigate('/', { replace: true });
@@ -86,6 +98,9 @@ export function useAuth() {
     isAuthenticated: !!currentUser,
     isInitialized,
     logout,
+    twoFactorStatus,
+    isTwoFactorStatusLoading,
+    needsTwoFactorSetup: !!twoFactorStatus?.required && !twoFactorStatus?.enabled,
     hasPermission: (permission: keyof SystemPermissions) => {
       if (!currentUser?.systemPermissions || typeof currentUser.systemPermissions !== 'object') {
         return false;

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { plainToClass } from 'class-transformer';
-import { ToBoolean } from './request-transformers';
+import { ToBoolean, ToJson } from './request-transformers';
 
 describe('ToBoolean transformer', () => {
   // Create a test class with the transformer
@@ -55,6 +55,42 @@ describe('ToBoolean transformer', () => {
   it('should return undefined for unknown string values', () => {
     expect(transform('something')).toBe(undefined);
     expect(transform('random')).toBe(undefined);
+  });
+
+  it('should leave null and undefined unchanged', () => {
+    expect(transform(null)).toBe(null);
+    expect(transform(undefined)).toBe(undefined);
+  });
+});
+
+describe('ToJson transformer', () => {
+  class TestClass {
+    @ToJson()
+    property: unknown;
+  }
+
+  const transform = (value: unknown): unknown => {
+    const plain = { property: value };
+    const instance = plainToClass(TestClass, plain);
+    return instance.property;
+  };
+
+  it('should leave non-string values unchanged', () => {
+    const value = { key: 'value' };
+    expect(transform(value)).toEqual(value);
+    expect(transform(42)).toBe(42);
+  });
+
+  it('should parse JSON objects from strings', () => {
+    expect(transform('{"key":"value"}')).toEqual({ key: 'value' });
+  });
+
+  it('should parse JSON arrays from strings', () => {
+    expect(transform('["one","two"]')).toEqual(['one', 'two']);
+  });
+
+  it('should return the original string on parse errors', () => {
+    expect(transform('{invalid')).toEqual('{invalid');
   });
 
   it('should leave null and undefined unchanged', () => {

@@ -7,6 +7,7 @@ import { UsersService } from './users/users.service';
 import { UsersController } from './users/users.controller';
 import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
+import { TwoFactorController } from './auth/two-factor.controller';
 import { SessionService } from './auth/session.service';
 
 // Strategies
@@ -36,6 +37,7 @@ import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
+import { TwoFactorService } from './auth/two-factor.service';
 
 @Module({
   imports: [
@@ -56,6 +58,7 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
     UsersService,
     AuthService,
     SessionService,
+    TwoFactorService,
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -87,7 +90,7 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
       inject: [ModuleRef, ConfigService],
     },
   ],
-  controllers: [UsersController, AuthController, SSOController],
+  controllers: [UsersController, AuthController, TwoFactorController, SSOController],
   exports: [UsersService, AuthService, SessionService],
 })
 export class UsersAndAuthModule {}

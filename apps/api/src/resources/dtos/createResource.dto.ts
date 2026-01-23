@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, IsEnum, IsUrl, ValidateIf, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsEnum, IsUrl, ValidateIf, IsBoolean, IsObject } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { DocumentationType, ResourceType } from '@attraccess/database-entities';
-import { ToBoolean } from '../../common/request-transformers';
+import { ToBoolean, ToJson } from '../../common/request-transformers';
 
 export class CreateResourceDto {
   @ApiProperty({
@@ -80,6 +80,21 @@ export class CreateResourceDto {
   @ValidateIf((o) => o.documentationType === DocumentationType.URL)
   @IsOptional()
   documentationUrl?: string;
+
+  @ApiProperty({
+    description: 'Custom metadata key-value pairs configured for this resource',
+    required: false,
+    type: Object,
+    example: {
+      location: 'lab-1',
+      template: 'door-access',
+    },
+    additionalProperties: true,
+  })
+  @IsObject()
+  @IsOptional()
+  @ToJson()
+  metadata?: Record<string, unknown>;
 
   @ApiProperty({
     description: 'Whether this resource allows overtaking by the next user without the prior user ending their session',

@@ -110,6 +110,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       const formData = new FormData(event.currentTarget as HTMLFormElement);
       const username = formData.get('username');
       const password = formData.get('password');
+      const twoFactorCode = formData.get('twoFactorCode');
 
       if (typeof username !== 'string' || typeof password !== 'string') {
         return;
@@ -118,6 +119,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       login({
         username,
         password,
+        twoFactorCode: typeof twoFactorCode === 'string' ? twoFactorCode.trim() || undefined : undefined,
         tokenLocation: 'cookie',
       });
     },
@@ -150,6 +152,19 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         isDisabled={isPending}
         data-cy="login-form-password-input"
         autoComplete="current-password"
+      />
+      <Input
+        id="twoFactorCode"
+        name="twoFactorCode"
+        type="text"
+        label={t('twoFactorCode')}
+        description={t('twoFactorHelper')}
+        variant="underlined"
+        isDisabled={isPending}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        data-cy="login-form-two-factor-input"
       />
       <div className="flex items-center justify-between">
         <Button

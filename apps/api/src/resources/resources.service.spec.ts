@@ -486,6 +486,7 @@ describe('ResourcesService', () => {
         documentationMarkdown: '# New Documentation',
         documentationUrl: null,
         allowTakeOver: false,
+        metadata: { location: 'lab-1', maxUsers: 2 },
       };
 
       const newResource = createMockResource({
@@ -496,6 +497,7 @@ describe('ResourcesService', () => {
         documentationMarkdown: createDto.documentationMarkdown as string,
         documentationUrl: createDto.documentationUrl,
         imageFilename: null,
+        metadata: createDto.metadata ?? null,
       });
 
       resourceRepository.create.mockReturnValue(newResource);
@@ -513,6 +515,7 @@ describe('ResourcesService', () => {
         documentationUrl: createDto.documentationUrl || null,
         allowTakeOver: createDto.allowTakeOver || false,
         separateUnlockAndUnlatch: false,
+        metadata: createDto.metadata ?? null,
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });
@@ -527,6 +530,7 @@ describe('ResourcesService', () => {
         description: 'Updated Description',
         documentationType: DocumentationType.URL,
         documentationUrl: 'https://example.com/updated',
+        metadata: { template: 'default', area: 'A2' },
       };
 
       const existingResource = createMockResource({
@@ -548,6 +552,7 @@ describe('ResourcesService', () => {
         documentationUrl: updateDto.documentationUrl,
         imageFilename: null,
         maintenances: [],
+        metadata: updateDto.metadata ?? null,
       });
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);

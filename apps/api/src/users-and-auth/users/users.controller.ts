@@ -42,6 +42,7 @@ import { ResetPasswordDto } from './dtos/resetPassword.dto';
 import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -714,6 +715,18 @@ export class UsersController {
   }
 
   @Auth()
+  @Patch('me/email')
+  @ApiOperation({ summary: 'Change current user email address', operationId: 'changeMyEmail' })
+  @ApiResponse({ status: 200, description: 'Email changed.', type: User })
+  async changeMyEmail(@Req() request: AuthenticatedRequest, @Body() body: ChangeEmailDto): Promise<User> {
+    try {
+      return await this.usersService.changeEmail(request.user.id, body.email, request.user);
+    } catch (error) {
+      throw this.mapEmailSendError(error);
+    }
+  }
+
+  @Auth()
   @Get(':id')
   @ApiOperation({ summary: 'Get a user by ID', operationId: 'getOneUserById' })
   @ApiResponse({
@@ -1062,6 +1075,22 @@ export class UsersController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     return await this.usersService.changeUsername(id, body.username, request.user);
+  }
+
+  @Patch(':id/email')
+  @Auth('canManageUsers')
+  @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
+  @ApiResponse({ status: 200, description: 'Email changed.', type: User })
+  async changeUserEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ChangeEmailDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<User> {
+    try {
+      return await this.usersService.changeEmail(id, body.email, request.user);
+    } catch (error) {
+      throw this.mapEmailSendError(error);
+    }
   }
 
   @Patch(':id/billing-factor')
