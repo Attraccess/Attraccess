@@ -1,16 +1,21 @@
 import { Button, Card, CardBody, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { TwoFactorCard } from '../account/two-factor';
-import type { TwoFactorGateState } from '../../hooks/useTwoFactorGate';
+import { useTwoFactorGate } from '../../hooks/useTwoFactorGate';
 import en from './en.json';
 import de from './de.json';
 
 interface TwoFactorGateProps {
-  gate: TwoFactorGateState;
+  children: React.ReactNode;
 }
 
-export function TwoFactorGate({ gate }: TwoFactorGateProps) {
+export function TwoFactorGate({ children }: TwoFactorGateProps) {
   const { t } = useTranslations({ en, de });
+  const gate = useTwoFactorGate();
+
+  if (!gate.shouldShow) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex w-full justify-center">
