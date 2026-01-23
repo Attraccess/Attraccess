@@ -1,19 +1,37 @@
 import { memo } from 'react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Spinner, Textarea } from '@heroui/react';
-import { FormFieldType, ResourceUsage } from '@attraccess/react-query-client';
+import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import { ProjectsSelect } from '../../../../../components/projectsSelect';
+import { useAuth } from '../../../../../hooks/useAuth';
 
 interface UsageNotesModalProps {
   isOpen: boolean;
   onClose: () => void;
   session: ResourceUsage | null;
+  projectLabel?: string;
+  projectPlaceholder?: string;
+  resolveProjectId?: (session: ResourceUsage) => number | null;
+  updatingSessionIds?: Record<number, boolean>;
+  onProjectChange?: (session: ResourceUsage, projectId: number | undefined) => void;
 }
 
-export const UsageNotesModal = memo(({ isOpen, onClose, session }: UsageNotesModalProps) => {
+export const UsageNotesModal = memo(
+  ({
+    isOpen,
+    onClose,
+    session,
+    projectLabel,
+    projectPlaceholder,
+    resolveProjectId,
+    updatingSessionIds,
+    onProjectChange,
+  }: UsageNotesModalProps) => {
   const { t } = useTranslations({ en, de });
+  const { user } = useAuth();
 
   if (!isOpen) return null;
 
@@ -24,6 +42,24 @@ export const UsageNotesModal = memo(({ isOpen, onClose, session }: UsageNotesMod
         <ModalBody>
           {session ? (
             <div className="space-y-4">
+              {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
+                  {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
+                    <ProjectsSelect
+                      value={resolveProjectId(session)}
+                      onValueChange={(projectId) => onProjectChange(session, projectId)}
+                      placeholder={projectPlaceholder}
+                      includeUnassignedOption
+                      unassignedLabel={projectPlaceholder}
+                      isDisabled={Boolean(updatingSessionIds?.[session.id])}
+                    />
+                  ) : (
+                    <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
+                  )}
+                </div>
+              )}
+
               <Textarea
                 labelPlacement="outside"
                 value={session.startNotes || t('noNotesProvided')}
