@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
@@ -146,14 +146,12 @@ export class TwoFactorService {
   }
 
   async assertTwoFactorForLogin(user: User, code: string | undefined): Promise<void> {
-    const [detail, policy] = await Promise.all([this.getTwoFactorDetail(user.id), this.getPolicy()]);
+    // Only validate a code if the user has already enabled 2FA.
+    // Policy enforcement for users without 2FA happens at the session layer.
+    const detail = await this.getTwoFactorDetail(user.id);
     const enabled = !!detail?.totpEnabledAt && !!detail?.totpSecret;
-    const required = this.isPolicyRequiredForUser(policy, user);
 
     if (!enabled) {
-      if (required) {
-        throw new ForbiddenException('TwoFactorSetupRequired');
-      }
       return;
     }
 

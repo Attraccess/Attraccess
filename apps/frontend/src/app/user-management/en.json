@@ -23,6 +23,7 @@
     "menu": "Settings",
     "editAllowedSignupDomains": "Edit signup domains",
     "inviteUser": "Invite user",
-    "sso": "SSO Providers"
+    "sso": "SSO Providers",
+    "twoFactorPolicy": "Two-factor policy"
   }
 }
