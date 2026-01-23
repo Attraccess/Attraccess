@@ -388,6 +388,14 @@ export interface ChangeUsernameDto {
   username: string;
 }
 
+export interface ChangeEmailDto {
+  /**
+   * The new email address
+   * @example "new.email@example.com"
+   */
+  email: string;
+}
+
 export type UserNotFoundException = object;
 
 export interface PaginatedUsersResponseDto {
@@ -2989,6 +2997,8 @@ export type ConfirmDeleteAccountData = any;
 
 export type ChangeMyUsernameData = User;
 
+export type ChangeMyEmailData = User;
+
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
@@ -3018,6 +3028,8 @@ export interface SetUserPasswordData {
 }
 
 export type ChangeUserUsernameData = User;
+
+export type ChangeUserEmailData = User;
 
 export type ChangeUserBillingFactorData = User;
 
@@ -3879,6 +3891,22 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name ChangeMyEmail
+   * @summary Change current user email address
+   * @request PATCH:/api/users/me/email
+   * @secure
+   */
+  export namespace ChangeMyEmail {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ChangeEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeMyEmailData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name GetOneUserById
    * @summary Get a user by ID
    * @request GET:/api/users/{id}
@@ -4021,6 +4049,24 @@ export namespace Users {
     export type RequestBody = ChangeUsernameDto;
     export type RequestHeaders = {};
     export type ResponseBody = ChangeUserUsernameData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ChangeUserEmail
+   * @summary Admin: Change a user's email address
+   * @request PATCH:/api/users/{id}/email
+   * @secure
+   */
+  export namespace ChangeUserEmail {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ChangeEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeUserEmailData;
   }
 
   /**
@@ -7333,6 +7379,26 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name ChangeMyEmail
+     * @summary Change current user email address
+     * @request PATCH:/api/users/me/email
+     * @secure
+     */
+    changeMyEmail: (data: ChangeEmailDto, params: RequestParams = {}) =>
+      this.request<ChangeMyEmailData, void>({
+        path: `/api/users/me/email`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name GetOneUserById
      * @summary Get a user by ID
      * @request GET:/api/users/{id}
@@ -7491,6 +7557,30 @@ export class Api<
     ) =>
       this.request<ChangeUserUsernameData, void>({
         path: `/api/users/${id}/username`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ChangeUserEmail
+     * @summary Admin: Change a user's email address
+     * @request PATCH:/api/users/{id}/email
+     * @secure
+     */
+    changeUserEmail: (
+      id: number,
+      data: ChangeEmailDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ChangeUserEmailData, void>({
+        path: `/api/users/${id}/email`,
         method: "PATCH",
         body: data,
         secure: true,

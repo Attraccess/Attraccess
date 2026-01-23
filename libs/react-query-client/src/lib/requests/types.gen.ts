@@ -222,6 +222,13 @@ export type ChangeUsernameDto = {
     username: string;
 };
 
+export type ChangeEmailDto = {
+    /**
+     * The new email address
+     */
+    email: string;
+};
+
 export type UserNotFoundException = {
     [key: string]: unknown;
 };
@@ -3017,6 +3024,12 @@ export type ChangeMyUsernameData = {
 
 export type ChangeMyUsernameResponse = User;
 
+export type ChangeMyEmailData = {
+    requestBody: ChangeEmailDto;
+};
+
+export type ChangeMyEmailResponse = User;
+
 export type GetOneUserByIdData = {
     id: number;
 };
@@ -3080,6 +3093,13 @@ export type ChangeUserUsernameData = {
 };
 
 export type ChangeUserUsernameResponse = User;
+
+export type ChangeUserEmailData = {
+    id: number;
+    requestBody: ChangeEmailDto;
+};
+
+export type ChangeUserEmailResponse = User;
 
 export type ChangeUserBillingFactorData = {
     id: number;
@@ -4471,6 +4491,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/me/email': {
+        patch: {
+            req: ChangeMyEmailData;
+            res: {
+                /**
+                 * Email changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users/{id}': {
         get: {
             req: GetOneUserByIdData;
@@ -4632,6 +4667,21 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/email': {
+        patch: {
+            req: ChangeUserEmailData;
+            res: {
+                /**
+                 * Email changed.
                  */
                 200: User;
                 /**
