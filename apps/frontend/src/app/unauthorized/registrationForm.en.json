@@ -23,5 +23,10 @@
     "message": "We have sent an activation email to {email}. Please check your inbox and click the activation link to complete your registration.",
     "closeButton": "Got it"
   },
+  "twoFactor": {
+    "title": "Set up two-factor authentication",
+    "description": "Secure your account by adding an authenticator app after you sign in.",
+    "action": "Set up 2FA after sign-in"
+  },
   "passwordConfirmationError": "The passwords do not match"
 }

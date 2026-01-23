@@ -59,14 +59,24 @@ private:
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);
     static void onSaveButtonEvent(lv_event_t *e);
+    static void onWifiDropdownEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();
+
+    void startWifiScan();
+    void populateWifiDropdown();
 
     lv_obj_t *devicePin = nullptr;
     lv_obj_t *labelForDevicePin = nullptr;
     lv_color_t labelForDevicePinDefaultColor;
 
     lv_obj_t *beeperEnabled = nullptr;
+
+    lv_obj_t *wifiSelectNetwork = nullptr;
+    bool wifiScanRequested = false;
+    bool wifiScanCompleted = false;
+    uint32_t wifiScanStartMs = 0;
+    bool wifiDropdownHasNetworks = false;
 
     lv_obj_t *createSaveButton(lv_obj_t *parent);
     lv_obj_t *createSaveContainer(lv_obj_t *parent);

@@ -4,8 +4,7 @@
  * The authentication strategy to use
  */
 export enum AuthenticationType {
-    LOCAL_PASSWORD = 'local_password',
-    SSO = 'sso'
+    LOCAL_PASSWORD = 'local_password'
 }
 
 export type CreateUserDto = {
@@ -223,6 +222,13 @@ export type ChangeUsernameDto = {
     username: string;
 };
 
+export type ChangeEmailDto = {
+    /**
+     * The new email address
+     */
+    email: string;
+};
+
 export type UserNotFoundException = {
     [key: string]: unknown;
 };
@@ -296,6 +302,55 @@ export type CreateSessionResponse = {
      * The authentication token
      */
     authToken: string;
+};
+
+/**
+ * The configured 2FA policy
+ */
+export enum TwoFactorPolicy {
+    OPTIONAL = 'optional',
+    REQUIRED_FOR_PRIVILEGED = 'required_for_privileged',
+    REQUIRED_FOR_ALL = 'required_for_all'
+}
+
+export type TwoFactorStatusDto = {
+    /**
+     * Whether TOTP is enabled for the current user
+     */
+    enabled: boolean;
+    /**
+     * Whether TOTP is required for the current user
+     */
+    required: boolean;
+    /**
+     * The configured 2FA policy
+     */
+    policy: TwoFactorPolicy;
+};
+
+export type TwoFactorSetupResponseDto = {
+    /**
+     * The shared secret for the authenticator app
+     */
+    secret: string;
+    /**
+     * The otpauth URL for QR code generation
+     */
+    otpauthUrl: string;
+};
+
+export type TwoFactorCodeDto = {
+    /**
+     * The current code from the authenticator app
+     */
+    code: string;
+};
+
+export type TwoFactorPolicyDto = {
+    /**
+     * The 2FA policy to enforce
+     */
+    policy: TwoFactorPolicy;
 };
 
 /**
@@ -651,6 +706,12 @@ export type CreateResourceDto = {
      */
     documentationUrl?: string;
     /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
+    /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
@@ -777,6 +838,12 @@ export type Resource = {
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver: boolean;
+    /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
     /**
      * When the resource was created
      */
@@ -1150,6 +1217,12 @@ export type UpdateResourceDto = {
      */
     documentationUrl?: string;
     /**
+     * Custom metadata key-value pairs configured for this resource
+     */
+    metadata?: {
+        [key: string]: unknown;
+    };
+    /**
      * Whether this resource allows overtaking by the next user without the prior user ending their session
      */
     allowTakeOver?: boolean;
@@ -1492,6 +1565,13 @@ export type EndUsageSessionDto = {
      * Form submissions associated with ending the usage session
      */
     formSubmissions?: Array<FormSubmissionRequestDto>;
+};
+
+export type UpdateUsageSessionProjectDto = {
+    /**
+     * The project to assign this usage session to. Set to null to clear the assignment.
+     */
+    projectId?: number | null;
 };
 
 export type GetResourceHistoryResponseDto = {
@@ -2944,6 +3024,12 @@ export type ChangeMyUsernameData = {
 
 export type ChangeMyUsernameResponse = User;
 
+export type ChangeMyEmailData = {
+    requestBody: ChangeEmailDto;
+};
+
+export type ChangeMyEmailResponse = User;
+
 export type GetOneUserByIdData = {
     id: number;
 };
@@ -3008,6 +3094,13 @@ export type ChangeUserUsernameData = {
 
 export type ChangeUserUsernameResponse = User;
 
+export type ChangeUserEmailData = {
+    id: number;
+    requestBody: ChangeEmailDto;
+};
+
+export type ChangeUserEmailResponse = User;
+
 export type ChangeUserBillingFactorData = {
     id: number;
     requestBody: ChangeBillingFactorDto;
@@ -3019,6 +3112,7 @@ export type CreateSessionData = {
     requestBody: {
         username?: string;
         password?: string;
+        twoFactorCode?: string;
         tokenLocation?: 'cookie' | 'body';
     };
 };
@@ -3134,6 +3228,30 @@ export type OidcLoginCallbackData = {
 };
 
 export type OidcLoginCallbackResponse = CreateSessionResponse;
+
+export type GetTwoFactorStatusResponse = TwoFactorStatusDto;
+
+export type SetupTwoFactorResponse = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type VerifyTwoFactorResponse = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = {
+    requestBody: TwoFactorCodeDto;
+};
+
+export type DisableTwoFactorResponse = unknown;
+
+export type GetTwoFactorPolicyResponse = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = {
+    requestBody: TwoFactorPolicyDto;
+};
+
+export type SetTwoFactorPolicyResponse = TwoFactorPolicyDto;
 
 export type EmailTemplateControllerPreviewMjmlData = {
     requestBody: PreviewMjmlDto;
@@ -3305,6 +3423,14 @@ export type ResourceUsageEndSessionData = {
 };
 
 export type ResourceUsageEndSessionResponse = ResourceUsage;
+
+export type ResourceUsageUpdateSessionProjectData = {
+    requestBody: UpdateUsageSessionProjectDto;
+    resourceId: number;
+    usageId: number;
+};
+
+export type ResourceUsageUpdateSessionProjectResponse = ResourceUsage;
 
 export type LockDoorData = {
     resourceId: number;
@@ -4365,6 +4491,21 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/users/me/email': {
+        patch: {
+            req: ChangeMyEmailData;
+            res: {
+                /**
+                 * Email changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/users/{id}': {
         get: {
             req: GetOneUserByIdData;
@@ -4526,6 +4667,21 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * Username changed.
+                 */
+                200: User;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/users/{id}/email': {
+        patch: {
+            req: ChangeUserEmailData;
+            res: {
+                /**
+                 * Email changed.
                  */
                 200: User;
                 /**
@@ -4761,6 +4917,91 @@ export type $OpenApiTs = {
                  * The user has been logged in
                  */
                 200: CreateSessionResponse;
+            };
+        };
+    };
+    '/api/auth/two-factor': {
+        get: {
+            res: {
+                /**
+                 * 2FA status for the current user
+                 */
+                200: TwoFactorStatusDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/setup': {
+        post: {
+            res: {
+                /**
+                 * 2FA setup details (secret and otpauth URL)
+                 */
+                200: TwoFactorSetupResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/verify': {
+        post: {
+            req: VerifyTwoFactorData;
+            res: {
+                /**
+                 * 2FA status after verification
+                 */
+                200: TwoFactorStatusDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/disable': {
+        post: {
+            req: DisableTwoFactorData;
+            res: {
+                /**
+                 * 2FA has been disabled
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/auth/two-factor/policy': {
+        get: {
+            res: {
+                /**
+                 * The configured 2FA policy
+                 */
+                200: TwoFactorPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: SetTwoFactorPolicyData;
+            res: {
+                /**
+                 * The configured 2FA policy has been updated
+                 */
+                200: TwoFactorPolicyDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
@@ -5079,6 +5320,33 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+                /**
+                 * Resource or session not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/usage/sessions/{usageId}/project': {
+        put: {
+            req: ResourceUsageUpdateSessionProjectData;
+            res: {
+                /**
+                 * Usage session project updated successfully.
+                 */
+                200: ResourceUsage;
+                /**
+                 * Bad Request - Invalid input data or session is active
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User is not authorized to update this session
+                 */
+                403: unknown;
                 /**
                  * Resource or session not found
                  */

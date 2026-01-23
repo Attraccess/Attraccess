@@ -27,7 +27,12 @@
       }
     },
     "machine": {
-      "inProgress": "In Benutzung"
+      "inProgress": "In Benutzung",
+      "project": {
+        "unassigned": "Nicht zugewiesen",
+        "updateSuccess": "Projekt aktualisiert",
+        "updateError": "Projektaktualisierung fehlgeschlagen"
+      }
     }
   },
 

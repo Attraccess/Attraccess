@@ -8,13 +8,13 @@ export class Projects1764094002706 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "temporary_project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "project_members"`);
         await queryRunner.query(`DROP TABLE "project_members"`);
         await queryRunner.query(`ALTER TABLE "temporary_project_members" RENAME TO "project_members"`);
-        await queryRunner.query(`DROP INDEX "IDX_project_invitation_pending_by_user"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_project_invitation_pending_by_user"`);
         await queryRunner.query(`CREATE TABLE "temporary_project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'))`);
         await queryRunner.query(`INSERT INTO "temporary_project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "project_invitations"`);
         await queryRunner.query(`DROP TABLE "project_invitations"`);
         await queryRunner.query(`ALTER TABLE "temporary_project_invitations" RENAME TO "project_invitations"`);
         await queryRunner.query(`CREATE INDEX "IDX_project_invitation_pending_by_user" ON "project_invitations" ("invitedUserId", "status") `);
-        await queryRunner.query(`DROP INDEX "IDX_project_invitation_pending_by_user"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_project_invitation_pending_by_user"`);
         await queryRunner.query(`CREATE TABLE "temporary_project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')))`);
         await queryRunner.query(`INSERT INTO "temporary_project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "project_members"`);
         await queryRunner.query(`DROP TABLE "project_members"`);
@@ -44,7 +44,7 @@ export class Projects1764094002706 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "temporary_project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "project_members"`);
         await queryRunner.query(`DROP TABLE "project_members"`);
         await queryRunner.query(`ALTER TABLE "temporary_project_members" RENAME TO "project_members"`);
-        await queryRunner.query(`DROP INDEX "IDX_26ead93d41194350fe5ce5dd11"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_26ead93d41194350fe5ce5dd11"`);
         await queryRunner.query(`CREATE TABLE "temporary_project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), CONSTRAINT "FK_55c8a93fcb3af8430c930e3a26a" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_fec031ecae4c834159164616812" FOREIGN KEY ("inviterId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_0cd3b1b5700b87dab2f2c4848b9" FOREIGN KEY ("invitedUserId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "project_invitations"`);
         await queryRunner.query(`DROP TABLE "project_invitations"`);
@@ -53,7 +53,7 @@ export class Projects1764094002706 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX "IDX_26ead93d41194350fe5ce5dd11"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_26ead93d41194350fe5ce5dd11"`);
         await queryRunner.query(`ALTER TABLE "project_invitations" RENAME TO "temporary_project_invitations"`);
         await queryRunner.query(`CREATE TABLE "project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'))`);
         await queryRunner.query(`INSERT INTO "project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "temporary_project_invitations"`);
@@ -67,7 +67,7 @@ export class Projects1764094002706 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "project_members" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "userId" integer NOT NULL, "role" varchar CHECK( "role" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), "joinedAt" datetime NOT NULL DEFAULT (datetime('now')))`);
         await queryRunner.query(`INSERT INTO "project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "temporary_project_members"`);
         await queryRunner.query(`DROP TABLE "temporary_project_members"`);
-        await queryRunner.query(`DROP INDEX "IDX_26ead93d41194350fe5ce5dd11"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_26ead93d41194350fe5ce5dd11"`);
         await queryRunner.query(`ALTER TABLE "project_invitations" RENAME TO "temporary_project_invitations"`);
         await queryRunner.query(`CREATE TABLE "project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'))`);
         await queryRunner.query(`INSERT INTO "project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "temporary_project_invitations"`);
@@ -89,7 +89,7 @@ export class Projects1764094002706 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "project_members"("id", "projectId", "userId", "role", "joinedAt") SELECT "id", "projectId", "userId", "role", "joinedAt" FROM "temporary_project_members"`);
         await queryRunner.query(`DROP TABLE "temporary_project_members"`);
         await queryRunner.query(`CREATE INDEX "IDX_project_invitation_pending_by_user" ON "project_invitations" ("invitedUserId", "status") `);
-        await queryRunner.query(`DROP INDEX "IDX_project_invitation_pending_by_user"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "IDX_project_invitation_pending_by_user"`);
         await queryRunner.query(`ALTER TABLE "project_invitations" RENAME TO "temporary_project_invitations"`);
         await queryRunner.query(`CREATE TABLE "project_invitations" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "projectId" integer NOT NULL, "inviterId" integer NOT NULL, "invitedUserId" integer NOT NULL, "status" varchar CHECK( "status" IN ('pending','accepted','declined','canceled') ) NOT NULL DEFAULT ('pending'), "respondedAt" datetime, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), "requestedRole" varchar CHECK( "requestedRole" IN ('viewer') ) NOT NULL DEFAULT ('viewer'), CONSTRAINT "FK_project_invitation_user" FOREIGN KEY ("invitedUserId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_project_invitation_inviter" FOREIGN KEY ("inviterId") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE NO ACTION, CONSTRAINT "FK_project_invitation_project" FOREIGN KEY ("projectId") REFERENCES "project" ("id") ON DELETE CASCADE ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "project_invitations"("id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole") SELECT "id", "projectId", "inviterId", "invitedUserId", "status", "respondedAt", "createdAt", "updatedAt", "requestedRole" FROM "temporary_project_invitations"`);
