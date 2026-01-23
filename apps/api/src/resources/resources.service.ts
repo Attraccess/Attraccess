@@ -51,6 +51,7 @@ export class ResourcesService {
       allowTakeOver: dto.allowTakeOver || false,
       type: dto.type,
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
+      metadata: dto.metadata ?? null,
     });
 
     // Save the resource first to get an ID
@@ -103,6 +104,7 @@ export class ResourcesService {
     if (dto.type !== undefined) resource.type = dto.type;
     if (dto.separateUnlockAndUnlatch !== undefined) resource.separateUnlockAndUnlatch = dto.separateUnlockAndUnlatch;
     if (dto.description !== undefined) resource.description = dto.description;
+    if (dto.metadata !== undefined) resource.metadata = dto.metadata;
 
     // Handle documentation fields
     if (dto.documentationType !== undefined) resource.documentationType = dto.documentationType;

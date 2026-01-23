@@ -1,0 +1,14 @@
+{
+  "messages": {
+    "updated": "Verification email sent"
+  },
+  "errors": {
+    "updateFailed": "Failed to update email"
+  },
+  "email": {
+    "label": "Email"
+  },
+  "actions": {
+    "save": "Save"
+  }
+}

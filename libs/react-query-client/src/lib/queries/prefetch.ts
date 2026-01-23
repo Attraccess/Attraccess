@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -56,6 +56,8 @@ export const prefetchUseAuthenticationServiceLoginWithSaml = (queryClient: Query
   providerId: string;
   redirectTo?: unknown;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceLoginWithSamlKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithSaml({ providerId, redirectTo }) });
+export const prefetchUseTwoFactorAuthenticationServiceGetTwoFactorStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorStatus() });
+export const prefetchUseTwoFactorAuthenticationServiceGetTwoFactorPolicy = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorPolicy() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
   type: EmailTemplateType;

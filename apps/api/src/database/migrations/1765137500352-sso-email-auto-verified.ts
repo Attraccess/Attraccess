@@ -27,7 +27,7 @@ export class SsoEmailAutoVerified1765137500352 implements MigrationInterface {
     // remove the SSO:OIDC prefix we added to external identifiers
     await queryRunner.query(`
       UPDATE "user"
-      SET "externalIdentifier" = SUBSTRING("externalIdentifier" FROM 10)
+      SET "externalIdentifier" = SUBSTR("externalIdentifier", 10)
       WHERE "externalIdentifier" LIKE 'SSO:OIDC:%'
     `);
   }

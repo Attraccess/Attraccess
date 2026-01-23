@@ -5,5 +5,23 @@
   },
   "profile": {
     "title": "Profil"
+  },
+  "delete": {
+    "title": "Benutzer löschen",
+    "description": "Löscht den Benutzer und anonymisiert die persönlichen Daten. Dies kann nicht rückgängig gemacht werden.",
+    "selfDisabled": "Du kannst dein eigenes Konto hier nicht löschen.",
+    "actions": {
+      "open": "Benutzer löschen",
+      "confirm": "Benutzer löschen",
+      "cancel": "Abbrechen"
+    },
+    "modal": {
+      "title": "Löschung bestätigen",
+      "description": "Möchtest du diesen Benutzer wirklich löschen? Die persönlichen Daten werden anonymisiert."
+    },
+    "success": {
+      "title": "Benutzer gelöscht",
+      "description": "{{username}} wurde gelöscht."
+    }
   }
 }

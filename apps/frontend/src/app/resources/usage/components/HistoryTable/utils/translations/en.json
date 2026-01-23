@@ -27,7 +27,12 @@
       }
     },
     "machine": {
-      "inProgress": "In Use"
+      "inProgress": "In Use",
+      "project": {
+        "unassigned": "Unassigned",
+        "updateSuccess": "Project updated",
+        "updateError": "Project update failed"
+      }
     }
   },
 

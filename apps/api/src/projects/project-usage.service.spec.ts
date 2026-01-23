@@ -1,9 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { ProjectUsageService } from './project-usage.service';
 import { Repository } from 'typeorm';
-import { BillingTransaction, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransaction, ResourceUsage, Setting } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BillingService } from '../billing/billing.service';
 import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectAccessService } from './project-access.service';
@@ -70,9 +69,7 @@ describe('ProjectUsageService', () => {
   let service: ProjectUsageService;
   let resourceUsageRepository: Repository<ResourceUsage>;
   let billingTransactionRepository: Repository<BillingTransaction>;
-  const billingService = {
-    getConfiguration: jest.fn(),
-  };
+  let settingRepository: Repository<Setting>;
   const projectAccessService = {
     getAccessOrThrow: jest.fn(),
   };
@@ -81,7 +78,6 @@ describe('ProjectUsageService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ProjectUsageService,
-        { provide: BillingService, useValue: billingService },
         {
           provide: getRepositoryToken(ResourceUsage),
           useValue: {
@@ -95,6 +91,12 @@ describe('ProjectUsageService', () => {
           },
         },
         {
+          provide: getRepositoryToken(Setting),
+          useValue: {
+            findOneBy: jest.fn(),
+          },
+        },
+        {
           provide: ProjectAccessService,
           useValue: projectAccessService,
         },
@@ -104,6 +106,7 @@ describe('ProjectUsageService', () => {
     service = moduleRef.get(ProjectUsageService);
     resourceUsageRepository = moduleRef.get(getRepositoryToken(ResourceUsage));
     billingTransactionRepository = moduleRef.get(getRepositoryToken(BillingTransaction));
+    settingRepository = moduleRef.get(getRepositoryToken(Setting));
 
     jest.resetAllMocks();
   });
@@ -161,7 +164,7 @@ describe('ProjectUsageService', () => {
 
       jest.spyOn(resourceUsageRepository, 'createQueryBuilder').mockReturnValue(usageQb as never);
       jest.spyOn(billingTransactionRepository, 'createQueryBuilder').mockReturnValue(billingQb as never);
-      billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
+      jest.spyOn(settingRepository, 'findOneBy').mockResolvedValue({ value: 'EUR' } as Setting);
 
       const result = await service.getProjectUsageStats(1, 5, {} as ProjectUsageStatsQueryDto);
 

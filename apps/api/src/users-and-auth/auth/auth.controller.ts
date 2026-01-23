@@ -33,6 +33,7 @@ export class AuthController {
       properties: {
         username: { type: 'string' },
         password: { type: 'string' },
+        twoFactorCode: { type: 'string' },
         tokenLocation: { type: 'string', enum: ['cookie', 'body'] },
       },
     },
@@ -40,7 +41,7 @@ export class AuthController {
   async createSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Body() body: { tokenLocation: 'cookie' | 'body' }
+    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string }
   ): Promise<CreateSessionResponse> {
     // Create session token using SessionService
     const sessionToken = await this.sessionService.createSession(request.user, {

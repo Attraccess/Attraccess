@@ -17,7 +17,7 @@
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "not_dependsOn": ["copy-attractap-firmware-into-assets"],
+      "dependsOn": ["copy-attractap-firmware-into-assets"],
       "inputs": [
         "production",
         "^production",
@@ -41,6 +41,7 @@
     "swagger-build": {
       "executor": "nx:run-commands",
       "cache": true,
+      "dependsOn": ["^build"],
       "inputs": ["swagger"],
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger"],
       "options": {
@@ -131,7 +132,7 @@
       "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": ["typeorm -d dist/apps/migrations/main.js migration:generate {args.name}"]
+        "commands": ["typeorm -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/migrations/{args.name}"]
       }
     },
     "migrations-run": {

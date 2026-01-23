@@ -24,6 +24,7 @@ import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
 import { AcceptInvitation } from './accept-invitation';
+import { TwoFactorGate } from './two-factor-gate';
 
 function useRoutesWithAuthElements(routes: RouteConfig[]) {
   const { user } = useAuth();
@@ -115,29 +116,31 @@ function AppContent() {
   const routesWithAuthElements = useRoutesWithAuthElements(allRoutes);
 
   return (
-    <Routes>
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route
-        path="/accept-invitation"
-        element={
-          <UnauthorizedLayout>
-            <AcceptInvitation />
-          </UnauthorizedLayout>
-        }
-      />
-      <Route
-        path="/reset-password"
-        element={
-          <UnauthorizedLayout>
-            <ResetPassword />
-          </UnauthorizedLayout>
-        }
-      />
+    <TwoFactorGate>
+      <Routes>
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route
+          path="/accept-invitation"
+          element={
+            <UnauthorizedLayout>
+              <AcceptInvitation />
+            </UnauthorizedLayout>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <UnauthorizedLayout>
+              <ResetPassword />
+            </UnauthorizedLayout>
+          }
+        />
 
-      {routesWithAuthElements}
+        {routesWithAuthElements}
 
-      {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
-    </Routes>
+        {!isAuthenticated && <Route path="*" element={<Unauthorized />} />}
+      </Routes>
+    </TwoFactorGate>
   );
 }
 

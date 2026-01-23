@@ -4,6 +4,7 @@ import { ResourceUsageService } from './resourceUsage.service';
 import { ResourceUsage } from '@attraccess/database-entities';
 import { StartUsageSessionDto } from './dtos/startUsageSession.dto';
 import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
+import { UpdateUsageSessionProjectDto } from './dtos/updateUsageSessionProject.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { GetResourceHistoryQueryDto } from './dtos/getResourceHistoryQuery.dto';
 import { GetResourceHistoryResponseDto } from './dtos/GetResourceHistoryResponse.dto';
@@ -69,6 +70,42 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     return this.resourceUsageService.endSession(resourceId, req.user, dto);
+  }
+
+  @Put('sessions/:usageId/project')
+  @Auth()
+  @ApiOperation({
+    summary: 'Update usage session project assignment',
+    operationId: 'resourceUsageUpdateSessionProject',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Usage session project updated successfully.',
+    type: ResourceUsage,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid input data or session is active',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User is not authorized to update this session',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource or session not found',
+  })
+  async updateSessionProject(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Body() dto: UpdateUsageSessionProjectDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceUsage> {
+    return this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto);
   }
 
   @Post('lock')

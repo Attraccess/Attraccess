@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Input } from '@heroui/react';
+import { Alert, Input } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -127,6 +127,13 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
     [canSubmit, createUserMutate, password, trimmedEmail, trimmedUsername],
   );
 
+  const markTwoFactorSetupIntent = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    sessionStorage.setItem('twoFactorSetupIntent', 'true');
+  }, []);
+
   return (
     <>
       <div>
@@ -152,7 +159,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           value={username}
           onValueChange={setUsername}
           required
-          variant="underlined"
+
           data-cy="registration-form-username-input"
           isRequired
         />
@@ -163,7 +170,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           type="email"
           label={t('email')}
           required
-          variant="underlined"
+
           data-cy="registration-form-email-input"
           isRequired
           value={email}
@@ -175,7 +182,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           name="password"
           label={t('password')}
           required
-          variant="underlined"
           data-cy="registration-form-password-input"
           autoComplete="new-password"
           isRequired
@@ -194,7 +200,6 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
           name="password_confirmation"
           label={t('passwordConfirmation')}
           required
-          variant="underlined"
           data-cy="registration-form-password-confirmation-input"
           autoComplete="new-password"
           isRequired
@@ -240,15 +245,26 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
                 <p className="text-center text-gray-500 dark:text-gray-400">
                   {t('success.message').replace('{email}', registeredEmail)}
                 </p>
+                <Alert color="primary" variant="flat" title={t('twoFactor.title')} description={t('twoFactor.description')} />
               </ModalBody>
               <ModalFooter>
                 <Button
-                  color="primary"
-                  fullWidth
+                  variant="light"
                   onPress={onClose}
                   data-cy="registration-form-success-modal-close-button"
                 >
                   {t('success.closeButton')}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={() => {
+                    markTwoFactorSetupIntent();
+                    onClose();
+                    onHasAccount();
+                  }}
+                  data-cy="registration-form-success-modal-two-factor-button"
+                >
+                  {t('twoFactor.action')}
                 </Button>
               </ModalFooter>
             </>

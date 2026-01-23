@@ -133,12 +133,20 @@ export enum EmailTemplateType {
   PasswordChanged = "password-changed",
   ResourceUsageBillingTransactionSummary = "resource-usage-billing-transaction-summary",
   ProjectInvitation = "project-invitation",
+  DeleteAccountConfirmation = "delete-account-confirmation",
 }
 
 /** The type of the provider */
 export enum SSOProviderType {
   OIDC = "OIDC",
   SAML = "SAML",
+}
+
+/** The configured 2FA policy */
+export enum TwoFactorPolicy {
+  Optional = "optional",
+  RequiredForPrivileged = "required_for_privileged",
+  RequiredForAll = "required_for_all",
 }
 
 export enum PermissionFilter {
@@ -150,7 +158,6 @@ export enum PermissionFilter {
 /** The authentication strategy to use */
 export enum AuthenticationType {
   LocalPassword = "local_password",
-  Sso = "sso",
 }
 
 export interface CreateUserDto {
@@ -230,6 +237,11 @@ export interface User {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * When the user was soft-deleted
+   * @format date-time
+   */
+  deletedAt?: string;
   /**
    * The external (origin) identifier of the user, if the user is authenticated via SSO
    * @example "1234567890"
@@ -356,12 +368,33 @@ export interface ChangePasswordDto {
   token: string;
 }
 
+export interface DeleteAccountConfirmDto {
+  /**
+   * The delete account confirmation token
+   * @example "1234567890"
+   */
+  token: string;
+  /**
+   * The email to delete
+   * @example "john.doe@example.com"
+   */
+  email: string;
+}
+
 export interface ChangeUsernameDto {
   /**
    * The new username
    * @example "new_handle"
    */
   username: string;
+}
+
+export interface ChangeEmailDto {
+  /**
+   * The new email address
+   * @example "new.email@example.com"
+   */
+  email: string;
 }
 
 export type UserNotFoundException = object;
@@ -436,6 +469,47 @@ export interface CreateSessionResponse {
    * @example "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
    */
   authToken: string;
+}
+
+export interface TwoFactorStatusDto {
+  /**
+   * Whether TOTP is enabled for the current user
+   * @example true
+   */
+  enabled: boolean;
+  /**
+   * Whether TOTP is required for the current user
+   * @example false
+   */
+  required: boolean;
+  /** The configured 2FA policy */
+  policy: TwoFactorPolicy;
+}
+
+export interface TwoFactorSetupResponseDto {
+  /**
+   * The shared secret for the authenticator app
+   * @example "JBSWY3DPEHPK3PXP"
+   */
+  secret: string;
+  /**
+   * The otpauth URL for QR code generation
+   * @example "otpauth://totp/Attraccess:testuser?secret=JBSWY3DPEHPK3PXP&issuer=Attraccess"
+   */
+  otpauthUrl: string;
+}
+
+export interface TwoFactorCodeDto {
+  /**
+   * The current code from the authenticator app
+   * @example "123456"
+   */
+  code: string;
+}
+
+export interface TwoFactorPolicyDto {
+  /** The 2FA policy to enforce */
+  policy: TwoFactorPolicy;
 }
 
 export interface SSOProviderOIDCConfiguration {
@@ -947,6 +1021,11 @@ export interface CreateResourceDto {
    */
   documentationUrl?: string;
   /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
+  /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @default false
    * @example false
@@ -1056,6 +1135,11 @@ export interface Resource {
    * @example false
    */
   allowTakeOver: boolean;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
   /**
    * When the resource was created
    * @format date-time
@@ -1341,6 +1425,11 @@ export interface UpdateResourceDto {
    * @example "https://example.com/documentation"
    */
   documentationUrl?: string;
+  /**
+   * Custom metadata key-value pairs configured for this resource
+   * @example {"location":"lab-1","template":"door-access"}
+   */
+  metadata?: Record<string, any>;
   /**
    * Whether this resource allows overtaking by the next user without the prior user ending their session
    * @example false
@@ -1696,6 +1785,14 @@ export interface EndUsageSessionDto {
   endTime?: string;
   /** Form submissions associated with ending the usage session */
   formSubmissions?: FormSubmissionRequestDto[];
+}
+
+export interface UpdateUsageSessionProjectDto {
+  /**
+   * The project to assign this usage session to. Set to null to clear the assignment.
+   * @example 35
+   */
+  projectId?: number | null;
 }
 
 export interface GetResourceHistoryResponseDto {
@@ -3045,11 +3142,19 @@ export type ChangePasswordViaResetTokenData = any;
 
 export type GetCurrentData = User;
 
+export type RequestDeleteAccountData = any;
+
+export type ConfirmDeleteAccountData = any;
+
 export type ChangeMyUsernameData = User;
+
+export type ChangeMyEmailData = User;
 
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
+
+export type DeleteUserData = any;
 
 export type UpdatePermissionsData = User;
 
@@ -3075,11 +3180,14 @@ export interface SetUserPasswordData {
 
 export type ChangeUserUsernameData = User;
 
+export type ChangeUserEmailData = User;
+
 export type ChangeUserBillingFactorData = User;
 
 export interface CreateSessionPayload {
   username?: string;
   password?: string;
+  twoFactorCode?: string;
   tokenLocation?: "cookie" | "body";
 }
 
@@ -3092,6 +3200,18 @@ export interface RefreshSessionParams {
 export type RefreshSessionData = CreateSessionResponse;
 
 export type EndSessionData = object;
+
+export type GetTwoFactorStatusData = TwoFactorStatusDto;
+
+export type SetupTwoFactorData = TwoFactorSetupResponseDto;
+
+export type VerifyTwoFactorData = TwoFactorStatusDto;
+
+export type DisableTwoFactorData = any;
+
+export type GetTwoFactorPolicyData = TwoFactorPolicyDto;
+
+export type SetTwoFactorPolicyData = TwoFactorPolicyDto;
 
 export type GetAllSsoProvidersData = SSOProvider[];
 
@@ -3261,6 +3381,8 @@ export type ResourceGroupIntroducersRevokeData = any;
 export type ResourceUsageStartSessionData = ResourceUsage;
 
 export type ResourceUsageEndSessionData = ResourceUsage;
+
+export type ResourceUsageUpdateSessionProjectData = ResourceUsage;
 
 export type LockDoorData = ResourceUsage;
 
@@ -3891,6 +4013,37 @@ export namespace Users {
   /**
    * No description
    * @tags Users
+   * @name RequestDeleteAccount
+   * @summary Request account deletion email
+   * @request POST:/api/users/me/delete-request
+   * @secure
+   */
+  export namespace RequestDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = RequestDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ConfirmDeleteAccount
+   * @summary Confirm account deletion via email token
+   * @request POST:/api/users/me/delete-confirm
+   */
+  export namespace ConfirmDeleteAccount {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = DeleteAccountConfirmDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ConfirmDeleteAccountData;
+  }
+
+  /**
+   * No description
+   * @tags Users
    * @name ChangeMyUsername
    * @summary Change current user username (limit once per day)
    * @request PATCH:/api/users/me/username
@@ -3902,6 +4055,22 @@ export namespace Users {
     export type RequestBody = ChangeUsernameDto;
     export type RequestHeaders = {};
     export type ResponseBody = ChangeMyUsernameData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ChangeMyEmail
+   * @summary Change current user email address
+   * @request PATCH:/api/users/me/email
+   * @secure
+   */
+  export namespace ChangeMyEmail {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ChangeEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeMyEmailData;
   }
 
   /**
@@ -3920,6 +4089,24 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetOneUserByIdData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name DeleteUser
+   * @summary Delete a user
+   * @request DELETE:/api/users/{id}
+   * @secure
+   */
+  export namespace DeleteUser {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteUserData;
   }
 
   /**
@@ -4031,6 +4218,24 @@ export namespace Users {
     export type RequestBody = ChangeUsernameDto;
     export type RequestHeaders = {};
     export type ResponseBody = ChangeUserUsernameData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ChangeUserEmail
+   * @summary Admin: Change a user's email address
+   * @request PATCH:/api/users/{id}/email
+   * @secure
+   */
+  export namespace ChangeUserEmail {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = ChangeEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ChangeUserEmailData;
   }
 
   /**
@@ -4332,6 +4537,104 @@ export namespace Authentication {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = SamlLoginCallbackData;
+  }
+}
+
+export namespace TwoFactorAuthentication {
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorStatus
+   * @summary Get 2FA status for the current user
+   * @request GET:/api/auth/two-factor
+   * @secure
+   */
+  export namespace GetTwoFactorStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetupTwoFactor
+   * @summary Start 2FA setup for the current user
+   * @request POST:/api/auth/two-factor/setup
+   * @secure
+   */
+  export namespace SetupTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetupTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name VerifyTwoFactor
+   * @summary Verify and enable 2FA for the current user
+   * @request POST:/api/auth/two-factor/verify
+   * @secure
+   */
+  export namespace VerifyTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = VerifyTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name DisableTwoFactor
+   * @summary Disable 2FA for the current user
+   * @request POST:/api/auth/two-factor/disable
+   * @secure
+   */
+  export namespace DisableTwoFactor {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorCodeDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = DisableTwoFactorData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name GetTwoFactorPolicy
+   * @summary Get the configured 2FA policy
+   * @request GET:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace GetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetTwoFactorPolicyData;
+  }
+
+  /**
+   * No description
+   * @tags Two-Factor Authentication
+   * @name SetTwoFactorPolicy
+   * @summary Set the configured 2FA policy
+   * @request POST:/api/auth/two-factor/policy
+   * @secure
+   */
+  export namespace SetTwoFactorPolicy {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TwoFactorPolicyDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = SetTwoFactorPolicyData;
   }
 }
 
@@ -4729,6 +5032,25 @@ export namespace Resources {
     export type RequestBody = EndUsageSessionDto;
     export type RequestHeaders = {};
     export type ResponseBody = ResourceUsageEndSessionData;
+  }
+
+  /**
+   * No description
+   * @tags Resources
+   * @name ResourceUsageUpdateSessionProject
+   * @summary Update usage session project assignment
+   * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+   * @secure
+   */
+  export namespace ResourceUsageUpdateSessionProject {
+    export type RequestParams = {
+      resourceId: number;
+      usageId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateUsageSessionProjectDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResourceUsageUpdateSessionProjectData;
   }
 
   /**
@@ -6916,7 +7238,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -7211,6 +7533,43 @@ export class Api<
      * No description
      *
      * @tags Users
+     * @name RequestDeleteAccount
+     * @summary Request account deletion email
+     * @request POST:/api/users/me/delete-request
+     * @secure
+     */
+    requestDeleteAccount: (params: RequestParams = {}) =>
+      this.request<RequestDeleteAccountData, void>({
+        path: `/api/users/me/delete-request`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ConfirmDeleteAccount
+     * @summary Confirm account deletion via email token
+     * @request POST:/api/users/me/delete-confirm
+     */
+    confirmDeleteAccount: (
+      data: DeleteAccountConfirmDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ConfirmDeleteAccountData, void>({
+        path: `/api/users/me/delete-confirm`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
      * @name ChangeMyUsername
      * @summary Change current user username (limit once per day)
      * @request PATCH:/api/users/me/username
@@ -7219,6 +7578,26 @@ export class Api<
     changeMyUsername: (data: ChangeUsernameDto, params: RequestParams = {}) =>
       this.request<ChangeMyUsernameData, void>({
         path: `/api/users/me/username`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ChangeMyEmail
+     * @summary Change current user email address
+     * @request PATCH:/api/users/me/email
+     * @secure
+     */
+    changeMyEmail: (data: ChangeEmailDto, params: RequestParams = {}) =>
+      this.request<ChangeMyEmailData, void>({
+        path: `/api/users/me/email`,
         method: "PATCH",
         body: data,
         secure: true,
@@ -7242,6 +7621,23 @@ export class Api<
         method: "GET",
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name DeleteUser
+     * @summary Delete a user
+     * @request DELETE:/api/users/{id}
+     * @secure
+     */
+    deleteUser: (id: number, params: RequestParams = {}) =>
+      this.request<DeleteUserData, void>({
+        path: `/api/users/${id}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
 
@@ -7372,6 +7768,30 @@ export class Api<
     ) =>
       this.request<ChangeUserUsernameData, void>({
         path: `/api/users/${id}/username`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ChangeUserEmail
+     * @summary Admin: Change a user's email address
+     * @request PATCH:/api/users/{id}/email
+     * @secure
+     */
+    changeUserEmail: (
+      id: number,
+      data: ChangeEmailDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ChangeUserEmailData, void>({
+        path: `/api/users/${id}/email`,
         method: "PATCH",
         body: data,
         secure: true,
@@ -7695,6 +8115,123 @@ export class Api<
         path: `/api/auth/sso/SAML/${providerId}/callback`,
         method: "POST",
         query: query,
+        format: "json",
+        ...params,
+      }),
+  };
+  twoFactorAuthentication = {
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorStatus
+     * @summary Get 2FA status for the current user
+     * @request GET:/api/auth/two-factor
+     * @secure
+     */
+    getTwoFactorStatus: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorStatusData, void>({
+        path: `/api/auth/two-factor`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetupTwoFactor
+     * @summary Start 2FA setup for the current user
+     * @request POST:/api/auth/two-factor/setup
+     * @secure
+     */
+    setupTwoFactor: (params: RequestParams = {}) =>
+      this.request<SetupTwoFactorData, void>({
+        path: `/api/auth/two-factor/setup`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name VerifyTwoFactor
+     * @summary Verify and enable 2FA for the current user
+     * @request POST:/api/auth/two-factor/verify
+     * @secure
+     */
+    verifyTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<VerifyTwoFactorData, void>({
+        path: `/api/auth/two-factor/verify`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name DisableTwoFactor
+     * @summary Disable 2FA for the current user
+     * @request POST:/api/auth/two-factor/disable
+     * @secure
+     */
+    disableTwoFactor: (data: TwoFactorCodeDto, params: RequestParams = {}) =>
+      this.request<DisableTwoFactorData, void>({
+        path: `/api/auth/two-factor/disable`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name GetTwoFactorPolicy
+     * @summary Get the configured 2FA policy
+     * @request GET:/api/auth/two-factor/policy
+     * @secure
+     */
+    getTwoFactorPolicy: (params: RequestParams = {}) =>
+      this.request<GetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Two-Factor Authentication
+     * @name SetTwoFactorPolicy
+     * @summary Set the configured 2FA policy
+     * @request POST:/api/auth/two-factor/policy
+     * @secure
+     */
+    setTwoFactorPolicy: (
+      data: TwoFactorPolicyDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SetTwoFactorPolicyData, void>({
+        path: `/api/auth/two-factor/policy`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -8118,6 +8655,31 @@ export class Api<
     ) =>
       this.request<ResourceUsageEndSessionData, void>({
         path: `/api/resources/${resourceId}/usage/end`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Resources
+     * @name ResourceUsageUpdateSessionProject
+     * @summary Update usage session project assignment
+     * @request PUT:/api/resources/{resourceId}/usage/sessions/{usageId}/project
+     * @secure
+     */
+    resourceUsageUpdateSessionProject: (
+      resourceId: number,
+      usageId: number,
+      data: UpdateUsageSessionProjectDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResourceUsageUpdateSessionProjectData, void>({
+        path: `/api/resources/${resourceId}/usage/sessions/${usageId}/project`,
         method: "PUT",
         body: data,
         secure: true,
