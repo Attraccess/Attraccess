@@ -15,25 +15,29 @@ import {
   UseFilters,
   Logger,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthGuard } from '@nestjs/passport';
-import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProvider, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from '../auth.types';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
 import { SSOService } from './sso.service';
-import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
 import { SSOLinkTokenService } from './link-token.service';
+import { timingSafeEqual } from 'crypto';
+import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
+import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 export class SSOController {
@@ -281,6 +285,139 @@ export class SSOController {
     return response.json();
   }
 
+  @Post(`/${SSOProviderType.OIDC}/:providerId/logout`)
+  @ApiOperation({ summary: 'SSO-initiated logout', operationId: 'ssoOidcLogout' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO client secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO client secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningUserDto })
+  @ApiResponse({
+    status: 200,
+    description: 'All user sessions have been revoked',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async oidcLogout(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningUserDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
+    await this.sessionService.revokeAllUserSessions(user.id);
+
+    return { OK: true };
+  }
+
+  @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
+  @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO client secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO client secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningUserDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been deleted',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async oidcDeleteUser(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningUserDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
+    await this.usersService.deleteOne(user.id);
+
+    return { OK: true };
+  }
+
+  @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
+  @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO client secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO client secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningPermissionsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The user permissions have been updated',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async oidcUpdatePermissions(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningPermissionsDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
+    const updates = this.extractPermissionUpdates(body);
+    if (Object.keys(updates).length > 0) {
+      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
+      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
+    }
+
+    return { OK: true };
+  }
+
   @Get(`/${SSOProviderType.OIDC}/:providerId/login`)
   @ApiOperation({
     summary: 'Login with OIDC',
@@ -373,5 +510,121 @@ export class SSOController {
     }
 
     return auth;
+  }
+
+  private parseProviderId(rawProviderId: string): number {
+    const providerId = parseInt(rawProviderId, 10);
+    if (Number.isNaN(providerId)) {
+      throw new InvalidSSOProviderIdException();
+    }
+    return providerId;
+  }
+
+  private extractProvisioningToken(request: Request): string | null {
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      return authHeader.substring(7).trim();
+    }
+
+    const apiKeyHeader = request.headers['x-api-key'];
+    if (Array.isArray(apiKeyHeader)) {
+      return apiKeyHeader.length > 0 ? apiKeyHeader[0].trim() : null;
+    }
+    if (typeof apiKeyHeader === 'string') {
+      return apiKeyHeader.trim();
+    }
+
+    return null;
+  }
+
+  private assertProvisioningAuthorized(provider: SSOProvider, request: Request): void {
+    const secret = provider.oidcConfiguration?.clientSecret;
+    if (!secret) {
+      throw new UnauthorizedException('SSO_CLIENT_SECRET_NOT_CONFIGURED');
+    }
+
+    const provided = this.extractProvisioningToken(request);
+    if (!provided) {
+      throw new UnauthorizedException('SSO_PROVISIONING_TOKEN_REQUIRED');
+    }
+
+    const expectedBuffer = Buffer.from(secret);
+    const actualBuffer = Buffer.from(provided);
+    if (expectedBuffer.length !== actualBuffer.length || !timingSafeEqual(expectedBuffer, actualBuffer)) {
+      throw new UnauthorizedException('SSO_PROVISIONING_UNAUTHORIZED');
+    }
+  }
+
+  private async loadProvisioningProvider(type: SSOProviderType, providerId: number): Promise<SSOProvider> {
+    const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(type, providerId);
+    if (!provider) {
+      throw new SSOProviderNotFoundException();
+    }
+
+    if (type === SSOProviderType.OIDC && !provider.oidcConfiguration) {
+      throw new SSOProviderNotFoundException();
+    }
+
+    return provider;
+  }
+
+  private async resolveProvisioningUser(
+    providerType: SSOProviderType,
+    providerId: number,
+    payload: SSOProvisioningUserDto,
+  ) {
+    const subject = payload.subject?.trim();
+    const email = payload.email?.trim();
+
+    if (!subject && !email) {
+      throw new BadRequestException('SSO_SUBJECT_OR_EMAIL_REQUIRED');
+    }
+
+    let user = subject ? await this.usersService.findOneBySSO(providerType, providerId, subject) : null;
+
+    if (!user && email) {
+      user = await this.usersService.findOne({ email }, ['authenticationDetails']);
+      if (user) {
+        const isMatchingProvider = user.authenticationDetails?.some(
+          (detail) =>
+            detail.type === AuthenticationType.SSO &&
+            detail.providerType === providerType &&
+            detail.providerId === providerId,
+        );
+        if (!isMatchingProvider) {
+          user = null;
+        }
+      }
+    }
+
+    if (!user) {
+      throw new NotFoundException('SSO_USER_NOT_FOUND');
+    }
+
+    return user;
+  }
+
+  private extractPermissionUpdates(payload: SSOProvisioningPermissionsDto): Partial<SystemPermissions> {
+    const updates: Partial<SystemPermissions> = {};
+
+    if (payload.canManageResources !== undefined) {
+      updates.canManageResources = payload.canManageResources;
+    }
+    if (payload.canManageSystemConfiguration !== undefined) {
+      updates.canManageSystemConfiguration = payload.canManageSystemConfiguration;
+    }
+    if (payload.canManageUsers !== undefined) {
+      updates.canManageUsers = payload.canManageUsers;
+    }
+    if (payload.canManageBilling !== undefined) {
+      updates.canManageBilling = payload.canManageBilling;
+    }
+
+    return updates as {
+      canManageResources?: boolean;
+      canManageSystemConfiguration?: boolean;
+      canManageUsers?: boolean;
+      canManageBilling?: boolean;
+    };
   }
 }

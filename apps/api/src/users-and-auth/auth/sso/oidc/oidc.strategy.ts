@@ -2,7 +2,13 @@ import { Profile, Strategy } from 'passport-openidconnect';
 import { get } from 'lodash-es';
 import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import {
+  AuthenticationType,
+  SSOProviderOIDCConfiguration,
+  SSOProviderType,
+  SystemPermissions,
+  User,
+} from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
@@ -12,6 +18,12 @@ import { AuthService } from '../../auth.service';
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
   private readonly config: SSOProviderOIDCConfiguration;
+  private readonly permissionKeyMap: Record<string, keyof SystemPermissions> = {
+    canmanageresources: 'canManageResources',
+    canmanagesystemconfiguration: 'canManageSystemConfiguration',
+    canmanageusers: 'canManageUsers',
+    canmanagebilling: 'canManageBilling',
+  };
 
   constructor(
     private moduleRef: ModuleRef,
@@ -89,7 +101,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
 
     if (user) {
       this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return user;
+      return await this.syncPermissionsFromClaims(user, claimSources, usersService);
     }
 
     // Step 2: No user found by external ID, check by email
@@ -139,6 +151,116 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     });
 
     this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
-    return user;
+    return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+  }
+
+  private normalizePermissionToken(token: string): string {
+    return token.toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
+    const paths = ['systemPermissions', 'permissions', 'roles', 'groups', 'realm_access.roles'];
+    if (this.config.clientId) {
+      paths.push(`resource_access.${this.config.clientId}.roles`);
+    }
+
+    const values: unknown[] = [];
+    for (const path of paths) {
+      for (const source of claimSources) {
+        const value = get(source, path);
+        if (value !== undefined && value !== null) {
+          values.push(value);
+        }
+      }
+    }
+
+    return values;
+  }
+
+  private resolvePermissionUpdates(claimSources: unknown[]): Partial<SystemPermissions> {
+    const updates: Partial<SystemPermissions> = {};
+    const roleNames: string[] = [];
+
+    for (const value of this.getPermissionClaimValues(claimSources)) {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') {
+            roleNames.push(entry);
+          }
+        }
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        roleNames.push(value);
+        continue;
+      }
+
+      if (value && typeof value === 'object') {
+        for (const [key, entry] of Object.entries(value)) {
+          const normalizedKey = this.normalizePermissionToken(key);
+          const permissionKey = this.permissionKeyMap[normalizedKey];
+          if (permissionKey && typeof entry === 'boolean') {
+            updates[permissionKey] = entry;
+            continue;
+          }
+
+          if (Array.isArray(entry)) {
+            for (const item of entry) {
+              if (typeof item === 'string') {
+                roleNames.push(item);
+              }
+            }
+            continue;
+          }
+
+          if (typeof entry === 'string') {
+            roleNames.push(entry);
+          }
+        }
+      }
+    }
+
+    for (const roleName of roleNames) {
+      const normalized = this.normalizePermissionToken(roleName);
+      const permissionKey = this.permissionKeyMap[normalized];
+      if (permissionKey && updates[permissionKey] !== false) {
+        updates[permissionKey] = true;
+      }
+    }
+
+    return updates;
+  }
+
+  private buildDefaultPermissions(): SystemPermissions {
+    return {
+      canManageResources: false,
+      canManageSystemConfiguration: false,
+      canManageUsers: false,
+      canManageBilling: false,
+    };
+  }
+
+  private async syncPermissionsFromClaims(
+    user: User,
+    claimSources: unknown[],
+    usersService: UsersService,
+  ): Promise<User> {
+    const updates = this.resolvePermissionUpdates(claimSources);
+    if (Object.keys(updates).length === 0) {
+      return user;
+    }
+
+    const current = user.systemPermissions ?? this.buildDefaultPermissions();
+    const merged = { ...current, ...updates };
+    const shouldUpdate = Object.keys(updates).some(
+      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
+    );
+    if (!shouldUpdate) {
+      return user;
+    }
+
+    this.logger.debug(`Updating permissions for user ${user.id} from SSO claims`);
+    return await usersService.updateOne(user.id, { systemPermissions: merged });
   }
 }
