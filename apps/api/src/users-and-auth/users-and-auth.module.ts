@@ -71,6 +71,7 @@ import { TwoFactorService } from './auth/two-factor.service';
     CookieConfigService,
     SSOOIDCGuard,
     SSOSamlGuard,
+    SSOSamlStrategy,
     SSOLinkTokenService,
     AccountLinkingExceptionFilter,
     {
@@ -93,29 +94,6 @@ import { TwoFactorService } from './auth/two-factor.service';
         const callbackURL = appConfig.ATTRACCESS_FRONTEND_URL + '/api/sso/OIDC/callback';
 
         return new SSOOIDCStrategy(moduleRef, config, callbackURL);
-      },
-      inject: [ModuleRef, ConfigService],
-    },
-    {
-      provide: SSOSamlStrategy,
-      useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {
-        const config = new SSOProviderSAMLConfiguration();
-        config.entryPoint = 'https://placeholder';
-        config.issuer = 'placeholder';
-        config.certificate = 'PLACEHOLDER_CERT';
-        config.wantAssertionsSigned = false;
-        config.wantAuthnResponseSigned = true;
-        config.forceAuthn = false;
-        config.signRequest = false;
-        config.ssoProviderId = 0;
-
-        const appConfig = configService.get<AppConfigType>('app');
-        if (!appConfig) {
-          throw new Error("App configuration ('app') not found.");
-        }
-        const callbackURL = appConfig.ATTRACCESS_FRONTEND_URL + '/api/sso/SAML/callback';
-
-        return new SSOSamlStrategy(moduleRef, config, callbackURL);
       },
       inject: [ModuleRef, ConfigService],
     },

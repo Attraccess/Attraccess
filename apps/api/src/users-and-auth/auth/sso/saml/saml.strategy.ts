@@ -1,57 +1,48 @@
 import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, Profile as SamlProfile, PassportSamlConfig } from '@node-saml/passport-saml';
+import {
+  Strategy,
+  Profile as SamlProfile,
+  PassportSamlConfig,
+  MultiSamlStrategy,
+} from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { UsersService } from '../../../users/users.service';
 import { SSOProviderSAMLConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { EncryptionService } from '../../../../encryption/encryption.service';
+import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 
-type StrategyCtor = new (options: PassportSamlConfig) => Strategy;
+type StrategyCtor = new (...args: any[]) => Strategy;
+type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
 
 @Injectable()
-export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as StrategyCtor, 'sso-saml') {
+export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unknown as StrategyCtor, 'sso-saml') {
   private readonly logger = new Logger(SSOSamlStrategy.name);
-  private readonly config: SSOProviderSAMLConfiguration;
 
-  constructor(
-    private readonly moduleRef: ModuleRef,
-    config: SSOProviderSAMLConfiguration,
-    callbackUrl: string,
-  ) {
+  constructor(private readonly moduleRef: ModuleRef) {
     const bootstrapLogger = new Logger(SSOSamlStrategy.name);
-    const signingPrivateKey = SSOSamlStrategy.decryptSigningKey(
-      moduleRef,
-      config.spSigningKeyEncrypted,
-      bootstrapLogger,
-    );
-    const signingCertificatePem = config.spSigningCertificate
-      ? SSOSamlStrategy.toPem(config.spSigningCertificate)
-      : undefined;
+    const getSamlOptions = (req: SSOSamlRequest, done: SamlOptionsCallback) => {
+      const requestOptions = req?.ssoSamlOptions;
+      if (!requestOptions?.samlConfiguration) {
+        bootstrapLogger.warn('Missing SAML request options; ensure SSOSamlGuard runs before AuthGuard.');
+        return done(new BadRequestException('Missing SAML configuration') as unknown as Error);
+      }
+
+      try {
+        const samlOptions = SSOSamlStrategy.buildPassportConfig(moduleRef, requestOptions, bootstrapLogger);
+        return done(null, samlOptions);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        bootstrapLogger.error(`Failed to build SAML options: ${reason}`);
+        return done(error instanceof Error ? error : new Error(reason));
+      }
+    };
 
     super({
-      entryPoint: config.entryPoint,
-      issuer: config.issuer,
-      callbackUrl,
-      idpCert: SSOSamlStrategy.toPem(config.certificate),
-      audience: config.audience ?? undefined,
-      wantAssertionsSigned: config.wantAssertionsSigned,
-      wantAuthnResponseSigned: config.wantAuthnResponseSigned,
-      forceAuthn: config.forceAuthn,
-      identifierFormat: null,
-      disableRequestedAuthnContext: false,
-      privateKey: signingPrivateKey,
-    });
-
-    this.config = config;
-
-    if (config.signRequest && (!signingPrivateKey || !signingCertificatePem)) {
-      this.logger.warn(
-        'SAML request signing is enabled but signing materials are missing. AuthnRequests will be sent unsigned.',
-      );
-    }
-
-    this.logger.log(`Initialized SAML strategy with issuer ${config.issuer} and callback ${callbackUrl}`);
+      passReqToCallback: true,
+      getSamlOptions,
+    } as unknown as PassportSamlConfig);
   }
 
   private static toPem(cert: string): string {
@@ -86,7 +77,39 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
     }
   }
 
-  private resolveEmail(profile: SamlProfile): string | undefined {
+  private static buildPassportConfig(
+    moduleRef: ModuleRef,
+    requestOptions: SSOSamlRequestOptions,
+    logger: Logger,
+  ): PassportSamlConfig {
+    const config = requestOptions.samlConfiguration;
+    const signingPrivateKey = SSOSamlStrategy.decryptSigningKey(moduleRef, config.spSigningKeyEncrypted, logger);
+    const signingCertificatePem = config.spSigningCertificate
+      ? SSOSamlStrategy.toPem(config.spSigningCertificate)
+      : undefined;
+
+    if (config.signRequest && (!signingPrivateKey || !signingCertificatePem)) {
+      logger.warn(
+        'SAML request signing is enabled but signing materials are missing. AuthnRequests will be sent unsigned.',
+      );
+    }
+
+    return {
+      entryPoint: config.entryPoint,
+      issuer: config.issuer,
+      callbackUrl: requestOptions.callbackUrl,
+      idpCert: SSOSamlStrategy.toPem(config.certificate),
+      audience: config.audience ?? undefined,
+      wantAssertionsSigned: config.wantAssertionsSigned,
+      wantAuthnResponseSigned: config.wantAuthnResponseSigned,
+      forceAuthn: config.forceAuthn,
+      identifierFormat: null,
+      disableRequestedAuthnContext: false,
+      privateKey: signingPrivateKey,
+    };
+  }
+
+  private resolveEmail(profile: SamlProfile, config: SSOProviderSAMLConfiguration): string | undefined {
     const baseCandidates = [
       'email',
       'mail',
@@ -95,8 +118,8 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
       'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name',
       'urn:oid:1.2.840.113549.1.9.1',
     ];
-    const customCandidates = Array.isArray(this.config.emailAttributeKeys)
-      ? this.config.emailAttributeKeys.filter(
+    const customCandidates = Array.isArray(config.emailAttributeKeys)
+      ? config.emailAttributeKeys.filter(
           (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
         )
       : [];
@@ -143,7 +166,15 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
     return fallbackEmail;
   }
 
-  async validate(profile: SamlProfile): Promise<User> {
+  async validate(req: SSOSamlRequest, profile: SamlProfile): Promise<User> {
+    const requestOptions = req?.ssoSamlOptions;
+    if (!requestOptions?.samlConfiguration) {
+      this.logger.error('SAML configuration missing on request');
+      throw new BadRequestException('Missing SAML configuration');
+    }
+
+    const config = requestOptions.samlConfiguration;
+    const providerId = requestOptions.providerId ?? config.ssoProviderId;
     const samlUserId = profile?.nameID;
     if (!samlUserId) {
       this.logger.error('No NameID found in SAML assertion');
@@ -151,7 +182,7 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
     }
 
     const usersService = await this.moduleRef.get(UsersService);
-    const email = this.resolveEmail(profile);
+    const email = this.resolveEmail(profile, config);
 
     if (!email) {
       this.logger.error('No email attribute could be resolved from the SAML assertion');
@@ -172,7 +203,7 @@ export class SSOSamlStrategy extends PassportStrategy(Strategy as unknown as Str
       throw new AccountLinkingRequiredException({
         email,
         externalId: samlUserId,
-        providerId: this.config.ssoProviderId,
+        providerId,
         providerType: SSOProviderType.SAML,
       });
     }

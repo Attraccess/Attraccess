@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../../../../config/app.config';
-import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
 import {
@@ -17,7 +16,7 @@ import {
   SSOProviderNotFoundException,
 } from '../errors';
 import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
-import { SSOSamlStrategy } from './saml.strategy';
+import { SSOSamlRequest } from './saml.types';
 
 @Injectable()
 export class SSOSamlGuard implements CanActivate {
@@ -25,7 +24,6 @@ export class SSOSamlGuard implements CanActivate {
 
   constructor(
     private readonly ssoService: SSOService,
-    private readonly moduleRef: ModuleRef,
     private readonly configService: ConfigService,
     private readonly licenseService: LicenseService,
   ) {}
@@ -89,8 +87,15 @@ export class SSOSamlGuard implements CanActivate {
       this.logger.warn('Unable to attach RelayState; missing request query container.');
     }
 
-    new SSOSamlStrategy(this.moduleRef, provider.samlConfiguration, callbackURL.toString());
-    this.logger.debug(`Initialized SSOSamlStrategy for provider ${providerId}`);
+    const samlRequest = req as SSOSamlRequest;
+    samlRequest.ssoSamlOptions = {
+      providerId,
+      samlConfiguration: provider.samlConfiguration,
+      callbackUrl: callbackURL.toString(),
+    };
+    this.logger.debug(
+      `Prepared per-request SAML options for provider ${providerId} with callback ${callbackURL.toString()}`,
+    );
 
     return true;
   }
