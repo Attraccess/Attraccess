@@ -43,6 +43,7 @@ import {
   Setting,
   SSOProvider,
   SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
   SSOProviderType,
   User,
   entities,
@@ -120,6 +121,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const mqttRepo = dataSource.getRepository(MqttServer);
   const ssoProviderRepo = dataSource.getRepository(SSOProvider);
   const ssoConfigRepo = dataSource.getRepository(SSOProviderOIDCConfiguration);
+  const ssoSamlConfigRepo = dataSource.getRepository(SSOProviderSAMLConfiguration);
   const authenticationRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const settingRepo = dataSource.getRepository(Setting);
@@ -173,6 +175,15 @@ const seedDatabase = async (dataSource: DataSource) => {
     type: SSOProviderType.OIDC,
   }));
 
+  const samlProvider =
+    (await ssoProviderRepo.findOne({ where: { type: SSOProviderType.SAML } })) ??
+    (await ssoProviderRepo.save(
+      ssoProviderRepo.create({
+        name: `Seed SSO SAML ${seedTag}`,
+        type: SSOProviderType.SAML,
+      }),
+    ));
+
   await ensureEntity(ssoConfigRepo, () => ({
     ssoProviderId: ssoProvider.id,
     issuer: 'https://issuer.example.com',
@@ -185,6 +196,27 @@ const seedDatabase = async (dataSource: DataSource) => {
     usernameClaimPaths: ['preferred_username'],
     emailClaimPaths: ['email'],
   }));
+
+  const existingSamlConfig = await ssoSamlConfigRepo.findOne({ where: { ssoProviderId: samlProvider.id } });
+  if (!existingSamlConfig) {
+    await ssoSamlConfigRepo.save(
+      ssoSamlConfigRepo.create({
+        ssoProviderId: samlProvider.id,
+        entryPoint: 'https://saml.example.com/sso',
+        issuer: 'https://app.example.com',
+        certificate: 'seed-certificate',
+        audience: null,
+        signRequest: false,
+        wantAssertionsSigned: false,
+        wantAuthnResponseSigned: true,
+        forceAuthn: false,
+        emailAttributeKeys: ['email'],
+        spSigningCertificate: null,
+        spSigningKeyEncrypted: null,
+        spSigningKeyEncryptionKeyId: null,
+      }),
+    );
+  }
 
   await ensureEntity(authenticationRepo, () => ({
     userId: primaryUser.id,
