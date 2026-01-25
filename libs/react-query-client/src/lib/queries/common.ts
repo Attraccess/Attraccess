@@ -96,6 +96,13 @@ export const UseAuthenticationServiceOidcLoginCallbackKeyFn = ({ code, iss, prov
   sessionState: unknown;
   state: unknown;
 }, queryKey?: Array<unknown>) => [useAuthenticationServiceOidcLoginCallbackKey, ...(queryKey ?? [{ code, iss, providerId, redirectTo, sessionState, state }])];
+export type AuthenticationServiceLoginWithSamlDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.loginWithSaml>>;
+export type AuthenticationServiceLoginWithSamlQueryResult<TData = AuthenticationServiceLoginWithSamlDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAuthenticationServiceLoginWithSamlKey = "AuthenticationServiceLoginWithSaml";
+export const UseAuthenticationServiceLoginWithSamlKeyFn = ({ providerId, redirectTo }: {
+  providerId: string;
+  redirectTo?: unknown;
+}, queryKey?: Array<unknown>) => [useAuthenticationServiceLoginWithSamlKey, ...(queryKey ?? [{ providerId, redirectTo }])];
 export type TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse = Awaited<ReturnType<typeof TwoFactorAuthenticationService.getTwoFactorStatus>>;
 export type TwoFactorAuthenticationServiceGetTwoFactorStatusQueryResult<TData = TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useTwoFactorAuthenticationServiceGetTwoFactorStatusKey = "TwoFactorAuthenticationServiceGetTwoFactorStatus";
@@ -480,6 +487,7 @@ export type UsersServiceSetUserPasswordMutationResult = Awaited<ReturnType<typeo
 export type AuthenticationServiceCreateSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.createSession>>;
 export type AuthenticationServiceCreateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.createOneSsoProvider>>;
 export type AuthenticationServiceLinkUserToExternalAccountMutationResult = Awaited<ReturnType<typeof AuthenticationService.linkUserToExternalAccount>>;
+export type AuthenticationServiceSamlLoginCallbackMutationResult = Awaited<ReturnType<typeof AuthenticationService.samlLoginCallback>>;
 export type TwoFactorAuthenticationServiceSetupTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setupTwoFactor>>;
 export type TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.verifyTwoFactor>>;
 export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.disableTwoFactor>>;

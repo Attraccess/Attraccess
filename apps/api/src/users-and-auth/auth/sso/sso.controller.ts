@@ -34,6 +34,9 @@ import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
+import { SSOSamlGuard } from './saml/saml.guard';
+import { ConfigService } from '@nestjs/config';
+import { AppConfigType } from '../../../config/app.config';
 import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
@@ -50,6 +53,7 @@ export class SSOController {
     private readonly ssoService: SSOService,
     private readonly cookieConfigService: CookieConfigService,
     private readonly linkTokenService: SSOLinkTokenService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get('providers')
@@ -484,7 +488,67 @@ export class SSOController {
     @Query('redirectTo') redirectTo: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
-    // Create session token using SessionService
+    return this.finalizeLogin(request, response, redirectTo);
+  }
+
+  @Get(`/${SSOProviderType.SAML}/:providerId/login`)
+  @ApiOperation({
+    summary: 'Login with SAML',
+    description:
+      'Initiate a SAML authentication request. Redirect the resulting browser request back to the callback endpoint to mint an API session token.',
+    operationId: 'loginWithSaml',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'SAML authentication initiated',
+  })
+  @ApiQuery({
+    name: 'redirectTo',
+    required: false,
+    description: 'URL that should receive the resulting session payload after authentication succeeds.',
+  })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  async loginWithSaml(): Promise<HttpStatus.OK> {
+    return HttpStatus.OK;
+  }
+
+  @Post(`/${SSOProviderType.SAML}/:providerId/callback`)
+  @ApiOperation({ summary: 'Callback for SAML login', operationId: 'samlLoginCallback' })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been logged in',
+    type: CreateSessionResponse,
+  })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @UseGuards(SSOSamlGuard, AuthGuard('sso-saml'))
+  @UseFilters(AccountLinkingExceptionFilter)
+  async samlLoginCallback(
+    @Req() request: AuthenticatedRequest,
+    @Query('redirectTo') redirectTo: string,
+    @Body('RelayState') relayState: string,
+    @Query('RelayState') relayStateQuery: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<CreateSessionResponse | void> {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const defaultRedirect = appConfig?.ATTRACCESS_FRONTEND_URL;
+    const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
+    return this.finalizeLogin(request, response, target);
+  }
+
+  private async finalizeLogin(
+    request: AuthenticatedRequest,
+    response: Response,
+    redirectTo?: string,
+  ): Promise<CreateSessionResponse | void> {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip || request.connection.remoteAddress,

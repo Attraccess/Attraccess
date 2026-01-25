@@ -20,6 +20,7 @@ import {
   User,
   AuthenticationDetail,
   SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
   SSOProvider,
   Session,
   ResourceUsage,
@@ -35,6 +36,9 @@ import { AppConfigType } from '../config/app.config';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
+import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
+import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 import { TwoFactorService } from './auth/two-factor.service';
@@ -46,12 +50,14 @@ import { TwoFactorService } from './auth/two-factor.service';
       AuthenticationDetail,
       SSOProvider,
       SSOProviderOIDCConfiguration,
+      SSOProviderSAMLConfiguration,
       Session,
       ResourceUsage,
       Setting,
     ]),
     PassportModule,
     EmailModule,
+    EncryptionModule,
     LicenseModule,
   ],
   providers: [
@@ -64,6 +70,8 @@ import { TwoFactorService } from './auth/two-factor.service';
     SSOService,
     CookieConfigService,
     SSOOIDCGuard,
+    SSOSamlGuard,
+    SSOSamlStrategy,
     SSOLinkTokenService,
     AccountLinkingExceptionFilter,
     {

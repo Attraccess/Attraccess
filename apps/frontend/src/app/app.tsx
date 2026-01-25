@@ -23,7 +23,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { ServerNotAvailable } from './serverNotAvailable';
 import { AccessDenied } from './unauthorized/accessDenied';
 import { getBaseUrl } from '../api';
-import { useReliableServerAvailability } from '../hooks/useReliableServerAvailability';
 import { AcceptInvitation } from './accept-invitation';
 import { TwoFactorGate } from './two-factor-gate';
 
@@ -84,11 +83,6 @@ function AppLayout(props: PropsWithChildren) {
 
   const { pullToRefreshIsEnabled } = usePtrStore();
 
-  const { isServerLikelyDown } = useReliableServerAvailability({
-    consecutiveErrorThreshold: 3,
-    refetchIntervalMs: 5000,
-  });
-
   return (
     <PullToRefresh
       onRefresh={() => queryClient.invalidateQueries()}
@@ -106,7 +100,7 @@ function AppLayout(props: PropsWithChildren) {
         <ToastProvider>
           <ReactFlowProvider>
             <Layout noLayout={!isAuthenticated}>
-              {isServerLikelyDown && <ServerNotAvailable />}
+              <ServerNotAvailable />
               {props.children}
             </Layout>
           </ReactFlowProvider>

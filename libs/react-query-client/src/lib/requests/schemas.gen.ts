@@ -592,7 +592,7 @@ export const $TwoFactorPolicyDto = {
 
 export const $SSOProviderType = {
     type: 'string',
-    enum: ['OIDC'],
+    enum: ['OIDC', 'SAML'],
     description: 'The type of the provider'
 } as const;
 
@@ -677,6 +677,95 @@ export const $SSOProviderOIDCConfiguration = {
     required: ['id', 'ssoProviderId', 'issuer', 'authorizationURL', 'tokenURL', 'userInfoURL', 'clientId', 'clientSecret', 'createdAt', 'updatedAt']
 } as const;
 
+export const $SSOProviderSAMLConfiguration = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the SAML configuration',
+            example: 1
+        },
+        ssoProviderId: {
+            type: 'number',
+            description: 'The ID of the parent SSO provider',
+            example: 3
+        },
+        entryPoint: {
+            type: 'string',
+            description: 'The Identity Provider entry point (SSO URL)',
+            example: 'https://login.example.com/realms/master/protocol/saml'
+        },
+        issuer: {
+            type: 'string',
+            description: 'The Service Provider issuer URL presented to the IdP',
+            example: 'https://app.attraccess.org'
+        },
+        certificate: {
+            type: 'string',
+            description: 'PEM encoded IdP signing certificate (without BEGIN/END markers)'
+        },
+        audience: {
+            type: 'string',
+            description: 'Optional audience restriction to validate within assertions',
+            nullable: true
+        },
+        signRequest: {
+            type: 'boolean',
+            description: 'Whether AuthnRequests should be signed by Attraccess',
+            default: false
+        },
+        wantAssertionsSigned: {
+            type: 'boolean',
+            description: 'Whether SAML Assertions must include their own signature',
+            default: false
+        },
+        wantAuthnResponseSigned: {
+            type: 'boolean',
+            description: 'Whether the SAML Response must be signed',
+            default: true
+        },
+        forceAuthn: {
+            type: 'boolean',
+            description: 'Force the IdP to re-authenticate the user',
+            default: false
+        },
+        emailAttributeKeys: {
+            description: 'Optional list of attribute keys (ordered) to resolve user emails from SAML assertions',
+            example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        spSigningCertificate: {
+            type: 'string',
+            description: 'PEM encoded Service Provider certificate used when signing AuthnRequests',
+            nullable: true
+        },
+        spSigningKeyEncrypted: {
+            type: 'string',
+            description: 'Encrypted Service Provider private key used for signing AuthnRequests',
+            nullable: true
+        },
+        spSigningKeyEncryptionKeyId: {
+            type: 'string',
+            description: 'Identifier for the encryption key used to protect the signing private key',
+            nullable: true
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the configuration was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the configuration was last updated'
+        }
+    },
+    required: ['id', 'ssoProviderId', 'entryPoint', 'issuer', 'certificate', 'signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn', 'createdAt', 'updatedAt']
+} as const;
+
 export const $SSOProvider = {
     type: 'object',
     properties: {
@@ -716,9 +805,17 @@ export const $SSOProvider = {
                     '$ref': '#/components/schemas/SSOProviderOIDCConfiguration'
                 }
             ]
+        },
+        samlConfiguration: {
+            description: 'The SAML configuration of the provider',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOProviderSAMLConfiguration'
+                }
+            ]
         }
     },
-    required: ['id', 'name', 'type', 'createdAt', 'updatedAt', 'oidcConfiguration']
+    required: ['id', 'name', 'type', 'createdAt', 'updatedAt']
 } as const;
 
 export const $LinkUserToExternalAccountRequestDto = {
@@ -799,6 +896,68 @@ export const $CreateOIDCConfigurationDto = {
     required: ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL', 'clientId', 'clientSecret']
 } as const;
 
+export const $CreateSAMLConfigurationDto = {
+    type: 'object',
+    properties: {
+        entryPoint: {
+            type: 'string',
+            description: 'Identity Provider SSO entry point URL',
+            example: 'https://idp.example.com/realms/master/protocol/saml'
+        },
+        issuer: {
+            type: 'string',
+            description: 'Service Provider issuer that IdP expects',
+            example: 'https://api.attraccess.org'
+        },
+        certificate: {
+            type: 'string',
+            description: 'Base64 encoded IdP certificate without PEM boundaries'
+        },
+        audience: {
+            type: 'string',
+            description: 'Audience restriction to validate against, defaults to issuer when omitted'
+        },
+        signRequest: {
+            type: 'boolean',
+            description: 'Whether AuthnRequests should be signed by Attraccess',
+            default: false
+        },
+        wantAssertionsSigned: {
+            type: 'boolean',
+            description: 'Require signed assertions inside the response',
+            default: false
+        },
+        wantAuthnResponseSigned: {
+            type: 'boolean',
+            description: 'Require the overall response to be signed',
+            default: true
+        },
+        forceAuthn: {
+            type: 'boolean',
+            description: 'Force IdP to re-authenticate the subject',
+            default: false
+        },
+        emailAttributeKeys: {
+            description: 'Ordered list of attribute keys to resolve email addresses from (first match wins)',
+            example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        spSigningCertificate: {
+            type: 'string',
+            description: 'PEM encoded Service Provider certificate used when signing requests'
+        },
+        spSigningPrivateKey: {
+            type: 'string',
+            description: 'PEM encoded Service Provider private key used for signing requests (stored encrypted)',
+            writeOnly: true
+        }
+    },
+    required: ['entryPoint', 'issuer', 'certificate', 'signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn']
+} as const;
+
 export const $CreateSSOProviderDto = {
     type: 'object',
     properties: {
@@ -821,6 +980,14 @@ export const $CreateSSOProviderDto = {
             allOf: [
                 {
                     '$ref': '#/components/schemas/CreateOIDCConfigurationDto'
+                }
+            ]
+        },
+        samlConfiguration: {
+            description: 'The SAML configuration for the provider',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/CreateSAMLConfigurationDto'
                 }
             ]
         }
@@ -888,6 +1055,65 @@ export const $UpdateOIDCConfigurationDto = {
     }
 } as const;
 
+export const $UpdateSAMLConfigurationDto = {
+    type: 'object',
+    properties: {
+        entryPoint: {
+            type: 'string',
+            description: 'Identity Provider SSO entry point URL'
+        },
+        issuer: {
+            type: 'string',
+            description: 'Service Provider issuer that IdP expects'
+        },
+        callbackUrl: {
+            type: 'string',
+            description: 'Optional Assertion Consumer Service override'
+        },
+        certificate: {
+            type: 'string',
+            description: 'Base64 encoded IdP certificate without PEM boundaries'
+        },
+        audience: {
+            type: 'string',
+            description: 'Audience restriction to validate against'
+        },
+        signRequest: {
+            type: 'boolean',
+            description: 'Whether AuthnRequests should be signed by Attraccess'
+        },
+        wantAssertionsSigned: {
+            type: 'boolean',
+            description: 'Require signed assertions inside the response'
+        },
+        wantAuthnResponseSigned: {
+            type: 'boolean',
+            description: 'Require the overall response to be signed'
+        },
+        forceAuthn: {
+            type: 'boolean',
+            description: 'Force IdP to re-authenticate the subject'
+        },
+        emailAttributeKeys: {
+            description: 'Ordered list of attribute keys to resolve email addresses from (first match wins)',
+            example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        spSigningCertificate: {
+            type: 'string',
+            description: 'PEM encoded Service Provider certificate used when signing requests'
+        },
+        spSigningPrivateKey: {
+            type: 'string',
+            description: 'PEM encoded Service Provider private key used for signing requests (stored encrypted)',
+            writeOnly: true
+        }
+    }
+} as const;
+
 export const $UpdateSSOProviderDto = {
     type: 'object',
     properties: {
@@ -901,6 +1127,14 @@ export const $UpdateSSOProviderDto = {
             allOf: [
                 {
                     '$ref': '#/components/schemas/UpdateOIDCConfigurationDto'
+                }
+            ]
+        },
+        samlConfiguration: {
+            description: 'The SAML configuration for the provider',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateSAMLConfigurationDto'
                 }
             ]
         }

@@ -15,6 +15,7 @@ import { ResourceIntroducer } from './entities/resourceIntroducer.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
 import { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
 import { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
+import { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
 import { User, SystemPermissions, type SystemPermission } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
@@ -64,6 +65,7 @@ export {
   SSOProvider,
   SSOProviderType,
   SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
   User,
   SystemPermissions,
   SystemPermission,
@@ -126,6 +128,7 @@ export const entities = {
   MqttServer,
   SSOProvider,
   SSOProviderOIDCConfiguration,
+  SSOProviderSAMLConfiguration,
   NFCCard,
   Attractap,
   EmailTemplate,

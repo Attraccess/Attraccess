@@ -52,6 +52,10 @@ export const useAuthenticationServiceOidcLoginCallback = <TData = Common.Authent
   sessionState: unknown;
   state: unknown;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }, queryKey), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) as TData, ...options });
+export const useAuthenticationServiceLoginWithSaml = <TData = Common.AuthenticationServiceLoginWithSamlDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ providerId, redirectTo }: {
+  providerId: string;
+  redirectTo?: unknown;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAuthenticationServiceLoginWithSamlKeyFn({ providerId, redirectTo }, queryKey), queryFn: () => AuthenticationService.loginWithSaml({ providerId, redirectTo }) as TData, ...options });
 export const useTwoFactorAuthenticationServiceGetTwoFactorStatus = <TData = Common.TwoFactorAuthenticationServiceGetTwoFactorStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn(queryKey), queryFn: () => TwoFactorAuthenticationService.getTwoFactorStatus() as TData, ...options });
 export const useTwoFactorAuthenticationServiceGetTwoFactorPolicy = <TData = Common.TwoFactorAuthenticationServiceGetTwoFactorPolicyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn(queryKey), queryFn: () => TwoFactorAuthenticationService.getTwoFactorPolicy() as TData, ...options });
 export const useEmailTemplatesServiceEmailTemplateControllerFindAll = <TData = Common.EmailTemplatesServiceEmailTemplateControllerFindAllDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(queryKey), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() as TData, ...options });
@@ -316,6 +320,15 @@ export const useAuthenticationServiceLinkUserToExternalAccount = <TData = Common
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: LinkUserToExternalAccountRequestDto;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthenticationService.linkUserToExternalAccount({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSamlLoginCallback = <TData = Common.AuthenticationServiceSamlLoginCallbackMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  providerId: string;
+  redirectTo: string;
+  relayState: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  providerId: string;
+  redirectTo: string;
+  relayState: string;
+}, TContext>({ mutationFn: ({ providerId, redirectTo, relayState }) => AuthenticationService.samlLoginCallback({ providerId, redirectTo, relayState }) as unknown as Promise<TData>, ...options });
 export const useTwoFactorAuthenticationServiceSetupTwoFactor = <TData = Common.TwoFactorAuthenticationServiceSetupTwoFactorMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => TwoFactorAuthenticationService.setupTwoFactor() as unknown as Promise<TData>, ...options });
 export const useTwoFactorAuthenticationServiceVerifyTwoFactor = <TData = Common.TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: TwoFactorCodeDto;

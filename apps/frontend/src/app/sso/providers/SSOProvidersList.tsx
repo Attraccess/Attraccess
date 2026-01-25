@@ -20,11 +20,14 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  Textarea,
+  Switch,
 } from '@heroui/react';
-import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical } from 'lucide-react';
+import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  CreateOIDCConfigurationDto,
   CreateSSOProviderDto,
   SSOProvider,
   SSOProviderType,
@@ -46,19 +49,43 @@ import { AuthentikDiscoveryDialog } from './discovery/authentik';
 import { OpenIDConfiguration } from './discovery/OpenIDC.data';
 import { KeycloakDiscoveryDialog } from './discovery/keycloak';
 import { Select } from '../../../components/select';
+import { getBaseUrl } from '../../../api';
+import { hasRequiredSamlSigningMaterial } from './signingMaterial';
+
+const getDefaultOidcConfiguration = () => ({
+  issuer: '',
+  authorizationURL: '',
+  tokenURL: '',
+  userInfoURL: '',
+  clientId: '',
+  clientSecret: '',
+});
+
+const getDefaultSamlConfiguration = () => ({
+  entryPoint: '',
+  issuer: '',
+  certificate: '',
+  audience: '',
+  signRequest: false,
+  wantAssertionsSigned: false,
+  wantAuthnResponseSigned: true,
+  forceAuthn: false,
+  spSigningCertificate: '',
+  spSigningPrivateKey: '',
+});
 
 const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
-  type: 'OIDC' as SSOProviderType.OIDC,
-  oidcConfiguration: {
-    issuer: '',
-    authorizationURL: '',
-    tokenURL: '',
-    userInfoURL: '',
-    clientId: '',
-    clientSecret: '',
-  },
+  type: SSOProviderType.OIDC,
+  oidcConfiguration: getDefaultOidcConfiguration(),
+  samlConfiguration: getDefaultSamlConfiguration(),
 };
+
+const ensureOidcConfiguration = (config?: CreateSSOProviderDto['oidcConfiguration']) =>
+  config ?? getDefaultOidcConfiguration();
+
+const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfiguration']) =>
+  config ?? getDefaultSamlConfiguration();
 
 export interface SSOProvidersListRef {
   handleAddNew: () => void;
@@ -74,6 +101,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const [scopesInput, setScopesInput] = useState('');
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
+  const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
   const queryClient = useQueryClient();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
@@ -107,6 +135,38 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       enabled: !!editingProvider,
     },
   );
+  const samlCallbackUrl = React.useMemo(() => {
+    if (!providerDetails?.id) {
+      return '';
+    }
+
+    try {
+      const baseUrl = getBaseUrl() ?? (typeof window !== 'undefined' ? window.location.origin : undefined);
+      if (!baseUrl) {
+        return '';
+      }
+      const callbackUrl = new URL(baseUrl);
+      callbackUrl.pathname = `/api/auth/sso/${SSOProviderType.SAML}/${providerDetails.id}/callback*`;
+      callbackUrl.search = '';
+      callbackUrl.hash = '';
+      return callbackUrl.toString();
+    } catch {
+      return '';
+    }
+  }, [providerDetails?.id]);
+  const hasSamlCallbackUrl = Boolean(samlCallbackUrl);
+
+  const isSamlProvider = formValues.type === SSOProviderType.SAML;
+  const isSamlSigningEnabled = isSamlProvider && (formValues.samlConfiguration?.signRequest ?? false);
+  const isMutationPending = createSSOProvider.isPending || updateSSOProvider.isPending;
+  const samlSigningMaterialsReady = hasRequiredSamlSigningMaterial({
+    isSigningEnabled: isSamlSigningEnabled,
+    storedCertificate: providerDetails?.samlConfiguration?.spSigningCertificate,
+    storedKey: providerDetails?.samlConfiguration?.spSigningKeyEncrypted,
+    inputCertificate: formValues.samlConfiguration?.spSigningCertificate,
+    inputPrivateKey: formValues.samlConfiguration?.spSigningPrivateKey,
+  });
+  const isSaveDisabled = isMutationPending || !samlSigningMaterialsReady;
 
   const onAutoDiscovery = useCallback((config: OpenIDConfiguration) => {
     setFormValues((prev) => ({
@@ -132,16 +192,18 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       const updatedFormValues: CreateSSOProviderDto = {
         name: extendedProvider.name,
         type: extendedProvider.type as SSOProviderType,
+        oidcConfiguration: getDefaultOidcConfiguration(),
+        samlConfiguration: getDefaultSamlConfiguration(),
       };
 
-      if (extendedProvider.type === 'OIDC' && extendedProvider.oidcConfiguration) {
+      if (extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration) {
         updatedFormValues.oidcConfiguration = {
-          issuer: extendedProvider.oidcConfiguration.issuer,
-          authorizationURL: extendedProvider.oidcConfiguration.authorizationURL,
-          tokenURL: extendedProvider.oidcConfiguration.tokenURL,
-          userInfoURL: extendedProvider.oidcConfiguration.userInfoURL,
-          clientId: extendedProvider.oidcConfiguration.clientId,
-          clientSecret: extendedProvider.oidcConfiguration.clientSecret,
+          issuer: extendedProvider.oidcConfiguration.issuer ?? '',
+          authorizationURL: extendedProvider.oidcConfiguration.authorizationURL ?? '',
+          tokenURL: extendedProvider.oidcConfiguration.tokenURL ?? '',
+          userInfoURL: extendedProvider.oidcConfiguration.userInfoURL ?? '',
+          clientId: extendedProvider.oidcConfiguration.clientId ?? '',
+          clientSecret: extendedProvider.oidcConfiguration.clientSecret ?? '',
         };
 
         setScopesInput(
@@ -159,6 +221,32 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
             : '',
         );
+      } else {
+        setScopesInput('');
+        setUsernameClaimPathsInput('');
+        setEmailClaimPathsInput('');
+      }
+
+      if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
+        updatedFormValues.samlConfiguration = {
+          entryPoint: extendedProvider.samlConfiguration.entryPoint ?? '',
+          issuer: extendedProvider.samlConfiguration.issuer ?? '',
+          certificate: extendedProvider.samlConfiguration.certificate ?? '',
+          audience: extendedProvider.samlConfiguration.audience ?? '',
+          signRequest: extendedProvider.samlConfiguration.signRequest ?? false,
+          wantAssertionsSigned: extendedProvider.samlConfiguration.wantAssertionsSigned ?? false,
+          wantAuthnResponseSigned: extendedProvider.samlConfiguration.wantAuthnResponseSigned ?? true,
+          forceAuthn: extendedProvider.samlConfiguration.forceAuthn ?? false,
+          spSigningCertificate: extendedProvider.samlConfiguration.spSigningCertificate ?? '',
+          spSigningPrivateKey: '',
+        };
+        setEmailAttributeKeysInput(
+          Array.isArray(extendedProvider.samlConfiguration.emailAttributeKeys)
+            ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
+            : '',
+        );
+      } else {
+        setEmailAttributeKeysInput('');
       }
 
       setFormValues(updatedFormValues);
@@ -168,6 +256,10 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const handleAddNew = () => {
     setEditingProvider(null);
     setFormValues(defaultProviderValues);
+    setScopesInput('');
+    setUsernameClaimPathsInput('');
+    setEmailClaimPathsInput('');
+    setEmailAttributeKeysInput('');
     onOpen();
   };
 
@@ -198,34 +290,28 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
     if (name.includes('.')) {
       const [section, field] = name.split('.');
       if (section === 'oidcConfiguration') {
-        setFormValues((prev) => {
-          // Ensure we have a valid oidcConfiguration object
-          const currentConfig = prev.oidcConfiguration ?? {
-            issuer: '',
-            authorizationURL: '',
-            tokenURL: '',
-            userInfoURL: '',
-            clientId: '',
-            clientSecret: '',
-          };
-
-          // Use type assertion to help TypeScript understand the structure
-          const newFormValues = {
-            ...prev,
-            oidcConfiguration: {
-              ...currentConfig,
-              [field]: value,
-            },
-          } as CreateSSOProviderDto;
-
-          return newFormValues;
-        });
+        setFormValues((prev) => ({
+          ...prev,
+          oidcConfiguration: {
+            ...ensureOidcConfiguration(prev.oidcConfiguration),
+            [field]: value,
+          },
+        }));
+      }
+      if (section === 'samlConfiguration') {
+        setFormValues((prev) => ({
+          ...prev,
+          samlConfiguration: {
+            ...ensureSamlConfiguration(prev.samlConfiguration),
+            [field]: value,
+          },
+        }));
       }
     } else {
       setFormValues((prev) => ({
@@ -235,10 +321,53 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   };
 
+  const handleCopySamlCallbackUrl = useCallback(async () => {
+    if (!samlCallbackUrl) {
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+      showError({
+        title: t('samlCallbackUrlCopyFailedTitle'),
+        description: t('samlCallbackUrlCopyUnsupported'),
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(samlCallbackUrl);
+      success({
+        title: t('samlCallbackUrlCopiedTitle'),
+      });
+    } catch (err) {
+      showError({
+        title: t('samlCallbackUrlCopyFailedTitle'),
+        description: err instanceof Error ? err.message : t('samlCallbackUrlCopyFailedDesc'),
+      });
+    }
+  }, [samlCallbackUrl, showError, success, t]);
+
+  const handleSamlToggleChange = (
+    field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>,
+    nextValue: boolean,
+  ) => {
+    setFormValues((prev) => ({
+      ...prev,
+      samlConfiguration: {
+        ...ensureSamlConfiguration(prev.samlConfiguration),
+        [field]: nextValue,
+      },
+    }));
+  };
+
   const handleSelectChange = (value: SSOProviderType) => {
     setFormValues((prev) => ({
       ...prev,
       type: value,
+      oidcConfiguration:
+        value === SSOProviderType.OIDC ? ensureOidcConfiguration(prev.oidcConfiguration) : prev.oidcConfiguration,
+      samlConfiguration:
+        value === SSOProviderType.SAML ? ensureSamlConfiguration(prev.samlConfiguration) : prev.samlConfiguration,
     }));
   };
 
@@ -250,15 +379,75 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           .map((s) => s.trim())
           .filter((s) => s.length > 0);
 
-      const requestBody: UpdateSSOProviderDto = { ...formValues };
-      if (!requestBody.oidcConfiguration) requestBody.oidcConfiguration = {};
-      if (scopesInput.trim().length > 0) requestBody.oidcConfiguration.scopes = parseList(scopesInput);
-      if (usernameClaimPathsInput.trim().length > 0)
-        requestBody.oidcConfiguration.usernameClaimPaths = parseList(usernameClaimPathsInput);
-      if (emailClaimPathsInput.trim().length > 0)
-        requestBody.oidcConfiguration.emailClaimPaths = parseList(emailClaimPathsInput);
+      const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
+
+      if (!samlSigningMaterialsReady) {
+        showError({
+          title: t('errorGeneric'),
+          description: t('signingMaterialsMissing'),
+        });
+        return;
+      }
+
+      const buildOidcPayload = () => {
+        const base = ensureOidcConfiguration(formValues.oidcConfiguration);
+        const payload: CreateOIDCConfigurationDto = {
+          issuer: base.issuer,
+          authorizationURL: base.authorizationURL,
+          tokenURL: base.tokenURL,
+          userInfoURL: base.userInfoURL,
+          clientId: base.clientId,
+          clientSecret: base.clientSecret,
+        };
+
+        if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
+        if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
+        if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
+
+        return payload;
+      };
+
+      const buildSamlPayload = () => {
+        const base = ensureSamlConfiguration(formValues.samlConfiguration);
+        const payload: NonNullable<CreateSSOProviderDto['samlConfiguration']> = {
+          ...base,
+          audience: sanitizeOptional(base.audience),
+        };
+        const parsedEmailKeys = parseList(emailAttributeKeysInput);
+        if (parsedEmailKeys.length > 0) {
+          payload.emailAttributeKeys = parsedEmailKeys;
+        } else {
+          delete payload.emailAttributeKeys;
+        }
+
+        const sanitizedSigningCertificate = sanitizeOptional(base.spSigningCertificate);
+        if (sanitizedSigningCertificate) {
+          payload.spSigningCertificate = sanitizedSigningCertificate;
+        } else {
+          delete payload.spSigningCertificate;
+        }
+
+        if (base.spSigningPrivateKey && base.spSigningPrivateKey.trim().length > 0) {
+          payload.spSigningPrivateKey = base.spSigningPrivateKey.trim();
+        } else {
+          delete payload.spSigningPrivateKey;
+        }
+        return payload;
+      };
 
       if (editingProvider) {
+        const requestBody: UpdateSSOProviderDto = {
+          name: formValues.name,
+        };
+
+        if (formValues.type === SSOProviderType.OIDC) {
+          requestBody.oidcConfiguration = buildOidcPayload();
+        }
+
+        if (formValues.type === SSOProviderType.SAML) {
+          requestBody.samlConfiguration = buildSamlPayload();
+        }
+
         await updateSSOProvider.mutateAsync({
           id: editingProvider.id,
           requestBody: requestBody,
@@ -268,7 +457,20 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           description: t('providerUpdatedDesc'),
         });
       } else {
-        await createSSOProvider.mutateAsync({ requestBody: requestBody as CreateSSOProviderDto });
+        const requestBody: CreateSSOProviderDto = {
+          name: formValues.name,
+          type: formValues.type,
+        };
+
+        if (formValues.type === SSOProviderType.OIDC) {
+          requestBody.oidcConfiguration = buildOidcPayload();
+        }
+
+        if (formValues.type === SSOProviderType.SAML) {
+          requestBody.samlConfiguration = buildSamlPayload();
+        }
+
+        await createSSOProvider.mutateAsync({ requestBody });
         success({
           title: t('providerCreated'),
           description: t('providerCreatedDesc'),
@@ -387,7 +589,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                     data-cy="sso-provider-form-type-select"
                   />
 
-                  {formValues.type === 'OIDC' && (
+                  {formValues.type === SSOProviderType.OIDC && (
                     <>
                       <Divider className="my-4" />
                       <div className="flex items-center justify-between mb-2">
@@ -528,13 +730,157 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       />
                     </>
                   )}
+                  {formValues.type === SSOProviderType.SAML && (
+                    <>
+                      <Divider className="my-4" />
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileCode size={16} />
+                        <span className="font-semibold">{t('samlConfiguration')}</span>
+                      </div>
+
+                      <Input
+                        label={t('entryPoint')}
+                        name="samlConfiguration.entryPoint"
+                        value={formValues.samlConfiguration?.entryPoint ?? ''}
+                        onChange={handleInputChange}
+                        placeholder="https://idp.example.com/realms/master/protocol/saml"
+                        isRequired
+                        data-cy="sso-provider-form-saml-entry-point-input"
+                      />
+
+                      <Input
+                        label={t('issuer')}
+                        name="samlConfiguration.issuer"
+                        value={formValues.samlConfiguration?.issuer ?? ''}
+                        onChange={handleInputChange}
+                        placeholder={window.location.origin ?? ''}
+                        isRequired
+                        data-cy="sso-provider-form-saml-issuer-input"
+                      />
+
+                      <Textarea
+                        label={t('certificate')}
+                        name="samlConfiguration.certificate"
+                        value={formValues.samlConfiguration?.certificate ?? ''}
+                        onChange={handleInputChange}
+                        placeholder="MIICmzCCAYMCBg..."
+                        minRows={4}
+                        isRequired
+                        data-cy="sso-provider-form-saml-certificate-input"
+                      />
+                      <p className="text-xs text-default-500">{t('certificateHint')}</p>
+
+                      <Input
+                        label={t('audience')}
+                        name="samlConfiguration.audience"
+                        value={formValues.samlConfiguration?.audience ?? ''}
+                        onChange={handleInputChange}
+                        placeholder={window.location.origin ?? ''}
+                        data-cy="sso-provider-form-saml-audience-input"
+                      />
+
+                      <Input
+                        label={t('samlCallbackUrl')}
+                        value={samlCallbackUrl}
+                        isReadOnly
+                        isDisabled={!hasSamlCallbackUrl}
+                        description={hasSamlCallbackUrl ? t('samlCallbackUrlDescription') : t('samlCallbackUrlPending')}
+                        endContent={
+                          hasSamlCallbackUrl ? (
+                            <Button
+                              size="sm"
+                              variant="light"
+                              onPress={handleCopySamlCallbackUrl}
+                              startContent={<Copy size={24} />}
+                              data-cy="sso-provider-form-saml-callback-url-copy-button"
+                            >
+                              {t('copy')}
+                            </Button>
+                          ) : undefined
+                        }
+                        data-cy="sso-provider-form-saml-callback-url"
+                      />
+
+                      <Input
+                        label={t('emailAttributeKeys')}
+                        description={t('emailAttributeKeysHint')}
+                        value={emailAttributeKeysInput}
+                        onChange={(e) => setEmailAttributeKeysInput(e.target.value)}
+                        placeholder="email, mail, urn:oid:1.2.840.113549.1.9.1"
+                        data-cy="sso-provider-form-saml-email-attribute-keys-input"
+                      />
+
+                      <Textarea
+                        label={t('spSigningCertificate')}
+                        name="samlConfiguration.spSigningCertificate"
+                        value={formValues.samlConfiguration?.spSigningCertificate ?? ''}
+                        onChange={handleInputChange}
+                        placeholder="MIICmzCCAYMCBg..."
+                        minRows={4}
+                        data-cy="sso-provider-form-saml-sp-certificate-input"
+                      />
+                      <p className="text-xs text-default-500">{t('spSigningCertificateHint')}</p>
+
+                      <Textarea
+                        label={t('spSigningPrivateKey')}
+                        name="samlConfiguration.spSigningPrivateKey"
+                        value={formValues.samlConfiguration?.spSigningPrivateKey ?? ''}
+                        onChange={handleInputChange}
+                        placeholder="-----BEGIN PRIVATE KEY-----"
+                        minRows={4}
+                        data-cy="sso-provider-form-saml-sp-private-key-input"
+                      />
+                      <p className="text-xs text-default-500">
+                        {providerDetails?.samlConfiguration?.spSigningKeyEncrypted
+                          ? t('spSigningPrivateKeyHintExisting')
+                          : t('spSigningPrivateKeyHint')}
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Switch
+                          isSelected={formValues.samlConfiguration?.signRequest ?? false}
+                          onValueChange={(value) => handleSamlToggleChange('signRequest', value)}
+                          data-cy="sso-provider-form-saml-sign-request-switch"
+                        >
+                          {t('signRequest')}
+                        </Switch>
+                        <Switch
+                          isSelected={formValues.samlConfiguration?.wantAssertionsSigned ?? false}
+                          onValueChange={(value) => handleSamlToggleChange('wantAssertionsSigned', value)}
+                          data-cy="sso-provider-form-saml-assertions-signed-switch"
+                        >
+                          {t('wantAssertionsSigned')}
+                        </Switch>
+                        <Switch
+                          isSelected={formValues.samlConfiguration?.wantAuthnResponseSigned ?? true}
+                          onValueChange={(value) => handleSamlToggleChange('wantAuthnResponseSigned', value)}
+                          data-cy="sso-provider-form-saml-response-signed-switch"
+                        >
+                          {t('wantAuthnResponseSigned')}
+                        </Switch>
+                        <Switch
+                          isSelected={formValues.samlConfiguration?.forceAuthn ?? false}
+                          onValueChange={(value) => handleSamlToggleChange('forceAuthn', value)}
+                          data-cy="sso-provider-form-saml-force-authn-switch"
+                        >
+                          {t('forceAuthn')}
+                        </Switch>
+                      </div>
+                    </>
+                  )}
                 </div>
               </ModalBody>
               <ModalFooter>
                 <Button variant="flat" onPress={onClose} data-cy="sso-provider-form-cancel-button">
                   {t('cancel')}
                 </Button>
-                <Button color="primary" onPress={handleSubmit} data-cy="sso-provider-form-save-button">
+                <Button
+                  color="primary"
+                  onPress={handleSubmit}
+                  isDisabled={isSaveDisabled}
+                  isLoading={isMutationPending}
+                  data-cy="sso-provider-form-save-button"
+                >
                   {t('save')}
                 </Button>
               </ModalFooter>
