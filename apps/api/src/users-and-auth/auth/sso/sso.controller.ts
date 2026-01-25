@@ -333,6 +333,49 @@ export class SSOController {
     return { OK: true };
   }
 
+  @Post(`/${SSOProviderType.SAML}/:providerId/logout`)
+  @ApiOperation({ summary: 'SAML-initiated logout', operationId: 'ssoSamlLogout' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO provisioning secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO provisioning secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningUserDto })
+  @ApiResponse({
+    status: 200,
+    description: 'All user sessions have been revoked',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async samlLogout(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningUserDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
+    await this.sessionService.revokeAllUserSessions(user.id);
+
+    return { OK: true };
+  }
+
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
   @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
   @ApiParam({
@@ -376,6 +419,49 @@ export class SSOController {
     return { OK: true };
   }
 
+  @Post(`/${SSOProviderType.SAML}/:providerId/users/delete`)
+  @ApiOperation({ summary: 'SAML-initiated user deletion', operationId: 'ssoSamlDeleteUser' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO provisioning secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO provisioning secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningUserDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The user has been deleted',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async samlDeleteUser(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningUserDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
+    await this.usersService.deleteOne(user.id);
+
+    return { OK: true };
+  }
+
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
   @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
   @ApiParam({
@@ -414,6 +500,53 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
+    const updates = this.buildPermissionUpdates(provider, body);
+    if (Object.keys(updates).length > 0) {
+      const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
+      await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
+    }
+
+    return { OK: true };
+  }
+
+  @Post(`/${SSOProviderType.SAML}/:providerId/users/permissions`)
+  @ApiOperation({ summary: 'SAML-initiated permission update', operationId: 'ssoSamlUpdatePermissions' })
+  @ApiParam({
+    name: 'providerId',
+    type: 'string',
+    description: 'The ID of the SSO provider',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    required: false,
+    description: 'Bearer <SSO provisioning secret> (or use x-api-key)',
+  })
+  @ApiHeader({
+    name: 'x-api-key',
+    required: false,
+    description: 'SSO provisioning secret (alternative to Authorization header)',
+  })
+  @ApiBody({ type: SSOProvisioningPermissionsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The user permissions have been updated',
+    schema: {
+      type: 'object',
+      properties: {
+        OK: { type: 'boolean' },
+      },
+    },
+  })
+  async samlUpdatePermissions(
+    @Param('providerId') providerId: string,
+    @Req() request: Request,
+    @Body() body: SSOProvisioningPermissionsDto,
+  ): Promise<{ OK: boolean }> {
+    const parsedProviderId = this.parseProviderId(providerId);
+    const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
+    this.assertProvisioningAuthorized(provider, request);
+
+    const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     const updates = this.buildPermissionUpdates(provider, body);
     if (Object.keys(updates).length > 0) {
       const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
@@ -603,7 +736,10 @@ export class SSOController {
   }
 
   private assertProvisioningAuthorized(provider: SSOProvider, request: Request): void {
-    const secret = provider.oidcConfiguration?.clientSecret;
+    const secret =
+      provider.type === SSOProviderType.SAML
+        ? provider.samlConfiguration?.provisioningSecret
+        : provider.oidcConfiguration?.clientSecret;
     if (!secret) {
       throw new UnauthorizedException('SSO_CLIENT_SECRET_NOT_CONFIGURED');
     }
@@ -627,6 +763,9 @@ export class SSOController {
     }
 
     if (type === SSOProviderType.OIDC && !provider.oidcConfiguration) {
+      throw new SSOProviderNotFoundException();
+    }
+    if (type === SSOProviderType.SAML && !provider.samlConfiguration) {
       throw new SSOProviderNotFoundException();
     }
 

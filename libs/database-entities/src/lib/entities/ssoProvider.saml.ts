@@ -97,6 +97,14 @@ export class SSOProviderSAMLConfiguration {
   })
   emailAttributeKeys?: string[] | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Shared secret used to authorize SAML provisioning requests',
+    required: false,
+    nullable: true,
+  })
+  provisioningSecret?: string | null;
+
   @Column({ type: 'json', nullable: true })
   @ApiProperty({
     description: 'Optional mapping between Attraccess permissions and SAML role attribute values',

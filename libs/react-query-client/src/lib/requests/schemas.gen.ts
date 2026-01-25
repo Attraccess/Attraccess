@@ -779,6 +779,11 @@ export const $SSOProviderSAMLConfiguration = {
                 type: 'string'
             }
         },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests',
+            nullable: true
+        },
         permissionMappings: {
             description: 'Optional mapping between Attraccess permissions and SAML role values',
             allOf: [
@@ -1003,6 +1008,10 @@ export const $CreateSAMLConfigurationDto = {
                 type: 'string'
             }
         },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests'
+        },
         permissionMappings: {
             description: 'Optional mapping between Attraccess permissions and SAML role values',
             allOf: [
@@ -1175,6 +1184,10 @@ export const $UpdateSAMLConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests'
         },
         permissionMappings: {
             description: 'Optional mapping between Attraccess permissions and SAML role values',

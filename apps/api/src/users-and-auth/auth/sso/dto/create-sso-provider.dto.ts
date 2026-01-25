@@ -171,6 +171,15 @@ export class CreateSAMLConfigurationDto {
   emailAttributeKeys?: string[];
 
   @ApiProperty({
+    description: 'Shared secret used to authorize SAML provisioning requests',
+    required: false,
+    writeOnly: true,
+  })
+  @IsOptional()
+  @IsString()
+  provisioningSecret?: string;
+
+  @ApiProperty({
     description: 'Optional mapping between Attraccess permissions and SAML role values',
     required: false,
     type: SSOPermissionMappingsDto,

@@ -485,6 +485,10 @@ export type SSOProviderSAMLConfiguration = {
      */
     emailAttributeKeys?: Array<(string)>;
     /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string | null;
+    /**
      * Optional mapping between Attraccess permissions and SAML role values
      */
     permissionMappings?: SSOPermissionMappingsDto | null;
@@ -633,6 +637,10 @@ export type CreateSAMLConfigurationDto = {
      */
     emailAttributeKeys?: Array<(string)>;
     /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string;
+    /**
      * Optional mapping between Attraccess permissions and SAML role values
      */
     permissionMappings?: SSOPermissionMappingsDto;
@@ -749,6 +757,10 @@ export type UpdateSAMLConfigurationDto = {
      * Ordered list of attribute keys to resolve email addresses from (first match wins)
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string;
     /**
      * Optional mapping between Attraccess permissions and SAML role values
      */

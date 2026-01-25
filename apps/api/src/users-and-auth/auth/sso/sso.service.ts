@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import {
   SSOProvider,
   SSOProviderOIDCConfiguration,
@@ -167,14 +167,17 @@ export class SSOService {
     void unusedSpCert;
     void unusedSpKey;
 
+    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
+
     const newConfig = this.samlConfigRepository.create({
       ...persistableConfig,
       certificate: normalizedCertificate,
+      provisioningSecret: config.provisioningSecret?.trim() || null,
       spSigningCertificate: normalizedSpSigningCertificate,
       spSigningKeyEncrypted: encryptedPrivateKey,
       spSigningKeyEncryptionKeyId: encryptedPrivateKey ? this.getEncryptionKeyId() : null,
       ssoProviderId: providerId,
-    });
+    } as DeepPartial<SAMLConfigEntity>);
 
     return this.samlConfigRepository.save(newConfig);
   }
@@ -188,7 +191,8 @@ export class SSOService {
       throw new BadRequestException('SAML configuration not found for provider');
     }
 
-    const payload: Partial<SSOProviderSAMLConfiguration> = {};
+    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
+    const payload: Partial<SAMLConfigEntity> = {};
 
     if (typeof config.entryPoint !== 'undefined') {
       payload.entryPoint = config.entryPoint;
@@ -216,6 +220,9 @@ export class SSOService {
     }
     if (typeof config.emailAttributeKeys !== 'undefined') {
       payload.emailAttributeKeys = config.emailAttributeKeys;
+    }
+    if (typeof config.provisioningSecret !== 'undefined') {
+      payload.provisioningSecret = config.provisioningSecret?.trim() || null;
     }
     if (typeof config.permissionMappings !== 'undefined') {
       payload.permissionMappings = config.permissionMappings;

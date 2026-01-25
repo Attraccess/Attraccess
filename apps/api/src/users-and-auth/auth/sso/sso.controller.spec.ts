@@ -48,6 +48,32 @@ describe('SsoController', () => {
     },
   } as SSOProvider;
 
+  const mockSamlProvider: SSOProvider = {
+    id: 2,
+    name: 'Test SAML Provider',
+    type: SSOProviderType.SAML,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    samlConfiguration: {
+      id: 2,
+      ssoProviderId: 2,
+      entryPoint: 'https://idp.example.com/sso',
+      issuer: 'https://sp.example.com',
+      certificate: 'CERT',
+      signRequest: false,
+      wantAssertionsSigned: false,
+      wantAuthnResponseSigned: true,
+      forceAuthn: false,
+      provisioningSecret: 'saml-secret',
+      permissionMappings: {
+        canManageBilling: ['billing-role'],
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ssoProvider: null,
+    },
+  } as SSOProvider;
+
   beforeEach(async () => {
     module = await Test.createTestingModule({
       providers: [
@@ -529,6 +555,85 @@ describe('SsoController', () => {
           canManageSystemConfiguration: false,
           canManageUsers: true,
           canManageBilling: false,
+        },
+      });
+    });
+
+    it('handles SAML provisioning logout', async () => {
+      const usersService = module.get<UsersService>(UsersService);
+      const sessionService = module.get<SessionService>(SessionService);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+
+      (usersService.findOne as jest.Mock).mockResolvedValue({
+        id: 101,
+        externalIdentifier: 'saml-user',
+        authenticationDetails: [],
+        systemPermissions: {},
+      });
+
+      const mockRequest = {
+        headers: { authorization: 'Bearer saml-secret' },
+      } as unknown as AuthenticatedRequest;
+
+      const result = await controller.samlLogout('2', mockRequest as unknown as Request, { subject: 'saml-user' });
+
+      expect(result).toEqual({ OK: true });
+      expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(101);
+    });
+
+    it('handles SAML provisioning delete', async () => {
+      const usersService = module.get<UsersService>(UsersService);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+
+      (usersService.findOne as jest.Mock).mockResolvedValue({
+        id: 102,
+        externalIdentifier: 'saml-user-2',
+        authenticationDetails: [],
+        systemPermissions: {},
+      });
+
+      const mockRequest = {
+        headers: { authorization: 'Bearer saml-secret' },
+      } as unknown as AuthenticatedRequest;
+
+      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, { subject: 'saml-user-2' });
+
+      expect(result).toEqual({ OK: true });
+      expect(usersService.deleteOne).toHaveBeenCalledWith(102);
+    });
+
+    it('handles SAML provisioning permission updates', async () => {
+      const usersService = module.get<UsersService>(UsersService);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValueOnce(mockSamlProvider);
+
+      (usersService.findOne as jest.Mock).mockResolvedValue({
+        id: 103,
+        externalIdentifier: 'saml-user-3',
+        authenticationDetails: [],
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+      });
+
+      const mockRequest = {
+        headers: { authorization: 'Bearer saml-secret' },
+      } as unknown as AuthenticatedRequest;
+
+      const result = await controller.samlUpdatePermissions('2', mockRequest as unknown as Request, {
+        subject: 'saml-user-3',
+        roles: ['billing-role'],
+      });
+
+      expect(result).toEqual({ OK: true });
+      expect(usersService.updateOne).toHaveBeenCalledWith(103, {
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: true,
         },
       });
     });
