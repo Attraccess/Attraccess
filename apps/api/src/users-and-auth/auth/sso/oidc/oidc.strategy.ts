@@ -114,14 +114,14 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
         ? this.config.usernameClaimPaths
         : defaultUsernamePaths;
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
-    const username = resolvedUsername || profile.username || email;
+    const rawUsername = resolvedUsername || profile.username || email;
+    const username = usersService.buildUsernameFromSSOClaim(rawUsername, email);
     this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
     user = await usersService.createOne({
       username,
       email,
       externalIdentifier: null,
       isEmailVerified: true,
-      skipUsernameSanitization: true,
     });
 
     if (!user) {

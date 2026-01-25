@@ -51,6 +51,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const usersService = {
       findOne: jest.fn(async () => null),
       updateOne: jest.fn(),
+      buildUsernameFromSSOClaim: jest.fn((raw: string) => raw),
       createOne: jest.fn(
         async ({ username, email, externalIdentifier }) =>
           ({
@@ -95,6 +96,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const usersService = {
       findOne: jest.fn(async () => null),
       updateOne: jest.fn(),
+      buildUsernameFromSSOClaim: jest.fn((raw: string) => raw),
       createOne: jest.fn(
         async ({ username, email, externalIdentifier }) =>
           ({
@@ -127,5 +129,51 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const user = await strategy.validate('https://issuer', profile);
     expect(user.email).toBe('jsonmail@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
+  });
+
+  it('normalizes SSO usernames before user creation', async () => {
+    const usersService = {
+      findOne: jest.fn(async () => null),
+      updateOne: jest.fn(),
+      buildUsernameFromSSOClaim: jest.fn(() => 'name.surname'),
+      createOne: jest.fn(
+        async ({ username, email, externalIdentifier }) =>
+          ({
+            id: 123,
+            username,
+            email,
+            externalIdentifier,
+          }) as unknown as User,
+      ),
+    };
+
+    const authService = {
+      findUserIdBySSO: jest.fn(async () => null),
+      addAuthenticationDetails: jest.fn(),
+    };
+
+    const strategy = createStrategy(
+      {
+        usernameClaimPaths: ['customUser'],
+      },
+      usersService,
+      authService,
+    );
+
+    const profile = {
+      id: 'ext-3',
+      emails: [{ value: 'user@example.com' }],
+      _json: { customUser: 'Name Surname' },
+    } as unknown as Profile;
+
+    const user = await strategy.validate('https://issuer', profile);
+    expect(usersService.buildUsernameFromSSOClaim).toHaveBeenCalledWith('Name Surname', 'user@example.com');
+    expect(user.username).toBe('name.surname');
+    expect(usersService.createOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'name.surname',
+        email: 'user@example.com',
+      }),
+    );
   });
 });
