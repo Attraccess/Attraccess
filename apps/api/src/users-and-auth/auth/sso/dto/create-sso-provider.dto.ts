@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested, IsArray, IsBoolean } from 'class-validator';
 import { SSOProviderType } from '@attraccess/database-entities';
 import { Type } from 'class-transformer';
+import { SSOPermissionMappingsDto } from './permission-mapping.dto';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
@@ -81,6 +82,16 @@ export class CreateOIDCConfigurationDto {
   @IsArray()
   @IsString({ each: true })
   emailClaimPaths?: string[];
+
+  @ApiProperty({
+    description: 'Optional mapping between Attraccess permissions and role names',
+    required: false,
+    type: SSOPermissionMappingsDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SSOPermissionMappingsDto)
+  permissionMappings?: SSOPermissionMappingsDto;
 }
 
 export class CreateSAMLConfigurationDto {
@@ -158,6 +169,16 @@ export class CreateSAMLConfigurationDto {
   @IsArray()
   @IsString({ each: true })
   emailAttributeKeys?: string[];
+
+  @ApiProperty({
+    description: 'Optional mapping between Attraccess permissions and SAML role values',
+    required: false,
+    type: SSOPermissionMappingsDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SSOPermissionMappingsDto)
+  permissionMappings?: SSOPermissionMappingsDto;
 
   @ApiProperty({
     description: 'PEM encoded Service Provider certificate used when signing requests',

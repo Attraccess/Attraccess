@@ -41,6 +41,7 @@ import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
+import { resolvePermissionsFromRoles } from './permission-mapping';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 export class SSOController {
@@ -413,7 +414,7 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    const updates = this.extractPermissionUpdates(body);
+    const updates = this.buildPermissionUpdates(provider, body);
     if (Object.keys(updates).length > 0) {
       const mergedPermissions = { ...(user.systemPermissions ?? {}), ...updates };
       await this.usersService.updateOne(user.id, { systemPermissions: mergedPermissions });
@@ -644,19 +645,30 @@ export class SSOController {
       throw new BadRequestException('SSO_SUBJECT_OR_EMAIL_REQUIRED');
     }
 
-    let user = subject ? await this.usersService.findOneBySSO(providerType, providerId, subject) : null;
+    let user =
+      subject && providerType === SSOProviderType.SAML
+        ? await this.usersService.findOne({ externalIdentifier: subject })
+        : subject
+          ? await this.usersService.findOneBySSO(providerType, providerId, subject)
+          : null;
 
     if (!user && email) {
       user = await this.usersService.findOne({ email }, ['authenticationDetails']);
       if (user) {
-        const isMatchingProvider = user.authenticationDetails?.some(
-          (detail) =>
-            detail.type === AuthenticationType.SSO &&
-            detail.providerType === providerType &&
-            detail.providerId === providerId,
-        );
-        if (!isMatchingProvider) {
-          user = null;
+        if (providerType === SSOProviderType.SAML) {
+          if (!user.externalIdentifier) {
+            user = null;
+          }
+        } else {
+          const isMatchingProvider = user.authenticationDetails?.some(
+            (detail) =>
+              detail.type === AuthenticationType.SSO &&
+              detail.providerType === providerType &&
+              detail.providerId === providerId,
+          );
+          if (!isMatchingProvider) {
+            user = null;
+          }
         }
       }
     }
@@ -689,6 +701,28 @@ export class SSOController {
       canManageSystemConfiguration?: boolean;
       canManageUsers?: boolean;
       canManageBilling?: boolean;
+    };
+  }
+
+  private buildPermissionUpdates(
+    provider: SSOProvider,
+    payload: SSOProvisioningPermissionsDto,
+  ): Partial<SystemPermissions> {
+    const updates = this.extractPermissionUpdates(payload);
+    const roleNames = payload.roles?.map((role) => role.trim()).filter((role) => role.length > 0) ?? [];
+    if (roleNames.length === 0) {
+      return updates;
+    }
+
+    const mapping =
+      provider.type === SSOProviderType.OIDC
+        ? provider.oidcConfiguration?.permissionMappings
+        : provider.samlConfiguration?.permissionMappings;
+    const roleUpdates = resolvePermissionsFromRoles(roleNames, mapping);
+
+    return {
+      ...roleUpdates,
+      ...updates,
     };
   }
 }

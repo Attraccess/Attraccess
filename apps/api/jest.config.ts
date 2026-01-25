@@ -10,5 +10,6 @@ export default {
   coverageDirectory: '../../coverage/apps/api',
   moduleNameMapper: {
     '^lodash-es$': 'lodash',
+    '^@node-saml/passport-saml$': '<rootDir>/src/test/mocks/node-saml-passport-saml.ts',
   },
 };

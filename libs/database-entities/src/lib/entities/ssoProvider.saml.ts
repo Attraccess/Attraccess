@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { SSOProvider } from './ssoProvider.entity';
+import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderSAMLConfiguration {
@@ -95,6 +96,17 @@ export class SSOProviderSAMLConfiguration {
     example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
   })
   emailAttributeKeys?: string[] | null;
+
+  @Column({ type: 'json', nullable: true })
+  @ApiProperty({
+    description: 'Optional mapping between Attraccess permissions and SAML role attribute values',
+    required: false,
+    example: {
+      canManageSystemConfiguration: ['attraccess_config_admin'],
+      canManageBilling: ['attraccess_billing'],
+    },
+  })
+  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({

@@ -13,17 +13,16 @@ import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
+import {
+  DEFAULT_PERMISSION_KEY_MAP,
+  normalizePermissionToken,
+  resolvePermissionsFromRoles,
+} from '../permission-mapping';
 
 @Injectable()
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
   private readonly config: SSOProviderOIDCConfiguration;
-  private readonly permissionKeyMap: Record<string, keyof SystemPermissions> = {
-    canmanageresources: 'canManageResources',
-    canmanagesystemconfiguration: 'canManageSystemConfiguration',
-    canmanageusers: 'canManageUsers',
-    canmanagebilling: 'canManageBilling',
-  };
 
   constructor(
     private moduleRef: ModuleRef,
@@ -154,10 +153,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     return await this.syncPermissionsFromClaims(user, claimSources, usersService);
   }
 
-  private normalizePermissionToken(token: string): string {
-    return token.toLowerCase().replace(/[^a-z0-9]/g, '');
-  }
-
   private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
     const paths = ['systemPermissions', 'permissions', 'roles', 'groups', 'realm_access.roles'];
     if (this.config.clientId) {
@@ -178,7 +173,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
   }
 
   private resolvePermissionUpdates(claimSources: unknown[]): Partial<SystemPermissions> {
-    const updates: Partial<SystemPermissions> = {};
+    const directUpdates: Partial<SystemPermissions> = {};
     const roleNames: string[] = [];
 
     for (const value of this.getPermissionClaimValues(claimSources)) {
@@ -198,10 +193,10 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
 
       if (value && typeof value === 'object') {
         for (const [key, entry] of Object.entries(value)) {
-          const normalizedKey = this.normalizePermissionToken(key);
-          const permissionKey = this.permissionKeyMap[normalizedKey];
+          const normalizedKey = normalizePermissionToken(key);
+          const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
           if (permissionKey && typeof entry === 'boolean') {
-            updates[permissionKey] = entry;
+            directUpdates[permissionKey] = entry;
             continue;
           }
 
@@ -221,15 +216,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
       }
     }
 
-    for (const roleName of roleNames) {
-      const normalized = this.normalizePermissionToken(roleName);
-      const permissionKey = this.permissionKeyMap[normalized];
-      if (permissionKey && updates[permissionKey] !== false) {
-        updates[permissionKey] = true;
-      }
-    }
-
-    return updates;
+    const roleBasedUpdates = resolvePermissionsFromRoles(roleNames, this.config.permissionMappings);
+    return {
+      ...roleBasedUpdates,
+      ...directUpdates,
+    };
   }
 
   private buildDefaultPermissions(): SystemPermissions {

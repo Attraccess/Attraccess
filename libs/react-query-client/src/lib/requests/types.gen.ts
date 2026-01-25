@@ -361,6 +361,25 @@ export enum SSOProviderType {
     SAML = 'SAML'
 }
 
+export type SSOPermissionMappingsDto = {
+    /**
+     * Role names that grant resource management permissions
+     */
+    canManageResources?: Array<(string)>;
+    /**
+     * Role names that grant system configuration permissions
+     */
+    canManageSystemConfiguration?: Array<(string)>;
+    /**
+     * Role names that grant user management permissions
+     */
+    canManageUsers?: Array<(string)>;
+    /**
+     * Role names that grant billing management permissions
+     */
+    canManageBilling?: Array<(string)>;
+};
+
 export type SSOProviderOIDCConfiguration = {
     /**
      * The unique identifier of the provider
@@ -406,6 +425,10 @@ export type SSOProviderOIDCConfiguration = {
      * Ordered list of claim paths to resolve the email
      */
     emailClaimPaths?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
     /**
      * When the user was created
      */
@@ -461,6 +484,10 @@ export type SSOProviderSAMLConfiguration = {
      * Optional list of attribute keys (ordered) to resolve user emails from SAML assertions
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role values
+     */
+    permissionMappings?: SSOPermissionMappingsDto | null;
     /**
      * PEM encoded Service Provider certificate used when signing AuthnRequests
      */
@@ -562,6 +589,10 @@ export type CreateOIDCConfigurationDto = {
      * Ordered list of claim paths to resolve the email
      */
     emailClaimPaths?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
 };
 
 export type CreateSAMLConfigurationDto = {
@@ -601,6 +632,10 @@ export type CreateSAMLConfigurationDto = {
      * Ordered list of attribute keys to resolve email addresses from (first match wins)
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role values
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
     /**
      * PEM encoded Service Provider certificate used when signing requests
      */
@@ -667,6 +702,10 @@ export type UpdateOIDCConfigurationDto = {
      * Ordered list of claim paths to resolve the email
      */
     emailClaimPaths?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
 };
 
 export type UpdateSAMLConfigurationDto = {
@@ -710,6 +749,10 @@ export type UpdateSAMLConfigurationDto = {
      * Ordered list of attribute keys to resolve email addresses from (first match wins)
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role values
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
     /**
      * PEM encoded Service Provider certificate used when signing requests
      */

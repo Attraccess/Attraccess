@@ -7,8 +7,12 @@ import {
   SSOProviderSAMLConfiguration,
   SSOProviderType,
 } from '@attraccess/database-entities';
-import { CreateSSOProviderDto, CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
-import { UpdateSSOProviderDto, UpdateSAMLConfigurationDto } from './dto/update-sso-provider.dto';
+import {
+  CreateSSOProviderDto,
+  CreateSAMLConfigurationDto,
+  CreateOIDCConfigurationDto,
+} from './dto/create-sso-provider.dto';
+import { UpdateSSOProviderDto, UpdateSAMLConfigurationDto, UpdateOIDCConfigurationDto } from './dto/update-sso-provider.dto';
 import { SSOProviderNotFoundException } from './errors';
 import { LicenseModuleType, LicenseService } from '../../../license/license.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
@@ -128,14 +132,7 @@ export class SSOService {
 
   private async createOIDCConfiguration(
     providerId: number,
-    config: {
-      issuer: string;
-      authorizationURL: string;
-      tokenURL: string;
-      userInfoURL: string;
-      clientId: string;
-      clientSecret: string;
-    },
+    config: CreateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
     const newConfig = this.oidcConfigRepository.create({
       ...config,
@@ -147,14 +144,7 @@ export class SSOService {
 
   private async updateOIDCConfiguration(
     providerId: number,
-    updateConfig: Partial<{
-      issuer: string;
-      authorizationURL: string;
-      tokenURL: string;
-      userInfoURL: string;
-      clientId: string;
-      clientSecret: string;
-    }>,
+    updateConfig: UpdateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, updateConfig);
     return this.oidcConfigRepository.findOne({ where: { ssoProviderId: providerId } });
@@ -226,6 +216,9 @@ export class SSOService {
     }
     if (typeof config.emailAttributeKeys !== 'undefined') {
       payload.emailAttributeKeys = config.emailAttributeKeys;
+    }
+    if (typeof config.permissionMappings !== 'undefined') {
+      payload.permissionMappings = config.permissionMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

@@ -57,6 +57,15 @@
   "scopes": "Scopes (durch Komma getrennt)",
   "usernameClaimPaths": "Benutzername-Claim-Pfade (durch Komma getrennt)",
   "emailClaimPaths": "E-Mail-Claim-Pfade (durch Komma getrennt)",
+  "permissionMappings": "Berechtigungszuordnungen",
+  "permissionMappingsHint": "Geben Sie Rollen- oder Gruppennamen an, die die jeweilige Berechtigung vergeben (durch Komma getrennt).",
+  "permissionMappingsPlaceholder": "attraccess_admin, attraccess_billing",
+  "permissionMappingLabels": {
+    "canManageResources": "Rollen für Ressourcenverwaltung",
+    "canManageSystemConfiguration": "Rollen für Systemkonfiguration",
+    "canManageUsers": "Rollen für Benutzerverwaltung",
+    "canManageBilling": "Rollen für Abrechnung"
+  },
   "cancel": "Abbrechen",
   "save": "Speichern",
   "edit": "Bearbeiten",

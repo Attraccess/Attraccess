@@ -39,6 +39,9 @@ describe('SsoController', () => {
       userInfoURL: 'https://test-issuer.com/userinfo',
       clientId: 'test-client-id',
       clientSecret: 'test-client-secret',
+      permissionMappings: {
+        canManageUsers: ['attraccess_admin'],
+      },
       createdAt: new Date(),
       updatedAt: new Date(),
       ssoProvider: null,
@@ -493,6 +496,39 @@ describe('SsoController', () => {
           canManageSystemConfiguration: false,
           canManageUsers: true,
           canManageBilling: true,
+        },
+      });
+    });
+
+    it('maps role names using provider permission mappings', async () => {
+      const usersService = module.get<UsersService>(UsersService);
+
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({
+        id: 99,
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+      });
+
+      const mockRequest = {
+        headers: { authorization: 'Bearer test-client-secret' },
+      } as unknown as AuthenticatedRequest;
+
+      const result = await controller.oidcUpdatePermissions('1', mockRequest as unknown as Request, {
+        subject: 'sub-4',
+        roles: ['attraccess_admin'],
+      });
+
+      expect(result).toEqual({ OK: true });
+      expect(usersService.updateOne).toHaveBeenCalledWith(99, {
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: true,
+          canManageBilling: false,
         },
       });
     });

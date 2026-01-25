@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsOptional, IsString } from 'class-validator';
 import { ToBoolean } from '../../../../common/request-transformers';
 
 export class SSOProvisioningUserDto {
@@ -23,6 +23,18 @@ export class SSOProvisioningUserDto {
 }
 
 export class SSOProvisioningPermissionsDto extends SSOProvisioningUserDto {
+  @ApiProperty({
+    description: 'Role or group names to evaluate against the configured permission mappings',
+    required: false,
+    isArray: true,
+    type: String,
+    example: ['attraccess_admin', 'attraccess_billing'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  roles?: string[];
+
   @ApiProperty({
     description: 'Whether the user can manage resources',
     required: false,

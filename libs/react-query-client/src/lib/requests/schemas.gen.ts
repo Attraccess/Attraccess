@@ -596,6 +596,40 @@ export const $SSOProviderType = {
     description: 'The type of the provider'
 } as const;
 
+export const $SSOPermissionMappingsDto = {
+    type: 'object',
+    properties: {
+        canManageResources: {
+            type: 'array',
+            description: 'Role names that grant resource management permissions',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageSystemConfiguration: {
+            type: 'array',
+            description: 'Role names that grant system configuration permissions',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageUsers: {
+            type: 'array',
+            description: 'Role names that grant user management permissions',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageBilling: {
+            type: 'array',
+            description: 'Role names that grant billing management permissions',
+            items: {
+                type: 'string'
+            }
+        }
+    }
+} as const;
+
 export const $SSOProviderOIDCConfiguration = {
     type: 'object',
     properties: {
@@ -662,6 +696,14 @@ export const $SSOProviderOIDCConfiguration = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and role names',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         },
         createdAt: {
             format: 'date-time',
@@ -736,6 +778,14 @@ export const $SSOProviderSAMLConfiguration = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and SAML role values',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         },
         spSigningCertificate: {
             type: 'string',
@@ -891,6 +941,14 @@ export const $CreateOIDCConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and role names',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         }
     },
     required: ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL', 'clientId', 'clientSecret']
@@ -944,6 +1002,14 @@ export const $CreateSAMLConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and SAML role values',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         },
         spSigningCertificate: {
             type: 'string',
@@ -1051,6 +1117,14 @@ export const $UpdateOIDCConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and role names',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         }
     }
 } as const;
@@ -1101,6 +1175,14 @@ export const $UpdateSAMLConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and SAML role values',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         },
         spSigningCertificate: {
             type: 'string',

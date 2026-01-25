@@ -177,4 +177,60 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     expect(user.systemPermissions.canManageUsers).toBe(true);
     expect(user.systemPermissions.canManageBilling).toBe(true);
   });
+
+  it('honors configured permission mappings and can revoke permissions', async () => {
+    const existingUser = {
+      id: 333,
+      username: 'existing',
+      email: 'existing@example.com',
+      systemPermissions: {
+        canManageResources: false,
+        canManageSystemConfiguration: false,
+        canManageUsers: true,
+        canManageBilling: false,
+      },
+    } as unknown as User;
+
+    const usersService = {
+      findOne: jest.fn(async () => existingUser),
+      updateOne: jest.fn(async (_id, update) => ({
+        ...existingUser,
+        systemPermissions: update.systemPermissions,
+      })),
+      createOne: jest.fn(),
+    };
+
+    const authService = {
+      findUserIdBySSO: jest.fn(async () => existingUser.id),
+      addAuthenticationDetails: jest.fn(),
+    };
+
+    const strategy = createStrategy(
+      {
+        permissionMappings: {
+          canManageUsers: ['attraccess_admin'],
+        },
+      },
+      usersService,
+      authService,
+    );
+
+    const profile = {
+      id: 'ext-mapping',
+      emails: [{ value: 'existing@example.com' }],
+      _json: { roles: ['other-role'] },
+    } as unknown as Profile;
+
+    const user = await strategy.validate('https://issuer', profile);
+
+    expect(usersService.updateOne).toHaveBeenCalledWith(existingUser.id, {
+      systemPermissions: {
+        canManageResources: false,
+        canManageSystemConfiguration: false,
+        canManageUsers: false,
+        canManageBilling: false,
+      },
+    });
+    expect(user.systemPermissions.canManageUsers).toBe(false);
+  });
 });

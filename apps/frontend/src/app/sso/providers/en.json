@@ -57,6 +57,15 @@
   "scopes": "Scopes (comma-separated)",
   "usernameClaimPaths": "Username claim paths (comma-separated)",
   "emailClaimPaths": "Email claim paths (comma-separated)",
+  "permissionMappings": "Permission mappings",
+  "permissionMappingsHint": "Provide role or group names that grant each permission (comma-separated).",
+  "permissionMappingsPlaceholder": "attraccess_admin, attraccess_billing",
+  "permissionMappingLabels": {
+    "canManageResources": "Roles for resource management",
+    "canManageSystemConfiguration": "Roles for system configuration",
+    "canManageUsers": "Roles for user management",
+    "canManageBilling": "Roles for billing management"
+  },
   "cancel": "Cancel",
   "save": "Save",
   "edit": "Edit",
