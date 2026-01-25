@@ -13,7 +13,7 @@ import { AccountLinkingRequiredException } from '../oidc/exceptions/account-link
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 
-type StrategyCtor = new (...args: any[]) => Strategy;
+type StrategyCtor = new (...args: unknown[]) => Strategy;
 type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
 
 @Injectable()
