@@ -29,6 +29,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   CreateOIDCConfigurationDto,
   CreateSSOProviderDto,
+  SSOPermissionMappingsDto,
   SSOProvider,
   SSOProviderType,
   UpdateSSOProviderDto,
@@ -207,7 +208,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }));
   }, []);
 
-  const buildPermissionMappingInputs = (mapping?: Partial<Record<PermissionKey, string[]>> | null) => ({
+  const buildPermissionMappingInputs = (mapping?: SSOPermissionMappingsDto | null) => ({
     canManageResources: Array.isArray(mapping?.canManageResources) ? mapping?.canManageResources.join(', ') : '',
     canManageSystemConfiguration: Array.isArray(mapping?.canManageSystemConfiguration)
       ? mapping?.canManageSystemConfiguration.join(', ')
@@ -253,7 +254,11 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             : '',
         );
         setOidcPermissionMappingsInput(
-          buildPermissionMappingInputs(extendedProvider.oidcConfiguration.permissionMappings ?? undefined),
+          buildPermissionMappingInputs(
+            (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
+              | Partial<Record<PermissionKey, string[]>>
+              | undefined,
+          ),
         );
       } else {
         setScopesInput('');
@@ -282,7 +287,11 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             : '',
         );
         setSamlPermissionMappingsInput(
-          buildPermissionMappingInputs(extendedProvider.samlConfiguration.permissionMappings ?? undefined),
+          buildPermissionMappingInputs(
+            (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
+              | Partial<Record<PermissionKey, string[]>>
+              | undefined,
+          ),
         );
       } else {
         setEmailAttributeKeysInput('');
