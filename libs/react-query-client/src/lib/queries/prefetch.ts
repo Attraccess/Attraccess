@@ -52,6 +52,10 @@ export const prefetchUseAuthenticationServiceOidcLoginCallback = (queryClient: Q
   sessionState: unknown;
   state: unknown;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
+export const prefetchUseAuthenticationServiceLoginWithSaml = (queryClient: QueryClient, { providerId, redirectTo }: {
+  providerId: string;
+  redirectTo?: unknown;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAuthenticationServiceLoginWithSamlKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithSaml({ providerId, redirectTo }) });
 export const prefetchUseTwoFactorAuthenticationServiceGetTwoFactorStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorStatus() });
 export const prefetchUseTwoFactorAuthenticationServiceGetTwoFactorPolicy = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorPolicy() });
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });

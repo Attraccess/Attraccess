@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSystemServiceInfo } from '@attraccess/react-query-client';
 
 interface Options {
@@ -7,36 +7,29 @@ interface Options {
 }
 
 export function useReliableServerAvailability(options: Options = {}) {
-  const { consecutiveErrorThreshold = 3, refetchIntervalMs = 5000 } = options;
+  const { consecutiveErrorThreshold = 2, refetchIntervalMs = 3000 } = options;
 
   const [errorStreak, setErrorStreak] = useState(0);
-  const mountedRef = useRef(true);
 
   const query = useSystemServiceInfo(undefined, {
-    refetchInterval: refetchIntervalMs,
     retry: false,
   });
 
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (query.isSuccess) {
-      if (mountedRef.current) {
+    const run = async () => {
+      const result = await query.refetch();
+      if (result.isSuccess) {
         setErrorStreak(0);
+        return;
       }
-      return;
-    }
-    if (query.isError) {
-      if (mountedRef.current) {
-        setErrorStreak((prev) => Math.min(prev + 1, consecutiveErrorThreshold));
-      }
-    }
-  }, [query.isSuccess, query.isError, consecutiveErrorThreshold]);
+
+      setErrorStreak((prev) => Math.min(prev + 1, consecutiveErrorThreshold));
+    };
+
+    run();
+    const intervalId = setInterval(run, refetchIntervalMs);
+    return () => clearInterval(intervalId);
+  }, [query, consecutiveErrorThreshold, refetchIntervalMs]);
 
   const isServerLikelyDown = useMemo(
     () => errorStreak >= consecutiveErrorThreshold,

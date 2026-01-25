@@ -41,6 +41,7 @@
     "swagger-build": {
       "executor": "nx:run-commands",
       "cache": true,
+      "dependsOn": ["^build"],
       "inputs": ["swagger"],
       "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger"],
       "options": {

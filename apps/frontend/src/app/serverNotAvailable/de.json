@@ -1,4 +1,7 @@
 {
   "title": "Server nicht verfügbar",
-  "description": "Der Server ist nicht verfügbar. Bitte versuchen Sie es später erneut."
+  "description": "Der Server ist nicht verfügbar. Bitte versuchen Sie es später erneut.",
+  "actions": {
+    "reload": "Neu laden"
+  }
 }

@@ -52,6 +52,10 @@ export const ensureUseAuthenticationServiceOidcLoginCallbackData = (queryClient:
   sessionState: unknown;
   state: unknown;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceOidcLoginCallbackKeyFn({ code, iss, providerId, redirectTo, sessionState, state }), queryFn: () => AuthenticationService.oidcLoginCallback({ code, iss, providerId, redirectTo, sessionState, state }) });
+export const ensureUseAuthenticationServiceLoginWithSamlData = (queryClient: QueryClient, { providerId, redirectTo }: {
+  providerId: string;
+  redirectTo?: unknown;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAuthenticationServiceLoginWithSamlKeyFn({ providerId, redirectTo }), queryFn: () => AuthenticationService.loginWithSaml({ providerId, redirectTo }) });
 export const ensureUseTwoFactorAuthenticationServiceGetTwoFactorStatusData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorStatusKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorStatus() });
 export const ensureUseTwoFactorAuthenticationServiceGetTwoFactorPolicyData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn(), queryFn: () => TwoFactorAuthenticationService.getTwoFactorPolicy() });
 export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindAllData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindAllKeyFn(), queryFn: () => EmailTemplatesService.emailTemplateControllerFindAll() });

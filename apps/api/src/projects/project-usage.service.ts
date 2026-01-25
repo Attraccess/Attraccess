@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { BillingTransaction, BillingTransactionStatus, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionStatus, ResourceUsage, Setting } from '@attraccess/database-entities';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
 import { ProjectUsageHistoryResponseDto } from './dto/project-usage-history-response.dto';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
-import { BillingService } from '../billing/billing.service';
 import { ProjectAccessService } from './project-access.service';
+import { Currency } from '../billing/dto/set-configuration.dto';
 
 type UsageSummaryRaw = {
   totalSessions: string | null;
@@ -48,7 +48,8 @@ export class ProjectUsageService {
     private readonly resourceUsageRepository: Repository<ResourceUsage>,
     @InjectRepository(BillingTransaction)
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
-    private readonly billingService: BillingService,
+    @InjectRepository(Setting)
+    private readonly settingRepository: Repository<Setting>,
     private readonly projectAccessService: ProjectAccessService,
   ) {}
 
@@ -101,7 +102,7 @@ export class ProjectUsageService {
   ): Promise<ProjectUsageStatsDto> {
     await this.projectAccessService.getAccessOrThrow(userId, projectId);
 
-    const configuration = await this.billingService.getConfiguration();
+    const configuration = await this.getBillingConfiguration();
 
     const completedUsageQb = this.resourceUsageRepository
       .createQueryBuilder('usage')
@@ -203,5 +204,26 @@ export class ProjectUsageService {
       timeSeries,
       topResources,
     };
+  }
+
+  private async getBillingConfiguration(): Promise<{ currency: Currency; minorUnit: number }> {
+    const currencySetting = await this.settingRepository.findOneBy({
+      parent: 'billing',
+      key: 'currency',
+    });
+    const currencyValue = (currencySetting?.value as Currency) ?? Currency.EUR;
+
+    let minorUnit: number;
+    switch (currencyValue) {
+      case Currency.EUR:
+        minorUnit = 2;
+        break;
+      default: {
+        const exhaustiveCheck: never = currencyValue;
+        throw new Error(`Unsupported currency: ${exhaustiveCheck}`);
+      }
+    }
+
+    return { currency: currencyValue, minorUnit };
   }
 }

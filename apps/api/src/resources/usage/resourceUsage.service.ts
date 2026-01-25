@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
 import {
@@ -67,6 +67,7 @@ export class ResourceUsageService {
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
+    @Inject(forwardRef(() => ResourceFlowsExecutorService))
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     private readonly projectsService: ProjectsService,
     private readonly resourceFormsService: ResourceFormsService,
