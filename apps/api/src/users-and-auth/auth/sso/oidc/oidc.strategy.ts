@@ -20,7 +20,7 @@ import {
 } from '../permission-mapping';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
   private readonly config: SSOProviderOIDCConfiguration;
 
@@ -56,7 +56,29 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     return undefined;
   }
 
-  async validate(_issuer: string, profile: Profile): Promise<User> {
+  private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
+    if (!idToken) {
+      return undefined;
+    }
+
+    const parts = idToken.split('.');
+    if (parts.length < 2) {
+      this.logger.warn('OIDC id_token format invalid; skipping claim extraction');
+      return undefined;
+    }
+
+    try {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = Buffer.from(padded, 'base64').toString('utf8');
+      return JSON.parse(payload) as Record<string, unknown>;
+    } catch (error) {
+      this.logger.warn(`Failed to parse id_token claims: ${String(error)}`);
+      return undefined;
+    }
+  }
+
+  async validate(_issuer: string, profile: Profile, _context?: unknown, idToken?: string): Promise<User> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
     const oidcUserId = profile.id;
@@ -73,6 +95,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const claimSources: unknown[] = [profile];
     const raw = profile && '_json' in profile && profile._json ? profile._json : undefined;
     if (raw) claimSources.push(raw);
+    const idTokenClaims = this.parseIdTokenClaims(idToken);
+    if (idTokenClaims) claimSources.push(idTokenClaims);
 
     // Resolve email via configured or default paths
     const defaultEmailPaths = ['email', 'emails[0].value', 'upn'];
@@ -176,7 +200,10 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const directUpdates: Partial<SystemPermissions> = {};
     const roleNames: string[] = [];
 
-    for (const value of this.getPermissionClaimValues(claimSources)) {
+    const claimValues = this.getPermissionClaimValues(claimSources);
+    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
+
+    for (const value of claimValues) {
       if (Array.isArray(value)) {
         for (const entry of value) {
           if (typeof entry === 'string') {
@@ -216,7 +243,10 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
       }
     }
 
+    this.logger.debug(`Resolved role names: ${JSON.stringify(roleNames)}`);
+    this.logger.debug(`Direct permission updates: ${JSON.stringify(directUpdates)}`);
     const roleBasedUpdates = resolvePermissionsFromRoles(roleNames, this.config.permissionMappings);
+    this.logger.debug(`Role-based updates: ${JSON.stringify(roleBasedUpdates)}`);
     return {
       ...roleBasedUpdates,
       ...directUpdates,
@@ -239,6 +269,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
   ): Promise<User> {
     const updates = this.resolvePermissionUpdates(claimSources);
     if (Object.keys(updates).length === 0) {
+      this.logger.debug('No permission updates resolved from SSO claims');
       return user;
     }
 
