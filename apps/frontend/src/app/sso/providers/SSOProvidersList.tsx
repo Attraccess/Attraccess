@@ -587,6 +587,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       {providers && providers.length > 0 ? (
         <Table aria-label={t('table.ariaLabel')} data-cy="sso-providers-table">
           <TableHeader>
+            <TableColumn>{t('id')}</TableColumn>
             <TableColumn>{t('name')}</TableColumn>
             <TableColumn>{t('type')}</TableColumn>
             <TableColumn>{t('actions')}</TableColumn>
@@ -599,6 +600,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           >
             {(provider) => (
               <TableRow key={provider.id}>
+                <TableCell>
+                  <span className="font-mono text-sm">{provider.id}</span>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Key size={16} />

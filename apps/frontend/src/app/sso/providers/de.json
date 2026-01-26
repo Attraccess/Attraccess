@@ -1,5 +1,6 @@
 {
   "addNewProvider": "Neuen Anbieter hinzufügen",
+  "id": "ID",
   "name": "Name",
   "type": "Typ",
   "configuration": "Konfiguration",

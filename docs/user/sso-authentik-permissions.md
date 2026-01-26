@@ -87,3 +87,6 @@ corresponding permission is removed on their next login.
   keeps Authentik as the source of truth for group membership.
 
 See `user/sso-providers.md` for the general SSO provider setup steps and fields.
+
+If you need permission changes to apply immediately when group memberships change,
+see `user/sso-authentik-webhooks.md` for a webhook-based sync approach.
