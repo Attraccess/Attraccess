@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, UpdateMaintenanceData, UpdateMaintenanceResponse, CancelMaintenanceData, CancelMaintenanceResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
+import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, SsoOidcLogoutData, SsoOidcLogoutResponse, SsoSamlLogoutData, SsoSamlLogoutResponse, SsoOidcDeleteUserData, SsoOidcDeleteUserResponse, SsoSamlDeleteUserData, SsoSamlDeleteUserResponse, SsoOidcUpdatePermissionsData, SsoOidcUpdatePermissionsResponse, SsoSamlUpdatePermissionsData, SsoSamlUpdatePermissionsResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, UpdateMaintenanceData, UpdateMaintenanceResponse, CancelMaintenanceData, CancelMaintenanceResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
 
 export class SystemService {
     /**
@@ -801,6 +801,162 @@ export class AuthenticationService {
                 400: 'Invalid host or realm',
                 401: 'Unauthorized'
             }
+        });
+    }
+    
+    /**
+     * SSO-initiated logout
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO client secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO client secret> (or use x-api-key)
+     * @returns unknown All user sessions have been revoked
+     * @throws ApiError
+     */
+    public static ssoOidcLogout(data: SsoOidcLogoutData): CancelablePromise<SsoOidcLogoutResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/OIDC/{providerId}/logout',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * SAML-initiated logout
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO provisioning secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO provisioning secret> (or use x-api-key)
+     * @returns unknown All user sessions have been revoked
+     * @throws ApiError
+     */
+    public static ssoSamlLogout(data: SsoSamlLogoutData): CancelablePromise<SsoSamlLogoutResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/SAML/{providerId}/logout',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * SSO-initiated user deletion
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO client secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO client secret> (or use x-api-key)
+     * @returns unknown The user has been deleted
+     * @throws ApiError
+     */
+    public static ssoOidcDeleteUser(data: SsoOidcDeleteUserData): CancelablePromise<SsoOidcDeleteUserResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/OIDC/{providerId}/users/delete',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * SAML-initiated user deletion
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO provisioning secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO provisioning secret> (or use x-api-key)
+     * @returns unknown The user has been deleted
+     * @throws ApiError
+     */
+    public static ssoSamlDeleteUser(data: SsoSamlDeleteUserData): CancelablePromise<SsoSamlDeleteUserResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/SAML/{providerId}/users/delete',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * SSO-initiated permission update
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO client secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO client secret> (or use x-api-key)
+     * @returns unknown The user permissions have been updated
+     * @throws ApiError
+     */
+    public static ssoOidcUpdatePermissions(data: SsoOidcUpdatePermissionsData): CancelablePromise<SsoOidcUpdatePermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/OIDC/{providerId}/users/permissions',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
+        });
+    }
+    
+    /**
+     * SAML-initiated permission update
+     * @param data The data for the request.
+     * @param data.providerId The ID of the SSO provider
+     * @param data.requestBody
+     * @param data.xApiKey SSO provisioning secret (alternative to Authorization header)
+     * @param data.authorization Bearer <SSO provisioning secret> (or use x-api-key)
+     * @returns unknown The user permissions have been updated
+     * @throws ApiError
+     */
+    public static ssoSamlUpdatePermissions(data: SsoSamlUpdatePermissionsData): CancelablePromise<SsoSamlUpdatePermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/auth/sso/SAML/{providerId}/users/permissions',
+            path: {
+                providerId: data.providerId
+            },
+            headers: {
+                'x-api-key': data.xApiKey,
+                Authorization: data.authorization
+            },
+            body: data.requestBody,
+            mediaType: 'application/json'
         });
     }
     

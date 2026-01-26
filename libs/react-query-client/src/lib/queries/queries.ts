@@ -2,7 +2,7 @@
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceGetLocalSignupDomainWhitelist = <TData = Common.UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(queryKey), queryFn: () => UsersService.getLocalSignupDomainWhitelist() as TData, ...options });
@@ -320,6 +320,72 @@ export const useAuthenticationServiceLinkUserToExternalAccount = <TData = Common
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: LinkUserToExternalAccountRequestDto;
 }, TContext>({ mutationFn: ({ requestBody }) => AuthenticationService.linkUserToExternalAccount({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoOidcLogout = <TData = Common.AuthenticationServiceSsoOidcLogoutMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcLogout({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoSamlLogout = <TData = Common.AuthenticationServiceSsoSamlLogoutMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlLogout({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoOidcDeleteUser = <TData = Common.AuthenticationServiceSsoOidcDeleteUserMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcDeleteUser({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoSamlDeleteUser = <TData = Common.AuthenticationServiceSsoSamlDeleteUserMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningUserDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlDeleteUser({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoOidcUpdatePermissions = <TData = Common.AuthenticationServiceSsoOidcUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningPermissionsDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningPermissionsDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcUpdatePermissions({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
+export const useAuthenticationServiceSsoSamlUpdatePermissions = <TData = Common.AuthenticationServiceSsoSamlUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningPermissionsDto;
+  xApiKey?: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  authorization?: string;
+  providerId: string;
+  requestBody: SSOProvisioningPermissionsDto;
+  xApiKey?: string;
+}, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlUpdatePermissions({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceSamlLoginCallback = <TData = Common.AuthenticationServiceSamlLoginCallbackMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   providerId: string;
   redirectTo: string;

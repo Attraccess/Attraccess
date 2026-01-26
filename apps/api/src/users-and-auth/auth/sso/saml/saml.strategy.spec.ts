@@ -119,7 +119,7 @@ describe('SSOSamlStrategy', () => {
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = buildRequest(30, 'email');
-    request.ssoSamlOptions!.samlConfiguration.permissionMappings = {
+    request.ssoSamlOptions.samlConfiguration.permissionMappings = {
       canManageUsers: ['attraccess_admin'],
       canManageBilling: ['billing-role'],
     };
