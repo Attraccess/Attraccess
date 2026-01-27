@@ -407,6 +407,12 @@ export type SSOProviderOIDCConfiguration = {
      */
     emailClaimPaths?: Array<(string)>;
     /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: {
+        [key: string]: unknown;
+    };
+    /**
      * When the user was created
      */
     createdAt: string;
@@ -461,6 +467,16 @@ export type SSOProviderSAMLConfiguration = {
      * Optional list of attribute keys (ordered) to resolve user emails from SAML assertions
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string | null;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role attribute values
+     */
+    permissionMappings?: {
+        [key: string]: unknown;
+    };
     /**
      * PEM encoded Service Provider certificate used when signing AuthnRequests
      */
@@ -525,6 +541,25 @@ export type LinkUserToExternalAccountRequestDto = {
     linkToken: string;
 };
 
+export type SSOPermissionMappingsDto = {
+    /**
+     * Role names that grant resource management permissions
+     */
+    canManageResources?: Array<(string)>;
+    /**
+     * Role names that grant system configuration permissions
+     */
+    canManageSystemConfiguration?: Array<(string)>;
+    /**
+     * Role names that grant user management permissions
+     */
+    canManageUsers?: Array<(string)>;
+    /**
+     * Role names that grant billing management permissions
+     */
+    canManageBilling?: Array<(string)>;
+};
+
 export type CreateOIDCConfigurationDto = {
     /**
      * The issuer of the provider
@@ -562,6 +597,10 @@ export type CreateOIDCConfigurationDto = {
      * Ordered list of claim paths to resolve the email
      */
     emailClaimPaths?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
 };
 
 export type CreateSAMLConfigurationDto = {
@@ -601,6 +640,14 @@ export type CreateSAMLConfigurationDto = {
      * Ordered list of attribute keys to resolve email addresses from (first match wins)
      */
     emailAttributeKeys?: Array<(string)>;
+    /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role values
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
     /**
      * PEM encoded Service Provider certificate used when signing requests
      */
@@ -667,6 +714,10 @@ export type UpdateOIDCConfigurationDto = {
      * Ordered list of claim paths to resolve the email
      */
     emailClaimPaths?: Array<(string)>;
+    /**
+     * Optional mapping between Attraccess permissions and role names
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
 };
 
 export type UpdateSAMLConfigurationDto = {
@@ -711,6 +762,14 @@ export type UpdateSAMLConfigurationDto = {
      */
     emailAttributeKeys?: Array<(string)>;
     /**
+     * Shared secret used to authorize SAML provisioning requests
+     */
+    provisioningSecret?: string;
+    /**
+     * Optional mapping between Attraccess permissions and SAML role values
+     */
+    permissionMappings?: SSOPermissionMappingsDto;
+    /**
      * PEM encoded Service Provider certificate used when signing requests
      */
     spSigningCertificate?: string;
@@ -733,6 +792,48 @@ export type UpdateSSOProviderDto = {
      * The SAML configuration for the provider
      */
     samlConfiguration?: UpdateSAMLConfigurationDto;
+};
+
+export type SSOProvisioningUserDto = {
+    /**
+     * The SSO subject (sub) identifier
+     */
+    subject?: string;
+    /**
+     * The user email address
+     */
+    email?: string;
+};
+
+export type SSOProvisioningPermissionsDto = {
+    /**
+     * The SSO subject (sub) identifier
+     */
+    subject?: string;
+    /**
+     * The user email address
+     */
+    email?: string;
+    /**
+     * Role or group names to evaluate against the configured permission mappings
+     */
+    roles?: Array<(string)>;
+    /**
+     * Whether the user can manage resources
+     */
+    canManageResources?: boolean;
+    /**
+     * Whether the user can manage system configuration
+     */
+    canManageSystemConfiguration?: boolean;
+    /**
+     * Whether the user can manage users
+     */
+    canManageUsers?: boolean;
+    /**
+     * Whether the user can manage billing
+     */
+    canManageBilling?: boolean;
 };
 
 export type PreviewMjmlDto = {
@@ -3380,6 +3481,126 @@ export type DiscoverKeycloakOidcData = {
 
 export type DiscoverKeycloakOidcResponse = unknown;
 
+export type SsoOidcLogoutData = {
+    /**
+     * Bearer <SSO client secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningUserDto;
+    /**
+     * SSO client secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoOidcLogoutResponse = {
+    OK?: boolean;
+};
+
+export type SsoSamlLogoutData = {
+    /**
+     * Bearer <SSO provisioning secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningUserDto;
+    /**
+     * SSO provisioning secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoSamlLogoutResponse = {
+    OK?: boolean;
+};
+
+export type SsoOidcDeleteUserData = {
+    /**
+     * Bearer <SSO client secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningUserDto;
+    /**
+     * SSO client secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoOidcDeleteUserResponse = {
+    OK?: boolean;
+};
+
+export type SsoSamlDeleteUserData = {
+    /**
+     * Bearer <SSO provisioning secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningUserDto;
+    /**
+     * SSO provisioning secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoSamlDeleteUserResponse = {
+    OK?: boolean;
+};
+
+export type SsoOidcUpdatePermissionsData = {
+    /**
+     * Bearer <SSO client secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningPermissionsDto;
+    /**
+     * SSO client secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoOidcUpdatePermissionsResponse = {
+    OK?: boolean;
+};
+
+export type SsoSamlUpdatePermissionsData = {
+    /**
+     * Bearer <SSO provisioning secret> (or use x-api-key)
+     */
+    authorization?: string;
+    /**
+     * The ID of the SSO provider
+     */
+    providerId: string;
+    requestBody: SSOProvisioningPermissionsDto;
+    /**
+     * SSO provisioning secret (alternative to Authorization header)
+     */
+    xApiKey?: string;
+};
+
+export type SsoSamlUpdatePermissionsResponse = {
+    OK?: boolean;
+};
+
 export type LoginWithOidcData = {
     /**
      * The ID of the SSO provider
@@ -5097,6 +5318,84 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/auth/sso/OIDC/{providerId}/logout': {
+        post: {
+            req: SsoOidcLogoutData;
+            res: {
+                /**
+                 * All user sessions have been revoked
+                 */
+                200: {
+                    OK?: boolean;
+                };
+            };
+        };
+    };
+    '/api/auth/sso/SAML/{providerId}/logout': {
+        post: {
+            req: SsoSamlLogoutData;
+            res: {
+                /**
+                 * All user sessions have been revoked
+                 */
+                200: {
+                    OK?: boolean;
+                };
+            };
+        };
+    };
+    '/api/auth/sso/OIDC/{providerId}/users/delete': {
+        post: {
+            req: SsoOidcDeleteUserData;
+            res: {
+                /**
+                 * The user has been deleted
+                 */
+                200: {
+                    OK?: boolean;
+                };
+            };
+        };
+    };
+    '/api/auth/sso/SAML/{providerId}/users/delete': {
+        post: {
+            req: SsoSamlDeleteUserData;
+            res: {
+                /**
+                 * The user has been deleted
+                 */
+                200: {
+                    OK?: boolean;
+                };
+            };
+        };
+    };
+    '/api/auth/sso/OIDC/{providerId}/users/permissions': {
+        post: {
+            req: SsoOidcUpdatePermissionsData;
+            res: {
+                /**
+                 * The user permissions have been updated
+                 */
+                200: {
+                    OK?: boolean;
+                };
+            };
+        };
+    };
+    '/api/auth/sso/SAML/{providerId}/users/permissions': {
+        post: {
+            req: SsoSamlUpdatePermissionsData;
+            res: {
+                /**
+                 * The user permissions have been updated
+                 */
+                200: {
+                    OK?: boolean;
+                };
             };
         };
     };

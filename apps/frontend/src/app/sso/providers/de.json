@@ -1,5 +1,6 @@
 {
   "addNewProvider": "Neuen Anbieter hinzufügen",
+  "id": "ID",
   "name": "Name",
   "type": "Typ",
   "configuration": "Konfiguration",
@@ -57,6 +58,19 @@
   "scopes": "Scopes (durch Komma getrennt)",
   "usernameClaimPaths": "Benutzername-Claim-Pfade (durch Komma getrennt)",
   "emailClaimPaths": "E-Mail-Claim-Pfade (durch Komma getrennt)",
+  "samlProvisioningSecret": "SAML-Provisioning-Secret",
+  "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
+  "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",
+  "hideSamlProvisioningSecret": "Provisioning-Secret verbergen",
+  "permissionMappings": "Berechtigungszuordnungen",
+  "permissionMappingsHint": "Geben Sie Rollen- oder Gruppennamen an, die die jeweilige Berechtigung vergeben (durch Komma getrennt).",
+  "permissionMappingsPlaceholder": "attraccess_admin, attraccess_billing",
+  "permissionMappingLabels": {
+    "canManageResources": "Rollen für Ressourcenverwaltung",
+    "canManageSystemConfiguration": "Rollen für Systemkonfiguration",
+    "canManageUsers": "Rollen für Benutzerverwaltung",
+    "canManageBilling": "Rollen für Abrechnung"
+  },
   "cancel": "Abbrechen",
   "save": "Speichern",
   "edit": "Bearbeiten",

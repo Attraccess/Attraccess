@@ -2,14 +2,25 @@ import { Profile, Strategy } from 'passport-openidconnect';
 import { get } from 'lodash-es';
 import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import {
+  AuthenticationType,
+  SSOProviderOIDCConfiguration,
+  SSOProviderType,
+  SystemPermissions,
+  User,
+} from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { ModuleRef } from '@nestjs/core';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { AuthService } from '../../auth.service';
+import {
+  DEFAULT_PERMISSION_KEY_MAP,
+  normalizePermissionToken,
+  resolvePermissionsFromRoles,
+} from '../permission-mapping';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
   private readonly config: SSOProviderOIDCConfiguration;
 
@@ -45,7 +56,29 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     return undefined;
   }
 
-  async validate(_issuer: string, profile: Profile): Promise<User> {
+  private parseIdTokenClaims(idToken?: string): Record<string, unknown> | undefined {
+    if (!idToken) {
+      return undefined;
+    }
+
+    const parts = idToken.split('.');
+    if (parts.length < 2) {
+      this.logger.warn('OIDC id_token format invalid; skipping claim extraction');
+      return undefined;
+    }
+
+    try {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = Buffer.from(padded, 'base64').toString('utf8');
+      return JSON.parse(payload) as Record<string, unknown>;
+    } catch (error) {
+      this.logger.warn(`Failed to parse id_token claims: ${String(error)}`);
+      return undefined;
+    }
+  }
+
+  async validate(_issuer: string, profile: Profile, _context?: unknown, idToken?: string): Promise<User> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
     const oidcUserId = profile.id;
@@ -62,6 +95,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     const claimSources: unknown[] = [profile];
     const raw = profile && '_json' in profile && profile._json ? profile._json : undefined;
     if (raw) claimSources.push(raw);
+    const idTokenClaims = this.parseIdTokenClaims(idToken);
+    if (idTokenClaims) claimSources.push(idTokenClaims);
 
     // Resolve email via configured or default paths
     const defaultEmailPaths = ['email', 'emails[0].value', 'upn'];
@@ -89,7 +124,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
 
     if (user) {
       this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return user;
+      return await this.syncPermissionsFromClaims(user, claimSources, usersService);
     }
 
     // Step 2: No user found by external ID, check by email
@@ -139,6 +174,115 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc') {
     });
 
     this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
-    return user;
+    return await this.syncPermissionsFromClaims(user, claimSources, usersService);
+  }
+
+  private getPermissionClaimValues(claimSources: unknown[]): unknown[] {
+    const paths = ['systemPermissions', 'permissions', 'roles', 'groups', 'realm_access.roles'];
+    if (this.config.clientId) {
+      paths.push(`resource_access.${this.config.clientId}.roles`);
+    }
+
+    const values: unknown[] = [];
+    for (const path of paths) {
+      for (const source of claimSources) {
+        const value = get(source, path);
+        if (value !== undefined && value !== null) {
+          values.push(value);
+        }
+      }
+    }
+
+    return values;
+  }
+
+  private resolvePermissionUpdates(claimSources: unknown[]): Partial<SystemPermissions> {
+    const directUpdates: Partial<SystemPermissions> = {};
+    const roleNames: string[] = [];
+
+    const claimValues = this.getPermissionClaimValues(claimSources);
+    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
+
+    for (const value of claimValues) {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') {
+            roleNames.push(entry);
+          }
+        }
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        roleNames.push(value);
+        continue;
+      }
+
+      if (value && typeof value === 'object') {
+        for (const [key, entry] of Object.entries(value)) {
+          const normalizedKey = normalizePermissionToken(key);
+          const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
+          if (permissionKey && typeof entry === 'boolean') {
+            directUpdates[permissionKey] = entry;
+            continue;
+          }
+
+          if (Array.isArray(entry)) {
+            for (const item of entry) {
+              if (typeof item === 'string') {
+                roleNames.push(item);
+              }
+            }
+            continue;
+          }
+
+          if (typeof entry === 'string') {
+            roleNames.push(entry);
+          }
+        }
+      }
+    }
+
+    this.logger.debug(`Resolved role names: ${JSON.stringify(roleNames)}`);
+    this.logger.debug(`Direct permission updates: ${JSON.stringify(directUpdates)}`);
+    const roleBasedUpdates = resolvePermissionsFromRoles(roleNames, this.config.permissionMappings);
+    this.logger.debug(`Role-based updates: ${JSON.stringify(roleBasedUpdates)}`);
+    return {
+      ...roleBasedUpdates,
+      ...directUpdates,
+    };
+  }
+
+  private buildDefaultPermissions(): SystemPermissions {
+    return {
+      canManageResources: false,
+      canManageSystemConfiguration: false,
+      canManageUsers: false,
+      canManageBilling: false,
+    };
+  }
+
+  private async syncPermissionsFromClaims(
+    user: User,
+    claimSources: unknown[],
+    usersService: UsersService,
+  ): Promise<User> {
+    const updates = this.resolvePermissionUpdates(claimSources);
+    if (Object.keys(updates).length === 0) {
+      this.logger.debug('No permission updates resolved from SSO claims');
+      return user;
+    }
+
+    const current = user.systemPermissions ?? this.buildDefaultPermissions();
+    const merged = { ...current, ...updates };
+    const shouldUpdate = Object.keys(updates).some(
+      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
+    );
+    if (!shouldUpdate) {
+      return user;
+    }
+
+    this.logger.debug(`Updating permissions for user ${user.id} from SSO claims`);
+    return await usersService.updateOne(user.id, { systemPermissions: merged });
   }
 }

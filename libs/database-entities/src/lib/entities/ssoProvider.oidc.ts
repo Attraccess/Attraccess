@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { SSOProvider } from './ssoProvider.entity';
+import { SystemPermission } from './user.entity';
 
 @Entity()
 export class SSOProviderOIDCConfiguration {
@@ -91,6 +92,17 @@ export class SSOProviderOIDCConfiguration {
     required: false,
   })
   emailClaimPaths!: string[] | null;
+
+  @Column({ type: 'json', nullable: true })
+  @ApiProperty({
+    description: 'Optional mapping between Attraccess permissions and role names',
+    required: false,
+    example: {
+      canManageResources: ['attraccess_resources'],
+      canManageUsers: ['attraccess_admin'],
+    },
+  })
+  permissionMappings?: Partial<Record<SystemPermission, string[]>> | null;
 
   @CreateDateColumn()
   @ApiProperty({

@@ -8,10 +8,15 @@ import {
 } from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { UsersService } from '../../../users/users.service';
-import { SSOProviderSAMLConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import { SSOProviderSAMLConfiguration, SSOProviderType, SystemPermissions, User } from '@attraccess/database-entities';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
+import {
+  DEFAULT_PERMISSION_KEY_MAP,
+  normalizePermissionToken,
+  resolvePermissionsFromRoles,
+} from '../permission-mapping';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
 type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
@@ -175,7 +180,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     const config = requestOptions.samlConfiguration;
     const providerId = requestOptions.providerId ?? config.ssoProviderId;
-    const samlUserId = profile?.nameID;
+    const samlUserId = typeof profile?.nameID === 'string' ? profile.nameID : undefined;
     if (!samlUserId) {
       this.logger.error('No NameID found in SAML assertion');
       throw new BadRequestException('No NameID found in SAML assertion');
@@ -191,13 +196,14 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     let user = await usersService.findOne({ externalIdentifier: samlUserId }).catch(() => null);
     if (user) {
-      return user;
+      return await this.syncPermissionsFromClaims(user, profile, config, usersService);
     }
 
     user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
     if (user) {
       if (user.authenticationDetails.length === 0) {
-        return await usersService.updateOne(user.id, { externalIdentifier: samlUserId });
+        const updated = await usersService.updateOne(user.id, { externalIdentifier: samlUserId });
+        return await this.syncPermissionsFromClaims(updated, profile, config, usersService);
       }
 
       throw new AccountLinkingRequiredException({
@@ -226,6 +232,123 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       throw new UnauthorizedException();
     }
 
-    return user;
+    return await this.syncPermissionsFromClaims(user, profile, config, usersService);
+  }
+
+  private getPermissionClaimValues(profile: SamlProfile): unknown[] {
+    const values: unknown[] = [];
+    const profileRecord = profile as Record<string, unknown>;
+    const attributes = profileRecord.attributes;
+    if (attributes && typeof attributes === 'object') {
+      values.push(...Object.values(attributes as Record<string, unknown>));
+    }
+
+    const candidateKeys = ['roles', 'role', 'groups', 'group'];
+    for (const key of candidateKeys) {
+      const value = profileRecord[key];
+      if (value !== undefined && value !== null) {
+        values.push(value);
+      }
+    }
+
+    return values;
+  }
+
+  private resolvePermissionUpdates(profile: SamlProfile, config: SSOProviderSAMLConfiguration): Partial<SystemPermissions> {
+    const roleNames: string[] = [];
+    const directUpdates: Partial<SystemPermissions> = {};
+
+    for (const value of this.getPermissionClaimValues(profile)) {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') {
+            roleNames.push(entry);
+          }
+        }
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        roleNames.push(value);
+        continue;
+      }
+    }
+
+    const profileRecord = profile as Record<string, unknown>;
+    const attributeRecord = (profileRecord.attributes ?? {}) as Record<string, unknown>;
+    const entries = [...Object.entries(profileRecord), ...Object.entries(attributeRecord)];
+    for (const [key, entry] of entries) {
+      const normalizedKey = normalizePermissionToken(key);
+      const permissionKey = DEFAULT_PERMISSION_KEY_MAP[normalizedKey];
+      if (!permissionKey) {
+        continue;
+      }
+
+      const coerced = this.coerceBoolean(entry);
+      if (typeof coerced === 'boolean') {
+        directUpdates[permissionKey] = coerced;
+      }
+    }
+
+    const roleUpdates = resolvePermissionsFromRoles(roleNames, config.permissionMappings);
+    return {
+      ...roleUpdates,
+      ...directUpdates,
+    };
+  }
+
+  private coerceBoolean(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'on'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'no', 'off'].includes(normalized)) {
+        return false;
+      }
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+      return this.coerceBoolean(value[0]);
+    }
+
+    return undefined;
+  }
+
+  private buildDefaultPermissions(): SystemPermissions {
+    return {
+      canManageResources: false,
+      canManageSystemConfiguration: false,
+      canManageUsers: false,
+      canManageBilling: false,
+    };
+  }
+
+  private async syncPermissionsFromClaims(
+    user: User,
+    profile: SamlProfile,
+    config: SSOProviderSAMLConfiguration,
+    usersService: UsersService,
+  ): Promise<User> {
+    const updates = this.resolvePermissionUpdates(profile, config);
+    if (Object.keys(updates).length === 0) {
+      return user;
+    }
+
+    const current = user.systemPermissions ?? this.buildDefaultPermissions();
+    const merged = { ...current, ...updates };
+    const shouldUpdate = Object.keys(updates).some(
+      (key) => merged[key as keyof SystemPermissions] !== current[key as keyof SystemPermissions],
+    );
+    if (!shouldUpdate) {
+      return user;
+    }
+
+    this.logger.debug(`Updating permissions for user ${user.id} from SAML claims`);
+    return await usersService.updateOne(user.id, { systemPermissions: merged });
   }
 }

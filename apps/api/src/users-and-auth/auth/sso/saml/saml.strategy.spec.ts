@@ -1,9 +1,10 @@
-import { Profile as SamlProfile } from '@node-saml/passport-saml';
 import { ModuleRef } from '@nestjs/core';
 import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
 import { SSOSamlRequest } from './saml.types';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
+
+type SamlProfile = Record<string, unknown>;
 
 describe('SSOSamlStrategy', () => {
   const buildRequest = (providerId: number, emailKey: string): SSOSamlRequest => {
@@ -101,7 +102,6 @@ describe('SSOSamlStrategy', () => {
           }) as unknown as { id: number; username: string; email: string; externalIdentifier: string },
       ),
     };
-
     const moduleRef = {
       get: jest.fn().mockResolvedValue(usersService),
     } as unknown as ModuleRef;
@@ -128,5 +128,63 @@ describe('SSOSamlStrategy', () => {
       }),
     );
     expect(user.username).toBe('name.surname');
+  });
+
+  it('syncs permissions from SAML role attributes', async () => {
+    const usersService = {
+      findOne: jest.fn(),
+      updateOne: jest.fn(async (_id: number, update: { systemPermissions: Record<string, boolean> }) => ({
+        id: 44,
+        systemPermissions: update.systemPermissions,
+      })),
+    };
+
+    usersService.findOne.mockImplementation((query: Record<string, unknown>) => {
+      if ('externalIdentifier' in query) {
+        return Promise.resolve({
+          id: 44,
+          externalIdentifier: 'saml-user',
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const moduleRef = {
+      get: jest.fn().mockResolvedValue(usersService),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    request.ssoSamlOptions.samlConfiguration.permissionMappings = {
+      canManageUsers: ['attraccess_admin'],
+      canManageBilling: ['billing-role'],
+    };
+
+    const profile = {
+      nameID: 'saml-user',
+      email: 'user@example.com',
+      attributes: {
+        roles: ['attraccess_admin', 'billing-role'],
+      },
+    } as SamlProfile;
+
+    const user = await strategy.validate(request, profile);
+
+    expect(usersService.updateOne).toHaveBeenCalledWith(44, {
+      systemPermissions: {
+        canManageResources: false,
+        canManageSystemConfiguration: false,
+        canManageUsers: true,
+        canManageBilling: true,
+      },
+    });
+    expect(user.systemPermissions.canManageUsers).toBe(true);
+    expect(user.systemPermissions.canManageBilling).toBe(true);
   });
 });
