@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Link } from '@heroui/react';
+import { Button } from '@heroui/react';
 import de from './ssoLogin.de.json';
 import en from './ssoLogin.en.json';
 import { useMemo } from 'react';
