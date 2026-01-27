@@ -17,6 +17,8 @@
   - [Plugins](user/plugins.md)
   - [Resource Take-Over](user/resource-takeover.md)
   - [SSO](user/sso-providers.md)
+  - [Authentik OIDC Permissions](user/sso-authentik-permissions.md)
+  - [Authentik Webhook Sync](user/sso-authentik-webhooks.md)
 
 - **Developer Documentation**
 

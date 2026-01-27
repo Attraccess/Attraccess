@@ -1,5 +1,6 @@
 {
   "addNewProvider": "Add New Provider",
+  "id": "ID",
   "name": "Name",
   "type": "Type",
   "configuration": "Configuration",
@@ -57,6 +58,19 @@
   "scopes": "Scopes (comma-separated)",
   "usernameClaimPaths": "Username claim paths (comma-separated)",
   "emailClaimPaths": "Email claim paths (comma-separated)",
+  "samlProvisioningSecret": "SAML provisioning secret",
+  "samlProvisioningSecretHint": "Used to authorize SAML provisioning calls (logout, delete, permissions). Leave blank to keep existing secret.",
+  "showSamlProvisioningSecret": "Show provisioning secret",
+  "hideSamlProvisioningSecret": "Hide provisioning secret",
+  "permissionMappings": "Permission mappings",
+  "permissionMappingsHint": "Provide role or group names that grant each permission (comma-separated).",
+  "permissionMappingsPlaceholder": "attraccess_admin, attraccess_billing",
+  "permissionMappingLabels": {
+    "canManageResources": "Roles for resource management",
+    "canManageSystemConfiguration": "Roles for system configuration",
+    "canManageUsers": "Roles for user management",
+    "canManageBilling": "Roles for billing management"
+  },
   "cancel": "Cancel",
   "save": "Save",
   "edit": "Edit",

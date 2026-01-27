@@ -1,14 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import {
   SSOProvider,
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   SSOProviderType,
 } from '@attraccess/database-entities';
-import { CreateSSOProviderDto, CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
-import { UpdateSSOProviderDto, UpdateSAMLConfigurationDto } from './dto/update-sso-provider.dto';
+import {
+  CreateSSOProviderDto,
+  CreateSAMLConfigurationDto,
+  CreateOIDCConfigurationDto,
+} from './dto/create-sso-provider.dto';
+import { UpdateSSOProviderDto, UpdateSAMLConfigurationDto, UpdateOIDCConfigurationDto } from './dto/update-sso-provider.dto';
 import { SSOProviderNotFoundException } from './errors';
 import { LicenseModuleType, LicenseService } from '../../../license/license.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
@@ -128,14 +132,7 @@ export class SSOService {
 
   private async createOIDCConfiguration(
     providerId: number,
-    config: {
-      issuer: string;
-      authorizationURL: string;
-      tokenURL: string;
-      userInfoURL: string;
-      clientId: string;
-      clientSecret: string;
-    },
+    config: CreateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
     const newConfig = this.oidcConfigRepository.create({
       ...config,
@@ -147,14 +144,7 @@ export class SSOService {
 
   private async updateOIDCConfiguration(
     providerId: number,
-    updateConfig: Partial<{
-      issuer: string;
-      authorizationURL: string;
-      tokenURL: string;
-      userInfoURL: string;
-      clientId: string;
-      clientSecret: string;
-    }>,
+    updateConfig: UpdateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, updateConfig);
     return this.oidcConfigRepository.findOne({ where: { ssoProviderId: providerId } });
@@ -177,14 +167,17 @@ export class SSOService {
     void unusedSpCert;
     void unusedSpKey;
 
+    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
+
     const newConfig = this.samlConfigRepository.create({
       ...persistableConfig,
       certificate: normalizedCertificate,
+      provisioningSecret: config.provisioningSecret?.trim() || null,
       spSigningCertificate: normalizedSpSigningCertificate,
       spSigningKeyEncrypted: encryptedPrivateKey,
       spSigningKeyEncryptionKeyId: encryptedPrivateKey ? this.getEncryptionKeyId() : null,
       ssoProviderId: providerId,
-    });
+    } as DeepPartial<SAMLConfigEntity>);
 
     return this.samlConfigRepository.save(newConfig);
   }
@@ -198,7 +191,8 @@ export class SSOService {
       throw new BadRequestException('SAML configuration not found for provider');
     }
 
-    const payload: Partial<SSOProviderSAMLConfiguration> = {};
+    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
+    const payload: Partial<SAMLConfigEntity> = {};
 
     if (typeof config.entryPoint !== 'undefined') {
       payload.entryPoint = config.entryPoint;
@@ -226,6 +220,12 @@ export class SSOService {
     }
     if (typeof config.emailAttributeKeys !== 'undefined') {
       payload.emailAttributeKeys = config.emailAttributeKeys;
+    }
+    if (typeof config.provisioningSecret !== 'undefined') {
+      payload.provisioningSecret = config.provisioningSecret?.trim() || null;
+    }
+    if (typeof config.permissionMappings !== 'undefined') {
+      payload.permissionMappings = config.permissionMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate

@@ -29,6 +29,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   CreateOIDCConfigurationDto,
   CreateSSOProviderDto,
+  SSOPermissionMappingsDto,
   SSOProvider,
   SSOProviderType,
   UpdateSSOProviderDto,
@@ -52,6 +53,15 @@ import { Select } from '../../../components/select';
 import { getBaseUrl } from '../../../api';
 import { hasRequiredSamlSigningMaterial } from './signingMaterial';
 
+const permissionKeys = [
+  'canManageResources',
+  'canManageSystemConfiguration',
+  'canManageUsers',
+  'canManageBilling',
+] as const;
+
+type PermissionKey = (typeof permissionKeys)[number];
+
 const getDefaultOidcConfiguration = () => ({
   issuer: '',
   authorizationURL: '',
@@ -70,9 +80,17 @@ const getDefaultSamlConfiguration = () => ({
   wantAssertionsSigned: false,
   wantAuthnResponseSigned: true,
   forceAuthn: false,
+  provisioningSecret: '',
   spSigningCertificate: '',
   spSigningPrivateKey: '',
 });
+
+const emptyPermissionMappingsInput: Record<PermissionKey, string> = {
+  canManageResources: '',
+  canManageSystemConfiguration: '',
+  canManageUsers: '',
+  canManageBilling: '',
+};
 
 const defaultProviderValues: CreateSSOProviderDto = {
   name: '',
@@ -98,10 +116,15 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const [editingProvider, setEditingProvider] = useState<SSOProvider | null>(null);
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
+  const [showSamlProvisioningSecret, setShowSamlProvisioningSecret] = useState(false);
   const [scopesInput, setScopesInput] = useState('');
   const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
   const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
   const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
+  const [oidcPermissionMappingsInput, setOidcPermissionMappingsInput] =
+    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
+  const [samlPermissionMappingsInput, setSamlPermissionMappingsInput] =
+    useState<Record<PermissionKey, string>>(emptyPermissionMappingsInput);
   const queryClient = useQueryClient();
 
   const loadingState = useReactQueryStatusToHeroUiTableLoadingState(fetchStatus);
@@ -185,6 +208,15 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }));
   }, []);
 
+  const buildPermissionMappingInputs = (mapping?: SSOPermissionMappingsDto | null) => ({
+    canManageResources: Array.isArray(mapping?.canManageResources) ? mapping?.canManageResources.join(', ') : '',
+    canManageSystemConfiguration: Array.isArray(mapping?.canManageSystemConfiguration)
+      ? mapping?.canManageSystemConfiguration.join(', ')
+      : '',
+    canManageUsers: Array.isArray(mapping?.canManageUsers) ? mapping?.canManageUsers.join(', ') : '',
+    canManageBilling: Array.isArray(mapping?.canManageBilling) ? mapping?.canManageBilling.join(', ') : '',
+  });
+
   // Set form values when provider details are loaded
   React.useEffect(() => {
     if (providerDetails && editingProvider) {
@@ -221,10 +253,18 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
             : '',
         );
+        setOidcPermissionMappingsInput(
+          buildPermissionMappingInputs(
+            (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
+              | Partial<Record<PermissionKey, string[]>>
+              | undefined,
+          ),
+        );
       } else {
         setScopesInput('');
         setUsernameClaimPathsInput('');
         setEmailClaimPathsInput('');
+        setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
       }
 
       if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
@@ -237,6 +277,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           wantAssertionsSigned: extendedProvider.samlConfiguration.wantAssertionsSigned ?? false,
           wantAuthnResponseSigned: extendedProvider.samlConfiguration.wantAuthnResponseSigned ?? true,
           forceAuthn: extendedProvider.samlConfiguration.forceAuthn ?? false,
+          provisioningSecret: '',
           spSigningCertificate: extendedProvider.samlConfiguration.spSigningCertificate ?? '',
           spSigningPrivateKey: '',
         };
@@ -245,8 +286,16 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
             : '',
         );
+        setSamlPermissionMappingsInput(
+          buildPermissionMappingInputs(
+            (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
+              | Partial<Record<PermissionKey, string[]>>
+              | undefined,
+          ),
+        );
       } else {
         setEmailAttributeKeysInput('');
+        setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
       }
 
       setFormValues(updatedFormValues);
@@ -260,6 +309,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     setUsernameClaimPathsInput('');
     setEmailClaimPathsInput('');
     setEmailAttributeKeysInput('');
+    setOidcPermissionMappingsInput(emptyPermissionMappingsInput);
+    setSamlPermissionMappingsInput(emptyPermissionMappingsInput);
+    setShowSamlProvisioningSecret(false);
     onOpen();
   };
 
@@ -321,6 +373,15 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   };
 
+  const handlePermissionMappingChange =
+    (setter: React.Dispatch<React.SetStateAction<Record<PermissionKey, string>>>, key: PermissionKey) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setter((prev) => ({
+        ...prev,
+        [key]: event.target.value,
+      }));
+    };
+
   const handleCopySamlCallbackUrl = useCallback(async () => {
     if (!samlCallbackUrl) {
       return;
@@ -381,6 +442,17 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
       const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
+      const buildPermissionMappings = (inputs: Record<PermissionKey, string>) => {
+        const mappings: Partial<Record<PermissionKey, string[]>> = {};
+        permissionKeys.forEach((key) => {
+          const parsed = parseList(inputs[key] ?? '');
+          if (parsed.length > 0) {
+            mappings[key] = parsed;
+          }
+        });
+        return Object.keys(mappings).length > 0 ? mappings : undefined;
+      };
+
       if (!samlSigningMaterialsReady) {
         showError({
           title: t('errorGeneric'),
@@ -403,6 +475,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
         if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
         if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
+        const permissionMappings = buildPermissionMappings(oidcPermissionMappingsInput);
+        if (permissionMappings) payload.permissionMappings = permissionMappings;
 
         return payload;
       };
@@ -431,6 +505,19 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           payload.spSigningPrivateKey = base.spSigningPrivateKey.trim();
         } else {
           delete payload.spSigningPrivateKey;
+        }
+
+        if (base.provisioningSecret && base.provisioningSecret.trim().length > 0) {
+          payload.provisioningSecret = base.provisioningSecret.trim();
+        } else {
+          delete payload.provisioningSecret;
+        }
+
+        const permissionMappings = buildPermissionMappings(samlPermissionMappingsInput);
+        if (permissionMappings) {
+          payload.permissionMappings = permissionMappings;
+        } else {
+          delete payload.permissionMappings;
         }
         return payload;
       };
@@ -500,6 +587,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       {providers && providers.length > 0 ? (
         <Table aria-label={t('table.ariaLabel')} data-cy="sso-providers-table">
           <TableHeader>
+            <TableColumn>{t('id')}</TableColumn>
             <TableColumn>{t('name')}</TableColumn>
             <TableColumn>{t('type')}</TableColumn>
             <TableColumn>{t('actions')}</TableColumn>
@@ -512,6 +600,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
           >
             {(provider) => (
               <TableRow key={provider.id}>
+                <TableCell>
+                  <span className="font-mono text-sm">{provider.id}</span>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Key size={16} />
@@ -728,6 +819,23 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         placeholder="email, emails[0].value, upn"
                         data-cy="sso-provider-form-oidc-email-claims-input"
                       />
+
+                      <Divider className="my-2" />
+                      <div className="flex items-center gap-2 mb-2">
+                        <Key size={16} />
+                        <span className="font-semibold">{t('permissionMappings')}</span>
+                      </div>
+                      <p className="text-xs text-default-500">{t('permissionMappingsHint')}</p>
+                      {permissionKeys.map((permissionKey) => (
+                        <Input
+                          key={`oidc-permission-${permissionKey}`}
+                          label={t(`permissionMappingLabels.${permissionKey}`)}
+                          value={oidcPermissionMappingsInput[permissionKey]}
+                          onChange={handlePermissionMappingChange(setOidcPermissionMappingsInput, permissionKey)}
+                          placeholder={t('permissionMappingsPlaceholder')}
+                          data-cy={`sso-provider-form-oidc-permission-mapping-${permissionKey}`}
+                        />
+                      ))}
                     </>
                   )}
                   {formValues.type === SSOProviderType.SAML && (
@@ -809,6 +917,49 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         placeholder="email, mail, urn:oid:1.2.840.113549.1.9.1"
                         data-cy="sso-provider-form-saml-email-attribute-keys-input"
                       />
+
+                      <Input
+                        type={showSamlProvisioningSecret ? 'text' : 'password'}
+                        label={t('samlProvisioningSecret')}
+                        name="samlConfiguration.provisioningSecret"
+                        value={formValues.samlConfiguration?.provisioningSecret ?? ''}
+                        onChange={handleInputChange}
+                        placeholder="••••••••••••••••"
+                        description={t('samlProvisioningSecretHint')}
+                        data-cy="sso-provider-form-saml-provisioning-secret-input"
+                        endContent={
+                          <Tooltip
+                            content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}
+                          >
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              onPress={() => setShowSamlProvisioningSecret(!showSamlProvisioningSecret)}
+                              data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"
+                            >
+                              {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </Button>
+                          </Tooltip>
+                        }
+                      />
+
+                      <Divider className="my-2" />
+                      <div className="flex items-center gap-2 mb-2">
+                        <Key size={16} />
+                        <span className="font-semibold">{t('permissionMappings')}</span>
+                      </div>
+                      <p className="text-xs text-default-500">{t('permissionMappingsHint')}</p>
+                      {permissionKeys.map((permissionKey) => (
+                        <Input
+                          key={`saml-permission-${permissionKey}`}
+                          label={t(`permissionMappingLabels.${permissionKey}`)}
+                          value={samlPermissionMappingsInput[permissionKey]}
+                          onChange={handlePermissionMappingChange(setSamlPermissionMappingsInput, permissionKey)}
+                          placeholder={t('permissionMappingsPlaceholder')}
+                          data-cy={`sso-provider-form-saml-permission-mapping-${permissionKey}`}
+                        />
+                      ))}
 
                       <Textarea
                         label={t('spSigningCertificate')}

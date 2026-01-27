@@ -663,6 +663,14 @@ export const $SSOProviderOIDCConfiguration = {
                 type: 'string'
             }
         },
+        permissionMappings: {
+            type: 'object',
+            description: 'Optional mapping between Attraccess permissions and role names',
+            example: {
+                canManageResources: ['attraccess_resources'],
+                canManageUsers: ['attraccess_admin']
+            }
+        },
         createdAt: {
             format: 'date-time',
             type: 'string',
@@ -735,6 +743,19 @@ export const $SSOProviderSAMLConfiguration = {
             type: 'array',
             items: {
                 type: 'string'
+            }
+        },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests',
+            nullable: true
+        },
+        permissionMappings: {
+            type: 'object',
+            description: 'Optional mapping between Attraccess permissions and SAML role attribute values',
+            example: {
+                canManageSystemConfiguration: ['attraccess_config_admin'],
+                canManageBilling: ['attraccess_billing']
             }
         },
         spSigningCertificate: {
@@ -835,6 +856,44 @@ export const $LinkUserToExternalAccountRequestDto = {
     required: ['password', 'linkToken']
 } as const;
 
+export const $SSOPermissionMappingsDto = {
+    type: 'object',
+    properties: {
+        canManageResources: {
+            description: 'Role names that grant resource management permissions',
+            example: ['attraccess_resources'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageSystemConfiguration: {
+            description: 'Role names that grant system configuration permissions',
+            example: ['attraccess_config_admin'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageUsers: {
+            description: 'Role names that grant user management permissions',
+            example: ['attraccess_admin'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageBilling: {
+            description: 'Role names that grant billing management permissions',
+            example: ['attraccess_billing'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        }
+    }
+} as const;
+
 export const $CreateOIDCConfigurationDto = {
     type: 'object',
     properties: {
@@ -891,6 +950,14 @@ export const $CreateOIDCConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and role names',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         }
     },
     required: ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL', 'clientId', 'clientSecret']
@@ -944,6 +1011,19 @@ export const $CreateSAMLConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests',
+            writeOnly: true
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and SAML role values',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         },
         spSigningCertificate: {
             type: 'string',
@@ -1051,6 +1131,14 @@ export const $UpdateOIDCConfigurationDto = {
             items: {
                 type: 'string'
             }
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and role names',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
         }
     }
 } as const;
@@ -1102,6 +1190,19 @@ export const $UpdateSAMLConfigurationDto = {
                 type: 'string'
             }
         },
+        provisioningSecret: {
+            type: 'string',
+            description: 'Shared secret used to authorize SAML provisioning requests',
+            writeOnly: true
+        },
+        permissionMappings: {
+            description: 'Optional mapping between Attraccess permissions and SAML role values',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SSOPermissionMappingsDto'
+                }
+            ]
+        },
         spSigningCertificate: {
             type: 'string',
             description: 'PEM encoded Service Provider certificate used when signing requests'
@@ -1137,6 +1238,66 @@ export const $UpdateSSOProviderDto = {
                     '$ref': '#/components/schemas/UpdateSAMLConfigurationDto'
                 }
             ]
+        }
+    }
+} as const;
+
+export const $SSOProvisioningUserDto = {
+    type: 'object',
+    properties: {
+        subject: {
+            type: 'string',
+            description: 'The SSO subject (sub) identifier',
+            example: '00u1abcd1234'
+        },
+        email: {
+            type: 'string',
+            description: 'The user email address',
+            example: 'user@example.com'
+        }
+    }
+} as const;
+
+export const $SSOProvisioningPermissionsDto = {
+    type: 'object',
+    properties: {
+        subject: {
+            type: 'string',
+            description: 'The SSO subject (sub) identifier',
+            example: '00u1abcd1234'
+        },
+        email: {
+            type: 'string',
+            description: 'The user email address',
+            example: 'user@example.com'
+        },
+        roles: {
+            description: 'Role or group names to evaluate against the configured permission mappings',
+            example: ['attraccess_admin', 'attraccess_billing'],
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        },
+        canManageResources: {
+            type: 'boolean',
+            description: 'Whether the user can manage resources',
+            example: true
+        },
+        canManageSystemConfiguration: {
+            type: 'boolean',
+            description: 'Whether the user can manage system configuration',
+            example: false
+        },
+        canManageUsers: {
+            type: 'boolean',
+            description: 'Whether the user can manage users',
+            example: false
+        },
+        canManageBilling: {
+            type: 'boolean',
+            description: 'Whether the user can manage billing',
+            example: false
         }
     }
 } as const;
