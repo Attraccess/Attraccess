@@ -503,6 +503,7 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
+      relations: ['authenticationDetails'],
     });
 
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);

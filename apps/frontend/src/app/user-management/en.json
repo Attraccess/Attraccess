@@ -11,12 +11,14 @@
       "id": "ID",
       "username": "Username",
       "externalIdentifier": "External ID",
+      "ssoLinked": "SSO",
       "permissions": "Permissions",
       "canManageResources": "Configure resources",
       "canManageSystemConfiguration": "Configure system",
       "canManageUsers": "User configuration",
       "canManageBilling": "Manage billing"
     },
+    "ssoLinked": "SSO linked ({{providers}})",
     "noPermissions": "No permissions"
   },
   "actions": {

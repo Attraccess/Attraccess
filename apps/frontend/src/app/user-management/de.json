@@ -11,12 +11,14 @@
       "id": "ID",
       "username": "Benutzername",
       "externalIdentifier": "Externe ID",
+      "ssoLinked": "SSO",
       "permissions": "Berechtigungen",
       "canManageResources": "Ressourcen konfigurieren",
       "canManageSystemConfiguration": "System konfigurieren",
       "canManageUsers": "Benutzerkonfiguration",
       "canManageBilling": "Abrechnung verwalten"
     },
+    "ssoLinked": "SSO verknüpft ({{providers}})",
     "noPermissions": "Keine Berechtigungen"
   },
   "actions": {

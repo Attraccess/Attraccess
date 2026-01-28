@@ -158,6 +158,11 @@ export class User {
   @OneToMany(() => AuthenticationDetail, (detail) => detail.user, {
     onDelete: 'CASCADE',
   })
+  @ApiProperty({
+    description: 'Authentication details linked to the user',
+    type: [AuthenticationDetail],
+    required: false,
+  })
   authenticationDetails!: AuthenticationDetail[];
 
   @OneToMany(() => ResourceIntroducer, (introducer) => introducer.user, {
