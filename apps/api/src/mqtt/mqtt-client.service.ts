@@ -18,7 +18,7 @@ export class MqttClientService implements OnModuleDestroy {
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   async onModuleDestroy() {
     // Disconnect all clients on shutdown
@@ -93,7 +93,7 @@ export class MqttClientService implements OnModuleDestroy {
         } catch {
           // propably not json, just ignore it
         }
-        this.logger.debug(`mqtt message: ${topic}: ${payloadString}`);
+        this.logger.debug(`received mqtt message at topic "${topic}": ${payloadString.substring(0, 100)}...`);
 
         this.eventEmitter.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(serverId, topic, payload));
       });

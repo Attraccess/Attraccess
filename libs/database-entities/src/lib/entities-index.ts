@@ -1,6 +1,8 @@
 // Import entities
 import { EmailTemplate } from './entities/email-template.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
+import { Beacon, BeaconType } from './entities/beacon.entity';
+import { BleGateway } from './entities/bleGateway.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
 import { Resource } from './entities/resource.entity';
@@ -54,6 +56,9 @@ import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } fr
 // Export all entities individually
 export {
   AuthenticationDetail,
+  Beacon,
+  BeaconType,
+  BleGateway,
   MqttServer,
   Resource,
   ResourceGroup,
@@ -119,6 +124,8 @@ export const entities = {
   User,
   AuthenticationDetail,
   Session,
+  Beacon,
+  BleGateway,
   Resource,
   ResourceGroup,
   ResourceUsage,

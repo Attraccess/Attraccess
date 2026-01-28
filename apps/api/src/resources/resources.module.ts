@@ -25,6 +25,7 @@ import { ResourceFlowsModule } from './flows/resource-flows.module';
 import { ResourceMaintenanceModule } from './maintenances/maintenance.module';
 import { ResourceFormsModule } from './forms/forms.module';
 import { LicenseModule } from '../license/license.module';
+import { PositionalTrackingModule } from './positional-tracking/positional-tracking.module';
 
 @Module({
   imports: [
@@ -52,9 +53,10 @@ import { LicenseModule } from '../license/license.module';
     ResourceMaintenanceModule,
     ResourceFormsModule,
     LicenseModule,
+    PositionalTrackingModule,
   ],
   controllers: [ResourcesController],
   providers: [ResourcesService, ResourceImageService],
   exports: [ResourcesService, ResourceImageService],
 })
-export class ResourcesModule {}
+export class ResourcesModule { }
