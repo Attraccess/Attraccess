@@ -216,6 +216,11 @@ export const prefetchUseResourceFormsServiceResourceFormsGetOne = (queryClient: 
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) });
 export const prefetchUsePositionalTrackingServicePositionalTrackingControllerStreamDebug = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn(), queryFn: () => PositionalTrackingService.positionalTrackingControllerStreamDebug() });
+export const prefetchUsePositionalTrackingServiceGetPositionalTrackingGateways = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn(), queryFn: () => PositionalTrackingService.getPositionalTrackingGateways() });
+export const prefetchUsePositionalTrackingServiceGetPositionalTrackingGatewayById = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.prefetchQuery({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewayByIdKeyFn({ id }), queryFn: () => PositionalTrackingService.getPositionalTrackingGatewayById({ id }) });
+export const prefetchUsePositionalTrackingServiceGetPositionalTrackingBeacons = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn(), queryFn: () => PositionalTrackingService.getPositionalTrackingBeacons() });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

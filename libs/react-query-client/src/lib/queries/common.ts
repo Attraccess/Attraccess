@@ -416,6 +416,20 @@ export type PositionalTrackingServicePositionalTrackingControllerStreamDebugDefa
 export type PositionalTrackingServicePositionalTrackingControllerStreamDebugQueryResult<TData = PositionalTrackingServicePositionalTrackingControllerStreamDebugDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePositionalTrackingServicePositionalTrackingControllerStreamDebugKey = "PositionalTrackingServicePositionalTrackingControllerStreamDebug";
 export const UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn = (queryKey?: Array<unknown>) => [usePositionalTrackingServicePositionalTrackingControllerStreamDebugKey, ...(queryKey ?? [])];
+export type PositionalTrackingServiceGetPositionalTrackingGatewaysDefaultResponse = Awaited<ReturnType<typeof PositionalTrackingService.getPositionalTrackingGateways>>;
+export type PositionalTrackingServiceGetPositionalTrackingGatewaysQueryResult<TData = PositionalTrackingServiceGetPositionalTrackingGatewaysDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePositionalTrackingServiceGetPositionalTrackingGatewaysKey = "PositionalTrackingServiceGetPositionalTrackingGateways";
+export const UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn = (queryKey?: Array<unknown>) => [usePositionalTrackingServiceGetPositionalTrackingGatewaysKey, ...(queryKey ?? [])];
+export type PositionalTrackingServiceGetPositionalTrackingGatewayByIdDefaultResponse = Awaited<ReturnType<typeof PositionalTrackingService.getPositionalTrackingGatewayById>>;
+export type PositionalTrackingServiceGetPositionalTrackingGatewayByIdQueryResult<TData = PositionalTrackingServiceGetPositionalTrackingGatewayByIdDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePositionalTrackingServiceGetPositionalTrackingGatewayByIdKey = "PositionalTrackingServiceGetPositionalTrackingGatewayById";
+export const UsePositionalTrackingServiceGetPositionalTrackingGatewayByIdKeyFn = ({ id }: {
+  id: number;
+}, queryKey?: Array<unknown>) => [usePositionalTrackingServiceGetPositionalTrackingGatewayByIdKey, ...(queryKey ?? [{ id }])];
+export type PositionalTrackingServiceGetPositionalTrackingBeaconsDefaultResponse = Awaited<ReturnType<typeof PositionalTrackingService.getPositionalTrackingBeacons>>;
+export type PositionalTrackingServiceGetPositionalTrackingBeaconsQueryResult<TData = PositionalTrackingServiceGetPositionalTrackingBeaconsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePositionalTrackingServiceGetPositionalTrackingBeaconsKey = "PositionalTrackingServiceGetPositionalTrackingBeacons";
+export const UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn = (queryKey?: Array<unknown>) => [usePositionalTrackingServiceGetPositionalTrackingBeaconsKey, ...(queryKey ?? [])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";
@@ -533,6 +547,8 @@ export type ProjectsServiceResendProjectInvitationMutationResult = Awaited<Retur
 export type ProjectInvitationsServiceAcceptProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.acceptProjectInvitation>>;
 export type ProjectInvitationsServiceDeclineProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectInvitationsService.declineProjectInvitation>>;
 export type ResourceFormsServiceResourceFormsCreateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsCreate>>;
+export type PositionalTrackingServiceCreatePositionalTrackingGatewayMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.createPositionalTrackingGateway>>;
+export type PositionalTrackingServiceCreatePositionalTrackingBeaconMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.createPositionalTrackingBeacon>>;
 export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof PluginsService.uploadPlugin>>;
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
@@ -547,6 +563,9 @@ export type ResourceMaintenancesServiceUpdateMaintenanceMutationResult = Awaited
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
 export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
 export type ResourceFormsServiceResourceFormsUpdateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsUpdate>>;
+export type PositionalTrackingServiceUpdatePositionalTrackingGatewayMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.updatePositionalTrackingGateway>>;
+export type PositionalTrackingServiceUpdatePositionalTrackingGatewayCalibrationMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.updatePositionalTrackingGatewayCalibration>>;
+export type PositionalTrackingServiceUpdatePositionalTrackingBeaconMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.updatePositionalTrackingBeacon>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
 export type UsersServiceChangeMyEmailMutationResult = Awaited<ReturnType<typeof UsersService.changeMyEmail>>;
 export type UsersServiceUpdatePermissionsMutationResult = Awaited<ReturnType<typeof UsersService.updatePermissions>>;
@@ -571,5 +590,7 @@ export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<t
 export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;
 export type ProjectsServiceCancelProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.cancelProjectInvitation>>;
 export type ResourceFormsServiceResourceFormsDeleteMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsDelete>>;
+export type PositionalTrackingServiceDeletePositionalTrackingGatewayMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.deletePositionalTrackingGateway>>;
+export type PositionalTrackingServiceDeletePositionalTrackingBeaconMutationResult = Awaited<ReturnType<typeof PositionalTrackingService.deletePositionalTrackingBeacon>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;

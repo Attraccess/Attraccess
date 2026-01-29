@@ -2,6 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { MqttServer } from './mqttServer.entity';
 
+export enum BleGatewayType {
+  GLS10 = 'gls10',
+  SHELLY = 'shelly',
+}
+
 export class GatewayCoordinates {
   @Column({ type: 'real', nullable: true })
   @ApiProperty({ description: 'Gateway X coordinate (meters)', required: false })
@@ -36,6 +41,10 @@ export class BleGateway {
   @ApiProperty({ description: 'Gateway identifier as reported by the device' })
   identifier!: string;
 
+  @Column({ type: 'simple-enum', enum: BleGatewayType, default: BleGatewayType.GLS10 })
+  @ApiProperty({ description: 'Gateway type', enum: BleGatewayType, enumName: 'BleGatewayType' })
+  type!: BleGatewayType;
+
   @Column({ type: 'integer' })
   @ApiProperty({ description: 'MQTT server ID for subscriptions' })
   mqttServerId!: number;
@@ -44,9 +53,9 @@ export class BleGateway {
   @ApiProperty({ description: 'MQTT server for this gateway', type: () => MqttServer })
   mqttServer!: MqttServer;
 
-  @Column({ type: 'text' })
-  @ApiProperty({ description: 'MQTT topic to subscribe to for this gateway' })
-  topic!: string;
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'MQTT topic to subscribe to for this gateway', required: false })
+  topic!: string | null;
 
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({ description: 'Optional MQTT QoS', required: false })

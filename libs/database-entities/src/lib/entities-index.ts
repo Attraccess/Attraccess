@@ -3,7 +3,7 @@ import { EmailTemplate } from './entities/email-template.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { Beacon, BeaconType } from './entities/beacon.entity';
 import { BeaconPosition } from './entities/beaconPosition.entity';
-import { BleGateway } from './entities/bleGateway.entity';
+import { BleGateway, BleGatewayType } from './entities/bleGateway.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
 import { Resource } from './entities/resource.entity';
@@ -61,6 +61,7 @@ export {
   BeaconType,
   BeaconPosition,
   BleGateway,
+  BleGatewayType,
   MqttServer,
   Resource,
   ResourceGroup,

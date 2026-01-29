@@ -216,6 +216,11 @@ export const ensureUseResourceFormsServiceResourceFormsGetOneData = (queryClient
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) });
 export const ensureUsePositionalTrackingServicePositionalTrackingControllerStreamDebugData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn(), queryFn: () => PositionalTrackingService.positionalTrackingControllerStreamDebug() });
+export const ensureUsePositionalTrackingServiceGetPositionalTrackingGatewaysData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn(), queryFn: () => PositionalTrackingService.getPositionalTrackingGateways() });
+export const ensureUsePositionalTrackingServiceGetPositionalTrackingGatewayByIdData = (queryClient: QueryClient, { id }: {
+  id: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewayByIdKeyFn({ id }), queryFn: () => PositionalTrackingService.getPositionalTrackingGatewayById({ id }) });
+export const ensureUsePositionalTrackingServiceGetPositionalTrackingBeaconsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn(), queryFn: () => PositionalTrackingService.getPositionalTrackingBeacons() });
 export const ensureUsePluginsServiceGetPluginsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const ensureUsePluginsServiceGetFrontendPluginFileData = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

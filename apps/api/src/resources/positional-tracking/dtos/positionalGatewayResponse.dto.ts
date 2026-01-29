@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { BleGatewayType } from '@attraccess/database-entities';
 
 class GatewayCoordinatesDto {
   @ApiProperty({ description: 'Gateway X coordinate (meters)', required: false })
@@ -25,6 +26,18 @@ export class PositionalGatewayResponseDto {
 
   @ApiProperty({ description: 'Gateway identifier as reported by the device' })
   identifier!: string;
+
+  @ApiProperty({ description: 'Gateway type', enum: BleGatewayType, enumName: 'BleGatewayType' })
+  type!: BleGatewayType;
+
+  @ApiProperty({ description: 'MQTT server ID for subscriptions' })
+  mqttServerId!: number;
+
+  @ApiProperty({ description: 'MQTT topic to subscribe to', required: false })
+  topic!: string | null;
+
+  @ApiProperty({ description: 'Optional MQTT QoS', required: false })
+  subscribeQos!: number | null;
 
   @ApiProperty({ description: 'Gateway coordinates', type: () => GatewayCoordinatesDto })
   coordinates!: GatewayCoordinatesDto;

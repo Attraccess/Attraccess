@@ -1,7 +1,6 @@
 import { Repository } from 'typeorm';
 import { Beacon, BeaconPosition, BleGateway } from '@attraccess/database-entities';
 import { PositionalTrackingService } from './positional-tracking.service';
-import { MqttClientService } from '../../mqtt/mqtt-client.service';
 
 interface PositionalTrackingServicePrivate {
   computeFilteredRssi: (readingKey: string, rssi: number) => number;
@@ -19,7 +18,6 @@ describe('PositionalTrackingService', () => {
       {} as Repository<Beacon>,
       {} as Repository<BeaconPosition>,
       {} as Repository<BleGateway>,
-      {} as MqttClientService,
     );
   });
 

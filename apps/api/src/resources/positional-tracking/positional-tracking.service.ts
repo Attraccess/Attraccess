@@ -1,16 +1,23 @@
-import { Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
-import { Beacon, BeaconPosition, BeaconType, BleGateway } from '@attraccess/database-entities';
-import { MqttClientService } from '../../mqtt/mqtt-client.service';
-import { MqttMessageEvent } from '../../mqtt/mqtt-message.event';
+import { Beacon, BeaconPosition, BeaconType, BleGateway, BleGatewayType } from '@attraccess/database-entities';
 import { Observable, Subject } from 'rxjs';
+import { normalizeMac, parseHolyiotBatteryPercentFromHex } from './beacons/beacon-parser.utils';
+import { NormalizedGatewayAdvertisement } from './gateways/gateway-adapter.interface';
+import { CreateGatewayDto } from './dtos/createGateway.dto';
+import { UpdateGatewayDto } from './dtos/updateGateway.dto';
+import { CreateBeaconDto } from './dtos/createBeacon.dto';
+import { UpdateBeaconDto } from './dtos/updateBeacon.dto';
 
 type DebugGateway = {
   id: number;
   identifier: string;
+  type: BleGatewayType;
+  mqttServerId: number;
+  topic: string | null;
+  subscribeQos: number | null;
   coordinates: { x: number | null; y: number | null };
   calibration: {
     txPowerAt1m: number | null;
@@ -43,6 +50,11 @@ type DebugSample = {
   observedAt: string;
 };
 
+type DebugBeacon = {
+  identifier: string;
+  type: BeaconType;
+};
+
 type InMemoryReading = {
   gateway: BleGateway;
   rssi: number;
@@ -69,30 +81,13 @@ export type PositionalDebugEvent =
     inputSamples: DebugSample[];
   };
 
-type GatewayAdvertisement = {
-  mac?: string;
-  rssi?: number;
-  n?: string;
-  ad?: string;
-  ts?: number;
-};
-
-type GatewayPayload = {
-  dev_wifi_sta_mac?: string;
-  dev_ble_mac?: string;
-  dev_sn?: string;
-  dev_id?: string;
-  dev_version?: string;
-  dev_list?: GatewayAdvertisement[];
-};
-
 @Injectable()
-export class PositionalTrackingService implements OnModuleInit {
+export class PositionalTrackingService {
   private readonly logger = new Logger(PositionalTrackingService.name);
   // How long to keep computed positions.
   private readonly positionRetentionDays = 7;
   // Window used to ignore stale readings across gateways for trilateration.
-  private readonly recentReadingWindowMs = 15 * 1000;
+  private readonly recentReadingWindowMs = 60 * 1000;
   // Throttle for how often we recompute a beacon's position.
   private readonly positionUpdateIntervalMs = 5 * 1000;
   private readonly lastPositionAtByBeacon = new Map<string, number>();
@@ -112,33 +107,7 @@ export class PositionalTrackingService implements OnModuleInit {
     private readonly beaconPositionRepository: Repository<BeaconPosition>,
     @InjectRepository(BleGateway)
     private readonly bleGatewayRepository: Repository<BleGateway>,
-    @Inject(MqttClientService)
-    private readonly mqttClientService: MqttClientService,
   ) { }
-
-  async onModuleInit(): Promise<void> {
-    const gateways = await this.bleGatewayRepository.find();
-    if (gateways.length === 0) {
-      this.logger.warn('No BLE gateways configured for positional tracking');
-      return;
-    }
-
-    this.logger.log(`Initializing positional tracking for ${gateways.length} BLE gateway(s)`);
-    for (const gateway of gateways) {
-      const qos = gateway.subscribeQos ?? undefined;
-      this.logger.debug(
-        `Subscribing to gateway ${gateway.identifier} on server ${gateway.mqttServerId} topic ${gateway.topic}`,
-      );
-      await this.mqttClientService.subscribe(gateway.mqttServerId, gateway.topic, qos as 0 | 1 | 2 | undefined).catch(
-        (error) => {
-          this.logger.error(
-            `Failed to subscribe to topic ${gateway.topic} for server ID ${gateway.mqttServerId}`,
-            error.stack,
-          );
-        },
-      );
-    }
-  }
 
   getDebugStream(): Observable<PositionalDebugEvent> {
     return this.debugSubject.asObservable();
@@ -176,106 +145,201 @@ export class PositionalTrackingService implements OnModuleInit {
     return this.buildDebugGateway(saved);
   }
 
-  @OnEvent(MqttMessageEvent.EVENT_NAME)
-  async handleMqttMessage(event: MqttMessageEvent): Promise<void> {
-    if (!(await this.isRelevantMessage(event.serverId, event.topic))) {
-      this.logger.debug(`Ignoring MQTT message on ${event.topic} (server ${event.serverId})`);
-      return;
+  async createGateway(dto: CreateGatewayDto): Promise<DebugGateway> {
+    const existing = await this.bleGatewayRepository.findOneBy({ identifier: dto.identifier });
+    if (existing) {
+      throw new ConflictException('Gateway identifier already exists');
     }
+    const gateway = this.bleGatewayRepository.create({
+      identifier: dto.identifier,
+      type: dto.type,
+      mqttServerId: dto.mqttServerId,
+      topic: dto.topic ?? null,
+      subscribeQos: dto.subscribeQos ?? null,
+      coordinates: {
+        x: dto.coordinates?.x ?? null,
+        y: dto.coordinates?.y ?? null,
+      },
+      calibration: {
+        txPowerAt1m: null,
+        pathLossExponent: null,
+        calibrationUpdatedAt: null,
+      },
+    });
+    const saved = await this.bleGatewayRepository.save(gateway);
+    return this.buildDebugGateway(saved);
+  }
 
-    const payload = event.payload;
-    if (!this.isGatewayPayload(payload)) {
-      this.logger.debug(`Ignoring MQTT message on ${event.topic}; payload is not a gateway payload`);
-      return;
-    }
-
-    const gatewayIdentifier = this.getGatewayIdentifier(payload);
-    if (!gatewayIdentifier) {
-      this.logger.debug(`Skipping MQTT message on ${event.topic}; missing gateway identifier`);
-      return;
-    }
-
-    const gateway = await this.bleGatewayRepository.findOneBy({ identifier: gatewayIdentifier });
+  async updateGateway(id: number, dto: UpdateGatewayDto): Promise<DebugGateway> {
+    const gateway = await this.bleGatewayRepository.findOneBy({ id });
     if (!gateway) {
-      this.logger.debug(`Skipping MQTT message; unknown gateway identifier ${gatewayIdentifier}`);
+      throw new NotFoundException('Gateway not found');
+    }
+    if (dto.identifier && dto.identifier !== gateway.identifier) {
+      const existing = await this.bleGatewayRepository.findOneBy({ identifier: dto.identifier });
+      if (existing && existing.id !== id) {
+        throw new ConflictException('Gateway identifier already exists');
+      }
+      gateway.identifier = dto.identifier;
+    }
+    if (dto.type !== undefined) {
+      gateway.type = dto.type;
+    }
+    if (dto.mqttServerId !== undefined) {
+      gateway.mqttServerId = dto.mqttServerId;
+    }
+    if (dto.topic !== undefined) {
+      gateway.topic = dto.topic ?? null;
+    }
+    if (dto.subscribeQos !== undefined) {
+      gateway.subscribeQos = dto.subscribeQos ?? null;
+    }
+    if (dto.coordinates) {
+      gateway.coordinates = {
+        x: dto.coordinates.x ?? null,
+        y: dto.coordinates.y ?? null,
+      };
+    }
+    const saved = await this.bleGatewayRepository.save(gateway);
+    return this.buildDebugGateway(saved);
+  }
+
+  async deleteGateway(id: number): Promise<void> {
+    const result = await this.bleGatewayRepository.delete({ id });
+    if (!result.affected) {
+      throw new NotFoundException('Gateway not found');
+    }
+  }
+
+  async listBeacons(): Promise<DebugBeacon[]> {
+    const beacons = await this.beaconRepository.find({ order: { identifier: 'ASC' } });
+    return beacons.map((beacon) => this.buildDebugBeacon(beacon));
+  }
+
+  async createBeacon(dto: CreateBeaconDto): Promise<DebugBeacon> {
+    const existing = await this.beaconRepository.findOneBy({ identifier: dto.identifier });
+    if (existing) {
+      throw new ConflictException('Beacon identifier already exists');
+    }
+    const beacon = this.beaconRepository.create({
+      identifier: dto.identifier,
+      type: dto.type,
+      battery: null,
+      lastSeenAt: new Date(),
+    });
+    const saved = await this.beaconRepository.save(beacon);
+    return this.buildDebugBeacon(saved);
+  }
+
+  async updateBeacon(identifier: string, dto: UpdateBeaconDto): Promise<DebugBeacon> {
+    const beacon = await this.beaconRepository.findOneBy({ identifier });
+    if (!beacon) {
+      throw new NotFoundException('Beacon not found');
+    }
+    if (dto.type !== undefined) {
+      beacon.type = dto.type;
+    }
+    const saved = await this.beaconRepository.save(beacon);
+    return this.buildDebugBeacon(saved);
+  }
+
+  async deleteBeacon(identifier: string): Promise<void> {
+    const result = await this.beaconRepository.delete({ identifier });
+    if (!result.affected) {
+      throw new NotFoundException('Beacon not found');
+    }
+  }
+
+  async processGatewayAdvertisement(
+    gateway: BleGateway,
+    advertisement: NormalizedGatewayAdvertisement,
+  ): Promise<void> {
+    if (!advertisement.dataHex) {
+      this.logger.warn(`No data hex to parse`, advertisement);
+      throw new Error(`No data hex to parse for gateway ${gateway.identifier} advertisement ${advertisement.mac}`);
+    }
+
+    const identifier = normalizeMac(advertisement.mac);
+    if (!identifier) {
+      this.logger.debug(`Unable to build beacon identifier for gateway ${gateway.identifier}`);
       return;
     }
 
-    const advertisements = payload.dev_list ?? [];
-    for (const advertisement of advertisements) {
-      const adHex = advertisement.ad;
-      if (!adHex) {
-        continue;
-      }
+    const trackedBeacon = await this.beaconRepository.findOneBy({
+      identifier,
+      type: BeaconType.HOLYIOT,
+    });
 
-      const battery = this.parseHolyiotBatteryPercentFromHex(adHex);
-      if (battery === null) {
-        continue;
-      }
-
-      const identifier = this.normalizeMac(advertisement.mac);
-      if (!identifier) {
-        this.logger.debug(`Unable to build beacon identifier for gateway ${gatewayIdentifier}`);
-        continue;
-      }
-
-      const trackedBeacon = await this.beaconRepository.findOneBy({
-        identifier,
-        type: BeaconType.HOLYIOT,
-      });
-      if (!trackedBeacon) {
-        continue;
-      }
-
-      const lastSeenAt = typeof advertisement.ts === 'number' ? new Date(advertisement.ts) : new Date();
-      const rssi = typeof advertisement.rssi === 'number' ? advertisement.rssi : null;
-
-      if (rssi !== null) {
-        const readingKey = `${gateway.id}:${identifier}`;
-        const filteredRssi = this.computeFilteredRssi(readingKey, rssi);
-        const distance = this.estimateDistance(filteredRssi, gateway);
-        this.storeReading(identifier, {
-          gateway,
-          rssi,
-          filteredRssi,
-          distance,
-          battery,
-          observedAt: lastSeenAt,
-        });
-        const recentReadings = this.loadRecentReadings(identifier, lastSeenAt);
-        const shouldUpdatePosition = this.shouldUpdatePosition(identifier, lastSeenAt);
-        const position = shouldUpdatePosition
-          ? await this.computeAndSavePosition(identifier, lastSeenAt, recentReadings)
-          : null;
-        if (position) {
-          this.lastPositionAtByBeacon.set(identifier, lastSeenAt.getTime());
-        }
-        const latestReadings = this.getLatestReadingsByGateway(recentReadings);
-        const latestPosition = position ?? (await this.findLatestPosition(identifier));
-        this.debugSubject.next({
-          type: 'reading',
-          beaconIdentifier: identifier,
-          observedAt: lastSeenAt.toISOString(),
-          reading: this.buildDebugReading({
-            gateway,
-            rssi,
-            filteredRssi,
-            distance,
-            battery,
-            observedAt: lastSeenAt,
-          }),
-          latestReadings: latestReadings.map((reading) => this.buildDebugReading(reading)),
-          latestPosition,
-        });
-      }
-
-      await this.updateBeacon(trackedBeacon, {
-        identifier,
-        type: BeaconType.HOLYIOT,
-        battery,
-        lastSeenAt,
-      });
+    if (!trackedBeacon) {
+      return;
     }
+
+    this.logger.debug(`Advertisement from ${advertisement.mac} at ${advertisement.observedAt?.toISOString()}: ${advertisement.dataHex}`);
+
+    const battery = parseHolyiotBatteryPercentFromHex(advertisement.dataHex);
+    //if (battery === null) {
+    //  this.logger.debug(`no battery to parse for gateway ${gateway.identifier} advertisement ${advertisement.mac}`);
+    //  continue;
+    //}
+
+    this.logger.debug(`Battery: ${battery}`);
+
+    const lastSeenAt = advertisement.observedAt ?? new Date();
+    await this.updateBeaconEntity(trackedBeacon, {
+      identifier,
+      type: BeaconType.HOLYIOT,
+      battery: battery ?? undefined,
+      lastSeenAt,
+    });
+
+    const rssi = typeof advertisement.rssi === 'number' ? advertisement.rssi : null;
+
+    const readingKey = `${gateway.id}:${identifier}`;
+    const filteredRssi = this.computeFilteredRssi(readingKey, rssi);
+    const distance = this.estimateDistance(filteredRssi, gateway);
+
+    this.logger.debug(`Filtered RSSI: ${filteredRssi}`);
+    this.logger.debug(`Distance: ${distance}`);
+
+    this.storeReading(identifier, {
+      gateway,
+      rssi,
+      filteredRssi,
+      distance,
+      battery: battery ?? undefined,
+      observedAt: lastSeenAt,
+    });
+
+    const recentReadings = this.loadRecentReadings(identifier, lastSeenAt);
+    const shouldUpdatePosition = this.shouldUpdatePosition(identifier, lastSeenAt);
+
+    const position = shouldUpdatePosition
+      ? await this.computeAndSavePosition(identifier, lastSeenAt, recentReadings)
+      : null;
+
+    this.logger.debug(`Position: ${position}`);
+
+    if (position) {
+      this.lastPositionAtByBeacon.set(identifier, lastSeenAt.getTime());
+    }
+    const latestReadings = this.getLatestReadingsByGateway(recentReadings);
+    const latestPosition = position ?? (await this.findLatestPosition(identifier));
+
+    this.debugSubject.next({
+      type: 'reading',
+      beaconIdentifier: identifier,
+      observedAt: lastSeenAt.toISOString(),
+      reading: this.buildDebugReading({
+        gateway,
+        rssi,
+        filteredRssi,
+        distance,
+        battery: battery ?? undefined,
+        observedAt: lastSeenAt,
+      }),
+      latestReadings: latestReadings.map((reading) => this.buildDebugReading(reading)),
+      latestPosition,
+    });
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -284,95 +348,6 @@ export class PositionalTrackingService implements OnModuleInit {
     const positionCutoff = new Date(now.getTime() - this.positionRetentionDays * 24 * 60 * 60 * 1000);
 
     await this.beaconPositionRepository.delete({ observedAt: LessThan(positionCutoff) });
-  }
-
-  private isGatewayPayload(payload: unknown): payload is GatewayPayload {
-    if (!payload || typeof payload !== 'object') {
-      return false;
-    }
-
-    const maybePayload = payload as { dev_list?: unknown };
-    return Array.isArray(maybePayload.dev_list);
-  }
-
-  private getGatewayIdentifier(payload: GatewayPayload): string | null {
-    return payload.dev_ble_mac ?? null;
-  }
-
-  private async isRelevantMessage(serverId: number, topic: string): Promise<boolean> {
-    const gateways = await this.bleGatewayRepository.findBy({ mqttServerId: serverId });
-    return gateways.some((gateway) => this.topicMatches(gateway.topic, topic));
-  }
-
-  private topicMatches(filter: string, topic: string): boolean {
-    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const parts = filter.split('/').map((segment, index, arr) => {
-      if (segment === '+') {
-        return '[^/]+';
-      }
-      if (segment === '#' && index === arr.length - 1) {
-        return '.*';
-      }
-      return escapeRegex(segment);
-    });
-    const pattern = '^' + parts.join('/') + '$';
-    return new RegExp(pattern).test(topic);
-  }
-
-  private normalizeMac(mac?: string): string | null {
-    if (!mac) {
-      return null;
-    }
-    const normalized = mac.replace(/[^a-fA-F0-9]/g, '').toLowerCase();
-    return normalized.length > 0 ? normalized : null;
-  }
-
-  private parseHolyiotBatteryPercentFromHex(adHex: string): number | null {
-    const bytes = this.hexToBytes(adHex);
-    if (!bytes) {
-      return null;
-    }
-
-    let offset = 0;
-    while (offset < bytes.length) {
-      const length = bytes[offset];
-      if (length === 0) {
-        break;
-      }
-      const nextOffset = offset + length + 1;
-      if (nextOffset > bytes.length || offset + 1 >= bytes.length) {
-        break;
-      }
-      const type = bytes[offset + 1];
-      if (type === 0x16) {
-        const start = offset + 2;
-        const end = offset + 1 + length;
-        if (end - start + 1 >= 3) {
-          const uuid = bytes[start] | (bytes[start + 1] << 8);
-          if (uuid === 0x5242) {
-            const payloadStart = start + 2;
-            if (payloadStart + 1 <= end && bytes[payloadStart] === 0x41) {
-              return bytes[payloadStart + 1];
-            }
-          }
-        }
-      }
-      offset = nextOffset;
-    }
-
-    return null;
-  }
-
-  private hexToBytes(hex: string): number[] | null {
-    const cleaned = hex.trim().replace(/\s+/g, '');
-    if (!cleaned || cleaned.length % 2 !== 0 || /[^a-fA-F0-9]/.test(cleaned)) {
-      return null;
-    }
-    const bytes: number[] = [];
-    for (let i = 0; i < cleaned.length; i += 2) {
-      bytes.push(parseInt(cleaned.slice(i, i + 2), 16));
-    }
-    return bytes;
   }
 
   private computeFilteredRssi(readingKey: string, rssi: number): number {
@@ -534,7 +509,7 @@ export class PositionalTrackingService implements OnModuleInit {
     return { x, y, residual };
   }
 
-  private async updateBeacon(
+  private async updateBeaconEntity(
     existing: Beacon,
     data: Omit<Beacon, 'createdAt' | 'updatedAt'>,
   ): Promise<void> {
@@ -550,6 +525,10 @@ export class PositionalTrackingService implements OnModuleInit {
       return {
         id: -1,
         identifier: 'unknown',
+        type: BleGatewayType.GLS10,
+        mqttServerId: 0,
+        topic: null,
+        subscribeQos: null,
         coordinates: { x: null, y: null },
         calibration: { txPowerAt1m: null, pathLossExponent: null, calibrationUpdatedAt: null },
       };
@@ -557,6 +536,10 @@ export class PositionalTrackingService implements OnModuleInit {
     return {
       id: gateway.id,
       identifier: gateway.identifier,
+      type: gateway.type,
+      mqttServerId: gateway.mqttServerId,
+      topic: gateway.topic ?? null,
+      subscribeQos: gateway.subscribeQos ?? null,
       coordinates: {
         x: gateway.coordinates?.x ?? null,
         y: gateway.coordinates?.y ?? null,
@@ -581,6 +564,13 @@ export class PositionalTrackingService implements OnModuleInit {
       distance: reading.distance ?? null,
       battery: reading.battery ?? null,
       observedAt: reading.observedAt.toISOString(),
+    };
+  }
+
+  private buildDebugBeacon(beacon: Beacon): DebugBeacon {
+    return {
+      identifier: beacon.identifier,
+      type: beacon.type,
     };
   }
 

@@ -19,19 +19,33 @@ import {
 import { CRS, LatLngBoundsExpression } from 'leaflet';
 import { CircleMarker, MapContainer, Pane, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getBaseUrl } from '../../api';
+import {
+  BeaconType,
+  BleGatewayType,
+  PositionalBeaconResponseDto,
+  PositionalGatewayResponseDto,
+  UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn,
+  UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn,
+  usePositionalTrackingServiceCreatePositionalTrackingBeacon,
+  usePositionalTrackingServiceCreatePositionalTrackingGateway,
+  usePositionalTrackingServiceDeletePositionalTrackingBeacon,
+  usePositionalTrackingServiceDeletePositionalTrackingGateway,
+  usePositionalTrackingServiceGetPositionalTrackingBeacons,
+  usePositionalTrackingServiceGetPositionalTrackingGateways,
+  usePositionalTrackingServiceUpdatePositionalTrackingBeacon,
+  usePositionalTrackingServiceUpdatePositionalTrackingGateway,
+  usePositionalTrackingServiceUpdatePositionalTrackingGatewayCalibration,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   CalibrationSample,
   CalibrationRegressionResult,
   computeCalibrationRegression,
 } from './positional-tracking.calibration';
 
-type DebugGateway = {
-  id: number;
-  identifier: string;
-  coordinates: { x: number | null; y: number | null };
-  calibration: { txPowerAt1m: number | null; pathLossExponent: number | null; calibrationUpdatedAt: string | null };
-};
+type DebugGateway = PositionalGatewayResponseDto;
+
+type ManagedBeacon = PositionalBeaconResponseDto;
 
 type DebugReading = {
   gateway: DebugGateway;
@@ -74,6 +88,24 @@ type DebugEvent =
     inputSamples: DebugSample[];
   };
 
+function mergeLatestReadings(previous: DebugReading[], incoming: DebugReading[]) {
+  const merged = new Map<number, DebugReading>();
+  previous.forEach((reading) => merged.set(reading.gateway.id, reading));
+  incoming.forEach((reading) => {
+    const existing = merged.get(reading.gateway.id);
+    if (!existing) {
+      merged.set(reading.gateway.id, reading);
+      return;
+    }
+    const existingTime = Date.parse(existing.observedAt);
+    const nextTime = Date.parse(reading.observedAt);
+    if (Number.isNaN(existingTime) || Number.isNaN(nextTime) || nextTime >= existingTime) {
+      merged.set(reading.gateway.id, reading);
+    }
+  });
+  return [...merged.values()].sort((a, b) => a.gateway.identifier.localeCompare(b.gateway.identifier));
+}
+
 type BeaconState = {
   latestReadings: DebugReading[];
   latestPosition: DebugPosition | null;
@@ -86,8 +118,6 @@ type CalibrationRow = CalibrationSample & {
 };
 
 type CalibrationGateway = DebugGateway;
-
-type CalibrationRequestState = 'idle' | 'loading' | 'saving' | 'error';
 
 type CalibrationSamplingState = {
   gatewayId: number | null;
@@ -103,26 +133,24 @@ type CalibrationStats = {
   lastSampleAt: string | null;
 };
 
+type GatewayFormState = {
+  identifier: string;
+  type: DebugGateway['type'];
+  mqttServerId: string;
+  topic: string;
+  subscribeQos: string;
+  x: string;
+  y: string;
+};
+
+const gatewayTypeOptions: DebugGateway['type'][] = [BleGatewayType.GLS10, BleGatewayType.SHELLY];
+const beaconTypeOptions: ManagedBeacon['type'][] = [BeaconType.HOLYIOT];
+
 const emptySamplingState: CalibrationSamplingState = {
   gatewayId: null,
   beaconIdentifier: null,
   activeDistance: null,
 };
-
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getBaseUrl()}${path}`, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
 
 function formatRelativeSeconds(isoTimestamp: string, nowMs: number) {
   const parsed = Date.parse(isoTimestamp);
@@ -131,6 +159,26 @@ function formatRelativeSeconds(isoTimestamp: string, nowMs: number) {
   }
   const diffSeconds = Math.max(0, Math.floor((nowMs - parsed) / 1000));
   return diffSeconds === 1 ? '1 second ago' : `${diffSeconds} seconds ago`;
+}
+
+function buildGatewayForm(gateway: DebugGateway): GatewayFormState {
+  return {
+    identifier: gateway.identifier,
+    type: gateway.type,
+    mqttServerId: gateway.mqttServerId ? String(gateway.mqttServerId) : '',
+    topic: gateway.topic ?? '',
+    subscribeQos: gateway.subscribeQos !== null && gateway.subscribeQos !== undefined ? String(gateway.subscribeQos) : '',
+    x: gateway.coordinates.x !== null && gateway.coordinates.x !== undefined ? String(gateway.coordinates.x) : '',
+    y: gateway.coordinates.y !== null && gateway.coordinates.y !== undefined ? String(gateway.coordinates.y) : '',
+  };
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  if (value.trim() === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function MapBoundsUpdater({ bounds }: { bounds: LatLngBoundsExpression }) {
@@ -148,8 +196,6 @@ export function PositionalTrackingDebugPage() {
   const [lastEventAt, setLastEventAt] = useState<string | null>(null);
   const [beacons, setBeacons] = useState<Record<string, BeaconState>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [calibrationGateways, setCalibrationGateways] = useState<CalibrationGateway[]>([]);
-  const [calibrationState, setCalibrationState] = useState<CalibrationRequestState>('idle');
   const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [selectedGatewayId, setSelectedGatewayId] = useState<number | null>(null);
   const [selectedBeaconIdentifier, setSelectedBeaconIdentifier] = useState<string | null>(null);
@@ -157,6 +203,81 @@ export function PositionalTrackingDebugPage() {
   const [calibrationRows, setCalibrationRows] = useState<CalibrationRow[]>([]);
   const [activeDistance, setActiveDistance] = useState<number | null>(null);
   const samplingRef = useRef<CalibrationSamplingState>(emptySamplingState);
+  const [gatewayForms, setGatewayForms] = useState<Record<number, GatewayFormState>>({});
+  const [newGatewayForm, setNewGatewayForm] = useState<GatewayFormState>({
+    identifier: '',
+    type: BleGatewayType.GLS10,
+    mqttServerId: '',
+    topic: '',
+    subscribeQos: '',
+    x: '',
+    y: '',
+  });
+  const [gatewayError, setGatewayError] = useState<string | null>(null);
+  const [beaconForms, setBeaconForms] = useState<Record<string, ManagedBeacon['type']>>({});
+  const [newBeaconIdentifier, setNewBeaconIdentifier] = useState('');
+  const [newBeaconType, setNewBeaconType] = useState<ManagedBeacon['type']>(BeaconType.HOLYIOT);
+  const [beaconError, setBeaconError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const {
+    data: calibrationGateways = [],
+    status: gatewaysStatus,
+    error: gatewaysError,
+  } = usePositionalTrackingServiceGetPositionalTrackingGateways();
+  const {
+    data: managedBeacons = [],
+    status: beaconsStatus,
+    error: beaconsError,
+  } = usePositionalTrackingServiceGetPositionalTrackingBeacons();
+  const createGatewayMutation = usePositionalTrackingServiceCreatePositionalTrackingGateway({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn()[0]],
+      });
+    },
+  });
+  const updateGatewayMutation = usePositionalTrackingServiceUpdatePositionalTrackingGateway({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn()[0]],
+      });
+    },
+  });
+  const deleteGatewayMutation = usePositionalTrackingServiceDeletePositionalTrackingGateway({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn()[0]],
+      });
+    },
+  });
+  const updateCalibrationMutation = usePositionalTrackingServiceUpdatePositionalTrackingGatewayCalibration({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn()[0]],
+      });
+    },
+  });
+  const createBeaconMutation = usePositionalTrackingServiceCreatePositionalTrackingBeacon({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn()[0]],
+      });
+    },
+  });
+  const updateBeaconMutation = usePositionalTrackingServiceUpdatePositionalTrackingBeacon({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn()[0]],
+      });
+    },
+  });
+  const deleteBeaconMutation = usePositionalTrackingServiceDeletePositionalTrackingBeacon({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn()[0]],
+      });
+    },
+  });
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -171,29 +292,19 @@ export function PositionalTrackingDebugPage() {
     };
   }, [selectedGatewayId, selectedBeaconIdentifier, activeDistance]);
 
-  const loadCalibrationGateways = useCallback(async () => {
-    setCalibrationState('loading');
-    setCalibrationError(null);
-    try {
-      const gateways = await fetchJson<CalibrationGateway[]>('/api/positional-tracking/gateways');
-      setCalibrationGateways(gateways);
-      setCalibrationState('idle');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load gateways';
-      setCalibrationError(message);
-      setCalibrationState('error');
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCalibrationGateways();
-  }, [loadCalibrationGateways]);
-
   useEffect(() => {
     if (selectedGatewayId === null && calibrationGateways.length > 0) {
       setSelectedGatewayId(calibrationGateways[0].id);
     }
   }, [selectedGatewayId, calibrationGateways]);
+
+  useEffect(() => {
+    setGatewayForms(Object.fromEntries(calibrationGateways.map((gateway) => [gateway.id, buildGatewayForm(gateway)])));
+  }, [calibrationGateways]);
+
+  useEffect(() => {
+    setBeaconForms(Object.fromEntries(managedBeacons.map((beacon) => [beacon.identifier, beacon.type])));
+  }, [managedBeacons]);
 
   useEffect(() => {
     const identifiers = Object.keys(beacons);
@@ -213,10 +324,11 @@ export function PositionalTrackingDebugPage() {
         lastEventAt: null,
       };
       if (parsed.type === 'reading') {
+        const mergedReadings = mergeLatestReadings(current.latestReadings, parsed.latestReadings);
         return {
           ...prev,
           [parsed.beaconIdentifier]: {
-            latestReadings: parsed.latestReadings.sort((a, b) => a.gateway.identifier.localeCompare(b.gateway.identifier)),
+            latestReadings: mergedReadings,
             latestPosition: parsed.latestPosition,
             lastReading: parsed.reading,
             lastEventAt: parsed.observedAt,
@@ -302,8 +414,9 @@ export function PositionalTrackingDebugPage() {
   const plotData = useMemo(() => {
     const points: Array<{ x: number; y: number }> = [];
     gateways.forEach((gateway) => {
-      if (gateway.coordinates.x !== null && gateway.coordinates.y !== null) {
-        points.push({ x: gateway.coordinates.x, y: gateway.coordinates.y });
+      const { x, y } = gateway.coordinates;
+      if (typeof x === 'number' && typeof y === 'number') {
+        points.push({ x, y });
       }
     });
     positions.forEach((pos) => {
@@ -398,30 +511,176 @@ export function PositionalTrackingDebugPage() {
     if (!regressionResult || selectedGatewayId === null) {
       return;
     }
-    setCalibrationState('saving');
     setCalibrationError(null);
     try {
-      const saved = await fetchJson<CalibrationGateway>(`/api/positional-tracking/gateways/${selectedGatewayId}/calibration`, {
-        method: 'PUT',
-        body: JSON.stringify({
+      await updateCalibrationMutation.mutateAsync({
+        id: selectedGatewayId,
+        requestBody: {
           txPowerAt1m: regressionResult.txPowerAt1m,
           pathLossExponent: regressionResult.pathLossExponent,
-        }),
+        },
       });
-      setCalibrationGateways((prev) => {
-        const exists = prev.some((gateway) => gateway.id === saved.id);
-        if (!exists) {
-          return [...prev, saved].sort((a, b) => a.id - b.id);
-        }
-        return prev.map((gateway) => (gateway.id === saved.id ? saved : gateway));
-      });
-      setCalibrationState('idle');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save calibration';
       setCalibrationError(message);
-      setCalibrationState('error');
     }
   };
+
+  const handleGatewayFormChange = (gatewayId: number, field: keyof GatewayFormState, value: string) => {
+    setGatewayForms((prev) => ({
+      ...prev,
+      [gatewayId]: {
+        ...prev[gatewayId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleCreateGateway = async () => {
+    if (!newGatewayForm.identifier.trim()) {
+      setGatewayError('Gateway identifier is required');
+      return;
+    }
+    const mqttServerId = Number(newGatewayForm.mqttServerId);
+    if (!Number.isFinite(mqttServerId)) {
+      setGatewayError('MQTT server ID must be a number');
+      return;
+    }
+    setGatewayError(null);
+    try {
+      await createGatewayMutation.mutateAsync({
+        requestBody: {
+          identifier: newGatewayForm.identifier.trim(),
+          type: newGatewayForm.type,
+          mqttServerId,
+          topic: newGatewayForm.topic.trim() || undefined,
+          subscribeQos: parseOptionalNumber(newGatewayForm.subscribeQos),
+          coordinates: {
+            x: parseOptionalNumber(newGatewayForm.x),
+            y: parseOptionalNumber(newGatewayForm.y),
+          },
+        },
+      });
+      setNewGatewayForm({
+        identifier: '',
+        type: BleGatewayType.GLS10,
+        mqttServerId: '',
+        topic: '',
+        subscribeQos: '',
+        x: '',
+        y: '',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create gateway';
+      setGatewayError(message);
+    }
+  };
+
+  const handleSaveGateway = async (gatewayId: number) => {
+    const form = gatewayForms[gatewayId];
+    if (!form) {
+      return;
+    }
+    if (!form.identifier.trim()) {
+      setGatewayError('Gateway identifier is required');
+      return;
+    }
+    const mqttServerId = Number(form.mqttServerId);
+    if (!Number.isFinite(mqttServerId)) {
+      setGatewayError('MQTT server ID must be a number');
+      return;
+    }
+    setGatewayError(null);
+    try {
+      await updateGatewayMutation.mutateAsync({
+        id: gatewayId,
+        requestBody: {
+          identifier: form.identifier.trim(),
+          type: form.type,
+          mqttServerId,
+          topic: form.topic.trim() || undefined,
+          subscribeQos: parseOptionalNumber(form.subscribeQos),
+          coordinates: {
+            x: parseOptionalNumber(form.x),
+            y: parseOptionalNumber(form.y),
+          },
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update gateway';
+      setGatewayError(message);
+    }
+  };
+
+  const handleDeleteGateway = async (gatewayId: number) => {
+    setGatewayError(null);
+    try {
+      await deleteGatewayMutation.mutateAsync({ id: gatewayId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete gateway';
+      setGatewayError(message);
+    }
+  };
+
+  const handleBeaconTypeChange = (identifier: string, value: ManagedBeacon['type']) => {
+    setBeaconForms((prev) => ({ ...prev, [identifier]: value }));
+  };
+
+  const handleCreateBeacon = async () => {
+    if (!newBeaconIdentifier.trim()) {
+      setBeaconError('Beacon identifier is required');
+      return;
+    }
+    setBeaconError(null);
+    try {
+      await createBeaconMutation.mutateAsync({
+        requestBody: {
+          identifier: newBeaconIdentifier.trim(),
+          type: newBeaconType,
+        },
+      });
+      setNewBeaconIdentifier('');
+      setNewBeaconType(BeaconType.HOLYIOT);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create beacon';
+      setBeaconError(message);
+    }
+  };
+
+  const handleSaveBeacon = async (identifier: string) => {
+    const type = beaconForms[identifier];
+    if (!type) {
+      return;
+    }
+    setBeaconError(null);
+    try {
+      await updateBeaconMutation.mutateAsync({
+        identifier,
+        requestBody: { type },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update beacon';
+      setBeaconError(message);
+    }
+  };
+
+  const handleDeleteBeacon = async (identifier: string) => {
+    setBeaconError(null);
+    try {
+      await deleteBeaconMutation.mutateAsync({ identifier });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete beacon';
+      setBeaconError(message);
+    }
+  };
+
+  const isGatewayMutationPending =
+    createGatewayMutation.isPending || updateGatewayMutation.isPending || deleteGatewayMutation.isPending;
+  const isBeaconMutationPending =
+    createBeaconMutation.isPending || updateBeaconMutation.isPending || deleteBeaconMutation.isPending;
+  const isCalibrationSaving = updateCalibrationMutation.isPending;
+  const gatewaysErrorMessage = gatewaysError instanceof Error ? gatewaysError.message : null;
+  const beaconsErrorMessage = beaconsError instanceof Error ? beaconsError.message : null;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -459,13 +718,14 @@ export function PositionalTrackingDebugPage() {
                 />
                 <Pane name="gateways" style={{ zIndex: 400 }}>
                   {gateways.map((gateway) => {
-                    if (gateway.coordinates.x === null || gateway.coordinates.y === null) {
+                    const { x, y } = gateway.coordinates;
+                    if (typeof x !== 'number' || typeof y !== 'number') {
                       return null;
                     }
                     return (
                       <CircleMarker
                         key={`gateway-${gateway.id}`}
-                        center={[gateway.coordinates.y, gateway.coordinates.x]}
+                        center={[y, x]}
                         radius={6}
                         pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9 }}
                       >
@@ -473,7 +733,7 @@ export function PositionalTrackingDebugPage() {
                           <div className="text-sm">
                             <div className="font-semibold">{gateway.identifier}</div>
                             <div>
-                              ({formatNumber(gateway.coordinates.x)}, {formatNumber(gateway.coordinates.y)})
+                              ({formatNumber(x)}, {formatNumber(y)})
                             </div>
                           </div>
                         </Popup>
@@ -547,6 +807,295 @@ export function PositionalTrackingDebugPage() {
       </div>
 
       <Card>
+        <CardHeader className="text-lg font-semibold">Beacons</CardHeader>
+        <CardBody className="flex flex-col gap-6">
+          {Object.entries(beacons).length === 0 && (
+            <div className="text-sm text-foreground-500">Waiting for readings.</div>
+          )}
+          {Object.entries(beacons).map(([identifier, beacon]) => (
+            <Card key={identifier} className="border" shadow="none">
+              <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-semibold">Beacon {identifier}</div>
+                <div className="text-xs text-foreground-500">Last event {beacon.lastEventAt ?? '-'}</div>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-4">
+                {beacon.latestPosition ? (
+                  <div className="text-sm text-foreground-700">
+                    Position: ({formatNumber(beacon.latestPosition.x)}, {formatNumber(beacon.latestPosition.y)}) residual{' '}
+                    {formatNumber(beacon.latestPosition.residual, 4)}
+                  </div>
+                ) : (
+                  <div className="text-sm text-foreground-500">No position calculated yet.</div>
+                )}
+
+                <Table aria-label={`Readings for beacon ${identifier}`}>
+                  <TableHeader>
+                    <TableColumn>Gateway</TableColumn>
+                    <TableColumn>RSSI</TableColumn>
+                    <TableColumn>Filtered</TableColumn>
+                    <TableColumn>Distance</TableColumn>
+                    <TableColumn>Battery</TableColumn>
+                    <TableColumn>Observed</TableColumn>
+                  </TableHeader>
+                  <TableBody items={beacon.latestReadings} emptyContent="No readings in window.">
+                    {(reading) => (
+                      <TableRow key={`${identifier}-${reading.gateway.id}`}>
+                        <TableCell>{reading.gateway.identifier}</TableCell>
+                        <TableCell>{formatNumber(reading.rssi)}</TableCell>
+                        <TableCell>{formatNumber(reading.filteredRssi)}</TableCell>
+                        <TableCell>{formatNumber(reading.distance)}</TableCell>
+                        <TableCell>{formatNumber(reading.battery, 0)}</TableCell>
+                        <TableCell>{formatRelativeSeconds(reading.observedAt, nowMs)}</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardBody>
+            </Card>
+          ))}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="text-lg font-semibold">Manage Beacons</CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Input
+              label="Identifier"
+              value={newBeaconIdentifier}
+              onChange={(event) => setNewBeaconIdentifier(event.target.value)}
+            />
+            <Select
+              label="Type"
+              selectedKeys={[newBeaconType]}
+              onSelectionChange={(keys) => {
+                const [value] = Array.from(keys) as ManagedBeacon['type'][];
+                setNewBeaconType(value ?? BeaconType.HOLYIOT);
+              }}
+            >
+              {beaconTypeOptions.map((type) => (
+                <SelectItem key={type}>{type}</SelectItem>
+              ))}
+            </Select>
+            <div className="flex items-end">
+              <Button onPress={handleCreateBeacon} isDisabled={isBeaconMutationPending}>
+                Add beacon
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground-500">
+            <div>
+              {beaconsStatus === 'pending' && 'Loading beacons...'}
+              {isBeaconMutationPending && 'Saving beacon changes...'}
+            </div>
+          </div>
+          {(beaconError || beaconsErrorMessage) && (
+            <div className="text-sm text-danger-500">{beaconError ?? beaconsErrorMessage}</div>
+          )}
+          <Table aria-label="Manage beacons">
+            <TableHeader>
+              <TableColumn>Identifier</TableColumn>
+              <TableColumn>Type</TableColumn>
+              <TableColumn>Actions</TableColumn>
+            </TableHeader>
+            <TableBody items={managedBeacons} emptyContent="No beacons configured.">
+              {(beacon) => {
+                const type = beaconForms[beacon.identifier] ?? beacon.type;
+                return (
+                  <TableRow key={`manage-${beacon.identifier}`}>
+                    <TableCell>{beacon.identifier}</TableCell>
+                    <TableCell>
+                      <Select
+                        aria-label={`Type for beacon ${beacon.identifier}`}
+                        selectedKeys={[type]}
+                        onSelectionChange={(keys) => {
+                          const [value] = Array.from(keys) as ManagedBeacon['type'][];
+                          handleBeaconTypeChange(beacon.identifier, value ?? BeaconType.HOLYIOT);
+                        }}
+                      >
+                        {beaconTypeOptions.map((option) => (
+                          <SelectItem key={option}>{option}</SelectItem>
+                        ))}
+                      </Select>
+                    </TableCell>
+                    <TableCell className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onPress={() => handleSaveBeacon(beacon.identifier)}
+                        isDisabled={isBeaconMutationPending}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="light"
+                        onPress={() => handleDeleteBeacon(beacon.identifier)}
+                        isDisabled={isBeaconMutationPending}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              }}
+            </TableBody>
+          </Table>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader className="text-lg font-semibold">Manage Gateways</CardHeader>
+        <CardBody className="flex flex-col gap-4">
+          <div className="grid gap-4 lg:grid-cols-7">
+            <Input
+              label="Identifier"
+              value={newGatewayForm.identifier}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, identifier: event.target.value }))}
+            />
+            <Select
+              label="Type"
+              selectedKeys={[newGatewayForm.type]}
+              onSelectionChange={(keys) => {
+                const [value] = Array.from(keys) as DebugGateway['type'][];
+                setNewGatewayForm((prev) => ({ ...prev, type: value ?? BleGatewayType.GLS10 }));
+              }}
+            >
+              {gatewayTypeOptions.map((type) => (
+                <SelectItem key={type}>{type}</SelectItem>
+              ))}
+            </Select>
+            <Input
+              label="MQTT server ID"
+              type="number"
+              min={0}
+              value={newGatewayForm.mqttServerId}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, mqttServerId: event.target.value }))}
+            />
+            <Input
+              label="Topic"
+              value={newGatewayForm.topic}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, topic: event.target.value }))}
+            />
+            <Input
+              label="QoS"
+              type="number"
+              min={0}
+              value={newGatewayForm.subscribeQos}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, subscribeQos: event.target.value }))}
+            />
+            <Input
+              label="X"
+              type="number"
+              value={newGatewayForm.x}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, x: event.target.value }))}
+            />
+            <Input
+              label="Y"
+              type="number"
+              value={newGatewayForm.y}
+              onChange={(event) => setNewGatewayForm((prev) => ({ ...prev, y: event.target.value }))}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm text-foreground-500">
+              {gatewaysStatus === 'pending' && 'Loading gateways...'}
+              {isGatewayMutationPending && 'Saving gateway changes...'}
+            </div>
+            <Button onPress={handleCreateGateway} isDisabled={isGatewayMutationPending}>
+              Add gateway
+            </Button>
+          </div>
+          {(gatewayError || gatewaysErrorMessage) && (
+            <div className="text-sm text-danger-500">{gatewayError ?? gatewaysErrorMessage}</div>
+          )}
+          {calibrationGateways.length === 0 ? (
+            <div className="text-sm text-foreground-500">No gateways configured.</div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {calibrationGateways.map((gateway) => {
+                const form = gatewayForms[gateway.id] ?? buildGatewayForm(gateway);
+                return (
+                  <Card key={`manage-${gateway.id}`} className="border" shadow="none">
+                    <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold">Gateway {gateway.id}</div>
+                      <div className="text-xs text-foreground-500">{gateway.identifier}</div>
+                    </CardHeader>
+                    <CardBody className="flex flex-col gap-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Input
+                          label="Identifier"
+                          value={form.identifier}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'identifier', event.target.value)}
+                        />
+                        <Select
+                          label="Type"
+                          selectedKeys={[form.type]}
+                          onSelectionChange={(keys) => {
+                            const [value] = Array.from(keys) as DebugGateway['type'][];
+                            handleGatewayFormChange(gateway.id, 'type', value ?? BleGatewayType.GLS10);
+                          }}
+                        >
+                          {gatewayTypeOptions.map((type) => (
+                            <SelectItem key={type}>{type}</SelectItem>
+                          ))}
+                        </Select>
+                        <Input
+                          label="MQTT server ID"
+                          type="number"
+                          min={0}
+                          value={form.mqttServerId}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'mqttServerId', event.target.value)}
+                        />
+                        <Input
+                          label="Topic"
+                          value={form.topic}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'topic', event.target.value)}
+                        />
+                        <Input
+                          label="QoS"
+                          type="number"
+                          min={0}
+                          value={form.subscribeQos}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'subscribeQos', event.target.value)}
+                        />
+                        <Input
+                          label="X"
+                          type="number"
+                          value={form.x}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'x', event.target.value)}
+                        />
+                        <Input
+                          label="Y"
+                          type="number"
+                          value={form.y}
+                          onChange={(event) => handleGatewayFormChange(gateway.id, 'y', event.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onPress={() => handleSaveGateway(gateway.id)} isDisabled={isGatewayMutationPending}>
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          color="danger"
+                          variant="light"
+                          onPress={() => handleDeleteGateway(gateway.id)}
+                          isDisabled={isGatewayMutationPending}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </CardBody>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
         <CardHeader className="text-lg font-semibold">Calibration</CardHeader>
         <CardBody className="flex flex-col gap-4">
           <div className="grid gap-4 md:grid-cols-3">
@@ -558,7 +1107,7 @@ export function PositionalTrackingDebugPage() {
                 const [value] = Array.from(keys) as string[];
                 setSelectedGatewayId(value ? Number(value) : null);
               }}
-              isDisabled={calibrationState === 'loading'}
+              isDisabled={gatewaysStatus === 'pending'}
             >
               {calibrationGateways.map((gateway) => (
                 <SelectItem key={String(gateway.id)}>{gateway.identifier}</SelectItem>
@@ -601,12 +1150,14 @@ export function PositionalTrackingDebugPage() {
                 : 'Not sampling - pick a distance to start'}
             </div>
             <div>
-              {calibrationState === 'loading' && 'Loading gateways...'}
-              {calibrationState === 'saving' && 'Saving calibration...'}
+              {gatewaysStatus === 'pending' && 'Loading gateways...'}
+              {isCalibrationSaving && 'Saving calibration...'}
             </div>
           </div>
 
-          {calibrationError && <div className="text-sm text-danger-500">{calibrationError}</div>}
+          {(calibrationError || gatewaysErrorMessage) && (
+            <div className="text-sm text-danger-500">{calibrationError ?? gatewaysErrorMessage}</div>
+          )}
 
           <Table aria-label="Calibration samples">
             <TableHeader>
@@ -657,8 +1208,8 @@ export function PositionalTrackingDebugPage() {
               isDisabled={
                 !regressionResult ||
                 selectedGatewayId === null ||
-                calibrationState === 'saving' ||
-                calibrationState === 'loading'
+                isCalibrationSaving ||
+                gatewaysStatus === 'pending'
               }
             >
               Save calibration
@@ -667,58 +1218,7 @@ export function PositionalTrackingDebugPage() {
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader className="text-lg font-semibold">Beacons</CardHeader>
-        <CardBody className="flex flex-col gap-6">
-          {Object.entries(beacons).length === 0 && (
-            <div className="text-sm text-foreground-500">Waiting for readings.</div>
-          )}
-          {Object.entries(beacons).map(([identifier, beacon]) => (
-            <Card key={identifier} className="border" shadow="none">
-              <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-semibold">Beacon {identifier}</div>
-                <div className="text-xs text-foreground-500">Last event {beacon.lastEventAt ?? '-'}</div>
-              </CardHeader>
-              <CardBody className="flex flex-col gap-4">
-                {beacon.latestPosition ? (
-                  <div className="text-sm text-foreground-700">
-                    Position: ({formatNumber(beacon.latestPosition.x)}, {formatNumber(beacon.latestPosition.y)}) residual{' '}
-                    {formatNumber(beacon.latestPosition.residual, 4)}
-                  </div>
-                ) : (
-                  <div className="text-sm text-foreground-500">No position calculated yet.</div>
-                )}
 
-                <Table aria-label={`Readings for beacon ${identifier}`}>
-                  <TableHeader>
-                    <TableColumn>Gateway</TableColumn>
-                    <TableColumn>RSSI</TableColumn>
-                    <TableColumn>Filtered</TableColumn>
-                    <TableColumn>Distance</TableColumn>
-                    <TableColumn>Battery</TableColumn>
-                    <TableColumn>Observed</TableColumn>
-                  </TableHeader>
-                  <TableBody
-                    items={beacon.latestReadings}
-                    emptyContent="No readings in window."
-                  >
-                    {(reading) => (
-                      <TableRow key={`${identifier}-${reading.gateway.id}`}>
-                        <TableCell>{reading.gateway.identifier}</TableCell>
-                        <TableCell>{formatNumber(reading.rssi)}</TableCell>
-                        <TableCell>{formatNumber(reading.filteredRssi)}</TableCell>
-                        <TableCell>{formatNumber(reading.distance)}</TableCell>
-                        <TableCell>{formatNumber(reading.battery, 0)}</TableCell>
-                        <TableCell>{formatRelativeSeconds(reading.observedAt, nowMs)}</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardBody>
-            </Card>
-          ))}
-        </CardBody>
-      </Card>
     </div>
   );
 }

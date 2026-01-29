@@ -4539,6 +4539,254 @@ export const $UpdateFormDto = {
     required: ['name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'fields']
 } as const;
 
+export const $BleGatewayType = {
+    type: 'string',
+    enum: ['gls10', 'shelly'],
+    description: 'Gateway type'
+} as const;
+
+export const $GatewayCoordinatesDto = {
+    type: 'object',
+    properties: {
+        x: {
+            type: 'number',
+            description: 'Gateway X coordinate (meters)'
+        },
+        y: {
+            type: 'number',
+            description: 'Gateway Y coordinate (meters)'
+        }
+    }
+} as const;
+
+export const $GatewayCalibrationDto = {
+    type: 'object',
+    properties: {
+        txPowerAt1m: {
+            type: 'number',
+            description: 'Calibrated RSSI at 1 meter (dBm)'
+        },
+        pathLossExponent: {
+            type: 'number',
+            description: 'Path-loss exponent for the environment'
+        },
+        calibrationUpdatedAt: {
+            type: 'string',
+            description: 'When calibration was last updated',
+            format: 'date-time'
+        }
+    }
+} as const;
+
+export const $PositionalGatewayResponseDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the BLE gateway'
+        },
+        identifier: {
+            type: 'string',
+            description: 'Gateway identifier as reported by the device'
+        },
+        type: {
+            description: 'Gateway type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BleGatewayType'
+                }
+            ]
+        },
+        mqttServerId: {
+            type: 'number',
+            description: 'MQTT server ID for subscriptions'
+        },
+        topic: {
+            type: 'string',
+            description: 'MQTT topic to subscribe to'
+        },
+        subscribeQos: {
+            type: 'number',
+            description: 'Optional MQTT QoS'
+        },
+        coordinates: {
+            description: 'Gateway coordinates',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/GatewayCoordinatesDto'
+                }
+            ]
+        },
+        calibration: {
+            description: 'Gateway calibration parameters',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/GatewayCalibrationDto'
+                }
+            ]
+        }
+    },
+    required: ['id', 'identifier', 'type', 'mqttServerId', 'coordinates', 'calibration']
+} as const;
+
+export const $CreateGatewayDto = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string',
+            description: 'Gateway identifier as reported by the device'
+        },
+        type: {
+            description: 'Gateway type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BleGatewayType'
+                }
+            ]
+        },
+        mqttServerId: {
+            type: 'number',
+            description: 'MQTT server ID for subscriptions'
+        },
+        topic: {
+            type: 'string',
+            description: 'MQTT topic to subscribe to'
+        },
+        subscribeQos: {
+            type: 'number',
+            description: 'Optional MQTT QoS'
+        },
+        coordinates: {
+            description: 'Gateway coordinates',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/GatewayCoordinatesDto'
+                }
+            ]
+        }
+    },
+    required: ['identifier', 'type', 'mqttServerId']
+} as const;
+
+export const $UpdateGatewayDto = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string',
+            description: 'Gateway identifier as reported by the device'
+        },
+        type: {
+            description: 'Gateway type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BleGatewayType'
+                }
+            ]
+        },
+        mqttServerId: {
+            type: 'number',
+            description: 'MQTT server ID for subscriptions'
+        },
+        topic: {
+            type: 'string',
+            description: 'MQTT topic to subscribe to'
+        },
+        subscribeQos: {
+            type: 'number',
+            description: 'Optional MQTT QoS'
+        },
+        coordinates: {
+            description: 'Gateway coordinates',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/GatewayCoordinatesDto'
+                }
+            ]
+        }
+    }
+} as const;
+
+export const $UpdateGatewayCalibrationDto = {
+    type: 'object',
+    properties: {
+        txPowerAt1m: {
+            type: 'number',
+            description: 'Calibrated RSSI at 1 meter (dBm)',
+            example: -55
+        },
+        pathLossExponent: {
+            type: 'number',
+            description: 'Path-loss exponent for the environment',
+            example: 2.1
+        },
+        calibrationUpdatedAt: {
+            type: 'string',
+            description: 'When calibration was last updated (defaults to now)',
+            format: 'date-time',
+            example: '2026-01-28T12:00:00.000Z'
+        }
+    },
+    required: ['txPowerAt1m', 'pathLossExponent']
+} as const;
+
+export const $BeaconType = {
+    type: 'string',
+    enum: ['holyiot'],
+    description: 'Beacon type'
+} as const;
+
+export const $PositionalBeaconResponseDto = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string',
+            description: 'Beacon identifier (primary key)'
+        },
+        type: {
+            description: 'Beacon type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BeaconType'
+                }
+            ]
+        }
+    },
+    required: ['identifier', 'type']
+} as const;
+
+export const $CreateBeaconDto = {
+    type: 'object',
+    properties: {
+        identifier: {
+            type: 'string',
+            description: 'Beacon identifier (primary key)'
+        },
+        type: {
+            description: 'Beacon type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BeaconType'
+                }
+            ]
+        }
+    },
+    required: ['identifier', 'type']
+} as const;
+
+export const $UpdateBeaconDto = {
+    type: 'object',
+    properties: {
+        type: {
+            description: 'Beacon type',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/BeaconType'
+                }
+            ]
+        }
+    }
+} as const;
+
 export const $PluginMainFrontend = {
     type: 'object',
     properties: {

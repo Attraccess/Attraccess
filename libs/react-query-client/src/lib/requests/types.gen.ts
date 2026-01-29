@@ -2907,6 +2907,180 @@ export type UpdateFormDto = {
     fields: Array<UpdateFormFieldDto>;
 };
 
+/**
+ * Gateway type
+ */
+export enum BleGatewayType {
+    GLS10 = 'gls10',
+    SHELLY = 'shelly'
+}
+
+export type GatewayCoordinatesDto = {
+    /**
+     * Gateway X coordinate (meters)
+     */
+    x?: number;
+    /**
+     * Gateway Y coordinate (meters)
+     */
+    y?: number;
+};
+
+export type GatewayCalibrationDto = {
+    /**
+     * Calibrated RSSI at 1 meter (dBm)
+     */
+    txPowerAt1m?: number;
+    /**
+     * Path-loss exponent for the environment
+     */
+    pathLossExponent?: number;
+    /**
+     * When calibration was last updated
+     */
+    calibrationUpdatedAt?: string;
+};
+
+export type PositionalGatewayResponseDto = {
+    /**
+     * The unique identifier of the BLE gateway
+     */
+    id: number;
+    /**
+     * Gateway identifier as reported by the device
+     */
+    identifier: string;
+    /**
+     * Gateway type
+     */
+    type: BleGatewayType;
+    /**
+     * MQTT server ID for subscriptions
+     */
+    mqttServerId: number;
+    /**
+     * MQTT topic to subscribe to
+     */
+    topic?: string;
+    /**
+     * Optional MQTT QoS
+     */
+    subscribeQos?: number;
+    /**
+     * Gateway coordinates
+     */
+    coordinates: GatewayCoordinatesDto;
+    /**
+     * Gateway calibration parameters
+     */
+    calibration: GatewayCalibrationDto;
+};
+
+export type CreateGatewayDto = {
+    /**
+     * Gateway identifier as reported by the device
+     */
+    identifier: string;
+    /**
+     * Gateway type
+     */
+    type: BleGatewayType;
+    /**
+     * MQTT server ID for subscriptions
+     */
+    mqttServerId: number;
+    /**
+     * MQTT topic to subscribe to
+     */
+    topic?: string;
+    /**
+     * Optional MQTT QoS
+     */
+    subscribeQos?: number;
+    /**
+     * Gateway coordinates
+     */
+    coordinates?: GatewayCoordinatesDto;
+};
+
+export type UpdateGatewayDto = {
+    /**
+     * Gateway identifier as reported by the device
+     */
+    identifier?: string;
+    /**
+     * Gateway type
+     */
+    type?: BleGatewayType;
+    /**
+     * MQTT server ID for subscriptions
+     */
+    mqttServerId?: number;
+    /**
+     * MQTT topic to subscribe to
+     */
+    topic?: string;
+    /**
+     * Optional MQTT QoS
+     */
+    subscribeQos?: number;
+    /**
+     * Gateway coordinates
+     */
+    coordinates?: GatewayCoordinatesDto;
+};
+
+export type UpdateGatewayCalibrationDto = {
+    /**
+     * Calibrated RSSI at 1 meter (dBm)
+     */
+    txPowerAt1m: number;
+    /**
+     * Path-loss exponent for the environment
+     */
+    pathLossExponent: number;
+    /**
+     * When calibration was last updated (defaults to now)
+     */
+    calibrationUpdatedAt?: string;
+};
+
+/**
+ * Beacon type
+ */
+export enum BeaconType {
+    HOLYIOT = 'holyiot'
+}
+
+export type PositionalBeaconResponseDto = {
+    /**
+     * Beacon identifier (primary key)
+     */
+    identifier: string;
+    /**
+     * Beacon type
+     */
+    type: BeaconType;
+};
+
+export type CreateBeaconDto = {
+    /**
+     * Beacon identifier (primary key)
+     */
+    identifier: string;
+    /**
+     * Beacon type
+     */
+    type: BeaconType;
+};
+
+export type UpdateBeaconDto = {
+    /**
+     * Beacon type
+     */
+    type?: BeaconType;
+};
+
 export type PluginMainFrontend = {
     /**
      * The directory of the plugins frontend files
@@ -4513,6 +4687,61 @@ export type ResourceFormsDeleteData = {
 };
 
 export type ResourceFormsDeleteResponse = void;
+
+export type GetPositionalTrackingGatewaysResponse = Array<PositionalGatewayResponseDto>;
+
+export type CreatePositionalTrackingGatewayData = {
+    requestBody: CreateGatewayDto;
+};
+
+export type CreatePositionalTrackingGatewayResponse = PositionalGatewayResponseDto;
+
+export type GetPositionalTrackingGatewayByIdData = {
+    id: number;
+};
+
+export type GetPositionalTrackingGatewayByIdResponse = PositionalGatewayResponseDto;
+
+export type UpdatePositionalTrackingGatewayData = {
+    id: number;
+    requestBody: UpdateGatewayDto;
+};
+
+export type UpdatePositionalTrackingGatewayResponse = PositionalGatewayResponseDto;
+
+export type DeletePositionalTrackingGatewayData = {
+    id: number;
+};
+
+export type DeletePositionalTrackingGatewayResponse = unknown;
+
+export type UpdatePositionalTrackingGatewayCalibrationData = {
+    id: number;
+    requestBody: UpdateGatewayCalibrationDto;
+};
+
+export type UpdatePositionalTrackingGatewayCalibrationResponse = PositionalGatewayResponseDto;
+
+export type GetPositionalTrackingBeaconsResponse = Array<PositionalBeaconResponseDto>;
+
+export type CreatePositionalTrackingBeaconData = {
+    requestBody: CreateBeaconDto;
+};
+
+export type CreatePositionalTrackingBeaconResponse = PositionalBeaconResponseDto;
+
+export type UpdatePositionalTrackingBeaconData = {
+    identifier: string;
+    requestBody: UpdateBeaconDto;
+};
+
+export type UpdatePositionalTrackingBeaconResponse = PositionalBeaconResponseDto;
+
+export type DeletePositionalTrackingBeaconData = {
+    identifier: string;
+};
+
+export type DeletePositionalTrackingBeaconResponse = unknown;
 
 export type GetPluginsResponse = Array<LoadedPluginManifest>;
 
@@ -7131,6 +7360,168 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/positional-tracking/gateways': {
+        get: {
+            res: {
+                /**
+                 * List of gateways used for positional tracking.
+                 */
+                200: Array<PositionalGatewayResponseDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreatePositionalTrackingGatewayData;
+            res: {
+                /**
+                 * Gateway created successfully.
+                 */
+                201: PositionalGatewayResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/positional-tracking/gateways/{id}': {
+        get: {
+            req: GetPositionalTrackingGatewayByIdData;
+            res: {
+                /**
+                 * Gateway retrieved successfully.
+                 */
+                200: PositionalGatewayResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Gateway not found
+                 */
+                404: unknown;
+            };
+        };
+        put: {
+            req: UpdatePositionalTrackingGatewayData;
+            res: {
+                /**
+                 * Gateway updated successfully.
+                 */
+                200: PositionalGatewayResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Gateway not found
+                 */
+                404: unknown;
+            };
+        };
+        delete: {
+            req: DeletePositionalTrackingGatewayData;
+            res: {
+                /**
+                 * Gateway deleted successfully.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Gateway not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/positional-tracking/gateways/{id}/calibration': {
+        put: {
+            req: UpdatePositionalTrackingGatewayCalibrationData;
+            res: {
+                /**
+                 * Gateway calibration updated successfully.
+                 */
+                200: PositionalGatewayResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Gateway not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/positional-tracking/beacons': {
+        get: {
+            res: {
+                /**
+                 * List of beacons used for positional tracking.
+                 */
+                200: Array<PositionalBeaconResponseDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        post: {
+            req: CreatePositionalTrackingBeaconData;
+            res: {
+                /**
+                 * Beacon created successfully.
+                 */
+                201: PositionalBeaconResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/positional-tracking/beacons/{identifier}': {
+        put: {
+            req: UpdatePositionalTrackingBeaconData;
+            res: {
+                /**
+                 * Beacon updated successfully.
+                 */
+                200: PositionalBeaconResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Beacon not found
+                 */
+                404: unknown;
+            };
+        };
+        delete: {
+            req: DeletePositionalTrackingBeaconData;
+            res: {
+                /**
+                 * Beacon deleted successfully.
+                 */
+                200: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Beacon not found
+                 */
+                404: unknown;
             };
         };
     };

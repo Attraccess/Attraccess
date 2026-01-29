@@ -2,7 +2,7 @@
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, PositionalTrackingService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateBeaconDto, CreateFormDto, CreateGatewayDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateBeaconDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateGatewayCalibrationDto, UpdateGatewayDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceGetLocalSignupDomainWhitelist = <TData = Common.UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(queryKey), queryFn: () => UsersService.getLocalSignupDomainWhitelist() as TData, ...options });
@@ -216,6 +216,11 @@ export const useResourceFormsServiceResourceFormsGetOne = <TData = Common.Resour
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }, queryKey), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) as TData, ...options });
 export const usePositionalTrackingServicePositionalTrackingControllerStreamDebug = <TData = Common.PositionalTrackingServicePositionalTrackingControllerStreamDebugDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn(queryKey), queryFn: () => PositionalTrackingService.positionalTrackingControllerStreamDebug() as TData, ...options });
+export const usePositionalTrackingServiceGetPositionalTrackingGateways = <TData = Common.PositionalTrackingServiceGetPositionalTrackingGatewaysDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewaysKeyFn(queryKey), queryFn: () => PositionalTrackingService.getPositionalTrackingGateways() as TData, ...options });
+export const usePositionalTrackingServiceGetPositionalTrackingGatewayById = <TData = Common.PositionalTrackingServiceGetPositionalTrackingGatewayByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
+  id: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingGatewayByIdKeyFn({ id }, queryKey), queryFn: () => PositionalTrackingService.getPositionalTrackingGatewayById({ id }) as TData, ...options });
+export const usePositionalTrackingServiceGetPositionalTrackingBeacons = <TData = Common.PositionalTrackingServiceGetPositionalTrackingBeaconsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePositionalTrackingServiceGetPositionalTrackingBeaconsKeyFn(queryKey), queryFn: () => PositionalTrackingService.getPositionalTrackingBeacons() as TData, ...options });
 export const usePluginsServiceGetPlugins = <TData = Common.PluginsServiceGetPluginsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(queryKey), queryFn: () => PluginsService.getPlugins() as TData, ...options });
 export const usePluginsServiceGetFrontendPluginFile = <TData = Common.PluginsServiceGetFrontendPluginFileDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ filePath, pluginName }: {
   filePath: string;
@@ -605,6 +610,16 @@ export const useResourceFormsServiceResourceFormsCreate = <TData = Common.Resour
   requestBody: CreateFormDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceFormsService.resourceFormsCreate({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceCreatePositionalTrackingGateway = <TData = Common.PositionalTrackingServiceCreatePositionalTrackingGatewayMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateGatewayDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateGatewayDto;
+}, TContext>({ mutationFn: ({ requestBody }) => PositionalTrackingService.createPositionalTrackingGateway({ requestBody }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceCreatePositionalTrackingBeacon = <TData = Common.PositionalTrackingServiceCreatePositionalTrackingBeaconMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateBeaconDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateBeaconDto;
+}, TContext>({ mutationFn: ({ requestBody }) => PositionalTrackingService.createPositionalTrackingBeacon({ requestBody }) as unknown as Promise<TData>, ...options });
 export const usePluginsServiceUploadPlugin = <TData = Common.PluginsServiceUploadPluginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   formData: UploadPluginDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
@@ -701,6 +716,27 @@ export const useResourceFormsServiceResourceFormsUpdate = <TData = Common.Resour
   requestBody: UpdateFormDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ formId, requestBody, resourceId }) => ResourceFormsService.resourceFormsUpdate({ formId, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceUpdatePositionalTrackingGateway = <TData = Common.PositionalTrackingServiceUpdatePositionalTrackingGatewayMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+  requestBody: UpdateGatewayDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+  requestBody: UpdateGatewayDto;
+}, TContext>({ mutationFn: ({ id, requestBody }) => PositionalTrackingService.updatePositionalTrackingGateway({ id, requestBody }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceUpdatePositionalTrackingGatewayCalibration = <TData = Common.PositionalTrackingServiceUpdatePositionalTrackingGatewayCalibrationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+  requestBody: UpdateGatewayCalibrationDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+  requestBody: UpdateGatewayCalibrationDto;
+}, TContext>({ mutationFn: ({ id, requestBody }) => PositionalTrackingService.updatePositionalTrackingGatewayCalibration({ id, requestBody }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceUpdatePositionalTrackingBeacon = <TData = Common.PositionalTrackingServiceUpdatePositionalTrackingBeaconMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  identifier: string;
+  requestBody: UpdateBeaconDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  identifier: string;
+  requestBody: UpdateBeaconDto;
+}, TContext>({ mutationFn: ({ identifier, requestBody }) => PositionalTrackingService.updatePositionalTrackingBeacon({ identifier, requestBody }) as unknown as Promise<TData>, ...options });
 export const useUsersServiceChangeMyUsername = <TData = Common.UsersServiceChangeMyUsernameMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: ChangeUsernameDto;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
@@ -847,6 +883,16 @@ export const useResourceFormsServiceResourceFormsDelete = <TData = Common.Resour
   formId: number;
   resourceId: number;
 }, TContext>({ mutationFn: ({ formId, resourceId }) => ResourceFormsService.resourceFormsDelete({ formId, resourceId }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceDeletePositionalTrackingGateway = <TData = Common.PositionalTrackingServiceDeletePositionalTrackingGatewayMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+}, TContext>({ mutationFn: ({ id }) => PositionalTrackingService.deletePositionalTrackingGateway({ id }) as unknown as Promise<TData>, ...options });
+export const usePositionalTrackingServiceDeletePositionalTrackingBeacon = <TData = Common.PositionalTrackingServiceDeletePositionalTrackingBeaconMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  identifier: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  identifier: string;
+}, TContext>({ mutationFn: ({ identifier }) => PositionalTrackingService.deletePositionalTrackingBeacon({ identifier }) as unknown as Promise<TData>, ...options });
 export const usePluginsServiceDeletePlugin = <TData = Common.PluginsServiceDeletePluginMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   pluginId: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
