@@ -11,13 +11,13 @@ export function useReliableServerAvailability(options: Options = {}) {
 
   const [errorStreak, setErrorStreak] = useState(0);
 
-  const query = useSystemServiceInfo(undefined, {
+  const { refetch, data: apiInfo, isLoading } = useSystemServiceInfo(undefined, {
     retry: false,
   });
 
   useEffect(() => {
     const run = async () => {
-      const result = await query.refetch();
+      const result = await refetch();
       if (result.isSuccess) {
         setErrorStreak(0);
         return;
@@ -29,7 +29,7 @@ export function useReliableServerAvailability(options: Options = {}) {
     run();
     const intervalId = setInterval(run, refetchIntervalMs);
     return () => clearInterval(intervalId);
-  }, [query, consecutiveErrorThreshold, refetchIntervalMs]);
+  }, [refetch, consecutiveErrorThreshold, refetchIntervalMs]);
 
   const isServerLikelyDown = useMemo(
     () => errorStreak >= consecutiveErrorThreshold,
@@ -39,8 +39,8 @@ export function useReliableServerAvailability(options: Options = {}) {
   return {
     isServerLikelyDown,
     errorStreak,
-    data: query.data,
-    isLoading: query.isLoading,
-    refetch: query.refetch,
+    data: apiInfo,
+    isLoading,
+    refetch,
   };
 }

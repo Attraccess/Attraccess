@@ -94,4 +94,4 @@ export * from './1768742247837-add-delete-account-email-template';
 export * from './1768821805962-add-two-factor-totp';
 export * from './1769012345678-sso-permission-mappings';
 export * from './1769012345680-sso-saml-provisioning-secret';
-export * from './1769608058660-beacons-and-ble-gateways';
+export * from './1769619457074-beacons-and-ble-gateways';

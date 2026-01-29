@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, PositionalTrackingService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -412,6 +412,10 @@ export const UseResourceFormsServiceResourceFormsGetOneKeyFn = ({ formId, resour
   formId: number;
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFormsServiceResourceFormsGetOneKey, ...(queryKey ?? [{ formId, resourceId }])];
+export type PositionalTrackingServicePositionalTrackingControllerStreamDebugDefaultResponse = Awaited<ReturnType<typeof PositionalTrackingService.positionalTrackingControllerStreamDebug>>;
+export type PositionalTrackingServicePositionalTrackingControllerStreamDebugQueryResult<TData = PositionalTrackingServicePositionalTrackingControllerStreamDebugDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const usePositionalTrackingServicePositionalTrackingControllerStreamDebugKey = "PositionalTrackingServicePositionalTrackingControllerStreamDebug";
+export const UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn = (queryKey?: Array<unknown>) => [usePositionalTrackingServicePositionalTrackingControllerStreamDebugKey, ...(queryKey ?? [])];
 export type PluginsServiceGetPluginsDefaultResponse = Awaited<ReturnType<typeof PluginsService.getPlugins>>;
 export type PluginsServiceGetPluginsQueryResult<TData = PluginsServiceGetPluginsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const usePluginsServiceGetPluginsKey = "PluginsServiceGetPlugins";

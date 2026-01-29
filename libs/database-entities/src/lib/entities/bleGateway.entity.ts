@@ -2,6 +2,30 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { MqttServer } from './mqttServer.entity';
 
+export class GatewayCoordinates {
+  @Column({ type: 'real', nullable: true })
+  @ApiProperty({ description: 'Gateway X coordinate (meters)', required: false })
+  x!: number | null;
+
+  @Column({ type: 'real', nullable: true })
+  @ApiProperty({ description: 'Gateway Y coordinate (meters)', required: false })
+  y!: number | null;
+}
+
+export class GatewayCalibration {
+  @Column({ type: 'real', nullable: true })
+  @ApiProperty({ description: 'Calibrated RSSI at 1 meter (dBm)', required: false })
+  txPowerAt1m!: number | null;
+
+  @Column({ type: 'real', nullable: true })
+  @ApiProperty({ description: 'Path-loss exponent for the environment', required: false })
+  pathLossExponent!: number | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When calibration was last updated', required: false })
+  calibrationUpdatedAt!: Date | null;
+}
+
 @Entity()
 export class BleGateway {
   @PrimaryGeneratedColumn()
@@ -27,6 +51,14 @@ export class BleGateway {
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({ description: 'Optional MQTT QoS', required: false })
   subscribeQos!: number | null;
+
+  @Column(() => GatewayCoordinates, { prefix: '' })
+  @ApiProperty({ description: 'Gateway coordinates', type: () => GatewayCoordinates })
+  coordinates!: GatewayCoordinates;
+
+  @Column(() => GatewayCalibration, { prefix: '' })
+  @ApiProperty({ description: 'Gateway calibration parameters', type: () => GatewayCalibration })
+  calibration!: GatewayCalibration;
 
   @CreateDateColumn()
   @ApiProperty({ description: 'When the gateway was created' })

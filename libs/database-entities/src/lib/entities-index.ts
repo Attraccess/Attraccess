@@ -2,6 +2,7 @@
 import { EmailTemplate } from './entities/email-template.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { Beacon, BeaconType } from './entities/beacon.entity';
+import { BeaconPosition } from './entities/beaconPosition.entity';
 import { BleGateway } from './entities/bleGateway.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NFCCard } from './entities/nfcCard.entity';
@@ -58,6 +59,7 @@ export {
   AuthenticationDetail,
   Beacon,
   BeaconType,
+  BeaconPosition,
   BleGateway,
   MqttServer,
   Resource,
@@ -125,6 +127,7 @@ export const entities = {
   AuthenticationDetail,
   Session,
   Beacon,
+  BeaconPosition,
   BleGateway,
   Resource,
   ResourceGroup,

@@ -9,6 +9,21 @@ import re
 
 def resolve_python_command():
     """Pick a Python executable with fallback."""
+    candidate_platformio_homes = [
+        os.environ.get('PLATFORMIO_HOME_DIR'),
+        os.path.join(os.path.expanduser('~'), '.platformio'),
+        os.path.join(os.getcwd(), '.platformio'),
+        '/home/ubuntu/.platformio',
+        '/root/.platformio',
+    ]
+    for platformio_home in dict.fromkeys(filter(None, candidate_platformio_homes)):
+        for penv_path in (
+            os.path.join(platformio_home, 'penv', 'bin', 'python3'),
+            os.path.join(platformio_home, 'penv', 'bin', 'python'),
+            os.path.join(platformio_home, 'penv', 'Scripts', 'python.exe'),
+        ):
+            if os.path.exists(penv_path):
+                return penv_path
     if sys.executable and os.path.exists(sys.executable):
         return sys.executable
     for cmd in ("python3", "python"):

@@ -1,10 +1,73 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Beacon, BeaconType, BleGateway } from '@attraccess/database-entities';
+import { LessThan, Repository } from 'typeorm';
+import { Beacon, BeaconPosition, BeaconType, BleGateway } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../../mqtt/mqtt-message.event';
+import { Observable, Subject } from 'rxjs';
+
+type DebugGateway = {
+  id: number;
+  identifier: string;
+  coordinates: { x: number | null; y: number | null };
+  calibration: {
+    txPowerAt1m: number | null;
+    pathLossExponent: number | null;
+    calibrationUpdatedAt: string | null;
+  };
+};
+
+type DebugReading = {
+  gateway: DebugGateway;
+  rssi: number;
+  filteredRssi: number | null;
+  distance: number | null;
+  battery: number | null;
+  observedAt: string;
+};
+
+type DebugPosition = {
+  x: number;
+  y: number;
+  residual: number | null;
+  observedAt: string;
+};
+
+type DebugSample = {
+  gateway: DebugGateway;
+  rssi: number;
+  filteredRssi: number | null;
+  distance: number;
+  observedAt: string;
+};
+
+type InMemoryReading = {
+  gateway: BleGateway;
+  rssi: number;
+  filteredRssi: number | null;
+  distance: number | null;
+  battery: number | null;
+  observedAt: Date;
+};
+
+export type PositionalDebugEvent =
+  | {
+    type: 'reading';
+    beaconIdentifier: string;
+    observedAt: string;
+    reading: DebugReading;
+    latestReadings: DebugReading[];
+    latestPosition: DebugPosition | null;
+  }
+  | {
+    type: 'position';
+    beaconIdentifier: string;
+    observedAt: string;
+    position: DebugPosition;
+    inputSamples: DebugSample[];
+  };
 
 type GatewayAdvertisement = {
   mac?: string;
@@ -26,10 +89,27 @@ type GatewayPayload = {
 @Injectable()
 export class PositionalTrackingService implements OnModuleInit {
   private readonly logger = new Logger(PositionalTrackingService.name);
+  // How long to keep computed positions.
+  private readonly positionRetentionDays = 7;
+  // Window used to ignore stale readings across gateways for trilateration.
+  private readonly recentReadingWindowMs = 15 * 1000;
+  // Throttle for how often we recompute a beacon's position.
+  private readonly positionUpdateIntervalMs = 5 * 1000;
+  private readonly lastPositionAtByBeacon = new Map<string, number>();
+  private readonly recentReadingsByBeacon = new Map<string, Map<number, InMemoryReading>>();
+  // Rolling median window size for RSSI smoothing.
+  private readonly rssiWindowSize = 5;
+  private readonly rssiWindowByKey = new Map<string, number[]>();
+  // Defaults used when gateway calibration is missing.
+  private readonly defaultTxPowerAt1m = -53;
+  private readonly defaultPathLossExponent = 2.0;
+  private readonly debugSubject = new Subject<PositionalDebugEvent>();
 
   constructor(
     @InjectRepository(Beacon)
     private readonly beaconRepository: Repository<Beacon>,
+    @InjectRepository(BeaconPosition)
+    private readonly beaconPositionRepository: Repository<BeaconPosition>,
     @InjectRepository(BleGateway)
     private readonly bleGatewayRepository: Repository<BleGateway>,
     @Inject(MqttClientService)
@@ -60,6 +140,42 @@ export class PositionalTrackingService implements OnModuleInit {
     }
   }
 
+  getDebugStream(): Observable<PositionalDebugEvent> {
+    return this.debugSubject.asObservable();
+  }
+
+  async listGatewaysForCalibration(): Promise<DebugGateway[]> {
+    const gateways = await this.bleGatewayRepository.find({ order: { id: 'ASC' } });
+    return gateways.map((gateway) => this.buildDebugGateway(gateway));
+  }
+
+  async getGatewayForCalibration(id: number): Promise<DebugGateway> {
+    const gateway = await this.bleGatewayRepository.findOneBy({ id });
+    if (!gateway) {
+      throw new NotFoundException('Gateway not found');
+    }
+    return this.buildDebugGateway(gateway);
+  }
+
+  async updateGatewayCalibration(
+    id: number,
+    calibration: { txPowerAt1m: number; pathLossExponent: number; calibrationUpdatedAt?: string },
+  ): Promise<DebugGateway> {
+    const gateway = await this.bleGatewayRepository.findOneBy({ id });
+    if (!gateway) {
+      throw new NotFoundException('Gateway not found');
+    }
+    const updatedAt = calibration.calibrationUpdatedAt ? new Date(calibration.calibrationUpdatedAt) : new Date();
+    gateway.calibration = {
+      ...(gateway.calibration ?? {}),
+      txPowerAt1m: calibration.txPowerAt1m,
+      pathLossExponent: calibration.pathLossExponent,
+      calibrationUpdatedAt: updatedAt,
+    };
+    const saved = await this.bleGatewayRepository.save(gateway);
+    return this.buildDebugGateway(saved);
+  }
+
   @OnEvent(MqttMessageEvent.EVENT_NAME)
   async handleMqttMessage(event: MqttMessageEvent): Promise<void> {
     if (!(await this.isRelevantMessage(event.serverId, event.topic))) {
@@ -85,10 +201,6 @@ export class PositionalTrackingService implements OnModuleInit {
       return;
     }
 
-    this.logger.debug(
-      `Processing ${payload.dev_list?.length ?? 0} advertisement(s) for gateway ${gatewayIdentifier}`,
-    );
-
     const advertisements = payload.dev_list ?? [];
     for (const advertisement of advertisements) {
       const adHex = advertisement.ad;
@@ -107,17 +219,71 @@ export class PositionalTrackingService implements OnModuleInit {
         continue;
       }
 
-      const lastSeenAt = typeof advertisement.ts === 'number' ? new Date(advertisement.ts) : new Date();
-
-      await this.upsertBeacon({
+      const trackedBeacon = await this.beaconRepository.findOneBy({
         identifier,
-        type: BeaconType.EDDYSTONE,
-        gatewayId: gateway.id,
-        distanceToGateway: typeof advertisement.rssi === 'number' ? advertisement.rssi : null,
+        type: BeaconType.HOLYIOT,
+      });
+      if (!trackedBeacon) {
+        continue;
+      }
+
+      const lastSeenAt = typeof advertisement.ts === 'number' ? new Date(advertisement.ts) : new Date();
+      const rssi = typeof advertisement.rssi === 'number' ? advertisement.rssi : null;
+
+      if (rssi !== null) {
+        const readingKey = `${gateway.id}:${identifier}`;
+        const filteredRssi = this.computeFilteredRssi(readingKey, rssi);
+        const distance = this.estimateDistance(filteredRssi, gateway);
+        this.storeReading(identifier, {
+          gateway,
+          rssi,
+          filteredRssi,
+          distance,
+          battery,
+          observedAt: lastSeenAt,
+        });
+        const recentReadings = this.loadRecentReadings(identifier, lastSeenAt);
+        const shouldUpdatePosition = this.shouldUpdatePosition(identifier, lastSeenAt);
+        const position = shouldUpdatePosition
+          ? await this.computeAndSavePosition(identifier, lastSeenAt, recentReadings)
+          : null;
+        if (position) {
+          this.lastPositionAtByBeacon.set(identifier, lastSeenAt.getTime());
+        }
+        const latestReadings = this.getLatestReadingsByGateway(recentReadings);
+        const latestPosition = position ?? (await this.findLatestPosition(identifier));
+        this.debugSubject.next({
+          type: 'reading',
+          beaconIdentifier: identifier,
+          observedAt: lastSeenAt.toISOString(),
+          reading: this.buildDebugReading({
+            gateway,
+            rssi,
+            filteredRssi,
+            distance,
+            battery,
+            observedAt: lastSeenAt,
+          }),
+          latestReadings: latestReadings.map((reading) => this.buildDebugReading(reading)),
+          latestPosition,
+        });
+      }
+
+      await this.updateBeacon(trackedBeacon, {
+        identifier,
+        type: BeaconType.HOLYIOT,
         battery,
         lastSeenAt,
       });
     }
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupTrackingHistory(): Promise<void> {
+    const now = new Date();
+    const positionCutoff = new Date(now.getTime() - this.positionRetentionDays * 24 * 60 * 60 * 1000);
+
+    await this.beaconPositionRepository.delete({ observedAt: LessThan(positionCutoff) });
   }
 
   private isGatewayPayload(payload: unknown): payload is GatewayPayload {
@@ -209,23 +375,264 @@ export class PositionalTrackingService implements OnModuleInit {
     return bytes;
   }
 
-  private async upsertBeacon(data: Omit<Beacon, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
-    const existing = await this.beaconRepository.findOneBy({
-      type: data.type,
-      identifier: data.identifier,
-      gatewayId: data.gatewayId,
-    });
+  private computeFilteredRssi(readingKey: string, rssi: number): number {
+    const window = this.rssiWindowByKey.get(readingKey) ?? [];
+    window.push(rssi);
+    if (window.length > this.rssiWindowSize) {
+      window.shift();
+    }
+    this.rssiWindowByKey.set(readingKey, window);
+    return this.median(window);
+  }
 
-    if (existing) {
-      await this.beaconRepository.save({
-        ...existing,
-        ...data,
-        battery: data.battery ?? existing.battery,
-      });
+  private median(values: number[]): number {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    return sorted[mid];
+  }
+
+  private estimateDistance(filteredRssi: number, gateway: BleGateway): number | null {
+    const txPowerAt1m = gateway.calibration?.txPowerAt1m ?? this.defaultTxPowerAt1m;
+    const pathLossExponent = gateway.calibration?.pathLossExponent ?? this.defaultPathLossExponent;
+    if (!Number.isFinite(txPowerAt1m) || !Number.isFinite(pathLossExponent) || pathLossExponent <= 0) {
+      return null;
+    }
+    return Math.pow(10, (txPowerAt1m - filteredRssi) / (10 * pathLossExponent));
+  }
+
+  private async computeAndSavePosition(
+    beaconIdentifier: string,
+    observedAt: Date,
+    recentReadings?: InMemoryReading[],
+  ): Promise<DebugPosition | null> {
+    const readings = recentReadings ?? this.loadRecentReadings(beaconIdentifier, observedAt);
+    if (readings.length === 0) {
       return;
     }
 
-    const created = this.beaconRepository.create(data);
-    await this.beaconRepository.save(created);
+    const latestReadings = this.getLatestReadingsByGateway(readings);
+    const inputSamples = latestReadings
+      .map((reading) => {
+        const gateway = reading.gateway;
+        const x = gateway?.coordinates?.x ?? null;
+        const y = gateway?.coordinates?.y ?? null;
+        const distance = reading.distance;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(distance) || distance <= 0) {
+          return null;
+        }
+        return {
+          gateway: this.buildDebugGateway(gateway),
+          rssi: reading.rssi,
+          filteredRssi: reading.filteredRssi,
+          distance,
+          observedAt: reading.observedAt.toISOString(),
+        };
+      })
+      .filter((sample): sample is DebugSample => sample !== null);
+
+    if (inputSamples.length < 3) {
+      return null;
+    }
+
+    const position = this.solveTrilateration2d(
+      inputSamples.map((sample) => ({
+        x: sample.gateway.coordinates.x ?? 0,
+        y: sample.gateway.coordinates.y ?? 0,
+        distance: sample.distance,
+      })),
+    );
+    if (!position) {
+      return null;
+    }
+
+    const debugPosition: DebugPosition = {
+      x: position.x,
+      y: position.y,
+      residual: position.residual,
+      observedAt: observedAt.toISOString(),
+    };
+
+    await this.beaconPositionRepository.save(
+      this.beaconPositionRepository.create({
+        beaconIdentifier,
+        x: debugPosition.x,
+        y: debugPosition.y,
+        residual: debugPosition.residual,
+        observedAt,
+      }),
+    );
+
+    this.debugSubject.next({
+      type: 'position',
+      beaconIdentifier,
+      observedAt: observedAt.toISOString(),
+      position: debugPosition,
+      inputSamples,
+    });
+
+    return debugPosition;
+  }
+
+  private solveTrilateration2d(
+    samples: Array<{ x: number; y: number; distance: number }>,
+  ): { x: number; y: number; residual: number } | null {
+    if (samples.length < 3) {
+      return null;
+    }
+
+    const reference = samples[0];
+    const x0 = reference.x;
+    const y0 = reference.y;
+    const d0 = reference.distance;
+    let a00 = 0;
+    let a01 = 0;
+    let a11 = 0;
+    let b0 = 0;
+    let b1 = 0;
+
+    for (let i = 1; i < samples.length; i += 1) {
+      const { x: xi, y: yi, distance: di } = samples[i];
+      const aX = 2 * (xi - x0);
+      const aY = 2 * (yi - y0);
+      const b =
+        d0 * d0 -
+        di * di +
+        xi * xi -
+        x0 * x0 +
+        yi * yi -
+        y0 * y0;
+      a00 += aX * aX;
+      a01 += aX * aY;
+      a11 += aY * aY;
+      b0 += aX * b;
+      b1 += aY * b;
+    }
+
+    const det = a00 * a11 - a01 * a01;
+    if (!Number.isFinite(det) || Math.abs(det) < 1e-6) {
+      return null;
+    }
+
+    const x = (a11 * b0 - a01 * b1) / det;
+    const y = (a00 * b1 - a01 * b0) / det;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+
+    let sumSq = 0;
+    for (const sample of samples) {
+      const dx = x - sample.x;
+      const dy = y - sample.y;
+      const estimated = Math.sqrt(dx * dx + dy * dy);
+      const error = estimated - sample.distance;
+      sumSq += error * error;
+    }
+    const residual = Math.sqrt(sumSq / samples.length);
+    return { x, y, residual };
+  }
+
+  private async updateBeacon(
+    existing: Beacon,
+    data: Omit<Beacon, 'createdAt' | 'updatedAt'>,
+  ): Promise<void> {
+    await this.beaconRepository.save({
+      ...existing,
+      ...data,
+      battery: data.battery ?? existing.battery,
+    });
+  }
+
+  private buildDebugGateway(gateway: BleGateway | undefined): DebugGateway {
+    if (!gateway) {
+      return {
+        id: -1,
+        identifier: 'unknown',
+        coordinates: { x: null, y: null },
+        calibration: { txPowerAt1m: null, pathLossExponent: null, calibrationUpdatedAt: null },
+      };
+    }
+    return {
+      id: gateway.id,
+      identifier: gateway.identifier,
+      coordinates: {
+        x: gateway.coordinates?.x ?? null,
+        y: gateway.coordinates?.y ?? null,
+      },
+      calibration: {
+        txPowerAt1m: gateway.calibration?.txPowerAt1m ?? null,
+        pathLossExponent: gateway.calibration?.pathLossExponent ?? null,
+        calibrationUpdatedAt: gateway.calibration?.calibrationUpdatedAt
+          ? gateway.calibration.calibrationUpdatedAt.toISOString()
+          : null,
+      },
+    };
+  }
+
+  private buildDebugReading(
+    reading: InMemoryReading,
+  ): DebugReading {
+    return {
+      gateway: this.buildDebugGateway(reading.gateway),
+      rssi: reading.rssi,
+      filteredRssi: reading.filteredRssi ?? null,
+      distance: reading.distance ?? null,
+      battery: reading.battery ?? null,
+      observedAt: reading.observedAt.toISOString(),
+    };
+  }
+
+  private storeReading(beaconIdentifier: string, reading: InMemoryReading): void {
+    const readingsByGateway = this.recentReadingsByBeacon.get(beaconIdentifier) ?? new Map<number, InMemoryReading>();
+    readingsByGateway.set(reading.gateway.id, reading);
+    this.recentReadingsByBeacon.set(beaconIdentifier, readingsByGateway);
+    this.loadRecentReadings(beaconIdentifier, reading.observedAt);
+  }
+
+  private loadRecentReadings(beaconIdentifier: string, observedAt: Date): InMemoryReading[] {
+    const readingsByGateway = this.recentReadingsByBeacon.get(beaconIdentifier);
+    if (!readingsByGateway) {
+      return [];
+    }
+    const windowStart = observedAt.getTime() - this.recentReadingWindowMs;
+    const readings: InMemoryReading[] = [];
+    for (const [gatewayId, reading] of readingsByGateway.entries()) {
+      if (reading.observedAt.getTime() >= windowStart) {
+        readings.push(reading);
+      } else {
+        readingsByGateway.delete(gatewayId);
+      }
+    }
+    if (readingsByGateway.size === 0) {
+      this.recentReadingsByBeacon.delete(beaconIdentifier);
+    }
+    return readings;
+  }
+
+  private getLatestReadingsByGateway(readings: InMemoryReading[]): InMemoryReading[] {
+    return readings;
+  }
+
+  private async findLatestPosition(beaconIdentifier: string): Promise<DebugPosition | null> {
+    const latest = await this.beaconPositionRepository.findOne({
+      where: { beaconIdentifier },
+      order: { observedAt: 'DESC' },
+    });
+    if (!latest) {
+      return null;
+    }
+    return {
+      x: latest.x,
+      y: latest.y,
+      residual: latest.residual,
+      observedAt: latest.observedAt.toISOString(),
+    };
+  }
+
+  private shouldUpdatePosition(beaconIdentifier: string, observedAt: Date): boolean {
+    const lastPositionAt = this.lastPositionAtByBeacon.get(beaconIdentifier) ?? 0;
+    return observedAt.getTime() - lastPositionAt >= this.positionUpdateIntervalMs;
   }
 }

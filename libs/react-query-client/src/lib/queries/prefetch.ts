@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, PositionalTrackingService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -215,6 +215,7 @@ export const prefetchUseResourceFormsServiceResourceFormsGetOne = (queryClient: 
   formId: number;
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFormsServiceResourceFormsGetOneKeyFn({ formId, resourceId }), queryFn: () => ResourceFormsService.resourceFormsGetOne({ formId, resourceId }) });
+export const prefetchUsePositionalTrackingServicePositionalTrackingControllerStreamDebug = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePositionalTrackingServicePositionalTrackingControllerStreamDebugKeyFn(), queryFn: () => PositionalTrackingService.positionalTrackingControllerStreamDebug() });
 export const prefetchUsePluginsServiceGetPlugins = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UsePluginsServiceGetPluginsKeyFn(), queryFn: () => PluginsService.getPlugins() });
 export const prefetchUsePluginsServiceGetFrontendPluginFile = (queryClient: QueryClient, { filePath, pluginName }: {
   filePath: string;

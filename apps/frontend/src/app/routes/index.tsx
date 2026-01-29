@@ -30,6 +30,7 @@ import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
+import { PositionalTrackingDebugPage } from '../debug/positional-tracking';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -196,6 +197,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/projects/:id/team',
     element: <ProjectTeamPage />,
     authRequired: true,
+  },
+  {
+    path: '/debug/positional-tracking',
+    element: <PositionalTrackingDebugPage />,
+    authRequired: 'canManageResources',
   },
 ];
 

@@ -7124,6 +7124,16 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/positional-tracking/debug': {
+        get: {
+            res: {
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
     '/api/plugins': {
         get: {
             res: {

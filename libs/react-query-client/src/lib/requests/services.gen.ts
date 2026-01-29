@@ -3376,6 +3376,22 @@ export class ResourceFormsService {
     
 }
 
+export class PositionalTrackingService {
+    /**
+     * @throws ApiError
+     */
+    public static positionalTrackingControllerStreamDebug(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/positional-tracking/debug',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+}
+
 export class PluginsService {
     /**
      * Get all plugins
