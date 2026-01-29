@@ -70,7 +70,7 @@ export class ShellyGatewayAdapter implements GatewayAdapter {
       return null;
     }
 
-    const gatewayIdentifier = payload.src ?? null;
+    const gatewayIdentifier = payload.dst.replace('/events', '');
     const baseTimestamp = parseEpochSecondsOrMs(payload.params?.ts);
     const advertisements =
       payload.params?.events
