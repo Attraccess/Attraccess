@@ -3,11 +3,10 @@
   "version": "0.0.16",
   "license": "MIT",
   "scripts": {
-    "start": "ts-node src/index.ts",
-    "typeorm": "typeorm-ts-node-commonjs",
+    "serve": "nx run-many -t serve --projects=api,frontend --outputStyle=stream",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
-    "precommit": "pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e",
+    "precommit": "pnpm nx affected --nxBail -t lint,typecheck,build,test,e2e --files=\"$(git diff --name-only --cached)\"",
     "services": "node --experimental-strip-types scripts/services-compose.mts"
   },
   "private": true,

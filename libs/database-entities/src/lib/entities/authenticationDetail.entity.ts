@@ -36,6 +36,7 @@ export class AuthenticationDetail {
   type!: AuthenticationType;
 
   @Column({ nullable: true, type: 'text' })
+  @Exclude()
   @ApiProperty({
     description: 'The hashed password (for local authentication)',
     required: false,
