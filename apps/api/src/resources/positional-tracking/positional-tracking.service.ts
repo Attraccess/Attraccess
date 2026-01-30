@@ -395,7 +395,16 @@ export class PositionalTrackingService {
         const x = gateway?.coordinates?.x ?? null;
         const y = gateway?.coordinates?.y ?? null;
         const distance = reading.distance;
-        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(distance) || distance <= 0) {
+        const rssiValue = reading.filteredRssi ?? reading.rssi;
+        if (
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          !Number.isFinite(distance) ||
+          distance <= 0 ||
+          distance > 15 ||
+          !Number.isFinite(rssiValue) ||
+          rssiValue < -80
+        ) {
           return null;
         }
         return {

@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@heroui/react';
 import { CRS, LatLngBoundsExpression } from 'leaflet';
-import { CircleMarker, MapContainer, Pane, Popup, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, Pane, Polyline, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   BeaconType,
@@ -143,6 +143,15 @@ type GatewayFormState = {
   y: string;
 };
 
+type DistanceConnection = {
+  key: string;
+  beaconIdentifier: string;
+  gatewayIdentifier: string;
+  beaconCoordinates: { x: number; y: number };
+  gatewayCoordinates: { x: number; y: number };
+  distance: number;
+};
+
 const gatewayTypeOptions: DebugGateway['type'][] = [BleGatewayType.GLS10, BleGatewayType.SHELLY];
 const beaconTypeOptions: ManagedBeacon['type'][] = [BeaconType.HOLYIOT];
 
@@ -181,12 +190,30 @@ function parseOptionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function MapBoundsUpdater({ bounds }: { bounds: LatLngBoundsExpression }) {
+function MapBoundsUpdater({
+  bounds,
+  gatewayIds,
+}: {
+  bounds: LatLngBoundsExpression;
+  gatewayIds: number[];
+}) {
   const map = useMap();
+  const previousGatewayIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    map.fitBounds(bounds, { padding: [24, 24] });
-  }, [map, bounds]);
+    const previousIds = previousGatewayIds.current;
+    const nextIds = new Set(gatewayIds);
+    let hasNewGateway = false;
+    nextIds.forEach((id) => {
+      if (!previousIds.has(id)) {
+        hasNewGateway = true;
+      }
+    });
+    if (hasNewGateway) {
+      map.fitBounds(bounds, { padding: [24, 24] });
+    }
+    previousGatewayIds.current = nextIds;
+  }, [map, bounds, gatewayIds]);
 
   return null;
 }
@@ -409,6 +436,42 @@ export function PositionalTrackingDebugPage() {
         };
       })
       .filter((entry): entry is { identifier: string; position: DebugPosition } => entry !== null);
+  }, [beacons]);
+
+  const gatewayIdsWithCoordinates = useMemo(() => {
+    return gateways
+      .filter((gateway) => typeof gateway.coordinates.x === 'number' && typeof gateway.coordinates.y === 'number')
+      .map((gateway) => gateway.id)
+      .sort((a, b) => a - b);
+  }, [gateways]);
+
+  const distanceConnections = useMemo<DistanceConnection[]>(() => {
+    const connections: DistanceConnection[] = [];
+    Object.entries(beacons).forEach(([identifier, beacon]) => {
+      const position = beacon.latestPosition;
+      if (!position) {
+        return;
+      }
+      beacon.latestReadings.forEach((reading) => {
+        const { x, y } = reading.gateway.coordinates;
+        if (typeof x !== 'number' || typeof y !== 'number') {
+          return;
+        }
+        const distance = reading.distance;
+        if (distance === null || !Number.isFinite(distance)) {
+          return;
+        }
+        connections.push({
+          key: `${identifier}-${reading.gateway.id}`,
+          beaconIdentifier: identifier,
+          gatewayIdentifier: reading.gateway.identifier,
+          beaconCoordinates: { x: position.x, y: position.y },
+          gatewayCoordinates: { x, y },
+          distance,
+        });
+      });
+    });
+    return connections;
   }, [beacons]);
 
   const plotData = useMemo(() => {
@@ -698,113 +761,91 @@ export function PositionalTrackingDebugPage() {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="text-lg font-semibold">Map</CardHeader>
-          <CardBody>
-            {plotData ? (
-              <MapContainer
-                className="h-[400px] w-full rounded-md border border-default-200 bg-default-50"
-                crs={CRS.Simple}
-                zoom={0}
-                minZoom={-5}
-                center={[0, 0]}
-              >
-                <MapBoundsUpdater
-                  bounds={[
-                    [plotData.minY, plotData.minX],
-                    [plotData.minY + plotData.rangeY, plotData.minX + plotData.rangeX],
-                  ]}
-                />
-                <Pane name="gateways" style={{ zIndex: 400 }}>
-                  {gateways.map((gateway) => {
-                    const { x, y } = gateway.coordinates;
-                    if (typeof x !== 'number' || typeof y !== 'number') {
-                      return null;
-                    }
-                    return (
-                      <CircleMarker
-                        key={`gateway-${gateway.id}`}
-                        center={[y, x]}
-                        radius={6}
-                        pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9 }}
-                      >
-                        <Popup>
-                          <div className="text-sm">
-                            <div className="font-semibold">{gateway.identifier}</div>
-                            <div>
-                              ({formatNumber(x)}, {formatNumber(y)})
-                            </div>
-                          </div>
-                        </Popup>
-                      </CircleMarker>
-                    );
-                  })}
-                </Pane>
-                <Pane name="beacons" style={{ zIndex: 500 }}>
-                  {positions.map((pos) => (
+      <Card>
+        <CardHeader className="text-lg font-semibold">Map</CardHeader>
+        <CardBody>
+          {plotData ? (
+            <MapContainer
+              className="h-[400px] w-full rounded-md border border-default-200 bg-default-50"
+              crs={CRS.Simple}
+              zoom={0}
+              minZoom={-5}
+              center={[0, 0]}
+            >
+              <MapBoundsUpdater
+                bounds={[
+                  [plotData.minY, plotData.minX],
+                  [plotData.minY + plotData.rangeY, plotData.minX + plotData.rangeX],
+                ]}
+                gatewayIds={gatewayIdsWithCoordinates}
+              />
+              <Pane name="gateways" style={{ zIndex: 400 }}>
+                {gateways.map((gateway) => {
+                  const { x, y } = gateway.coordinates;
+                  if (typeof x !== 'number' || typeof y !== 'number') {
+                    return null;
+                  }
+                  return (
                     <CircleMarker
-                      key={`pos-${pos.identifier}`}
-                      center={[pos.position.y, pos.position.x]}
-                      radius={5}
-                      pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.9 }}
+                      key={`gateway-${gateway.id}`}
+                      center={[y, x]}
+                      radius={6}
+                      pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.9 }}
                     >
                       <Popup>
                         <div className="text-sm">
-                          <div className="font-semibold">{pos.identifier}</div>
+                          <div className="font-semibold">{gateway.identifier}</div>
                           <div>
-                            ({formatNumber(pos.position.x)}, {formatNumber(pos.position.y)})
+                            ({formatNumber(x)}, {formatNumber(y)})
                           </div>
-                          <div>Residual {formatNumber(pos.position.residual, 4)}</div>
                         </div>
                       </Popup>
                     </CircleMarker>
-                  ))}
-                </Pane>
-              </MapContainer>
-            ) : (
-              <div className="text-sm text-foreground-500">Waiting for gateway coordinates or positions.</div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader className="text-lg font-semibold">Gateways</CardHeader>
-          <CardBody>
-            <Table aria-label="Gateways">
-              <TableHeader>
-                <TableColumn>ID</TableColumn>
-                <TableColumn>Identifier</TableColumn>
-                <TableColumn>X</TableColumn>
-                <TableColumn>Y</TableColumn>
-                <TableColumn>TxPower</TableColumn>
-                <TableColumn>PathLoss</TableColumn>
-                <TableColumn>Calibrated</TableColumn>
-              </TableHeader>
-              <TableBody
-                items={gateways}
-                emptyContent="No gateways seen yet."
-              >
-                {(gateway) => (
-                  <TableRow key={gateway.id}>
-                    <TableCell>{gateway.id}</TableCell>
-                    <TableCell>{gateway.identifier}</TableCell>
-                    <TableCell>{formatNumber(gateway.coordinates.x)}</TableCell>
-                    <TableCell>{formatNumber(gateway.coordinates.y)}</TableCell>
-                    <TableCell>{formatNumber(gateway.calibration.txPowerAt1m)}</TableCell>
-                    <TableCell>{formatNumber(gateway.calibration.pathLossExponent)}</TableCell>
-                    <TableCell>
-                      {gateway.calibration.calibrationUpdatedAt
-                        ? formatRelativeSeconds(gateway.calibration.calibrationUpdatedAt, nowMs)
-                        : '-'}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardBody>
-        </Card>
-      </div>
+                  );
+                })}
+              </Pane>
+              <Pane name="distances" style={{ zIndex: 450 }}>
+                {distanceConnections.map((connection) => (
+                  <Polyline
+                    key={connection.key}
+                    positions={[
+                      [connection.beaconCoordinates.y, connection.beaconCoordinates.x],
+                      [connection.gatewayCoordinates.y, connection.gatewayCoordinates.x],
+                    ]}
+                    pathOptions={{ color: '#f59e0b', weight: 2, dashArray: '4 6' }}
+                  >
+                    <Tooltip direction="center" permanent>
+                      {`${formatNumber(connection.distance)} m`}
+                    </Tooltip>
+                  </Polyline>
+                ))}
+              </Pane>
+              <Pane name="beacons" style={{ zIndex: 500 }}>
+                {positions.map((pos) => (
+                  <CircleMarker
+                    key={`pos-${pos.identifier}`}
+                    center={[pos.position.y, pos.position.x]}
+                    radius={5}
+                    pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.9 }}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <div className="font-semibold">{pos.identifier}</div>
+                        <div>
+                          ({formatNumber(pos.position.x)}, {formatNumber(pos.position.y)})
+                        </div>
+                        <div>Residual {formatNumber(pos.position.residual, 4)}</div>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                ))}
+              </Pane>
+            </MapContainer>
+          ) : (
+            <div className="text-sm text-foreground-500">Waiting for gateway coordinates or positions.</div>
+          )}
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader className="text-lg font-semibold">Beacons</CardHeader>
