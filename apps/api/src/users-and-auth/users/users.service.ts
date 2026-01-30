@@ -113,6 +113,44 @@ export class UsersService {
     return username.trim().toLowerCase();
   }
 
+  private normalizeUsernameCandidate(value: string): string {
+    const cleaned = this.cleanupUsername(value)
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_.-]+/g, '.')
+      .replace(/\.+/g, '.')
+      .replace(/^[._-]+|[._-]+$/g, '');
+    return cleaned;
+  }
+
+  public buildUsernameFromSSOClaim(rawUsername?: string | null, fallback?: string): string {
+    const candidates = [rawUsername, fallback].filter(
+      (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
+    );
+
+    for (const candidate of candidates) {
+      const normalized = this.normalizeUsernameCandidate(candidate);
+      if (!normalized) {
+        continue;
+      }
+
+      const truncated = normalized.slice(0, 32).replace(/[._-]+$/g, '');
+      if (!truncated) {
+        continue;
+      }
+
+      try {
+        this.validateUsernameOrThrow(truncated);
+        return truncated;
+      } catch {
+        continue;
+      }
+    }
+
+    const suffix = nanoid(8).toLowerCase();
+    return `sso-user-${suffix}`;
+  }
+
   private isEmailUniqueConstraintViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;
@@ -465,6 +503,7 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
+      relations: ['authenticationDetails'],
     });
 
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);

@@ -88,6 +88,48 @@ describe('SSOSamlStrategy', () => {
     expect(errorB.email).toBe('b@example.com');
   });
 
+  it('normalizes SAML display names for new users', async () => {
+    const usersService = {
+      findOne: jest.fn(async () => null),
+      buildUsernameFromSSOClaim: jest.fn(() => 'name.surname'),
+      createOne: jest.fn(
+        async ({ username, email, externalIdentifier }) =>
+          ({
+            id: 101,
+            username,
+            email,
+            externalIdentifier,
+          }) as unknown as { id: number; username: string; email: string; externalIdentifier: string },
+      ),
+    };
+    const moduleRef = {
+      get: jest.fn().mockResolvedValue(usersService),
+    } as unknown as ModuleRef;
+
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    const profile = {
+      nameID: 'user-1',
+      issuer: 'https://issuer.example.com',
+      nameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+      email: 'user@example.com',
+      displayName: 'Name Surname',
+    } as SamlProfile;
+
+    const user = await strategy.validate(request, profile);
+
+    expect(usersService.buildUsernameFromSSOClaim).toHaveBeenCalledWith('Name Surname', 'user@example.com');
+    expect(usersService.createOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: 'name.surname',
+        email: 'user@example.com',
+        externalIdentifier: 'user-1',
+        isEmailVerified: true,
+      }),
+    );
+    expect(user.username).toBe('name.surname');
+  });
+
   it('syncs permissions from SAML role attributes', async () => {
     const usersService = {
       findOne: jest.fn(),

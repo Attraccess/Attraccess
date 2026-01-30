@@ -191,6 +191,23 @@ describe('UsersService', () => {
     });
   });
 
+  describe('buildUsernameFromSSOClaim', () => {
+    it('normalizes usernames from SSO claims', () => {
+      const result = service.buildUsernameFromSSOClaim('Name Surname');
+      expect(result).toBe('name.surname');
+    });
+
+    it('falls back to alternate claim when primary is invalid', () => {
+      const result = service.buildUsernameFromSSOClaim('@@@', 'Jane Doe');
+      expect(result).toBe('jane.doe');
+    });
+
+    it('generates a safe fallback when no candidates are usable', () => {
+      const result = service.buildUsernameFromSSOClaim('@@@', ' ');
+      expect(result).toMatch(/^sso-user-[a-z0-9_-]{8}$/);
+    });
+  });
+
   describe('updateUser', () => {
     it('should update allowed fields and trim values', async () => {
       const updatedUser = {

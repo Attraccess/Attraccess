@@ -4,7 +4,19 @@
     "externalIdentifier": "External ID: {{identifier}}"
   },
   "profile": {
-    "title": "Profile"
+    "title": "Profile",
+    "usernameTitle": "Username",
+    "emailTitle": "Email",
+    "passwordTitle": "Password"
+  },
+  "sso": {
+    "title": "SSO",
+    "notLinked": "No SSO account linked.",
+    "notLinkedHint": "Connect a provider to enable SSO for this user.",
+    "notLinkedChip": "Not linked",
+    "linked": "{{count}} linked",
+    "provider": "Provider",
+    "userId": "SSO user ID"
   },
   "delete": {
     "title": "Delete user",

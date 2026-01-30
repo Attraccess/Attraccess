@@ -77,7 +77,7 @@ export class UsersController {
     private readonly emailService: EmailService,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
-  ) {}
+  ) { }
 
   private mapEmailSendError(error: unknown): never {
     const code = (error as { code?: string })?.code;
@@ -754,7 +754,7 @@ export class UsersController {
       throw new ForbiddenException();
     }
 
-    const user = await this.usersService.findOne({ id });
+    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);

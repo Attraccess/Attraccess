@@ -214,13 +214,13 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       });
     }
 
-    const username = this.resolveDisplayName(profile, email);
+    const rawUsername = this.resolveDisplayName(profile, email);
+    const username = usersService.buildUsernameFromSSOClaim(rawUsername, email);
     user = await usersService
       .createOne({
         username,
         email,
         externalIdentifier: samlUserId,
-        skipUsernameSanitization: true,
         isEmailVerified: true,
       })
       .catch((error: Error) => {

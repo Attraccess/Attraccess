@@ -1,1 +1,1 @@
-pnpm nx run-many --nxBail -t lint,typecheck,build,test,e2e
+pnpm precommit

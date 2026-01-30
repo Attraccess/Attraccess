@@ -27,7 +27,13 @@ import {
   CreditCardIcon,
   KeyIcon,
 } from 'lucide-react';
-import { useLicenseServiceGetLicenseInformation, useUsersServiceFindMany } from '@attraccess/react-query-client';
+import {
+  SSOProvider,
+  User,
+  useAuthenticationServiceGetAllSsoProviders,
+  useLicenseServiceGetLicenseInformation,
+  useUsersServiceFindMany,
+} from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
@@ -67,6 +73,25 @@ export const UserManagementPage: React.FC = () => {
   }, [searchResult?.total, limit]);
 
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: ssoProviders } = useAuthenticationServiceGetAllSsoProviders(undefined, {
+    enabled: license?.modules.includes('sso'),
+  });
+
+  const providersById = useMemo(
+    () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
+    [ssoProviders],
+  );
+
+  type AuthenticationDetailSummary = {
+    providerId?: number | null;
+    providerType?: string | null;
+    ssoSubject?: string | null;
+    type?: string | null;
+  };
+
+  type UserWithAuthDetails = User & {
+    authenticationDetails?: AuthenticationDetailSummary[];
+  };
 
   return (
     <div data-cy="user-management-page">
@@ -137,6 +162,9 @@ export const UserManagementPage: React.FC = () => {
               <TableColumn width="0">{t('table.columns.id')}</TableColumn>
               <TableColumn>{t('table.columns.username')}</TableColumn>
               <TableColumn className="hidden md:table-cell">{t('table.columns.externalIdentifier')}</TableColumn>
+              <TableColumn width="0" className="text-center">
+                {t('table.columns.ssoLinked')}
+              </TableColumn>
               <TableColumn className="text-center">{t('table.columns.permissions')}</TableColumn>
             </TableHeader>
 
@@ -146,68 +174,102 @@ export const UserManagementPage: React.FC = () => {
               emptyContent={<EmptyState />}
               loadingContent={<TableDataLoadingIndicator />}
             >
-              {(user) => (
-                <TableRow key={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
-                  <TableCell className="hidden md:table-cell">
-                    {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
-                  </TableCell>
-                  <TableCell>{user.id}</TableCell>
-                  <TableCell>
-                    <AttraccessUser user={user} />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 justify-center">
-                      {[
-                        {
-                          key: 'canManageResources',
-                          enabled: user.systemPermissions?.canManageResources,
-                          label: t('table.columns.canManageResources'),
-                          icon: <WrenchIcon className="w-3.5 h-3.5" />,
-                        },
-                        {
-                          key: 'canManageSystemConfiguration',
-                          enabled: user.systemPermissions?.canManageSystemConfiguration,
-                          label: t('table.columns.canManageSystemConfiguration'),
-                          icon: <Settings2Icon className="w-3.5 h-3.5" />,
-                        },
-                        {
-                          key: 'canManageUsers',
-                          enabled: user.systemPermissions?.canManageUsers,
-                          label: t('table.columns.canManageUsers'),
-                          icon: <Users className="w-3.5 h-3.5" />,
-                        },
-                        {
-                          key: 'canManageBilling',
-                          enabled: user.systemPermissions?.canManageBilling,
-                          label: t('table.columns.canManageBilling'),
-                          icon: <CreditCardIcon className="w-3.5 h-3.5" />,
-                        },
-                      ]
-                        .filter((permission) => permission.enabled)
-                        .map((permission) => (
-                          <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
-                            <Chip
-                              size="sm"
-                              variant="flat"
-                              color="primary"
-                              className="min-w-0 px-2"
-                              data-cy={`user-permission-chip-${permission.key}`}
-                            >
-                              {permission.icon}
-                            </Chip>
-                          </Tooltip>
-                        ))}
-                      {![
-                        user.systemPermissions?.canManageResources,
-                        user.systemPermissions?.canManageSystemConfiguration,
-                        user.systemPermissions?.canManageUsers,
-                        user.systemPermissions?.canManageBilling,
-                      ].some(Boolean) && <span className="text-default-400 text-sm">{t('table.noPermissions')}</span>}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
+              {(user) => {
+                const ssoDetails =
+                  (user as UserWithAuthDetails).authenticationDetails?.filter(
+                    (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
+                  ) ?? [];
+                const ssoProviderNames = ssoDetails
+                  .map((detail) => {
+                    if (detail.providerId) {
+                      const provider = providersById.get(detail.providerId);
+                      if (provider?.name) {
+                        return provider.name;
+                      }
+                    }
+                    if (detail.providerType && detail.providerId) {
+                      return `${detail.providerType} #${detail.providerId}`;
+                    }
+                    return detail.providerType ?? '';
+                  })
+                  .filter((value) => value.length > 0)
+                  .join(', ');
+                const isSsoLinked = ssoDetails.length > 0;
+
+                return (
+                  <TableRow key={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
+                    <TableCell className="hidden md:table-cell">
+                      {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
+                    </TableCell>
+                    <TableCell>{user.id}</TableCell>
+                    <TableCell>
+                      <AttraccessUser user={user} />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                    <TableCell className="text-center">
+                      {isSsoLinked ? (
+                        <Tooltip content={t('table.ssoLinked', { providers: ssoProviderNames || '-' })} showArrow placement="top">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-100 text-primary-700">
+                            <KeyIcon className="w-3.5 h-3.5" />
+                          </span>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-default-300">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 justify-center">
+                        {[
+                          {
+                            key: 'canManageResources',
+                            enabled: user.systemPermissions?.canManageResources,
+                            label: t('table.columns.canManageResources'),
+                            icon: <WrenchIcon className="w-3.5 h-3.5" />,
+                          },
+                          {
+                            key: 'canManageSystemConfiguration',
+                            enabled: user.systemPermissions?.canManageSystemConfiguration,
+                            label: t('table.columns.canManageSystemConfiguration'),
+                            icon: <Settings2Icon className="w-3.5 h-3.5" />,
+                          },
+                          {
+                            key: 'canManageUsers',
+                            enabled: user.systemPermissions?.canManageUsers,
+                            label: t('table.columns.canManageUsers'),
+                            icon: <Users className="w-3.5 h-3.5" />,
+                          },
+                          {
+                            key: 'canManageBilling',
+                            enabled: user.systemPermissions?.canManageBilling,
+                            label: t('table.columns.canManageBilling'),
+                            icon: <CreditCardIcon className="w-3.5 h-3.5" />,
+                          },
+                        ]
+                          .filter((permission) => permission.enabled)
+                          .map((permission) => (
+                            <Tooltip key={permission.key} content={permission.label} showArrow placement="top">
+                              <Chip
+                                size="sm"
+                                variant="flat"
+                                color="primary"
+                                className="min-w-0 px-2"
+                                data-cy={`user-permission-chip-${permission.key}`}
+                              >
+                                {permission.icon}
+                              </Chip>
+                            </Tooltip>
+                          ))}
+                        {![
+                          user.systemPermissions?.canManageResources,
+                          user.systemPermissions?.canManageSystemConfiguration,
+                          user.systemPermissions?.canManageUsers,
+                          user.systemPermissions?.canManageBilling,
+                        ].some(Boolean) && <span className="text-default-400 text-sm">{t('table.noPermissions')}</span>}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              }}
             </TableBody>
           </Table>
         </CardBody>

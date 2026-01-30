@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Link } from '@heroui/react';
+import { Button } from '@heroui/react';
 import de from './ssoLogin.de.json';
 import en from './ssoLogin.en.json';
 import { useMemo } from 'react';
@@ -22,7 +22,7 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
   const loginHref = useCallbackURL(provider.id, provider.type);
 
   return (
-    <Button as={Link} href={loginHref} isExternal target="_self" fullWidth data-cy={`sso-login-button-${provider.name}`}>
+    <Button as="a" href={loginHref} target="_self" fullWidth data-cy={`sso-login-button-${provider.name}`}>
       {t('loginWith', { provider: provider.name })}
     </Button>
   );
