@@ -4,6 +4,7 @@
 
   - [Installation](setup/installation.md)
   - [SSL Configuration](setup/ssl-configuration.md)
+  - [Upgrade Notes](setup/upgrade-notes.md)
   - **Beginner Guides**
     - [Complete Beginner Guide](setup/beginner-guide.md)
     - [Docker Compose Guide](setup/docker-compose-guide.md)
