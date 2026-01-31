@@ -16,6 +16,7 @@ Attraccess is a powerful platform designed to simplify and secure access managem
 ## Getting Started
 
 - For new installations, visit the [Setup Guide](setup/installation.md)
+- Upgrading an existing instance? See [Upgrade Notes](setup/upgrade-notes.md)
 - Existing users should check the [User Guides](user/getting-started.md)
 - Developers interested in extending Attraccess can explore the [Developer Documentation](developer/get-started.md)
 
