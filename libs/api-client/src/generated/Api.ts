@@ -569,6 +569,11 @@ export interface SSOProviderOIDCConfiguration {
    */
   emailClaimPaths?: string[];
   /**
+   * Optional mapping between Attraccess permissions and role names
+   * @example {"canManageResources":["attraccess_resources"],"canManageUsers":["attraccess_admin"]}
+   */
+  permissionMappings?: object;
+  /**
    * When the user was created
    * @format date-time
    */
@@ -630,6 +635,13 @@ export interface SSOProviderSAMLConfiguration {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** Shared secret used to authorize SAML provisioning requests */
+  provisioningSecret?: string | null;
+  /**
+   * Optional mapping between Attraccess permissions and SAML role attribute values
+   * @example {"canManageSystemConfiguration":["attraccess_config_admin"],"canManageBilling":["attraccess_billing"]}
+   */
+  permissionMappings?: object;
   /** PEM encoded Service Provider certificate used when signing AuthnRequests */
   spSigningCertificate?: string | null;
   /** Encrypted Service Provider private key used for signing AuthnRequests */
@@ -693,6 +705,29 @@ export interface LinkUserToExternalAccountRequestDto {
   linkToken: string;
 }
 
+export interface SSOPermissionMappingsDto {
+  /**
+   * Role names that grant resource management permissions
+   * @example ["attraccess_resources"]
+   */
+  canManageResources?: string[];
+  /**
+   * Role names that grant system configuration permissions
+   * @example ["attraccess_config_admin"]
+   */
+  canManageSystemConfiguration?: string[];
+  /**
+   * Role names that grant user management permissions
+   * @example ["attraccess_admin"]
+   */
+  canManageUsers?: string[];
+  /**
+   * Role names that grant billing management permissions
+   * @example ["attraccess_billing"]
+   */
+  canManageBilling?: string[];
+}
+
 export interface CreateOIDCConfigurationDto {
   /**
    * The issuer of the provider
@@ -739,6 +774,8 @@ export interface CreateOIDCConfigurationDto {
    * @example ["email","emails[0].value","upn"]
    */
   emailClaimPaths?: string[];
+  /** Optional mapping between Attraccess permissions and role names */
+  permissionMappings?: SSOPermissionMappingsDto;
 }
 
 export interface CreateSAMLConfigurationDto {
@@ -781,6 +818,10 @@ export interface CreateSAMLConfigurationDto {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** Shared secret used to authorize SAML provisioning requests */
+  provisioningSecret?: string;
+  /** Optional mapping between Attraccess permissions and SAML role values */
+  permissionMappings?: SSOPermissionMappingsDto;
   /** PEM encoded Service Provider certificate used when signing requests */
   spSigningCertificate?: string;
   /** PEM encoded Service Provider private key used for signing requests (stored encrypted) */
@@ -850,6 +891,8 @@ export interface UpdateOIDCConfigurationDto {
    * @example ["email","emails[0].value","upn"]
    */
   emailClaimPaths?: string[];
+  /** Optional mapping between Attraccess permissions and role names */
+  permissionMappings?: SSOPermissionMappingsDto;
 }
 
 export interface UpdateSAMLConfigurationDto {
@@ -876,6 +919,10 @@ export interface UpdateSAMLConfigurationDto {
    * @example ["email","urn:oid:1.2.840.113549.1.9.1"]
    */
   emailAttributeKeys?: string[];
+  /** Shared secret used to authorize SAML provisioning requests */
+  provisioningSecret?: string;
+  /** Optional mapping between Attraccess permissions and SAML role values */
+  permissionMappings?: SSOPermissionMappingsDto;
   /** PEM encoded Service Provider certificate used when signing requests */
   spSigningCertificate?: string;
   /** PEM encoded Service Provider private key used for signing requests (stored encrypted) */
@@ -892,6 +939,57 @@ export interface UpdateSSOProviderDto {
   oidcConfiguration?: UpdateOIDCConfigurationDto;
   /** The SAML configuration for the provider */
   samlConfiguration?: UpdateSAMLConfigurationDto;
+}
+
+export interface SSOProvisioningUserDto {
+  /**
+   * The SSO subject (sub) identifier
+   * @example "00u1abcd1234"
+   */
+  subject?: string;
+  /**
+   * The user email address
+   * @example "user@example.com"
+   */
+  email?: string;
+}
+
+export interface SSOProvisioningPermissionsDto {
+  /**
+   * The SSO subject (sub) identifier
+   * @example "00u1abcd1234"
+   */
+  subject?: string;
+  /**
+   * The user email address
+   * @example "user@example.com"
+   */
+  email?: string;
+  /**
+   * Role or group names to evaluate against the configured permission mappings
+   * @example ["attraccess_admin","attraccess_billing"]
+   */
+  roles?: string[];
+  /**
+   * Whether the user can manage resources
+   * @example true
+   */
+  canManageResources?: boolean;
+  /**
+   * Whether the user can manage system configuration
+   * @example false
+   */
+  canManageSystemConfiguration?: boolean;
+  /**
+   * Whether the user can manage users
+   * @example false
+   */
+  canManageUsers?: boolean;
+  /**
+   * Whether the user can manage billing
+   * @example false
+   */
+  canManageBilling?: boolean;
 }
 
 export interface PreviewMjmlDto {
@@ -3246,6 +3344,30 @@ export interface DiscoverKeycloakOidcParams {
 
 export type DiscoverKeycloakOidcData = any;
 
+export interface SsoOidcLogoutData {
+  OK?: boolean;
+}
+
+export interface SsoSamlLogoutData {
+  OK?: boolean;
+}
+
+export interface SsoOidcDeleteUserData {
+  OK?: boolean;
+}
+
+export interface SsoSamlDeleteUserData {
+  OK?: boolean;
+}
+
+export interface SsoOidcUpdatePermissionsData {
+  OK?: boolean;
+}
+
+export interface SsoSamlUpdatePermissionsData {
+  OK?: boolean;
+}
+
 export interface LoginWithOidcParams {
   /** The URL to redirect to after login (optional), if you intend to redirect to your frontned, your frontend should pass the query parameters back to the sso callback endpoint to retreive a JWT token for furhter authentication */
   redirectTo?: any;
@@ -4450,6 +4572,144 @@ export namespace Authentication {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = DiscoverKeycloakOidcData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoOidcLogout
+   * @summary SSO-initiated logout
+   * @request POST:/api/auth/sso/OIDC/{providerId}/logout
+   */
+  export namespace SsoOidcLogout {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningUserDto;
+    export type RequestHeaders = {
+      /** SSO client secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO client secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoOidcLogoutData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoSamlLogout
+   * @summary SAML-initiated logout
+   * @request POST:/api/auth/sso/SAML/{providerId}/logout
+   */
+  export namespace SsoSamlLogout {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningUserDto;
+    export type RequestHeaders = {
+      /** SSO provisioning secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO provisioning secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoSamlLogoutData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoOidcDeleteUser
+   * @summary SSO-initiated user deletion
+   * @request POST:/api/auth/sso/OIDC/{providerId}/users/delete
+   */
+  export namespace SsoOidcDeleteUser {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningUserDto;
+    export type RequestHeaders = {
+      /** SSO client secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO client secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoOidcDeleteUserData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoSamlDeleteUser
+   * @summary SAML-initiated user deletion
+   * @request POST:/api/auth/sso/SAML/{providerId}/users/delete
+   */
+  export namespace SsoSamlDeleteUser {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningUserDto;
+    export type RequestHeaders = {
+      /** SSO provisioning secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO provisioning secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoSamlDeleteUserData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoOidcUpdatePermissions
+   * @summary SSO-initiated permission update
+   * @request POST:/api/auth/sso/OIDC/{providerId}/users/permissions
+   */
+  export namespace SsoOidcUpdatePermissions {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningPermissionsDto;
+    export type RequestHeaders = {
+      /** SSO client secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO client secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoOidcUpdatePermissionsData;
+  }
+
+  /**
+   * No description
+   * @tags Authentication
+   * @name SsoSamlUpdatePermissions
+   * @summary SAML-initiated permission update
+   * @request POST:/api/auth/sso/SAML/{providerId}/users/permissions
+   */
+  export namespace SsoSamlUpdatePermissions {
+    export type RequestParams = {
+      /** The ID of the SSO provider */
+      providerId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = SSOProvisioningPermissionsDto;
+    export type RequestHeaders = {
+      /** SSO provisioning secret (alternative to Authorization header) */
+      "x-api-key"?: string;
+      /** Bearer <SSO provisioning secret> (or use x-api-key) */
+      Authorization?: string;
+    };
+    export type ResponseBody = SsoSamlUpdatePermissionsData;
   }
 
   /**
@@ -7238,7 +7498,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -8038,6 +8298,138 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoOidcLogout
+     * @summary SSO-initiated logout
+     * @request POST:/api/auth/sso/OIDC/{providerId}/logout
+     */
+    ssoOidcLogout: (
+      providerId: string,
+      data: SSOProvisioningUserDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoOidcLogoutData, any>({
+        path: `/api/auth/sso/OIDC/${providerId}/logout`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoSamlLogout
+     * @summary SAML-initiated logout
+     * @request POST:/api/auth/sso/SAML/{providerId}/logout
+     */
+    ssoSamlLogout: (
+      providerId: string,
+      data: SSOProvisioningUserDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoSamlLogoutData, any>({
+        path: `/api/auth/sso/SAML/${providerId}/logout`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoOidcDeleteUser
+     * @summary SSO-initiated user deletion
+     * @request POST:/api/auth/sso/OIDC/{providerId}/users/delete
+     */
+    ssoOidcDeleteUser: (
+      providerId: string,
+      data: SSOProvisioningUserDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoOidcDeleteUserData, any>({
+        path: `/api/auth/sso/OIDC/${providerId}/users/delete`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoSamlDeleteUser
+     * @summary SAML-initiated user deletion
+     * @request POST:/api/auth/sso/SAML/{providerId}/users/delete
+     */
+    ssoSamlDeleteUser: (
+      providerId: string,
+      data: SSOProvisioningUserDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoSamlDeleteUserData, any>({
+        path: `/api/auth/sso/SAML/${providerId}/users/delete`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoOidcUpdatePermissions
+     * @summary SSO-initiated permission update
+     * @request POST:/api/auth/sso/OIDC/{providerId}/users/permissions
+     */
+    ssoOidcUpdatePermissions: (
+      providerId: string,
+      data: SSOProvisioningPermissionsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoOidcUpdatePermissionsData, any>({
+        path: `/api/auth/sso/OIDC/${providerId}/users/permissions`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Authentication
+     * @name SsoSamlUpdatePermissions
+     * @summary SAML-initiated permission update
+     * @request POST:/api/auth/sso/SAML/{providerId}/users/permissions
+     */
+    ssoSamlUpdatePermissions: (
+      providerId: string,
+      data: SSOProvisioningPermissionsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<SsoSamlUpdatePermissionsData, any>({
+        path: `/api/auth/sso/SAML/${providerId}/users/permissions`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
         ...params,
       }),
 
