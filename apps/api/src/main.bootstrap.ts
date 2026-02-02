@@ -18,6 +18,7 @@ import { join } from 'path';
 import { StorageConfigType } from './config/storage.config';
 import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { SettingsService } from './settings/settings.service';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -63,6 +64,9 @@ export async function bootstrap() {
     const storageDir = storageConfig.root;
 
     const host = appConfig.ATTRACCESS_URL;
+    if (!host) {
+      throw new Error('ATTRACCESS_URL is required to generate self-signed certificates.');
+    }
     const hostUrl = new URL(host);
     const domain = hostUrl.hostname;
 
@@ -92,8 +96,20 @@ export async function bootstrap() {
 
   app.use(cookieParser());
 
+  const settingsService = app.get(SettingsService);
   app.enableCors({
-    origin: appConfig.ATTRACCESS_FRONTEND_URL,
+    origin: (origin, callback) => {
+      settingsService
+        .getFrontendUrl()
+        .then((frontendUrl) => {
+          if (!frontendUrl || !origin || origin === frontendUrl) {
+            callback(null, true);
+            return;
+          }
+          callback(new Error('Not allowed by CORS'));
+        })
+        .catch((error) => callback(error));
+    },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
     credentials: true, // Allow cookies to be sent

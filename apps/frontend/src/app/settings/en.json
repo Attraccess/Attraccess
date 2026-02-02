@@ -1,0 +1,81 @@
+{
+  "title": "Settings",
+  "subtitle": "Manage system configuration",
+  "loading": "Loading settings...",
+  "actions": {
+    "save": "Save"
+  },
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  },
+  "sections": {
+    "app": {
+      "title": "Application",
+      "subtitle": "Base URLs and license configuration",
+      "licenseStatus": {
+        "configured": "License configured",
+        "missing": "License missing"
+      },
+      "inputs": {
+        "frontendUrl": {
+          "label": "Frontend URL",
+          "description": "The URL users access the frontend at."
+        },
+        "backendUrl": {
+          "label": "Backend URL",
+          "description": "The URL used for API callbacks and internal links."
+        },
+        "publicInternetUrl": {
+          "label": "Public Internet URL",
+          "description": "Optional URL used for external callbacks (e.g. SumUp)."
+        },
+        "licenseKey": {
+          "label": "License Key",
+          "description": "Paste a new license key to update."
+        }
+      }
+    },
+    "smtp": {
+      "title": "Email (SMTP)",
+      "subtitle": "Outgoing email configuration",
+      "passwordStatus": {
+        "configured": "Password configured",
+        "missing": "Password missing"
+      },
+      "service": {
+        "none": "Disabled",
+        "smtp": "SMTP",
+        "outlook": "Outlook 365"
+      },
+      "inputs": {
+        "service": {
+          "label": "Service"
+        },
+        "host": {
+          "label": "Host",
+          "description": "SMTP server host name."
+        },
+        "port": {
+          "label": "Port",
+          "description": "SMTP server port."
+        },
+        "secure": {
+          "label": "Use TLS"
+        },
+        "user": {
+          "label": "Username",
+          "description": "Optional username for SMTP authentication."
+        },
+        "pass": {
+          "label": "Password",
+          "description": "Leave empty to keep the current password."
+        },
+        "from": {
+          "label": "From address",
+          "description": "Default sender address for outgoing emails."
+        }
+      }
+    }
+  }
+}

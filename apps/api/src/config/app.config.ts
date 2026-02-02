@@ -5,15 +5,7 @@ import { LogLevel } from '@nestjs/common';
 const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    LICENSE_KEY: z
-      .string({
-        error:
-          'LICENSE_KEY is required. If you are a non-profit organization, you may use Attraccess for free by setting LICENSE_KEY to: "I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"',
-      })
-      .min(1, {
-        message:
-          'LICENSE_KEY must not be empty. Non-profits can set LICENSE_KEY to: "I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"',
-      }),
+    LICENSE_KEY: z.string().min(1).optional(),
     PORT: z.coerce.number().default(3000),
     LOG_LEVELS: z
       .string()
@@ -29,9 +21,9 @@ const AppEnvSchema = z
         message: 'Invalid log level(s). Allowed: log, error, warn, debug, verbose.',
       }),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
-    ATTRACCESS_URL: z.url(),
-    ATTRACCESS_FRONTEND_URL: z.url(),
-    ATTRACCESS_PUBLIC_INTERNET_URL: z.url(),
+    ATTRACCESS_URL: z.string().url().optional(),
+    ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
+    ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
@@ -87,8 +79,8 @@ const appConfigFactory = (): AppConfigType => {
       ATTRACCESS_PUBLIC_INTERNET_URL: ATTRACCESS_PUBLIC_INTERNET_URL_ENV,
     });
 
-    let licensoDeviceId = env.ATTRACCESS_FRONTEND_URL;
-    licensoDeviceId = licensoDeviceId.replace('https://', '');
+    const licensoDeviceIdSource = env.ATTRACCESS_FRONTEND_URL ?? env.ATTRACCESS_URL ?? 'unknown';
+    let licensoDeviceId = licensoDeviceIdSource.replace('https://', '');
     licensoDeviceId = licensoDeviceId.replace('http://', '');
 
     return {

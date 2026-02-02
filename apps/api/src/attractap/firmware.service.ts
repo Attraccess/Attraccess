@@ -2,18 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AttractapFirmware } from './dtos/firmware.dto';
 import { readFileSync, createReadStream, existsSync, statSync } from 'fs';
 import { join } from 'path';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../config/app.config';
 
 @Injectable()
 export class AttractapFirmwareService {
   private readonly firmwareAssetsDirectory: string;
   private readonly logger = new Logger(AttractapFirmwareService.name);
-  private readonly apiUrl: string;
 
   private firmwares: AttractapFirmware[] = [];
 
-  public constructor(private readonly configService: ConfigService) {
+  public constructor() {
     this.firmwareAssetsDirectory = join(__dirname, 'assets', 'attractap-firmwares');
     this.logger.debug(`Firmware assets directory: ${this.firmwareAssetsDirectory}`);
 
@@ -30,9 +27,6 @@ export class AttractapFirmwareService {
 
     this.logger.debug(`Loaded ${this.firmwares.length} firmware definitions`);
 
-    const appConfig = this.configService.get<AppConfigType>('app');
-    this.apiUrl = appConfig.ATTRACCESS_URL;
-    this.logger.debug(`API URL configured: ${this.apiUrl}`);
   }
 
   public async getFirmwares(): Promise<AttractapFirmware[]> {
