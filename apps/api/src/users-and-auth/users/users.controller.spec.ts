@@ -3,6 +3,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
+import { SSOService } from '../auth/sso/sso.service';
 import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateUserDto } from './dtos/createUser.dto';
@@ -49,6 +50,12 @@ describe('UsersController', () => {
           provide: EmailService,
           useValue: {
             sendVerificationEmail: jest.fn(),
+          },
+        },
+        {
+          provide: SSOService,
+          useValue: {
+            getProviderByTypeAndIdWithConfiguration: jest.fn(),
           },
         },
         {

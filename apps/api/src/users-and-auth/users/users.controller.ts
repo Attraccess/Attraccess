@@ -30,6 +30,7 @@ import {
   SystemPermissions,
   Setting,
   AuthenticationType,
+  SSOProviderType,
 } from '@attraccess/database-entities';
 import { ApiTags, ApiResponse, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CreateUserDto } from './dtos/createUser.dto';
@@ -64,6 +65,8 @@ import { validate, isEmail } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { EntityManager } from 'typeorm';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
+import { SSOService } from '../auth/sso/sso.service';
+import { hasConfiguredPermissionMapping } from '../auth/sso/permission-mapping';
 
 @ApiTags('Users')
 @Controller('users')
@@ -75,6 +78,7 @@ export class UsersController {
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
+    private readonly ssoService: SSOService,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
   ) { }
@@ -85,6 +89,46 @@ export class UsersController {
       throw new ServiceUnavailableException('EmailSendFailed');
     }
     throw error;
+  }
+
+  private async isPermissionsManagedBySso(user: User): Promise<boolean> {
+    const authenticationDetails = user.authenticationDetails ?? [];
+    const ssoDetails = authenticationDetails.filter(
+      (detail) => detail.type === AuthenticationType.SSO && detail.providerId && detail.providerType,
+    );
+
+    if (ssoDetails.length === 0) {
+      return false;
+    }
+
+    for (const detail of ssoDetails) {
+      const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(
+        detail.providerType as SSOProviderType,
+        detail.providerId as number,
+      );
+
+      if (!provider) {
+        continue;
+      }
+
+      const permissionMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.permissionMappings
+          : provider.samlConfiguration?.permissionMappings;
+
+      if (hasConfiguredPermissionMapping(permissionMappings)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private async ensurePermissionsNotManagedBySso(user: User): Promise<void> {
+    if (await this.isPermissionsManagedBySso(user)) {
+      this.logger.warn(`Permissions update blocked for SSO-managed user ID: ${user.id}`);
+      throw new ForbiddenException('UserPermissionsManagedBySSO');
+    }
   }
 
   private async inviteUsersTransactional(
@@ -842,11 +886,13 @@ export class UsersController {
     this.validateCanGrantPermissions(request.user, body);
 
     // Get the user to update
-    const user = await this.usersService.findOne({ id });
+    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);
     }
+
+    await this.ensurePermissionsNotManagedBySso(user);
 
     // Create an update object with just the systemPermissions
     const updates: Partial<User> = {
@@ -905,6 +951,7 @@ export class UsersController {
     }
 
     const updatedUsers: User[] = [];
+    const updateCandidates: Array<{ update: BulkUpdateUserPermissionsDto['updates'][number]; user: User }> = [];
 
     for (const update of body.updates) {
       // Skip if user is trying to update their own permissions
@@ -913,14 +960,18 @@ export class UsersController {
         continue;
       }
 
-      try {
-        // Get the user to update
-        const user = await this.usersService.findOne({ id: update.userId });
-        if (!user) {
-          this.logger.debug(`User not found with ID: ${update.userId}, skipping`);
-          continue;
-        }
+      const user = await this.usersService.findOne({ id: update.userId }, ['authenticationDetails']);
+      if (!user) {
+        this.logger.debug(`User not found with ID: ${update.userId}, skipping`);
+        continue;
+      }
 
+      await this.ensurePermissionsNotManagedBySso(user);
+      updateCandidates.push({ update, user });
+    }
+
+    for (const { update, user } of updateCandidates) {
+      try {
         // Create an update object with just the systemPermissions
         const updates: Partial<User> = {
           systemPermissions: {
