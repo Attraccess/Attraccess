@@ -175,10 +175,10 @@ export const UserManagementPage: React.FC = () => {
               loadingContent={<TableDataLoadingIndicator />}
             >
               {(user) => {
+                const authenticationDetails = (user as UserWithAuthDetails)
+                  .authenticationDetails as AuthenticationDetailSummary[] | undefined;
                 const ssoDetails =
-                  (user as UserWithAuthDetails).authenticationDetails?.filter(
-                    (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-                  ) ?? [];
+                  authenticationDetails?.filter((detail) => detail.ssoSubject || detail.providerId || detail.providerType) ?? [];
                 const ssoProviderNames = ssoDetails
                   .map((detail) => {
                     if (detail.providerId) {

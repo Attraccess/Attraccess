@@ -59,6 +59,7 @@ export default defineConfig({
       injectManifest: {
         minify: process.env.NODE_ENV === 'production',
         enableWorkboxModulesLogs: true,
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: {
         enabled: true,

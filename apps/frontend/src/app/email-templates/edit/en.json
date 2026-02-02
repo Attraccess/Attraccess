@@ -1,5 +1,5 @@
 {
-  "subtitle": "Modify the subject and body (MJML) content of the template.",
+  "subtitle": "Modify the subject and content of the template using the visual editor.",
   "templateType": {
     "verify-email": "Email Verification",
     "reset-password": "Password Reset",
@@ -7,24 +7,33 @@
     "password-changed": "Password Changed",
     "resource-usage-billing-transaction-summary": "Resource Usage Billing Transaction Summary",
     "user-invitation": "User Invitation",
-    "project-invitation": "Project Invitation"
+    "project-invitation": "Project Invitation",
+    "delete-account-confirmation": "Delete Account Confirmation"
   },
   "form": {
-    "subject": "Subject",
-    "mjmlDocumentation": "MJML Documentation"
+    "subject": "Subject"
   },
   "sections": {
-    "template": "Template",
-    "preview": "Preview"
+    "template": "Template Editor"
   },
-  "preview": {
-    "iframeTitle": "Body Preview",
-    "loading": "Loading...",
-    "errorPrefix": "Error loading preview.",
-    "emptyPlaceholder": "Start editing the MJML body to see a preview."
+  "editor": {
+    "categories": {
+      "content": "Content",
+      "layout": "Layout"
+    },
+    "layouts": {
+      "twoColumns": "2 columns",
+      "threeColumns": "3 columns",
+      "fourColumns": "4 columns"
+    },
+    "parseError": "This template could not be loaded into the visual editor. The layout has been reset."
+  },
+  "loading": "Loading template...",
+  "error": {
+    "title": "Something went wrong",
+    "unknown": "Unable to load the email template."
   },
   "actions": {
-    "close": "Close",
     "cancel": "Cancel",
     "save": "Save Changes"
   }

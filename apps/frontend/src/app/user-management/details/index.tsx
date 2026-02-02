@@ -67,10 +67,10 @@ export function UserManagementDetailsPage() {
   type UserWithAuthDetails = User & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
+  const authenticationDetails =
+    (user as UserWithAuthDetails | undefined)?.authenticationDetails as AuthenticationDetailSummary[] | undefined;
   const ssoDetails =
-    (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
-      (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-    ) ?? [];
+    authenticationDetails?.filter((detail) => detail.ssoSubject || detail.providerId || detail.providerType) ?? [];
 
   const isSelf = !!me && !!user && me.id === user.id;
   const { mutate: deleteUser, isPending: isDeleting } = useUsersServiceDeleteUser({

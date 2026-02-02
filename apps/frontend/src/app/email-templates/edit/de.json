@@ -1,5 +1,5 @@
 {
-  "subtitle": "Ändern Sie Betreff und Inhalt (MJML) der Vorlage.",
+  "subtitle": "Ändern Sie Betreff und Inhalt der Vorlage im visuellen Editor.",
   "templateType": {
     "verify-email": "E-Mail Verifizierung",
     "reset-password": "Passwort Zurücksetzen",
@@ -7,24 +7,33 @@
     "password-changed": "Passwort geändert",
     "resource-usage-billing-transaction-summary": "Ressourcennutzung Kostenübersicht",
     "user-invitation": "Benutzereinladung",
-    "project-invitation": "Projekteinladung"
+    "project-invitation": "Projekteinladung",
+    "delete-account-confirmation": "Bestätigung der Kontolöschung"
   },
   "form": {
-    "subject": "Betreff",
-    "mjmlDocumentation": "MJML Dokumentation"
+    "subject": "Betreff"
   },
   "sections": {
-    "template": "Vorlage",
-    "preview": "Vorschau"
+    "template": "Vorlagen-Editor"
   },
-  "preview": {
-    "iframeTitle": "Körper-Vorschau",
-    "loading": "Laden...",
-    "errorPrefix": "Fehler beim Laden der Vorschau.",
-    "emptyPlaceholder": "Beginnen Sie mit dem Bearbeiten des MJML-Inhalts, um eine Vorschau zu sehen."
+  "editor": {
+    "categories": {
+      "content": "Inhalt",
+      "layout": "Layout"
+    },
+    "layouts": {
+      "twoColumns": "2 Spalten",
+      "threeColumns": "3 Spalten",
+      "fourColumns": "4 Spalten"
+    },
+    "parseError": "Diese Vorlage konnte nicht in den visuellen Editor geladen werden. Das Layout wurde zurückgesetzt."
+  },
+  "loading": "Vorlage wird geladen...",
+  "error": {
+    "title": "Es ist ein Fehler aufgetreten",
+    "unknown": "Die E-Mail-Vorlage konnte nicht geladen werden."
   },
   "actions": {
-    "close": "Schließen",
     "cancel": "Abbrechen",
     "save": "Änderungen speichern"
   }
