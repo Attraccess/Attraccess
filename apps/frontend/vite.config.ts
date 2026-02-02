@@ -8,6 +8,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { reactCompilerBabelConfig } from '../../tools/react-compiler';
 
 export default defineConfig({
   root: __dirname,
@@ -23,7 +25,7 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
-    react(),
+    react({ babel: reactCompilerBabelConfig }),
     nxViteTsPaths(),
     nxCopyAssetsPlugin([]),
     federation({
@@ -59,6 +61,7 @@ export default defineConfig({
       injectManifest: {
         minify: process.env.NODE_ENV === 'production',
         enableWorkboxModulesLogs: true,
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: {
         enabled: true,

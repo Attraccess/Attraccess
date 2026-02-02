@@ -24,7 +24,7 @@ export function WebSerialConsole({ children }: Props) {
   const espTools = useRef<ESPTools>(ESPTools.getInstance());
   const [isConnected, setIsConnected] = useState<boolean>(espTools.current.isConnected);
   const [error, setError] = useState<{ type: ESPToolsErrorType; details?: unknown } | null>(null);
-  const disconnectRef = useRef<() => void>();
+  const disconnectRef = useRef<(() => void) | null>(null);
 
   const onConnect = useCallback(async () => {
     const connectionResult = await espTools.current.connectToDevice();
@@ -45,7 +45,7 @@ export function WebSerialConsole({ children }: Props) {
   const onDisconnect = useCallback(() => {
     if (disconnectRef.current) {
       disconnectRef.current();
-      disconnectRef.current = undefined;
+      disconnectRef.current = null;
     }
     setIsConnected(false);
   }, []);

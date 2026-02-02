@@ -2,9 +2,11 @@ import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { reactCompilerBabelConfig } from '../../tools/react-compiler';
 
 export default defineConfig({
-  plugins: [react(), nxViteTsPaths()],
+  plugins: [react({ babel: reactCompilerBabelConfig }), nxViteTsPaths()],
   test: {
     root: __dirname,
     globals: true,
