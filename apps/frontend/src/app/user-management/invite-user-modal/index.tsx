@@ -67,6 +67,12 @@ export function InviteUserModal(props: Props) {
 
   const canSubmit = useMemo(() => isUsernameValid && !!trimmedEmail, [isUsernameValid, trimmedEmail]);
 
+  const resetSingleInviteForm = useCallback(() => {
+    setUsername('');
+    setEmail('');
+    formRef.current?.reset();
+  }, [setEmail, setUsername]);
+
   const { mutate: inviteUser, isPending } = useUsersServiceInviteUser({
     onSuccess: () => {
       toast.success({
@@ -76,6 +82,7 @@ export function InviteUserModal(props: Props) {
       queryClient.invalidateQueries({
         queryKey: [useUsersServiceFindManyKey],
       });
+      resetSingleInviteForm();
       onClose();
     },
     onError: (error) => {
