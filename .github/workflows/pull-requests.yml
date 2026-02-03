@@ -52,6 +52,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio esptool
 
+      - name: Run precommit checks
+        run: pnpm precommit
+
+      - name: Ensure precommit does not modify files
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "pnpm precommit modified files. Please run it locally and commit the changes."
+            git status --porcelain
+            git --no-pager diff
+            exit 1
+          fi
+
       - name: Run build steps (adjust target as needed)
         env:
           NODE_ENV: production

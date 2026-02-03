@@ -41,8 +41,11 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceInviteUser: () => ({
-    mutate: mutateMock,
+  useUsersServiceInviteUser: (options?: { onSuccess?: () => void }) => ({
+    mutate: (payload: unknown) => {
+      mutateMock(payload);
+      options?.onSuccess?.();
+    },
     isPending: false,
   }),
   useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
@@ -106,5 +109,21 @@ describe('InviteUserModal', () => {
         email: 'test@example.com',
       },
     });
+  });
+
+  it('clears inputs after a successful invite', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(screen.getByText('Open'));
+
+    await user.type(screen.getByLabelText('Username'), 'Jane_Doe');
+    await user.type(screen.getByLabelText('Email'), 'test@example.com');
+
+    await user.click(screen.getByRole('button', { name: 'Invite' }));
+
+    await user.click(screen.getByText('Open'));
+
+    expect(screen.getByLabelText('Username')).toHaveValue('');
+    expect(screen.getByLabelText('Email')).toHaveValue('');
   });
 });
