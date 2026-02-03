@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, type ChangeEvent } from 'react';
+import { useCallback, useMemo } from 'react';
 import { type Edge, type Node } from '@xyflow/react';
 import { ResourceFlowEdgeDto, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -139,7 +139,6 @@ export function useFlowImportExport({
   t,
 }: FlowImportExportProps) {
   const toast = useToastMessage();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportFileName = useMemo(() => {
     if (resourceId) {
@@ -172,14 +171,29 @@ export function useFlowImportExport({
   }, [edges, exportFileName, nodes, t, toast]);
 
   const handleImportClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.display = 'none';
 
-  const handleImportFileChange = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const input = event.target;
+    const host = document.body ?? document.documentElement;
+    if (!host) {
+      return;
+    }
+
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+      input.remove();
+    };
+
+    const handleChange = async () => {
       const file = input.files?.[0];
       if (!file) {
+        cleanup();
         return;
       }
 
@@ -209,16 +223,27 @@ export function useFlowImportExport({
           description: t(`import.errors.${errorKey}`),
         });
       } finally {
-        input.value = '';
+        cleanup();
       }
-    },
-    [setNodes, setEdges, t, toast],
-  );
+    };
+
+    input.addEventListener('change', handleChange, { once: true });
+    window.addEventListener(
+      'focus',
+      () => {
+        if (!cleanedUp && !input.files?.length) {
+          cleanup();
+        }
+      },
+      { once: true },
+    );
+
+    host.appendChild(input);
+    input.click();
+  }, [setNodes, setEdges, t, toast]);
 
   return {
-    fileInputRef,
     handleExport,
     handleImportClick,
-    handleImportFileChange,
   };
 }

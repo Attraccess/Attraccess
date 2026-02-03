@@ -155,7 +155,7 @@ function FlowsPageInner() {
     flowNodeTypes,
   } = useFlowContext();
 
-  const { fileInputRef, handleExport, handleImportClick, handleImportFileChange } = useFlowImportExport({
+  const { handleExport, handleImportClick } = useFlowImportExport({
     nodes,
     edges,
     setNodes,
@@ -364,13 +364,6 @@ function FlowsPageInner() {
               {(open) => <Button color="primary" isIconOnly startContent={<PlusIcon />} onPress={open} />}
             </NodePickerModal>
           </Panel>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            onChange={handleImportFileChange}
-            className="hidden"
-          />
         </ReactFlow>
       </div>
     </div>
