@@ -75,6 +75,10 @@ export type User = {
      */
     deletedAt?: string;
     /**
+     * Authentication details linked to the user
+     */
+    authenticationDetails?: Array<(unknown[])>;
+    /**
      * The external (origin) identifier of the user, if the user is authenticated via SSO
      */
     externalIdentifier?: string | null;
