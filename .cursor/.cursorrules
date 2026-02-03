@@ -21,6 +21,10 @@ If you need to start the API locally, set `LICENSE_KEY` as described in `README.
 - Ensure dependencies are installed and required env vars are set before running
   full checks.
 - Firmware build is separate from Nx and requires PlatformIO (see below).
+- Before committing, always run `pnpm precommit`.
+- If `pnpm precommit` regenerates the API client, accept those changes and
+  commit them together with your own work. Never revert them.
+- Never manually edit generated API clients; only update via regeneration.
 
 ## Common Commands
 - Show available targets for a project:
