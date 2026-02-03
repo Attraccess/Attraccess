@@ -70,7 +70,6 @@ export function InviteUserModal(props: Props) {
   const resetSingleInviteForm = useCallback(() => {
     setUsername('');
     setEmail('');
-    formRef.current?.reset();
   }, [setEmail, setUsername]);
 
   const { mutate: inviteUser, isPending } = useUsersServiceInviteUser({

@@ -1,13 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InviteUserModal } from './index';
 import { TestWrapper } from '../../../test-utils/wrappers';
 
 const mutateMock = vi.fn();
-let inviteUserOptions: { onSuccess?: () => void } | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
@@ -42,13 +41,13 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceInviteUser: (options?: { onSuccess?: () => void }) => {
-    inviteUserOptions = options;
-    return {
-      mutate: mutateMock,
-      isPending: false,
-    };
-  },
+  useUsersServiceInviteUser: (options?: { onSuccess?: () => void }) => ({
+    mutate: (payload: unknown) => {
+      mutateMock(payload);
+      options?.onSuccess?.();
+    },
+    isPending: false,
+  }),
   useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
   ApiError: class ApiError extends Error {},
 }));
@@ -63,7 +62,6 @@ function renderModal() {
 describe('InviteUserModal', () => {
   beforeEach(() => {
     mutateMock.mockReset();
-    inviteUserOptions = undefined;
   });
 
   it('shows username guidance text', async () => {
@@ -121,9 +119,7 @@ describe('InviteUserModal', () => {
     await user.type(screen.getByLabelText('Username'), 'Jane_Doe');
     await user.type(screen.getByLabelText('Email'), 'test@example.com');
 
-    await act(async () => {
-      inviteUserOptions?.onSuccess?.();
-    });
+    await user.click(screen.getByRole('button', { name: 'Invite' }));
 
     await user.click(screen.getByText('Open'));
 
