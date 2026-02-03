@@ -25,6 +25,7 @@ log/
 
 .cursor/*
 !.cursor/.cursorrules
+!.cursor/environment.json
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 

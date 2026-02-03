@@ -1,0 +1,3 @@
+{
+  "install": "bash -lc 'source scripts/cloud-agent/setup-gpg-signing.sh && pnpm install'"
+}

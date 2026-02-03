@@ -23,6 +23,30 @@ If you need to start the API locally, set `LICENSE_KEY` as described in `README.
   full checks.
 - Firmware build is separate from Nx and requires PlatformIO (see below).
 
+## Commit signing (Cursor Cloud Agents)
+This repo configures Cursor Cloud Agents to auto-sign commits using a GPG key
+stored in Cursor secrets. The install step sources
+`scripts/cloud-agent/setup-gpg-signing.sh`, which imports your key, preloads the
+passphrase, and sets global git config for signing.
+
+### Required Cursor secrets
+- `IS_RUNNING_CURSOR_CLOUD_AGENT`: Set to `1`.
+- `GPG_PRIVATE_KEY_BASE64`: Base64-encoded ASCII-armored private key.
+- `GPG_PRIVATE_KEY_PASSPHRASE`: Passphrase for the private key.
+- `MY_GIT_EMAIL`: Email associated with the GPG key and Git commits.
+- `MY_FULL_NAME`: Full name for Git commits.
+
+### Export helper
+Use this on your local machine to generate `GPG_PRIVATE_KEY_BASE64`:
+
+```bash
+gpg --list-secret-keys --keyid-format=long
+gpg --armor --export-secret-keys YOUR_KEY_ID | base64 | tr -d '\n'; echo
+```
+
+Make sure the public key is added to your Git provider (e.g., GitHub) so signed
+commits verify.
+
 ## Common Commands
 - Show available targets for a project:
   - `pnpm nx show project <project> --json`
