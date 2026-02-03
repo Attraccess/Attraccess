@@ -7,7 +7,7 @@ import { UserPermissionForm } from './index';
 import { TestWrapper } from '../../../../../test-utils/wrappers';
 import type { User } from '@attraccess/react-query-client';
 
-const mutateAsyncMock = vi.fn();
+const mutateAsyncMock = vi.fn().mockResolvedValue(undefined);
 const permissionsFixture = {
   canManageResources: true,
   canManageSystemConfiguration: false,
@@ -62,7 +62,7 @@ vi.mock('@attraccess/react-query-client', () => ({
 
 describe('UserPermissionForm', () => {
   beforeEach(() => {
-    mutateAsyncMock.mockReset();
+    mutateAsyncMock.mockClear();
   });
 
   it('disables permission editing when managed by SSO', async () => {
