@@ -39,6 +39,30 @@ export class EncryptionService {
     return Buffer.from(input, 'base64url');
   }
 
+  isEncrypted(value: string | null | undefined): value is string {
+    return typeof value === 'string' && value.startsWith(`${TOKEN_VERSION}.`);
+  }
+
+  encryptIfPlain(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (this.isEncrypted(value)) {
+      return value;
+    }
+    return this.encrypt(value);
+  }
+
+  decryptIfEncrypted(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (!this.isEncrypted(value)) {
+      return value;
+    }
+    return this.decrypt(value);
+  }
+
   encrypt(plaintext: string): string {
     if (typeof plaintext !== 'string') {
       throw new TypeError('encrypt: plaintext must be a string');

@@ -5,6 +5,7 @@ import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attrac
 import { TwoFactorPolicy } from './two-factor.dto';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../../config/app.config';
+import { EncryptionService } from '../../encryption/encryption.service';
 
 @Injectable()
 export class TwoFactorService {
@@ -20,6 +21,7 @@ export class TwoFactorService {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly configService: ConfigService,
+    private readonly encryptionService: EncryptionService,
   ) {
     this.issuer = this.resolveIssuer();
   }
@@ -91,6 +93,7 @@ export class TwoFactorService {
 
     const { generateSecret, generateURI } = await this.loadOtplib();
     const secret = generateSecret();
+    const encryptedSecret = this.encryptionService.encrypt(secret);
     const accountName = user.email ?? user.username;
     const otpauthUrl = generateURI({
       secret,
@@ -100,14 +103,14 @@ export class TwoFactorService {
     });
 
     if (existing) {
-      existing.totpSecret = secret;
+      existing.totpSecret = encryptedSecret;
       existing.totpEnabledAt = null;
       await this.authenticationDetailRepository.save(existing);
     } else {
       const detail = new AuthenticationDetail();
       detail.userId = user.id;
       detail.type = AuthenticationType.TOTP;
-      detail.totpSecret = secret;
+      detail.totpSecret = encryptedSecret;
       detail.totpEnabledAt = null;
       await this.authenticationDetailRepository.save(detail);
     }
@@ -124,7 +127,8 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorAlreadyEnabled');
     }
 
-    if (!(await this.isCodeValid(detail.totpSecret, code))) {
+    const secret = await this.resolveTotpSecret(detail);
+    if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
 
@@ -138,7 +142,8 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorNotEnabled');
     }
 
-    if (!(await this.isCodeValid(detail.totpSecret, code))) {
+    const secret = await this.resolveTotpSecret(detail);
+    if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
 
@@ -159,7 +164,8 @@ export class TwoFactorService {
       throw new UnauthorizedException('TwoFactorRequired');
     }
 
-    if (!(await this.isCodeValid(detail.totpSecret, code))) {
+    const secret = detail ? await this.resolveTotpSecret(detail) : null;
+    if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
   }
@@ -168,6 +174,22 @@ export class TwoFactorService {
     return this.authenticationDetailRepository.findOne({
       where: { userId, type: AuthenticationType.TOTP },
     });
+  }
+
+  private async resolveTotpSecret(detail: AuthenticationDetail): Promise<string | null> {
+    if (!detail.totpSecret) {
+      return null;
+    }
+
+    if (this.encryptionService.isEncrypted(detail.totpSecret)) {
+      return this.encryptionService.decrypt(detail.totpSecret);
+    }
+
+    const plaintext = detail.totpSecret;
+    const encrypted = this.encryptionService.encrypt(plaintext);
+    detail.totpSecret = encrypted;
+    await this.authenticationDetailRepository.update(detail.id, { totpSecret: encrypted });
+    return plaintext;
   }
 
   private isPolicyRequiredForUser(policy: TwoFactorPolicy, user: User): boolean {
