@@ -4,7 +4,7 @@ import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from '../auth/sso/sso.service';
-import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
+import { User, AuthenticationType, Setting, SSOProviderType } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -17,6 +17,7 @@ describe('UsersController', () => {
   let usersService: UsersService;
   let authService: AuthService;
   let emailService: EmailService;
+  let ssoService: SSOService;
   let settingRepository: {
     findOne: jest.Mock;
     insert: jest.Mock;
@@ -33,6 +34,7 @@ describe('UsersController', () => {
             findOne: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
+            updateOne: jest.fn(),
             cleanupUsername: jest.fn((value: string) => value),
             validateUsernameOrThrow: jest.fn(),
           },
@@ -73,6 +75,7 @@ describe('UsersController', () => {
     usersService = module.get<UsersService>(UsersService);
     authService = module.get<AuthService>(AuthService);
     emailService = module.get<EmailService>(EmailService);
+    ssoService = module.get<SSOService>(SSOService);
     settingRepository = module.get(getRepositoryToken(Setting));
   });
 
@@ -306,6 +309,100 @@ describe('UsersController', () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
       const result = await controller.isLocalSignupEnabled();
       expect(result).toEqual({ value: true });
+    });
+  });
+
+  describe('permission updates with SSO mappings', () => {
+    const requestUser = {
+      id: 99,
+      systemPermissions: {
+        canManageResources: true,
+        canManageSystemConfiguration: true,
+        canManageUsers: true,
+        canManageBilling: true,
+      },
+    } as User;
+
+    it('blocks updatePermissions when SSO permission mappings exist', async () => {
+      const targetUser = {
+        id: 1,
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [
+          {
+            type: AuthenticationType.SSO,
+            providerType: SSOProviderType.OIDC,
+            providerId: 42,
+          },
+        ],
+      } as User;
+
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+        oidcConfiguration: {
+          permissionMappings: {
+            canManageUsers: ['admins'],
+          },
+        },
+      } as never);
+
+      await expect(
+        controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true },
+          { user: requestUser } as AuthenticatedRequest,
+        ),
+      ).rejects.toThrow('UserPermissionsManagedBySSO');
+
+      expect(usersService.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('blocks bulkUpdatePermissions when SSO permission mappings exist', async () => {
+      const targetUser = {
+        id: 2,
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [
+          {
+            type: AuthenticationType.SSO,
+            providerType: SSOProviderType.OIDC,
+            providerId: 7,
+          },
+        ],
+      } as User;
+
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+      jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+        oidcConfiguration: {
+          permissionMappings: {
+            canManageResources: ['resource-admins'],
+          },
+        },
+      } as never);
+
+      await expect(
+        controller.bulkUpdatePermissions(
+          {
+            updates: [
+              {
+                userId: targetUser.id,
+                permissions: { canManageResources: true },
+              },
+            ],
+          },
+          { user: requestUser } as AuthenticatedRequest,
+        ),
+      ).rejects.toThrow('UserPermissionsManagedBySSO');
+
+      expect(usersService.updateOne).not.toHaveBeenCalled();
     });
   });
 });
