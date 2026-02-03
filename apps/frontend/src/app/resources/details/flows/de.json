@@ -1,4 +1,32 @@
 {
   "title": "Flows für {{resourceName}}",
-  "subtitle": "Mit Flows kannst du Arbeitsabläufe für deine Ressourcen automatisieren und beispielsweise Smarte Steckdosen oder Lampen ansteuern."
+  "subtitle": "Mit Flows kannst du Arbeitsabläufe für deine Ressourcen automatisieren und beispielsweise Smarte Steckdosen oder Lampen ansteuern.",
+  "actions": {
+    "export": "Exportieren",
+    "import": "Importieren"
+  },
+  "export": {
+    "success": {
+      "title": "Flow exportiert",
+      "description": "Der Flow wurde als JSON-Datei heruntergeladen."
+    },
+    "error": {
+      "title": "Export fehlgeschlagen",
+      "description": "Die Exportdatei konnte nicht erstellt werden."
+    }
+  },
+  "import": {
+    "success": {
+      "title": "Flow importiert",
+      "description": "Der Flow wurde geladen. Klicke auf Speichern, um ihn zu übernehmen."
+    },
+    "error": {
+      "title": "Import fehlgeschlagen"
+    },
+    "errors": {
+      "invalidJson": "Die Datei ist kein gültiges JSON.",
+      "invalidStructure": "Die Datei enthält keinen gültigen Flow-Export.",
+      "unknown": "Die Datei konnte nicht importiert werden."
+    }
+  }
 }
