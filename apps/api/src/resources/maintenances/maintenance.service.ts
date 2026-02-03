@@ -247,7 +247,7 @@ export class ResourceMaintenanceService {
       .createQueryBuilder('maintenance')
       .where('maintenance.resourceId = :resourceId', { resourceId })
       .andWhere('maintenance.startTime <= :now', { now })
-      .andWhere('maintenance.endTime IS NULL')
+      .andWhere('(maintenance.endTime IS NULL OR maintenance.endTime > :now)', { now })
       .getOne();
 
     return !!activeMaintenance;

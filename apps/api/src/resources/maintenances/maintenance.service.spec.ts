@@ -47,6 +47,7 @@ describe('MaintenanceService', () => {
               take: jest.fn().mockReturnThis(),
               getCount: jest.fn(),
               getMany: jest.fn(),
+              getOne: jest.fn(),
             })),
             find: jest.fn(),
           },
@@ -261,6 +262,45 @@ describe('MaintenanceService', () => {
       const result = await service.updateMaintenance(1, dto);
 
       expect(result.endTime).toBeNull();
+    });
+  });
+
+  describe('hasActiveMaintenance', () => {
+    it('should return true when an active maintenance exists', async () => {
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(mockMaintenance),
+      };
+
+      jest
+        .spyOn(maintenanceRepository, 'createQueryBuilder')
+        .mockReturnValue(queryBuilder as unknown as ReturnType<Repository<ResourceMaintenance>['createQueryBuilder']>);
+
+      const result = await service.hasActiveMaintenance(1);
+
+      expect(result).toBe(true);
+      expect(queryBuilder.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('maintenance.startTime <= :now', { now: expect.any(Date) });
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('(maintenance.endTime IS NULL OR maintenance.endTime > :now)', {
+        now: expect.any(Date),
+      });
+    });
+
+    it('should return false when no active maintenance exists', async () => {
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+
+      jest
+        .spyOn(maintenanceRepository, 'createQueryBuilder')
+        .mockReturnValue(queryBuilder as unknown as ReturnType<Repository<ResourceMaintenance>['createQueryBuilder']>);
+
+      const result = await service.hasActiveMaintenance(1);
+
+      expect(result).toBe(false);
     });
   });
 });
