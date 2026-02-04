@@ -437,6 +437,10 @@ describe('Migrations down/up with data (e2e)', () => {
   let createdTempRoot: string | undefined;
 
   beforeAll(async () => {
+    // EncryptSensitiveData migration down() needs AUTH_SESSION_SECRET to decrypt; use a stable test value.
+    process.env.AUTH_SESSION_SECRET =
+      process.env.AUTH_SESSION_SECRET || 'e2e-migrations-test-secret';
+
     const tmpRoot = await getTestStorageRoot();
     if (!process.env.STORAGE_ROOT) {
       createdTempRoot = tmpRoot;
