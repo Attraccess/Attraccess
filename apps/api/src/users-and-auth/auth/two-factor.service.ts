@@ -127,7 +127,7 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorAlreadyEnabled');
     }
 
-    const secret = await this.resolveTotpSecret(detail);
+    const secret = this.resolveTotpSecret(detail);
     if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
@@ -142,7 +142,7 @@ export class TwoFactorService {
       throw new BadRequestException('TwoFactorNotEnabled');
     }
 
-    const secret = await this.resolveTotpSecret(detail);
+    const secret = this.resolveTotpSecret(detail);
     if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
@@ -164,7 +164,7 @@ export class TwoFactorService {
       throw new UnauthorizedException('TwoFactorRequired');
     }
 
-    const secret = detail ? await this.resolveTotpSecret(detail) : null;
+    const secret = detail ? this.resolveTotpSecret(detail) : null;
     if (!secret || !(await this.isCodeValid(secret, code))) {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
@@ -176,20 +176,17 @@ export class TwoFactorService {
     });
   }
 
-  private async resolveTotpSecret(detail: AuthenticationDetail): Promise<string | null> {
+  /**
+   * Returns the TOTP secret for verification. Assumes stored values are already
+   * encrypted (see migration EncryptSensitiveData).
+   */
+  private resolveTotpSecret(detail: AuthenticationDetail): string | null {
     if (!detail.totpSecret) {
       return null;
     }
-
-    if (this.encryptionService.isEncrypted(detail.totpSecret)) {
-      return this.encryptionService.decrypt(detail.totpSecret);
-    }
-
-    const plaintext = detail.totpSecret;
-    const encrypted = this.encryptionService.encrypt(plaintext);
-    detail.totpSecret = encrypted;
-    await this.authenticationDetailRepository.update(detail.id, { totpSecret: encrypted });
-    return plaintext;
+    return (
+      this.encryptionService.decryptIfEncrypted(detail.totpSecret) ?? detail.totpSecret
+    );
   }
 
   private isPolicyRequiredForUser(policy: TwoFactorPolicy, user: User): boolean {

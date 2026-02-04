@@ -109,6 +109,9 @@ describe('SsoService', () => {
             decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
             isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
             encryptIfPlain: jest.fn((value: string) => (value.startsWith('enc:') ? value : `enc:${value}`)),
+            decryptIfEncrypted: jest.fn((value: string) =>
+              value?.startsWith('enc:') ? value.replace(/^enc:/, '') : value
+            ),
           },
         },
       ],

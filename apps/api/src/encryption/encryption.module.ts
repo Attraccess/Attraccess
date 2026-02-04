@@ -9,4 +9,4 @@ import { TokenHashService } from './token-hash.service';
   providers: [EncryptionService, TokenHashService],
   exports: [EncryptionService, TokenHashService],
 })
-export class EncryptionModule {}
+export class EncryptionModule { }

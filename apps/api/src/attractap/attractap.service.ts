@@ -26,22 +26,22 @@ export class AttractapService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
-    return await this.hydrateCardKey(card);
+    return this.decryptCardKey(card);
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
-    await Promise.all(cards.map((card) => this.hydrateCardKey(card)));
+    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find();
-    await Promise.all(cards.map((card) => this.hydrateCardKey(card)));
+    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
@@ -63,7 +63,7 @@ export class AttractapService {
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
-    return await this.hydrateCardKey(card);
+    return this.decryptCardKey(card);
   }
 
   public async createNFCCard(
@@ -280,30 +280,20 @@ export class AttractapService {
       await this.userRepository.save(user);
       return token;
     }
-
-    if (this.encryptionService.isEncrypted(user.nfcKeySeedToken)) {
-      return this.encryptionService.decrypt(user.nfcKeySeedToken);
-    }
-
-    const plaintext = user.nfcKeySeedToken;
-    user.nfcKeySeedToken = this.encryptionService.encrypt(plaintext);
-    await this.userRepository.save(user);
-    return plaintext;
+    return (
+      this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken
+    );
   }
 
-  private async hydrateCardKey(card?: NFCCard | null): Promise<NFCCard | undefined> {
+  /**
+   * Decrypts card key in place for use in the app. Assumes stored values are
+   * already encrypted (see migration EncryptSensitiveData).
+   */
+  private decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
     if (!card?.key) {
       return card ?? undefined;
     }
-
-    if (this.encryptionService.isEncrypted(card.key)) {
-      card.key = this.encryptionService.decrypt(card.key);
-      return card;
-    }
-
-    const plaintext = card.key;
-    const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.nfcCardRepository.update(card.id, { key: encrypted });
+    card.key = this.encryptionService.decryptIfEncrypted(card.key) ?? card.key;
     return card;
   }
 }

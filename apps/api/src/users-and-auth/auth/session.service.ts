@@ -22,7 +22,7 @@ export class SessionService {
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
     private readonly tokenHashService: TokenHashService,
-  ) {}
+  ) { }
 
   /**
    * Creates a new session for the given user
@@ -34,11 +34,11 @@ export class SessionService {
     const token = this.generateSessionToken();
     const storedToken = this.tokenHashService.hashToken(token);
     const expiresIn = metadata?.expiresIn || this.defaultExpirationHours * 3600; // Convert hours to seconds
-    
+
     // Ensure expiration doesn't exceed maximum allowed
     const maxExpirationSeconds = this.maxExpirationHours * 3600;
     const actualExpiresIn = Math.min(expiresIn, maxExpirationSeconds);
-    
+
     const expiresAt = new Date(Date.now() + actualExpiresIn * 1000);
 
     const session = this.sessionRepository.create({
@@ -50,9 +50,9 @@ export class SessionService {
     });
 
     await this.sessionRepository.save(session);
-    
+
     this.logger.log(`Created session for user ${user.id} (${user.username}), expires at ${expiresAt.toISOString()}`);
-    
+
     return token;
   }
 
@@ -120,9 +120,9 @@ export class SessionService {
     session.lastAccessedAt = new Date();
 
     await this.sessionRepository.save(session);
-    
+
     this.logger.log(`Refreshed session for user ${session.userId} (${session.user.username})`);
-    
+
     return newToken;
   }
 
@@ -140,7 +140,7 @@ export class SessionService {
     if (!result.affected) {
       result = await this.sessionRepository.delete({ token });
     }
-    
+
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
     }
@@ -152,7 +152,7 @@ export class SessionService {
    */
   async revokeAllUserSessions(userId: number): Promise<void> {
     const result = await this.sessionRepository.delete({ userId });
-    
+
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked ${result.affected} sessions for user ${userId}`);
     }
@@ -213,7 +213,7 @@ export class SessionService {
    */
   async getUserSessions(userId: number): Promise<Session[]> {
     return this.sessionRepository.find({
-      where: { 
+      where: {
         userId,
         expiresAt: MoreThan(new Date()) // Only return non-expired sessions
       },
@@ -230,7 +230,7 @@ export class SessionService {
     expiredSessions: number;
   }> {
     const now = new Date();
-    
+
     const [totalActiveSessions, expiredSessions] = await Promise.all([
       this.sessionRepository.count({
         where: { expiresAt: MoreThan(now) },

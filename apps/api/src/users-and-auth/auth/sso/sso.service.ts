@@ -28,13 +28,13 @@ export class SSOService {
     private samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
     private licenseService: LicenseService,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   public async getAllProviders(): Promise<SSOProvider[]> {
     const providers = await this.ssoProviderRepository.find({
       relations: ['oidcConfiguration', 'samlConfiguration'],
     });
-    await Promise.all(providers.map((provider) => this.hydrateProviderSecrets(provider)));
+    providers.forEach((provider) => this.decryptProviderSecrets(provider));
     return providers;
   }
 
@@ -48,11 +48,14 @@ export class SSOService {
       throw new SSOProviderNotFoundException();
     }
 
-    await this.hydrateProviderSecrets(provider);
+    this.decryptProviderSecrets(provider);
     return provider;
   }
 
-  public getProviderByTypeAndIdWithConfiguration(ssoType: SSOProviderType, providerId: number): Promise<SSOProvider> {
+  public async getProviderByTypeAndIdWithConfiguration(
+    ssoType: SSOProviderType,
+    providerId: number
+  ): Promise<SSOProvider | null> {
     const relations: string[] = [];
 
     if (ssoType === SSOProviderType.OIDC) {
@@ -63,13 +66,14 @@ export class SSOService {
       relations.push('samlConfiguration');
     }
 
-    return this.ssoProviderRepository.findOne({
+    const provider = await this.ssoProviderRepository.findOne({
       where: { type: ssoType, id: providerId },
       relations,
-    }).then(async (provider) => {
-      await this.hydrateProviderSecrets(provider);
-      return provider;
     });
+    if (provider) {
+      this.decryptProviderSecrets(provider);
+    }
+    return provider;
   }
 
   public async createProvider(createDto: CreateSSOProviderDto): Promise<SSOProvider> {
@@ -104,7 +108,12 @@ export class SSOService {
         throw new BadRequestException(`Unsupported SSO provider type: ${createDto.type}`);
     }
 
-    return this.getProviderByTypeAndIdWithConfiguration(savedProvider.type, savedProvider.id);
+    const provider = await this.getProviderByTypeAndIdWithConfiguration(
+      savedProvider.type,
+      savedProvider.id
+    );
+    if (!provider) throw new BadRequestException('Provider not found after create');
+    return provider;
   }
 
   public async updateProvider(id: number, updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
@@ -122,7 +131,9 @@ export class SSOService {
       await this.ssoProviderRepository.update(provider.id, { name: updateDto.name });
     }
 
-    return this.getProviderByTypeAndIdWithConfiguration(provider.type, provider.id);
+    const updated = await this.getProviderByTypeAndIdWithConfiguration(provider.type, provider.id);
+    if (!updated) throw new BadRequestException('Provider not found after update');
+    return updated;
   }
 
   public async deleteProvider(id: number): Promise<void> {
@@ -275,45 +286,24 @@ export class SSOService {
     return this.samlConfigRepository.findOne({ where: { ssoProviderId: providerId } });
   }
 
-  private async hydrateProviderSecrets(provider?: SSOProvider | null): Promise<void> {
+  /**
+   * Decrypts provider secrets in place for use in the app. Assumes stored values
+   * are already encrypted (see migration EncryptSensitiveData).
+   */
+  private decryptProviderSecrets(provider?: SSOProvider | null): void {
     if (!provider) {
       return;
     }
-
-    await Promise.all([
-      this.hydrateOidcSecret(provider.oidcConfiguration),
-      this.hydrateSamlProvisioningSecret(provider.samlConfiguration),
-    ]);
-  }
-
-  private async hydrateOidcSecret(config?: SSOProviderOIDCConfiguration | null): Promise<void> {
-    if (!config?.clientSecret) {
-      return;
+    if (provider.oidcConfiguration?.clientSecret) {
+      provider.oidcConfiguration.clientSecret =
+        this.encryptionService.decryptIfEncrypted(provider.oidcConfiguration.clientSecret) ??
+        provider.oidcConfiguration.clientSecret;
     }
-
-    if (this.encryptionService.isEncrypted(config.clientSecret)) {
-      config.clientSecret = this.encryptionService.decrypt(config.clientSecret);
-      return;
+    if (provider.samlConfiguration?.provisioningSecret) {
+      provider.samlConfiguration.provisioningSecret =
+        this.encryptionService.decryptIfEncrypted(provider.samlConfiguration.provisioningSecret) ??
+        provider.samlConfiguration.provisioningSecret;
     }
-
-    const plaintext = config.clientSecret;
-    const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.oidcConfigRepository.update(config.id, { clientSecret: encrypted });
-  }
-
-  private async hydrateSamlProvisioningSecret(config?: SSOProviderSAMLConfiguration | null): Promise<void> {
-    if (!config?.provisioningSecret) {
-      return;
-    }
-
-    if (this.encryptionService.isEncrypted(config.provisioningSecret)) {
-      config.provisioningSecret = this.encryptionService.decrypt(config.provisioningSecret);
-      return;
-    }
-
-    const plaintext = config.provisioningSecret;
-    const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.samlConfigRepository.update(config.id, { provisioningSecret: encrypted });
   }
 
   private normalizeCertificate(cert: string): string {

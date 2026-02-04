@@ -11,14 +11,14 @@ export class MqttServerService {
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   /**
    * Get all MQTT servers
    */
   async findAll(): Promise<MqttServer[]> {
     const servers = await this.mqttServerRepository.find();
-    await Promise.all(servers.map((server) => this.hydrateServerSecret(server)));
+    servers.forEach((server) => this.decryptServerPassword(server));
     return servers;
   }
 
@@ -34,7 +34,7 @@ export class MqttServerService {
       throw new NotFoundException(`MQTT server with ID ${id} not found`);
     }
 
-    await this.hydrateServerSecret(server);
+    this.decryptServerPassword(server);
     return server;
   }
 
@@ -70,18 +70,13 @@ export class MqttServerService {
     await this.mqttServerRepository.remove(server);
   }
 
-  private async hydrateServerSecret(server: MqttServer): Promise<void> {
-    if (!server.password) {
-      return;
+  /**
+   * Decrypts password in place for use in the app. Assumes stored values are
+   * already encrypted (see migration EncryptSensitiveData).
+   */
+  private decryptServerPassword(server: MqttServer): void {
+    if (server.password) {
+      server.password = this.encryptionService.decryptIfEncrypted(server.password) ?? server.password;
     }
-
-    if (this.encryptionService.isEncrypted(server.password)) {
-      server.password = this.encryptionService.decrypt(server.password);
-      return;
-    }
-
-    const plaintext = server.password;
-    const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.mqttServerRepository.update(server.id, { password: encrypted });
   }
 }
