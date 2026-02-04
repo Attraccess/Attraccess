@@ -47,7 +47,9 @@ claim that contains the Authentik group names.
 3. Choose `OAuth2/OIDC` as the provider type.
 4. In the provider configuration, add the `attraccess-roles` mapping under
    **Scope mappings**.
-5. Save. Make sure `openid`, `email`, and `profile` are requested scopes.
+5. In **Redirect URIs**, enable regex matching and use a pattern like:
+   `^http://localhost:3000/api/auth/sso/OIDC/1/callback(\\?.*)?$` (replace host and provider ID).
+6. Save. Make sure `openid`, `email`, and `profile` are requested scopes.
 
 You can use the app slug later for Attraccess auto-discovery.
 
