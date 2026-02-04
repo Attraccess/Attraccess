@@ -25,8 +25,6 @@ export class SettingsStoreService {
   async getPlainSetting(
     parent: string,
     key: string,
-    fallback: string | null,
-    persistFallback: boolean,
   ): Promise<string | null> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
@@ -39,21 +37,13 @@ export class SettingsStoreService {
       this.setCache(cacheKey, existing.value, true);
       return existing.value;
     }
-
-    const normalizedFallback = this.normalizeString(fallback);
-    if (normalizedFallback && persistFallback) {
-      await this.upsertSetting(parent, key, normalizedFallback);
-    }
-
-    this.setCache(cacheKey, normalizedFallback ?? null, !!normalizedFallback);
-    return normalizedFallback ?? null;
+    this.setCache(cacheKey, null, false);
+    return null;
   }
 
   async getSecretSetting(
     parent: string,
     key: string,
-    fallback: string | null,
-    persistFallback: boolean,
   ): Promise<{ value: string | null; configured: boolean }> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
@@ -67,16 +57,6 @@ export class SettingsStoreService {
       this.setCache(cacheKey, decrypted, true);
       return { value: decrypted, configured: true };
     }
-
-    const normalizedFallback = this.normalizeString(fallback);
-    if (normalizedFallback) {
-      if (persistFallback) {
-        await this.upsertSetting(parent, key, this.encryptionService.encrypt(normalizedFallback));
-      }
-      this.setCache(cacheKey, normalizedFallback, true);
-      return { value: normalizedFallback, configured: true };
-    }
-
     this.setCache(cacheKey, null, false);
     return { value: null, configured: false };
   }

@@ -92,21 +92,16 @@ export class SmtpSettingsService {
   }
 
   private async getInternalSettings(): Promise<SmtpSettingsInternal> {
-    const serviceRaw = await this.settingsStore.getPlainSetting(
-      SMTP_PARENT,
-      SMTP_KEYS.service,
-      process.env.SMTP_SERVICE ?? null,
-      true,
-    );
+    const serviceRaw = await this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.service);
     const service = this.normalizeService(serviceRaw);
 
     const [host, portRaw, secureRaw, user, from, pass] = await Promise.all([
-      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.host, process.env.SMTP_HOST ?? null, true),
-      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.port, process.env.SMTP_PORT ?? null, true),
-      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.secure, process.env.SMTP_SECURE ?? null, true),
-      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.user, process.env.SMTP_USER ?? null, true),
-      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.from, process.env.SMTP_FROM ?? null, true),
-      this.settingsStore.getSecretSetting(SMTP_PARENT, SMTP_KEYS.pass, process.env.SMTP_PASS ?? null, true),
+      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.host),
+      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.port),
+      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.secure),
+      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.user),
+      this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.from),
+      this.settingsStore.getSecretSetting(SMTP_PARENT, SMTP_KEYS.pass),
     ]);
 
     return {

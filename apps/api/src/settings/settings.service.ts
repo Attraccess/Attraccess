@@ -8,15 +8,16 @@ import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
-import { AppSettingsService } from './app-settings.service';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
+import { APP_KEYS, APP_PARENT } from './constants';
+import { SettingsStoreService } from './settings-store.service';
 
 @Injectable()
 export class SettingsService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly appSettingsService: AppSettingsService,
+    private readonly settingsStore: SettingsStoreService,
     private readonly smtpSettingsService: SmtpSettingsService,
   ) {}
 
@@ -26,7 +27,7 @@ export class SettingsService {
   }
 
   async getSystemSettings(): Promise<SystemSettingsDto> {
-    const [app, smtp] = await Promise.all([this.appSettingsService.getSettings(), this.smtpSettingsService.getSettings()]);
+    const [app, smtp] = await Promise.all([this.getAppSettings(), this.smtpSettingsService.getSettings()]);
     return { app, smtp };
   }
 
@@ -41,11 +42,34 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    return this.appSettingsService.getSettings();
+    const [frontendUrl, backendUrl, publicInternetUrl, licenseKey] = await Promise.all([
+      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.frontendUrl),
+      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.backendUrl),
+      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
+      this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
+    ]);
+
+    return {
+      frontendUrl,
+      backendUrl,
+      publicInternetUrl,
+      licenseKeyConfigured: licenseKey.configured,
+    };
   }
 
   async updateAppSettings(update: UpdateAppSettingsDto): Promise<void> {
-    return this.appSettingsService.updateSettings(update);
+    if (Object.prototype.hasOwnProperty.call(update, 'frontendUrl')) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.frontendUrl, update.frontendUrl ?? null);
+    }
+    if (Object.prototype.hasOwnProperty.call(update, 'backendUrl')) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.backendUrl, update.backendUrl ?? null);
+    }
+    if (Object.prototype.hasOwnProperty.call(update, 'publicInternetUrl')) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl, update.publicInternetUrl ?? null);
+    }
+    if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
+      await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
+    }
   }
 
   async getSmtpSettings(): Promise<SmtpSettingsDto> {
@@ -57,19 +81,20 @@ export class SettingsService {
   }
 
   async getFrontendUrl(): Promise<string | null> {
-    return this.appSettingsService.getFrontendUrl();
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.frontendUrl);
   }
 
   async getBackendUrl(): Promise<string | null> {
-    return this.appSettingsService.getBackendUrl();
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.backendUrl);
   }
 
   async getPublicInternetUrl(): Promise<string | null> {
-    return this.appSettingsService.getPublicInternetUrl();
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl);
   }
 
   async getLicenseKey(): Promise<string | null> {
-    return this.appSettingsService.getLicenseKey();
+    const licenseKey = await this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey);
+    return licenseKey.value;
   }
 
   async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
