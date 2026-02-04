@@ -13,13 +13,14 @@ import {
   NodeTypes,
   NodeProps,
 } from '@xyflow/react';
-import { ResourceFlowLog, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
+import { ResourceFlowLog, ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from './liveLogs';
 import { AttraccessNode } from './node';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
+import { SubFlowSummary, useSubFlows } from '../../../subflows/api';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
 
@@ -42,19 +43,27 @@ interface FlowContextType {
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;
+  subFlows: SubFlowSummary[];
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
 
 interface FlowProviderProps {
   children: ReactNode;
-  resourceId: number;
+  resourceId?: number;
+  nodeSchemas?: ResourceFlowNodeSchemaDto[];
+  mode?: 'resource' | 'subflow';
 }
 
-export function FlowProvider({ children, resourceId }: FlowProviderProps) {
+export function FlowProvider({ children, resourceId, nodeSchemas: nodeSchemasOverride, mode = 'resource' }: FlowProviderProps) {
+  const isResourceMode = mode === 'resource';
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useResourcesServiceGetOneResourceById(
+    { id: resourceId ?? 0 },
+    undefined,
+    { enabled: isResourceMode && Number.isFinite(resourceId) },
+  );
 
   const { t: tNodeTranslations } = useTranslations({
     de: nodesDeTranslations,
@@ -117,11 +126,18 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   }, []);
 
   const { liveLogs } = useLiveLogs({
-    resourceId,
+    resourceId: resourceId ?? 0,
     onUpdate: publishLiveLog,
+    enabled: isResourceMode && Number.isFinite(resourceId),
   });
 
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+  const { data: nodeSchemasFromApi } = useResourceFlowsServiceGetNodeSchemas(
+    { resourceId: resourceId ?? 0 },
+    undefined,
+    { enabled: isResourceMode && Number.isFinite(resourceId) && !nodeSchemasOverride },
+  );
+  const nodeSchemas = nodeSchemasOverride ?? nodeSchemasFromApi;
+  const { data: subFlows } = useSubFlows({ enabled: isResourceMode });
   const flowNodeTypes = useMemo(() => {
     if (!nodeSchemas) {
       return {};
@@ -149,7 +165,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       removeNode,
       setNodes,
       setEdges,
-      resourceId,
+      resourceId: resourceId ?? 0,
       resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
       resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
       resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
@@ -157,6 +173,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      subFlows: subFlows ?? [],
     }),
     [
       nodes,
@@ -177,6 +194,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      subFlows,
     ],
   );
 

@@ -30,6 +30,7 @@ import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
+import { SubFlowEditorPage, SubFlowsListPage } from '../subflows';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -66,6 +67,16 @@ const coreRoutes: RouteConfig[] = [
     path: '/resources/:id/flows',
     element: <FlowsPage />,
     authRequired: true,
+  },
+  {
+    path: '/flows/subflows',
+    element: <SubFlowsListPage />,
+    authRequired: 'canManageResources',
+  },
+  {
+    path: '/flows/subflows/:subFlowId',
+    element: <SubFlowEditorPage />,
+    authRequired: 'canManageResources',
   },
   {
     path: '/resources/:id/forms',

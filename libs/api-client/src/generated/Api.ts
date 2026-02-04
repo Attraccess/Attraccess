@@ -30,16 +30,19 @@ export enum ResourceFlowNodeType {
   InputResourceDoorUnlatched = "input.resource.door.unlatched",
   InputMqttMessageReceived = "input.mqtt.message.received",
   InputResourceActivityNoActivity = "input.resource.activity.no-activity",
+  InputSubflow = "input.subflow",
   OutputHttpSendRequest = "output.http.sendRequest",
   OutputMqttSendMessage = "output.mqtt.sendMessage",
   OutputResourceBillingCalculationSetAdditionalItems = "output.resource.billing.calculation.set-additional-items",
   OutputResourceUsageEndSession = "output.resource.usage.end-session",
   OutputResourceActivityTrackActivity = "output.resource.activity.track-activity",
+  OutputSubflow = "output.subflow",
   ProcessingWait = "processing.wait",
   ProcessingIf = "processing.if",
   ProcessingSetPayload = "processing.set-payload",
   ProcessingMqttWaitForMessage = "processing.mqtt.waitForMessage",
   ProcessingError = "processing.error",
+  ProcessingSubflow = "processing.subflow",
 }
 
 /** The status of the transaction */

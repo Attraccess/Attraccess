@@ -123,6 +123,21 @@
             }
           }
         }
+      },
+      "subflow": {
+        "title": "Sub-Flow Eingang",
+        "description": "Einstiegspunkt für einen Sub-Flow.",
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "name": "Handle"
+        },
+        "config": {
+          "name": {
+            "label": "Handle-Name"
+          }
+        }
       }
     },
     "processing": {
@@ -233,6 +248,34 @@
             "items": {
               "key": { "label": "Schlüssel (Pfad)" },
               "value": { "label": "Wert-Template" }
+            }
+          }
+        }
+      },
+      "subflow": {
+        "title": "Sub-Flow",
+        "description": "Einen wiederverwendbaren Sub-Flow ausführen.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "outputs": {
+          "output": "Ausgabe"
+        },
+        "preview": {
+          "subFlow": "Sub-Flow",
+          "mappings": "Zuordnungen"
+        },
+        "config": {
+          "subFlowId": {
+            "label": "Sub-Flow"
+          },
+          "inputMappings": {
+            "label": "Input-Zuordnungen",
+            "empty": "Keine Zuordnungen konfiguriert.",
+            "add": "Zuordnung hinzufügen",
+            "items": {
+              "key": { "label": "Input-Schlüssel (Pfad)" },
+              "value": { "label": "Input-Wert-Template" }
             }
           }
         }
@@ -386,6 +429,21 @@
             "outputs": {
               "output": "Ausgabe"
             }
+          }
+        }
+      },
+      "subflow": {
+        "title": "Sub-Flow Ausgang",
+        "description": "Ausgabe eines Sub-Flows mit benanntem Ausgang.",
+        "inputs": {
+          "input": "Eingabe"
+        },
+        "preview": {
+          "name": "Handle"
+        },
+        "config": {
+          "name": {
+            "label": "Handle-Name"
           }
         }
       }

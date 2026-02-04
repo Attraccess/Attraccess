@@ -15,6 +15,7 @@ import {
   Textarea,
 } from '@heroui/react';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
+import { SubFlowSelect } from '../../../../../../../components/subFlowSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
@@ -35,7 +36,7 @@ export interface Property<TValue> {
   stringVariant?: 'multiline';
   exclusiveMinimum?: number;
   maximum?: number;
-  selectFromEntity?: 'mqttServer';
+  selectFromEntity?: 'mqttServer' | 'subFlow';
   selectFromEntityProperty?: string;
   overrideWithInput?: string;
   isCurrency?: boolean;
@@ -148,6 +149,19 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           </ModalContent>
         </Modal>
       </>
+    );
+  }
+
+  if (schema.selectFromEntity === 'subFlow') {
+    return (
+      <SubFlowSelect
+        selectedId={value as number}
+        onSelectionChange={(newValue) => onChange(newValue as TValue)}
+        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+        isRequired={isRequired}
+        description={description}
+        className="w-full"
+      />
     );
   }
 

@@ -1,0 +1,27 @@
+{
+  "list": {
+    "title": "Sub-flows",
+    "subtitle": "Reusable building blocks for resource flows.",
+    "create": "Create sub-flow",
+    "emptyTitle": "No sub-flows yet",
+    "emptyDescription": "Create one to reuse flow logic across resources.",
+    "inputs": "Inputs: {{count}}",
+    "outputs": "Outputs: {{count}}",
+    "updated": "Updated",
+    "createError": "Failed to create sub-flow"
+  },
+  "create": {
+    "title": "Create sub-flow",
+    "name": "Name",
+    "description": "Description",
+    "cancel": "Cancel",
+    "confirm": "Create"
+  },
+  "editor": {
+    "title": "{{name}}",
+    "subtitle": "Edit nodes, inputs, and outputs.",
+    "name": "Name",
+    "description": "Description",
+    "saveError": "Failed to save sub-flow"
+  }
+}

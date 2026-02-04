@@ -22,6 +22,7 @@
         "plugins": "Plugins",
         "emailTemplates": "E-Mail-Vorlagen",
         "mqttServers": "MQTT-Server",
+        "subFlows": "Sub-Flows",
         "csvExport": "CSV-Export",
         "balena": "Balena"
       }

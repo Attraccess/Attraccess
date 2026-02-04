@@ -9,6 +9,9 @@ import {
   ResourceFlowLog,
   ResourceFlowEdge,
   BillingTransactionItem,
+  ResourceSubFlow,
+  ResourceSubFlowEdge,
+  ResourceSubFlowNode,
   ResourceType,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
@@ -44,6 +47,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let flowEdgeRepository: Partial<Repository<Edge>>;
   let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
   let resourceRepository: Partial<Repository<Resource>>;
+  let subFlowRepository: Partial<Repository<ResourceSubFlow>>;
+  let subFlowNodeRepository: Partial<Repository<ResourceSubFlowNode>>;
+  let subFlowEdgeRepository: Partial<Repository<ResourceSubFlowEdge>>;
   let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
@@ -107,6 +113,19 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       })),
     } as unknown as Repository<Resource>;
 
+    subFlowRepository = {
+      findOne: jest.fn(async () => null),
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlow>;
+
+    subFlowNodeRepository = {
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlowNode>;
+
+    subFlowEdgeRepository = {
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlowEdge>;
+
     configService = {
       get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
     } as unknown as ConfigService;
@@ -136,6 +155,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
       flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
+      subFlowRepository as Repository<ResourceSubFlow>,
+      subFlowNodeRepository as Repository<ResourceSubFlowNode>,
+      subFlowEdgeRepository as Repository<ResourceSubFlowEdge>,
       configService as ConfigService,
       mqttClientService,
       resourceUsageService,
@@ -508,6 +530,9 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
   let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
   let resourceRepository: Partial<Repository<Resource>>;
+  let subFlowRepository: Partial<Repository<ResourceSubFlow>>;
+  let subFlowNodeRepository: Partial<Repository<ResourceSubFlowNode>>;
+  let subFlowEdgeRepository: Partial<Repository<ResourceSubFlowEdge>>;
   let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
@@ -565,6 +590,19 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       })),
     } as unknown as Repository<Resource>;
 
+    subFlowRepository = {
+      findOne: jest.fn(async () => null),
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlow>;
+
+    subFlowNodeRepository = {
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlowNode>;
+
+    subFlowEdgeRepository = {
+      find: jest.fn(async () => []),
+    } as unknown as Repository<ResourceSubFlowEdge>;
+
     configService = {
       get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
     } as unknown as ConfigService;
@@ -593,6 +631,9 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
       flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
+      subFlowRepository as Repository<ResourceSubFlow>,
+      subFlowNodeRepository as Repository<ResourceSubFlowNode>,
+      subFlowEdgeRepository as Repository<ResourceSubFlowEdge>,
       configService as ConfigService,
       mqttClientService,
       resourceUsageService,

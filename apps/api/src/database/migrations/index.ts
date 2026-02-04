@@ -87,6 +87,7 @@ export * from './1765137500352-sso-email-auto-verified';
 export * from './1765925113481-improved-sso-linking';
 export * from './1766141166000-resource-usage-session-finalization';
 export * from './1766157134415-resource-inactivity-tracking';
+export * from './1770160018000-sub-flows';
 export * from './1766580562460-attractap-capabilities';
 export * from './1768836210283-resource-metadata';
 export * from './1768741974728-add-user-soft-delete';

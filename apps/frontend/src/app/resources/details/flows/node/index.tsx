@@ -1,4 +1,4 @@
-import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { ResourceFlowLogType, ResourceFlowNodeSchemaDto, ResourceFlowNodeType } from '@attraccess/react-query-client';
 import { NodeProps } from '@xyflow/react';
 import { Button, Card, CardBody, CardHeader, cn, Code, Tooltip, useDisclosure } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
@@ -64,7 +64,7 @@ export function AttraccessNode(props: Props) {
     [nodeId],
   );
 
-  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode } = useFlowContext();
+  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, subFlows } = useFlowContext();
 
   useEffect(() => {
     if (!nodeId || previewMode) {
@@ -101,13 +101,34 @@ export function AttraccessNode(props: Props) {
     });
   }, [processingState, schema]);
 
+  const nodeData = props.node?.data as Record<string, unknown> | undefined;
+  const subFlowId = nodeData?.subFlowId as number | undefined;
+  const subFlow = useMemo(() => subFlows.find((flow) => flow.id === subFlowId), [subFlows, subFlowId]);
+
+  const effectiveInputs = useMemo(() => {
+    if (schema.type === ResourceFlowNodeType.PROCESSING_SUBFLOW) {
+      return subFlow?.inputs ?? schema.inputs;
+    }
+    return schema.inputs;
+  }, [schema, subFlow]);
+
+  const effectiveOutputs = useMemo(() => {
+    if (schema.type === ResourceFlowNodeType.PROCESSING_SUBFLOW) {
+      return subFlow?.outputs ?? schema.outputs;
+    }
+    return schema.outputs;
+  }, [schema, subFlow]);
+
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
-    return schema.inputs.map((inputName, index) => {
-      const totalHandles = schema.inputs.length;
+    return effectiveInputs.map((inputName, index) => {
+      const totalHandles = effectiveInputs.length;
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: inputName,
-        label: t('nodes.' + schema.type + '.inputs.' + inputName),
+        label:
+          schema.type === ResourceFlowNodeType.PROCESSING_SUBFLOW
+            ? inputName
+            : t('nodes.' + schema.type + '.inputs.' + inputName),
         style: {
           left: `${leftPercentage}%`,
           top: '-15px',
@@ -115,15 +136,18 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [effectiveInputs, schema, t]);
 
   const sourceHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
-    return schema.outputs.map((outputName, index) => {
-      const totalHandles = schema.outputs.length;
+    return effectiveOutputs.map((outputName, index) => {
+      const totalHandles = effectiveOutputs.length;
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: outputName,
-        label: t('nodes.' + schema.type + '.outputs.' + outputName),
+        label:
+          schema.type === ResourceFlowNodeType.PROCESSING_SUBFLOW
+            ? outputName
+            : t('nodes.' + schema.type + '.outputs.' + outputName),
         style: {
           left: `${leftPercentage}%`,
           bottom: '-15px',
@@ -131,7 +155,7 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [effectiveOutputs, schema, t]);
 
   const isEditable = useMemo(() => {
     if (previewMode) {

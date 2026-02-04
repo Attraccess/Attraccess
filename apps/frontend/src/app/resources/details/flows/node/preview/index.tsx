@@ -2,6 +2,7 @@ import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, ResourceFlowNodeType } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
+import { useFlowContext } from '../../flowContext';
 
 interface Props {
   tNodeTranslations: TFunction;
@@ -17,9 +18,22 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
   const { tNodeTranslations: t, schema } = props;
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
+  const { subFlows } = useFlowContext();
 
   return useMemo(() => {
-    switch (schema.type) {
+    const subFlowId = nodeData?.data?.subFlowId as number | undefined;
+    const subFlow = subFlows.find((flow) => flow.id === subFlowId);
+    const nodeType = schema.type as string;
+
+    switch (nodeType) {
+      case ResourceFlowNodeType.INPUT_SUBFLOW:
+        return [
+          {
+            label: t('nodes.input.subflow.preview.name'),
+            value: nodeData?.data.name as string,
+          },
+        ];
+
       case ResourceFlowNodeType.INPUT_BUTTON:
         return [
           {
@@ -102,6 +116,20 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
         ];
       }
 
+      case ResourceFlowNodeType.PROCESSING_SUBFLOW: {
+        const mappings = (nodeData?.data.inputMappings as Array<{ key: string; value: string }>) ?? [];
+        return [
+          {
+            label: t('nodes.processing.subflow.preview.subFlow'),
+            value: subFlow?.name ?? String(subFlowId ?? ''),
+          },
+          {
+            label: t('nodes.processing.subflow.preview.mappings'),
+            value: String(mappings.length),
+          },
+        ];
+      }
+
       case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS:
         return [
           {
@@ -141,10 +169,16 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
         return [];
 
-      default: {
-        const exhaustiveCheck: never = schema.type;
-        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-      }
+      case ResourceFlowNodeType.OUTPUT_SUBFLOW:
+        return [
+          {
+            label: t('nodes.output.subflow.preview.name'),
+            value: nodeData?.data.name as string,
+          },
+        ];
+
+      default:
+        throw new Error(`Unknown node type: ${schema.type}`);
     }
-  }, [schema, t, nodeData]);
+  }, [schema, t, nodeData, subFlows]);
 }

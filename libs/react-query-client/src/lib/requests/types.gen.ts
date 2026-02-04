@@ -2324,16 +2324,19 @@ export enum ResourceFlowNodeType {
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
     INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
     INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+    INPUT_SUBFLOW = 'input.subflow',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
     OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
     OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
+    OUTPUT_SUBFLOW = 'output.subflow',
     PROCESSING_WAIT = 'processing.wait',
     PROCESSING_IF = 'processing.if',
     PROCESSING_SET_PAYLOAD = 'processing.set-payload',
     PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
-    PROCESSING_ERROR = 'processing.error'
+    PROCESSING_ERROR = 'processing.error',
+    PROCESSING_SUBFLOW = 'processing.subflow'
 }
 
 export type ResourceFlowNodeSchemaDto = {

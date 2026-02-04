@@ -3507,7 +3507,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'input.subflow', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'output.subflow', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'processing.subflow'],
     description: 'The name of the node type'
 } as const;
 

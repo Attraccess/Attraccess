@@ -14,16 +14,19 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
   INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
   INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+  INPUT_SUBFLOW = 'input.subflow',
   OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
   OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
   OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
+  OUTPUT_SUBFLOW = 'output.subflow',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
   PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
   PROCESSING_ERROR = 'processing.error',
+  PROCESSING_SUBFLOW = 'processing.subflow',
 }
 
 // Zod schemas for node data validation
@@ -44,6 +47,11 @@ export const HttpRequestNodeDataSchema = z.object({
 
 const MqttServerIdSchema = z.number().int().positive().meta({
   selectFromEntity: 'mqttServer',
+  entityProperty: 'id',
+});
+
+const SubFlowIdSchema = z.number().int().positive().meta({
+  selectFromEntity: 'subFlow',
   entityProperty: 'id',
 });
 
@@ -117,6 +125,28 @@ export const SetPayloadNodeDataSchema = z.object({
     .default([]),
 });
 
+export const SubFlowInputNodeDataSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+});
+
+export const SubFlowOutputNodeDataSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+});
+
+export const SubFlowNodeDataSchema = z.object({
+  subFlowId: SubFlowIdSchema,
+  inputMappings: z
+    .array(
+      z.object({
+        key: z.string().min(1, 'Key is required'),
+        value: z.string().optional().default('').meta({
+          stringVariant: 'multiline',
+        }),
+      }),
+    )
+    .default([]),
+});
+
 export const MqttWaitForMessageNodeDataSchema = z.object({
   serverId: MqttServerIdSchema,
   topic: z.string().min(1, 'Topic is required'),
@@ -159,6 +189,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
       return InputResourceActivityNoActivityNodeDataSchema;
 
+    case ResourceFlowNodeType.INPUT_SUBFLOW:
+      return SubFlowInputNodeDataSchema;
+
     case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
       return BillingTransactionItemCreateSchema;
 
@@ -167,6 +200,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
       return MqttSendMessageNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_SUBFLOW:
+      return SubFlowOutputNodeDataSchema;
 
     case ResourceFlowNodeType.PROCESSING_WAIT:
       return WaitNodeDataSchema;
@@ -182,6 +218,9 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
 
     case ResourceFlowNodeType.PROCESSING_ERROR:
       return ErrorNodeDataSchema;
+
+    case ResourceFlowNodeType.PROCESSING_SUBFLOW:
+      return SubFlowNodeDataSchema;
 
     case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
       return ResourceUsageEndSessionNodeDataSchema;

@@ -123,6 +123,21 @@
             }
           }
         }
+      },
+      "subflow": {
+        "title": "Sub-flow input",
+        "description": "Entry point for a sub-flow.",
+        "outputs": {
+          "output": "Output"
+        },
+        "preview": {
+          "name": "Handle"
+        },
+        "config": {
+          "name": {
+            "label": "Handle name"
+          }
+        }
       }
     },
     "processing": {
@@ -233,6 +248,34 @@
             "items": {
               "key": { "label": "Key (path)" },
               "value": { "label": "Value template" }
+            }
+          }
+        }
+      },
+      "subflow": {
+        "title": "Sub-flow",
+        "description": "Invoke a reusable sub-flow.",
+        "inputs": {
+          "input": "Input"
+        },
+        "outputs": {
+          "output": "Output"
+        },
+        "preview": {
+          "subFlow": "Sub-flow",
+          "mappings": "Mappings"
+        },
+        "config": {
+          "subFlowId": {
+            "label": "Sub-flow"
+          },
+          "inputMappings": {
+            "label": "Input mappings",
+            "empty": "No mappings configured.",
+            "add": "Add mapping",
+            "items": {
+              "key": { "label": "Input key (path)" },
+              "value": { "label": "Input value template" }
             }
           }
         }
@@ -387,6 +430,21 @@
             "outputs": {
               "output": "Output"
             }
+          }
+        }
+      },
+      "subflow": {
+        "title": "Sub-flow output",
+        "description": "Return from a sub-flow with a named output.",
+        "inputs": {
+          "input": "Input"
+        },
+        "preview": {
+          "name": "Handle"
+        },
+        "config": {
+          "name": {
+            "label": "Handle name"
           }
         }
       }

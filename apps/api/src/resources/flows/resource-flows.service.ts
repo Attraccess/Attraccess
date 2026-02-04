@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
   Resource,
   ResourceFlowLog,
+  ResourceSubFlow,
   getNodeDataSchema,
   ResourceFlowNodeType,
   EventNodeDataSchema,
@@ -23,6 +24,9 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  SubFlowNodeDataSchema,
+  SubFlowInputNodeDataSchema,
+  SubFlowOutputNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -60,6 +64,8 @@ export class ResourceFlowsService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceFlowLog)
     private readonly flowLogRepository: Repository<ResourceFlowLog>,
+    @InjectRepository(ResourceSubFlow)
+    private readonly subFlowRepository: Repository<ResourceSubFlow>,
     private readonly mqttClientService: MqttClientService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -136,6 +142,37 @@ export class ResourceFlowsService {
     for (const nodeData of flowData.nodes) {
       const nodeErrors = this.validateNodeData(nodeData);
       allValidationErrors.push(...nodeErrors);
+    }
+
+    const subFlowNodes = flowData.nodes.filter((node) => node.type === ResourceFlowNodeType.PROCESSING_SUBFLOW);
+    if (subFlowNodes.length > 0) {
+      const subFlowReferences = subFlowNodes
+        .map((node) => {
+          const parsed = SubFlowNodeDataSchema.safeParse(node.data);
+          if (!parsed.success) {
+            return null;
+          }
+          return { nodeId: node.id, subFlowId: parsed.data.subFlowId };
+        })
+        .filter((entry): entry is { nodeId: string; subFlowId: number } => Boolean(entry));
+
+      const uniqueIds = Array.from(new Set(subFlowReferences.map((ref) => ref.subFlowId)));
+      if (uniqueIds.length > 0) {
+        const existing = await this.subFlowRepository.find({ where: { id: In(uniqueIds) } });
+        const existingIds = new Set(existing.map((subFlow) => subFlow.id));
+
+        subFlowReferences.forEach((ref) => {
+          if (!existingIds.has(ref.subFlowId)) {
+            allValidationErrors.push({
+              nodeId: ref.nodeId,
+              nodeType: ResourceFlowNodeType.PROCESSING_SUBFLOW,
+              field: 'subFlowId',
+              message: `Referenced sub-flow does not exist: ${ref.subFlowId}`,
+              value: ref.subFlowId,
+            });
+          }
+        });
+      }
     }
 
     // Start transaction to ensure data consistency
@@ -355,6 +392,12 @@ export class ResourceFlowsService {
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
 
+        case ResourceFlowNodeType.INPUT_SUBFLOW:
+          schema.configSchema = z.toJSONSchema(SubFlowInputNodeDataSchema);
+          schema.outputs = ['output'];
+          schema.supportedByResource = false;
+          break;
+
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
           schema.inputs = ['input'];
@@ -390,6 +433,13 @@ export class ResourceFlowsService {
           schema.isOutput = true;
           break;
 
+        case ResourceFlowNodeType.OUTPUT_SUBFLOW:
+          schema.configSchema = z.toJSONSchema(SubFlowOutputNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.supportedByResource = false;
+          schema.isOutput = true;
+          break;
+
         case ResourceFlowNodeType.PROCESSING_WAIT:
           schema.configSchema = z.toJSONSchema(WaitNodeDataSchema);
           schema.inputs = ['input'];
@@ -421,6 +471,13 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.PROCESSING_ERROR:
           schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema);
           schema.inputs = ['input'];
+          schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_SUBFLOW:
+          schema.configSchema = z.toJSONSchema(SubFlowNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 

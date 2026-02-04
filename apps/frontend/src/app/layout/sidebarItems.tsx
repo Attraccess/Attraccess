@@ -7,6 +7,7 @@ import {
   FileIcon,
   FolderIcon,
   GiftIcon,
+  GitBranchIcon,
   LightbulbIcon,
   LucideProps,
   MailIcon,
@@ -91,6 +92,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           path: '/mqtt/servers',
           translationKey: 'mqttServers',
           icon: ServerIcon,
+        },
+        {
+          path: '/flows/subflows',
+          translationKey: 'subFlows',
+          icon: GitBranchIcon,
         },
         {
           path: '/plugins',

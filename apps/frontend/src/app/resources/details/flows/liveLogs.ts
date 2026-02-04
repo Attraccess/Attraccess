@@ -5,10 +5,11 @@ import { useState } from 'react';
 interface Props {
   resourceId: number;
   onUpdate: (log: ResourceFlowLog) => void;
+  enabled?: boolean;
 }
 
 export function useLiveLogs(props: Props) {
-  const { resourceId, onUpdate } = props;
+  const { resourceId, onUpdate, enabled = true } = props;
   const [liveLogs, setLiveLogs] = useState<ResourceFlowLog[]>([]);
 
   const { abort } = useSSE<ResourceFlowLog>({
@@ -17,6 +18,7 @@ export function useLiveLogs(props: Props) {
       setLiveLogs((prev) => [...prev, data]);
       onUpdate(data);
     },
+    enabled,
   });
 
   return {

@@ -1,0 +1,27 @@
+{
+  "list": {
+    "title": "Sub-Flows",
+    "subtitle": "Wiederverwendbare Bausteine für Ressourcen-Flows.",
+    "create": "Sub-Flow erstellen",
+    "emptyTitle": "Noch keine Sub-Flows",
+    "emptyDescription": "Erstelle einen, um Flow-Logik wiederzuverwenden.",
+    "inputs": "Eingänge: {{count}}",
+    "outputs": "Ausgänge: {{count}}",
+    "updated": "Aktualisiert",
+    "createError": "Sub-Flow konnte nicht erstellt werden"
+  },
+  "create": {
+    "title": "Sub-Flow erstellen",
+    "name": "Name",
+    "description": "Beschreibung",
+    "cancel": "Abbrechen",
+    "confirm": "Erstellen"
+  },
+  "editor": {
+    "title": "{{name}}",
+    "subtitle": "Knoten, Eingänge und Ausgänge bearbeiten.",
+    "name": "Name",
+    "description": "Beschreibung",
+    "saveError": "Sub-Flow konnte nicht gespeichert werden"
+  }
+}
