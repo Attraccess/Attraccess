@@ -8,7 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
-import { reactCompilerBabelConfig } from '../../tools/react-compiler';
+import { reactCompilerBabelConfig } from '@attraccess/react-compiler';
 import { resolvePwaMaxCacheBytes } from '../../tools/build-config';
 
 const maximumFileSizeToCacheInBytes = resolvePwaMaxCacheBytes(process.env.ATTRACCESS_PWA_MAX_CACHE_BYTES);

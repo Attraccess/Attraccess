@@ -1,0 +1,20 @@
+{
+  "name": "react-compiler",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/react-compiler/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/react-compiler",
+        "tsConfig": "libs/react-compiler/tsconfig.lib.json",
+        "packageJson": "libs/react-compiler/package.json",
+        "main": "libs/react-compiler/src/index.ts",
+        "assets": ["libs/react-compiler/*.md"]
+      }
+    }
+  }
+}

@@ -5,7 +5,7 @@ import dts from 'vite-plugin-dts';
 import * as path from 'path';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
-import { reactCompilerBabelConfig } from '../../tools/react-compiler';
+import { reactCompilerBabelConfig } from '@attraccess/react-compiler';
 
 const sharedLibs = [
   'react',

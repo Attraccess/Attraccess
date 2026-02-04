@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { reactCompilerBabelConfig } from '../../tools/react-compiler';
+import { reactCompilerBabelConfig } from '@attraccess/react-compiler';
 
 export default defineConfig({
   plugins: [react({ babel: reactCompilerBabelConfig }), nxViteTsPaths()],

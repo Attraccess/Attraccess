@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reactCompilerBabelConfig, reactCompilerBabelPlugins } from '../../tools/react-compiler';
+import { reactCompilerBabelConfig, reactCompilerBabelPlugins } from '@attraccess/react-compiler';
 
 describe('react compiler babel config', () => {
   it('includes the react compiler plugin', () => {
