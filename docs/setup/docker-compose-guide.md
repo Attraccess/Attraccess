@@ -98,6 +98,8 @@ Create directories for Attraccess data that will be mapped to the Docker contain
 mkdir -p storage plugins
 ```
 
+The app runs as user `appuser` with fixed UID/GID **10001**. At startup the container sets ownership of `./storage` so the app can write, for both new and existing volumes.
+
 ### Step 4: Customizing Your Configuration
 
 #### Email Configuration
