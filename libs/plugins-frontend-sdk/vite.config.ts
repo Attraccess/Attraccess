@@ -5,7 +5,6 @@ import dts from 'vite-plugin-dts';
 import * as path from 'path';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { reactCompilerBabelConfig } from '../../tools/react-compiler';
 
 const sharedLibs = [
