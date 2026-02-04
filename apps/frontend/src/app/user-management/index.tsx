@@ -89,7 +89,7 @@ export const UserManagementPage: React.FC = () => {
     type?: string | null;
   };
 
-  type UserWithAuthDetails = User & {
+  type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
 
