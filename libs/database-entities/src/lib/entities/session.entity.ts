@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
 
 @Entity()
@@ -18,7 +19,9 @@ export class Session {
   @ApiProperty({
     description: 'The session token',
     example: 'abc123def456...',
+    writeOnly: true,
   })
+  @Exclude()
   token!: string;
 
   @Column({ type: 'int' })
