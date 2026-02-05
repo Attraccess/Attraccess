@@ -110,6 +110,13 @@ export const $User = {
             type: 'string',
             description: 'When the user was soft-deleted'
         },
+        authenticationDetails: {
+            description: 'Authentication details linked to the user',
+            type: 'array',
+            items: {
+                type: 'array'
+            }
+        },
         externalIdentifier: {
             type: 'string',
             description: 'The external (origin) identifier of the user, if the user is authenticated via SSO',
@@ -637,7 +644,8 @@ export const $SSOProviderOIDCConfiguration = {
         clientSecret: {
             type: 'string',
             description: 'The client secret of the provider',
-            example: '1234567890'
+            example: '1234567890',
+            writeOnly: true
         },
         scopes: {
             description: 'Optional list of OIDC scopes to request',
@@ -748,7 +756,8 @@ export const $SSOProviderSAMLConfiguration = {
         provisioningSecret: {
             type: 'string',
             description: 'Shared secret used to authorize SAML provisioning requests',
-            nullable: true
+            nullable: true,
+            writeOnly: true
         },
         permissionMappings: {
             type: 'object',
@@ -766,7 +775,8 @@ export const $SSOProviderSAMLConfiguration = {
         spSigningKeyEncrypted: {
             type: 'string',
             description: 'Encrypted Service Provider private key used for signing AuthnRequests',
-            nullable: true
+            nullable: true,
+            writeOnly: true
         },
         spSigningKeyEncryptionKeyId: {
             type: 'string',
@@ -2263,7 +2273,8 @@ export const $MqttServer = {
         password: {
             type: 'string',
             description: 'Optional authentication password',
-            example: 'password123'
+            example: 'password123',
+            writeOnly: true
         },
         clientId: {
             type: 'string',

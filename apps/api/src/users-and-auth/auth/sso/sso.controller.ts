@@ -163,7 +163,12 @@ export class SSOController {
   async getOneById(@Param('id') id: string): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
     const provider = await this.ssoService.getProviderById(providerId);
-    return this.ssoService.getProviderByTypeAndIdWithConfiguration(provider.type, providerId);
+    const withConfig = await this.ssoService.getProviderByTypeAndIdWithConfiguration(
+      provider.type,
+      providerId
+    );
+    if (!withConfig) throw new SSOProviderNotFoundException();
+    return withConfig;
   }
 
   @Post('providers')

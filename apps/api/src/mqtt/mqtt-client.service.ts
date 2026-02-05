@@ -6,6 +6,7 @@ import * as mqtt from 'mqtt';
 import { MqttClient } from 'mqtt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent } from './mqtt-message.event';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
@@ -18,6 +19,7 @@ export class MqttClientService implements OnModuleDestroy {
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   async onModuleDestroy() {
@@ -65,6 +67,7 @@ export class MqttClientService implements OnModuleDestroy {
     if (!server) {
       throw new Error(`MQTT server with ID ${serverId} not found`);
     }
+    const password = await this.resolveServerPassword(server);
 
     return new Promise((resolve, reject) => {
       const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${server.port}`;
@@ -79,8 +82,8 @@ export class MqttClientService implements OnModuleDestroy {
         options.username = server.username;
       }
 
-      if (server.password) {
-        options.password = server.password;
+      if (password) {
+        options.password = password;
       }
 
       const client = mqtt.connect(url, options);
@@ -147,6 +150,21 @@ export class MqttClientService implements OnModuleDestroy {
         clearTimeout(timeout);
       });
     });
+  }
+
+  private async resolveServerPassword(server: MqttServer): Promise<string | null> {
+    if (!server.password) {
+      return null;
+    }
+
+    if (this.encryptionService.isEncrypted(server.password)) {
+      return this.encryptionService.decrypt(server.password);
+    }
+
+    const plaintext = server.password;
+    const encrypted = this.encryptionService.encrypt(plaintext);
+    await this.mqttServerRepository.update(server.id, { password: encrypted });
+    return plaintext;
   }
 
   async publish(

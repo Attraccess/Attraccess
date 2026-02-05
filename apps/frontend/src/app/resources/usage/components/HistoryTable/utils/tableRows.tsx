@@ -1,5 +1,5 @@
-import { ReactElement } from 'react';
-import { TableCell, Chip } from '@heroui/react';
+import { type ReactElement } from 'react';
+import { TableCell, Chip, type TableCellProps, type TableRowProps } from '@heroui/react';
 import { Resource, ResourceUsage } from '@attraccess/react-query-client';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { DurationDisplay, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -16,8 +16,8 @@ export function generateRowCells(
   showAllUsers: boolean,
   canManageResources: boolean,
   projectCellRenderer?: (session: ResourceUsage) => ReactElement,
-): ReactElement[] {
-  const cells: ReactElement[] = [];
+): TableRowProps<ResourceUsage>['children'] {
+  const cells: ReactElement<TableCellProps>[] = [];
 
   // Only show user cell if we're showing all users (requires canManageResources)
   if (canManageResources && showAllUsers) {

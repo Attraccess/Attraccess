@@ -242,6 +242,8 @@ export interface User {
    * @format date-time
    */
   deletedAt?: string;
+  /** Authentication details linked to the user */
+  authenticationDetails?: any[][];
   /**
    * The external (origin) identifier of the user, if the user is authenticated via SSO
    * @example "1234567890"

@@ -9,7 +9,7 @@ interface FormFieldEditorProps {
   onChange: (field: EditableFormField) => void;
   onRemove: () => void;
   t: (key: string, vars?: Record<string, unknown>) => string;
-  labelInputRef?: React.RefObject<HTMLInputElement>;
+  labelInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 const FIELD_TYPE_OPTIONS: { value: FormFieldType; labelKey: string }[] = [

@@ -40,22 +40,22 @@ If your storage is a **bind mount on the host**, `appuser` does not exist on the
 Use numeric ownership based on the container's `appuser` IDs:
 
 ```
-docker exec <container> id -u appuser
-docker exec <container> id -g appuser
+docker exec <attraccess container id> id -u appuser
+docker exec <attraccess container id> id -g appuser
 chown -R <uid>:<gid> /path/to/storage
 ```
 
 If you want to run it **inside the container**, you must exec as root (no sudo in the image):
 
 ```
-docker exec --user 0 -it <container> sh
+docker exec --user 0 -it <attraccess container id> sh
 chown -R appuser:appuser /app/storage
 ```
 
 For Docker Compose:
 
 ```
-docker compose exec --user 0 api sh
+docker compose exec --user 0 <attraccess container id> sh
 chown -R appuser:appuser /app/storage
 ```
 
@@ -64,3 +64,7 @@ chown -R appuser:appuser /app/storage
 - The `appuser` UID/GID can vary between images unless explicitly pinned.
 - Some storage backends (NFS/SMB) may block ownership changes. Update ownership
   on the storage server or adjust mount options.
+
+### Storage ownership auto-init (current images)
+
+Newer images automatically set ownership of the storage directory at container startup. This applies to both fresh volumes and existing mounts, so you typically do not need to run a manual chown. If you still see permission issues (e.g. NFS/SMB), use the manual fix above.
