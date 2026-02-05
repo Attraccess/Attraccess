@@ -8,6 +8,7 @@ import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
@@ -57,6 +58,7 @@ export class AuthService {
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
     private usersService: UsersService,
+    private readonly tokenHashService: TokenHashService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -203,12 +205,13 @@ export class AuthService {
 
   async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
     const token = nanoid();
+    const storedToken = this.tokenHashService.hashToken(token);
 
     this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
     await this.usersService.updateOne(
       user.id,
       {
-        emailVerificationToken: token,
+        emailVerificationToken: storedToken,
         emailVerificationTokenExpiresAt: addDays(new Date(), 3),
       },
       manager,
@@ -227,7 +230,8 @@ export class AuthService {
       throw new UserEmailInvalidVerificationTokenException();
     }
 
-    if (user.emailVerificationToken !== token) {
+    const expected = this.tokenHashService.hashToken(token);
+    if (user.emailVerificationToken !== expected && user.emailVerificationToken !== token) {
       this.logger.debug(`Invalid verification token for user ID: ${user.id}`);
       throw new UserEmailInvalidVerificationTokenException();
     }
@@ -254,8 +258,9 @@ export class AuthService {
     }
 
     const token = nanoid();
+    const storedToken = this.tokenHashService.hashToken(token);
     await this.usersService.updateOne(user.id, {
-      passwordResetToken: token,
+      passwordResetToken: storedToken,
       passwordResetTokenExpiresAt: addDays(new Date(), 1),
     });
 

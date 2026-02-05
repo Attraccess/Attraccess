@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 
 @Entity()
 export class MqttServer {
@@ -44,7 +45,9 @@ export class MqttServer {
     description: 'Optional authentication password',
     example: 'password123',
     required: false,
+    writeOnly: true,
   })
+  @Exclude()
   password!: string | null;
 
   @Column({ nullable: true, type: 'text' })

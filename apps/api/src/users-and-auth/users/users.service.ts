@@ -29,6 +29,7 @@ import { DataSource, IsNull, QueryFailedError } from 'typeorm';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { addDays } from 'date-fns';
 import { nanoid } from 'nanoid';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -92,6 +93,7 @@ export class UsersService {
     private licenseService: LicenseService,
     private emailService: EmailService,
     private dataSource: DataSource,
+    private readonly tokenHashService: TokenHashService,
   ) {}
 
   public validateUsernameOrThrow(username: string): void {
@@ -695,9 +697,10 @@ export class UsersService {
 
     const token = nanoid();
     const expiresAt = addDays(new Date(), 1);
+    const storedToken = this.tokenHashService.hashToken(token);
 
     await this.userRepository.update(user.id, {
-      deleteAccountToken: token,
+      deleteAccountToken: storedToken,
       deleteAccountTokenExpiresAt: expiresAt,
       deleteAccountRequestedAt: new Date(),
     });
@@ -719,7 +722,8 @@ export class UsersService {
       throw new DeleteAccountTokenInvalidException();
     }
 
-    if (user.deleteAccountToken !== token) {
+    const expected = this.tokenHashService.hashToken(token);
+    if (user.deleteAccountToken !== expected && user.deleteAccountToken !== token) {
       throw new DeleteAccountTokenInvalidException();
     }
 

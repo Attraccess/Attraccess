@@ -8,6 +8,7 @@ import { securelyHashToken } from './websockets/websocket.utils';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttractapFirmwareVersion } from '@attraccess/database-entities';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class AttractapService {
@@ -24,18 +25,24 @@ export class AttractapService {
     private readonly resourceRepository: Repository<Resource>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+    private readonly encryptionService: EncryptionService,
+  ) { }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    return await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
+    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
+    return this.decryptCardKey(card);
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
-    return await this.nfcCardRepository.find({ where: { user: { id: userId } } });
+    const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
+    cards.forEach((card) => this.decryptCardKey(card));
+    return cards;
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
-    return await this.nfcCardRepository.find();
+    const cards = await this.nfcCardRepository.find();
+    cards.forEach((card) => this.decryptCardKey(card));
+    return cards;
   }
 
   public async updateLastReaderConnection(id: number) {
@@ -55,7 +62,8 @@ export class AttractapService {
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    return await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
+    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
+    return this.decryptCardKey(card);
   }
 
   public async createNFCCard(
@@ -67,6 +75,7 @@ export class AttractapService {
 
       return await transactionalEntityManager.save(NFCCard, {
         ...data,
+        key: this.encryptionService.encrypt(data.key),
         user,
         isActive: true,
       });
@@ -243,14 +252,10 @@ export class AttractapService {
       throw new Error(`User with ID ${data.userId} not found`);
     }
 
-    // Generate a secure token if it doesn't exist
-    if (!user.nfcKeySeedToken) {
-      user.nfcKeySeedToken = nanoid(32); // 32 characters = ~192 bits of entropy
-      await this.userRepository.save(user);
-    }
+    const seedToken = await this.resolveNfcKeySeedToken(user);
 
     // Create a secure seed using the user's unique token, key number, and card UID
-    const seed = `${user.nfcKeySeedToken}:${data.keyNo}:${data.cardUID}`;
+    const seed = `${seedToken}:${data.keyNo}:${data.cardUID}`;
 
     // Create a deterministic salt from card UID and key number
     // This ensures the same card+key combination always produces the same salt
@@ -266,5 +271,29 @@ export class AttractapService {
 
     // shrink to 16 bytes
     return new Uint8Array(derivedKey).slice(0, 16);
+  }
+
+  private async resolveNfcKeySeedToken(user: User): Promise<string> {
+    if (!user.nfcKeySeedToken) {
+      const token = nanoid(32); // 32 characters = ~192 bits of entropy
+      user.nfcKeySeedToken = this.encryptionService.encrypt(token);
+      await this.userRepository.save(user);
+      return token;
+    }
+    return (
+      this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken
+    );
+  }
+
+  /**
+   * Decrypts card key in place for use in the app. Assumes stored values are
+   * already encrypted (see migration EncryptSensitiveData).
+   */
+  private decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
+    if (!card?.key) {
+      return card ?? undefined;
+    }
+    card.key = this.encryptionService.decryptIfEncrypted(card.key) ?? card.key;
+    return card;
   }
 }

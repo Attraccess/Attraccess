@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -49,6 +50,12 @@ describe('AuthService', () => {
           provide: SSOService,
           useValue: {
             getProviderById: jest.fn(),
+          },
+        },
+        {
+          provide: TokenHashService,
+          useValue: {
+            hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
         },
       ],
