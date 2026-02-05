@@ -24,7 +24,6 @@ const SMTP_KEYS = {
 const TOKEN_VERSION = 'v1';
 const KEY_LENGTH_BYTES = 32;
 const IV_LENGTH_BYTES = 12;
-const AUTH_TAG_LENGTH_BYTES = 16;
 
 export class SeedSettingsFromEnv1770205070762 implements MigrationInterface {
   name = 'SeedSettingsFromEnv1770205070762';

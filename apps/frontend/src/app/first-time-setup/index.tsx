@@ -98,12 +98,12 @@ export function FirstTimeSetupPage() {
 
     const trimmedLicense = licenseKey.trim();
     if (trimmedLicense) {
-      payload.app!.licenseKey = trimmedLicense;
+      payload.app = { ...payload.app, licenseKey: trimmedLicense };
     }
 
     const trimmedPass = smtpPass.trim();
     if (trimmedPass) {
-      payload.smtp!.pass = trimmedPass;
+      payload.smtp = { ...payload.smtp, pass: trimmedPass };
     }
 
     saveSetup(payload);

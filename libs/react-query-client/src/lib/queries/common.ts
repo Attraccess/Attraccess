@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -121,6 +121,14 @@ export const useEmailTemplatesServiceEmailTemplateControllerFindOneKey = "EmailT
 export const UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn = ({ type }: {
   type: EmailTemplateType;
 }, queryKey?: Array<unknown>) => [useEmailTemplatesServiceEmailTemplateControllerFindOneKey, ...(queryKey ?? [{ type }])];
+export type SettingsServiceGetSystemSettingsDefaultResponse = Awaited<ReturnType<typeof SettingsService.getSystemSettings>>;
+export type SettingsServiceGetSystemSettingsQueryResult<TData = SettingsServiceGetSystemSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetSystemSettingsKey = "SettingsServiceGetSystemSettings";
+export const UseSettingsServiceGetSystemSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetSystemSettingsKey, ...(queryKey ?? [])];
+export type SettingsServiceIsFirstTimeSetupAvailableDefaultResponse = Awaited<ReturnType<typeof SettingsService.isFirstTimeSetupAvailable>>;
+export type SettingsServiceIsFirstTimeSetupAvailableQueryResult<TData = SettingsServiceIsFirstTimeSetupAvailableDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceIsFirstTimeSetupAvailableKey = "SettingsServiceIsFirstTimeSetupAvailable";
+export const UseSettingsServiceIsFirstTimeSetupAvailableKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceIsFirstTimeSetupAvailableKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
@@ -499,6 +507,7 @@ export type TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult = Awaite
 export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.disableTwoFactor>>;
 export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setTwoFactorPolicy>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
+export type SettingsServiceApplyFirstTimeSetupSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.applyFirstTimeSetupSettings>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
 export type ResourcesServiceResourceGroupsAddResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsAddResource>>;
@@ -550,6 +559,7 @@ export type UsersServiceChangeUserUsernameMutationResult = Awaited<ReturnType<ty
 export type UsersServiceChangeUserEmailMutationResult = Awaited<ReturnType<typeof UsersService.changeUserEmail>>;
 export type UsersServiceChangeUserBillingFactorMutationResult = Awaited<ReturnType<typeof UsersService.changeUserBillingFactor>>;
 export type EmailTemplatesServiceEmailTemplateControllerUpdateMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerUpdate>>;
+export type SettingsServiceUpdateSystemSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.updateSystemSettings>>;
 export type AttractapServiceUpdateReaderMutationResult = Awaited<ReturnType<typeof AttractapService.updateReader>>;
 export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<typeof AttractapService.toggleCardActive>>;
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;

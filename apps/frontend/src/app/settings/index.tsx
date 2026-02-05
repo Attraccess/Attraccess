@@ -110,7 +110,7 @@ export function SystemSettingsPage() {
 
     const trimmedLicense = licenseKey.trim();
     if (trimmedLicense) {
-      payload.app!.licenseKey = trimmedLicense;
+      payload.app = { ...payload.app, licenseKey: trimmedLicense };
     }
 
     saveAppSettings(payload);
@@ -137,7 +137,7 @@ export function SystemSettingsPage() {
 
     const trimmedPass = smtpPass.trim();
     if (trimmedPass) {
-      payload.smtp!.pass = trimmedPass;
+      payload.smtp = { ...payload.smtp, pass: trimmedPass };
     }
 
     saveSmtpSettings(payload);
