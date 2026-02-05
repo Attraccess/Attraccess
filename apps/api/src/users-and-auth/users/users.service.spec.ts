@@ -8,6 +8,7 @@ import { UserNotFoundException } from '../../exceptions/user.notFound.exception'
 import { LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -34,6 +35,12 @@ describe('UsersService', () => {
           provide: DataSource,
           useValue: {
             transaction: jest.fn(),
+          },
+        },
+        {
+          provide: TokenHashService,
+          useValue: {
+            hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
         },
         {

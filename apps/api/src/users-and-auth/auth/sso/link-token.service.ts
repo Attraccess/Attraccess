@@ -3,6 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SSOProviderType, Setting } from '@attraccess/database-entities';
+import { EncryptionService } from '../../../encryption/encryption.service';
 
 export interface SSOLinkTokenPayload {
   email: string;
@@ -26,6 +27,7 @@ export class SSOLinkTokenService {
   constructor(
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   async issue(
@@ -95,18 +97,24 @@ export class SSOLinkTokenService {
     });
 
     if (existing?.value) {
-      this.cachedSecret = existing.value;
+      const decrypted = this.encryptionService.decryptIfEncrypted(existing.value) ?? existing.value;
+      if (!this.encryptionService.isEncrypted(existing.value)) {
+        const encrypted = this.encryptionService.encrypt(decrypted);
+        await this.settingRepository.update(existing.id, { value: encrypted });
+      }
+      this.cachedSecret = decrypted;
       this.lastFetchedAt = now;
-      return existing.value;
+      return decrypted;
     }
 
     const generated = randomBytes(64).toString('base64url');
+    const encrypted = this.encryptionService.encrypt(generated);
 
     try {
       await this.settingRepository.insert({
         parent: this.secretParent,
         key: this.secretKey,
-        value: generated,
+        value: encrypted,
       });
       this.cachedSecret = generated;
       this.lastFetchedAt = now;
@@ -119,9 +127,14 @@ export class SSOLinkTokenService {
       });
 
       if (afterInsert?.value) {
-        this.cachedSecret = afterInsert.value;
+        const decrypted = this.encryptionService.decryptIfEncrypted(afterInsert.value) ?? afterInsert.value;
+        if (!this.encryptionService.isEncrypted(afterInsert.value)) {
+          const encryptedAfter = this.encryptionService.encrypt(decrypted);
+          await this.settingRepository.update(afterInsert.id, { value: encryptedAfter });
+        }
+        this.cachedSecret = decrypted;
         this.lastFetchedAt = now;
-        return afterInsert.value;
+        return decrypted;
       }
 
       this.logger.error('SSO link token secret could not be created or retrieved', error as Error);
