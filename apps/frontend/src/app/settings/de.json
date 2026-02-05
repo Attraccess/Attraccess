@@ -9,6 +9,19 @@
     "title": "Einstellungen gespeichert",
     "description": "Deine Änderungen wurden übernommen."
   },
+  "firstTimeSetup": {
+    "title": "Ersteinrichtung",
+    "subtitle": "Konfiguriere deine Instanz, bevor du Benutzer erstellst",
+    "note": "Diese Einstellungen können später von einem Admin geändert werden.",
+    "loading": "Einrichtungsstatus wird geprüft...",
+    "actions": {
+      "save": "Einstellungen speichern"
+    },
+    "success": {
+      "title": "Einrichtung abgeschlossen",
+      "description": "Du kannst jetzt den ersten Benutzer erstellen."
+    }
+  },
   "sections": {
     "app": {
       "title": "Anwendung",

@@ -63,7 +63,7 @@ export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (q
   type: EmailTemplateType;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const prefetchUseSettingsServiceGetSystemSettings = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetSystemSettingsKeyFn(), queryFn: () => SettingsService.getSystemSettings() });
-export const prefetchUseSettingsServiceIsFirstTimeSetupAvailable = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceIsFirstTimeSetupAvailableKeyFn(), queryFn: () => SettingsService.isFirstTimeSetupAvailable() });
+export const prefetchUseSettingsServiceGetFirstTimeSetupStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetFirstTimeSetupStatusKeyFn(), queryFn: () => SettingsService.getFirstTimeSetupStatus() });
 export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const prefetchUseResourcesServiceGetAllResources = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
   groupId?: number;

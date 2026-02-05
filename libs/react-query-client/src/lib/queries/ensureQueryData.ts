@@ -63,7 +63,7 @@ export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindOneData = 
   type: EmailTemplateType;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const ensureUseSettingsServiceGetSystemSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetSystemSettingsKeyFn(), queryFn: () => SettingsService.getSystemSettings() });
-export const ensureUseSettingsServiceIsFirstTimeSetupAvailableData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceIsFirstTimeSetupAvailableKeyFn(), queryFn: () => SettingsService.isFirstTimeSetupAvailable() });
+export const ensureUseSettingsServiceGetFirstTimeSetupStatusData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetFirstTimeSetupStatusKeyFn(), queryFn: () => SettingsService.getFirstTimeSetupStatus() });
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const ensureUseResourcesServiceGetAllResourcesData = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
   groupId?: number;

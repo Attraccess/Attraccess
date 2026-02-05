@@ -1,0 +1,8 @@
+{
+  "title": "E-Mail (SMTP)",
+  "subtitle": "Konfiguration für ausgehende E-Mails",
+  "passwordStatus": {
+    "configured": "Passwort konfiguriert",
+    "missing": "Passwort fehlt"
+  }
+}

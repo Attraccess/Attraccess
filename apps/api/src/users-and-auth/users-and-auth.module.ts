@@ -78,8 +78,7 @@ import { SettingsService } from '../settings/settings.service';
     {
       provide: SSOOIDCStrategy,
       useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService) => {
-        // This is a placeholder - you'll need to retrieve an actual configuration
-        // from the database or environment variables
+        // Placeholder config; actual OIDC providers are resolved at request time
         const config = new SSOProviderOIDCConfiguration();
         config.issuer = 'placeholder';
         config.authorizationURL = 'placeholder';
@@ -89,10 +88,10 @@ import { SettingsService } from '../settings/settings.service';
         config.clientSecret = 'placeholder';
 
         const frontendUrl = await settingsService.getFrontendUrl();
-        if (!frontendUrl) {
-          throw new Error('Frontend URL not configured.');
-        }
-        const callbackURL = frontendUrl + '/api/sso/OIDC/callback';
+        // Use fallback during first-time setup when no settings exist; real callback is only needed when OIDC is used
+        const callbackURL = frontendUrl
+          ? frontendUrl.replace(/\/$/, '') + '/api/sso/OIDC/callback'
+          : 'http://localhost:4200/api/sso/OIDC/callback';
 
         return new SSOOIDCStrategy(moduleRef, config, callbackURL);
       },

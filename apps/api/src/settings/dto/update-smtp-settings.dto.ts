@@ -1,34 +1,31 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { SmtpServiceType } from './smtp-settings.dto';
 
 export class UpdateSmtpSettingsDto {
-  @IsOptional()
   @IsEnum(SmtpServiceType)
-  @ApiPropertyOptional({
-    description: 'SMTP provider type.',
+  @ApiProperty({
+    description: 'SMTP provider type. An email provider is required.',
     enum: SmtpServiceType,
     enumName: 'SmtpServiceType',
   })
-  service?: SmtpServiceType | null;
+  service!: SmtpServiceType;
 
-  @IsOptional()
   @IsString()
   @MinLength(1)
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'SMTP host.',
     example: 'smtp.example.com',
   })
-  host?: string | null;
+  host!: string;
 
-  @IsOptional()
   @IsInt()
   @Min(1)
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'SMTP port.',
     example: 587,
   })
-  port?: number | null;
+  port!: number;
 
   @IsOptional()
   @IsBoolean()
@@ -38,13 +35,13 @@ export class UpdateSmtpSettingsDto {
   })
   secure?: boolean | null;
 
-  @IsOptional()
   @IsString()
-  @ApiPropertyOptional({
+  @MinLength(1)
+  @ApiProperty({
     description: 'SMTP username.',
     example: 'no-reply@example.com',
   })
-  user?: string | null;
+  user!: string;
 
   @IsOptional()
   @IsString()
@@ -54,12 +51,11 @@ export class UpdateSmtpSettingsDto {
   })
   pass?: string | null;
 
-  @IsOptional()
   @IsString()
   @MinLength(1)
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Default FROM address.',
     example: 'no-reply@example.com',
   })
-  from?: string | null;
+  from!: string;
 }

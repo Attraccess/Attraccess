@@ -25,8 +25,8 @@ const TOKEN_VERSION = 'v1';
 const KEY_LENGTH_BYTES = 32;
 const IV_LENGTH_BYTES = 12;
 
-export class SeedSettingsFromEnv1770205070762 implements MigrationInterface {
-  name = 'SeedSettingsFromEnv1770205070762';
+export class SeedSettingsFromEnv1770236486649 implements MigrationInterface {
+  name = 'SeedSettingsFromEnv1770236486649';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Only seed when no app/smtp settings exist to avoid overwriting existing configuration.
@@ -40,10 +40,10 @@ export class SeedSettingsFromEnv1770205070762 implements MigrationInterface {
 
     const frontendUrl = normalizeString(
       process.env.ATTRACCESS_FRONTEND_URL ??
-        process.env.FRONTEND_URL ??
-        process.env.ATTRACCESS_URL ??
-        process.env.VITE_ATTRACCESS_URL ??
-        null,
+      process.env.FRONTEND_URL ??
+      process.env.ATTRACCESS_URL ??
+      process.env.VITE_ATTRACCESS_URL ??
+      null,
     );
     const backendUrl = normalizeString(
       process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL ?? null,

@@ -1004,17 +1004,17 @@ export type UpdateAppSettingsDto = {
 
 export type UpdateSmtpSettingsDto = {
     /**
-     * SMTP provider type.
+     * SMTP provider type. An email provider is required.
      */
-    service?: SmtpServiceType;
+    service: SmtpServiceType;
     /**
      * SMTP host.
      */
-    host?: string;
+    host: string;
     /**
      * SMTP port.
      */
-    port?: number;
+    port: number;
     /**
      * Whether to use a secure SMTP connection.
      */
@@ -1022,7 +1022,7 @@ export type UpdateSmtpSettingsDto = {
     /**
      * SMTP username.
      */
-    user?: string;
+    user: string;
     /**
      * SMTP password.
      */
@@ -1030,7 +1030,7 @@ export type UpdateSmtpSettingsDto = {
     /**
      * Default FROM address.
      */
-    from?: string;
+    from: string;
 };
 
 export type UpdateSystemSettingsDto = {
@@ -1042,6 +1042,32 @@ export type UpdateSystemSettingsDto = {
      * SMTP settings update
      */
     smtp?: UpdateSmtpSettingsDto;
+};
+
+export type FirstTimeSetupStepsDto = {
+    /**
+     * Whether the app settings step (URLs and license) is completed.
+     */
+    app: boolean;
+    /**
+     * Whether the SMTP settings step is completed.
+     */
+    smtp: boolean;
+    /**
+     * Whether at least one admin user has been created.
+     */
+    admin: boolean;
+};
+
+export type FirstTimeSetupStatusDto = {
+    /**
+     * Whether first-time setup is still available (no users exist yet).
+     */
+    available: boolean;
+    /**
+     * Which wizard steps are already completed. Used to open the first incomplete step.
+     */
+    stepsCompleted: FirstTimeSetupStepsDto;
 };
 
 export type LicenseDataDto = {
@@ -3845,7 +3871,7 @@ export type UpdateSystemSettingsData = {
 
 export type UpdateSystemSettingsResponse = SystemSettingsDto;
 
-export type IsFirstTimeSetupAvailableResponse = BooleanDto;
+export type GetFirstTimeSetupStatusResponse = FirstTimeSetupStatusDto;
 
 export type ApplyFirstTimeSetupSettingsData = {
     requestBody: UpdateSystemSettingsDto;
@@ -5782,9 +5808,9 @@ export type $OpenApiTs = {
         get: {
             res: {
                 /**
-                 * Whether first-time setup is available.
+                 * First-time setup status and steps completed.
                  */
-                200: BooleanDto;
+                200: FirstTimeSetupStatusDto;
             };
         };
         post: {

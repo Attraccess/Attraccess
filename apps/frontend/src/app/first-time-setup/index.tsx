@@ -1,132 +1,87 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError } from '@attraccess/react-query-client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, CardBody, CardHeader, Form, Input, Spinner, Switch, Alert } from '@heroui/react';
-import { Settings2Icon, MailIcon } from 'lucide-react';
-import {
-  applyFirstTimeSetup,
-  getFirstTimeSetupAvailable,
-  type UpdateSystemSettingsPayload,
-} from '../../api/settings';
+import { Accordion, AccordionItem, Selection, Spinner } from '@heroui/react';
+import { CheckCircle2Icon, Settings2Icon } from 'lucide-react';
 import { PageHeader } from '../../components/pageHeader';
-import { PasswordInput } from '../../components/PasswordInput';
-import { Select } from '../../components/select';
-import { useToastMessage } from '../../components/toastProvider';
-import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
-import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import { AppSettingsForm } from '../settings/forms/AppSettingsForm';
+import { SmtpSettingsForm } from '../settings/forms/SmtpSettingsForm';
+import { CreateAdminStep } from './steps/CreateAdminStep';
+import { VerifyEmailStep } from './steps/VerifyEmailStep';
 import en from './en.json';
 import de from './de.json';
+import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
+
+const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4'] as const;
+type WizardStepKey = (typeof WIZARD_STEPS)[number];
+
+function isWizardStepKey(key: string): key is WizardStepKey {
+  return WIZARD_STEPS.includes(key as WizardStepKey);
+}
 
 export function FirstTimeSetupPage() {
-  const { t, tExists } = useTranslations({
-    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
-    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
-  });
-  const toast = useToastMessage();
+  const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState<WizardStepKey>(WIZARD_STEPS[0]);
+  const hasInitializedStep = useRef(false);
+  const hasSeenSetupAvailable = useRef(false);
 
-  const { data: setupStatus, isLoading: isCheckingSetup } = useQuery({
-    queryKey: ['first-time-setup'],
-    queryFn: getFirstTimeSetupAvailable,
-  });
+  const { data: setupStatus, isLoading: isCheckingSetup } = useSettingsServiceGetFirstTimeSetupStatus();
 
+  if (setupStatus?.available) {
+    hasSeenSetupAvailable.current = true;
+  }
+
+  const stepCompleted = useMemo(() => {
+    const s = setupStatus?.stepsCompleted;
+    if (!s) return [false, false, false, false] as const;
+    return [s.app, s.smtp, s.admin, s.admin] as const;
+  }, [setupStatus?.stepsCompleted]);
+
+  const firstIncompleteIndex = useMemo(() => {
+    const i = stepCompleted.findIndex((done) => !done);
+    return i >= 0 ? i : WIZARD_STEPS.length - 1;
+  }, [stepCompleted]);
+
+  // Only redirect when user landed on this page with setup already complete (e.g. bookmarked).
+  // Do not redirect when they just completed the admin step – let them see the final step.
   useEffect(() => {
-    if (!isCheckingSetup && setupStatus && !setupStatus.value) {
+    if (!isCheckingSetup && setupStatus && !setupStatus.available && !hasSeenSetupAvailable.current) {
       navigate('/', { replace: true });
     }
   }, [isCheckingSetup, navigate, setupStatus]);
 
-  const [frontendUrl, setFrontendUrl] = useState('');
-  const [backendUrl, setBackendUrl] = useState('');
-  const [publicInternetUrl, setPublicInternetUrl] = useState('');
-  const [licenseKey, setLicenseKey] = useState('');
-
-  const [smtpService, setSmtpService] = useState('');
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState('');
-  const [smtpSecure, setSmtpSecure] = useState(false);
-  const [smtpUser, setSmtpUser] = useState('');
-  const [smtpFrom, setSmtpFrom] = useState('');
-  const [smtpPass, setSmtpPass] = useState('');
-
-  const formRef = useRef<HTMLFormElement>(null);
-
-  const { mutate: saveSetup, isPending: isSaving } = useMutation({
-    mutationFn: applyFirstTimeSetup,
-    onSuccess: () => {
-      toast.success({
-        title: t('success.title'),
-        description: t('success.description'),
-      });
-      navigate('/', { replace: true });
-    },
-    onError: (error: Error) => {
-      toast.apiError({
-        error: error as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
-    },
-  });
-
-  const onSubmit = useCallback(() => {
-    if (!formRef.current?.checkValidity()) {
+  // Set current step to first incomplete step once when status has loaded (only once).
+  useEffect(() => {
+    if (isCheckingSetup || setupStatus === undefined || hasInitializedStep.current) {
       return;
     }
+    hasInitializedStep.current = true;
+    setCurrentStep(WIZARD_STEPS[firstIncompleteIndex]);
+  }, [isCheckingSetup, firstIncompleteIndex, setupStatus]);
 
-    const parsedPort = smtpPort.trim() ? Number(smtpPort) : null;
-    const portValue = parsedPort !== null && Number.isNaN(parsedPort) ? null : parsedPort;
+  const goToStep2 = useCallback(() => setCurrentStep('step-2'), []);
+  const goToStep3 = useCallback(() => setCurrentStep('step-3'), []);
+  const goToStep4 = useCallback(() => setCurrentStep('step-4'), []);
 
-    const payload: UpdateSystemSettingsPayload = {
-      app: {
-        frontendUrl: frontendUrl.trim(),
-        backendUrl: backendUrl.trim(),
-        publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : null,
-      },
-      smtp: {
-        service: smtpService ? (smtpService as 'SMTP' | 'Outlook365') : null,
-        host: smtpHost.trim() ? smtpHost.trim() : null,
-        port: portValue,
-        secure: smtpSecure,
-        user: smtpUser.trim() ? smtpUser.trim() : null,
-        from: smtpFrom.trim() ? smtpFrom.trim() : null,
-      },
-    };
+  const currentStepIndex = WIZARD_STEPS.indexOf(currentStep);
 
-    const trimmedLicense = licenseKey.trim();
-    if (trimmedLicense) {
-      payload.app = { ...payload.app, licenseKey: trimmedLicense };
-    }
-
-    const trimmedPass = smtpPass.trim();
-    if (trimmedPass) {
-      payload.smtp = { ...payload.smtp, pass: trimmedPass };
-    }
-
-    saveSetup(payload);
-  }, [
-    backendUrl,
-    frontendUrl,
-    licenseKey,
-    publicInternetUrl,
-    saveSetup,
-    smtpFrom,
-    smtpHost,
-    smtpPass,
-    smtpPort,
-    smtpSecure,
-    smtpService,
-    smtpUser,
-  ]);
-
-  const smtpServiceOptions = [
-    { key: '', label: t('sections.smtp.service.none') },
-    { key: 'SMTP', label: t('sections.smtp.service.smtp') },
-    { key: 'Outlook365', label: t('sections.smtp.service.outlook') },
-  ];
+  const handleAccordionSelectionChange = useCallback(
+    (keys: Selection) => {
+      const keySet = typeof keys === 'string' ? new Set<string>() : keys;
+      const newKey = Array.from(keySet)[0];
+      if (newKey == null || typeof newKey !== 'string' || !isWizardStepKey(newKey)) return;
+      const newIndex = WIZARD_STEPS.indexOf(newKey);
+      const goingBack = newIndex < currentStepIndex;
+      const goingToNext = newIndex === currentStepIndex + 1;
+      const currentDone = stepCompleted[currentStepIndex];
+      const allowed = goingBack || (goingToNext && currentDone) || newIndex === currentStepIndex;
+      if (allowed) {
+        setCurrentStep(newKey);
+      }
+    },
+    [currentStepIndex, stepCompleted]
+  );
 
   if (isCheckingSetup) {
     return (
@@ -139,130 +94,76 @@ export function FirstTimeSetupPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto">
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<Settings2Icon size={20} />}
+      />
 
-      <Alert color="primary" variant="flat">
-        {t('note')}
-      </Alert>
-
-      <Form
-        ref={formRef}
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-        className="flex flex-col gap-6"
+      <Accordion
+        variant="splitted"
+        selectionMode="single"
+        selectedKeys={new Set([currentStep])}
+        onSelectionChange={handleAccordionSelectionChange}
+        className="w-full"
       >
-        <Card>
-          <CardHeader>
-            <PageHeader
-              title={t('sections.app.title')}
-              subtitle={t('sections.app.subtitle')}
-              icon={<Settings2Icon size={18} />}
-              noMargin
-            />
-          </CardHeader>
-          <CardBody className="flex flex-col gap-4">
-            <Input
-              label={t('sections.app.inputs.frontendUrl.label')}
-              description={t('sections.app.inputs.frontendUrl.description')}
-              type="url"
-              isRequired
-              value={frontendUrl}
-              onValueChange={setFrontendUrl}
-            />
-            <Input
-              label={t('sections.app.inputs.backendUrl.label')}
-              description={t('sections.app.inputs.backendUrl.description')}
-              type="url"
-              isRequired
-              value={backendUrl}
-              onValueChange={setBackendUrl}
-            />
-            <Input
-              label={t('sections.app.inputs.publicInternetUrl.label')}
-              description={t('sections.app.inputs.publicInternetUrl.description')}
-              type="url"
-              value={publicInternetUrl}
-              onValueChange={setPublicInternetUrl}
-            />
-            <PasswordInput
-              label={t('sections.app.inputs.licenseKey.label')}
-              description={t('sections.app.inputs.licenseKey.description')}
-              value={licenseKey}
-              onChange={(event) => setLicenseKey(event.target.value)}
-              autoComplete="off"
-            />
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <PageHeader
-              title={t('sections.smtp.title')}
-              subtitle={t('sections.smtp.subtitle')}
-              icon={<MailIcon size={18} />}
-              noMargin
-            />
-          </CardHeader>
-          <CardBody className="flex flex-col gap-4">
-            <Select
-              label={t('sections.smtp.inputs.service.label')}
-              selectedKey={smtpService}
-              onSelectionChange={setSmtpService}
-              items={smtpServiceOptions}
-            />
-            <Input
-              label={t('sections.smtp.inputs.host.label')}
-              description={t('sections.smtp.inputs.host.description')}
-              value={smtpHost}
-              onValueChange={setSmtpHost}
-              isRequired={smtpService === 'SMTP'}
-              isDisabled={smtpService !== 'SMTP'}
-            />
-            <Input
-              label={t('sections.smtp.inputs.port.label')}
-              description={t('sections.smtp.inputs.port.description')}
-              type="number"
-              value={smtpPort}
-              onValueChange={setSmtpPort}
-              isRequired={smtpService === 'SMTP'}
-              isDisabled={smtpService !== 'SMTP'}
-              min={1}
-            />
-            <Switch isSelected={smtpSecure} onValueChange={setSmtpSecure} isDisabled={smtpService !== 'SMTP'}>
-              {t('sections.smtp.inputs.secure.label')}
-            </Switch>
-            <Input
-              label={t('sections.smtp.inputs.user.label')}
-              description={t('sections.smtp.inputs.user.description')}
-              value={smtpUser}
-              onValueChange={setSmtpUser}
-            />
-            <PasswordInput
-              label={t('sections.smtp.inputs.pass.label')}
-              description={t('sections.smtp.inputs.pass.description')}
-              value={smtpPass}
-              onChange={(event) => setSmtpPass(event.target.value)}
-              autoComplete="off"
-            />
-            <Input
-              label={t('sections.smtp.inputs.from.label')}
-              description={t('sections.smtp.inputs.from.description')}
-              value={smtpFrom}
-              onValueChange={setSmtpFrom}
-              isRequired={smtpService !== ''}
-              isDisabled={smtpService === ''}
-            />
-          </CardBody>
-        </Card>
-
-        <div className="flex justify-end">
-          <Button color="primary" onPress={onSubmit} isLoading={isSaving}>
-            {t('actions.save')}
-          </Button>
-        </div>
-      </Form>
+        <AccordionItem
+          key="step-1"
+          aria-label={t('steps.app')}
+          title={
+            <span className="flex items-center gap-2">
+              {stepCompleted[0] && (
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
+              )}
+              {t('steps.app')}
+            </span>
+          }
+        >
+          <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
+        </AccordionItem>
+        <AccordionItem
+          key="step-2"
+          aria-label={t('steps.smtp')}
+          title={
+            <span className="flex items-center gap-2">
+              {stepCompleted[1] && (
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
+              )}
+              {t('steps.smtp')}
+            </span>
+          }
+        >
+          <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
+        </AccordionItem>
+        <AccordionItem
+          key="step-3"
+          aria-label={t('steps.admin')}
+          title={
+            <span className="flex items-center gap-2">
+              {stepCompleted[2] && (
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
+              )}
+              {t('steps.admin')}
+            </span>
+          }
+        >
+          <CreateAdminStep onSuccess={goToStep4} />
+        </AccordionItem>
+        <AccordionItem
+          key="step-4"
+          aria-label={t('steps.verify')}
+          title={
+            <span className="flex items-center gap-2">
+              {stepCompleted[3] && (
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
+              )}
+              {t('steps.verify')}
+            </span>
+          }
+        >
+          <VerifyEmailStep />
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }

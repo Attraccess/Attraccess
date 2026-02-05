@@ -9,6 +9,19 @@
     "title": "Settings saved",
     "description": "Your changes have been applied."
   },
+  "firstTimeSetup": {
+    "title": "First-time setup",
+    "subtitle": "Configure your instance before creating users",
+    "note": "These settings can be updated later by an admin.",
+    "loading": "Checking setup status...",
+    "actions": {
+      "save": "Save settings"
+    },
+    "success": {
+      "title": "Setup complete",
+      "description": "You can now create the first user."
+    }
+  },
   "sections": {
     "app": {
       "title": "Application",

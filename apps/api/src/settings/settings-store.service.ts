@@ -121,7 +121,13 @@ export class SettingsStoreService {
   }
 
   private async upsertSetting(parent: string, key: string, value: string): Promise<void> {
-    await this.settingRepository.upsert({ parent, key, value }, ['parent', 'key']);
+    const existing = await this.settingRepository.findOneBy({ parent, key });
+    if (existing) {
+      existing.value = value;
+      await this.settingRepository.save(existing);
+    } else {
+      await this.settingRepository.save(this.settingRepository.create({ parent, key, value }));
+    }
   }
 
   private decryptSecret(parent: string, key: string, value: string): string {

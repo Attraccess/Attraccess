@@ -1,74 +1,11 @@
 {
   "title": "First-time setup",
-  "subtitle": "Configure your instance before creating users",
-  "note": "These settings can be updated later by an admin.",
+  "subtitle": "Configure your instance and create the first admin user.",
   "loading": "Checking setup status...",
-  "actions": {
-    "save": "Save settings"
-  },
-  "success": {
-    "title": "Setup complete",
-    "description": "You can now create the first user."
-  },
-  "sections": {
-    "app": {
-      "title": "Application",
-      "subtitle": "Base URLs and license configuration",
-      "inputs": {
-        "frontendUrl": {
-          "label": "Frontend URL",
-          "description": "The URL users access the frontend at."
-        },
-        "backendUrl": {
-          "label": "Backend URL",
-          "description": "The URL used for API callbacks and internal links."
-        },
-        "publicInternetUrl": {
-          "label": "Public Internet URL",
-          "description": "Optional URL used for external callbacks (e.g. SumUp)."
-        },
-        "licenseKey": {
-          "label": "License Key",
-          "description": "Paste a license key to activate your instance."
-        }
-      }
-    },
-    "smtp": {
-      "title": "Email (SMTP)",
-      "subtitle": "Outgoing email configuration",
-      "service": {
-        "none": "Disabled",
-        "smtp": "SMTP",
-        "outlook": "Outlook 365"
-      },
-      "inputs": {
-        "service": {
-          "label": "Service"
-        },
-        "host": {
-          "label": "Host",
-          "description": "SMTP server host name."
-        },
-        "port": {
-          "label": "Port",
-          "description": "SMTP server port."
-        },
-        "secure": {
-          "label": "Use TLS"
-        },
-        "user": {
-          "label": "Username",
-          "description": "Optional username for SMTP authentication."
-        },
-        "pass": {
-          "label": "Password",
-          "description": "Optional password for SMTP authentication."
-        },
-        "from": {
-          "label": "From address",
-          "description": "Default sender address for outgoing emails."
-        }
-      }
-    }
+  "steps": {
+    "app": "Application settings",
+    "smtp": "Email (SMTP)",
+    "admin": "Create admin user",
+    "verify": "You're all set"
   }
 }

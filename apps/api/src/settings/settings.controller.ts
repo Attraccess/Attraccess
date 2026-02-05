@@ -2,9 +2,9 @@ import { Body, Controller, ForbiddenException, Get, Patch, Post } from '@nestjs/
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from './settings.service';
+import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
-import { BooleanDto } from '../types/boolean.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -28,10 +28,15 @@ export class SettingsController {
   }
 
   @Get('first-time-setup')
-  @ApiOperation({ summary: 'Check if first-time setup is available', operationId: 'isFirstTimeSetupAvailable' })
-  @ApiResponse({ status: 200, description: 'Whether first-time setup is available.', type: BooleanDto })
-  async isFirstTimeSetupAvailable(): Promise<BooleanDto> {
-    return { value: await this.settingsService.isFirstTimeSetupAvailable() };
+  @ApiOperation({
+    summary: 'Get first-time setup status',
+    operationId: 'getFirstTimeSetupStatus',
+    description:
+      'Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.',
+  })
+  @ApiResponse({ status: 200, description: 'First-time setup status and steps completed.', type: FirstTimeSetupStatusDto })
+  async getFirstTimeSetupStatus(): Promise<FirstTimeSetupStatusDto> {
+    return this.settingsService.getFirstTimeSetupStatus();
   }
 
   @Post('first-time-setup')

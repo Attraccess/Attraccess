@@ -34,7 +34,7 @@ export class SmtpSettingsService {
 
   async updateSettings(update: UpdateSmtpSettingsDto): Promise<void> {
     if (Object.prototype.hasOwnProperty.call(update, 'service')) {
-      await this.settingsStore.setPlainSetting(SMTP_PARENT, SMTP_KEYS.service, update.service ?? null);
+      await this.settingsStore.setPlainSetting(SMTP_PARENT, SMTP_KEYS.service, update.service);
     }
     if (Object.prototype.hasOwnProperty.call(update, 'host')) {
       await this.settingsStore.setPlainSetting(SMTP_PARENT, SMTP_KEYS.host, update.host ?? null);

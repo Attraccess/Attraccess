@@ -1,0 +1,21 @@
+{
+  "title": "Create admin user",
+  "subtitle": "Set up the first administrator account.",
+  "username": "Username",
+  "usernameDescription": "3-32 characters. Letters, numbers, underscores, hyphens, and dots.",
+  "usernameValidation": {
+    "length": "Username must be between {{min}} and {{max}} characters.",
+    "format": "Only letters, numbers, underscores, hyphens, and dots are allowed."
+  },
+  "email": "Email address",
+  "password": "Password",
+  "passwordConfirmation": "Confirm password",
+  "actions": {
+    "create": "Create admin account"
+  },
+  "validationError": {
+    "passwordTooShort": "Password must be at least 8 characters long.",
+    "passwordsDoNotMatch": "The passwords do not match."
+  },
+  "creating": "Creating account..."
+}

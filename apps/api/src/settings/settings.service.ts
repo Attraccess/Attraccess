@@ -11,6 +11,10 @@ import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
 import { APP_KEYS, APP_PARENT } from './constants';
 import { SettingsStoreService } from './settings-store.service';
+import {
+  FirstTimeSetupStatusDto,
+  FirstTimeSetupStepsDto,
+} from './dto/first-time-setup-status.dto';
 
 @Injectable()
 export class SettingsService {
@@ -24,6 +28,31 @@ export class SettingsService {
   async isFirstTimeSetupAvailable(): Promise<boolean> {
     const count = await this.userRepository.count();
     return count === 0;
+  }
+
+  async getFirstTimeSetupStatus(): Promise<FirstTimeSetupStatusDto> {
+    const [app, smtp, userCount] = await Promise.all([
+      this.getAppSettings(),
+      this.smtpSettingsService.getSettings(),
+      this.userRepository.count(),
+    ]);
+
+    const stepsCompleted: FirstTimeSetupStepsDto = {
+      app:
+        !!app.frontendUrl?.trim() &&
+        !!app.backendUrl?.trim() &&
+        app.licenseKeyConfigured === true,
+      smtp:
+        !!smtp.service &&
+        !!smtp.user?.trim() &&
+        !!smtp.from?.trim(),
+      admin: userCount > 0,
+    };
+
+    return {
+      available: userCount === 0,
+      stepsCompleted,
+    };
   }
 
   async getSystemSettings(): Promise<SystemSettingsDto> {

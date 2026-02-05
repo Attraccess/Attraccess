@@ -1550,7 +1550,7 @@ export const $UpdateSmtpSettingsDto = {
     type: 'object',
     properties: {
         service: {
-            description: 'SMTP provider type.',
+            description: 'SMTP provider type. An email provider is required.',
             allOf: [
                 {
                     '$ref': '#/components/schemas/SmtpServiceType'
@@ -1587,7 +1587,8 @@ export const $UpdateSmtpSettingsDto = {
             description: 'Default FROM address.',
             example: 'no-reply@example.com'
         }
-    }
+    },
+    required: ['service', 'host', 'port', 'user', 'from']
 } as const;
 
 export const $UpdateSystemSettingsDto = {
@@ -1610,6 +1611,48 @@ export const $UpdateSystemSettingsDto = {
             ]
         }
     }
+} as const;
+
+export const $FirstTimeSetupStepsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            type: 'boolean',
+            description: 'Whether the app settings step (URLs and license) is completed.',
+            example: true
+        },
+        smtp: {
+            type: 'boolean',
+            description: 'Whether the SMTP settings step is completed.',
+            example: false
+        },
+        admin: {
+            type: 'boolean',
+            description: 'Whether at least one admin user has been created.',
+            example: false
+        }
+    },
+    required: ['app', 'smtp', 'admin']
+} as const;
+
+export const $FirstTimeSetupStatusDto = {
+    type: 'object',
+    properties: {
+        available: {
+            type: 'boolean',
+            description: 'Whether first-time setup is still available (no users exist yet).',
+            example: true
+        },
+        stepsCompleted: {
+            description: 'Which wizard steps are already completed. Used to open the first incomplete step.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FirstTimeSetupStepsDto'
+                }
+            ]
+        }
+    },
+    required: ['available', 'stepsCompleted']
 } as const;
 
 export const $LicenseDataDto = {

@@ -125,10 +125,10 @@ export type SettingsServiceGetSystemSettingsDefaultResponse = Awaited<ReturnType
 export type SettingsServiceGetSystemSettingsQueryResult<TData = SettingsServiceGetSystemSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSettingsServiceGetSystemSettingsKey = "SettingsServiceGetSystemSettings";
 export const UseSettingsServiceGetSystemSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetSystemSettingsKey, ...(queryKey ?? [])];
-export type SettingsServiceIsFirstTimeSetupAvailableDefaultResponse = Awaited<ReturnType<typeof SettingsService.isFirstTimeSetupAvailable>>;
-export type SettingsServiceIsFirstTimeSetupAvailableQueryResult<TData = SettingsServiceIsFirstTimeSetupAvailableDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useSettingsServiceIsFirstTimeSetupAvailableKey = "SettingsServiceIsFirstTimeSetupAvailable";
-export const UseSettingsServiceIsFirstTimeSetupAvailableKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceIsFirstTimeSetupAvailableKey, ...(queryKey ?? [])];
+export type SettingsServiceGetFirstTimeSetupStatusDefaultResponse = Awaited<ReturnType<typeof SettingsService.getFirstTimeSetupStatus>>;
+export type SettingsServiceGetFirstTimeSetupStatusQueryResult<TData = SettingsServiceGetFirstTimeSetupStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetFirstTimeSetupStatusKey = "SettingsServiceGetFirstTimeSetupStatus";
+export const UseSettingsServiceGetFirstTimeSetupStatusKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetFirstTimeSetupStatusKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
