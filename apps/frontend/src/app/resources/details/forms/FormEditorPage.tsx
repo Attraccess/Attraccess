@@ -123,7 +123,7 @@ export function FormEditorPage() {
     },
   });
 
-  const lastLabelInputRef = useRef<HTMLInputElement>(null);
+  const lastLabelInputRef = useRef<HTMLInputElement | null>(null);
   const [fieldAdded, setFieldAdded] = useState(false);
 
   const addField = () => {
