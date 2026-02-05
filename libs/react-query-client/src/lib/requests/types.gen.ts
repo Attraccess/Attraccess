@@ -914,6 +914,136 @@ export type UpdateEmailTemplateDto = {
     body?: string;
 };
 
+export type AppSettingsDto = {
+    /**
+     * The frontend URL used for redirects and links.
+     */
+    frontendUrl: string | null;
+    /**
+     * The backend/base URL used for callbacks and API links.
+     */
+    backendUrl: string | null;
+    /**
+     * Optional public URL used for external callbacks (e.g., SumUp).
+     */
+    publicInternetUrl: string | null;
+    /**
+     * Whether a license key has been configured.
+     */
+    licenseKeyConfigured: boolean;
+};
+
+/**
+ * Selected SMTP provider type.
+ */
+export enum SmtpServiceType {
+    SMTP = 'SMTP',
+    OUTLOOK365 = 'Outlook365'
+}
+
+export type SmtpSettingsDto = {
+    /**
+     * Selected SMTP provider type.
+     */
+    service: (SmtpServiceType) | null;
+    /**
+     * SMTP host for direct SMTP connections.
+     */
+    host: string | null;
+    /**
+     * SMTP port for direct SMTP connections.
+     */
+    port: number | null;
+    /**
+     * Whether to use a secure SMTP connection.
+     */
+    secure: boolean | null;
+    /**
+     * SMTP username.
+     */
+    user: string | null;
+    /**
+     * Default FROM address for outgoing emails.
+     */
+    from: string | null;
+    /**
+     * Whether an SMTP password has been configured.
+     */
+    passConfigured: boolean;
+};
+
+export type SystemSettingsDto = {
+    /**
+     * Application settings
+     */
+    app: AppSettingsDto;
+    /**
+     * SMTP settings
+     */
+    smtp: SmtpSettingsDto;
+};
+
+export type UpdateAppSettingsDto = {
+    /**
+     * Frontend URL used for redirects and links.
+     */
+    frontendUrl?: string;
+    /**
+     * Backend/base URL used for callbacks and API links.
+     */
+    backendUrl?: string;
+    /**
+     * Public URL used for external callbacks.
+     */
+    publicInternetUrl?: string;
+    /**
+     * License key to use for license validation.
+     */
+    licenseKey?: string;
+};
+
+export type UpdateSmtpSettingsDto = {
+    /**
+     * SMTP provider type.
+     */
+    service?: SmtpServiceType;
+    /**
+     * SMTP host.
+     */
+    host?: string;
+    /**
+     * SMTP port.
+     */
+    port?: number;
+    /**
+     * Whether to use a secure SMTP connection.
+     */
+    secure?: boolean;
+    /**
+     * SMTP username.
+     */
+    user?: string;
+    /**
+     * SMTP password.
+     */
+    pass?: string;
+    /**
+     * Default FROM address.
+     */
+    from?: string;
+};
+
+export type UpdateSystemSettingsDto = {
+    /**
+     * Application settings update
+     */
+    app?: UpdateAppSettingsDto;
+    /**
+     * SMTP settings update
+     */
+    smtp?: UpdateSmtpSettingsDto;
+};
+
 export type LicenseDataDto = {
     /**
      * Whether the license is valid
@@ -3707,6 +3837,22 @@ export type EmailTemplateControllerUpdateData = {
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
 
+export type GetSystemSettingsResponse = SystemSettingsDto;
+
+export type UpdateSystemSettingsData = {
+    requestBody: UpdateSystemSettingsDto;
+};
+
+export type UpdateSystemSettingsResponse = SystemSettingsDto;
+
+export type IsFirstTimeSetupAvailableResponse = BooleanDto;
+
+export type ApplyFirstTimeSetupSettingsData = {
+    requestBody: UpdateSystemSettingsDto;
+};
+
+export type ApplyFirstTimeSetupSettingsResponse = SystemSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
 
 export type CreateOneResourceData = {
@@ -5602,6 +5748,56 @@ export type $OpenApiTs = {
                  * Template not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/settings': {
+        get: {
+            res: {
+                /**
+                 * Current system settings.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateSystemSettingsData;
+            res: {
+                /**
+                 * System settings updated.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/first-time-setup': {
+        get: {
+            res: {
+                /**
+                 * Whether first-time setup is available.
+                 */
+                200: BooleanDto;
+            };
+        };
+        post: {
+            req: ApplyFirstTimeSetupSettingsData;
+            res: {
+                /**
+                 * System settings updated.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * First-time setup is not available.
+                 */
+                403: unknown;
             };
         };
     };
