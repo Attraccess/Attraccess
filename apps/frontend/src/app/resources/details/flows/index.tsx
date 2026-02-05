@@ -18,10 +18,11 @@ import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '@heroui/react';
-import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon } from 'lucide-react';
+import { CheckIcon, LayoutGridIcon, LogsIcon, PlusIcon, SaveIcon, Download as DownloadIcon, Upload as UploadIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { NodePickerModal } from './nodePickerModal';
 import { FlowProvider, useFlowContext } from './flowContext';
+import { useFlowImportExport } from './flowImportExport';
 import { useQueryClient } from '@tanstack/react-query';
 import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
@@ -153,6 +154,15 @@ function FlowsPageInner() {
     removeLiveLogReceiver,
     flowNodeTypes,
   } = useFlowContext();
+
+  const { handleExport, handleImportClick } = useFlowImportExport({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    resourceId: Number(resourceId),
+    t,
+  });
 
   useEffect(() => {
     if (originalFlowData) {
@@ -333,6 +343,13 @@ function FlowsPageInner() {
               onPress={save}
               isDisabled={!flowHasChanged}
               color={saveFailed ? 'danger' : flowHasChanged ? 'primary' : 'default'}
+            />
+            <Button isIconOnly startContent={<UploadIcon />} onPress={handleImportClick} aria-label={t('actions.import')} />
+            <Button
+              isIconOnly
+              startContent={<DownloadIcon />}
+              onPress={handleExport}
+              aria-label={t('actions.export')}
             />
             <LogViewer resourceId={Number(resourceId)}>
               {(open) => <Button isIconOnly startContent={<LogsIcon />} onPress={open} />}

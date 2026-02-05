@@ -64,7 +64,7 @@ export function UserManagementDetailsPage() {
     ssoSubject?: string | null;
     type?: string | null;
   };
-  type UserWithAuthDetails = User & {
+  type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
   const ssoDetails =

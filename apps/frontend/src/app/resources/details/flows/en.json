@@ -1,4 +1,32 @@
 {
   "title": "Flows for {{resourceName}}",
-  "subtitle": "With flows you can automate workflows for your resources and for example control smart plugs or lamps."
+  "subtitle": "With flows you can automate workflows for your resources and for example control smart plugs or lamps.",
+  "actions": {
+    "export": "Export",
+    "import": "Import"
+  },
+  "export": {
+    "success": {
+      "title": "Flow exported",
+      "description": "The flow has been downloaded as a JSON file."
+    },
+    "error": {
+      "title": "Export failed",
+      "description": "We couldn't create the export file."
+    }
+  },
+  "import": {
+    "success": {
+      "title": "Flow imported",
+      "description": "The flow has been loaded. Click save to apply it."
+    },
+    "error": {
+      "title": "Import failed"
+    },
+    "errors": {
+      "invalidJson": "The file isn't valid JSON.",
+      "invalidStructure": "The file doesn't contain a valid flow export.",
+      "unknown": "The file couldn't be imported."
+    }
+  }
 }

@@ -110,6 +110,13 @@ export const $User = {
             type: 'string',
             description: 'When the user was soft-deleted'
         },
+        authenticationDetails: {
+            description: 'Authentication details linked to the user',
+            type: 'array',
+            items: {
+                type: 'array'
+            }
+        },
         externalIdentifier: {
             type: 'string',
             description: 'The external (origin) identifier of the user, if the user is authenticated via SSO',
