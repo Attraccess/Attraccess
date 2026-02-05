@@ -8,10 +8,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 // @ts-expect-error - site.webmanifest.json is not a module
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
-import { reactCompilerBabelConfig } from '@attraccess/react-compiler';
-import { resolvePwaMaxCacheBytes } from '../../tools/build-config';
-
-const maximumFileSizeToCacheInBytes = resolvePwaMaxCacheBytes(process.env.ATTRACCESS_PWA_MAX_CACHE_BYTES);
 
 export default defineConfig({
   root: __dirname,
@@ -27,7 +23,7 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
-    react({ babel: reactCompilerBabelConfig }),
+    react(),
     nxViteTsPaths(),
     nxCopyAssetsPlugin([]),
     federation({
@@ -63,7 +59,6 @@ export default defineConfig({
       injectManifest: {
         minify: process.env.NODE_ENV === 'production',
         enableWorkboxModulesLogs: true,
-        maximumFileSizeToCacheInBytes,
       },
       devOptions: {
         enabled: true,
