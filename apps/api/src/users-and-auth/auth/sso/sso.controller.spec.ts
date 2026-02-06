@@ -133,6 +133,7 @@ describe('SsoController', () => {
           provide: SettingsService,
           useValue: {
             getFrontendUrl: jest.fn().mockResolvedValue('http://localhost:3000'),
+            getBackendUrl: jest.fn().mockResolvedValue('http://localhost:3000'),
           },
         },
         {

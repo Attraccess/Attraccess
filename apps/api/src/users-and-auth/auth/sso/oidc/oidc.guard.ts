@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
-import { SSOOIDCStrategy } from './oidc.strategy';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
@@ -83,11 +83,11 @@ export class SSOOIDCGuard implements CanActivate {
       throw new SSOProviderNotFoundException();
     }
 
-    if (!requestURL.searchParams.has('redirectTo')) {
+    const isCallbackRoute = routeAction === 'callback';
+    if (!isCallbackRoute && !requestURL.searchParams.has('redirectTo')) {
       throw new BadRequestException('No redirectTo found in query params');
     }
-
-    const redirectTo = requestURL.searchParams.get('redirectTo');
+    const redirectTo = requestURL.searchParams.get('redirectTo') ?? '';
 
     const backendUrl = await this.settingsService.getBackendUrl();
     if (!backendUrl) {
@@ -101,9 +101,10 @@ export class SSOOIDCGuard implements CanActivate {
     this.logger.debug(`Callback URL from query params: ${callbackURL}`);
 
     this.logger.debug(
-      `Initializing SSOOIDCStrategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
+      `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
     );
-    new SSOOIDCStrategy(this.moduleRef, oidcConfig, callbackURL.toString());
+    // Pass callback URL to the strategy so it uses current settings (no restart needed when URLs change)
+    (req as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] = callbackURL.toString();
     this.logger.debug(`OIDC Guard activation for ${routeAction} successful`);
     return true;
   }

@@ -53,6 +53,8 @@ export async function bootstrap() {
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
+  const settingsService = appForConfig.get(SettingsService);
+  const backendUrlFromDb = await settingsService.getBackendUrl();
   await appForConfig.close();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
@@ -62,10 +64,11 @@ export async function bootstrap() {
 
   if (appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES) {
     const storageDir = storageConfig.root;
-
-    const host = appConfig.ATTRACCESS_URL;
+    const host = backendUrlFromDb ?? appConfig.ATTRACCESS_URL;
     if (!host) {
-      throw new Error('ATTRACCESS_URL is required to generate self-signed certificates.');
+      throw new Error(
+        'Backend URL is required to generate self-signed certificates. Configure it in Settings or set ATTRACCESS_URL.',
+      );
     }
     const hostUrl = new URL(host);
     const domain = hostUrl.hostname;
@@ -96,7 +99,6 @@ export async function bootstrap() {
 
   app.use(cookieParser());
 
-  const settingsService = app.get(SettingsService);
   app.enableCors({
     origin: (origin, callback) => {
       settingsService

@@ -33,7 +33,7 @@ export class TwoFactorService {
       const url = new URL(backendUrl);
       return `Attraccess (${url.hostname})`;
     } catch (error) {
-      this.logger.warn('Failed to parse ATTRACCESS_URL for 2FA issuer', error as Error);
+      this.logger.warn('Failed to parse backend URL for 2FA issuer', error as Error);
       return 'Attraccess';
     }
   }

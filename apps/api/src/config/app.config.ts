@@ -5,7 +5,6 @@ import { LogLevel } from '@nestjs/common';
 const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    LICENSE_KEY: z.string().min(1).optional(),
     PORT: z.coerce.number().default(3000),
     LOG_LEVELS: z
       .string()
@@ -57,11 +56,12 @@ const AppEnvSchema = z
 export type AppConfigType = z.infer<typeof AppEnvSchema> & {
   GLOBAL_PREFIX: string;
   LICENSO_PUBLIC_KEY: string;
-  LICENSO_DEVICE_ID: string;
 };
 
 const appConfigFactory = (): AppConfigType => {
   try {
+    // Optional env fallbacks for bootstrap/first-run (e.g. SSL cert generation).
+    // Primary source for URLs is now DB settings (SettingsService).
     const FRONTEND_URL_ENV =
       process.env.ATTRACCESS_FRONTEND_URL ??
       process.env.FRONTEND_URL ??
@@ -79,15 +79,10 @@ const appConfigFactory = (): AppConfigType => {
       ATTRACCESS_PUBLIC_INTERNET_URL: ATTRACCESS_PUBLIC_INTERNET_URL_ENV,
     });
 
-    const licensoDeviceIdSource = env.ATTRACCESS_FRONTEND_URL ?? env.ATTRACCESS_URL ?? 'unknown';
-    let licensoDeviceId = licensoDeviceIdSource.replace('https://', '');
-    licensoDeviceId = licensoDeviceId.replace('http://', '');
-
     return {
       ...env,
       GLOBAL_PREFIX: 'api',
       LICENSO_PUBLIC_KEY: 'oPN_IZFgPiWDNcfHfXwVoDZ7DAm8JcezucY3EVy1wTI',
-      LICENSO_DEVICE_ID: licensoDeviceId,
     };
   } catch (e) {
     const zodErrors = Array.isArray(e?.errors)

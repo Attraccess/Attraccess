@@ -18,4 +18,5 @@ export const SMTP_KEYS = {
   from: 'from',
 } as const;
 
-export const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+/** Cache TTL for settings reads. Writes update cache immediately; this only affects reads when DB is changed outside this process. */
+export const SETTINGS_CACHE_TTL_MS = 60 * 1000; // 1 minute

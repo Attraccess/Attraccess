@@ -71,10 +71,11 @@ export class LicenseService {
       // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
       try {
         const { verifyLicense } = await import('@licenso/client');
-        const frontendUrl = await this.settingsService.getFrontendUrl();
-        const licensoDeviceId = this.buildLicensoDeviceId(
-          frontendUrl ?? appConfig.ATTRACCESS_FRONTEND_URL ?? appConfig.ATTRACCESS_URL ?? appConfig.LICENSO_DEVICE_ID,
-        );
+        const [frontendUrl, backendUrl] = await Promise.all([
+          this.settingsService.getFrontendUrl(),
+          this.settingsService.getBackendUrl(),
+        ]);
+        const licensoDeviceId = this.buildLicensoDeviceId(frontendUrl ?? backendUrl ?? null);
         const licenseData = await verifyLicense(
           licenseKey,
           appConfig.LICENSO_PUBLIC_KEY,

@@ -623,7 +623,7 @@ export class SSOController {
   @UseFilters(AccountLinkingExceptionFilter)
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
-    @Query('redirectTo') redirectTo: string,
+    @Query('redirectTo') redirectTo: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
     return this.finalizeLogin(request, response, redirectTo);
@@ -691,7 +691,7 @@ export class SSOController {
       ipAddress: request.ip || request.connection.remoteAddress,
     });
 
-    this.cookieConfigService.setAuthCookie(response, sessionToken);
+    await this.cookieConfigService.setAuthCookie(response, sessionToken);
 
     const auth: CreateSessionResponse = {
       user: request.user,

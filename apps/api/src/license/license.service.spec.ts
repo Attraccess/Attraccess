@@ -16,6 +16,7 @@ describe('LicenseService', () => {
   let configServiceGetMock: jest.Mock;
   let settingsServiceGetLicenseKeyMock: jest.Mock;
   let settingsServiceGetFrontendUrlMock: jest.Mock;
+  let settingsServiceGetBackendUrlMock: jest.Mock;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +33,7 @@ describe('LicenseService', () => {
           useValue: {
             getLicenseKey: (settingsServiceGetLicenseKeyMock = jest.fn()),
             getFrontendUrl: (settingsServiceGetFrontendUrlMock = jest.fn()),
+            getBackendUrl: (settingsServiceGetBackendUrlMock = jest.fn().mockResolvedValue(null)),
           },
         },
       ],
@@ -49,7 +51,6 @@ describe('LicenseService', () => {
 
   const baseAppConfig = {
     LICENSO_PUBLIC_KEY: 'public-key',
-    LICENSO_DEVICE_ID: 'device-id',
   } as AppConfigType;
 
   it('throws LicenseError when app config is missing', async () => {
@@ -88,7 +89,6 @@ describe('LicenseService', () => {
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
     settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
-
     const data = await service.getLicenseData();
 
     expect(verifyLicense).toHaveBeenCalledWith('standard-key', 'public-key', 'frontend.example');
@@ -97,6 +97,28 @@ describe('LicenseService', () => {
     expect(data.modules).toEqual([LicenseModuleType.ATTRACTAP]);
     expect(data.usageLimits[LicenseUsageLimitType.RESOURCES]).toBe(10);
     expect(data.usageLimits[LicenseUsageLimitType.USERS] ?? undefined).toBeUndefined();
+  });
+
+  it('uses backend URL for licenso device id when frontend URL is null (DB settings fallback)', async () => {
+    (verifyLicense as jest.Mock).mockResolvedValue({
+      valid: true,
+      reason: undefined,
+      payload: {
+        cfg: {
+          modules: { attractap: true },
+          usageLimits: {},
+        },
+      },
+    });
+    configServiceGetMock.mockReturnValue({ ...baseAppConfig });
+    settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
+    settingsServiceGetFrontendUrlMock.mockResolvedValue(null);
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://api.mycompany.com');
+
+    const data = await service.getLicenseData();
+
+    expect(verifyLicense).toHaveBeenCalledWith('standard-key', 'public-key', 'api.mycompany.com');
+    expect(data.valid).toBe(true);
   });
 
   it('verifyLicense throws when license is invalid', async () => {

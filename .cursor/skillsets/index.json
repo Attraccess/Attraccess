@@ -1,0 +1,19 @@
+{
+  "agents": [
+    {
+      "id": "nx-monorepo",
+      "file": ".cursor/skillsets/nx-monorepo-skillset.json",
+      "triggers": ["nx", "pnpm", "build", "lint", "test", "e2e", "serve", "precommit", "react-query", "monorepo", "target"]
+    },
+    {
+      "id": "setup-environment",
+      "file": ".cursor/skillsets/setup-skillset.json",
+      "triggers": ["setup", "install", "env", ".env", "migrations", "license", "LICENSE_KEY", "dependencies"]
+    },
+    {
+      "id": "firmware-attractap",
+      "file": ".cursor/skillsets/firmware-attractap-skillset.json",
+      "triggers": ["firmware", "attractap", "platformio", "pio", "esp32", "esptool", "flash", "upload", "ESP32-C3"]
+    }
+  ]
+}
