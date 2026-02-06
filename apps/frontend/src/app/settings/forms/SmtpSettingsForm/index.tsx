@@ -7,6 +7,7 @@ import {
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
   useSettingsServiceUpdateSystemSettings,
+  useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
 import { Button, Form, Input, Spinner, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -43,7 +44,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   const [smtpFrom, setSmtpFrom] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
+  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
@@ -73,7 +74,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
           title: t('success.title'),
           description: t('success.description'),
         });
-        queryClient.invalidateQueries({ queryKey: ['system-settings'] });
+        queryClient.invalidateQueries({ queryKey: [useSettingsServiceGetSystemSettingsKey] });
         if (endpoint === 'first-time-setup') {
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }

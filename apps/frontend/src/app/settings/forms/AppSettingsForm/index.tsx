@@ -39,7 +39,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
+  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;

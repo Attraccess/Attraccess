@@ -10,7 +10,7 @@ import { useCallback, useState } from 'react';
 import {
   useMqttServiceMqttServersCreateOne,
   CreateMqttServerDto,
-  UseMqttServiceMqttServersGetAllKeyFn,
+  useMqttServiceMqttServersGetAllKey,
   MqttServer,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,7 +47,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerPageProps>
         description: t('serverCreatedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [UseMqttServiceMqttServersGetAllKeyFn()[0]],
+        queryKey: [useMqttServiceMqttServersGetAllKey],
       });
       if (onSuccess) {
         onSuccess(server);
