@@ -1155,18 +1155,18 @@ export interface UpdateAppSettingsDto {
 }
 
 export interface UpdateSmtpSettingsDto {
-  /** SMTP provider type. */
-  service?: SmtpServiceType;
+  /** SMTP provider type. An email provider is required. */
+  service: SmtpServiceType;
   /**
    * SMTP host.
    * @example "smtp.example.com"
    */
-  host?: string;
+  host: string;
   /**
    * SMTP port.
    * @example 587
    */
-  port?: number;
+  port: number;
   /**
    * Whether to use a secure SMTP connection.
    * @example false
@@ -1176,7 +1176,7 @@ export interface UpdateSmtpSettingsDto {
    * SMTP username.
    * @example "no-reply@example.com"
    */
-  user?: string;
+  user: string;
   /**
    * SMTP password.
    * @example "secret"
@@ -1186,7 +1186,7 @@ export interface UpdateSmtpSettingsDto {
    * Default FROM address.
    * @example "no-reply@example.com"
    */
-  from?: string;
+  from: string;
 }
 
 export interface UpdateSystemSettingsDto {
@@ -1194,6 +1194,34 @@ export interface UpdateSystemSettingsDto {
   app?: UpdateAppSettingsDto;
   /** SMTP settings update */
   smtp?: UpdateSmtpSettingsDto;
+}
+
+export interface FirstTimeSetupStepsDto {
+  /**
+   * Whether the app settings step (URLs and license) is completed.
+   * @example true
+   */
+  app: boolean;
+  /**
+   * Whether the SMTP settings step is completed.
+   * @example false
+   */
+  smtp: boolean;
+  /**
+   * Whether at least one admin user has been created.
+   * @example false
+   */
+  admin: boolean;
+}
+
+export interface FirstTimeSetupStatusDto {
+  /**
+   * Whether first-time setup is still available (no users exist yet).
+   * @example true
+   */
+  available: boolean;
+  /** Which wizard steps are already completed. Used to open the first incomplete step. */
+  stepsCompleted: FirstTimeSetupStepsDto;
 }
 
 export interface LicenseDataDto {
@@ -3557,7 +3585,7 @@ export type GetSystemSettingsData = SystemSettingsDto;
 
 export type UpdateSystemSettingsData = SystemSettingsDto;
 
-export type IsFirstTimeSetupAvailableData = BooleanDto;
+export type GetFirstTimeSetupStatusData = FirstTimeSetupStatusDto;
 
 export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
 
@@ -5150,18 +5178,18 @@ export namespace Settings {
   }
 
   /**
-   * No description
+   * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
    * @tags Settings
-   * @name IsFirstTimeSetupAvailable
-   * @summary Check if first-time setup is available
+   * @name GetFirstTimeSetupStatus
+   * @summary Get first-time setup status
    * @request GET:/api/settings/first-time-setup
    */
-  export namespace IsFirstTimeSetupAvailable {
+  export namespace GetFirstTimeSetupStatus {
     export type RequestParams = {};
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = IsFirstTimeSetupAvailableData;
+    export type ResponseBody = GetFirstTimeSetupStatusData;
   }
 
   /**
@@ -8968,15 +8996,15 @@ export class Api<
       }),
 
     /**
-     * No description
+     * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
      *
      * @tags Settings
-     * @name IsFirstTimeSetupAvailable
-     * @summary Check if first-time setup is available
+     * @name GetFirstTimeSetupStatus
+     * @summary Get first-time setup status
      * @request GET:/api/settings/first-time-setup
      */
-    isFirstTimeSetupAvailable: (params: RequestParams = {}) =>
-      this.request<IsFirstTimeSetupAvailableData, any>({
+    getFirstTimeSetupStatus: (params: RequestParams = {}) =>
+      this.request<GetFirstTimeSetupStatusData, any>({
         path: `/api/settings/first-time-setup`,
         method: "GET",
         format: "json",

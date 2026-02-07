@@ -71,6 +71,7 @@ describe('SSOOIDCGuard', () => {
   });
 
   it('builds callback URL from backend URL and provider id', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     settingsService.getBackendUrl!.mockResolvedValue('https://backend.mycompany.com');
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/42/login?redirectTo=/home',

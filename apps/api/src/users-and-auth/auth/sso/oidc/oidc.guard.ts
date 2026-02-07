@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
-import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
@@ -27,7 +27,7 @@ export class SSOOIDCGuard implements CanActivate {
     private moduleRef: ModuleRef,
     private settingsService: SettingsService,
     private licenseService: LicenseService
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext) {
     this.logger.debug('OIDC Guard activation attempted');
