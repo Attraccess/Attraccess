@@ -1,0 +1,4 @@
+{
+  "install": "cp .env.example .env && pnpm install",
+  "start": "pnpm nx run-many -t serve --projects api,frontend"
+}

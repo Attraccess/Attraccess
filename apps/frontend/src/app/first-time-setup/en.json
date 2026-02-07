@@ -1,0 +1,11 @@
+{
+  "title": "First-time setup",
+  "subtitle": "Configure your instance and create the first admin user.",
+  "loading": "Checking setup status...",
+  "steps": {
+    "app": "Application settings",
+    "smtp": "Email (SMTP)",
+    "admin": "Create admin user",
+    "verify": "You're all set"
+  }
+}

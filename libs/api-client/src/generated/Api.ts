@@ -124,6 +124,12 @@ export enum ResourceType {
   Door = "door",
 }
 
+/** Selected SMTP provider type. */
+export enum SmtpServiceType {
+  SMTP = "SMTP",
+  Outlook365 = "Outlook365",
+}
+
 /** Template type/key used by the system */
 export enum EmailTemplateType {
   VerifyEmail = "verify-email",
@@ -1058,6 +1064,164 @@ export interface UpdateEmailTemplateDto {
   subject?: string;
   /** MJML content of the email body */
   body?: string;
+}
+
+export interface AppSettingsDto {
+  /**
+   * The frontend URL used for redirects and links.
+   * @example "https://frontend.example"
+   */
+  frontendUrl: string | null;
+  /**
+   * The backend/base URL used for callbacks and API links.
+   * @example "https://api.example"
+   */
+  backendUrl: string | null;
+  /**
+   * Optional public URL used for external callbacks (e.g., SumUp).
+   * @example "https://public.example"
+   */
+  publicInternetUrl: string | null;
+  /**
+   * Whether a license key has been configured.
+   * @example true
+   */
+  licenseKeyConfigured: boolean;
+}
+
+export interface SmtpSettingsDto {
+  /** Selected SMTP provider type. */
+  service: SmtpServiceType | null;
+  /**
+   * SMTP host for direct SMTP connections.
+   * @example "smtp.example.com"
+   */
+  host: string | null;
+  /**
+   * SMTP port for direct SMTP connections.
+   * @example 587
+   */
+  port: number | null;
+  /**
+   * Whether to use a secure SMTP connection.
+   * @example false
+   */
+  secure: boolean | null;
+  /**
+   * SMTP username.
+   * @example "no-reply@example.com"
+   */
+  user: string | null;
+  /**
+   * Default FROM address for outgoing emails.
+   * @example "no-reply@example.com"
+   */
+  from: string | null;
+  /**
+   * Whether an SMTP password has been configured.
+   * @example true
+   */
+  passConfigured: boolean;
+}
+
+export interface SystemSettingsDto {
+  /** Application settings */
+  app: AppSettingsDto;
+  /** SMTP settings */
+  smtp: SmtpSettingsDto;
+}
+
+export interface UpdateAppSettingsDto {
+  /**
+   * Frontend URL used for redirects and links.
+   * @example "https://frontend.example"
+   */
+  frontendUrl?: string;
+  /**
+   * Backend/base URL used for callbacks and API links.
+   * @example "https://api.example"
+   */
+  backendUrl?: string;
+  /**
+   * Public URL used for external callbacks.
+   * @example "https://public.example"
+   */
+  publicInternetUrl?: string;
+  /**
+   * License key to use for license validation.
+   * @example "LICENSE_KEY"
+   */
+  licenseKey?: string;
+}
+
+export interface UpdateSmtpSettingsDto {
+  /** SMTP provider type. An email provider is required. */
+  service: SmtpServiceType;
+  /**
+   * SMTP host.
+   * @example "smtp.example.com"
+   */
+  host: string;
+  /**
+   * SMTP port.
+   * @example 587
+   */
+  port: number;
+  /**
+   * Whether to use a secure SMTP connection.
+   * @example false
+   */
+  secure?: boolean;
+  /**
+   * SMTP username.
+   * @example "no-reply@example.com"
+   */
+  user: string;
+  /**
+   * SMTP password.
+   * @example "secret"
+   */
+  pass?: string;
+  /**
+   * Default FROM address.
+   * @example "no-reply@example.com"
+   */
+  from: string;
+}
+
+export interface UpdateSystemSettingsDto {
+  /** Application settings update */
+  app?: UpdateAppSettingsDto;
+  /** SMTP settings update */
+  smtp?: UpdateSmtpSettingsDto;
+}
+
+export interface FirstTimeSetupStepsDto {
+  /**
+   * Whether the app settings step (URLs and license) is completed.
+   * @example true
+   */
+  app: boolean;
+  /**
+   * Whether the SMTP settings step is completed.
+   * @example false
+   */
+  smtp: boolean;
+  /**
+   * Whether at least one admin user has been created.
+   * @example false
+   */
+  admin: boolean;
+}
+
+export interface FirstTimeSetupStatusDto {
+  /**
+   * Whether first-time setup is still available (no users exist yet).
+   * @example true
+   */
+  available: boolean;
+  /** Which wizard steps are already completed. Used to open the first incomplete step. */
+  stepsCompleted: FirstTimeSetupStepsDto;
 }
 
 export interface LicenseDataDto {
@@ -3417,6 +3581,14 @@ export type EmailTemplateControllerFindOneData = EmailTemplate;
 
 export type EmailTemplateControllerUpdateData = EmailTemplate;
 
+export type GetSystemSettingsData = SystemSettingsDto;
+
+export type UpdateSystemSettingsData = SystemSettingsDto;
+
+export type GetFirstTimeSetupStatusData = FirstTimeSetupStatusDto;
+
+export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
 
 export type CreateOneResourceData = Resource;
@@ -4969,6 +5141,70 @@ export namespace EmailTemplates {
     export type RequestBody = UpdateEmailTemplateDto;
     export type RequestHeaders = {};
     export type ResponseBody = EmailTemplateControllerUpdateData;
+  }
+}
+
+export namespace Settings {
+  /**
+   * No description
+   * @tags Settings
+   * @name GetSystemSettings
+   * @summary Get system settings
+   * @request GET:/api/settings
+   * @secure
+   */
+  export namespace GetSystemSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetSystemSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateSystemSettings
+   * @summary Update system settings
+   * @request PATCH:/api/settings
+   * @secure
+   */
+  export namespace UpdateSystemSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateSystemSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateSystemSettingsData;
+  }
+
+  /**
+   * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
+   * @tags Settings
+   * @name GetFirstTimeSetupStatus
+   * @summary Get first-time setup status
+   * @request GET:/api/settings/first-time-setup
+   */
+  export namespace GetFirstTimeSetupStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetFirstTimeSetupStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name ApplyFirstTimeSetupSettings
+   * @summary Apply first-time setup settings
+   * @request POST:/api/settings/first-time-setup
+   */
+  export namespace ApplyFirstTimeSetupSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateSystemSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ApplyFirstTimeSetupSettingsData;
   }
 }
 
@@ -8712,6 +8948,85 @@ export class Api<
         method: "PATCH",
         body: data,
         secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
+  settings = {
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetSystemSettings
+     * @summary Get system settings
+     * @request GET:/api/settings
+     * @secure
+     */
+    getSystemSettings: (params: RequestParams = {}) =>
+      this.request<GetSystemSettingsData, void>({
+        path: `/api/settings`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateSystemSettings
+     * @summary Update system settings
+     * @request PATCH:/api/settings
+     * @secure
+     */
+    updateSystemSettings: (
+      data: UpdateSystemSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateSystemSettingsData, void>({
+        path: `/api/settings`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
+     *
+     * @tags Settings
+     * @name GetFirstTimeSetupStatus
+     * @summary Get first-time setup status
+     * @request GET:/api/settings/first-time-setup
+     */
+    getFirstTimeSetupStatus: (params: RequestParams = {}) =>
+      this.request<GetFirstTimeSetupStatusData, any>({
+        path: `/api/settings/first-time-setup`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name ApplyFirstTimeSetupSettings
+     * @summary Apply first-time setup settings
+     * @request POST:/api/settings/first-time-setup
+     */
+    applyFirstTimeSetupSettings: (
+      data: UpdateSystemSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ApplyFirstTimeSetupSettingsData, void>({
+        path: `/api/settings/first-time-setup`,
+        method: "POST",
+        body: data,
         type: ContentType.Json,
         format: "json",
         ...params,

@@ -6,8 +6,7 @@ import { SumUp } from '@sumup/sdk';
 import { EncryptionService } from '../encryption/encryption.service';
 import { SumUpMerchantDto } from './dto/sumup/sumup-merchant.dto';
 import { SumUpReaderDto } from './dto/sumup/sumup-reader.dto';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../config/app.config';
+import { SettingsService } from '../settings/settings.service';
 import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LiveNotificationsService } from './liveNotificationsService';
@@ -18,21 +17,18 @@ export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 @Injectable()
 export class SumUpService {
   private readonly logger = new Logger(SumUpService.name);
-  private readonly appConfig: AppConfigType;
   private hasPendingTransactions = true;
 
   constructor(
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly encryptionService: EncryptionService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
     @InjectRepository(BillingTransaction)
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
     private readonly liveNotificationsService: LiveNotificationsService,
     private readonly billingService: BillingService,
-  ) {
-    this.appConfig = this.configService.get<AppConfigType>('app');
-  }
+  ) {}
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
@@ -133,9 +129,10 @@ export class SumUpService {
     const merchant = await sumUp.merchant.get();
     const merchantCode = merchant.merchant_profile.merchant_code;
 
-    let returnUrl: string;
-    if (this.appConfig.ATTRACCESS_PUBLIC_INTERNET_URL.startsWith('https://')) {
-      returnUrl = this.appConfig.ATTRACCESS_PUBLIC_INTERNET_URL + '/api/billing/top-up/sumup/callback';
+    let returnUrl: string | undefined;
+    const publicInternetUrl = await this.settingsService.getPublicInternetUrl();
+    if (publicInternetUrl?.startsWith('https://')) {
+      returnUrl = publicInternetUrl + '/api/billing/top-up/sumup/callback';
       this.logger.debug('setting returl_url for sumup checkout', { returnUrl });
     }
 
@@ -147,7 +144,7 @@ export class SumUpService {
           value: amount,
           minor_unit: minorUnit,
         },
-        return_url: returnUrl,
+        ...(returnUrl ? { return_url: returnUrl } : {}),
       });
 
       const transaction = await this.billingTransactionRepository.save({

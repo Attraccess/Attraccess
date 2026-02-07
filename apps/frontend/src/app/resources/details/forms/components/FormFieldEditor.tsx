@@ -42,7 +42,7 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
           value={field.name}
           onChange={(event) => onChange({ ...field, name: event.target.value })}
           isRequired
-          ref={labelInputRef}
+          ref={labelInputRef as React.Ref<HTMLInputElement> | undefined}
         />
 
         <Select

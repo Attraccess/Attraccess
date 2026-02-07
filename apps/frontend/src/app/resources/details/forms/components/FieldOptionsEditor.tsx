@@ -114,7 +114,7 @@ function renderOptionsByType(
                 placeholder={t('fields.options.select.optionPlaceholder')}
                 onChange={(e) => handleOptionChange(index, e.target.value)}
                 size="sm"
-                ref={index === currentOptions.length - 1 ? lastOptionInputRef : undefined}
+                ref={index === currentOptions.length - 1 ? (lastOptionInputRef as React.Ref<HTMLInputElement>) : undefined}
               />
               <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => handleRemoveOption(index)}>
                 <X className="w-4 h-4" />

@@ -11,7 +11,7 @@ import {
   useMqttServiceMqttServersUpdateOne,
   useMqttServiceMqttServersGetOneById,
   CreateMqttServerDto,
-  UseMqttServiceMqttServersGetAllKeyFn,
+  useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -67,7 +67,7 @@ export function EditMqttServerPage() {
         description: t('serverUpdatedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [UseMqttServiceMqttServersGetAllKeyFn()[0]],
+        queryKey: [useMqttServiceMqttServersGetAllKey],
       });
       navigate('/mqtt/servers');
     },

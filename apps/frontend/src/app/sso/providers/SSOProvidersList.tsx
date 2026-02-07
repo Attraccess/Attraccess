@@ -38,7 +38,7 @@ import {
   useAuthenticationServiceGetAllSsoProviders,
   useAuthenticationServiceGetOneSsoProviderById,
   useAuthenticationServiceUpdateOneSsoProvider,
-  UseAuthenticationServiceGetAllSsoProvidersKeyFn,
+  useAuthenticationServiceGetAllSsoProvidersKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -133,21 +133,21 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
   const updateSSOProvider = useAuthenticationServiceUpdateOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
   const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
@@ -256,8 +256,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         setOidcPermissionMappingsInput(
           buildPermissionMappingInputs(
             (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
           ),
         );
       } else {
@@ -289,8 +289,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         setSamlPermissionMappingsInput(
           buildPermissionMappingInputs(
             (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
           ),
         );
       } else {
@@ -375,12 +375,12 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
   const handlePermissionMappingChange =
     (setter: React.Dispatch<React.SetStateAction<Record<PermissionKey, string>>>, key: PermissionKey) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setter((prev) => ({
-        ...prev,
-        [key]: event.target.value,
-      }));
-    };
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        setter((prev) => ({
+          ...prev,
+          [key]: event.target.value,
+        }));
+      };
 
   const handleCopySamlCallbackUrl = useCallback(async () => {
     if (!samlCallbackUrl) {

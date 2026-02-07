@@ -1,6 +1,6 @@
 import { ModuleRef } from '@nestjs/core';
-import { Profile } from 'passport-openidconnect';
-import { SSOOIDCStrategy } from './oidc.strategy';
+import { Profile, Strategy } from 'passport-openidconnect';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { AuthService } from '../../auth.service';
 import {
   AuthenticationType,
@@ -280,5 +280,43 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       },
     });
     expect(user.systemPermissions.canManageUsers).toBe(false);
+  });
+
+  describe('authenticate (per-request callback URL)', () => {
+    it('passes callback URL from request to base strategy when set (no restart needed for URL changes)', () => {
+      const baseAuthenticateSpy = jest.spyOn(Strategy.prototype, 'authenticate').mockImplementation(() => {
+        /* noop: avoid running real Passport strategy */
+      });
+      const strategy = createStrategy(
+        {},
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn((s: string) => s), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      const dynamicCallback = 'https://api.example.com/api/auth/sso/oidc/1/callback?redirectTo=/dashboard';
+      const req = { [SSO_OIDC_CALLBACK_URL_REQUEST_KEY]: dynamicCallback } as unknown as Parameters<SSOOIDCStrategy['authenticate']>[0];
+
+      strategy.authenticate(req, undefined);
+
+      expect(baseAuthenticateSpy).toHaveBeenCalledWith(req, { callbackURL: dynamicCallback });
+      baseAuthenticateSpy.mockRestore();
+    });
+
+    it('passes through options when request has no callback URL key', () => {
+      const baseAuthenticateSpy = jest.spyOn(Strategy.prototype, 'authenticate').mockImplementation(() => {
+        /* noop */
+      });
+      const strategy = createStrategy(
+        {},
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn((s: string) => s), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      const req = {} as unknown as Parameters<SSOOIDCStrategy['authenticate']>[0];
+      const options = undefined;
+
+      strategy.authenticate(req, options);
+
+      expect(baseAuthenticateSpy).toHaveBeenCalledWith(req, options);
+      baseAuthenticateSpy.mockRestore();
+    });
   });
 });

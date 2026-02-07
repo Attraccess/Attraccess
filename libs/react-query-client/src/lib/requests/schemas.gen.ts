@@ -1410,6 +1410,251 @@ export const $UpdateEmailTemplateDto = {
     }
 } as const;
 
+export const $AppSettingsDto = {
+    type: 'object',
+    properties: {
+        frontendUrl: {
+            type: 'string',
+            description: 'The frontend URL used for redirects and links.',
+            example: 'https://frontend.example',
+            nullable: true
+        },
+        backendUrl: {
+            type: 'string',
+            description: 'The backend/base URL used for callbacks and API links.',
+            example: 'https://api.example',
+            nullable: true
+        },
+        publicInternetUrl: {
+            type: 'string',
+            description: 'Optional public URL used for external callbacks (e.g., SumUp).',
+            example: 'https://public.example',
+            nullable: true
+        },
+        licenseKeyConfigured: {
+            type: 'boolean',
+            description: 'Whether a license key has been configured.',
+            example: true
+        }
+    },
+    required: ['frontendUrl', 'backendUrl', 'publicInternetUrl', 'licenseKeyConfigured']
+} as const;
+
+export const $SmtpServiceType = {
+    type: 'string',
+    enum: ['SMTP', 'Outlook365'],
+    description: 'Selected SMTP provider type.'
+} as const;
+
+export const $SmtpSettingsDto = {
+    type: 'object',
+    properties: {
+        service: {
+            description: 'Selected SMTP provider type.',
+            nullable: true,
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpServiceType'
+                }
+            ]
+        },
+        host: {
+            type: 'string',
+            description: 'SMTP host for direct SMTP connections.',
+            example: 'smtp.example.com',
+            nullable: true
+        },
+        port: {
+            type: 'number',
+            description: 'SMTP port for direct SMTP connections.',
+            example: 587,
+            nullable: true
+        },
+        secure: {
+            type: 'boolean',
+            description: 'Whether to use a secure SMTP connection.',
+            example: false,
+            nullable: true
+        },
+        user: {
+            type: 'string',
+            description: 'SMTP username.',
+            example: 'no-reply@example.com',
+            nullable: true
+        },
+        from: {
+            type: 'string',
+            description: 'Default FROM address for outgoing emails.',
+            example: 'no-reply@example.com',
+            nullable: true
+        },
+        passConfigured: {
+            type: 'boolean',
+            description: 'Whether an SMTP password has been configured.',
+            example: true
+        }
+    },
+    required: ['service', 'host', 'port', 'secure', 'user', 'from', 'passConfigured']
+} as const;
+
+export const $SystemSettingsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            description: 'Application settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/AppSettingsDto'
+                }
+            ]
+        },
+        smtp: {
+            description: 'SMTP settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpSettingsDto'
+                }
+            ]
+        }
+    },
+    required: ['app', 'smtp']
+} as const;
+
+export const $UpdateAppSettingsDto = {
+    type: 'object',
+    properties: {
+        frontendUrl: {
+            type: 'string',
+            description: 'Frontend URL used for redirects and links.',
+            example: 'https://frontend.example'
+        },
+        backendUrl: {
+            type: 'string',
+            description: 'Backend/base URL used for callbacks and API links.',
+            example: 'https://api.example'
+        },
+        publicInternetUrl: {
+            type: 'string',
+            description: 'Public URL used for external callbacks.',
+            example: 'https://public.example'
+        },
+        licenseKey: {
+            type: 'string',
+            description: 'License key to use for license validation.',
+            example: 'LICENSE_KEY'
+        }
+    }
+} as const;
+
+export const $UpdateSmtpSettingsDto = {
+    type: 'object',
+    properties: {
+        service: {
+            description: 'SMTP provider type. An email provider is required.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpServiceType'
+                }
+            ]
+        },
+        host: {
+            type: 'string',
+            description: 'SMTP host.',
+            example: 'smtp.example.com'
+        },
+        port: {
+            type: 'number',
+            description: 'SMTP port.',
+            example: 587
+        },
+        secure: {
+            type: 'boolean',
+            description: 'Whether to use a secure SMTP connection.',
+            example: false
+        },
+        user: {
+            type: 'string',
+            description: 'SMTP username.',
+            example: 'no-reply@example.com'
+        },
+        pass: {
+            type: 'string',
+            description: 'SMTP password.',
+            example: 'secret'
+        },
+        from: {
+            type: 'string',
+            description: 'Default FROM address.',
+            example: 'no-reply@example.com'
+        }
+    },
+    required: ['service', 'host', 'port', 'user', 'from']
+} as const;
+
+export const $UpdateSystemSettingsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            description: 'Application settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateAppSettingsDto'
+                }
+            ]
+        },
+        smtp: {
+            description: 'SMTP settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateSmtpSettingsDto'
+                }
+            ]
+        }
+    }
+} as const;
+
+export const $FirstTimeSetupStepsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            type: 'boolean',
+            description: 'Whether the app settings step (URLs and license) is completed.',
+            example: true
+        },
+        smtp: {
+            type: 'boolean',
+            description: 'Whether the SMTP settings step is completed.',
+            example: false
+        },
+        admin: {
+            type: 'boolean',
+            description: 'Whether at least one admin user has been created.',
+            example: false
+        }
+    },
+    required: ['app', 'smtp', 'admin']
+} as const;
+
+export const $FirstTimeSetupStatusDto = {
+    type: 'object',
+    properties: {
+        available: {
+            type: 'boolean',
+            description: 'Whether first-time setup is still available (no users exist yet).',
+            example: true
+        },
+        stepsCompleted: {
+            description: 'Which wizard steps are already completed. Used to open the first incomplete step.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FirstTimeSetupStepsDto'
+                }
+            ]
+        }
+    },
+    required: ['available', 'stepsCompleted']
+} as const;
+
 export const $LicenseDataDto = {
     type: 'object',
     properties: {

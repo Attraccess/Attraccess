@@ -3,8 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
 import { TwoFactorPolicy } from './two-factor.dto';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../../config/app.config';
+import { SettingsService } from '../../settings/settings.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 
 @Injectable()
@@ -12,7 +11,6 @@ export class TwoFactorService {
   private readonly logger = new Logger(TwoFactorService.name);
   private readonly policyParent = 'auth';
   private readonly policyKey = 'two_factor_policy';
-  private readonly issuer: string;
   private otplibPromise: Promise<typeof import('otplib')> | null = null;
 
   constructor(
@@ -20,23 +18,22 @@ export class TwoFactorService {
     private readonly authenticationDetailRepository: Repository<AuthenticationDetail>,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
     private readonly encryptionService: EncryptionService,
   ) {
-    this.issuer = this.resolveIssuer();
   }
 
-  private resolveIssuer(): string {
-    const appConfig = this.configService.get<AppConfigType>('app');
-    if (!appConfig?.ATTRACCESS_URL) {
+  private async resolveIssuer(): Promise<string> {
+    const backendUrl = await this.settingsService.getBackendUrl();
+    if (!backendUrl) {
       return 'Attraccess';
     }
 
     try {
-      const url = new URL(appConfig.ATTRACCESS_URL);
+      const url = new URL(backendUrl);
       return `Attraccess (${url.hostname})`;
     } catch (error) {
-      this.logger.warn('Failed to parse ATTRACCESS_URL for 2FA issuer', error as Error);
+      this.logger.warn('Failed to parse backend URL for 2FA issuer', error as Error);
       return 'Attraccess';
     }
   }
@@ -92,13 +89,14 @@ export class TwoFactorService {
     }
 
     const { generateSecret, generateURI } = await this.loadOtplib();
+    const issuer = await this.resolveIssuer();
     const secret = generateSecret();
     const encryptedSecret = this.encryptionService.encrypt(secret);
     const accountName = user.email ?? user.username;
     const otpauthUrl = generateURI({
       secret,
       label: accountName,
-      issuer: this.issuer,
+      issuer,
       strategy: 'totp',
     });
 

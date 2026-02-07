@@ -35,7 +35,7 @@ export interface StandaloneEncryptor {
 export class EncryptionService {
   private cachedKey: Buffer | null = null;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   /**
    * Factory for use in scripts or other contexts where Nest ConfigService is not available.

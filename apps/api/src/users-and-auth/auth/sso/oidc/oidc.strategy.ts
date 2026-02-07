@@ -19,6 +19,9 @@ import {
   resolvePermissionsFromRoles,
 } from '../permission-mapping';
 
+/** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
+export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
+
 @Injectable()
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
   private readonly logger = new Logger(SSOOIDCStrategy.name);
@@ -42,6 +45,15 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
 
     this.logger.log(`Initialized OIDC strategy with issuer: ${config.issuer} and callbackURL: ${callbackURL}`);
     this.config = config;
+  }
+
+  /**
+   * Use per-request callback URL from the guard when set (so frontend/backend URL changes apply without restart).
+   */
+  authenticate(req: Parameters<InstanceType<typeof Strategy>['authenticate']>[0], options?: Parameters<InstanceType<typeof Strategy>['authenticate']>[1]): void {
+    const dynamicCallback = (req as unknown as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] as string | undefined;
+    const opts = dynamicCallback ? { ...options, callbackURL: dynamicCallback } : options;
+    super.authenticate(req, opts);
   }
 
   private firstNonEmptyStringFromPaths(paths: string[], sources: unknown[]): string | undefined {

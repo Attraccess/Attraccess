@@ -1,0 +1,8 @@
+{
+  "title": "Fertig",
+  "subtitle": "Überprüfe deine E-Mails zur Verifizierung.",
+  "message": "Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte öffne sie und klicke auf den Link, um dein Konto zu bestätigen. Anschließend kannst du dich anmelden und die Anwendung nutzen.",
+  "actions": {
+    "goToLogin": "Zur Anmeldung"
+  }
+}

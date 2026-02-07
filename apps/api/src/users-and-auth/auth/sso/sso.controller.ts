@@ -35,8 +35,7 @@ import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
 import { SSOSamlGuard } from './saml/saml.guard';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../../../config/app.config';
+import { SettingsService } from '../../../settings/settings.service';
 import { SSOLinkTokenService } from './link-token.service';
 import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
@@ -54,7 +53,7 @@ export class SSOController {
     private readonly ssoService: SSOService,
     private readonly cookieConfigService: CookieConfigService,
     private readonly linkTokenService: SSOLinkTokenService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Get('providers')
@@ -624,7 +623,7 @@ export class SSOController {
   @UseFilters(AccountLinkingExceptionFilter)
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
-    @Query('redirectTo') redirectTo: string,
+    @Query('redirectTo') redirectTo: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
     return this.finalizeLogin(request, response, redirectTo);
@@ -677,8 +676,7 @@ export class SSOController {
     @Query('RelayState') relayStateQuery: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
-    const appConfig = this.configService.get<AppConfigType>('app');
-    const defaultRedirect = appConfig?.ATTRACCESS_FRONTEND_URL;
+    const defaultRedirect = await this.settingsService.getFrontendUrl();
     const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
     return this.finalizeLogin(request, response, target);
   }
@@ -693,7 +691,7 @@ export class SSOController {
       ipAddress: request.ip || request.connection.remoteAddress,
     });
 
-    this.cookieConfigService.setAuthCookie(response, sessionToken);
+    await this.cookieConfigService.setAuthCookie(response, sessionToken);
 
     const auth: CreateSessionResponse = {
       user: request.user,

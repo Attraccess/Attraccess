@@ -4,19 +4,10 @@
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",
-  "publishConfig": {
-    "access": "public"
-  },
-  "exports": {
-    ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js",
-      "default": "./index.js"
-    }
-  },
-  "files": [
-    "index*.js",
-    "index.d.ts",
-    "lib"
-  ]
+  "publishConfig": { "access": "public" },
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.js", "default": "./index.js" } },
+  "files": ["index*.js", "index.d.ts", "lib"],
+  "devDependencies": {
+    "babel-plugin-react-compiler": "^1.0.0"
+  }
 }

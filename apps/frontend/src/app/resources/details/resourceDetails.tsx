@@ -14,7 +14,7 @@ import { memo, useState } from 'react';
 import {
   useResourcesServiceDeleteOneResource,
   useResourcesServiceGetOneResourceById,
-  UseResourcesServiceGetAllResourcesKeyFn,
+  useResourcesServiceGetAllResourcesKey,
   useAccessControlServiceResourceIntroducersIsIntroducer,
   useResourceMaintenancesServiceCanManageMaintenance,
 } from '@attraccess/react-query-client';
@@ -82,7 +82,7 @@ function ResourceDetailsComponent() {
         description: `${resource?.name} has been successfully deleted`,
       });
       queryClient.invalidateQueries({
-        queryKey: [UseResourcesServiceGetAllResourcesKeyFn()[0]],
+        queryKey: [useResourcesServiceGetAllResourcesKey],
       });
       navigate('/resources');
     } catch (err) {
