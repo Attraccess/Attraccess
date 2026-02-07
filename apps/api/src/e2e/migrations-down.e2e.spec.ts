@@ -36,6 +36,11 @@ import {
   ResourceIntroductionHistoryItem,
   ResourceIntroducer,
   ResourceMaintenance,
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceMaintenanceScheduleUsageCountConfig,
+  ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceType,
   ResourceUsage,
   ResourceUsageAction,
@@ -128,6 +133,16 @@ const seedDatabase = async (dataSource: DataSource) => {
   const attractapRepo = dataSource.getRepository(Attractap);
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
   const resourceMaintenanceRepo = dataSource.getRepository(ResourceMaintenance);
+  const maintenanceScheduleRepo = dataSource.getRepository(ResourceMaintenanceSchedule);
+  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(
+    ResourceMaintenanceScheduleUsageHoursConfig,
+  );
+  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(
+    ResourceMaintenanceScheduleUsageCountConfig,
+  );
+  const maintenanceScheduleTimeIntervalConfigRepo = dataSource.getRepository(
+    ResourceMaintenanceScheduleTimeIntervalConfig,
+  );
   const flowNodeRepo = dataSource.getRepository(ResourceFlowNode);
   const flowEdgeRepo = dataSource.getRepository(ResourceFlowEdge);
   const flowLogRepo = dataSource.getRepository(ResourceFlowLog);
@@ -262,6 +277,40 @@ const seedDatabase = async (dataSource: DataSource) => {
     startTime: new Date(),
     endTime: null,
     reason: 'Seed maintenance',
+  }));
+
+  const scheduleUsageHours = await ensureEntity(maintenanceScheduleRepo, () => ({
+    resourceId: resource.id,
+    name: `Seed schedule hours ${seedTag}`,
+    triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+    enabled: true,
+  }));
+  await ensureEntity(maintenanceScheduleUsageHoursConfigRepo, () => ({
+    scheduleId: scheduleUsageHours.id,
+    thresholdMinutes: 600,
+  }));
+
+  const scheduleUsageCount = await ensureEntity(maintenanceScheduleRepo, () => ({
+    resourceId: resource.id,
+    name: `Seed schedule count ${seedTag}`,
+    triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+    enabled: true,
+  }));
+  await ensureEntity(maintenanceScheduleUsageCountConfigRepo, () => ({
+    scheduleId: scheduleUsageCount.id,
+    thresholdSessions: 50,
+  }));
+
+  const scheduleTimeInterval = await ensureEntity(maintenanceScheduleRepo, () => ({
+    resourceId: resource.id,
+    name: `Seed schedule interval ${seedTag}`,
+    triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+    enabled: true,
+  }));
+  await ensureEntity(maintenanceScheduleTimeIntervalConfigRepo, () => ({
+    scheduleId: scheduleTimeInterval.id,
+    intervalDays: 30,
+    thresholdHours: null,
   }));
 
   const flowNode = await ensureEntity(flowNodeRepo, () => ({

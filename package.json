@@ -224,5 +224,10 @@
   },
   "nx": {
     "includedScripts": []
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "typeorm@0.3.28": "patches/typeorm@0.3.28.patch"
+    }
   }
 }

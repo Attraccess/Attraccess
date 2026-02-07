@@ -2074,6 +2074,107 @@ export type CreateMaintenanceDto = {
     reason?: string;
 };
 
+/**
+ * The type of trigger for this schedule
+ */
+export enum ResourceMaintenanceScheduleTriggerType {
+    USAGE_HOURS = 'USAGE_HOURS',
+    USAGE_COUNT = 'USAGE_COUNT',
+    TIME_INTERVAL = 'TIME_INTERVAL'
+}
+
+export type ResourceMaintenanceScheduleUsageHoursConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
+     */
+    thresholdMinutes: number;
+};
+
+export type ResourceMaintenanceScheduleUsageCountConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Trigger after this many usage sessions (since last maintenance done for this schedule)
+     */
+    thresholdSessions: number;
+};
+
+export type ResourceMaintenanceScheduleTimeIntervalConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Recurring: trigger every N days (e.g. 30 for monthly)
+     */
+    intervalDays?: number;
+    /**
+     * Wall-clock: trigger after this many hours since last maintenance done for this schedule
+     */
+    thresholdHours?: number;
+};
+
+export type ResourceMaintenanceSchedule = {
+    /**
+     * The unique identifier of the maintenance schedule
+     */
+    id: number;
+    /**
+     * When the schedule was created
+     */
+    createdAt: string;
+    /**
+     * When the schedule was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Config when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: ResourceMaintenanceScheduleUsageHoursConfig;
+    /**
+     * Config when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: ResourceMaintenanceScheduleUsageCountConfig;
+    /**
+     * Config when triggerType is TIME_INTERVAL
+     */
+    timeIntervalConfig?: ResourceMaintenanceScheduleTimeIntervalConfig;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled: boolean;
+};
+
 export type ResourceMaintenance = {
     /**
      * The unique identifier of the maintenance
@@ -2103,6 +2204,26 @@ export type ResourceMaintenance = {
      * The reason for the maintenance
      */
     reason?: string;
+    /**
+     * The user who created/started the maintenance record
+     */
+    createdByUser?: {
+        [key: string]: unknown;
+    };
+    /**
+     * The user who marked the maintenance as done
+     */
+    completedByUser?: {
+        [key: string]: unknown;
+    };
+    /**
+     * When the maintenance was marked as done
+     */
+    completedAt?: string | null;
+    /**
+     * The schedule that triggered this maintenance (null for manual)
+     */
+    maintenanceSchedule?: ResourceMaintenanceSchedule;
 };
 
 export type PaginatedMaintenanceResponse = {

@@ -41,6 +41,13 @@ import {
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
+import {
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTriggerType,
+} from './entities/resource-maintenance-schedule.entity';
+import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
+import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
 import { ResourceUsageAction } from './entities/resourceUsage.type';
 import { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
@@ -85,6 +92,11 @@ export {
   ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceMaintenanceScheduleUsageCountConfig,
+  ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceType,
   ResourceUsageAction,
   ButtonNodeDataSchema,
@@ -136,6 +148,10 @@ export const entities = {
   ResourceFlowEdge,
   ResourceFlowLog,
   ResourceMaintenance,
+  ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceMaintenanceScheduleUsageCountConfig,
+  ResourceMaintenanceScheduleTimeIntervalConfig,
   BillingTransaction,
   ResourceBillingConfiguration,
   Setting,

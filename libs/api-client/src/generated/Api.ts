@@ -77,6 +77,13 @@ export enum BillingTransactionStatus {
   Failed = "failed",
 }
 
+/** The type of trigger for this schedule */
+export enum ResourceMaintenanceScheduleTriggerType {
+  USAGE_HOURS = "USAGE_HOURS",
+  USAGE_COUNT = "USAGE_COUNT",
+  TIME_INTERVAL = "TIME_INTERVAL",
+}
+
 /** The action performed (revoke or grant) */
 export enum IntroductionHistoryAction {
   Revoke = "revoke",
@@ -2122,6 +2129,104 @@ export interface CreateMaintenanceDto {
   reason?: string;
 }
 
+export interface ResourceMaintenanceScheduleUsageHoursConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
+   * @example 6000
+   */
+  thresholdMinutes: number;
+}
+
+export interface ResourceMaintenanceScheduleUsageCountConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Trigger after this many usage sessions (since last maintenance done for this schedule)
+   * @example 50
+   */
+  thresholdSessions: number;
+}
+
+export interface ResourceMaintenanceScheduleTimeIntervalConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Recurring: trigger every N days (e.g. 30 for monthly)
+   * @example 30
+   */
+  intervalDays?: number;
+  /**
+   * Wall-clock: trigger after this many hours since last maintenance done for this schedule
+   * @example 500
+   */
+  thresholdHours?: number;
+}
+
+export interface ResourceMaintenanceSchedule {
+  /**
+   * The unique identifier of the maintenance schedule
+   * @example 1
+   */
+  id: number;
+  /**
+   * When the schedule was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the schedule was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /**
+   * The ID of the resource
+   * @example 1
+   */
+  resourceId: number;
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType: ResourceMaintenanceScheduleTriggerType;
+  /** Config when triggerType is USAGE_HOURS */
+  usageHoursConfig?: ResourceMaintenanceScheduleUsageHoursConfig;
+  /** Config when triggerType is USAGE_COUNT */
+  usageCountConfig?: ResourceMaintenanceScheduleUsageCountConfig;
+  /** Config when triggerType is TIME_INTERVAL */
+  timeIntervalConfig?: ResourceMaintenanceScheduleTimeIntervalConfig;
+  /**
+   * Whether the schedule is enabled
+   * @default true
+   * @example true
+   */
+  enabled: boolean;
+}
+
 export interface ResourceMaintenance {
   /**
    * The unique identifier of the maintenance
@@ -2157,6 +2262,17 @@ export interface ResourceMaintenance {
   endTime?: string | null;
   /** The reason for the maintenance */
   reason?: string;
+  /** The user who created/started the maintenance record */
+  createdByUser?: object;
+  /** The user who marked the maintenance as done */
+  completedByUser?: object;
+  /**
+   * When the maintenance was marked as done
+   * @format date-time
+   */
+  completedAt?: string | null;
+  /** The schedule that triggered this maintenance (null for manual) */
+  maintenanceSchedule?: ResourceMaintenanceSchedule;
 }
 
 export interface PaginatedMaintenanceResponse {

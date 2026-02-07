@@ -3102,6 +3102,152 @@ export const $CreateMaintenanceDto = {
     required: ['startTime']
 } as const;
 
+export const $ResourceMaintenanceScheduleTriggerType = {
+    type: 'string',
+    enum: ['USAGE_HOURS', 'USAGE_COUNT', 'TIME_INTERVAL'],
+    description: 'The type of trigger for this schedule'
+} as const;
+
+export const $ResourceMaintenanceScheduleUsageHoursConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        thresholdMinutes: {
+            type: 'number',
+            description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)',
+            example: 6000
+        }
+    },
+    required: ['id', 'scheduleId', 'thresholdMinutes']
+} as const;
+
+export const $ResourceMaintenanceScheduleUsageCountConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        thresholdSessions: {
+            type: 'number',
+            description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)',
+            example: 50
+        }
+    },
+    required: ['id', 'scheduleId', 'thresholdSessions']
+} as const;
+
+export const $ResourceMaintenanceScheduleTimeIntervalConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        intervalDays: {
+            type: 'number',
+            description: 'Recurring: trigger every N days (e.g. 30 for monthly)',
+            example: 30
+        },
+        thresholdHours: {
+            type: 'number',
+            description: 'Wall-clock: trigger after this many hours since last maintenance done for this schedule',
+            example: 500
+        }
+    },
+    required: ['id', 'scheduleId']
+} as const;
+
+export const $ResourceMaintenanceSchedule = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the maintenance schedule',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the schedule was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the schedule was last updated'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource',
+            example: 1
+        },
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Config when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleUsageHoursConfig'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Config when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleUsageCountConfig'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Config when triggerType is TIME_INTERVAL',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTimeIntervalConfig'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled',
+            example: true,
+            default: true
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'triggerType', 'enabled']
+} as const;
+
 export const $ResourceMaintenance = {
     type: 'object',
     properties: {
@@ -3141,6 +3287,28 @@ export const $ResourceMaintenance = {
         reason: {
             type: 'string',
             description: 'The reason for the maintenance'
+        },
+        createdByUser: {
+            type: 'object',
+            description: 'The user who created/started the maintenance record'
+        },
+        completedByUser: {
+            type: 'object',
+            description: 'The user who marked the maintenance as done'
+        },
+        completedAt: {
+            type: 'string',
+            description: 'When the maintenance was marked as done',
+            nullable: true,
+            format: 'date-time'
+        },
+        maintenanceSchedule: {
+            description: 'The schedule that triggered this maintenance (null for manual)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceSchedule'
+                }
+            ]
         }
     },
     required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'startTime']
