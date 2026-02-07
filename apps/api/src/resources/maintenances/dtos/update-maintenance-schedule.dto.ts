@@ -8,7 +8,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ResourceMaintenanceScheduleTriggerType } from '../../../../../../libs/database-entities/src/index';
+import { ResourceMaintenanceScheduleTriggerType } from '@attraccess/database-entities';
 import { UsageHoursTriggerConfigDto } from './usage-hours-trigger-config.dto';
 import { UsageCountTriggerConfigDto } from './usage-count-trigger-config.dto';
 import { TimeIntervalTriggerConfigDto } from './time-interval-trigger-config.dto';

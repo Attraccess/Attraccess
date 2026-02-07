@@ -2236,6 +2236,13 @@ export type PaginatedMaintenanceResponse = {
     data: Array<ResourceMaintenance>;
 };
 
+export type FinishMaintenanceDto = {
+    /**
+     * Optional notes when marking the maintenance as done
+     */
+    notes?: string;
+};
+
 export type UpdateMaintenanceDto = {
     /**
      * When the maintenance starts (must be in the future)
@@ -4475,6 +4482,20 @@ export type CancelMaintenanceData = {
 };
 
 export type CancelMaintenanceResponse = void;
+
+export type FinishMaintenanceData = {
+    /**
+     * The ID of the maintenance
+     */
+    maintenanceId: number;
+    requestBody: FinishMaintenanceDto;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+};
+
+export type FinishMaintenanceResponse = ResourceMaintenance;
 
 export type GetBillingBalanceData = {
     userId: number;
@@ -6795,6 +6816,33 @@ export type $OpenApiTs = {
                  * Maintenance cancelled successfully
                  */
                 204: void;
+                /**
+                 * Unauthorized - User is not authenticated
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to manage maintenances for this resource
+                 */
+                403: unknown;
+                /**
+                 * Maintenance not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenances/{maintenanceId}/finish': {
+        post: {
+            req: FinishMaintenanceData;
+            res: {
+                /**
+                 * Maintenance marked as done successfully
+                 */
+                200: ResourceMaintenance;
+                /**
+                 * Bad request - maintenance is already finished
+                 */
+                400: unknown;
                 /**
                  * Unauthorized - User is not authenticated
                  */

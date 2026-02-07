@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
-import { ResourceMaintenance, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceMaintenance, ResourceMaintenanceSchedule, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 import { UpdateMaintenanceDto } from './dtos/updateMaintenance.dto';
 import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
@@ -63,9 +63,45 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Finish a maintenance (set end time to current time)
+   * Create a maintenance from a schedule trigger (system-created). Used by the schedule evaluator.
    */
-  async finishMaintenance(maintenanceId: number): Promise<ResourceMaintenance> {
+  async createMaintenanceFromSchedule(
+    resourceId: number,
+    scheduleId: number,
+    reason: string,
+  ): Promise<ResourceMaintenance> {
+    const resource = await this.resourceRepository.findOne({
+      where: { id: resourceId },
+    });
+
+    if (!resource) {
+      throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+    }
+
+    const now = new Date();
+    const maintenance = this.maintenanceRepository.create({
+      resource,
+      startTime: now,
+      endTime: null,
+      reason,
+      maintenanceSchedule: { id: scheduleId } as ResourceMaintenanceSchedule,
+    });
+
+    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
+    );
+    return savedMaintenance;
+  }
+
+  /**
+   * Finish a maintenance (set end time, completedAt, and optionally completedBy from the calling user).
+   */
+  async finishMaintenance(
+    maintenanceId: number,
+    options?: { userId?: number; notes?: string },
+  ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: maintenanceId },
     });
@@ -78,7 +114,12 @@ export class ResourceMaintenanceService {
       throw new BadRequestException('Maintenance is already finished');
     }
 
-    maintenance.endTime = new Date();
+    const now = new Date();
+    maintenance.endTime = now;
+    maintenance.completedAt = now;
+    if (options?.userId != null) {
+      maintenance.completedByUser = { id: options.userId } as User;
+    }
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,

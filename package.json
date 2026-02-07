@@ -6,7 +6,7 @@
     "serve": "nx run-many -t serve --projects=api,frontend --outputStyle=stream",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
-    "precommit": "pnpm nx affected --nxBail -t lint,typecheck,build,test,e2e --files=\"$(git diff --name-only --cached)\"",
+    "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts"
   },

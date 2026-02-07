@@ -8,10 +8,12 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   Resource,
   ResourceIntroducer,
+  ResourceUsage,
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceController } from './maintenance.controller';
 import { CanManageMaintenanceGuard } from './canManageMaintenance.guard';
+import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 @Module({
   imports: [
@@ -23,10 +25,11 @@ import { CanManageMaintenanceGuard } from './canManageMaintenance.guard';
       ResourceMaintenanceScheduleTimeIntervalConfig,
       Resource,
       ResourceIntroducer,
+      ResourceUsage,
     ]),
   ],
   controllers: [ResourceMaintenanceController],
-  providers: [ResourceMaintenanceService, CanManageMaintenanceGuard],
+  providers: [ResourceMaintenanceService, CanManageMaintenanceGuard, MaintenanceScheduleEvaluatorService],
   exports: [ResourceMaintenanceService],
 })
 export class ResourceMaintenanceModule { }

@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceMaintenanceController } from './maintenance.controller';
 import { ResourceMaintenanceService } from './maintenance.service';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 // Mock the decorator
 jest.mock('./canManageMaintenance.decorator', () => ({
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  CanManageMaintenance: () => () => {},
+  CanManageMaintenance: () => () => { },
 }));
 
 const mockResource = {
@@ -41,6 +42,7 @@ describe('ResourceMaintenanceController', () => {
             findMaintenances: jest.fn(),
             getMaintenanceById: jest.fn(),
             updateMaintenance: jest.fn(),
+            finishMaintenance: jest.fn(),
             cancelMaintenance: jest.fn(),
             canManageMaintenance: jest.fn(),
           },
@@ -143,6 +145,22 @@ describe('ResourceMaintenanceController', () => {
       expect(result).toEqual(updatedMaintenance);
       expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.updateMaintenance).toHaveBeenCalledWith(1, dto);
+    });
+  });
+
+  describe('finishMaintenance', () => {
+    it('should mark a maintenance as done', async () => {
+      const finishedMaintenance = { ...mockMaintenance, endTime: new Date(), completedAt: new Date() };
+      const mockRequest = { user: { id: 42 } };
+
+      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
+      jest.spyOn(service, 'finishMaintenance').mockResolvedValue(finishedMaintenance);
+
+      const result = await controller.finishMaintenance(1, 1, { notes: 'Done' }, mockRequest as AuthenticatedRequest);
+
+      expect(result).toEqual(finishedMaintenance);
+      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
+      expect(service.finishMaintenance).toHaveBeenCalledWith(1, { userId: 42, notes: 'Done' });
     });
   });
 

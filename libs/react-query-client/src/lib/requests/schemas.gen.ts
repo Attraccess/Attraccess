@@ -3337,6 +3337,17 @@ export const $PaginatedMaintenanceResponse = {
     required: ['total', 'page', 'limit', 'data']
 } as const;
 
+export const $FinishMaintenanceDto = {
+    type: 'object',
+    properties: {
+        notes: {
+            type: 'string',
+            description: 'Optional notes when marking the maintenance as done',
+            example: 'Replaced filter, cleaned nozzle'
+        }
+    }
+} as const;
+
 export const $UpdateMaintenanceDto = {
     type: 'object',
     properties: {

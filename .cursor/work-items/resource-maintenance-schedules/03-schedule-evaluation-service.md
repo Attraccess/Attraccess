@@ -58,3 +58,12 @@ Implement the logic that evaluates maintenance schedules and automatically creat
 - When there is already an active maintenance, no duplicate is created.
 - TIME_INTERVAL is evaluated correctly for both recurring (intervalDays) and wall-clock threshold (thresholdHours) configs. Baseline is always last maintenance done for this schedule.
 - Evaluation runs periodically (and optionally on usage events); tests cover at least one trigger type and edge cases.
+
+---
+
+## Progress notes (agent)
+
+- **Done**: `MaintenanceScheduleEvaluatorService` added at `apps/api/src/resources/maintenances/maintenance-schedule-evaluator.service.ts`. Evaluates USAGE_HOURS (sum usage minutes since baseline), USAGE_COUNT (session count since baseline), TIME_INTERVAL (intervalDays and thresholdHours). Baseline = last completed maintenance for this schedule, or resource.createdAt.
+- **Done**: `ResourceMaintenanceService.createMaintenanceFromSchedule(resourceId, scheduleId, reason)` added for system-created maintenances; emits `ResourceMaintenanceChangedEvent`.
+- **Done**: Cron `@Cron(CronExpression.EVERY_5_MINUTES)` runs `evaluateAll()`; in-process lock prevents overlapping runs. Event-driven on session end not implemented; can be added later by calling `evaluateResource(resourceId)` from usage end handler.
+- **Done**: Unit tests in `maintenance-schedule-evaluator.service.spec.ts` cover: getBaselineDate (no previous / with previous), evaluateResource with hasActiveMaintenance (no create), USAGE_HOURS threshold met/not met, TIME_INTERVAL intervalDays due, disabled schedule skipped, evaluateAll calls evaluateResource per resource.
