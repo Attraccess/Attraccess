@@ -1,0 +1,8 @@
+{
+  "title": "Anwendung",
+  "subtitle": "Basis-URLs und Lizenzkonfiguration",
+  "licenseStatus": {
+    "configured": "Lizenz konfiguriert",
+    "missing": "Lizenz fehlt"
+  }
+}

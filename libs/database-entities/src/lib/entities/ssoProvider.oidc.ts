@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 import { SystemPermission } from './user.entity';
 
@@ -66,7 +67,9 @@ export class SSOProviderOIDCConfiguration {
   @ApiProperty({
     description: 'The client secret of the provider',
     example: '1234567890',
+    writeOnly: true,
   })
+  @Exclude()
   clientSecret!: string;
 
   @Column({ type: 'simple-array', nullable: true })

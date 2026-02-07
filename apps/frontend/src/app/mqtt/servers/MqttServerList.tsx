@@ -18,7 +18,7 @@ import { useState } from 'react';
 import {
   useMqttServiceMqttServersGetAll,
   useMqttServiceMqttServersDeleteOne,
-  UseMqttServiceMqttServersGetAllKeyFn,
+  useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -85,7 +85,7 @@ export function MqttServerList() {
         description: t('serverDeletedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [UseMqttServiceMqttServersGetAllKeyFn()[0]],
+        queryKey: [useMqttServiceMqttServersGetAllKey],
       });
       onClose();
     },

@@ -1,0 +1,94 @@
+{
+  "title": "Einstellungen",
+  "subtitle": "Systemkonfiguration verwalten",
+  "loading": "Einstellungen werden geladen...",
+  "actions": {
+    "save": "Speichern"
+  },
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Deine Änderungen wurden übernommen."
+  },
+  "firstTimeSetup": {
+    "title": "Ersteinrichtung",
+    "subtitle": "Konfiguriere deine Instanz, bevor du Benutzer erstellst",
+    "note": "Diese Einstellungen können später von einem Admin geändert werden.",
+    "loading": "Einrichtungsstatus wird geprüft...",
+    "actions": {
+      "save": "Einstellungen speichern"
+    },
+    "success": {
+      "title": "Einrichtung abgeschlossen",
+      "description": "Du kannst jetzt den ersten Benutzer erstellen."
+    }
+  },
+  "sections": {
+    "app": {
+      "title": "Anwendung",
+      "subtitle": "Basis-URLs und Lizenzkonfiguration",
+      "licenseStatus": {
+        "configured": "Lizenz konfiguriert",
+        "missing": "Lizenz fehlt"
+      },
+      "inputs": {
+        "frontendUrl": {
+          "label": "Frontend-URL",
+          "description": "URL, unter der Benutzer das Frontend erreichen."
+        },
+        "backendUrl": {
+          "label": "Backend-URL",
+          "description": "URL für API-Callbacks und interne Links."
+        },
+        "publicInternetUrl": {
+          "label": "Öffentliche Internet-URL",
+          "description": "Optionale URL für externe Callbacks (z. B. SumUp)."
+        },
+        "licenseKey": {
+          "label": "Lizenzschlüssel",
+          "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein."
+        }
+      }
+    },
+    "smtp": {
+      "title": "E-Mail (SMTP)",
+      "subtitle": "Konfiguration für ausgehende E-Mails",
+      "passwordStatus": {
+        "configured": "Passwort konfiguriert",
+        "missing": "Passwort fehlt"
+      },
+      "service": {
+        "none": "Deaktiviert",
+        "smtp": "SMTP",
+        "outlook": "Outlook 365"
+      },
+      "inputs": {
+        "service": {
+          "label": "Dienst"
+        },
+        "host": {
+          "label": "Host",
+          "description": "Hostname des SMTP-Servers."
+        },
+        "port": {
+          "label": "Port",
+          "description": "Port des SMTP-Servers."
+        },
+        "secure": {
+          "label": "TLS verwenden"
+        },
+        "user": {
+          "label": "Benutzername",
+          "description": "Optionaler Benutzername für SMTP-Authentifizierung."
+        },
+        "pass": {
+          "label": "Passwort",
+          "description": "Leer lassen, um das aktuelle Passwort beizubehalten."
+        },
+        "from": {
+          "label": "Absenderadresse",
+          "description": "Standard-Absenderadresse für ausgehende E-Mails."
+        }
+      }
+    }
+  }
+}

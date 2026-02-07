@@ -1,0 +1,29 @@
+{
+  "inputs": {
+    "frontendUrl": {
+      "label": "Frontend-URL",
+      "description": "URL, unter der Benutzer das Frontend erreichen."
+    },
+    "backendUrl": {
+      "label": "Backend-URL",
+      "description": "URL für API-Callbacks und interne Links."
+    },
+    "publicInternetUrl": {
+      "label": "Öffentliche Internet-URL",
+      "description": "Optionale URL für externe Callbacks (z. B. SumUp)."
+    },
+    "licenseKey": {
+      "label": "Lizenzschlüssel",
+      "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein."
+    }
+  },
+  "actions": {
+    "save": "Speichern",
+    "next": "Weiter"
+  },
+  "loading": "Einstellungen werden geladen...",
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Deine Änderungen wurden übernommen."
+  }
+}

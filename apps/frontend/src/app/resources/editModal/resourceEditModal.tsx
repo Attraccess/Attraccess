@@ -17,12 +17,12 @@ import de from './resourceEditModal.de.json';
 import {
   useResourcesServiceUpdateOneResource,
   UpdateResourceDto,
-  UseResourcesServiceGetAllResourcesKeyFn,
   Resource,
   useResourcesServiceGetOneResourceById,
   UseResourcesServiceGetOneResourceByIdKeyFn,
   useResourcesServiceCreateOneResource,
   ResourceType,
+  useResourcesServiceGetAllResourcesKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -78,7 +78,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
       }
 
       queryClient.invalidateQueries({
-        queryKey: [UseResourcesServiceGetAllResourcesKeyFn()[0]],
+        queryKey: [useResourcesServiceGetAllResourcesKey],
       });
 
       if (props.resourceId) {

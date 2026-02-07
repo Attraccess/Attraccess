@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EncryptionService } from '../encryption/encryption.service';
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
@@ -71,6 +72,7 @@ describe('MqttClientService', () => {
     mockRepository = {
       findOne: jest.fn(),
       findOneBy: jest.fn().mockResolvedValue(mockServer),
+      update: jest.fn(),
     };
 
     mockEventEmitter = {
@@ -87,6 +89,14 @@ describe('MqttClientService', () => {
         {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
+        },
+        {
+          provide: EncryptionService,
+          useValue: {
+            isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
+            encrypt: jest.fn((value: string) => `enc:${value}`),
+            decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
+          },
         },
       ],
     }).compile();

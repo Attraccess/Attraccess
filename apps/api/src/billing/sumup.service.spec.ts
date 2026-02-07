@@ -4,10 +4,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { SumUpService, SUMUP_TOPUP_TRANSACTION_PREFIX } from './sumup.service';
 import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
 import { EncryptionService } from '../encryption/encryption.service';
-import { ConfigService } from '@nestjs/config';
 import { BillingService } from './billing.service';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
+import { SettingsService } from '../settings/settings.service';
 
 // Mock @sumup/sdk
 const mockMerchantGet = jest.fn();
@@ -59,8 +59,8 @@ describe('SumUpService', () => {
     getConfiguration: jest.fn(),
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockConfigService: any = {
-    get: jest.fn(),
+  const mockSettingsService: any = {
+    getPublicInternetUrl: jest.fn(),
   };
 
   let service: SumUpService;
@@ -93,13 +93,13 @@ describe('SumUpService', () => {
     mockEncryptionService.decrypt.mockReset();
     mockLiveNotificationsService.notifyTransactionUpdate.mockReset();
     mockBillingService.getConfiguration.mockReset();
-    mockConfigService.get.mockReset();
+    mockSettingsService.getPublicInternetUrl.mockReset();
   };
 
   beforeEach(async () => {
     resetAllMocks();
 
-    mockConfigService.get.mockReturnValue({ ATTRACCESS_PUBLIC_INTERNET_URL: 'https://example.com' });
+    mockSettingsService.getPublicInternetUrl.mockResolvedValue('https://example.com');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,7 +107,7 @@ describe('SumUpService', () => {
         { provide: getRepositoryToken(Setting), useValue: mockSettingRepository },
         { provide: getRepositoryToken(BillingTransaction), useValue: mockBillingTransactionRepository },
         { provide: EncryptionService, useValue: mockEncryptionService },
-        { provide: ConfigService, useValue: mockConfigService },
+        { provide: SettingsService, useValue: mockSettingsService },
         { provide: LiveNotificationsService, useValue: mockLiveNotificationsService },
         { provide: BillingService, useValue: mockBillingService },
       ],
