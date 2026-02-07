@@ -39,7 +39,7 @@ Define the trigger types and their configuration schemas for maintenance schedul
 ## Code references
 - Usage entity (minutes, sessions): `libs/database-entities/src/lib/entities/resourceUsage.entity.ts`
 - Resource usage query examples: `apps/api/src/projects/project-usage.service.ts`, `apps/api/src/resources/usage/resourceUsage.service.ts`
-- Flow node data schemas (pattern): `libs/database-entities/src/lib/entities/resourceFlowNode.ts` (Zod schemas per type)
+- Existing DTO/validation pattern: `apps/api/src/resources/maintenances/dtos/createMaintenance.dto.ts`, `apps/api/src/resources/dtos/createResource.dto.ts` (ValidateIf, ValidateNested, class-validator)
 
 ## Dependencies
 - Work item 01 (ResourceMaintenanceSchedule and ResourceMaintenance with optional schedule link).
@@ -50,6 +50,32 @@ Define the trigger types and their configuration schemas for maintenance schedul
 
 ## Acceptance criteria
 - Trigger type enum is defined and used by `ResourceMaintenanceSchedule` (USAGE_HOURS, USAGE_COUNT, TIME_INTERVAL).
-- Each trigger type has a defined config schema and validation; invalid config is rejected.
-- TIME_INTERVAL supports both recurring (intervalDays) and wall-clock threshold (thresholdHours) configs. Baseline is always last maintenance done for this schedule.
+- Each trigger type has a defined config DTO and validation (class-validator); invalid config is rejected.
+- TIME_INTERVAL supports both recurring (intervalDays) and wall-clock threshold (thresholdHours) configs; exactly one required. Baseline is always last maintenance done for this schedule.
 - Docs or JSDoc describe each type and config for other agents.
+
+---
+
+## Progress notes (implementation)
+
+**Status:** Done (refactored to use Nest DTOs and class-validator; no Zod).
+
+**Completed:**
+
+1. **Trigger type enum**  
+   - Already defined in work item 01: `ResourceMaintenanceScheduleTriggerType` in `resource-maintenance-schedule.entity.ts` with `USAGE_HOURS`, `USAGE_COUNT`, `TIME_INTERVAL`. Used by the entity and DB. No migration change.
+
+2. **Trigger config DTOs (class-validator)**  
+   - **USAGE_HOURS**: `UsageHoursTriggerConfigDto` in `apps/api/src/resources/maintenances/dtos/usage-hours-trigger-config.dto.ts`.  
+   - **USAGE_COUNT**: `UsageCountTriggerConfigDto` in `apps/api/src/resources/maintenances/dtos/usage-count-trigger-config.dto.ts`.  
+   - **TIME_INTERVAL**: `TimeIntervalTriggerConfigDto` with custom `ExactlyOneOf` in `time-interval-trigger-config.dto.ts` and `validators/exactly-one-of.validator.ts`.  
+   - **Create/Update schedule**: `CreateMaintenanceScheduleDto` and `UpdateMaintenanceScheduleDto` use `@ValidateIf` + `@IsDefined()` + `@ValidateNested()` + `@Type()` for the matching config.  
+   - Config entities in database-entities remain the source of shape; DTOs mirror them for API request validation.
+
+3. **Validation in API**  
+   - No separate validation helper: Nest's global `ValidationPipe` and the DTOs handle validation. Schedule CRUD endpoints (work item 07) should use `CreateMaintenanceScheduleDto` / `UpdateMaintenanceScheduleDto` in the controller.
+
+4. **Documentation**  
+   - `apps/api/src/resources/maintenances/TRIGGER_TYPES.md` describes trigger types, config fields, examples, and references to DTOs and class-validator.
+
+**Refactor note:** Previously implemented with Zod; refactored to use Nest decorators and DTOs only, consistent with the rest of the API (entities/DTOs, class-validator).

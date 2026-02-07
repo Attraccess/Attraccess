@@ -11,7 +11,7 @@ This folder contains **work items** for the feature: **Resource Maintenance Sche
 | # | File | Summary | Depends on |
 |---|------|---------|------------|
 | 01 | `01-maintenance-schedules-data-model.md` | New `ResourceMaintenanceSchedule` entity; extend `ResourceMaintenance` with audit fields and optional `maintenanceScheduleId` | — |
-| 02 | `02-schedule-trigger-types.md` | Trigger types (USAGE_HOURS, USAGE_COUNT, TIME_INTERVAL) and config schemas | 01 |
+| 02 | `02-schedule-trigger-types.md` | Trigger types (USAGE_HOURS, USAGE_COUNT, TIME_INTERVAL) and config DTOs (class-validator) | 01 |
 | 03 | `03-schedule-evaluation-service.md` | Evaluate schedules (cron/event), create maintenance when triggered | 01, 02 |
 | 05 | `05-mark-as-done-and-permissions.md` | Finish endpoint, permissions, set completedBy/completedAt | 01 |
 | 06 | `06-audit-and-documentation-who-when.md` | Set createdBy on create; expose and show “who did maintenance when” in API and UI | 01, 05 |
