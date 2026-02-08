@@ -25,9 +25,15 @@ export class ResourceMaintenanceService {
   ) {}
 
   /**
-   * Create a maintenance for a given resource
+   * Create a maintenance for a given resource.
+   * When called from the API (manual create), pass userId to record the creating user.
+   * System-created maintenances (schedule evaluator) omit userId so createdByUser stays null.
    */
-  async createMaintenance(resourceId: number, dto: CreateMaintenanceDto): Promise<ResourceMaintenance> {
+  async createMaintenance(
+    resourceId: number,
+    dto: CreateMaintenanceDto,
+    userId?: number,
+  ): Promise<ResourceMaintenance> {
     // Verify the resource exists
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
@@ -52,6 +58,7 @@ export class ResourceMaintenanceService {
       startTime,
       endTime: dto.endTime ? new Date(dto.endTime) : null,
       reason: dto.reason || null,
+      createdByUser: userId != null ? ({ id: userId } as User) : undefined,
     });
 
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
@@ -248,6 +255,11 @@ export class ResourceMaintenanceService {
     // Get total count
     const total = await queryBuilder.getCount();
 
+    // Load audit relations for "who did maintenance when" display
+    queryBuilder
+      .leftJoinAndSelect('maintenance.createdByUser', 'createdByUser')
+      .leftJoinAndSelect('maintenance.completedByUser', 'completedByUser');
+
     // Get paginated results
     const data = await queryBuilder.skip(skip).take(limit).getMany();
 
@@ -260,11 +272,12 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Get a specific maintenance by ID
+   * Get a specific maintenance by ID (includes createdByUser and completedByUser for audit display).
    */
   async getMaintenanceById(maintenanceId: number): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: maintenanceId },
+      relations: ['createdByUser', 'completedByUser'],
     });
 
     if (!maintenance) {

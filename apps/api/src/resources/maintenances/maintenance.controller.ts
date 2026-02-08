@@ -104,9 +104,10 @@ export class ResourceMaintenanceController {
   })
   async createMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: CreateMaintenanceDto
+    @Body() dto: CreateMaintenanceDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto);
+    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
   }
 
   @Get()

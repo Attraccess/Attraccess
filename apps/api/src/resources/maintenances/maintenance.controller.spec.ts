@@ -59,18 +59,19 @@ describe('ResourceMaintenanceController', () => {
   });
 
   describe('createMaintenance', () => {
-    it('should create a maintenance', async () => {
+    it('should create a maintenance and pass the authenticated user id', async () => {
       const dto = {
         startTime: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
         reason: 'Test maintenance',
       };
+      const request = { user: { id: 42 } } as AuthenticatedRequest;
 
       jest.spyOn(service, 'createMaintenance').mockResolvedValue(mockMaintenance);
 
-      const result = await controller.createMaintenance(1, dto);
+      const result = await controller.createMaintenance(1, dto, request);
 
       expect(result).toEqual(mockMaintenance);
-      expect(service.createMaintenance).toHaveBeenCalledWith(1, dto);
+      expect(service.createMaintenance).toHaveBeenCalledWith(1, dto, 42);
     });
   });
 

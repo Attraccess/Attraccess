@@ -27,6 +27,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNow } from '../../../../../hooks/useNow';
+import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   resourceId: number;
@@ -207,6 +208,20 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
               )}
 
               <Textarea label={t('inputs.reason.label')} value={reason} onChange={(e) => setReason(e.target.value)} />
+
+              {existingMaintenance && (
+                <div className="rounded-lg border border-default-200 bg-default-50 p-3 text-sm">
+                  <div className="font-medium text-default-600 mb-2">{t('audit.createdBy')}: {(existingMaintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}</div>
+                  {existingMaintenance.endTime && (
+                    <>
+                      <div className="font-medium text-default-600 mb-1">{t('audit.completedBy')}: {(existingMaintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}</div>
+                      {existingMaintenance.completedAt && (
+                        <div className="font-medium text-default-600">{t('audit.completedAt')}: <DateTimeDisplay date={existingMaintenance.completedAt} /></div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {error ? (
                 <Alert color="danger" title={t('alert.error.title')} variant="flat">

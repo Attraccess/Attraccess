@@ -1,3 +1,9 @@
+/**
+ * Resource maintenance: manual and schedule-triggered maintenances.
+ * Manual maintenances record the creating user (createdByUser). Completed maintenances
+ * record the user who marked them done (completedByUser) and when (completedAt).
+ * System-created (schedule-triggered) maintenances have no creator until completed by a user.
+ */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {

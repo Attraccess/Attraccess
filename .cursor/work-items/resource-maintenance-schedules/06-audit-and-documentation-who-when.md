@@ -1,5 +1,13 @@
 # Work Item 06: Maintenance Audit and Documentation (Who Did Maintenance When)
 
+<!-- Progress: DONE.
+- 1) createMaintenance(resourceId, dto, userId?) in service; controller passes request.user?.id. createMaintenanceFromSchedule unchanged (no creator).
+- 2) findMaintenances: leftJoinAndSelect createdByUser, completedByUser. getMaintenanceById: relations ['createdByUser','completedByUser'].
+- 3) Frontend: table columns Created by, Completed by, Completed at; upsert modal shows audit block when existingMaintenance; i18n en/de (table.columns + audit in upsert).
+- 4) Doc note in maintenance.module.ts.
+- Optional list filters (createdByUserId, completedByUserId) not implemented per ticket.
+- Regenerate API client if needed (entity already had audit fields in OpenAPI). -->
+
 ## Goal
 Document who created and who completed each maintenance (and when), and expose this in APIs and UI so that “who did maintenance when” is visible for both manual and schedule-triggered maintenances.
 

@@ -1,18 +1,40 @@
 {
-  "title": "Maintenance",
-  "filters": { "includePast": "Include past" },
-  "table": { "ariaLabel": "Maintenance", "columns": { "start": "Start", "end": "End", "reason": "Reason" } },
-  "actions": {
-    "create": { "title": "Create maintenance period", "label": "New" },
-    "markDone": { "title": "Mark as done" }
-  },
-  "reason": {
-    "auto": {
-      "usageHours": "Auto: {{hours}} usage hours reached",
-      "usageCount": "Auto: {{count}} usage sessions reached",
-      "intervalDays": "Auto: recurring every {{days}} days",
-      "thresholdHours": "Auto: {{hours}} hours since last maintenance",
-      "fallback": "Auto: schedule {{scheduleId}}"
+    "title": "Maintenance",
+    "filters": {
+        "includePast": "Include past"
+    },
+    "table": {
+        "ariaLabel": "Maintenance",
+        "columns": {
+            "start": "Start",
+            "end": "End",
+            "reason": "Reason",
+            "createdBy": "Created by",
+            "completedBy": "Completed by",
+            "completedAt": "Completed at"
+        }
+    },
+    "actions": {
+        "create": {
+            "title": "Create maintenance period",
+            "label": "New"
+        },
+        "markDone": {
+            "title": "Mark as done"
+        }
+    },
+    "reason": {
+        "auto": {
+            "usageHours": "Auto: {{hours}} usage hours reached",
+            "usageCount": "Auto: {{count}} usage sessions reached",
+            "intervalDays": "Auto: recurring every {{days}} days",
+            "thresholdHours": "Auto: {{hours}} hours since last maintenance",
+            "fallback": "Auto: schedule {{scheduleId}}"
+        }
+    },
+    "audit": {
+        "createdBy": "Created by",
+        "completedBy": "Completed by",
+        "completedAt": "Completed at"
     }
-  }
 }

@@ -131,6 +131,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
             <TableColumn>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
             <TableColumn>{t('table.columns.reason')}</TableColumn>
+            <TableColumn>{t('table.columns.createdBy')}</TableColumn>
+            <TableColumn>{t('table.columns.completedBy')}</TableColumn>
+            <TableColumn>{t('table.columns.completedAt')}</TableColumn>
             <TableColumn>
               <CogIcon />
             </TableColumn>
@@ -151,6 +154,19 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 </TableCell>
                 <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
                   {formatReason(maintenance.reason)}
+                </TableCell>
+                <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
+                  {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
+                </TableCell>
+                <TableCell title={(maintenance.completedByUser as { username?: string } | undefined)?.username ?? ''}>
+                  {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
+                </TableCell>
+                <TableCell>
+                  {maintenance.completedAt ? (
+                    <DateTimeDisplay date={maintenance.completedAt} />
+                  ) : (
+                    '—'
+                  )}
                 </TableCell>
                 <TableCell align="right">
                   {maintenance.isActive && (
