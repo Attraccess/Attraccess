@@ -20,6 +20,8 @@ import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceController } from './maintenance.controller';
 import { CanManageMaintenanceGuard } from './canManageMaintenance.guard';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
+import { MaintenanceScheduleService } from './maintenance-schedule.service';
+import { MaintenanceScheduleController } from './maintenance-schedule.controller';
 
 @Module({
   imports: [
@@ -34,8 +36,13 @@ import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-eval
       ResourceUsage,
     ]),
   ],
-  controllers: [ResourceMaintenanceController],
-  providers: [ResourceMaintenanceService, CanManageMaintenanceGuard, MaintenanceScheduleEvaluatorService],
+  controllers: [ResourceMaintenanceController, MaintenanceScheduleController],
+  providers: [
+    ResourceMaintenanceService,
+    CanManageMaintenanceGuard,
+    MaintenanceScheduleEvaluatorService,
+    MaintenanceScheduleService,
+  ],
   exports: [ResourceMaintenanceService],
 })
 export class ResourceMaintenanceModule { }

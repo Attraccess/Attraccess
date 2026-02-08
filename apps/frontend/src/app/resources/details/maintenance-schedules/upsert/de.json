@@ -1,0 +1,21 @@
+{
+  "title": "Wartungsplan",
+  "titleCreate": "Plan hinzufügen",
+  "titleEdit": "Plan bearbeiten",
+  "triggerType": {
+    "USAGE_HOURS": "Nutzungsstunden",
+    "USAGE_COUNT": "Nutzungsanzahl",
+    "TIME_INTERVAL": "Zeitintervall"
+  },
+  "inputs": {
+    "name": { "label": "Name (optional)" },
+    "triggerType": { "label": "Auslösertyp" },
+    "thresholdMinutes": { "label": "Nutzungsminuten-Schwellwert" },
+    "thresholdSessions": { "label": "Sitzungsanzahl-Schwellwert" },
+    "intervalDays": { "label": "Intervall (Tage)" },
+    "thresholdHours": { "label": "Stunden seit letzter Wartung" },
+    "enabled": { "label": "Aktiv" }
+  },
+  "actions": { "save": "Speichern" },
+  "alert": { "error": { "title": "Fehler beim Speichern" } }
+}

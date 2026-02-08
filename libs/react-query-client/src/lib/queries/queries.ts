@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceDto, UpdateMaintenanceScheduleDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
 export const useUsersServiceGetLocalSignupDomainWhitelist = <TData = Common.UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(queryKey), queryFn: () => UsersService.getLocalSignupDomainWhitelist() as TData, ...options });
@@ -145,6 +145,13 @@ export const useResourceMaintenancesServiceGetMaintenance = <TData = Common.Reso
   maintenanceId: number;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenancesServiceGetMaintenanceKeyFn({ maintenanceId, resourceId }, queryKey), queryFn: () => ResourceMaintenancesService.getMaintenance({ maintenanceId, resourceId }) as TData, ...options });
+export const useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules = <TData = Common.ResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKeyFn({ resourceId }, queryKey), queryFn: () => ResourceMaintenanceSchedulesService.findMaintenanceSchedules({ resourceId }) as TData, ...options });
+export const useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule = <TData = Common.ResourceMaintenanceSchedulesServiceGetMaintenanceScheduleDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, scheduleId }: {
+  resourceId: number;
+  scheduleId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenanceSchedulesServiceGetMaintenanceScheduleKeyFn({ resourceId, scheduleId }, queryKey), queryFn: () => ResourceMaintenanceSchedulesService.getMaintenanceSchedule({ resourceId, scheduleId }) as TData, ...options });
 export const useBillingServiceGetBillingBalance = <TData = Common.BillingServiceGetBillingBalanceDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ userId }: {
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingBalanceKeyFn({ userId }, queryKey), queryFn: () => BillingService.getBillingBalance({ userId }) as TData, ...options });
@@ -531,6 +538,13 @@ export const useResourceMaintenancesServiceFinishMaintenance = <TData = Common.R
   requestBody: FinishMaintenanceDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ maintenanceId, requestBody, resourceId }) => ResourceMaintenancesService.finishMaintenance({ maintenanceId, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule = <TData = Common.ResourceMaintenanceSchedulesServiceCreateMaintenanceScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateMaintenanceScheduleDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateMaintenanceScheduleDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceMaintenanceSchedulesService.createMaintenanceSchedule({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
 export const useBillingServiceCreateManualTransaction = <TData = Common.BillingServiceCreateManualTransactionMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: ModifyBalanceDto;
   userId: number;
@@ -693,6 +707,15 @@ export const useResourceMaintenancesServiceUpdateMaintenance = <TData = Common.R
   requestBody: UpdateMaintenanceDto;
   resourceId: number;
 }, TContext>({ mutationFn: ({ maintenanceId, requestBody, resourceId }) => ResourceMaintenancesService.updateMaintenance({ maintenanceId, requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule = <TData = Common.ResourceMaintenanceSchedulesServiceUpdateMaintenanceScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateMaintenanceScheduleDto;
+  resourceId: number;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateMaintenanceScheduleDto;
+  resourceId: number;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId, scheduleId }) => ResourceMaintenanceSchedulesService.updateMaintenanceSchedule({ requestBody, resourceId, scheduleId }) as unknown as Promise<TData>, ...options });
 export const useResourceFlowsServiceSaveResourceFlow = <TData = Common.ResourceFlowsServiceSaveResourceFlowMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   requestBody: ResourceFlowSaveDto;
   resourceId: number;
@@ -836,6 +859,13 @@ export const useResourceMaintenancesServiceCancelMaintenance = <TData = Common.R
   maintenanceId: number;
   resourceId: number;
 }, TContext>({ mutationFn: ({ maintenanceId, resourceId }) => ResourceMaintenancesService.cancelMaintenance({ maintenanceId, resourceId }) as unknown as Promise<TData>, ...options });
+export const useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule = <TData = Common.ResourceMaintenanceSchedulesServiceDeleteMaintenanceScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ resourceId, scheduleId }) => ResourceMaintenanceSchedulesService.deleteMaintenanceSchedule({ resourceId, scheduleId }) as unknown as Promise<TData>, ...options });
 export const useBillingServiceRemoveSumUpReader = <TData = Common.BillingServiceRemoveSumUpReaderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   readerId: string;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {

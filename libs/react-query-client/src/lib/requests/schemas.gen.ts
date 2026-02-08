@@ -3372,6 +3372,145 @@ export const $UpdateMaintenanceDto = {
     }
 } as const;
 
+export const $UsageHoursTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        thresholdMinutes: {
+            type: 'number',
+            description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)',
+            example: 6000,
+            minimum: 1
+        }
+    },
+    required: ['thresholdMinutes']
+} as const;
+
+export const $UsageCountTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        thresholdSessions: {
+            type: 'number',
+            description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)',
+            example: 50,
+            minimum: 1
+        }
+    },
+    required: ['thresholdSessions']
+} as const;
+
+export const $TimeIntervalTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        intervalDays: {
+            type: 'number',
+            description: 'Recurring: trigger every N days (e.g. 30 for monthly)',
+            example: 30,
+            minimum: 1
+        },
+        thresholdHours: {
+            type: 'number',
+            description: 'Wall-clock: trigger after this many hours since last maintenance done for this schedule',
+            example: 500,
+            minimum: 0.01
+        }
+    }
+} as const;
+
+export const $CreateMaintenanceScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Required when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageHoursTriggerConfigDto'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Required when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageCountTriggerConfigDto'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled',
+            example: true,
+            default: true
+        }
+    },
+    required: ['triggerType']
+} as const;
+
+export const $UpdateMaintenanceScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Required when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageHoursTriggerConfigDto'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Required when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageCountTriggerConfigDto'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled'
+        }
+    }
+} as const;
+
 export const $BalanceDto = {
     type: 'object',
     properties: {

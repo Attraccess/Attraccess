@@ -1,0 +1,21 @@
+{
+  "title": "Maintenance schedule",
+  "titleCreate": "Add schedule",
+  "titleEdit": "Edit schedule",
+  "triggerType": {
+    "USAGE_HOURS": "Usage hours",
+    "USAGE_COUNT": "Usage count",
+    "TIME_INTERVAL": "Time interval"
+  },
+  "inputs": {
+    "name": { "label": "Name (optional)" },
+    "triggerType": { "label": "Trigger type" },
+    "thresholdMinutes": { "label": "Usage minutes threshold" },
+    "thresholdSessions": { "label": "Usage sessions threshold" },
+    "intervalDays": { "label": "Interval (days)" },
+    "thresholdHours": { "label": "Hours since last maintenance" },
+    "enabled": { "label": "Enabled" }
+  },
+  "actions": { "save": "Save" },
+  "alert": { "error": { "title": "Error saving schedule" } }
+}

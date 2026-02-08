@@ -1,0 +1,34 @@
+{
+  "title": "Maintenance schedules",
+  "table": {
+    "ariaLabel": "Maintenance schedules",
+    "columns": {
+      "name": "Name",
+      "triggerType": "Trigger",
+      "configSummary": "Config",
+      "enabled": "Enabled",
+      "actions": "Actions"
+    }
+  },
+  "triggerType": {
+    "USAGE_HOURS": "Usage hours",
+    "USAGE_COUNT": "Usage count",
+    "TIME_INTERVAL": "Time interval"
+  },
+  "configSummary": {
+    "usageHours": "Every {{minutes}} min usage",
+    "usageCount": "Every {{count}} sessions",
+    "intervalDays": "Every {{days}} days",
+    "thresholdHours": "After {{hours}} h since last"
+  },
+  "empty": "No schedules. Add one to trigger maintenance automatically.",
+  "actions": {
+    "add": "Add schedule",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "delete": {
+    "title": "Delete schedule",
+    "itemName": "schedule \"{{name}}\""
+  }
+}

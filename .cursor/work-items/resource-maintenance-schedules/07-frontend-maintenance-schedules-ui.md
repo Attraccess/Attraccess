@@ -57,3 +57,23 @@ Provide a UI for configuring multiple maintenance schedules per resource: list, 
 - User can list, create, edit, delete, and enable/disable maintenance schedules for a resource from the UI.
 - Trigger type and config are correctly represented and validated.
 - Only users with maintenance permission can change schedules; i18n is in place.
+
+---
+
+## Progress notes (work item 07)
+
+### Done
+- **API**: Added `MaintenanceScheduleService` and `MaintenanceScheduleController` in `apps/api/src/resources/maintenances/`:
+  - `GET/POST resources/:resourceId/maintenance-schedules`, `GET/PUT/DELETE .../maintenance-schedules/:scheduleId`
+  - All write operations protected with `@CanManageMaintenance()`.
+- **Client**: After you ran `pnpm nx build react-query-client --skipNxCache`, the generated hooks are available: `useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules`, `useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule`, `useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule`, `useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule`, `useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule`. Query key: `useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey`.
+- **Frontend – Schedules list**: New card at `apps/frontend/src/app/resources/details/maintenance-schedules/index.tsx`: table with name, trigger type (translated), config summary, enabled (Switch), actions (edit, delete). Empty state with message. Card is shown on resource details only when `maintenancePermissions?.canManage` (same as Maintenance card).
+- **Frontend – Create/Edit modal**: `maintenance-schedules/upsert/index.tsx`: name (optional), trigger type (Select), dynamic config (threshold minutes / threshold sessions / interval days or threshold hours), enabled (Switch). Create and update mutations with list invalidation.
+- **Frontend – Delete**: `maintenance-schedules/ScheduleDeleteModal.tsx` using existing `DeleteConfirmationModal`; delete mutation and list invalidation.
+- **Frontend – Enable/disable**: Toggle in table calls update with `enabled: true/false`; list invalidated.
+- **i18n**: `maintenance-schedules/en.json`, `de.json` and `upsert/en.json`, `de.json` with title, table columns, trigger types, config summaries, empty state, actions, delete copy, form labels.
+- **Resource details**: `resourceDetails.tsx` updated to render `MaintenanceSchedules` next to `MaintenanceManagement` when user can manage maintenance.
+
+### Not done (optional)
+- **Link to maintenances (task 5)**: Maintenances table already shows schedule-triggered reasons via `formatReason` and reason JSON (e.g. “Auto: … (schedule name)”). No extra column added; can be done later if desired.
+- **Invalidate schedule list when maintenance is created/finished**: Not wired; only schedule CRUD invalidates the schedule list. Can add invalidation of `useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey` in the finish-maintenance and create-maintenance success callbacks if the UI later shows “last triggered” per schedule.

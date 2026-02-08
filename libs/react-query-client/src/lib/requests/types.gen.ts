@@ -2258,6 +2258,85 @@ export type UpdateMaintenanceDto = {
     reason?: string;
 };
 
+export type UsageHoursTriggerConfigDto = {
+    /**
+     * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
+     */
+    thresholdMinutes: number;
+};
+
+export type UsageCountTriggerConfigDto = {
+    /**
+     * Trigger after this many usage sessions (since last maintenance done for this schedule)
+     */
+    thresholdSessions: number;
+};
+
+export type TimeIntervalTriggerConfigDto = {
+    /**
+     * Recurring: trigger every N days (e.g. 30 for monthly)
+     */
+    intervalDays?: number;
+    /**
+     * Wall-clock: trigger after this many hours since last maintenance done for this schedule
+     */
+    thresholdHours?: number;
+};
+
+export type CreateMaintenanceScheduleDto = {
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Required when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: UsageHoursTriggerConfigDto;
+    /**
+     * Required when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: UsageCountTriggerConfigDto;
+    /**
+     * Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)
+     */
+    timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled?: boolean;
+};
+
+export type UpdateMaintenanceScheduleDto = {
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType?: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Required when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: UsageHoursTriggerConfigDto;
+    /**
+     * Required when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: UsageCountTriggerConfigDto;
+    /**
+     * Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)
+     */
+    timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled?: boolean;
+};
+
 export type BalanceDto = {
     /**
      * The balance of the user
@@ -4496,6 +4575,65 @@ export type FinishMaintenanceData = {
 };
 
 export type FinishMaintenanceResponse = ResourceMaintenance;
+
+export type FindMaintenanceSchedulesData = {
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+};
+
+export type FindMaintenanceSchedulesResponse = Array<ResourceMaintenanceSchedule>;
+
+export type CreateMaintenanceScheduleData = {
+    requestBody: CreateMaintenanceScheduleDto;
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+};
+
+export type CreateMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type GetMaintenanceScheduleData = {
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type GetMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type UpdateMaintenanceScheduleData = {
+    requestBody: UpdateMaintenanceScheduleDto;
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type UpdateMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type DeleteMaintenanceScheduleData = {
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type DeleteMaintenanceScheduleResponse = void;
 
 export type GetBillingBalanceData = {
     userId: number;
@@ -6853,6 +6991,115 @@ export type $OpenApiTs = {
                 403: unknown;
                 /**
                  * Maintenance not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenance-schedules': {
+        get: {
+            req: FindMaintenanceSchedulesData;
+            res: {
+                /**
+                 * List of schedules
+                 */
+                200: Array<ResourceMaintenanceSchedule>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+        post: {
+            req: CreateMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule created
+                 */
+                201: ResourceMaintenanceSchedule;
+                /**
+                 * Bad request
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenance-schedules/{scheduleId}': {
+        get: {
+            req: GetMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule
+                 */
+                200: ResourceMaintenanceSchedule;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Schedule not found
+                 */
+                404: unknown;
+            };
+        };
+        put: {
+            req: UpdateMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule updated
+                 */
+                200: ResourceMaintenanceSchedule;
+                /**
+                 * Bad request
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
+                /**
+                 * Schedule not found
+                 */
+                404: unknown;
+            };
+        };
+        delete: {
+            req: DeleteMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule deleted
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
+                /**
+                 * Schedule not found
                  */
                 404: unknown;
             };
