@@ -1,5 +1,17 @@
 # Work Item 08: Maintenance Mode and Usage Blocking – Verification and Docs
 
+---
+
+## Progress notes (agent)
+
+- **Backend verification (done):** `hasActiveMaintenance` in `maintenance.service.ts` only checks `resourceId`, `startTime <= now`, `endTime IS NULL` — no filter by origin. Schedule-created maintenances use the same table and are therefore included. All usage entry points call `getResource(..., { checkMaintenance: true })`: `startSession`, `lockDoor`, `unlockDoor`, `unlatchDoor`. No code path bypasses the maintenance check.
+- **Frontend verification (done):** `ResourceUsageSession` uses `useResourceMaintenancesServiceFindMaintenances` with `includeActive: true`. When the list has any active maintenances, it renders `MaintenanceInProgressDisplay` instead of `StartSessionControls`. Only inside `MaintenanceInProgressDisplay`, users with `canManage` see `StartSessionControls`. Schedule-triggered maintenances are returned by the same API (`findMaintenances`), so they appear in the same list. The only way to start a session from the UI is via `StartSessionControls`, which calls the API; the API enforces the maintenance check. No UI bypass.
+- **Documentation:** Added `MAINTENANCE_MODE_AND_USAGE_BLOCKING.md` in this folder and a short “Behavior” section in the work-items README. Code comments added above `hasActiveMaintenance` and in `getResource` (checkMaintenance block).
+- **Tests:** Existing spec already has: “should throw ResourceUsageImpossibleMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance” and “should allow usage when resource is under maintenance but user can manage maintenance”. Added a test that explicitly documents that schedule-triggered maintenances (same `hasActiveMaintenance` result) block non–maintenance users the same as manual ones.
+- **Edge cases:** Documented in `MAINTENANCE_MODE_AND_USAGE_BLOCKING.md`: concurrent “mark as done” returns 400 “Maintenance is already finished” for the second caller (idempotent 200 not implemented).
+
+---
+
 ## Goal
 Verify and document that when any maintenance is active (manual or schedule-triggered), only maintenance users can start a session (turn the resource on). No one else can use the resource until the maintenance is marked as done. Ensure behavior is consistent and that schedule-created maintenances are treated the same as manual ones.
 
@@ -47,5 +59,5 @@ Verify and document that when any maintenance is active (manual or schedule-trig
 - New UI for “maintenance mode” beyond existing maintenance-in-progress message.
 
 ## Acceptance criteria
-- All code paths that allow starting a usage session enforce maintenance check; schedule-triggered maintenances block non–maintenance users the same as manual ones.
-- Behavior is documented in the repo; tests confirm blocking when maintenance is active and user cannot manage maintenance.
+- [x] All code paths that allow starting a usage session enforce maintenance check; schedule-triggered maintenances block non–maintenance users the same as manual ones.
+- [x] Behavior is documented in the repo; tests confirm blocking when maintenance is active and user cannot manage maintenance.

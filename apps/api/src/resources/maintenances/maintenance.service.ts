@@ -288,7 +288,10 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Check if there's an active maintenance window for a resource
+   * Check if there's an active maintenance window for a resource.
+   * This is the single source of truth for "resource in maintenance mode".
+   * Active = resourceId match, startTime <= now, endTime IS NULL. No distinction between
+   * manual and schedule-triggered maintenances; both block usage for non–maintenance users.
    */
   async hasActiveMaintenance(resourceId: number, transactionalEntityManager?: EntityManager): Promise<boolean> {
     const now = new Date();

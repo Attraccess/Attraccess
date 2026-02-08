@@ -4,6 +4,8 @@ This folder contains **work items** for the feature: **Resource Maintenance Sche
 
 **Base implementation**: The codebase already has manual maintenances (`ResourceMaintenance`, `ResourceMaintenanceService`, `ResourceMaintenanceController`, `hasActiveMaintenance`, `canManageMaintenance`). See `apps/api/src/resources/maintenances/maintenance.module.ts` and related files.
 
+**Behavior — Maintenance mode and usage blocking:** When a resource has an active maintenance (manual or schedule-triggered), only users with maintenance permission can start a session; others get an error and see the maintenance-in-progress message. Active = `startTime <= now` and `endTime IS NULL`. See [MAINTENANCE_MODE_AND_USAGE_BLOCKING.md](./MAINTENANCE_MODE_AND_USAGE_BLOCKING.md) for details.
+
 ---
 
 ## Work item order and dependencies
