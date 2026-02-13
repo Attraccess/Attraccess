@@ -153,8 +153,8 @@ export class MaintenanceScheduleEvaluatorService {
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
-        const hasActiveMaintenanceOfThisSchedule = !(await this.maintenanceService.hasActiveMaintenance({ resourceId, scheduleId: schedule.id }, transactionalEntityManager));
-        if (!hasActiveMaintenanceOfThisSchedule) {
+        const hasActiveMaintenanceOfThisSchedule = await this.maintenanceService.hasActiveMaintenance({ resourceId, scheduleId: schedule.id }, transactionalEntityManager);
+        if (hasActiveMaintenanceOfThisSchedule) {
           continue;
         }
 
@@ -163,7 +163,7 @@ export class MaintenanceScheduleEvaluatorService {
           continue;
         }
 
-        const reason = this.buildMaintenanceReasonFromScheduleDefintion(schedule);
+        const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
         await this.maintenanceService.createMaintenanceFromSchedule(
           resourceId,
           schedule.id,
@@ -184,7 +184,7 @@ export class MaintenanceScheduleEvaluatorService {
    * Frontend keys: name.auto.usageHours, name.auto.usageCount, name.auto.intervalDays,
    * name.auto.thresholdHours, name.auto.fallback
    */
-  private buildMaintenanceReasonFromScheduleDefintion(schedule: ResourceMaintenanceSchedule): string {
+  private buildMaintenanceReasonFromScheduleDefinition(schedule: ResourceMaintenanceSchedule): string {
     const scheduleName = schedule.name ?? undefined;
     const withParams = (details: Record<string, number | string | undefined>) => ({
       i18nKey: '' as string,
