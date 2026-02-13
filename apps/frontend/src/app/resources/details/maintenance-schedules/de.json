@@ -16,10 +16,13 @@
     "TIME_INTERVAL": "Zeitintervall"
   },
   "configSummary": {
-    "usageHours": "Alle {{minutes}} Min Nutzung",
+    "usageHoursMinutes": "Alle {{duration}} Min Nutzung",
+    "usageHoursHours": "Alle {{duration}} h Nutzung",
+    "usageHoursDays": "Alle {{duration}} Tage Nutzung",
     "usageCount": "Alle {{count}} Sitzungen",
-    "intervalDays": "Alle {{days}} Tage",
-    "thresholdHours": "Nach {{hours}} h seit letzter"
+    "timeIntervalMinutes": "Nach {{duration}} Min seit letzter",
+    "timeIntervalHours": "Nach {{duration}} h seit letzter",
+    "timeIntervalDays": "Nach {{duration}} Tage seit letzter"
   },
   "empty": "Keine Pläne. Einen hinzufügen für automatische Wartung.",
   "actions": {

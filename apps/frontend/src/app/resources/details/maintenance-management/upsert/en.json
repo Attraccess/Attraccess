@@ -11,7 +11,8 @@
             "label": "End time"
         },
         "reason": {
-            "label": "Reason (optional)"
+            "label": "Reason (optional)",
+            "displayedToUsers": "Displayed to users"
         }
     },
     "actions": {

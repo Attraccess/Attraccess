@@ -2083,6 +2083,15 @@ export enum ResourceMaintenanceScheduleTriggerType {
     TIME_INTERVAL = 'TIME_INTERVAL'
 }
 
+/**
+ * Unit for duration (MINUTES, HOURS, or DAYS)
+ */
+export enum UsageDurationUnit {
+    MINUTES = 'MINUTES',
+    HOURS = 'HOURS',
+    DAYS = 'DAYS'
+}
+
 export type ResourceMaintenanceScheduleUsageHoursConfig = {
     /**
      * Unique identifier
@@ -2093,9 +2102,13 @@ export type ResourceMaintenanceScheduleUsageHoursConfig = {
      */
     scheduleId: number;
     /**
-     * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
+     * Duration value (combined with unit) for usage threshold
      */
-    thresholdMinutes: number;
+    duration: number;
+    /**
+     * Unit for duration (MINUTES, HOURS, or DAYS)
+     */
+    unit: UsageDurationUnit;
 };
 
 export type ResourceMaintenanceScheduleUsageCountConfig = {
@@ -2123,13 +2136,13 @@ export type ResourceMaintenanceScheduleTimeIntervalConfig = {
      */
     scheduleId: number;
     /**
-     * Recurring: trigger every N days (e.g. 30 for monthly)
+     * Duration value (combined with unit)
      */
-    intervalDays?: number;
+    duration: number;
     /**
-     * Wall-clock: trigger after this many hours since last maintenance done for this schedule
+     * Unit for duration (MINUTES, HOURS, or DAYS)
      */
-    thresholdHours?: number;
+    unit: UsageDurationUnit;
 };
 
 export type ResourceMaintenanceSchedule = {
@@ -2243,26 +2256,15 @@ export type FinishMaintenanceDto = {
     notes?: string;
 };
 
-export type UpdateMaintenanceDto = {
-    /**
-     * When the maintenance starts (must be in the future)
-     */
-    startTime?: string;
-    /**
-     * When the maintenance ends (optional)
-     */
-    endTime?: string | null;
-    /**
-     * The reason for the maintenance
-     */
-    reason?: string;
-};
-
 export type UsageHoursTriggerConfigDto = {
     /**
-     * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
+     * Duration value (combined with unit) for usage threshold
      */
-    thresholdMinutes: number;
+    duration: number;
+    /**
+     * Unit for duration (MINUTES, HOURS, or DAYS)
+     */
+    unit: UsageDurationUnit;
 };
 
 export type UsageCountTriggerConfigDto = {
@@ -2274,13 +2276,13 @@ export type UsageCountTriggerConfigDto = {
 
 export type TimeIntervalTriggerConfigDto = {
     /**
-     * Recurring: trigger every N days (e.g. 30 for monthly)
+     * Duration value (combined with unit)
      */
-    intervalDays?: number;
+    duration: number;
     /**
-     * Wall-clock: trigger after this many hours since last maintenance done for this schedule
+     * Unit for duration (MINUTES, HOURS, or DAYS)
      */
-    thresholdHours?: number;
+    unit: UsageDurationUnit;
 };
 
 export type CreateMaintenanceScheduleDto = {
@@ -2301,7 +2303,7 @@ export type CreateMaintenanceScheduleDto = {
      */
     usageCountConfig?: UsageCountTriggerConfigDto;
     /**
-     * Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)
+     * Required when triggerType is TIME_INTERVAL (duration, unit, mode)
      */
     timeIntervalConfig?: TimeIntervalTriggerConfigDto;
     /**
@@ -2328,7 +2330,7 @@ export type UpdateMaintenanceScheduleDto = {
      */
     usageCountConfig?: UsageCountTriggerConfigDto;
     /**
-     * Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)
+     * Required when triggerType is TIME_INTERVAL (duration, unit, mode)
      */
     timeIntervalConfig?: TimeIntervalTriggerConfigDto;
     /**
@@ -4534,33 +4536,6 @@ export type GetMaintenanceData = {
 };
 
 export type GetMaintenanceResponse = ResourceMaintenance;
-
-export type UpdateMaintenanceData = {
-    /**
-     * The ID of the maintenance
-     */
-    maintenanceId: number;
-    requestBody: UpdateMaintenanceDto;
-    /**
-     * The ID of the resource
-     */
-    resourceId: number;
-};
-
-export type UpdateMaintenanceResponse = ResourceMaintenance;
-
-export type CancelMaintenanceData = {
-    /**
-     * The ID of the maintenance
-     */
-    maintenanceId: number;
-    /**
-     * The ID of the resource
-     */
-    resourceId: number;
-};
-
-export type CancelMaintenanceResponse = void;
 
 export type FinishMaintenanceData = {
     /**
@@ -6916,52 +6891,6 @@ export type $OpenApiTs = {
                  * Unauthorized - User is not authenticated
                  */
                 401: unknown;
-                /**
-                 * Maintenance not found
-                 */
-                404: unknown;
-            };
-        };
-        put: {
-            req: UpdateMaintenanceData;
-            res: {
-                /**
-                 * Maintenance updated successfully
-                 */
-                200: ResourceMaintenance;
-                /**
-                 * Bad request - invalid maintenance data
-                 */
-                400: unknown;
-                /**
-                 * Unauthorized - User is not authenticated
-                 */
-                401: unknown;
-                /**
-                 * Forbidden - User does not have permission to manage maintenances for this resource
-                 */
-                403: unknown;
-                /**
-                 * Maintenance not found
-                 */
-                404: unknown;
-            };
-        };
-        delete: {
-            req: CancelMaintenanceData;
-            res: {
-                /**
-                 * Maintenance cancelled successfully
-                 */
-                204: void;
-                /**
-                 * Unauthorized - User is not authenticated
-                 */
-                401: unknown;
-                /**
-                 * Forbidden - User does not have permission to manage maintenances for this resource
-                 */
-                403: unknown;
                 /**
                  * Maintenance not found
                  */

@@ -171,16 +171,16 @@ export const HistoryTable = ({
           >
             {resource
               ? generateRowCells(session, t, resource, showAllUsers, canManageResources, (sessionToRender) => (
-                  <ProjectAssignmentCell
-                    session={sessionToRender}
-                    canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
-                    projectId={resolveProjectId(sessionToRender)}
-                    isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
-                    placeholder={projectPlaceholder}
-                    unassignedLabel={projectPlaceholder}
-                    onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
-                  />
-                ))
+                <ProjectAssignmentCell
+                  session={sessionToRender}
+                  canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
+                  projectId={resolveProjectId(sessionToRender)}
+                  isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
+                  placeholder={projectPlaceholder}
+                  unassignedLabel={projectPlaceholder}
+                  onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
+                />
+              ))
               : []}
           </TableRow>
         ))}

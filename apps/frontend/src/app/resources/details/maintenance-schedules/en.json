@@ -16,10 +16,13 @@
     "TIME_INTERVAL": "Time interval"
   },
   "configSummary": {
-    "usageHours": "Every {{minutes}} min usage",
+    "usageHoursMinutes": "Every {{duration}} min usage",
+    "usageHoursHours": "Every {{duration}} h usage",
+    "usageHoursDays": "Every {{duration}} days usage",
     "usageCount": "Every {{count}} sessions",
-    "intervalDays": "Every {{days}} days",
-    "thresholdHours": "After {{hours}} h since last"
+    "timeIntervalMinutes": "After {{duration}} min since last",
+    "timeIntervalHours": "After {{duration}} h since last",
+    "timeIntervalDays": "After {{duration}} days since last"
   },
   "empty": "No schedules. Add one to trigger maintenance automatically.",
   "actions": {

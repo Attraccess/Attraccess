@@ -16,25 +16,25 @@ export class WebSocketEventService {
 
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
-    this.logger.debug('Got reader updated event', event);
+    this.logger.debug('Got reader updated event');
     this.attractapGateway.sendResourceList(event.reader.id);
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
   public async onReaderDeleted(event: ReaderDeletedEvent) {
-    this.logger.debug('Got reader deleted event', event);
+    this.logger.debug('Got reader deleted event');
     this.attractapGateway.disconnectReader(event.readerId);
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
   public async onResourceUsage(event: ResourceUsageEvent) {
-    this.logger.debug('Got resource usage started event', event);
+    this.logger.debug('Got resource usage started event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.usage.resource.id);
   }
 
   @OnEvent(ResourceUsageTakenOverEvent.EVENT_NAME)
   public async onResourceUsageTakenOver(event: ResourceUsageTakenOverEvent) {
-    this.logger.debug('Got resource usage ended event', event);
+    this.logger.debug('Got resource usage ended event');
     this.attractapGateway.sendResourceListToReadersWithResource(event.resource.id);
   }
 

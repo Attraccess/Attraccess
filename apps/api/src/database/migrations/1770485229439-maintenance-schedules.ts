@@ -28,7 +28,8 @@ export class MaintenanceSchedules1770485229439 implements MigrationInterface {
       `CREATE TABLE "resource_maintenance_schedule_usage_hours_config" (
         "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
         "scheduleId" integer NOT NULL,
-        "thresholdMinutes" integer NOT NULL,
+        "duration" integer NOT NULL,
+        "unit" varchar CHECK("unit" IN ('MINUTES', 'HOURS', 'DAYS')) NOT NULL,
         CONSTRAINT "UQ_usage_hours_scheduleId" UNIQUE ("scheduleId"),
         CONSTRAINT "FK_usage_hours_schedule" FOREIGN KEY ("scheduleId") REFERENCES "resource_maintenance_schedule" ("id") ON DELETE CASCADE ON UPDATE NO ACTION
       )`
@@ -46,8 +47,8 @@ export class MaintenanceSchedules1770485229439 implements MigrationInterface {
       `CREATE TABLE "resource_maintenance_schedule_time_interval_config" (
         "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
         "scheduleId" integer NOT NULL,
-        "intervalDays" integer,
-        "thresholdHours" real,
+        "duration" integer NOT NULL,
+        "unit" varchar CHECK("unit" IN ('MINUTES', 'HOURS', 'DAYS')) NOT NULL,
         CONSTRAINT "UQ_time_interval_scheduleId" UNIQUE ("scheduleId"),
         CONSTRAINT "FK_time_interval_schedule" FOREIGN KEY ("scheduleId") REFERENCES "resource_maintenance_schedule" ("id") ON DELETE CASCADE ON UPDATE NO ACTION
       )`

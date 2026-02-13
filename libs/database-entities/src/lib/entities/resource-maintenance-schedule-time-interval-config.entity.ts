@@ -7,11 +7,12 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
+import { UsageDurationUnit } from '../types/usageDurationUnit.enum';
 
 /**
- * Config for TIME_INTERVAL trigger. Exactly one mode must be used:
- * - Recurring: set intervalDays (e.g. every 30 days). Baseline = when last maintenance for this schedule was done.
- * - Wall-clock threshold: set thresholdHours. Baseline = when last maintenance for this schedule was done.
+ * Config for TIME_INTERVAL trigger. Uses duration + unit (same as USAGE_HOURS).
+ * Trigger after N duration (in unit) has passed since baseline (wall-clock).
+ * Baseline = when last maintenance for this schedule was done.
  */
 @Entity()
 export class ResourceMaintenanceScheduleTimeIntervalConfig {
@@ -29,21 +30,18 @@ export class ResourceMaintenanceScheduleTimeIntervalConfig {
   @JoinColumn({ name: 'scheduleId' })
   schedule!: ResourceMaintenanceSchedule;
 
-  /** Recurring mode: trigger every N days. Set this OR thresholdHours. */
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'int' })
   @ApiProperty({
-    description: 'Recurring: trigger every N days (e.g. 30 for monthly)',
-    required: false,
+    description: 'Duration value (combined with unit)',
     example: 30,
   })
-  intervalDays!: number | null;
+  duration!: number;
 
-  /** Wall-clock threshold mode: trigger after N hours since last maintenance done for this schedule. */
-  @Column({ type: 'real', nullable: true })
+  @Column({ type: 'simple-enum', enum: UsageDurationUnit })
   @ApiProperty({
-    description: 'Wall-clock: trigger after this many hours since last maintenance done for this schedule',
-    required: false,
-    example: 500,
+    description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+    enum: UsageDurationUnit,
+    enumName: 'UsageDurationUnit',
   })
-  thresholdHours!: number | null;
+  unit!: UsageDurationUnit;
 }

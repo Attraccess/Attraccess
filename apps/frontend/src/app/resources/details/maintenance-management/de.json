@@ -1,40 +1,39 @@
 {
-    "title": "Wartungsarbeiten",
-    "filters": {
-        "includePast": "Vergangene anzeigen"
-    },
-    "table": {
-        "ariaLabel": "Wartungsarbeiten",
-        "columns": {
-            "start": "Start",
-            "end": "Ende",
-            "reason": "Grund",
-            "createdBy": "Angelegt von",
-            "completedBy": "Abgeschlossen von",
-            "completedAt": "Abgeschlossen am"
-        }
-    },
-    "actions": {
-        "create": {
-            "title": "Wartungszeitraum anlegen",
-            "label": "Neu"
-        },
-        "markDone": {
-            "title": "Als erledigt markieren"
-        }
-    },
-    "reason": {
-        "auto": {
-            "usageHours": "Automatisch: {{hours}} Nutzungsstunden erreicht",
-            "usageCount": "Automatisch: {{count}} Nutzungssitzungen erreicht",
-            "intervalDays": "Automatisch: alle {{days}} Tage",
-            "thresholdHours": "Automatisch: {{hours}} Stunden seit letzter Wartung",
-            "fallback": "Automatisch: Zeitplan {{scheduleId}}"
-        }
-    },
-    "audit": {
-        "createdBy": "Angelegt von",
-        "completedBy": "Abgeschlossen von",
-        "completedAt": "Abgeschlossen am"
+  "title": "Wartungsarbeiten",
+  "filters": {
+    "includePast": "Vergangene anzeigen"
+  },
+  "table": {
+    "ariaLabel": "Wartungsarbeiten",
+    "columns": {
+      "start": "Start",
+      "end": "Ende",
+      "reason": "Grund",
+      "createdBy": "Angelegt von",
+      "completedBy": "Abgeschlossen von",
+      "completedAt": "Abgeschlossen am"
     }
+  },
+  "actions": {
+    "create": {
+      "title": "Wartungszeitraum anlegen",
+      "label": "Neu"
+    },
+    "markDone": {
+      "title": "Als erledigt markieren",
+      "modal": {
+        "title": "Wartung als erledigt markieren",
+        "notesLabel": "Notizen",
+        "notesPlaceholder": "Optionale Abschlussnotizen (z. B. was erledigt wurde)",
+        "notesOptional": "Optional",
+        "cancel": "Abbrechen",
+        "confirm": "Als erledigt markieren"
+      }
+    }
+  },
+  "audit": {
+    "createdBy": "Angelegt von",
+    "completedBy": "Abgeschlossen von",
+    "completedAt": "Abgeschlossen am"
+  }
 }

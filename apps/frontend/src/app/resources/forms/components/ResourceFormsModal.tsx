@@ -201,7 +201,7 @@ function renderFieldInput(
     case FormFieldType.BOOLEAN:
       return renderBooleanInput(value, onChange, error, t);
     case FormFieldType.SELECT:
-      return renderSelectInput(selectOptions ?? [], value, onChange, error, t);
+      return renderSelectInput(selectOptions ?? [], value, onChange, error, t, field.name);
     default:
       return (
         <Input
@@ -346,6 +346,7 @@ function renderSelectInput(
   onChange: (value: FieldValue) => void,
   error: string | null | undefined,
   t: (key: string) => string,
+  fieldName: string,
 ) {
   const selected = typeof value === 'string' && options.includes(value) ? new Set([value]) : new Set<string>();
   const handleSelectionChange = (keys: Selection) => {
@@ -364,6 +365,7 @@ function renderSelectInput(
       isDisabled={!options.length}
       isInvalid={Boolean(error)}
       errorMessage={error ?? undefined}
+      aria-label={fieldName}
     >
       {options.map((option) => (
         <SelectItem key={option}>{option}</SelectItem>

@@ -5,6 +5,7 @@ interface Props {
   selectedId?: number;
   onSelectionChange: (id: number) => void;
   label?: string;
+  ariaLabel?: string;
   placeholder?: string;
 }
 
@@ -15,13 +16,12 @@ export function MqttServerSelect(
       'items' | 'label' | 'placeholder' | 'selectedKey' | 'onSelectionChange' | 'data-cy' | 'isLoading' | 'children'
     >,
 ) {
-  const { selectedId, onSelectionChange, label, placeholder, ...selectProps } = props;
+  const { selectedId, onSelectionChange, placeholder, ...selectProps } = props;
   const { data: servers, isLoading } = useMqttServiceMqttServersGetAll();
 
   return (
     <Select
       items={(servers ?? []).map((server) => ({ key: server.id.toString(), label: server.name }))}
-      label={label}
       placeholder={servers?.find((r) => r.id === selectedId)?.name ?? placeholder}
       selectedKey={selectedId?.toString() ?? ''}
       onSelectionChange={(key) => onSelectionChange(Number(key))}

@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
+import { UsageDurationUnit } from '../types/usageDurationUnit.enum';
 
 /**
  * Config for USAGE_HOURS trigger. Baseline is always the end of the last maintenance
@@ -29,6 +30,17 @@ export class ResourceMaintenanceScheduleUsageHoursConfig {
   schedule!: ResourceMaintenanceSchedule;
 
   @Column({ type: 'int' })
-  @ApiProperty({ description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)', example: 6000 })
-  thresholdMinutes!: number;
+  @ApiProperty({
+    description: 'Duration value (combined with unit) for usage threshold',
+    example: 100,
+  })
+  duration!: number;
+
+  @Column({ type: 'simple-enum', enum: UsageDurationUnit })
+  @ApiProperty({
+    description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+    enum: UsageDurationUnit,
+    enumName: 'UsageDurationUnit',
+  })
+  unit!: UsageDurationUnit;
 }

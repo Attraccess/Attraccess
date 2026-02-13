@@ -20,11 +20,11 @@ import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule
 
 @ApiTags('Resource Maintenance Schedules')
 @Controller('resources/:resourceId/maintenance-schedules')
+@Auth()
 export class MaintenanceScheduleController {
   constructor(private readonly scheduleService: MaintenanceScheduleService) { }
 
   @Get()
-  @Auth()
   @ApiOperation({
     summary: 'List maintenance schedules for a resource',
     description: 'Get all maintenance schedules for the given resource',
@@ -41,7 +41,6 @@ export class MaintenanceScheduleController {
   }
 
   @Get(':scheduleId')
-  @Auth()
   @ApiOperation({
     summary: 'Get a maintenance schedule by ID',
     description: 'Get a single maintenance schedule',

@@ -21,6 +21,7 @@ import {
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
   useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
+  UsageDurationUnit
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -53,10 +54,11 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
   const [triggerType, setTriggerType] = useState<ResourceMaintenanceScheduleTriggerType>(
     ResourceMaintenanceScheduleTriggerType.USAGE_HOURS
   );
-  const [thresholdMinutes, setThresholdMinutes] = useState<string>('6000');
+  const [usageHoursDuration, setUsageHoursDuration] = useState<string>('100');
+  const [usageHoursUnit, setUsageHoursUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
   const [thresholdSessions, setThresholdSessions] = useState<string>('50');
-  const [intervalDays, setIntervalDays] = useState<string>('');
-  const [thresholdHours, setThresholdHours] = useState<string>('');
+  const [timeIntervalDuration, setTimeIntervalDuration] = useState<string>('500');
+  const [timeIntervalUnit, setTimeIntervalUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
   const [enabled, setEnabled] = useState(true);
 
   const { data: existingSchedule } = useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule(
@@ -70,10 +72,11 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
       if (!scheduleId) {
         setName('');
         setTriggerType(ResourceMaintenanceScheduleTriggerType.USAGE_HOURS);
-        setThresholdMinutes('6000');
+        setUsageHoursDuration('100');
+        setUsageHoursUnit(UsageDurationUnit.HOURS);
         setThresholdSessions('50');
-        setIntervalDays('');
-        setThresholdHours('');
+        setTimeIntervalDuration('500');
+        setTimeIntervalUnit(UsageDurationUnit.HOURS);
         setEnabled(true);
       }
       return;
@@ -81,17 +84,20 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     setName(existingSchedule.name ?? '');
     setTriggerType(existingSchedule.triggerType);
     setEnabled(existingSchedule.enabled);
-    setThresholdMinutes(
-      existingSchedule.usageHoursConfig?.thresholdMinutes?.toString() ?? '6000'
+    setUsageHoursDuration(
+      existingSchedule.usageHoursConfig?.duration?.toString() ?? '100'
+    );
+    setUsageHoursUnit(
+      existingSchedule.usageHoursConfig?.unit ?? UsageDurationUnit.HOURS
     );
     setThresholdSessions(
       existingSchedule.usageCountConfig?.thresholdSessions?.toString() ?? '50'
     );
-    setIntervalDays(
-      existingSchedule.timeIntervalConfig?.intervalDays?.toString() ?? ''
+    setTimeIntervalDuration(
+      existingSchedule.timeIntervalConfig?.duration?.toString() ?? '500'
     );
-    setThresholdHours(
-      existingSchedule.timeIntervalConfig?.thresholdHours?.toString() ?? ''
+    setTimeIntervalUnit(
+      (existingSchedule.timeIntervalConfig?.unit as UsageDurationUnit) ?? UsageDurationUnit.HOURS
     );
   }, [existingSchedule, scheduleId, isOpen]);
 
@@ -119,8 +125,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     if (!valid) return;
 
     if (triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
-      const minutes = parseInt(thresholdMinutes, 10);
-      if (Number.isNaN(minutes) || minutes < 1) return;
+      const duration = parseInt(usageHoursDuration, 10);
+      if (Number.isNaN(duration) || duration < 1) return;
+      const usageHoursConfig = { duration, unit: usageHoursUnit };
       if (scheduleId != null) {
         updateSchedule({
           resourceId,
@@ -128,7 +135,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
           requestBody: {
             name: name || undefined,
             triggerType,
-            usageHoursConfig: { thresholdMinutes: minutes },
+            usageHoursConfig,
             enabled,
           },
         });
@@ -138,7 +145,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
           requestBody: {
             name: name || undefined,
             triggerType,
-            usageHoursConfig: { thresholdMinutes: minutes },
+            usageHoursConfig,
             enabled,
           },
         });
@@ -175,18 +182,11 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     }
 
     if (triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL) {
-      const days = intervalDays ? parseInt(intervalDays, 10) : undefined;
-      const hours = thresholdHours ? parseFloat(thresholdHours) : undefined;
-      const hasDays = days != null && !Number.isNaN(days) && days >= 1;
-      const hasHours = hours != null && !Number.isNaN(hours) && hours > 0;
-      if (hasDays === hasHours) return; // exactly one required
-      const intervalDaysValue =
-        hasDays && days != null && !Number.isNaN(days) ? days : undefined;
-      const thresholdHoursValue =
-        hasHours && hours != null && !Number.isNaN(hours) ? hours : undefined;
+      const duration = parseInt(timeIntervalDuration, 10);
+      if (Number.isNaN(duration) || duration < 1) return;
       const timeIntervalConfig = {
-        intervalDays: intervalDaysValue,
-        thresholdHours: thresholdHoursValue,
+        duration,
+        unit: timeIntervalUnit,
       };
       if (scheduleId != null) {
         updateSchedule({
@@ -214,10 +214,11 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
   }, [
     name,
     triggerType,
-    thresholdMinutes,
+    usageHoursDuration,
+    usageHoursUnit,
     thresholdSessions,
-    intervalDays,
-    thresholdHours,
+    timeIntervalDuration,
+    timeIntervalUnit,
     enabled,
     resourceId,
     scheduleId,
@@ -261,14 +262,28 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
               </Select>
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && (
-                <Input
-                  type="number"
-                  label={t('inputs.thresholdMinutes.label')}
-                  value={thresholdMinutes}
-                  onValueChange={setThresholdMinutes}
-                  min={1}
-                  isRequired
-                />
+                <>
+                  <Input
+                    type="number"
+                    label={t('inputs.duration.label')}
+                    value={usageHoursDuration}
+                    onValueChange={setUsageHoursDuration}
+                    min={1}
+                    isRequired
+                  />
+                  <Select
+                    label={t('inputs.unit.label')}
+                    selectedKeys={[usageHoursUnit]}
+                    onSelectionChange={(keys) => {
+                      const v = Array.from(keys)[0] as UsageDurationUnit;
+                      if (v) setUsageHoursUnit(v);
+                    }}
+                  >
+                    {Object.values(UsageDurationUnit).map((unit) => (
+                      <SelectItem key={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                    ))}
+                  </Select>
+                </>
               )}
 
               {triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT && (
@@ -286,24 +301,25 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 <>
                   <Input
                     type="number"
-                    label={t('inputs.intervalDays.label')}
-                    value={intervalDays}
-                    onValueChange={setIntervalDays}
+                    label={t('inputs.duration.label')}
+                    value={timeIntervalDuration}
+                    onValueChange={setTimeIntervalDuration}
                     min={1}
                     placeholder="e.g. 30"
                   />
-                  <Input
-                    type="number"
-                    label={t('inputs.thresholdHours.label')}
-                    value={thresholdHours}
-                    onValueChange={setThresholdHours}
-                    min={0.01}
-                    step={0.01}
-                    placeholder="e.g. 500"
-                  />
-                  <p className="text-sm text-default-500">
-                    Set either interval (days) or hours since last maintenance, not both.
-                  </p>
+                  <Select
+                    label={t('inputs.unit.label')}
+                    selectedKeys={[timeIntervalUnit]}
+                    onSelectionChange={(keys) => {
+                      const v = Array.from(keys)[0] as UsageDurationUnit;
+                      if (v) setTimeIntervalUnit(v);
+                    }}
+                  >
+                    {Object.values(UsageDurationUnit).map((unit) => (
+                      <SelectItem key={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                    ))}
+                  </Select>
+                  <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>
                 </>
               )}
 

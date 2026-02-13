@@ -39,24 +39,34 @@ function configSummary(
   t: (key: string, params?: Record<string, number | string>) => string
 ): string {
   switch (schedule.triggerType) {
-    case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS:
-      return schedule.usageHoursConfig
-        ? t('configSummary.usageHours', { minutes: schedule.usageHoursConfig.thresholdMinutes })
-        : '—';
+    case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS: {
+      const config = schedule.usageHoursConfig;
+      if (!config) return '—';
+      const { duration, unit } = config as { duration: number; unit: string };
+      const key =
+        unit === 'MINUTES'
+          ? 'configSummary.usageHoursMinutes'
+          : unit === 'HOURS'
+            ? 'configSummary.usageHoursHours'
+            : 'configSummary.usageHoursDays';
+      return t(key, { duration });
+    }
     case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT:
       return schedule.usageCountConfig
         ? t('configSummary.usageCount', { count: schedule.usageCountConfig.thresholdSessions })
         : '—';
-    case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL:
-      if (schedule.timeIntervalConfig) {
-        if (schedule.timeIntervalConfig.intervalDays != null) {
-          return t('configSummary.intervalDays', { days: schedule.timeIntervalConfig.intervalDays });
-        }
-        if (schedule.timeIntervalConfig.thresholdHours != null) {
-          return t('configSummary.thresholdHours', { hours: schedule.timeIntervalConfig.thresholdHours });
-        }
-      }
-      return '—';
+    case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL: {
+      const config = schedule.timeIntervalConfig as { duration?: number; unit?: string } | undefined;
+      if (!config) return '—';
+      const { duration, unit } = config;
+      const key =
+        unit === 'MINUTES'
+          ? 'configSummary.timeIntervalMinutes'
+          : unit === 'HOURS'
+            ? 'configSummary.timeIntervalHours'
+            : 'configSummary.timeIntervalDays';
+      return t(key, { duration: duration ?? 0 });
+    }
     default:
       return '—';
   }

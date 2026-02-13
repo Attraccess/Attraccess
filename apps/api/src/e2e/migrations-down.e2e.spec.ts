@@ -52,6 +52,7 @@ import {
   SSOProviderType,
   User,
   entities,
+  UsageDurationUnit,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -287,7 +288,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   }));
   await ensureEntity(maintenanceScheduleUsageHoursConfigRepo, () => ({
     scheduleId: scheduleUsageHours.id,
-    thresholdMinutes: 600,
+    duration: 10,
+    unit: UsageDurationUnit.HOURS,
   }));
 
   const scheduleUsageCount = await ensureEntity(maintenanceScheduleRepo, () => ({
@@ -309,8 +311,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   }));
   await ensureEntity(maintenanceScheduleTimeIntervalConfigRepo, () => ({
     scheduleId: scheduleTimeInterval.id,
-    intervalDays: 30,
-    thresholdHours: null,
+    duration: 500,
+    unit: UsageDurationUnit.HOURS,
   }));
 
   const flowNode = await ensureEntity(flowNodeRepo, () => ({

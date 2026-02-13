@@ -62,7 +62,7 @@ export class CreateMaintenanceScheduleDto {
   @ValidateNested()
   @Type(() => TimeIntervalTriggerConfigDto)
   @ApiProperty({
-    description: 'Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)',
+    description: 'Required when triggerType is TIME_INTERVAL (duration, unit, mode)',
     required: false,
     type: TimeIntervalTriggerConfigDto,
   })

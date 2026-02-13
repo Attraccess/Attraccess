@@ -41,9 +41,7 @@ describe('ResourceMaintenanceController', () => {
             createMaintenance: jest.fn(),
             findMaintenances: jest.fn(),
             getMaintenanceById: jest.fn(),
-            updateMaintenance: jest.fn(),
             finishMaintenance: jest.fn(),
-            cancelMaintenance: jest.fn(),
             canManageMaintenance: jest.fn(),
           },
         },
@@ -105,50 +103,6 @@ describe('ResourceMaintenanceController', () => {
     });
   });
 
-  describe('updateMaintenance', () => {
-    it('should update a maintenance', async () => {
-      const dto = {
-        reason: 'Updated maintenance reason',
-      };
-
-      const updatedMaintenance = { ...mockMaintenance, reason: dto.reason };
-
-      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
-      jest.spyOn(service, 'updateMaintenance').mockResolvedValue(updatedMaintenance);
-
-      const result = await controller.updateMaintenance(1, 1, dto);
-
-      expect(result).toEqual(updatedMaintenance);
-      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
-      expect(service.updateMaintenance).toHaveBeenCalledWith(1, dto);
-    });
-
-    it('should update maintenance with start time and end time', async () => {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 1); // Tomorrow
-
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 2); // Day after tomorrow
-
-      const dto = {
-        startTime: futureDate.toISOString(),
-        endTime: endDate.toISOString(),
-        reason: 'Updated maintenance',
-      };
-
-      const updatedMaintenance = { ...mockMaintenance, ...dto };
-
-      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
-      jest.spyOn(service, 'updateMaintenance').mockResolvedValue(updatedMaintenance);
-
-      const result = await controller.updateMaintenance(1, 1, dto);
-
-      expect(result).toEqual(updatedMaintenance);
-      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
-      expect(service.updateMaintenance).toHaveBeenCalledWith(1, dto);
-    });
-  });
-
   describe('finishMaintenance', () => {
     it('should mark a maintenance as done', async () => {
       const finishedMaintenance = { ...mockMaintenance, endTime: new Date(), completedAt: new Date() };
@@ -162,18 +116,6 @@ describe('ResourceMaintenanceController', () => {
       expect(result).toEqual(finishedMaintenance);
       expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.finishMaintenance).toHaveBeenCalledWith(1, { userId: 42, notes: 'Done' });
-    });
-  });
-
-  describe('cancelMaintenance', () => {
-    it('should cancel a maintenance', async () => {
-      jest.spyOn(service, 'getMaintenanceById').mockResolvedValue(mockMaintenance);
-      jest.spyOn(service, 'cancelMaintenance').mockResolvedValue(undefined);
-
-      await controller.cancelMaintenance(1, 1);
-
-      expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
-      expect(service.cancelMaintenance).toHaveBeenCalledWith(1);
     });
   });
 

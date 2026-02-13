@@ -99,9 +99,10 @@ export async function bootstrap() {
 
   app.use(cookieParser());
 
+  const appSettingsService = app.get(SettingsService);
   app.enableCors({
     origin: (origin, callback) => {
-      settingsService
+      appSettingsService
         .getFrontendUrl()
         .then((frontendUrl) => {
           if (!frontendUrl || !origin || origin === frontendUrl) {

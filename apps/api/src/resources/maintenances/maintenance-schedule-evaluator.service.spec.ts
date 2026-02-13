@@ -3,6 +3,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
+import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
+import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenance,
@@ -37,15 +39,26 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   beforeEach(async () => {
     const qb = createQueryBuilderMock();
 
+    const scheduleRepoMock = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      manager: {
+        transaction: jest.fn(async (cb: (em: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) => {
+          const transactionalEntityManager = {
+            getRepository: (entity: unknown) =>
+              entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {},
+          };
+          return cb(transactionalEntityManager);
+        }),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleEvaluatorService,
         {
           provide: getRepositoryToken(ResourceMaintenanceSchedule),
-          useValue: {
-            find: jest.fn(),
-            findOne: jest.fn(),
-          },
+          useValue: scheduleRepoMock,
         },
         {
           provide: getRepositoryToken(ResourceMaintenance),
@@ -117,7 +130,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           resourceId,
           enabled: true,
           triggerType: 'USAGE_HOURS',
-          usageHoursConfig: { thresholdMinutes: 60 },
+          usageHoursConfig: { duration: 1, unit: 'HOURS' as const },
         } as ResourceMaintenanceSchedule,
       ]);
 
@@ -133,7 +146,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           resourceId,
           enabled: true,
           triggerType: 'USAGE_HOURS',
-          usageHoursConfig: { thresholdMinutes: 60 },
+          usageHoursConfig: { duration: 1, unit: 'HOURS' as const },
           usageCountConfig: null,
           timeIntervalConfig: null,
         } as ResourceMaintenanceSchedule,
@@ -150,11 +163,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         resourceId,
         scheduleId,
         expect.any(String),
+        expect.anything(),
       );
       const reason = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls[0][2];
       const parsed = JSON.parse(reason);
-      expect(parsed.i18nKey).toBe('reason.auto.usageHours');
-      expect(parsed.details.hours).toBe(1); // thresholdMinutes 60 -> 1 hour
+      expect(parsed.i18nKey).toBe('reason.auto.usageHoursHours');
+      expect(parsed.details.duration).toBe(1);
     });
 
     it('should not create when USAGE_HOURS threshold not met', async () => {
@@ -164,14 +178,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           resourceId,
           enabled: true,
           triggerType: 'USAGE_HOURS',
-          usageHoursConfig: { thresholdMinutes: 600 },
+          usageHoursConfig: { duration: 10, unit: 'HOURS' as const },
           usageCountConfig: null,
           timeIntervalConfig: null,
         } as ResourceMaintenanceSchedule,
       ]);
 
       const usageQb = createQueryBuilderMock();
-      usageQb.getRawOne.mockResolvedValue({ total: '100' }); // 100 < 600
+      usageQb.getRawOne.mockResolvedValue({ total: '100' }); // 100 < 600 (10 hours)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any);
 
@@ -180,7 +194,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
     });
 
-    it('should create when TIME_INTERVAL intervalDays due', async () => {
+    it('should create when TIME_INTERVAL threshold due', async () => {
       const oldBaseline = new Date('2024-12-01T00:00:00.000Z');
       const mantQb = createQueryBuilderMock();
       mantQb.getOne.mockResolvedValue({ endTime: oldBaseline });
@@ -195,7 +209,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           triggerType: 'TIME_INTERVAL',
           usageHoursConfig: null,
           usageCountConfig: null,
-          timeIntervalConfig: { intervalDays: 30, thresholdHours: null },
+          timeIntervalConfig: { duration: 30, unit: 'DAYS' },
         } as ResourceMaintenanceSchedule,
       ]);
 
@@ -205,11 +219,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         resourceId,
         scheduleId,
         expect.any(String),
+        expect.anything(),
       );
       const reason = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls[0][2];
       const parsed = JSON.parse(reason);
-      expect(parsed.i18nKey).toBe('reason.auto.intervalDays');
-      expect(parsed.details.days).toBe(30);
+      expect(parsed.i18nKey).toBe('reason.auto.timeIntervalDays');
+      expect(parsed.details.duration).toBe(30);
     });
 
     it('should skip disabled schedules', async () => {
@@ -219,7 +234,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           resourceId,
           enabled: false,
           triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
-          usageHoursConfig: { thresholdMinutes: 1 },
+          usageHoursConfig: { duration: 1, unit: 'MINUTES' as const },
         } as ResourceMaintenanceSchedule,
       ]);
 
@@ -242,6 +257,68 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       expect(evalSpy).toHaveBeenCalledWith(1);
       expect(evalSpy).toHaveBeenCalledWith(2);
+    });
+  });
+
+  describe('onResourceUsage', () => {
+    it('should not call evaluateResource when usage has no resource or resource id', async () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+
+      await service.onResourceUsage(new ResourceUsageEvent({ id: 1, resource: null } as never));
+      expect(evalSpy).not.toHaveBeenCalled();
+
+      await service.onResourceUsage(
+        new ResourceUsageEvent({ id: 1, resource: {} } as never),
+      );
+      expect(evalSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not call evaluateResource when session not ended (endTime null)', async () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      const event = new ResourceUsageEvent({
+        id: 1,
+        endTime: null,
+        resource: { id: resourceId },
+      } as never);
+
+      await service.onResourceUsage(event);
+
+      expect(evalSpy).not.toHaveBeenCalled();
+    });
+
+    it('should call evaluateResource when session ended (endTime set)', async () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      const event = new ResourceUsageEvent({
+        id: 1,
+        endTime: new Date(),
+        resource: { id: resourceId },
+      } as never);
+
+      await service.onResourceUsage(event);
+
+      expect(evalSpy).toHaveBeenCalledWith(resourceId);
+    });
+  });
+
+  describe('onMaintenanceChanged', () => {
+    it('should call evaluateResource when maintenance changed (e.g. marked done)', async () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      const event = new ResourceMaintenanceChangedEvent(resourceId, 99);
+
+      service.onMaintenanceChanged(event);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(evalSpy).toHaveBeenCalledWith(resourceId);
+    });
+
+    it('should not call evaluateResource when resourceId is null', async () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      const event = new ResourceMaintenanceChangedEvent(null as never, 99);
+
+      service.onMaintenanceChanged(event);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(evalSpy).not.toHaveBeenCalled();
     });
   });
 });

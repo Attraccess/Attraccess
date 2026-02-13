@@ -3108,6 +3108,12 @@ export const $ResourceMaintenanceScheduleTriggerType = {
     description: 'The type of trigger for this schedule'
 } as const;
 
+export const $UsageDurationUnit = {
+    type: 'string',
+    enum: ['MINUTES', 'HOURS', 'DAYS'],
+    description: 'Unit for duration (MINUTES, HOURS, or DAYS)'
+} as const;
+
 export const $ResourceMaintenanceScheduleUsageHoursConfig = {
     type: 'object',
     properties: {
@@ -3121,13 +3127,21 @@ export const $ResourceMaintenanceScheduleUsageHoursConfig = {
             description: 'Schedule this config belongs to',
             example: 1
         },
-        thresholdMinutes: {
+        duration: {
             type: 'number',
-            description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)',
-            example: 6000
+            description: 'Duration value (combined with unit) for usage threshold',
+            example: 100
+        },
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
         }
     },
-    required: ['id', 'scheduleId', 'thresholdMinutes']
+    required: ['id', 'scheduleId', 'duration', 'unit']
 } as const;
 
 export const $ResourceMaintenanceScheduleUsageCountConfig = {
@@ -3165,18 +3179,21 @@ export const $ResourceMaintenanceScheduleTimeIntervalConfig = {
             description: 'Schedule this config belongs to',
             example: 1
         },
-        intervalDays: {
+        duration: {
             type: 'number',
-            description: 'Recurring: trigger every N days (e.g. 30 for monthly)',
+            description: 'Duration value (combined with unit)',
             example: 30
         },
-        thresholdHours: {
-            type: 'number',
-            description: 'Wall-clock: trigger after this many hours since last maintenance done for this schedule',
-            example: 500
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
         }
     },
-    required: ['id', 'scheduleId']
+    required: ['id', 'scheduleId', 'duration', 'unit']
 } as const;
 
 export const $ResourceMaintenanceSchedule = {
@@ -3348,41 +3365,25 @@ export const $FinishMaintenanceDto = {
     }
 } as const;
 
-export const $UpdateMaintenanceDto = {
-    type: 'object',
-    properties: {
-        startTime: {
-            type: 'string',
-            description: 'When the maintenance starts (must be in the future)',
-            format: 'date-time',
-            example: '2025-01-01T10:00:00.000Z'
-        },
-        endTime: {
-            type: 'string',
-            description: 'When the maintenance ends (optional)',
-            format: 'date-time',
-            example: '2025-01-01T18:00:00.000Z',
-            nullable: true
-        },
-        reason: {
-            type: 'string',
-            description: 'The reason for the maintenance',
-            example: 'Scheduled maintenance for software updates'
-        }
-    }
-} as const;
-
 export const $UsageHoursTriggerConfigDto = {
     type: 'object',
     properties: {
-        thresholdMinutes: {
+        duration: {
             type: 'number',
-            description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)',
-            example: 6000,
+            description: 'Duration value (combined with unit) for usage threshold',
+            example: 100,
             minimum: 1
+        },
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
         }
     },
-    required: ['thresholdMinutes']
+    required: ['duration', 'unit']
 } as const;
 
 export const $UsageCountTriggerConfigDto = {
@@ -3401,19 +3402,22 @@ export const $UsageCountTriggerConfigDto = {
 export const $TimeIntervalTriggerConfigDto = {
     type: 'object',
     properties: {
-        intervalDays: {
+        duration: {
             type: 'number',
-            description: 'Recurring: trigger every N days (e.g. 30 for monthly)',
-            example: 30,
+            description: 'Duration value (combined with unit)',
+            example: 500,
             minimum: 1
         },
-        thresholdHours: {
-            type: 'number',
-            description: 'Wall-clock: trigger after this many hours since last maintenance done for this schedule',
-            example: 500,
-            minimum: 0.01
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
         }
-    }
+    },
+    required: ['duration', 'unit']
 } as const;
 
 export const $CreateMaintenanceScheduleDto = {
@@ -3448,7 +3452,7 @@ export const $CreateMaintenanceScheduleDto = {
             ]
         },
         timeIntervalConfig: {
-            description: 'Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)',
+            description: 'Required when triggerType is TIME_INTERVAL (duration, unit, mode)',
             allOf: [
                 {
                     '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'
@@ -3497,7 +3501,7 @@ export const $UpdateMaintenanceScheduleDto = {
             ]
         },
         timeIntervalConfig: {
-            description: 'Required when triggerType is TIME_INTERVAL (exactly one of intervalDays or thresholdHours)',
+            description: 'Required when triggerType is TIME_INTERVAL (duration, unit, mode)',
             allOf: [
                 {
                     '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'

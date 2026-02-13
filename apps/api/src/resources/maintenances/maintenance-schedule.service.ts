@@ -8,6 +8,7 @@ import {
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   Resource,
+  UsageDurationUnit,
 } from '@attraccess/database-entities';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
@@ -89,11 +90,13 @@ export class MaintenanceScheduleService {
     ) {
       await this.removeConfigsForSchedule(scheduleId);
       await this.upsertConfigForSchedule(scheduleId, triggerType, {
-        usageHoursConfig: dto.usageHoursConfig ?? (schedule.usageHoursConfig as { thresholdMinutes: number } | undefined),
+        usageHoursConfig:
+          dto.usageHoursConfig ??
+          (schedule.usageHoursConfig as { duration: number; unit: UsageDurationUnit } | undefined),
         usageCountConfig: dto.usageCountConfig ?? (schedule.usageCountConfig as { thresholdSessions: number } | undefined),
         timeIntervalConfig:
           dto.timeIntervalConfig ??
-          (schedule.timeIntervalConfig as { intervalDays?: number; thresholdHours?: number } | undefined),
+          (schedule.timeIntervalConfig as { duration: number; unit: UsageDurationUnit } | undefined),
       });
     }
 
@@ -127,9 +130,9 @@ export class MaintenanceScheduleService {
     scheduleId: number,
     triggerType: ResourceMaintenanceScheduleTriggerType,
     configs: {
-      usageHoursConfig?: { thresholdMinutes: number };
+      usageHoursConfig?: { duration: number; unit: UsageDurationUnit };
       usageCountConfig?: { thresholdSessions: number };
-      timeIntervalConfig?: { intervalDays?: number; thresholdHours?: number };
+      timeIntervalConfig?: { duration: number; unit: UsageDurationUnit };
     },
   ): Promise<void> {
     switch (triggerType) {
@@ -138,7 +141,8 @@ export class MaintenanceScheduleService {
           await this.usageHoursConfigRepository.save(
             this.usageHoursConfigRepository.create({
               scheduleId,
-              thresholdMinutes: configs.usageHoursConfig.thresholdMinutes,
+              duration: configs.usageHoursConfig.duration,
+              unit: configs.usageHoursConfig.unit,
             }),
           );
         }
@@ -155,12 +159,12 @@ export class MaintenanceScheduleService {
         break;
       case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL:
         if (configs.timeIntervalConfig) {
-          const { intervalDays, thresholdHours } = configs.timeIntervalConfig;
+          const { duration, unit } = configs.timeIntervalConfig;
           await this.timeIntervalConfigRepository.save(
             this.timeIntervalConfigRepository.create({
               scheduleId,
-              intervalDays: intervalDays ?? null,
-              thresholdHours: thresholdHours ?? null,
+              duration,
+              unit,
             }),
           );
         }

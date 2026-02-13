@@ -14,19 +14,19 @@ import {
   TableRow,
 } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
-import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances, useResourceMaintenancesServiceFindMaintenancesKey, useResourceMaintenancesServiceFinishMaintenance } from '@attraccess/react-query-client';
+import { MaintenanceReasonDisplay, useFormattedMaintenanceReason } from '../../../../components/MaintenanceReasonDisplay';
+import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
-import { ResourceMaintenanceCancelModal } from './cancel';
+import { MarkDoneModal } from './mark-done';
+import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
-import { useQueryClient } from '@tanstack/react-query';
 
 interface Props {
   resourceId: number;
@@ -40,38 +40,17 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     en,
   });
 
-  const formatReason = useMemo(
-    () => (reason: string | null | undefined) => {
-      if (reason == null || reason === '') return '';
-      try {
-        const parsed = JSON.parse(reason) as { i18nKey?: string; details?: Record<string, number | string> };
-        if (parsed?.i18nKey && typeof parsed.details === 'object') {
-          const { scheduleName, ...rest } = parsed.details;
-          const text = t(parsed.i18nKey, rest as Record<string, string | number>);
-          return scheduleName ? `${text} (${scheduleName})` : text;
-        }
-      } catch {
-        // not JSON or legacy reason
-      }
-      return reason;
-    },
-    [t]
-  );
+  const formatReason = useFormattedMaintenanceReason({});
 
   const [includePast, setIncludePast] = useState(false);
-  const queryClient = useQueryClient();
-
-  const { mutate: finishMaintenance, isPending: isFinishing } = useResourceMaintenancesServiceFinishMaintenance({
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useResourceMaintenancesServiceFindMaintenancesKey] });
-    },
-  });
 
   const { data: maintenances, status: fetchStatus } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includePast,
     includeActive: true,
     includeUpcoming: true,
+  }, undefined, {
+    refetchInterval: 10000,
   });
 
   const now = useNow();
@@ -153,7 +132,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
                 <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
-                  {formatReason(maintenance.reason)}
+                  <MaintenanceReasonDisplay reason={maintenance.reason} />
                 </TableCell>
                 <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
                   {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
@@ -170,22 +149,19 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 </TableCell>
                 <TableCell align="right">
                   {maintenance.isActive && (
-                    <Button
-                      isIconOnly
-                      startContent={<CheckCircleIcon className="w-4 h-4" />}
-                      title={t('actions.markDone.title')}
-                      onPress={() => finishMaintenance({ resourceId, maintenanceId: maintenance.id, requestBody: {} })}
-                      isLoading={isFinishing}
-                      color="success"
-                      variant="light"
-                    />
+                    <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
+                      {(openMarkDone: () => void) => (
+                        <Button
+                          isIconOnly
+                          startContent={<CheckCircleIcon className="w-4 h-4" />}
+                          title={t('actions.markDone.title')}
+                          onPress={openMarkDone}
+                          color="success"
+                          variant="light"
+                        />
+                      )}
+                    </MarkDoneModal>
                   )}
-                  <ResourceMaintenanceUpsertModal resourceId={resourceId} maintenanceId={maintenance.id}>
-                    {(open) => <Button onPress={open} isIconOnly startContent={<PencilIcon className="w-4 h-4" />} />}
-                  </ResourceMaintenanceUpsertModal>
-                  <ResourceMaintenanceCancelModal resourceId={resourceId} maintenanceId={maintenance.id}>
-                    {(open) => <Button onPress={open} isIconOnly startContent={<TrashIcon className="w-4 h-4" />} />}
-                  </ResourceMaintenanceCancelModal>
                 </TableCell>
               </TableRow>
             )}

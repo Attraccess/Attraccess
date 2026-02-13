@@ -77,6 +77,13 @@ export enum BillingTransactionStatus {
   Failed = "failed",
 }
 
+/** Unit for duration (MINUTES, HOURS, or DAYS) */
+export enum UsageDurationUnit {
+  MINUTES = "MINUTES",
+  HOURS = "HOURS",
+  DAYS = "DAYS",
+}
+
 /** The type of trigger for this schedule */
 export enum ResourceMaintenanceScheduleTriggerType {
   USAGE_HOURS = "USAGE_HOURS",
@@ -2141,10 +2148,12 @@ export interface ResourceMaintenanceScheduleUsageHoursConfig {
    */
   scheduleId: number;
   /**
-   * Trigger after this many minutes of resource usage (since last maintenance done for this schedule)
-   * @example 6000
+   * Duration value (combined with unit) for usage threshold
+   * @example 100
    */
-  thresholdMinutes: number;
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
 }
 
 export interface ResourceMaintenanceScheduleUsageCountConfig {
@@ -2177,15 +2186,12 @@ export interface ResourceMaintenanceScheduleTimeIntervalConfig {
    */
   scheduleId: number;
   /**
-   * Recurring: trigger every N days (e.g. 30 for monthly)
+   * Duration value (combined with unit)
    * @example 30
    */
-  intervalDays?: number;
-  /**
-   * Wall-clock: trigger after this many hours since last maintenance done for this schedule
-   * @example 500
-   */
-  thresholdHours?: number;
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
 }
 
 export interface ResourceMaintenanceSchedule {
@@ -2283,24 +2289,77 @@ export interface PaginatedMaintenanceResponse {
   data: ResourceMaintenance[];
 }
 
-export interface UpdateMaintenanceDto {
+export interface FinishMaintenanceDto {
   /**
-   * When the maintenance starts (must be in the future)
-   * @format date-time
-   * @example "2025-01-01T10:00:00.000Z"
+   * Optional notes when marking the maintenance as done
+   * @example "Replaced filter, cleaned nozzle"
    */
-  startTime?: string;
+  notes?: string;
+}
+
+export interface UsageHoursTriggerConfigDto {
   /**
-   * When the maintenance ends (optional)
-   * @format date-time
-   * @example "2025-01-01T18:00:00.000Z"
+   * Duration value (combined with unit) for usage threshold
+   * @min 1
+   * @example 100
    */
-  endTime?: string | null;
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface UsageCountTriggerConfigDto {
   /**
-   * The reason for the maintenance
-   * @example "Scheduled maintenance for software updates"
+   * Trigger after this many usage sessions (since last maintenance done for this schedule)
+   * @min 1
+   * @example 50
    */
-  reason?: string;
+  thresholdSessions: number;
+}
+
+export interface TimeIntervalTriggerConfigDto {
+  /**
+   * Duration value (combined with unit)
+   * @min 1
+   * @example 500
+   */
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface CreateMaintenanceScheduleDto {
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType: ResourceMaintenanceScheduleTriggerType;
+  /** Required when triggerType is USAGE_HOURS */
+  usageHoursConfig?: UsageHoursTriggerConfigDto;
+  /** Required when triggerType is USAGE_COUNT */
+  usageCountConfig?: UsageCountTriggerConfigDto;
+  /** Required when triggerType is TIME_INTERVAL (duration, unit, mode) */
+  timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+  /**
+   * Whether the schedule is enabled
+   * @default true
+   * @example true
+   */
+  enabled?: boolean;
+}
+
+export interface UpdateMaintenanceScheduleDto {
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType?: ResourceMaintenanceScheduleTriggerType;
+  /** Required when triggerType is USAGE_HOURS */
+  usageHoursConfig?: UsageHoursTriggerConfigDto;
+  /** Required when triggerType is USAGE_COUNT */
+  usageCountConfig?: UsageCountTriggerConfigDto;
+  /** Required when triggerType is TIME_INTERVAL (duration, unit, mode) */
+  timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+  /** Whether the schedule is enabled */
+  enabled?: boolean;
 }
 
 export interface BalanceDto {
@@ -3894,9 +3953,17 @@ export type FindMaintenancesData = PaginatedMaintenanceResponse;
 
 export type GetMaintenanceData = ResourceMaintenance;
 
-export type UpdateMaintenanceData = ResourceMaintenance;
+export type FinishMaintenanceData = ResourceMaintenance;
 
-export type CancelMaintenanceData = any;
+export type FindMaintenanceSchedulesData = ResourceMaintenanceSchedule[];
+
+export type CreateMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type GetMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type UpdateMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type DeleteMaintenanceScheduleData = any;
 
 export type GetBillingBalanceData = BalanceDto;
 
@@ -6306,14 +6373,14 @@ export namespace ResourceMaintenances {
   }
 
   /**
-   * @description Update a maintenance with new start time, end time, and/or reason
+   * @description Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.
    * @tags Resource Maintenances
-   * @name UpdateMaintenance
-   * @summary Update a maintenance
-   * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @name FinishMaintenance
+   * @summary Mark a maintenance as done
+   * @request POST:/api/resources/{resourceId}/maintenances/{maintenanceId}/finish
    * @secure
    */
-  export namespace UpdateMaintenance {
+  export namespace FinishMaintenance {
     export type RequestParams = {
       /** The ID of the resource */
       resourceId: number;
@@ -6321,30 +6388,112 @@ export namespace ResourceMaintenances {
       maintenanceId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = UpdateMaintenanceDto;
+    export type RequestBody = FinishMaintenanceDto;
     export type RequestHeaders = {};
-    export type ResponseBody = UpdateMaintenanceData;
+    export type ResponseBody = FinishMaintenanceData;
   }
+}
 
+export namespace ResourceMaintenanceSchedules {
   /**
-   * @description Delete a maintenance (cancel it)
-   * @tags Resource Maintenances
-   * @name CancelMaintenance
-   * @summary Cancel a maintenance
-   * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @description Get all maintenance schedules for the given resource
+   * @tags Resource Maintenance Schedules
+   * @name FindMaintenanceSchedules
+   * @summary List maintenance schedules for a resource
+   * @request GET:/api/resources/{resourceId}/maintenance-schedules
    * @secure
    */
-  export namespace CancelMaintenance {
+  export namespace FindMaintenanceSchedules {
     export type RequestParams = {
-      /** The ID of the resource */
+      /** Resource ID */
       resourceId: number;
-      /** The ID of the maintenance */
-      maintenanceId: number;
     };
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = CancelMaintenanceData;
+    export type ResponseBody = FindMaintenanceSchedulesData;
+  }
+
+  /**
+   * @description Create a new maintenance schedule for the resource
+   * @tags Resource Maintenance Schedules
+   * @name CreateMaintenanceSchedule
+   * @summary Create a maintenance schedule
+   * @request POST:/api/resources/{resourceId}/maintenance-schedules
+   * @secure
+   */
+  export namespace CreateMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateMaintenanceScheduleDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Get a single maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name GetMaintenanceSchedule
+   * @summary Get a maintenance schedule by ID
+   * @request GET:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace GetMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Update an existing maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name UpdateMaintenanceSchedule
+   * @summary Update a maintenance schedule
+   * @request PUT:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace UpdateMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateMaintenanceScheduleDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Delete a maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name DeleteMaintenanceSchedule
+   * @summary Delete a maintenance schedule
+   * @request DELETE:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace DeleteMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteMaintenanceScheduleData;
   }
 }
 
@@ -10165,22 +10314,115 @@ export class Api<
       }),
 
     /**
-     * @description Update a maintenance with new start time, end time, and/or reason
+     * @description Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.
      *
      * @tags Resource Maintenances
-     * @name UpdateMaintenance
-     * @summary Update a maintenance
-     * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @name FinishMaintenance
+     * @summary Mark a maintenance as done
+     * @request POST:/api/resources/{resourceId}/maintenances/{maintenanceId}/finish
      * @secure
      */
-    updateMaintenance: (
+    finishMaintenance: (
       resourceId: number,
       maintenanceId: number,
-      data: UpdateMaintenanceDto,
+      data: FinishMaintenanceDto,
       params: RequestParams = {},
     ) =>
-      this.request<UpdateMaintenanceData, void>({
-        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+      this.request<FinishMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}/finish`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
+  resourceMaintenanceSchedules = {
+    /**
+     * @description Get all maintenance schedules for the given resource
+     *
+     * @tags Resource Maintenance Schedules
+     * @name FindMaintenanceSchedules
+     * @summary List maintenance schedules for a resource
+     * @request GET:/api/resources/{resourceId}/maintenance-schedules
+     * @secure
+     */
+    findMaintenanceSchedules: (
+      resourceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<FindMaintenanceSchedulesData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Create a new maintenance schedule for the resource
+     *
+     * @tags Resource Maintenance Schedules
+     * @name CreateMaintenanceSchedule
+     * @summary Create a maintenance schedule
+     * @request POST:/api/resources/{resourceId}/maintenance-schedules
+     * @secure
+     */
+    createMaintenanceSchedule: (
+      resourceId: number,
+      data: CreateMaintenanceScheduleDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get a single maintenance schedule
+     *
+     * @tags Resource Maintenance Schedules
+     * @name GetMaintenanceSchedule
+     * @summary Get a maintenance schedule by ID
+     * @request GET:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+     * @secure
+     */
+    getMaintenanceSchedule: (
+      resourceId: number,
+      scheduleId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Update an existing maintenance schedule
+     *
+     * @tags Resource Maintenance Schedules
+     * @name UpdateMaintenanceSchedule
+     * @summary Update a maintenance schedule
+     * @request PUT:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+     * @secure
+     */
+    updateMaintenanceSchedule: (
+      resourceId: number,
+      scheduleId: number,
+      data: UpdateMaintenanceScheduleDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
         method: "PUT",
         body: data,
         secure: true,
@@ -10190,21 +10432,21 @@ export class Api<
       }),
 
     /**
-     * @description Delete a maintenance (cancel it)
+     * @description Delete a maintenance schedule
      *
-     * @tags Resource Maintenances
-     * @name CancelMaintenance
-     * @summary Cancel a maintenance
-     * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @tags Resource Maintenance Schedules
+     * @name DeleteMaintenanceSchedule
+     * @summary Delete a maintenance schedule
+     * @request DELETE:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
      * @secure
      */
-    cancelMaintenance: (
+    deleteMaintenanceSchedule: (
       resourceId: number,
-      maintenanceId: number,
+      scheduleId: number,
       params: RequestParams = {},
     ) =>
-      this.request<CancelMaintenanceData, void>({
-        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+      this.request<DeleteMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
         method: "DELETE",
         secure: true,
         ...params,

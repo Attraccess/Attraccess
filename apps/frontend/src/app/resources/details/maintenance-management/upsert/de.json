@@ -11,7 +11,8 @@
             "label": "Endzeit"
         },
         "reason": {
-            "label": "Grund (optional)"
+            "label": "Grund (optional)",
+            "displayedToUsers": "Wird Nutzenden angezeigt als"
         }
     },
     "actions": {

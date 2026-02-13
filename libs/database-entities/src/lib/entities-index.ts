@@ -45,7 +45,10 @@ import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import {
+  ResourceMaintenanceScheduleUsageHoursConfig,
+} from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
 import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
 import { ResourceUsageAction } from './entities/resourceUsage.type';
@@ -95,6 +98,7 @@ export {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
+  UsageDurationUnit,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceType,

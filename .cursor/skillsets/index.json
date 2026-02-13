@@ -1,9 +1,9 @@
 {
   "agents": [
     {
-      "id": "nx-monorepo",
-      "file": ".cursor/skillsets/nx-monorepo-skillset.json",
-      "triggers": ["nx", "pnpm", "build", "lint", "test", "e2e", "serve", "precommit", "react-query", "monorepo", "target"]
+      "id": "common",
+      "file": ".cursor/skillsets/common-skillset.json",
+      "triggers": ["nx", "pnpm", "build", "lint", "test", "e2e", "serve", "precommit", "react-query", "monorepo", "target","migration","migrations"]
     },
     {
       "id": "setup-environment",

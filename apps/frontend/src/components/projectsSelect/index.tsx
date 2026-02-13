@@ -7,6 +7,7 @@ interface Props {
   value: number | null | undefined;
   onValueChange: (value: number | undefined) => void;
   label?: string;
+  ariaLabel?: string;
   placeholder?: string;
   includeUnassignedOption?: boolean;
   unassignedLabel?: string;
@@ -14,7 +15,7 @@ interface Props {
 }
 
 export function ProjectsSelect(props: Props) {
-  const { value, onValueChange, includeUnassignedOption, unassignedLabel, isDisabled } = props;
+  const { value, onValueChange, includeUnassignedOption, unassignedLabel, isDisabled, ...selectProps } = props;
 
   const { data: projects, isLoading } = useProjectsServiceFindManyProjects();
   const resolvedValue = value ?? undefined;
@@ -25,8 +26,8 @@ export function ProjectsSelect(props: Props) {
 
   return (
     <Select
+      {...selectProps}
       items={items}
-      label={props.label}
       placeholder={projects?.data?.find((r) => r.id === resolvedValue)?.name ?? props.placeholder}
       selectedKey={resolvedValue ? resolvedValue.toString() : ''}
       onSelectionChange={(key) => {
@@ -40,7 +41,7 @@ export function ProjectsSelect(props: Props) {
       }}
       data-cy="projects-select"
       isLoading={isLoading}
-      isDisabled={isDisabled}
+      aria-label={props.ariaLabel ?? 'Projects Select'}
     />
   );
 }

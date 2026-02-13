@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsPositive } from 'class-validator';
+import { IsEnum, IsInt, IsPositive } from 'class-validator';
+import { UsageDurationUnit } from '@attraccess/database-entities';
 
 /**
  * Config for USAGE_HOURS trigger. Baseline = when the last maintenance
@@ -7,11 +8,19 @@ import { IsInt, IsPositive } from 'class-validator';
  */
 export class UsageHoursTriggerConfigDto {
   @ApiProperty({
-    description: 'Trigger after this many minutes of resource usage (since last maintenance done for this schedule)',
-    example: 6000,
+    description: 'Duration value (combined with unit) for usage threshold',
+    example: 100,
     minimum: 1,
   })
   @IsInt()
   @IsPositive()
-  thresholdMinutes!: number;
+  duration!: number;
+
+  @ApiProperty({
+    description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+    enum: UsageDurationUnit,
+    enumName: 'UsageDurationUnit',
+  })
+  @IsEnum(UsageDurationUnit)
+  unit!: UsageDurationUnit;
 }
