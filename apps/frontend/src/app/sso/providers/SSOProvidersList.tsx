@@ -474,6 +474,15 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     await handleCopyValue(oidcCallbackUrl, t('copySuccessTitle'));
   }, [handleCopyValue, oidcCallbackUrl, t]);
 
+  const handleCopyLoginUrl = useCallback(
+    async (value: string) => {
+      if (!value) {
+        return;
+      }
+      await handleCopyValue(value, t('copySuccessTitle'));
+    },
+    [handleCopyValue, t],
+  );
 
   const handleSamlToggleChange = (
     field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>,
