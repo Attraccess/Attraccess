@@ -15,7 +15,7 @@ export function FieldOptionsEditor({ field, onChange, t }: FieldOptionsEditorPro
     onChange({ ...field, options: { ...field.options, ...nextOptions } });
   };
 
-  const lastOptionInputRef = useRef<HTMLInputElement>(null);
+  const lastOptionInputRef = useRef<HTMLInputElement | null>(null);
   const [optionAdded, setOptionAdded] = useState(false);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ function renderOptionsByType(
   options: EditableFormField['options'],
   updateOptions: (options: EditableFormField['options']) => void,
   t: (key: string) => string,
-  lastOptionInputRef: React.RefObject<HTMLInputElement>,
+  lastOptionInputRef: React.RefObject<HTMLInputElement | null>,
   setOptionAdded: (value: boolean) => void,
 ) {
   switch (type) {
@@ -114,7 +114,7 @@ function renderOptionsByType(
                 placeholder={t('fields.options.select.optionPlaceholder')}
                 onChange={(e) => handleOptionChange(index, e.target.value)}
                 size="sm"
-                ref={index === currentOptions.length - 1 ? lastOptionInputRef : undefined}
+                ref={index === currentOptions.length - 1 ? (lastOptionInputRef as React.Ref<HTMLInputElement>) : undefined}
               />
               <Button isIconOnly size="sm" variant="light" color="danger" onPress={() => handleRemoveOption(index)}>
                 <X className="w-4 h-4" />

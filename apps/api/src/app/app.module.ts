@@ -23,6 +23,8 @@ import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { SettingsModule } from '../settings/settings.module';
+import { SettingsService } from '../settings/settings.service';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { ProjectsModule } from '../projects/projects.module';
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
+    SettingsModule,
     TypeOrmModule.forRoot(dataSourceConfig),
     ResourcesModule,
     ServeStaticModule.forRootAsync({
@@ -115,10 +118,20 @@ import { ProjectsModule } from '../projects/projects.module';
   providers: [AppService],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly licenseService: LicenseService) {}
+  constructor(
+    private readonly licenseService: LicenseService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   async onModuleInit() {
     try {
+      const licenseKey = await this.settingsService.getLicenseKey();
+      if (!licenseKey) {
+        // eslint-disable-next-line no-console
+        console.warn('LICENSE_KEY not configured yet. Skipping initial license validation.');
+        return;
+      }
+
       await this.licenseService.verifyLicense();
     } catch (error) {
       // eslint-disable-next-line no-console

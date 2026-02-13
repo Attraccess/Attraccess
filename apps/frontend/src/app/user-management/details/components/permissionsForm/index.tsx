@@ -7,8 +7,8 @@ import {
   User,
   useUsersServiceGetPermissions,
   useUsersServiceUpdatePermissions,
-  UseUsersServiceFindManyKeyFn,
   SystemPermissions,
+  useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -34,7 +34,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
   const { mutateAsync: savePermissions, isPending: isSavingPermissions } = useUsersServiceUpdatePermissions({
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: [UseUsersServiceFindManyKeyFn()[0]],
+        queryKey: [useUsersServiceFindManyKey],
       });
 
       toast.success({

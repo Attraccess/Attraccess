@@ -1,0 +1,44 @@
+{
+  "service": {
+    "none": "Deaktiviert",
+    "smtp": "SMTP",
+    "outlook": "Outlook 365"
+  },
+  "inputs": {
+    "service": {
+      "label": "Dienst"
+    },
+    "host": {
+      "label": "Host",
+      "description": "Hostname des SMTP-Servers."
+    },
+    "port": {
+      "label": "Port",
+      "description": "Port des SMTP-Servers."
+    },
+    "secure": {
+      "label": "TLS verwenden"
+    },
+    "user": {
+      "label": "Benutzername",
+      "description": "Optionaler Benutzername für SMTP-Authentifizierung."
+    },
+    "pass": {
+      "label": "Passwort",
+      "description": "Leer lassen, um das aktuelle Passwort beizubehalten."
+    },
+    "from": {
+      "label": "Absenderadresse",
+      "description": "Standard-Absenderadresse für ausgehende E-Mails."
+    }
+  },
+  "actions": {
+    "save": "Speichern",
+    "next": "Weiter"
+  },
+  "loading": "Einstellungen werden geladen...",
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Deine Änderungen wurden übernommen."
+  }
+}

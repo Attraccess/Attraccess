@@ -51,7 +51,7 @@ export class AuthController {
 
     if (body.tokenLocation === 'cookie') {
       // Set HTTP-only cookie for web browsers
-      this.cookieConfigService.setAuthCookie(response, sessionToken);
+      await this.cookieConfigService.setAuthCookie(response, sessionToken);
 
       // Return user data without token for web browsers
       return {
@@ -111,7 +111,7 @@ export class AuthController {
       });
 
       if (tokenLocation === 'cookie') {
-        this.cookieConfigService.setAuthCookie(response, sessionToken);
+        await this.cookieConfigService.setAuthCookie(response, sessionToken);
         return {
           user: request.user,
           authToken: '',
@@ -126,7 +126,7 @@ export class AuthController {
 
     if (tokenLocation === 'cookie') {
       // Update cookie with new token
-      this.cookieConfigService.setAuthCookie(response, newToken);
+      await this.cookieConfigService.setAuthCookie(response, newToken);
       return {
         user: request.user,
         authToken: '',
@@ -167,7 +167,7 @@ export class AuthController {
     const sessionToken = headerToken || cookieToken;
 
     // Clear authentication cookie regardless of request type
-    this.cookieConfigService.clearAuthCookie(response);
+    await this.cookieConfigService.clearAuthCookie(response);
 
     // Revoke session token if present
     if (sessionToken) {

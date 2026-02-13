@@ -33,10 +33,10 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
         queryKey: UseUsersServiceGetOneUserByIdKeyFn({ id: userId }),
       });
       queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] === useUsersServiceGetAllWithPermissionKey,
+        queryKey: [useUsersServiceGetAllWithPermissionKey],
       });
       queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] === useUsersServiceFindManyKey,
+        queryKey: [useUsersServiceFindManyKey],
       });
       showSuccess({ title: t('messages.updated') });
     },

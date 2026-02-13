@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 import { SystemPermission } from './user.entity';
 
@@ -102,7 +103,9 @@ export class SSOProviderSAMLConfiguration {
     description: 'Shared secret used to authorize SAML provisioning requests',
     required: false,
     nullable: true,
+    writeOnly: true,
   })
+  @Exclude()
   provisioningSecret?: string | null;
 
   @Column({ type: 'json', nullable: true })
@@ -129,7 +132,9 @@ export class SSOProviderSAMLConfiguration {
     description: 'Encrypted Service Provider private key used for signing AuthnRequests',
     required: false,
     nullable: true,
+    writeOnly: true,
   })
+  @Exclude()
   spSigningKeyEncrypted?: string | null;
 
   @Column({ type: 'text', nullable: true })

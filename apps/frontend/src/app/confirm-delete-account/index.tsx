@@ -7,7 +7,7 @@ import en from './en.json';
 import de from './de.json';
 import {
   useUsersServiceConfirmDeleteAccount,
-  UseUsersServiceGetCurrentKeyFn,
+  useUsersServiceGetCurrentKey,
   ApiError,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -38,7 +38,7 @@ export function ConfirmDeleteAccount() {
       setIsSuccess(true);
       setError(null);
       queryClient.invalidateQueries({
-        queryKey: [UseUsersServiceGetCurrentKeyFn()[0]],
+        queryKey: [useUsersServiceGetCurrentKey],
       });
     },
     onError: (error) => {
@@ -126,20 +126,20 @@ export function ConfirmDeleteAccount() {
             <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="confirm-delete-error-alert" />
           </CardBody>
           <CardFooter>
-          {allowRetry && (
-            <>
-              <Button
-                fullWidth
-                color="primary"
-                onPress={() => confirm(true)}
-                isDisabled={confirmDelete.isPending}
-                data-cy="confirm-delete-error-try-again-button"
-              >
-                {t('error.tryAgain')}
-              </Button>
-              <Spacer y={2} />
-            </>
-          )}
+            {allowRetry && (
+              <>
+                <Button
+                  fullWidth
+                  color="primary"
+                  onPress={() => confirm(true)}
+                  isDisabled={confirmDelete.isPending}
+                  data-cy="confirm-delete-error-try-again-button"
+                >
+                  {t('error.tryAgain')}
+                </Button>
+                <Spacer y={2} />
+              </>
+            )}
             <Button
               fullWidth
               variant="bordered"

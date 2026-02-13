@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { AppConfigType } from '../../config/app.config';
 import { SessionConfigType } from '../../config/session.config';
+import { SettingsService } from '../../settings/settings.service';
+import { deriveCookieSecurity } from './cookie-security';
 
 export type CookieConfigType = {
   name: string;
@@ -15,58 +16,63 @@ export type CookieConfigType = {
 
 @Injectable()
 export class CookieConfigService {
-  private readonly cookieConfig: CookieConfigType;
+  private readonly cookieConfig: Omit<CookieConfigType, 'secure' | 'sameSite'>;
 
-  constructor(private readonly configService: ConfigService) {
-    this.cookieConfig = this.getCookieConfig();
-  }
-
-  /**
-   * Gets cookie configuration based on environment
-   */
-  private getCookieConfig(): CookieConfigType {
-    const appConfig = this.configService.get<AppConfigType>('app');
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {
     const sessionConfig = this.configService.get<SessionConfigType>('session');
-    const isSecure = appConfig?.ATTRACCESS_URL?.startsWith('https://') ?? false;
-
-    return {
+    this.cookieConfig = {
       name: 'auth-session',
       httpOnly: true,
-      secure: isSecure,
-      sameSite: 'lax' as const,
       maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
       path: '/',
     };
   }
 
   /**
-   * Get the current cookie configuration
+   * Get the current cookie configuration (static options only; secure and sameSite are derived per-request from DB settings).
    */
   getConfig(): CookieConfigType {
-    return this.cookieConfig;
+    return {
+      ...this.cookieConfig,
+      sameSite: 'lax',
+      secure: false,
+    };
+  }
+
+  private async getCookieOptions(): Promise<Pick<CookieConfigType, 'secure' | 'sameSite'>> {
+    const [frontendUrl, backendUrl] = await Promise.all([
+      this.settingsService.getFrontendUrl(),
+      this.settingsService.getBackendUrl(),
+    ]);
+    return deriveCookieSecurity(frontendUrl, backendUrl);
   }
 
   /**
-   * Sets authentication cookie on the response
+   * Sets authentication cookie on the response. secure and sameSite are derived from configured frontend and backend URLs.
    */
-  setAuthCookie(res: Response, token: string): void {
+  async setAuthCookie(res: Response, token: string): Promise<void> {
+    const { secure, sameSite } = await this.getCookieOptions();
     res.cookie(this.cookieConfig.name, token, {
       httpOnly: this.cookieConfig.httpOnly,
-      secure: this.cookieConfig.secure,
-      sameSite: this.cookieConfig.sameSite,
+      secure,
+      sameSite,
       maxAge: this.cookieConfig.maxAge,
       path: this.cookieConfig.path,
     });
   }
 
   /**
-   * Clears authentication cookie from the response
+   * Clears authentication cookie from the response. secure and sameSite must match the values used when the cookie was set.
    */
-  clearAuthCookie(res: Response): void {
+  async clearAuthCookie(res: Response): Promise<void> {
+    const { secure, sameSite } = await this.getCookieOptions();
     res.clearCookie(this.cookieConfig.name, {
       httpOnly: this.cookieConfig.httpOnly,
-      secure: this.cookieConfig.secure,
-      sameSite: this.cookieConfig.sameSite,
+      secure,
+      sameSite,
       path: this.cookieConfig.path,
     });
   }

@@ -6,8 +6,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AppConfigType } from '../../../../config/app.config';
+import { SettingsService } from '../../../../settings/settings.service';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
 import {
@@ -24,7 +23,7 @@ export class SSOSamlGuard implements CanActivate {
 
   constructor(
     private readonly ssoService: SSOService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
     private readonly licenseService: LicenseService,
   ) {}
 
@@ -40,13 +39,13 @@ export class SSOSamlGuard implements CanActivate {
       throw new ForbiddenException('SSO is not permitted by the current license');
     }
 
-    const appConfig = this.configService.get<AppConfigType>('app');
-    if (!appConfig) {
-      this.logger.error("App configuration ('app') not found. Cannot construct URLs.");
+    const frontendUrl = await this.settingsService.getFrontendUrl();
+    if (!frontendUrl) {
+      this.logger.error('Frontend URL not configured. Cannot construct URLs.');
       return false;
     }
 
-    const requestURL = new URL(appConfig.ATTRACCESS_FRONTEND_URL + req.url);
+    const requestURL = new URL(frontendUrl + req.url);
     const urlPathParts = requestURL.pathname.split('/');
     const [, providerIdString, ssoType] = urlPathParts.reverse();
     const providerId = parseInt(providerIdString, 10);
@@ -69,14 +68,19 @@ export class SSOSamlGuard implements CanActivate {
 
     try {
       redirectTo = rawRedirect
-        ? new URL(rawRedirect, appConfig.ATTRACCESS_FRONTEND_URL).toString()
-        : appConfig.ATTRACCESS_FRONTEND_URL;
+        ? new URL(rawRedirect, frontendUrl).toString()
+        : frontendUrl;
     } catch {
       this.logger.warn(`Invalid redirectTo provided: ${rawRedirect ?? 'undefined'}`);
       throw new BadRequestException('Invalid redirectTo parameter');
     }
 
-    const callbackURL = new URL(appConfig.ATTRACCESS_URL);
+    const backendUrl = await this.settingsService.getBackendUrl();
+    if (!backendUrl) {
+      this.logger.error('Backend URL not configured. Cannot construct callback URLs.');
+      return false;
+    }
+    const callbackURL = new URL(backendUrl);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
 
     // Persist RelayState for passport-saml to round-trip the redirect target

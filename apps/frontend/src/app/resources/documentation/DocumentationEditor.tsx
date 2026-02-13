@@ -23,6 +23,7 @@ import {
   useResourcesServiceUpdateOneResource,
   UseResourcesServiceGetOneResourceByIdKeyFn,
   DocumentationType,
+  useResourcesServiceGetAllResourcesKey,
 } from '@attraccess/react-query-client';
 import ReactMarkdown from 'react-markdown';
 import en from './documentationEditor.en.json';
@@ -66,7 +67,7 @@ function DocumentationEditorComponent() {
       // Invalidate the specific resource query
       queryClient.invalidateQueries({ queryKey: resourceQueryKey });
       // Invalidate the resources list query if needed
-      queryClient.invalidateQueries({ queryKey: ['ResourcesService', 'getAllResources'] });
+      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
 
       success({
         title: t('notifications.saveSuccess.title'),

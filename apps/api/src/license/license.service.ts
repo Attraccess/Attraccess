@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../config/app.config';
 import { LicenseDataDto } from './dtos/license.dto';
+import { SettingsService } from '../settings/settings.service';
 
 export class LicenseError extends Error {
   public reason: string;
@@ -30,7 +31,10 @@ interface LicenseRequirements {
 
 @Injectable()
 export class LicenseService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   public async getLicenseData(): Promise<LicenseDataDto> {
     const appConfig = this.configService.get<AppConfigType>('app');
@@ -38,10 +42,21 @@ export class LicenseService {
       throw new LicenseError('Application configuration not loaded');
     }
 
+    const licenseKey = await this.settingsService.getLicenseKey();
+    if (!licenseKey) {
+      return {
+        valid: false,
+        reason: 'LICENSE_KEY_NOT_CONFIGURED',
+        modules: [],
+        usageLimits: {},
+        isNonProfit: false,
+      };
+    }
+
     let response: LicenseDataDto;
 
     if (
-      appConfig.LICENSE_KEY ===
+      licenseKey ===
       'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
     ) {
       response = {
@@ -56,10 +71,15 @@ export class LicenseService {
       // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
       try {
         const { verifyLicense } = await import('@licenso/client');
+        const [frontendUrl, backendUrl] = await Promise.all([
+          this.settingsService.getFrontendUrl(),
+          this.settingsService.getBackendUrl(),
+        ]);
+        const licensoDeviceId = this.buildLicensoDeviceId(frontendUrl ?? backendUrl ?? null);
         const licenseData = await verifyLicense(
-          appConfig.LICENSE_KEY,
+          licenseKey,
           appConfig.LICENSO_PUBLIC_KEY,
-          appConfig.LICENSO_DEVICE_ID,
+          licensoDeviceId,
         );
 
         response = {
@@ -122,5 +142,12 @@ export class LicenseService {
     }
 
     return licenseData;
+  }
+
+  private buildLicensoDeviceId(source?: string | null): string {
+    if (!source) {
+      return 'unknown';
+    }
+    return source.replace('https://', '').replace('http://', '');
   }
 }

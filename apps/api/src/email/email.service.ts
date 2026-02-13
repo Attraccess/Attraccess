@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
-import { MailerService } from '@nestjs-modules/mailer';
-import { ConfigService } from '@nestjs/config';
+import { createTransport } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import {
   User,
   EmailTemplateType,
@@ -14,29 +14,21 @@ import {
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
-import { AppConfigType } from '../config/app.config';
 import { EntityManager } from 'typeorm';
+import { SettingsService } from '../settings/settings.service';
+import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly frontendUrl: string;
-  private readonly backendUrl: string;
 
   constructor(
-    private readonly mailerService: MailerService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
     private readonly emailTemplateService: EmailTemplateService,
     private readonly mjmlService: MjmlService,
   ) {
     this.logger.debug('Initializing EmailService');
-
-    const appConfig = this.configService.get<AppConfigType>('app');
-
-    this.frontendUrl = appConfig.ATTRACCESS_FRONTEND_URL;
-    this.backendUrl = appConfig.ATTRACCESS_URL;
-
-    this.logger.debug(`EmailService initialized with ATTRACCESS_FRONTEND_URL: ${this.frontendUrl}`);
+    this.logger.debug('EmailService initialized');
   }
 
   private convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {
@@ -63,15 +55,20 @@ export class EmailService {
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = this.convertTemplate(dbTemplate, context);
+      const { transporter, from } = await this.createTransporter();
 
       this.logger.debug(
         `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
-      await this.mailerService.sendMail({
+      await transporter.sendMail({
         to: user.email,
+        from,
         subject,
         html: body,
       });
+      if (typeof transporter.close === 'function') {
+        transporter.close();
+      }
       this.logger.debug(`Email sent successfully to: ${user.email}`);
     } catch (error) {
       this.logger.error(`Failed to send email to: ${user.email}`, error.stack);
@@ -79,7 +76,8 @@ export class EmailService {
     }
   }
 
-  private getBaseContext(user: User) {
+  private async getBaseContext(user: User) {
+    const { frontendUrl, backendUrl } = await this.getUrls();
     return {
       user: {
         username: user.username,
@@ -87,20 +85,21 @@ export class EmailService {
         id: user.id,
       },
       host: {
-        frontend: this.frontendUrl,
-        backend: this.backendUrl,
+        frontend: frontendUrl,
+        backend: backendUrl,
       },
-      url: this.frontendUrl,
+      url: frontendUrl,
     } as const;
   }
 
   async sendVerificationEmail(user: User, verificationToken: string) {
-    const verificationUrl = `${this.frontendUrl}/verify-email?email=${encodeURIComponent(
+    const { frontendUrl } = await this.getUrls();
+    const verificationUrl = `${frontendUrl}/verify-email?email=${encodeURIComponent(
       user.email,
     )}&token=${verificationToken}`;
 
     const context = {
-      ...this.getBaseContext(user),
+      ...(await this.getBaseContext(user)),
       url: verificationUrl,
     };
 
@@ -108,12 +107,13 @@ export class EmailService {
   }
 
   async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
-    const verificationUrl = `${this.frontendUrl}/accept-invitation?email=${encodeURIComponent(
+    const { frontendUrl } = await this.getUrls();
+    const verificationUrl = `${frontendUrl}/accept-invitation?email=${encodeURIComponent(
       user.email,
     )}&token=${verificationToken}`;
 
     const context = {
-      ...this.getBaseContext(user),
+      ...(await this.getBaseContext(user)),
       url: verificationUrl,
     };
 
@@ -121,10 +121,11 @@ export class EmailService {
   }
 
   async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {
-    const invitationUrl = `${this.frontendUrl}/projects?invitationId=${invitation.id}`;
+    const { frontendUrl } = await this.getUrls();
+    const invitationUrl = `${frontendUrl}/projects?invitationId=${invitation.id}`;
 
     const context = {
-      ...this.getBaseContext(invitedUser),
+      ...(await this.getBaseContext(invitedUser)),
       project: {
         id: project.id,
         name: project.name,
@@ -145,10 +146,11 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(user: User, resetToken: string) {
-    const resetUrl = `${this.frontendUrl}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
+    const { frontendUrl } = await this.getUrls();
+    const resetUrl = `${frontendUrl}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
 
     const context = {
-      ...this.getBaseContext(user),
+      ...(await this.getBaseContext(user)),
       url: resetUrl,
     };
 
@@ -156,12 +158,13 @@ export class EmailService {
   }
 
   async sendDeleteAccountConfirmationEmail(user: User, token: string) {
-    const confirmUrl = `${this.frontendUrl}/confirm-delete-account?email=${encodeURIComponent(
+    const { frontendUrl } = await this.getUrls();
+    const confirmUrl = `${frontendUrl}/confirm-delete-account?email=${encodeURIComponent(
       user.email,
     )}&token=${encodeURIComponent(token)}`;
 
     const context = {
-      ...this.getBaseContext(user),
+      ...(await this.getBaseContext(user)),
       url: confirmUrl,
     };
 
@@ -169,7 +172,7 @@ export class EmailService {
   }
 
   async sendUsernameChangedEmail(user: User, previousUsername: string) {
-    const base = this.getBaseContext(user) as unknown as {
+    const base = (await this.getBaseContext(user)) as unknown as {
       user: { username: string; email: string; id: number };
       host: { frontend: string; backend: string };
       url: string;
@@ -188,7 +191,7 @@ export class EmailService {
   }
 
   async sendPasswordChangedEmail(user: User) {
-    const context = this.getBaseContext(user);
+    const context = await this.getBaseContext(user);
     await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
   }
 
@@ -214,7 +217,7 @@ export class EmailService {
     const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit); // transaction.amount is negative when charging user
 
     const context = {
-      ...this.getBaseContext(user),
+      ...(await this.getBaseContext(user)),
       resource: {
         id: usage.resource.id,
         name: usage.resource.name,
@@ -230,5 +233,47 @@ export class EmailService {
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
+  }
+
+  private async getUrls(): Promise<{ frontendUrl: string; backendUrl: string }> {
+    const [frontendUrl, backendUrl] = await Promise.all([
+      this.settingsService.getFrontendUrl(),
+      this.settingsService.getBackendUrl(),
+    ]);
+
+    if (!frontendUrl) {
+      throw new Error('Frontend URL not configured');
+    }
+    if (!backendUrl) {
+      throw new Error('Backend URL not configured');
+    }
+
+    return { frontendUrl, backendUrl };
+  }
+
+  private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
+    const smtpConfig = await this.settingsService.getSmtpConfiguration();
+    if (!smtpConfig) {
+      throw new Error('SMTP configuration not set');
+    }
+
+    let transportOptions: SMTPTransport.Options;
+
+    if (smtpConfig.service === SmtpServiceType.Outlook365) {
+      transportOptions = {
+        service: 'Outlook365',
+        auth: smtpConfig.user || smtpConfig.pass ? { user: smtpConfig.user ?? '', pass: smtpConfig.pass ?? '' } : undefined,
+      };
+    } else {
+      transportOptions = {
+        host: smtpConfig.host ?? undefined,
+        port: smtpConfig.port ?? undefined,
+        secure: smtpConfig.secure ?? false,
+        auth: smtpConfig.user || smtpConfig.pass ? { user: smtpConfig.user ?? '', pass: smtpConfig.pass ?? '' } : undefined,
+      };
+    }
+
+    const transporter = createTransport(transportOptions);
+    return { transporter, from: smtpConfig.from ?? '' };
   }
 }

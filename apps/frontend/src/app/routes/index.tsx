@@ -30,6 +30,9 @@ import { BalenaPage } from '../balena';
 import { ProjectsListPage } from '../projects';
 import { ProjectDetailsPage } from '../projects/details';
 import { ProjectTeamPage } from '../projects/details/team';
+import SystemSettingsPage from '../settings';
+import FirstTimeSetupPage from '../first-time-setup';
+import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 
 const coreRoutes: RouteConfig[] = [
   {
@@ -45,6 +48,15 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/dependencies',
     element: <Dependencies />,
+    authRequired: false,
+  },
+  {
+    path: '/first-time-setup',
+    element: (
+      <UnauthorizedLayout>
+        <FirstTimeSetupPage />
+      </UnauthorizedLayout>
+    ),
     authRequired: false,
   },
   {
@@ -165,6 +177,11 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/plugins',
     element: <PluginsList />,
+    authRequired: 'canManageSystemConfiguration',
+  },
+  {
+    path: '/settings',
+    element: <SystemSettingsPage />,
     authRequired: 'canManageSystemConfiguration',
   },
   {

@@ -6,7 +6,7 @@ import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useUsersServiceVerifyEmail, UseUsersServiceGetCurrentKeyFn, ApiError } from '@attraccess/react-query-client';
+import { useUsersServiceVerifyEmail, useUsersServiceGetCurrentKey, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
@@ -28,7 +28,7 @@ export function VerifyEmail() {
       setIsSuccess(true);
       setError(null);
       queryClient.invalidateQueries({
-        queryKey: [UseUsersServiceGetCurrentKeyFn()[0]],
+        queryKey: [useUsersServiceGetCurrentKey],
       });
     },
     onError: (error) => {

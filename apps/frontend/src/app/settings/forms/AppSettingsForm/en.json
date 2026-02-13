@@ -1,0 +1,29 @@
+{
+  "inputs": {
+    "frontendUrl": {
+      "label": "Frontend URL",
+      "description": "The URL users access the frontend at."
+    },
+    "backendUrl": {
+      "label": "Backend URL",
+      "description": "The URL used for API callbacks and internal links."
+    },
+    "publicInternetUrl": {
+      "label": "Public Internet URL",
+      "description": "Optional URL used for external callbacks (e.g. SumUp)."
+    },
+    "licenseKey": {
+      "label": "License Key",
+      "description": "Paste a new license key to update."
+    }
+  },
+  "actions": {
+    "save": "Save",
+    "next": "Next"
+  },
+  "loading": "Loading settings...",
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  }
+}

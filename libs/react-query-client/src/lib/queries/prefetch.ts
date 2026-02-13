@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -62,6 +62,8 @@ export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindAll = (q
 export const prefetchUseEmailTemplatesServiceEmailTemplateControllerFindOne = (queryClient: QueryClient, { type }: {
   type: EmailTemplateType;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
+export const prefetchUseSettingsServiceGetSystemSettings = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetSystemSettingsKeyFn(), queryFn: () => SettingsService.getSystemSettings() });
+export const prefetchUseSettingsServiceGetFirstTimeSetupStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSettingsServiceGetFirstTimeSetupStatusKeyFn(), queryFn: () => SettingsService.getFirstTimeSetupStatus() });
 export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const prefetchUseResourcesServiceGetAllResources = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
   groupId?: number;
