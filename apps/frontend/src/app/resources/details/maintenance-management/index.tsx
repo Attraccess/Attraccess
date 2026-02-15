@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
+import { MaintenanceReasonDisplay, useFormattedMaintenanceReason } from '../../../../components/MaintenanceReasonDisplay';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -21,8 +22,8 @@ import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-u
 import de from './de.json';
 import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert';
-import { CogIcon, ConstructionIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react';
-import { ResourceMaintenanceCancelModal } from './cancel';
+import { MarkDoneModal } from './mark-done';
+import { CheckCircleIcon, CogIcon, ConstructionIcon, PlusIcon } from 'lucide-react';
 import { useNow } from '../../../../hooks/useNow';
 import { EmptyState } from '../../../../components/emptyState';
 import { useReactQueryStatusToHeroUiTableLoadingState } from '../../../../hooks/useReactQueryStatusToHeroUiTableLoadingState';
@@ -39,6 +40,8 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     en,
   });
 
+  const formatReason = useFormattedMaintenanceReason({});
+
   const [includePast, setIncludePast] = useState(false);
 
   const { data: maintenances, status: fetchStatus } = useResourceMaintenancesServiceFindMaintenances({
@@ -46,6 +49,8 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
     includePast,
     includeActive: true,
     includeUpcoming: true,
+  }, undefined, {
+    refetchInterval: 10000,
   });
 
   const now = useNow();
@@ -105,6 +110,9 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
             <TableColumn>{t('table.columns.start')}</TableColumn>
             <TableColumn>{t('table.columns.end')}</TableColumn>
             <TableColumn>{t('table.columns.reason')}</TableColumn>
+            <TableColumn>{t('table.columns.createdBy')}</TableColumn>
+            <TableColumn>{t('table.columns.completedBy')}</TableColumn>
+            <TableColumn>{t('table.columns.completedAt')}</TableColumn>
             <TableColumn>
               <CogIcon />
             </TableColumn>
@@ -123,16 +131,37 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                 <TableCell>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
-                <TableCell className="overflow-hidden text-ellipsis" title={maintenance.reason}>
-                  {maintenance.reason}
+                <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
+                  <MaintenanceReasonDisplay reason={maintenance.reason} />
+                </TableCell>
+                <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
+                  {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
+                </TableCell>
+                <TableCell title={(maintenance.completedByUser as { username?: string } | undefined)?.username ?? ''}>
+                  {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
+                </TableCell>
+                <TableCell>
+                  {maintenance.completedAt ? (
+                    <DateTimeDisplay date={maintenance.completedAt} />
+                  ) : (
+                    '—'
+                  )}
                 </TableCell>
                 <TableCell align="right">
-                  <ResourceMaintenanceUpsertModal resourceId={resourceId} maintenanceId={maintenance.id}>
-                    {(open) => <Button onPress={open} isIconOnly startContent={<PencilIcon className="w-4 h-4" />} />}
-                  </ResourceMaintenanceUpsertModal>
-                  <ResourceMaintenanceCancelModal resourceId={resourceId} maintenanceId={maintenance.id}>
-                    {(open) => <Button onPress={open} isIconOnly startContent={<TrashIcon className="w-4 h-4" />} />}
-                  </ResourceMaintenanceCancelModal>
+                  {maintenance.isActive && (
+                    <MarkDoneModal resourceId={resourceId} maintenanceId={maintenance.id}>
+                      {(openMarkDone: () => void) => (
+                        <Button
+                          isIconOnly
+                          startContent={<CheckCircleIcon className="w-4 h-4" />}
+                          title={t('actions.markDone.title')}
+                          onPress={openMarkDone}
+                          color="success"
+                          variant="light"
+                        />
+                      )}
+                    </MarkDoneModal>
+                  )}
                 </TableCell>
               </TableRow>
             )}

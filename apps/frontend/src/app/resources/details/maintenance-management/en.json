@@ -8,13 +8,32 @@
     "columns": {
       "start": "Start",
       "end": "End",
-      "reason": "Reason"
+      "reason": "Reason",
+      "createdBy": "Created by",
+      "completedBy": "Completed by",
+      "completedAt": "Completed at"
     }
   },
   "actions": {
     "create": {
       "title": "Create maintenance period",
       "label": "New"
+    },
+    "markDone": {
+      "title": "Mark as done",
+      "modal": {
+        "title": "Mark maintenance as done",
+        "notesLabel": "Notes",
+        "notesPlaceholder": "Optional completion notes (e.g. what was done)",
+        "notesOptional": "Optional",
+        "cancel": "Cancel",
+        "confirm": "Mark as done"
+      }
     }
+  },
+  "audit": {
+    "createdBy": "Created by",
+    "completedBy": "Completed by",
+    "completedAt": "Completed at"
   }
 }

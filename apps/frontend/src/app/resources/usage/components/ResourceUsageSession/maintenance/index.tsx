@@ -3,6 +3,7 @@ import {
   useResourceMaintenancesServiceFindMaintenances,
 } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { MaintenanceReasonDisplay } from '../../../../../../components/MaintenanceReasonDisplay';
 import { StartSessionControls } from '../../StartSessionControls';
 import { Alert } from '@heroui/react';
 import { ConstructionIcon } from 'lucide-react';
@@ -42,6 +43,7 @@ export function MaintenanceInProgressDisplay(props: Props) {
     <div className="flex flex-col gap-4">
       {(activeMaintenances?.data ?? []).map((maintenance) => (
         <Alert
+          key={maintenance.id}
           color="warning"
           title={t('alert.title')}
           icon={<ConstructionIcon />}
@@ -51,7 +53,9 @@ export function MaintenanceInProgressDisplay(props: Props) {
           })}
         >
           <small className="text-sm text-gray-500 mt-4 ">{t('alert.reason.label')}</small>
-          <p className="text-lg whitespace-pre-wrap">{maintenance.reason || t('alert.reason.noReason')}</p>
+          <p className="text-lg whitespace-pre-wrap">
+            <MaintenanceReasonDisplay reason={maintenance.reason} fallback={t('alert.reason.noReason')} />
+          </p>
         </Alert>
       ))}
 

@@ -97,3 +97,4 @@ export * from './1769012345680-sso-saml-provisioning-secret';
 export * from './1769012345690-backfill-oidc-auth-details';
 export * from './1770236486648-encrypt-sensitive-data';
 export * from './1770236486649-seed-settings-from-env';
+export * from './1770485229439-maintenance-schedules';

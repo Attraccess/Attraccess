@@ -1,0 +1,75 @@
+diff --git a/driver/sqlite-abstract/AbstractSqliteDriver.js b/driver/sqlite-abstract/AbstractSqliteDriver.js
+index 5d74dc90a91e04df7d8ddd8364caf304e5c58707..3fccd2d80693312dc1c19886002a32eb1584ed8d 100644
+--- a/driver/sqlite-abstract/AbstractSqliteDriver.js
++++ b/driver/sqlite-abstract/AbstractSqliteDriver.js
+@@ -563,8 +563,13 @@ class AbstractSqliteDriver {
+             const tableColumn = tableColumns.find((c) => c.name === columnMetadata.databaseName);
+             if (!tableColumn)
+                 return false; // we don't need new columns, we only need exist and changed
++            const normType = this.normalizeType(columnMetadata);
++            const typeMismatch = tableColumn.type !== normType &&
++                !(tableColumn.enum && columnMetadata.enum &&
++                    ((tableColumn.type === "varchar" && normType === "text") ||
++                        (tableColumn.type === "text" && normType === "varchar")));
+             const isColumnChanged = tableColumn.name !== columnMetadata.databaseName ||
+-                tableColumn.type !== this.normalizeType(columnMetadata) ||
++                typeMismatch ||
+                 tableColumn.length !== columnMetadata.length ||
+                 tableColumn.precision !== columnMetadata.precision ||
+                 tableColumn.scale !== columnMetadata.scale ||
+diff --git a/driver/sqlite-abstract/AbstractSqliteQueryRunner.js b/driver/sqlite-abstract/AbstractSqliteQueryRunner.js
+index 4f4e657f787f7c598cbf3ebb92a897b65d0ebb49..7dbf803b0722a70ee3c58f530cd6984a021eeab5 100644
+--- a/driver/sqlite-abstract/AbstractSqliteQueryRunner.js
++++ b/driver/sqlite-abstract/AbstractSqliteQueryRunner.js
+@@ -944,7 +944,14 @@ class AbstractSqliteQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+             table.columns = await Promise.all(dbColumns.map(async (dbColumn) => {
+                 const tableColumn = new TableColumn_1.TableColumn();
+                 tableColumn.name = dbColumn["name"];
+-                tableColumn.type = dbColumn["type"].toLowerCase();
++                // SQLite PRAGMA table_xinfo returns the full declared type including CHECK(...) for enum columns.
++                // Strip CHECK so type is just "varchar"/"text"; otherwise schema comparison thinks the column changed
++                // and keeps generating the same migration. See: enum columns with simple-enum in SQLite.
++                let rawType = dbColumn["type"].toLowerCase();
++                if (rawType.includes(" check(")) {
++                    rawType = rawType.substring(0, rawType.indexOf(" check("));
++                }
++                tableColumn.type = rawType;
+                 tableColumn.default =
+                     dbColumn["dflt_value"] !== null &&
+                         dbColumn["dflt_value"] !== undefined
+@@ -976,7 +983,7 @@ class AbstractSqliteQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+                         tableColumn.asExpression = "";
+                     }
+                 }
+-                if (tableColumn.type === "varchar") {
++                if (tableColumn.type === "varchar" || tableColumn.type === "text") {
+                     tableColumn.enum = OrmUtils_1.OrmUtils.parseSqlCheckExpression(sql, tableColumn.name);
+                 }
+                 // parse datatype and attempt to retrieve length, precision and scale
+@@ -1014,9 +1021,10 @@ class AbstractSqliteQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+             while ((fkResult = fkRegex.exec(sql)) !== null) {
+                 fkMappings.push({
+                     name: fkResult[1],
+-                    columns: fkResult[2]
+-                        .substr(1, fkResult[2].length - 2)
+-                        .split(`", "`),
++                    columns: (() => {
++                    const colPart = fkResult[2].replace(/\\s+/g, " ").trim();
++                    return colPart.length >= 2 ? colPart.substr(1, colPart.length - 2).split(`", "`).map((c) => c.trim()) : [];
++                })(),
+                     referencedTableName: fkResult[3],
+                 });
+             }
+@@ -1031,8 +1039,11 @@ class AbstractSqliteQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+                 const fkMapping = fkMappings.find((it) => it.referencedTableName ===
+                     foreignKey["table"] &&
+                     it.columns.every((column) => columnNames.indexOf(column) !== -1));
++                const fkName = fkMapping?.name !== undefined && fkMapping?.name !== ""
++                    ? fkMapping.name
++                    : this.connection.namingStrategy.foreignKeyName(table, columnNames, foreignKey["table"], referencedColumnNames);
+                 return new TableForeignKey_1.TableForeignKey({
+-                    name: fkMapping?.name,
++                    name: fkName,
+                     columnNames: columnNames,
+                     referencedTableName: foreignKey["table"],
+                     referencedColumnNames: referencedColumnNames,

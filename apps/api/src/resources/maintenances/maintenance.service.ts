@@ -1,9 +1,8 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
-import { ResourceMaintenance, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceMaintenance, ResourceMaintenanceSchedule, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
-import { UpdateMaintenanceDto } from './dtos/updateMaintenance.dto';
 import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -22,12 +21,18 @@ export class ResourceMaintenanceService {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   /**
-   * Create a maintenance for a given resource
+   * Create a maintenance for a given resource.
+   * When called from the API (manual create), pass userId to record the creating user.
+   * System-created maintenances (schedule evaluator) omit userId so createdByUser stays null.
    */
-  async createMaintenance(resourceId: number, dto: CreateMaintenanceDto): Promise<ResourceMaintenance> {
+  async createMaintenance(
+    resourceId: number,
+    dto: CreateMaintenanceDto,
+    userId?: number,
+  ): Promise<ResourceMaintenance> {
     // Verify the resource exists
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
@@ -52,6 +57,7 @@ export class ResourceMaintenanceService {
       startTime,
       endTime: dto.endTime ? new Date(dto.endTime) : null,
       reason: dto.reason || null,
+      createdByUser: userId != null ? ({ id: userId } as User) : undefined,
     });
 
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
@@ -63,9 +69,53 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Finish a maintenance (set end time to current time)
+   * Create a maintenance from a schedule trigger (system-created). Used by the schedule evaluator.
    */
-  async finishMaintenance(maintenanceId: number): Promise<ResourceMaintenance> {
+  async createMaintenanceFromSchedule(
+    resourceId: number,
+    scheduleId: number,
+    reason: string,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceMaintenance> {
+    const resourceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(Resource)
+      : this.resourceRepository;
+    const maintenanceRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceMaintenance)
+      : this.maintenanceRepository;
+
+    const resource = await resourceRepository.findOne({
+      where: { id: resourceId },
+    });
+
+    if (!resource) {
+      throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+    }
+
+    const now = new Date();
+    const maintenance = maintenanceRepository.create({
+      resource,
+      startTime: now,
+      endTime: null,
+      reason,
+      maintenanceSchedule: { id: scheduleId } as ResourceMaintenanceSchedule,
+    });
+
+    const savedMaintenance = await maintenanceRepository.save(maintenance);
+    this.eventEmitter.emit(
+      ResourceMaintenanceChangedEvent.EVENT_NAME,
+      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
+    );
+    return savedMaintenance;
+  }
+
+  /**
+   * Finish a maintenance (set end time, completedAt, and optionally completedBy from the calling user).
+   */
+  async finishMaintenance(
+    maintenanceId: number,
+    options?: { userId?: number; notes?: string },
+  ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: maintenanceId },
     });
@@ -78,74 +128,18 @@ export class ResourceMaintenanceService {
       throw new BadRequestException('Maintenance is already finished');
     }
 
-    maintenance.endTime = new Date();
+    const now = new Date();
+    maintenance.endTime = now;
+    maintenance.completedAt = now;
+    if (options?.userId != null) {
+      maintenance.completedByUser = { id: options.userId } as User;
+    }
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
       new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),
     );
     return savedMaintenance;
-  }
-
-  /**
-   * Update a maintenance with new start time, end time, and/or reason
-   */
-  async updateMaintenance(maintenanceId: number, dto: UpdateMaintenanceDto): Promise<ResourceMaintenance> {
-    const maintenance = await this.maintenanceRepository.findOne({
-      where: { id: maintenanceId },
-    });
-
-    if (!maintenance) {
-      throw new NotFoundException(`Maintenance with ID ${maintenanceId} not found`);
-    }
-
-    // Update start time if provided
-    if (dto.startTime) {
-      const startTime = new Date(dto.startTime);
-      maintenance.startTime = startTime;
-    }
-
-    // Update end time if provided
-    if (dto.endTime !== undefined) {
-      const endTime = dto.endTime ? new Date(dto.endTime) : null;
-      maintenance.endTime = endTime;
-    }
-
-    // Update reason if provided
-    if (dto.reason !== undefined) {
-      maintenance.reason = dto.reason;
-    }
-
-    // Validate that end time is after start time if both are set
-    if (maintenance.endTime && maintenance.startTime >= maintenance.endTime) {
-      throw new BadRequestException('End time must be after start time');
-    }
-
-    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
-    this.eventEmitter.emit(
-      ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),
-    );
-    return savedMaintenance;
-  }
-
-  /**
-   * Cancel a maintenance (delete it)
-   */
-  async cancelMaintenance(maintenanceId: number): Promise<void> {
-    const maintenance = await this.maintenanceRepository.findOne({
-      where: { id: maintenanceId },
-    });
-
-    if (!maintenance) {
-      throw new NotFoundException(`Maintenance with ID ${maintenanceId} not found`);
-    }
-
-    await this.maintenanceRepository.remove(maintenance);
-    this.eventEmitter.emit(
-      ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(maintenance.resourceId, maintenance.id),
-    );
   }
 
   /**
@@ -207,6 +201,11 @@ export class ResourceMaintenanceService {
     // Get total count
     const total = await queryBuilder.getCount();
 
+    // Load audit relations for "who did maintenance when" display
+    queryBuilder
+      .leftJoinAndSelect('maintenance.createdByUser', 'createdByUser')
+      .leftJoinAndSelect('maintenance.completedByUser', 'completedByUser');
+
     // Get paginated results
     const data = await queryBuilder.skip(skip).take(limit).getMany();
 
@@ -219,11 +218,12 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Get a specific maintenance by ID
+   * Get a specific maintenance by ID (includes createdByUser and completedByUser for audit display).
    */
   async getMaintenanceById(maintenanceId: number): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: maintenanceId },
+      relations: ['createdByUser', 'completedByUser'],
     });
 
     if (!maintenance) {
@@ -234,20 +234,34 @@ export class ResourceMaintenanceService {
   }
 
   /**
-   * Check if there's an active maintenance window for a resource
+   * Check if there's an active maintenance window for a resource.
+   * This is the single source of truth for "resource in maintenance mode".
+   * Active = resourceId match, startTime <= now, endTime IS NULL. No distinction between
+   * manual and schedule-triggered maintenances; both block usage for non–maintenance users.
    */
-  async hasActiveMaintenance(resourceId: number, transactionalEntityManager?: EntityManager): Promise<boolean> {
+  async hasActiveMaintenance(resourceId: number, transactionalEntityManager?: EntityManager): Promise<boolean>;
+  async hasActiveMaintenance(filter: { resourceId: number; scheduleId: number }, transactionalEntityManager?: EntityManager): Promise<boolean>;
+  async hasActiveMaintenance(resourceIdOrFilter: number | { resourceId: number; scheduleId?: number }, transactionalEntityManager?: EntityManager): Promise<boolean> {
+    const resourceId = typeof resourceIdOrFilter === 'number' ? resourceIdOrFilter : resourceIdOrFilter.resourceId;
+    const scheduleId = typeof resourceIdOrFilter === 'number' ? undefined : resourceIdOrFilter.scheduleId;
+
     const now = new Date();
 
     const maintenanceRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(ResourceMaintenance)
       : this.maintenanceRepository;
 
-    const activeMaintenance = await maintenanceRepository
+    const query = maintenanceRepository
       .createQueryBuilder('maintenance')
       .where('maintenance.resourceId = :resourceId', { resourceId })
       .andWhere('maintenance.startTime <= :now', { now })
-      .andWhere('maintenance.endTime IS NULL')
+      .andWhere('maintenance.endTime IS NULL');
+
+    if (scheduleId) {
+      query.andWhere('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId });
+    }
+
+    const activeMaintenance = await query
       .getOne();
 
     return !!activeMaintenance;

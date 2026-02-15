@@ -1,26 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Param,
-  Body,
-  Query,
-  ParseIntPipe,
-  HttpCode,
-  HttpStatus,
-  Req,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, Req, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ResourceMaintenanceService } from './maintenance.service';
 import {
   CreateMaintenanceDto,
-  UpdateMaintenanceDto,
   ListMaintenancesDto,
   PaginatedMaintenanceResponse,
   CanManageMaintenanceResponseDto,
+  FinishMaintenanceDto,
 } from './dtos';
 import { ResourceMaintenance } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -30,7 +16,7 @@ import { CanManageMaintenance } from './canManageMaintenance.decorator';
 @Controller('resources/:resourceId/maintenances')
 @Auth()
 export class ResourceMaintenanceController {
-  constructor(private readonly maintenanceService: ResourceMaintenanceService) {}
+  constructor(private readonly maintenanceService: ResourceMaintenanceService) { }
 
   @Get('can-manage')
   @ApiOperation({
@@ -103,9 +89,10 @@ export class ResourceMaintenanceController {
   })
   async createMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: CreateMaintenanceDto
+    @Body() dto: CreateMaintenanceDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto);
+    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
   }
 
   @Get()
@@ -216,12 +203,13 @@ export class ResourceMaintenanceController {
     return maintenance;
   }
 
-  @Put(':maintenanceId')
+  @Post(':maintenanceId/finish')
   @CanManageMaintenance()
   @ApiOperation({
-    summary: 'Update a maintenance',
-    description: 'Update a maintenance with new start time, end time, and/or reason',
-    operationId: 'updateMaintenance',
+    summary: 'Mark a maintenance as done',
+    description:
+      'Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.',
+    operationId: 'finishMaintenance',
   })
   @ApiParam({
     name: 'resourceId',
@@ -235,12 +223,12 @@ export class ResourceMaintenanceController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Maintenance updated successfully',
+    description: 'Maintenance marked as done successfully',
     type: ResourceMaintenance,
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad request - invalid maintenance data',
+    description: 'Bad request - maintenance is already finished',
   })
   @ApiResponse({
     status: 401,
@@ -254,10 +242,11 @@ export class ResourceMaintenanceController {
     status: 404,
     description: 'Maintenance not found',
   })
-  async updateMaintenance(
+  async finishMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('maintenanceId', ParseIntPipe) maintenanceId: number,
-    @Body() dto: UpdateMaintenanceDto
+    @Body() dto: FinishMaintenanceDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
@@ -265,53 +254,9 @@ export class ResourceMaintenanceController {
       throw new NotFoundException('Maintenance not found');
     }
 
-    return await this.maintenanceService.updateMaintenance(maintenanceId, dto);
-  }
-
-  @Delete(':maintenanceId')
-  @CanManageMaintenance()
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary: 'Cancel a maintenance',
-    description: 'Delete a maintenance (cancel it)',
-    operationId: 'cancelMaintenance',
-  })
-  @ApiParam({
-    name: 'resourceId',
-    description: 'The ID of the resource',
-    type: Number,
-  })
-  @ApiParam({
-    name: 'maintenanceId',
-    description: 'The ID of the maintenance',
-    type: Number,
-  })
-  @ApiResponse({
-    status: 204,
-    description: 'Maintenance cancelled successfully',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage maintenances for this resource',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Maintenance not found',
-  })
-  async cancelMaintenance(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('maintenanceId', ParseIntPipe) maintenanceId: number
-  ): Promise<void> {
-    const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
-
-    if (maintenance.resourceId !== resourceId) {
-      throw new NotFoundException('Maintenance not found');
-    }
-
-    await this.maintenanceService.cancelMaintenance(maintenanceId);
+    return await this.maintenanceService.finishMaintenance(maintenanceId, {
+      userId: request.user?.id,
+      notes: dto?.notes,
+    });
   }
 }

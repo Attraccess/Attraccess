@@ -1,0 +1,15 @@
+{
+  "reason": {
+    "auto": {
+      "usageHoursMinutes": "{{scheduleName}} ({{duration}} Minuten Nutzung erreicht)",
+      "usageHoursHours": "{{scheduleName}} ({{duration}} Stunden Nutzung erreicht)",
+      "usageHoursDays": "{{scheduleName}} ({{duration}} Tage Nutzung erreicht)",
+      "usageCount": "{{scheduleName}} ({{count}} Nutzungssitzungen erreicht)",
+      "timeIntervalMinutes": "{{scheduleName}} ({{duration}} Minuten seit letzter Wartung)",
+      "timeIntervalHours": "{{scheduleName}} ({{duration}} Stunden seit letzter Wartung)",
+      "timeIntervalDays": "{{scheduleName}} ({{duration}} Tage seit letzter Wartung)",
+      "fallback": "{{scheduleName}} (Zeitplan {{scheduleId}})"
+    },
+    "noReason": "Keine Begründung"
+  }
+}

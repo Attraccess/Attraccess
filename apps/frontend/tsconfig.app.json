@@ -23,5 +23,10 @@
     "src/**/*.spec.jsx",
     "src/**/*.test.jsx"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "../../libs/plugins-frontend-ui/src/lib/components/attraccess-user/attraccessUser.de.ts", "../../libs/plugins-frontend-ui/src/lib/components/attraccess-user/attraccessUser.en.ts"]
+  "include": [
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
 }

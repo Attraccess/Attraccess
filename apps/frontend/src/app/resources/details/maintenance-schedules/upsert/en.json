@@ -1,0 +1,42 @@
+{
+    "title": "Maintenance schedule",
+    "titleCreate": "Add schedule",
+    "titleEdit": "Edit schedule",
+    "triggerType": {
+        "USAGE_HOURS": "Usage hours",
+        "USAGE_COUNT": "Usage count",
+        "TIME_INTERVAL": "Time interval"
+    },
+    "inputs": {
+        "name": {
+            "label": "Name (optional)"
+        },
+        "triggerType": {
+            "label": "Trigger type"
+        },
+        "duration": {
+            "label": "Duration"
+        },
+        "unit": {
+            "label": "Unit",
+            "MINUTES": "Minutes",
+            "HOURS": "Hours",
+            "DAYS": "Days"
+        },
+        "thresholdSessions": {
+            "label": "Usage sessions threshold"
+        },
+        "enabled": {
+            "label": "Enabled"
+        },
+        "timeIntervalEvaluationNote": "Time-based schedules are evaluated every 5 minutes."
+    },
+    "actions": {
+        "save": "Save"
+    },
+    "alert": {
+        "error": {
+            "title": "Error saving schedule"
+        }
+    }
+}
