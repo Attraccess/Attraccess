@@ -16,26 +16,24 @@ import {
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { parseAbsolute, type DateValue, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
 import {
   useResourceMaintenancesServiceCreateMaintenance,
   useResourceMaintenancesServiceFindMaintenancesKey,
-  useResourceMaintenancesServiceGetMaintenance,
-  useResourceMaintenancesServiceUpdateMaintenance,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNow } from '../../../../../hooks/useNow';
 
 interface Props {
   resourceId: number;
-  maintenanceId?: number;
   children: (onOpen: () => void) => React.ReactNode;
 }
 
 export function ResourceMaintenanceUpsertModal(props: Props) {
-  const { resourceId, maintenanceId, children: activator } = props;
+  const { resourceId, children: activator } = props;
 
   const { t } = useTranslations({
     de,
@@ -55,51 +53,25 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
 
-  const { data: existingMaintenance } = useResourceMaintenancesServiceGetMaintenance(
-    {
-      resourceId,
-      maintenanceId: maintenanceId ?? 0,
-    },
-    undefined,
-    {
-      enabled: maintenanceId !== undefined,
-    },
-  );
-
-  useEffect(() => {
-    if (!existingMaintenance) {
-      return;
-    }
-
-    setStartTime(parseAbsolute(existingMaintenance.startTime, timezoneOfBrowser));
-    setEndTime(parseAbsolute(existingMaintenance.endTime ?? existingMaintenance.startTime, timezoneOfBrowser));
-    setReason(existingMaintenance.reason ?? '');
-    setHasEndDate(!!existingMaintenance.endTime);
-  }, [existingMaintenance, timezoneOfBrowser]);
-
   const onHasEndDateChange = useCallback(
     (val: boolean) => {
       if (val) {
-        setEndTime(parseAbsolute(existingMaintenance?.endTime ?? now.toISOString(), timezoneOfBrowser));
+        setEndTime(parseAbsolute(now.toISOString(), timezoneOfBrowser));
       } else {
         setEndTime(null);
       }
-
       setHasEndDate(val);
     },
-    [existingMaintenance, timezoneOfBrowser, now],
+    [timezoneOfBrowser, now],
   );
 
   const dateValueToAbsoluteString = useCallback(
     (value: DateValue | null): string | null => {
       if (!value) return null;
 
-      // If it's already a ZonedDateTime, use toAbsoluteString
       if ('toAbsoluteString' in value) {
         return value.toAbsoluteString();
       }
-
-      // Otherwise, convert to ZonedDateTime first
       const zonedValue = toZoned(value, timezoneOfBrowser);
       return zonedValue.toAbsoluteString();
     },
@@ -121,55 +93,28 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     onSuccess: onSaveSuccess,
   });
 
-  const { mutate: updateMaintenanceMutation, isPending: isUpdating } = useResourceMaintenancesServiceUpdateMaintenance({
-    onSuccess: onSaveSuccess,
-  });
-
   const onSubmit = useCallback(() => {
     const isValid = formRef.current?.reportValidity();
-    if (!isValid) {
-      return;
-    }
-
-    if (!startTime) {
-      return;
-    }
+    if (!isValid || !startTime) return;
 
     const startTimeStr = dateValueToAbsoluteString(startTime);
     const endTimeStr = hasEndDate ? dateValueToAbsoluteString(endTime) : null;
+    if (!startTimeStr) return;
 
-    if (!startTimeStr) {
-      return;
-    }
-
-    if (maintenanceId !== undefined) {
-      updateMaintenanceMutation({
-        resourceId,
-        maintenanceId,
-        requestBody: {
-          startTime: startTimeStr,
-          endTime: endTimeStr,
-          reason,
-        },
-      });
-    } else {
-      createMaintenanceMutation({
-        resourceId,
-        requestBody: {
-          startTime: startTimeStr,
-          endTime: endTimeStr ?? undefined,
-          reason,
-        },
-      });
-    }
+    createMaintenanceMutation({
+      resourceId,
+      requestBody: {
+        startTime: startTimeStr,
+        endTime: endTimeStr ?? undefined,
+        reason,
+      },
+    });
   }, [
     createMaintenanceMutation,
     startTime,
     endTime,
     reason,
     resourceId,
-    maintenanceId,
-    updateMaintenanceMutation,
     hasEndDate,
     dateValueToAbsoluteString,
   ]);
@@ -206,7 +151,15 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                 />
               )}
 
-              <Textarea label={t('inputs.reason.label')} value={reason} onChange={(e) => setReason(e.target.value)} />
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
+                {reason ? (
+                  <p className="text-sm text-default-500 mb-2">
+                    {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
+                  </p>
+                ) : null}
+                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+              </div>
 
               {error ? (
                 <Alert color="danger" title={t('alert.error.title')} variant="flat">
@@ -219,7 +172,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
           </ModalBody>
 
           <ModalFooter>
-            <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating || isUpdating}>
+            <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating}>
               {t('actions.save')}
             </Button>
           </ModalFooter>

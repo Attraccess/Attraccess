@@ -1,7 +1,13 @@
 {
   "name": "Setup & Environment Specialist",
   "domain": "setup-environment",
-  "expertise": ["install", "env", "migrations", "license", "dependencies"],
+  "expertise": [
+    "install",
+    "env",
+    "migrations",
+    "license",
+    "dependencies"
+  ],
   "setup_steps": {
     "install": "pnpm install",
     "env": "cp .env.example .env",

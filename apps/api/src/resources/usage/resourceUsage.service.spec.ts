@@ -634,6 +634,22 @@ describe('ResourceUsageService', () => {
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
     });
 
+    it('should block non-maintenance users when active maintenance exists including schedule-triggered (same as manual)', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      // hasActiveMaintenance does not filter by origin: schedule-created maintenances use the same
+      // table and criteria (startTime <= now, endTime IS NULL), so they block the same as manual ones
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
+      resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
+
+      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(
+        ResourceUsageImpossibleMaintenanceInProgressException,
+      );
+      expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
+    });
+
     it('should allow usage when resource is under maintenance but user can manage maintenance', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
 

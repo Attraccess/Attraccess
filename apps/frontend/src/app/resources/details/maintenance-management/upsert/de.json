@@ -1,25 +1,31 @@
 {
-  "title": "Wartungszeitraum anlegen",
-  "inputs": {
-    "startTime": {
-      "label": "Startzeit"
+    "title": "Wartungszeitraum anlegen",
+    "inputs": {
+        "startTime": {
+            "label": "Startzeit"
+        },
+        "hasEndDate": {
+            "label": "Endzeit bereits bekannt?"
+        },
+        "endTime": {
+            "label": "Endzeit"
+        },
+        "reason": {
+            "label": "Grund (optional)",
+            "displayedToUsers": "Wird Nutzenden angezeigt als"
+        }
     },
-    "hasEndDate": {
-      "label": "Endzeit bereits bekannt?"
+    "actions": {
+        "save": "Speichern"
     },
-    "endTime": {
-      "label": "Endzeit"
+    "alert": {
+        "error": {
+            "title": "Fehler beim Hinzufügen des Wartungszeitraums"
+        }
     },
-    "reason": {
-      "label": "Grund (optional)"
+    "audit": {
+        "createdBy": "Angelegt von",
+        "completedBy": "Abgeschlossen von",
+        "completedAt": "Abgeschlossen am"
     }
-  },
-  "actions": {
-    "save": "Speichern"
-  },
-  "alert": {
-    "error": {
-      "title": "Fehler beim Hinzufügen des Wartungszeitraums"
-    }
-  }
 }

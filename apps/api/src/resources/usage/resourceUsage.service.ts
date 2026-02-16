@@ -132,7 +132,9 @@ export class ResourceUsageService {
     this.logger.debug(`Found resource ${resourceId}: ${resource.name}`);
 
     if (checkMaintenance) {
-      // Check if there's an active maintenance window
+      // Single enforcement point for maintenance mode: only users who can manage maintenance
+      // may start a session (or lock/unlock door, etc.). Applies to both manual and
+      // schedule-triggered maintenances (see hasActiveMaintenance).
       const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(
         resourceId,
         transactionalEntityManager,

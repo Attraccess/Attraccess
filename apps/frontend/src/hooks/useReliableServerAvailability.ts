@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSystemServiceInfo } from '@attraccess/react-query-client';
 
 interface Options {
@@ -15,9 +15,14 @@ export function useReliableServerAvailability(options: Options = {}) {
     retry: false,
   });
 
+  // Keep a ref to refetch so the effect doesn't depend on `query` (which gets a new
+  // reference every time the query state updates and would cause an infinite refetch loop).
+  const refetchRef = useRef(query.refetch);
+  refetchRef.current = query.refetch;
+
   useEffect(() => {
     const run = async () => {
-      const result = await query.refetch();
+      const result = await refetchRef.current();
       if (result.isSuccess) {
         setErrorStreak(0);
         return;
@@ -29,7 +34,7 @@ export function useReliableServerAvailability(options: Options = {}) {
     run();
     const intervalId = setInterval(run, refetchIntervalMs);
     return () => clearInterval(intervalId);
-  }, [query, consecutiveErrorThreshold, refetchIntervalMs]);
+  }, [consecutiveErrorThreshold, refetchIntervalMs]);
 
   const isServerLikelyDown = useMemo(
     () => errorStreak >= consecutiveErrorThreshold,

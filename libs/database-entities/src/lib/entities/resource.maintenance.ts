@@ -1,6 +1,15 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
+import { User } from './user.entity';
+import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
 
 @Entity()
 export class ResourceMaintenance {
@@ -59,4 +68,35 @@ export class ResourceMaintenance {
     required: false,
   })
   reason!: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @ApiProperty({
+    description: 'The user who created/started the maintenance record',
+    required: false,
+  })
+  createdByUser!: User | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @ApiProperty({
+    description: 'The user who marked the maintenance as done',
+    required: false,
+  })
+  completedByUser!: User | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({
+    description: 'When the maintenance was marked as done',
+    required: false,
+    type: String,
+    nullable: true,
+    format: 'date-time',
+  })
+  completedAt!: Date | null;
+
+  @ManyToOne(() => ResourceMaintenanceSchedule, { nullable: true })
+  @ApiProperty({
+    description: 'The schedule that triggered this maintenance (null for manual)',
+    required: false,
+  })
+  maintenanceSchedule!: ResourceMaintenanceSchedule | null;
 }

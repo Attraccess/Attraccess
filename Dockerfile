@@ -26,8 +26,9 @@ RUN pip install --upgrade pip && \
 
 WORKDIR /app
 
-# Copy package.json and pnpm-lock.yaml first for better layer caching
+# Copy package.json, lockfile, patches (required for pnpm patchedDependencies), and .npmrc first for better layer caching
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY patches/ patches/
 
 # Install dependencies
 RUN corepack enable && corepack prepare && \

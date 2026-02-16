@@ -43,7 +43,7 @@ function renderPreviewField(field: EditableFormField, t: (key: string) => string
     case FormFieldType.NUMBER:
       return renderPreviewNumber(field.options as NumberFieldOptions);
     case FormFieldType.SELECT:
-      return renderPreviewSelect(field.options as SelectFieldOptions, t);
+      return renderPreviewSelect(field.options as SelectFieldOptions, t, field.name);
     case FormFieldType.BOOLEAN:
       return renderPreviewBoolean(t);
     default:
@@ -67,10 +67,10 @@ function renderPreviewNumber(options: NumberFieldOptions) {
   return <Input type="number" placeholder="0" min={min} max={max} step={step} />;
 }
 
-function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string) {
+function renderPreviewSelect(options: SelectFieldOptions, t: (key: string) => string, fieldName: string) {
   const items = options.options ?? [];
   return (
-    <Select placeholder={t('preview.selectPlaceholder')}>
+    <Select placeholder={t('preview.selectPlaceholder')} aria-label={fieldName}>
       {items.map((option) => (
         <SelectItem key={option}>{option}</SelectItem>
       ))}
