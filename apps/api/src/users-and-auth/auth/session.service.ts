@@ -4,6 +4,7 @@ import { Repository, LessThan, MoreThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Session, User } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 export interface SessionMetadata {
   userAgent?: string;
@@ -20,7 +21,8 @@ export class SessionService {
   constructor(
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
-  ) {}
+    private readonly tokenHashService: TokenHashService,
+  ) { }
 
   /**
    * Creates a new session for the given user
@@ -30,16 +32,17 @@ export class SessionService {
    */
   async createSession(user: User, metadata?: SessionMetadata): Promise<string> {
     const token = this.generateSessionToken();
+    const storedToken = this.tokenHashService.hashToken(token);
     const expiresIn = metadata?.expiresIn || this.defaultExpirationHours * 3600; // Convert hours to seconds
-    
+
     // Ensure expiration doesn't exceed maximum allowed
     const maxExpirationSeconds = this.maxExpirationHours * 3600;
     const actualExpiresIn = Math.min(expiresIn, maxExpirationSeconds);
-    
+
     const expiresAt = new Date(Date.now() + actualExpiresIn * 1000);
 
     const session = this.sessionRepository.create({
-      token,
+      token: storedToken,
       userId: user.id,
       userAgent: metadata?.userAgent || null,
       ipAddress: metadata?.ipAddress || null,
@@ -47,9 +50,9 @@ export class SessionService {
     });
 
     await this.sessionRepository.save(session);
-    
+
     this.logger.log(`Created session for user ${user.id} (${user.username}), expires at ${expiresAt.toISOString()}`);
-    
+
     return token;
   }
 
@@ -63,10 +66,7 @@ export class SessionService {
       return null;
     }
 
-    const session = await this.sessionRepository.findOne({
-      where: { token },
-      relations: ['user'],
-    });
+    const session = await this.findSessionByToken(token, true);
 
     if (!session) {
       return null;
@@ -97,10 +97,7 @@ export class SessionService {
       return null;
     }
 
-    const session = await this.sessionRepository.findOne({
-      where: { token },
-      relations: ['user'],
-    });
+    const session = await this.findSessionByToken(token, true);
 
     if (!session) {
       return null;
@@ -115,16 +112,17 @@ export class SessionService {
 
     // Generate new token and extend expiration
     const newToken = this.generateSessionToken();
+    const storedToken = this.tokenHashService.hashToken(newToken);
     const newExpiresAt = new Date(Date.now() + this.defaultExpirationHours * 3600 * 1000);
 
-    session.token = newToken;
+    session.token = storedToken;
     session.expiresAt = newExpiresAt;
     session.lastAccessedAt = new Date();
 
     await this.sessionRepository.save(session);
-    
+
     this.logger.log(`Refreshed session for user ${session.userId} (${session.user.username})`);
-    
+
     return newToken;
   }
 
@@ -137,8 +135,12 @@ export class SessionService {
       return;
     }
 
-    const result = await this.sessionRepository.delete({ token });
-    
+    const hashed = this.tokenHashService.hashToken(token);
+    let result = await this.sessionRepository.delete({ token: hashed });
+    if (!result.affected) {
+      result = await this.sessionRepository.delete({ token });
+    }
+
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
     }
@@ -150,7 +152,7 @@ export class SessionService {
    */
   async revokeAllUserSessions(userId: number): Promise<void> {
     const result = await this.sessionRepository.delete({ userId });
-    
+
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked ${result.affected} sessions for user ${userId}`);
     }
@@ -180,6 +182,30 @@ export class SessionService {
     return randomBytes(32).toString('base64url');
   }
 
+  private async findSessionByToken(token: string, withUser: boolean): Promise<Session | null> {
+    const hashed = this.tokenHashService.hashToken(token);
+    const relations = withUser ? ['user'] : undefined;
+    let session = await this.sessionRepository.findOne({
+      where: { token: hashed },
+      relations,
+    });
+    if (session) {
+      return session;
+    }
+
+    session = await this.sessionRepository.findOne({
+      where: { token },
+      relations,
+    });
+    if (!session) {
+      return null;
+    }
+
+    session.token = hashed;
+    await this.sessionRepository.save(session);
+    return session;
+  }
+
   /**
    * Gets all active sessions for a user (for administrative purposes)
    * @param userId The ID of the user
@@ -187,7 +213,7 @@ export class SessionService {
    */
   async getUserSessions(userId: number): Promise<Session[]> {
     return this.sessionRepository.find({
-      where: { 
+      where: {
         userId,
         expiresAt: MoreThan(new Date()) // Only return non-expired sessions
       },
@@ -204,7 +230,7 @@ export class SessionService {
     expiredSessions: number;
   }> {
     const now = new Date();
-    
+
     const [totalActiveSessions, expiredSessions] = await Promise.all([
       this.sessionRepository.count({
         where: { expiresAt: MoreThan(now) },

@@ -9,6 +9,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, LessThan, MoreThan } from 'typeorm';
 import { SessionService, SessionMetadata } from './session.service';
 import { Session, User } from '@attraccess/database-entities';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -50,12 +51,17 @@ describe('SessionService', () => {
           provide: getRepositoryToken(Session),
           useValue: mockRepository,
         },
+        {
+          provide: TokenHashService,
+          useValue: {
+            hashToken: jest.fn((token: string) => `hashed:${token}`),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<SessionService>(SessionService);
     sessionRepository = module.get(getRepositoryToken(Session));
-
     // Reset mocks
     jest.clearAllMocks();
   });
@@ -85,7 +91,7 @@ describe('SessionService', () => {
 
       expect(result).toBe('mocked-random-token');
       expect(sessionRepository.create).toHaveBeenCalledWith({
-        token: 'mocked-random-token',
+        token: 'hashed:mocked-random-token',
         userId: 1,
         userAgent: null,
         ipAddress: null,
@@ -109,7 +115,7 @@ describe('SessionService', () => {
 
       expect(result).toBe('mocked-random-token');
       expect(sessionRepository.create).toHaveBeenCalledWith({
-        token: 'mocked-random-token',
+        token: 'hashed:mocked-random-token',
         userId: 1,
         userAgent: 'Custom User Agent',
         ipAddress: '10.0.0.1',
@@ -163,7 +169,7 @@ describe('SessionService', () => {
 
       expect(result).toEqual(mockUser);
       expect(sessionRepository.findOne).toHaveBeenCalledWith({
-        where: { token: 'valid-token' },
+        where: { token: 'hashed:valid-token' },
         relations: ['user'],
       });
       expect(sessionRepository.save).toHaveBeenCalledWith({
@@ -178,7 +184,11 @@ describe('SessionService', () => {
       const result = await service.validateSession('non-existent-token');
 
       expect(result).toBeNull();
-      expect(sessionRepository.findOne).toHaveBeenCalledWith({
+      expect(sessionRepository.findOne).toHaveBeenNthCalledWith(1, {
+        where: { token: 'hashed:non-existent-token' },
+        relations: ['user'],
+      });
+      expect(sessionRepository.findOne).toHaveBeenNthCalledWith(2, {
         where: { token: 'non-existent-token' },
         relations: ['user'],
       });
@@ -247,7 +257,7 @@ describe('SessionService', () => {
       expect(result).toBe('new-refreshed-token');
       expect(sessionRepository.save).toHaveBeenCalledWith({
         ...existingSession,
-        token: 'new-refreshed-token',
+        token: 'hashed:new-refreshed-token',
         expiresAt: expect.any(Date),
         lastAccessedAt: expect.any(Date),
       });
@@ -292,7 +302,7 @@ describe('SessionService', () => {
 
       await service.revokeSession('token-to-revoke');
 
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 'token-to-revoke' });
+      expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 'hashed:token-to-revoke' });
     });
 
     it('should handle non-existent session gracefully', async () => {
@@ -300,7 +310,8 @@ describe('SessionService', () => {
 
       await service.revokeSession('non-existent-token');
 
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 'non-existent-token' });
+      expect(sessionRepository.delete).toHaveBeenNthCalledWith(1, { token: 'hashed:non-existent-token' });
+      expect(sessionRepository.delete).toHaveBeenNthCalledWith(2, { token: 'non-existent-token' });
     });
 
     it('should handle empty token gracefully', async () => {

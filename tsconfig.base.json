@@ -10,23 +10,48 @@
     "importHelpers": true,
     "target": "es2015",
     "module": "esnext",
-    "lib": ["es2020", "dom"],
+    "lib": [
+      "es2020",
+      "dom"
+    ],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "baseUrl": ".",
     "paths": {
-      "@attraccess/api-client": ["libs/api-client/src/index.ts"],
-      "@attraccess/attracces": ["tools/attracces/src/index.ts"],
-      "@attraccess/database-entities": ["libs/database-entities/src/index.ts"],
-      "@attraccess/env": ["libs/env/src/index.ts"],
-      "@attraccess/plugins-backend-sdk": ["libs/plugins-backend-sdk/src/index.ts"],
-      "@attraccess/plugins-frontend-sdk": ["libs/plugins-frontend-sdk/src/index.ts"],
-      "@attraccess/plugins-frontend-ui": ["libs/plugins-frontend-ui/src/index.ts"],
-      "@attraccess/react-query-client": ["libs/react-query-client/src/index.ts"],
-      "@attraccess/shared": ["libs/shared/src/index.ts"]
+      "@attraccess/api-client": [
+        "libs/api-client/src/index.ts"
+      ],
+      "@attraccess/attracces": [
+        "tools/attracces/src/index.ts"
+      ],
+      "@attraccess/database-entities": [
+        "libs/database-entities/src/index.ts"
+      ],
+      "@attraccess/env": [
+        "libs/env/src/index.ts"
+      ],
+      "@attraccess/plugins-backend-sdk": [
+        "libs/plugins-backend-sdk/src/index.ts"
+      ],
+      "@attraccess/plugins-frontend-sdk": [
+        "libs/plugins-frontend-sdk/src/index.ts"
+      ],
+      "@attraccess/plugins-frontend-ui": [
+        "libs/plugins-frontend-ui/src/index.ts"
+      ],
+      "@attraccess/react-query-client": [
+        "libs/react-query-client/src/index.ts"
+      ],
+      "@attraccess/shared": [
+        "libs/shared/src/index.ts"
+      ]
     }
   },
-  "exclude": ["node_modules", "tmp", "*.md"]
+  "exclude": [
+    "node_modules",
+    "tmp",
+    "*.md"
+  ]
 }

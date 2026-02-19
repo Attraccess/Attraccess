@@ -30,82 +30,83 @@ export const UsageNotesModal = memo(
     updatingSessionIds,
     onProjectChange,
   }: UsageNotesModalProps) => {
-  const { t } = useTranslations({ en, de });
-  const { user } = useAuth();
+    const { t } = useTranslations({ en, de });
+    const { user } = useAuth();
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
-      <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">{t('sessionNotes')}</ModalHeader>
-        <ModalBody>
-          {session ? (
-            <div className="space-y-4">
-              {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
-                  {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
-                    <ProjectsSelect
-                      value={resolveProjectId(session)}
-                      onValueChange={(projectId) => onProjectChange(session, projectId)}
-                      placeholder={projectPlaceholder}
-                      includeUnassignedOption
-                      unassignedLabel={projectPlaceholder}
-                      isDisabled={Boolean(updatingSessionIds?.[session.id])}
-                    />
-                  ) : (
-                    <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
-                  )}
-                </div>
-              )}
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">{t('sessionNotes')}</ModalHeader>
+          <ModalBody>
+            {session ? (
+              <div className="space-y-4">
+                {session.usageAction === ResourceUsageAction.USAGE && projectLabel && projectPlaceholder && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{projectLabel}</p>
+                    {session.endTime && session.userId === user?.id && resolveProjectId && onProjectChange ? (
+                      <ProjectsSelect
+                        label={t('projectSelectLabel')}
+                        value={resolveProjectId(session)}
+                        onValueChange={(projectId) => onProjectChange(session, projectId)}
+                        placeholder={projectPlaceholder}
+                        includeUnassignedOption
+                        unassignedLabel={projectPlaceholder}
+                        isDisabled={Boolean(updatingSessionIds?.[session.id])}
+                      />
+                    ) : (
+                      <p className="text-sm text-default-500">{session.project?.name ?? projectPlaceholder}</p>
+                    )}
+                  </div>
+                )}
 
-              <Textarea
-                labelPlacement="outside"
-                value={session.startNotes || t('noNotesProvided')}
-                label={t('startNotes')}
-                readOnly
-              />
-
-              {session.endTime && (
                 <Textarea
                   labelPlacement="outside"
-                  value={session.endNotes || t('noNotesProvided')}
-                  label={t('endNotes')}
+                  value={session.startNotes || t('noNotesProvided')}
+                  label={t('startNotes')}
                   readOnly
                 />
-              )}
 
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <p>
-                  {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
-                </p>
                 {session.endTime && (
-                  <p>
-                    {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
-                  </p>
+                  <Textarea
+                    labelPlacement="outside"
+                    value={session.endNotes || t('noNotesProvided')}
+                    label={t('endNotes')}
+                    readOnly
+                  />
                 )}
+
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p>
+                    {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
+                  </p>
+                  {session.endTime && (
+                    <p>
+                      {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
+                  {renderFormSubmissions(session, t)}
+                </div>
               </div>
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('formsTitle')}</p>
-                {renderFormSubmissions(session, t)}
+            ) : (
+              <div className="flex justify-center py-4">
+                <Spinner size="md" color="primary" />
               </div>
-            </div>
-          ) : (
-            <div className="flex justify-center py-4">
-              <Spinner size="md" color="primary" />
-            </div>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button color="primary" variant="light" onPress={onClose}>
-            {t('close')}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
-});
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="primary" variant="light" onPress={onClose}>
+              {t('close')}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    );
+  });
 
 UsageNotesModal.displayName = 'UsageNotesModal';
 
@@ -117,7 +118,7 @@ function renderFormSubmissions(session: ResourceUsage, t: (key: string) => strin
   return session.formSubmissions.map((submission) => {
     const entries = Object.values(
       (submission.data as Record<string, { value: string; fieldDefinition: { name: string; type: FormFieldType } }>) ??
-        {},
+      {},
     );
 
     if (!entries.length) {

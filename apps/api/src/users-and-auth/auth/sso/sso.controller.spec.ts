@@ -5,7 +5,6 @@ import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
 import { AuthenticationDetail, AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
@@ -16,6 +15,7 @@ import { CookieConfigService } from '../../../common/services/cookie-config.serv
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { LicenseService } from '../../../license/license.service';
 import { SSOLinkTokenService } from './link-token.service';
+import { SettingsService } from '../../../settings/settings.service';
 
 describe('SsoController', () => {
   let controller: SSOController;
@@ -130,24 +130,10 @@ describe('SsoController', () => {
           },
         },
         {
-          provide: ConfigService,
+          provide: SettingsService,
           useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'app') {
-                return {
-                  ATTRACCESS_URL: 'http://localhost:3000',
-                  ATTRACCESS_FRONTEND_URL: 'http://localhost:3000',
-                };
-              }
-
-              if (key === 'session') {
-                return {
-                  SESSION_COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
-                };
-              }
-
-              return null;
-            }),
+            getFrontendUrl: jest.fn().mockResolvedValue('http://localhost:3000'),
+            getBackendUrl: jest.fn().mockResolvedValue('http://localhost:3000'),
           },
         },
         {

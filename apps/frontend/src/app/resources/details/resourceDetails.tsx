@@ -14,7 +14,7 @@ import { memo, useState } from 'react';
 import {
   useResourcesServiceDeleteOneResource,
   useResourcesServiceGetOneResourceById,
-  UseResourcesServiceGetAllResourcesKeyFn,
+  useResourcesServiceGetAllResourcesKey,
   useAccessControlServiceResourceIntroducersIsIntroducer,
   useResourceMaintenancesServiceCanManageMaintenance,
 } from '@attraccess/react-query-client';
@@ -30,6 +30,7 @@ import { ResourceQrCode } from './qrcode';
 import { useQrCodeAction } from './useQrCodeAction';
 import { filenameToUrl } from '../../../api';
 import { MaintenanceManagement } from './maintenance-management';
+import { MaintenanceSchedules } from './maintenance-schedules';
 import { ResourceBillingInfo } from './resourceBillingInfo';
 
 function ResourceDetailsComponent() {
@@ -82,7 +83,7 @@ function ResourceDetailsComponent() {
         description: `${resource?.name} has been successfully deleted`,
       });
       queryClient.invalidateQueries({
-        queryKey: [UseResourcesServiceGetAllResourcesKeyFn()[0]],
+        queryKey: [useResourcesServiceGetAllResourcesKey],
       });
       navigate('/resources');
     } catch (err) {
@@ -215,7 +216,12 @@ function ResourceDetailsComponent() {
         <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
           <ResourceUsageHistory resourceId={resourceId} data-cy="resource-usage-history" className="flex-grow" />
 
-          {maintenancePermissions?.canManage && <MaintenanceManagement resourceId={resourceId} className="flex-grow" />}
+          {maintenancePermissions?.canManage && (
+            <>
+              <MaintenanceManagement resourceId={resourceId} className="flex-grow" />
+              <MaintenanceSchedules resourceId={resourceId} className="flex-grow" />
+            </>
+          )}
         </div>
       </div>
 

@@ -24,6 +24,9 @@ IdP, validate the returned response, and mint an Attraccess session token.
 
 - Use the **Auto-Discovery** menu to fetch metadata from Authentik or Keycloak – issuer and
   endpoint URLs are filled automatically.
+- Authentik requires regex mode for redirect URI matching if you use the `redirectTo` query
+  parameter. Use a pattern like:
+  `^http://localhost:3000/api/auth/sso/OIDC/1/callback(\\?.*)?$` (replace host and provider ID).
 - `Scopes`, `Username claim paths`, and `Email claim paths` accept comma-separated lists and
   are evaluated in order. They allow you to prioritise custom claim names if your IdP does
   not populate the defaults (`preferred_username`, `email`, `sub`, …).

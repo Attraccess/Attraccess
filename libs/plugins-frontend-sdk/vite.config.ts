@@ -5,6 +5,13 @@ import dts from 'vite-plugin-dts';
 import * as path from 'path';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
+import type { PluginItem, TransformOptions } from '@babel/core';
+
+export const reactCompilerBabelPlugins: PluginItem[] = ['babel-plugin-react-compiler'];
+
+export const reactCompilerBabelConfig: TransformOptions = {
+  plugins: reactCompilerBabelPlugins,
+};
 
 const sharedLibs = [
   'react',
@@ -21,7 +28,7 @@ export default defineConfig({
   root: __dirname,
   cacheDir: '../../node_modules/.vite/libs/plugins-frontend-sdk',
   plugins: [
-    react(),
+    react({ babel: reactCompilerBabelConfig }),
     nxViteTsPaths(),
     nxCopyAssetsPlugin(['*.md']),
     dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json') }),

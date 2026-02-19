@@ -1,5 +1,10 @@
 export { CreateMaintenanceDto } from './createMaintenance.dto';
-export { UpdateMaintenanceDto } from './updateMaintenance.dto';
 export { ListMaintenancesDto } from './listMaintenances.dto';
 export { PaginatedMaintenanceResponse } from './paginatedMaintenanceResponse.dto';
 export { CanManageMaintenanceResponseDto } from './canManageMaintenanceResponse.dto';
+export { UsageHoursTriggerConfigDto } from './usage-hours-trigger-config.dto';
+export { UsageCountTriggerConfigDto } from './usage-count-trigger-config.dto';
+export { TimeIntervalTriggerConfigDto } from './time-interval-trigger-config.dto';
+export { CreateMaintenanceScheduleDto } from './create-maintenance-schedule.dto';
+export { UpdateMaintenanceScheduleDto } from './update-maintenance-schedule.dto';
+export { FinishMaintenanceDto } from './finish-maintenance.dto';

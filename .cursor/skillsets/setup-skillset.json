@@ -1,0 +1,18 @@
+{
+  "name": "Setup & Environment Specialist",
+  "domain": "setup-environment",
+  "expertise": [
+    "install",
+    "env",
+    "migrations",
+    "license",
+    "dependencies"
+  ],
+  "setup_steps": {
+    "install": "pnpm install",
+    "env": "cp .env.example .env",
+    "migrations": "pnpm nx run api:migrations-run (when needed)"
+  },
+  "local_api": "If starting API locally, set LICENSE_KEY as described in README.md",
+  "pre_checks": "Ensure dependencies installed and required env vars set before full checks"
+}

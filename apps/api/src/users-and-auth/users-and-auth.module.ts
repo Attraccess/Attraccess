@@ -30,9 +30,7 @@ import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
 import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
 import { SSOController } from './auth/sso/sso.controller';
-import { AppConfigType } from '../config/app.config';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
@@ -42,6 +40,8 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 import { TwoFactorService } from './auth/two-factor.service';
+import { SettingsModule } from '../settings/settings.module';
+import { SettingsService } from '../settings/settings.service';
 
 @Module({
   imports: [
@@ -59,6 +59,7 @@ import { TwoFactorService } from './auth/two-factor.service';
     EmailModule,
     EncryptionModule,
     LicenseModule,
+    SettingsModule,
   ],
   providers: [
     UsersService,
@@ -76,9 +77,8 @@ import { TwoFactorService } from './auth/two-factor.service';
     AccountLinkingExceptionFilter,
     {
       provide: SSOOIDCStrategy,
-      useFactory: (moduleRef: ModuleRef, configService: ConfigService) => {
-        // This is a placeholder - you'll need to retrieve an actual configuration
-        // from the database or environment variables
+      useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService) => {
+        // Placeholder config; actual OIDC providers are resolved at request time
         const config = new SSOProviderOIDCConfiguration();
         config.issuer = 'placeholder';
         config.authorizationURL = 'placeholder';
@@ -87,15 +87,15 @@ import { TwoFactorService } from './auth/two-factor.service';
         config.clientId = 'placeholder';
         config.clientSecret = 'placeholder';
 
-        const appConfig = configService.get<AppConfigType>('app');
-        if (!appConfig) {
-          throw new Error("App configuration ('app') not found.");
-        }
-        const callbackURL = appConfig.ATTRACCESS_FRONTEND_URL + '/api/sso/OIDC/callback';
+        const frontendUrl = await settingsService.getFrontendUrl();
+        // Use fallback during first-time setup when no settings exist; real callback is only needed when OIDC is used
+        const callbackURL = frontendUrl
+          ? frontendUrl.replace(/\/$/, '') + '/api/sso/OIDC/callback'
+          : 'http://localhost:4200/api/sso/OIDC/callback';
 
         return new SSOOIDCStrategy(moduleRef, config, callbackURL);
       },
-      inject: [ModuleRef, ConfigService],
+      inject: [ModuleRef, SettingsService],
     },
   ],
   controllers: [UsersController, AuthController, TwoFactorController, SSOController],

@@ -1,4 +1,3 @@
-import { MailerService } from '@nestjs-modules/mailer';
 import { EmailService } from './email.service';
 import {
   EmailTemplateType,
@@ -8,9 +7,15 @@ import {
   ResourceUsage,
   Resource,
 } from '@attraccess/database-entities';
-import { ConfigService } from '@nestjs/config';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MjmlService } from '../email-template/mjml.service';
+import { createTransport } from 'nodemailer';
+import { SettingsService } from '../settings/settings.service';
+import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
+
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn(),
+}));
 
 describe('EmailService', () => {
   const makeUser = (overrides: Partial<User> = {}): User =>
@@ -33,16 +38,22 @@ describe('EmailService', () => {
     }) as unknown as User;
 
   const setup = () => {
-    const mailerService = { sendMail: jest.fn().mockResolvedValue(undefined) };
-    const configService = {
-      get: jest.fn().mockImplementation((key: string) => {
-        if (key === 'app') {
-          return {
-            ATTRACCESS_FRONTEND_URL: 'https://frontend.example',
-            ATTRACCESS_URL: 'https://backend.example',
-          };
-        }
-        return undefined;
+    const sendMail = jest.fn().mockResolvedValue(undefined);
+    const close = jest.fn();
+    (createTransport as jest.Mock).mockReturnValue({ sendMail, close });
+
+    const settingsService = {
+      getFrontendUrl: jest.fn().mockResolvedValue('https://frontend.example'),
+      getBackendUrl: jest.fn().mockResolvedValue('https://backend.example'),
+      getSmtpConfiguration: jest.fn().mockResolvedValue({
+        service: SmtpServiceType.SMTP,
+        host: 'smtp.example.com',
+        port: 587,
+        secure: false,
+        user: 'mailer@example.com',
+        pass: 'secret',
+        from: 'no-reply@example.com',
+        passConfigured: true,
       }),
     };
     const emailTemplateService = {
@@ -87,23 +98,22 @@ describe('EmailService', () => {
     };
 
     const service = new EmailService(
-      mailerService as unknown as MailerService,
-      configService as unknown as ConfigService,
+      settingsService as unknown as SettingsService,
       emailTemplateService as unknown as EmailTemplateService,
       mjmlService as unknown as MjmlService,
     );
 
-    return { service, mailerService, configService, emailTemplateService, mjmlService };
+    return { service, sendMail, close, settingsService, emailTemplateService, mjmlService };
   };
 
   it('sends username changed email with resolved variables', async () => {
-    const { service, mailerService } = setup();
+    const { service, sendMail } = setup();
     const user = makeUser({ username: 'alice' });
 
     await service.sendUsernameChangedEmail(user, 'old_alice');
 
-    expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
-    const callArg = (mailerService.sendMail as jest.Mock).mock.calls[0][0];
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('alice@example.com');
     expect(callArg.subject).toBe('Username changed for alice');
     expect(callArg.html).toContain('Hello alice');
@@ -114,14 +124,14 @@ describe('EmailService', () => {
   });
 
   it('sends verification email with correct URL', async () => {
-    const { service, mailerService } = setup();
+    const { service, sendMail } = setup();
     const user = makeUser({ email: 'bob@example.com' });
     const token = 'verify-token-123';
 
     await service.sendVerificationEmail(user, token);
 
-    expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
-    const callArg = (mailerService.sendMail as jest.Mock).mock.calls[0][0];
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('bob@example.com');
     expect(callArg.subject).toContain('Verify bob@example.com');
     expect(callArg.html).toMatch(
@@ -130,14 +140,14 @@ describe('EmailService', () => {
   });
 
   it('sends password reset email with correct URL', async () => {
-    const { service, mailerService } = setup();
+    const { service, sendMail } = setup();
     const user = makeUser({ id: 42, email: 'charlie@example.com' });
     const token = 'reset-token-XYZ';
 
     await service.sendPasswordResetEmail(user, token);
 
-    expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
-    const callArg = (mailerService.sendMail as jest.Mock).mock.calls[0][0];
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('charlie@example.com');
     expect(callArg.subject).toContain('Reset password for charlie@example.com');
     expect(callArg.html).toMatch(
@@ -146,15 +156,15 @@ describe('EmailService', () => {
   });
 
   it('bubbles up errors when sending fails', async () => {
-    const { service, mailerService } = setup();
-    (mailerService.sendMail as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
+    const { service, sendMail } = setup();
+    (sendMail as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
     const user = makeUser();
 
     await expect(service.sendVerificationEmail(user, 'tok')).rejects.toThrow('SMTP down');
   });
 
   it('sends billing transaction summary email with expected context', async () => {
-    const { service, mailerService } = setup();
+    const { service, sendMail } = setup();
     const user = makeUser({ id: 7, username: 'dana', email: 'dana@example.com', creditBalance: 1234 });
 
     const transaction: Partial<BillingTransaction> = {
@@ -183,8 +193,8 @@ describe('EmailService', () => {
       2,
     );
 
-    expect(mailerService.sendMail).toHaveBeenCalledTimes(1);
-    const callArg = (mailerService.sendMail as jest.Mock).mock.calls[0][0];
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('dana@example.com');
     expect(callArg.subject).toContain('Laser Cutter');
     expect(callArg.html).toContain('dana');

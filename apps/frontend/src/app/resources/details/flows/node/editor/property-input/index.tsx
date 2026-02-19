@@ -109,6 +109,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               selectedId={value as number}
               onSelectionChange={(newValue) => onChange(newValue as TValue)}
               label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+              ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
               isRequired={isRequired}
               description={description}
               className="w-full"

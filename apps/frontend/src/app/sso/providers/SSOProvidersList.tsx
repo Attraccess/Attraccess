@@ -16,14 +16,18 @@ import {
   ModalHeader,
   useDisclosure,
   Divider,
+  Card,
+  CardBody,
+  CardHeader,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
   Textarea,
   Switch,
+  Link,
 } from '@heroui/react';
-import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy } from 'lucide-react';
+import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -38,7 +42,7 @@ import {
   useAuthenticationServiceGetAllSsoProviders,
   useAuthenticationServiceGetOneSsoProviderById,
   useAuthenticationServiceUpdateOneSsoProvider,
-  UseAuthenticationServiceGetAllSsoProvidersKeyFn,
+  useAuthenticationServiceGetAllSsoProvidersKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -105,6 +109,8 @@ const ensureOidcConfiguration = (config?: CreateSSOProviderDto['oidcConfiguratio
 const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfiguration']) =>
   config ?? getDefaultSamlConfiguration();
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export interface SSOProvidersListRef {
   handleAddNew: () => void;
 }
@@ -133,21 +139,21 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
   const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
   const updateSSOProvider = useAuthenticationServiceUpdateOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
   const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseAuthenticationServiceGetAllSsoProvidersKeyFn()[0]],
+        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
       });
     },
   });
@@ -158,17 +164,35 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       enabled: !!editingProvider,
     },
   );
+  const ssoBaseUrl = React.useMemo(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    return getBaseUrl() ?? window.location.origin;
+  }, []);
+  const docsSsoProvidersUrl = React.useMemo(() => {
+    if (!ssoBaseUrl) {
+      return undefined;
+    }
+    return new URL('/docs/user/sso-providers', ssoBaseUrl).toString();
+  }, [ssoBaseUrl]);
+  const docsAuthentikPermissionsUrl = React.useMemo(() => {
+    if (!ssoBaseUrl) {
+      return undefined;
+    }
+    return new URL('/docs/user/sso-authentik-permissions', ssoBaseUrl).toString();
+  }, [ssoBaseUrl]);
   const samlCallbackUrl = React.useMemo(() => {
     if (!providerDetails?.id) {
       return '';
     }
 
     try {
-      const baseUrl = getBaseUrl() ?? (typeof window !== 'undefined' ? window.location.origin : undefined);
-      if (!baseUrl) {
+      if (!ssoBaseUrl) {
         return '';
       }
-      const callbackUrl = new URL(baseUrl);
+      const callbackUrl = new URL(ssoBaseUrl);
       callbackUrl.pathname = `/api/auth/sso/${SSOProviderType.SAML}/${providerDetails.id}/callback*`;
       callbackUrl.search = '';
       callbackUrl.hash = '';
@@ -176,8 +200,31 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     } catch {
       return '';
     }
-  }, [providerDetails?.id]);
-  const hasSamlCallbackUrl = Boolean(samlCallbackUrl);
+  }, [providerDetails?.id, ssoBaseUrl]);
+  const oidcCallbackUrl = React.useMemo(() => {
+    if (!providerDetails?.id) {
+      return '';
+    }
+
+    try {
+      if (!ssoBaseUrl) {
+        return '';
+      }
+      const callbackUrl = new URL(ssoBaseUrl);
+      callbackUrl.pathname = `/api/auth/sso/${SSOProviderType.OIDC}/${providerDetails.id}/callback`;
+      callbackUrl.search = '';
+      callbackUrl.hash = '';
+      return callbackUrl.toString();
+    } catch {
+      return '';
+    }
+  }, [providerDetails?.id, ssoBaseUrl]);
+  const authentikRedirectRegexPattern = React.useMemo(() => {
+    const baseUrl = ssoBaseUrl ? escapeRegex(ssoBaseUrl) : 'http://localhost:3000';
+    const providerId = providerDetails?.id ?? 1;
+    return `^${baseUrl}/api/auth/sso/OIDC/${providerId}/callback(\\?.*)?$`;
+  }, [providerDetails?.id, ssoBaseUrl]);
+  const hasSetupUrls = Boolean(providerDetails?.id && ssoBaseUrl);
 
   const isSamlProvider = formValues.type === SSOProviderType.SAML;
   const isSamlSigningEnabled = isSamlProvider && (formValues.samlConfiguration?.signRequest ?? false);
@@ -256,8 +303,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         setOidcPermissionMappingsInput(
           buildPermissionMappingInputs(
             (extendedProvider.oidcConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
           ),
         );
       } else {
@@ -289,8 +336,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
         setSamlPermissionMappingsInput(
           buildPermissionMappingInputs(
             (extendedProvider.samlConfiguration.permissionMappings ?? undefined) as
-              | Partial<Record<PermissionKey, string[]>>
-              | undefined,
+            | Partial<Record<PermissionKey, string[]>>
+            | undefined,
           ),
         );
       } else {
@@ -375,38 +422,67 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
 
   const handlePermissionMappingChange =
     (setter: React.Dispatch<React.SetStateAction<Record<PermissionKey, string>>>, key: PermissionKey) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setter((prev) => ({
-        ...prev,
-        [key]: event.target.value,
-      }));
-    };
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        setter((prev) => ({
+          ...prev,
+          [key]: event.target.value,
+        }));
+      };
+
+  const handleCopyValue = useCallback(
+    async (value: string, successTitle: string) => {
+      if (!value) {
+        return;
+      }
+
+      if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+        showError({
+          title: t('copyFailedTitle'),
+          description: t('copyUnsupported'),
+        });
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(value);
+        success({
+          title: successTitle,
+        });
+      } catch (err) {
+        showError({
+          title: t('copyFailedTitle'),
+          description: err instanceof Error ? err.message : t('copyFailedDesc'),
+        });
+      }
+    },
+    [showError, success, t],
+  );
 
   const handleCopySamlCallbackUrl = useCallback(async () => {
     if (!samlCallbackUrl) {
       return;
     }
 
-    if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
-      showError({
-        title: t('samlCallbackUrlCopyFailedTitle'),
-        description: t('samlCallbackUrlCopyUnsupported'),
-      });
+    await handleCopyValue(samlCallbackUrl, t('copySuccessTitle'));
+  }, [handleCopyValue, samlCallbackUrl, t]);
+
+  const handleCopyOidcCallbackUrl = useCallback(async () => {
+    if (!oidcCallbackUrl) {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(samlCallbackUrl);
-      success({
-        title: t('samlCallbackUrlCopiedTitle'),
-      });
-    } catch (err) {
-      showError({
-        title: t('samlCallbackUrlCopyFailedTitle'),
-        description: err instanceof Error ? err.message : t('samlCallbackUrlCopyFailedDesc'),
-      });
-    }
-  }, [samlCallbackUrl, showError, success, t]);
+    await handleCopyValue(oidcCallbackUrl, t('copySuccessTitle'));
+  }, [handleCopyValue, oidcCallbackUrl, t]);
+
+  const handleCopyLoginUrl = useCallback(
+    async (value: string) => {
+      if (!value) {
+        return;
+      }
+      await handleCopyValue(value, t('copySuccessTitle'));
+    },
+    [handleCopyValue, t],
+  );
 
   const handleSamlToggleChange = (
     field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>,
@@ -888,28 +964,6 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       />
 
                       <Input
-                        label={t('samlCallbackUrl')}
-                        value={samlCallbackUrl}
-                        isReadOnly
-                        isDisabled={!hasSamlCallbackUrl}
-                        description={hasSamlCallbackUrl ? t('samlCallbackUrlDescription') : t('samlCallbackUrlPending')}
-                        endContent={
-                          hasSamlCallbackUrl ? (
-                            <Button
-                              size="sm"
-                              variant="light"
-                              onPress={handleCopySamlCallbackUrl}
-                              startContent={<Copy size={24} />}
-                              data-cy="sso-provider-form-saml-callback-url-copy-button"
-                            >
-                              {t('copy')}
-                            </Button>
-                          ) : undefined
-                        }
-                        data-cy="sso-provider-form-saml-callback-url"
-                      />
-
-                      <Input
                         label={t('emailAttributeKeys')}
                         description={t('emailAttributeKeysHint')}
                         value={emailAttributeKeysInput}
@@ -1019,6 +1073,82 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       </div>
                     </>
                   )}
+
+                  <Divider className="my-4" />
+                  <Card className="border border-default-200" data-cy="sso-provider-form-setup-card">
+                    <CardHeader className="flex items-center gap-2">
+                      <Info size={16} />
+                      <span className="font-semibold">{t('setupInstructions')}</span>
+                    </CardHeader>
+                    <CardBody className="flex flex-col gap-3">
+                      <p className="text-xs text-default-500">{t('setupInstructionsHint')}</p>
+                      <div className="flex flex-col gap-3">
+                        {!isSamlProvider && (
+                          <Input
+                            label={t('authentikRedirectRegex')}
+                            value={authentikRedirectRegexPattern}
+                            isReadOnly
+                            isDisabled={!hasSetupUrls}
+                            description={hasSetupUrls ? t('authentikRedirectRegexDescription') : t('setupUrlPending')}
+                            endContent={
+                              hasSetupUrls ? (
+                                <Button
+                                  size="sm"
+                                  variant="light"
+                                  onPress={() => handleCopyLoginUrl(authentikRedirectRegexPattern)}
+                                  startContent={<Copy size={24} />}
+                                  data-cy="sso-provider-form-authentik-regex-copy-button"
+                                >
+                                  {t('copy')}
+                                </Button>
+                              ) : undefined
+                            }
+                            data-cy="sso-provider-form-authentik-regex"
+                          />
+                        )}
+                        <Input
+                          label={isSamlProvider ? t('samlAcsUrl') : t('oidcRedirectUri')}
+                          value={isSamlProvider ? samlCallbackUrl : oidcCallbackUrl}
+                          isReadOnly
+                          isDisabled={!hasSetupUrls}
+                          description={
+                            hasSetupUrls
+                              ? isSamlProvider
+                                ? t('samlAcsUrlDescription')
+                                : t('oidcRedirectUriDescription')
+                              : t('setupUrlPending')
+                          }
+                          endContent={
+                            hasSetupUrls ? (
+                              <Button
+                                size="sm"
+                                variant="light"
+                                onPress={isSamlProvider ? handleCopySamlCallbackUrl : handleCopyOidcCallbackUrl}
+                                startContent={<Copy size={24} />}
+                                data-cy="sso-provider-form-callback-url-copy-button"
+                              >
+                                {t('copy')}
+                              </Button>
+                            ) : undefined
+                          }
+                          data-cy="sso-provider-form-callback-url"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        {docsSsoProvidersUrl && (
+                          <Link href={docsSsoProvidersUrl} isExternal showAnchorIcon>
+                            {t('docsSsoProviders')}
+                          </Link>
+                        )}
+                        {docsAuthentikPermissionsUrl && (
+                          <Link href={docsAuthentikPermissionsUrl} isExternal showAnchorIcon>
+                            {t('docsAuthentikPermissions')}
+                          </Link>
+                        )}
+                      </div>
+                    </CardBody>
+                  </Card>
                 </div>
               </ModalBody>
               <ModalFooter>

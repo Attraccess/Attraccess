@@ -1,0 +1,37 @@
+{
+  "title": "Wartungspläne",
+  "table": {
+    "ariaLabel": "Wartungspläne",
+    "columns": {
+      "name": "Name",
+      "triggerType": "Auslöser",
+      "configSummary": "Konfiguration",
+      "enabled": "Aktiv",
+      "actions": "Aktionen"
+    }
+  },
+  "triggerType": {
+    "USAGE_HOURS": "Nutzungsstunden",
+    "USAGE_COUNT": "Nutzungsanzahl",
+    "TIME_INTERVAL": "Zeitintervall"
+  },
+  "configSummary": {
+    "usageHoursMinutes": "Alle {{duration}} Min Nutzung",
+    "usageHoursHours": "Alle {{duration}} h Nutzung",
+    "usageHoursDays": "Alle {{duration}} Tage Nutzung",
+    "usageCount": "Alle {{count}} Sitzungen",
+    "timeIntervalMinutes": "Nach {{duration}} Min seit letzter",
+    "timeIntervalHours": "Nach {{duration}} h seit letzter",
+    "timeIntervalDays": "Nach {{duration}} Tage seit letzter"
+  },
+  "empty": "Keine Pläne. Einen hinzufügen für automatische Wartung.",
+  "actions": {
+    "add": "Plan hinzufügen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen"
+  },
+  "delete": {
+    "title": "Plan löschen",
+    "itemName": "Plan \"{{name}}\""
+  }
+}

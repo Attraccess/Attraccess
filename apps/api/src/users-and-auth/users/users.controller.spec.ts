@@ -11,6 +11,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -66,6 +67,12 @@ describe('UsersController', () => {
             findOne: jest.fn(),
             insert: jest.fn(),
             update: jest.fn(),
+          },
+        },
+        {
+          provide: TokenHashService,
+          useValue: {
+            hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
         },
       ],

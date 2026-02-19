@@ -26,8 +26,9 @@ RUN pip install --upgrade pip && \
 
 WORKDIR /app
 
-# Copy package.json and pnpm-lock.yaml first for better layer caching
+# Copy package.json, lockfile, patches (required for pnpm patchedDependencies), and .npmrc first for better layer caching
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY patches/ patches/
 
 # Install dependencies
 RUN corepack enable && corepack prepare && \
@@ -42,14 +43,17 @@ RUN pnpm nx run-many -t build --projects=api,frontend
 
 FROM node:${NODE_VERSION}-alpine
 
-# Create unprivileged user for runtime
-RUN addgroup -S appuser && adduser -S -G appuser -h /app appuser
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+# Create unprivileged user for runtime with fixed UID/GID
+RUN addgroup -g ${APP_GID} -S appuser && adduser -u ${APP_UID} -S -G appuser -h /app appuser
 
 # Set working directory
 WORKDIR /app
 
-# Minimal runtime libs for native Node modules
-RUN apk add --no-cache libstdc++
+# Minimal runtime libs for native Node modules and su-exec for privilege drop
+RUN apk add --no-cache libstdc++ su-exec
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist/apps/api dist/apps/api
@@ -72,19 +76,16 @@ WORKDIR /app/dist/apps/api
 RUN corepack enable && corepack prepare && \
     pnpm install # --frozen-lockfile (not enabled frozen lockfile since nx is fucking up the lockfile)
 
-# Ensure runtime files are owned by the unprivileged user
-RUN chown -R appuser:appuser /app
-
 # Back to app root for consistent starting dir
 WORKDIR /app
 
 COPY package.json package.json
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Expose the API port
 EXPOSE 3000
 
-# Drop privileges for runtime
-USER appuser
-
-# Start the API using the launch script
+# Entrypoint runs as root to chown empty storage on first run, then drops to appuser
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/apps/api/main.js"]

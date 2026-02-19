@@ -3,19 +3,23 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
+import { EncryptionService } from '../../encryption/encryption.service';
 
 @Injectable()
 export class MqttServerService {
   constructor(
     @InjectRepository(MqttServer)
-    private readonly mqttServerRepository: Repository<MqttServer>
-  ) {}
+    private readonly mqttServerRepository: Repository<MqttServer>,
+    private readonly encryptionService: EncryptionService,
+  ) { }
 
   /**
    * Get all MQTT servers
    */
   async findAll(): Promise<MqttServer[]> {
-    return this.mqttServerRepository.find();
+    const servers = await this.mqttServerRepository.find();
+    servers.forEach((server) => this.decryptServerPassword(server));
+    return servers;
   }
 
   /**
@@ -30,6 +34,7 @@ export class MqttServerService {
       throw new NotFoundException(`MQTT server with ID ${id} not found`);
     }
 
+    this.decryptServerPassword(server);
     return server;
   }
 
@@ -37,7 +42,10 @@ export class MqttServerService {
    * Create a new MQTT server
    */
   async create(createMqttServerDto: CreateMqttServerDto): Promise<MqttServer> {
-    const newServer = this.mqttServerRepository.create(createMqttServerDto);
+    const newServer = this.mqttServerRepository.create({
+      ...createMqttServerDto,
+      password: createMqttServerDto.password ? this.encryptionService.encrypt(createMqttServerDto.password) : null,
+    });
     return this.mqttServerRepository.save(newServer);
   }
 
@@ -49,6 +57,7 @@ export class MqttServerService {
 
     // Update the server with the new values
     Object.assign(server, updateMqttServerDto);
+    server.password = server.password ? this.encryptionService.encrypt(server.password) : null;
 
     return this.mqttServerRepository.save(server);
   }
@@ -59,5 +68,15 @@ export class MqttServerService {
   async remove(id: number): Promise<void> {
     const server = await this.findOne(id);
     await this.mqttServerRepository.remove(server);
+  }
+
+  /**
+   * Decrypts password in place for use in the app. Assumes stored values are
+   * already encrypted (see migration EncryptSensitiveData).
+   */
+  private decryptServerPassword(server: MqttServer): void {
+    if (server.password) {
+      server.password = this.encryptionService.decryptIfEncrypted(server.password) ?? server.password;
+    }
   }
 }

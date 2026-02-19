@@ -16,6 +16,20 @@ def resolve_python_command():
             return cmd
     return "python3"
 
+
+def resolve_platformio_python(platformio_home):
+    """Return PlatformIO penv Python if it exists (has pyserial for esptool), else None."""
+    if not platformio_home:
+        return None
+    # PlatformIO Core uses penv with dependencies (pyserial) for tool-esptoolpy
+    if sys.platform == "win32":
+        penv_python = os.path.join(platformio_home, "penv", "Scripts", "python.exe")
+    else:
+        penv_python = os.path.join(platformio_home, "penv", "bin", "python")
+    if os.path.exists(penv_python):
+        return penv_python
+    return None
+
 def extract_define_value(flags, define_name):
     """Extract a -D define value from build_flags"""
     pattern = fr'-D\s*{define_name}=(["\']?)(.*?)\1(?:\s|$)'
@@ -294,11 +308,13 @@ def main():
                     '/root/.platformio',
                 ]
 
+                # Use PlatformIO's bundled esptool. Prefer penv Python (has pyserial); else use current Python.
                 esptool_cmd = [python_cmd, '-m', 'esptool']
                 for platformio_home in dict.fromkeys(filter(None, candidate_platformio_homes)):
                     esptool_script = os.path.join(platformio_home, 'packages', 'tool-esptoolpy', 'esptool.py')
                     if os.path.exists(esptool_script):
-                        esptool_cmd = [python_cmd, esptool_script]
+                        esptool_python = resolve_platformio_python(platformio_home) or python_cmd
+                        esptool_cmd = [esptool_python, esptool_script]
                         break
 
                 merge_cmd = [
@@ -320,6 +336,11 @@ def main():
                     print(f"Return code: {result.returncode}")
                     print(f"STDOUT: {result.stdout}")
                     print(f"STDERR: {result.stderr}")
+                    if result.stderr and "No module named 'serial'" in result.stderr:
+                        print(
+                            "Hint: esptool needs pyserial. Install it for the Python used above, e.g.: "
+                            "pip install pyserial   or   pip install esptool"
+                        )
                     sys.exit(1)
                 
                 print(f"Merged firmware created at: {merged_bin_path}")

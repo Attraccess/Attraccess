@@ -1,0 +1,11 @@
+{
+  "title": "Ersteinrichtung",
+  "subtitle": "Konfiguriere deine Instanz und lege den ersten Admin-Benutzer an.",
+  "loading": "Einrichtungsstatus wird geprüft...",
+  "steps": {
+    "app": "Anwendungseinstellungen",
+    "smtp": "E-Mail (SMTP)",
+    "admin": "Admin-Benutzer anlegen",
+    "verify": "Fertig"
+  }
+}

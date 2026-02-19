@@ -1,0 +1,44 @@
+{
+  "service": {
+    "none": "Disabled",
+    "smtp": "SMTP",
+    "outlook": "Outlook 365"
+  },
+  "inputs": {
+    "service": {
+      "label": "Service"
+    },
+    "host": {
+      "label": "Host",
+      "description": "SMTP server host name."
+    },
+    "port": {
+      "label": "Port",
+      "description": "SMTP server port."
+    },
+    "secure": {
+      "label": "Use TLS"
+    },
+    "user": {
+      "label": "Username",
+      "description": "Optional username for SMTP authentication."
+    },
+    "pass": {
+      "label": "Password",
+      "description": "Leave empty to keep the current password."
+    },
+    "from": {
+      "label": "From address",
+      "description": "Default sender address for outgoing emails."
+    }
+  },
+  "actions": {
+    "save": "Save",
+    "next": "Next"
+  },
+  "loading": "Loading settings...",
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  }
+}

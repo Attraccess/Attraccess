@@ -50,7 +50,6 @@ export function Select(props: Props) {
     <HeroUiSelect
       {...selectProps}
       items={items}
-      label={props.label}
       selectedKeys={value}
       onSelectionChange={handleSelectionChange}
     >

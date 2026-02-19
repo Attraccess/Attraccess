@@ -81,10 +81,13 @@ export function UserManagementDetailsPage() {
   type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
-  const ssoDetails =
-    (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
-      (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
-    ) ?? [];
+  const ssoDetails = useMemo(
+    () =>
+      (user as UserWithAuthDetails | undefined)?.authenticationDetails?.filter(
+        (detail) => detail.ssoSubject || detail.providerId || detail.providerType,
+      ) ?? [],
+    [user],
+  );
 
   const ssoManagedProviders = useMemo(() => {
     if (ssoDetails.length === 0) {

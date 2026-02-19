@@ -10,7 +10,7 @@ import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {
   useUsersServiceCreateOneUser,
-  UseUsersServiceFindManyKeyFn,
+  useUsersServiceFindManyKey,
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
@@ -92,7 +92,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [UseUsersServiceFindManyKeyFn()[0]],
+        queryKey: [useUsersServiceFindManyKey],
       });
       onOpen();
     },

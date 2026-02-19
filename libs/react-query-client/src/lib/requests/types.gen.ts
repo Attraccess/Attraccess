@@ -914,6 +914,162 @@ export type UpdateEmailTemplateDto = {
     body?: string;
 };
 
+export type AppSettingsDto = {
+    /**
+     * The frontend URL used for redirects and links.
+     */
+    frontendUrl: string | null;
+    /**
+     * The backend/base URL used for callbacks and API links.
+     */
+    backendUrl: string | null;
+    /**
+     * Optional public URL used for external callbacks (e.g., SumUp).
+     */
+    publicInternetUrl: string | null;
+    /**
+     * Whether a license key has been configured.
+     */
+    licenseKeyConfigured: boolean;
+};
+
+/**
+ * Selected SMTP provider type.
+ */
+export enum SmtpServiceType {
+    SMTP = 'SMTP',
+    OUTLOOK365 = 'Outlook365'
+}
+
+export type SmtpSettingsDto = {
+    /**
+     * Selected SMTP provider type.
+     */
+    service: (SmtpServiceType) | null;
+    /**
+     * SMTP host for direct SMTP connections.
+     */
+    host: string | null;
+    /**
+     * SMTP port for direct SMTP connections.
+     */
+    port: number | null;
+    /**
+     * Whether to use a secure SMTP connection.
+     */
+    secure: boolean | null;
+    /**
+     * SMTP username.
+     */
+    user: string | null;
+    /**
+     * Default FROM address for outgoing emails.
+     */
+    from: string | null;
+    /**
+     * Whether an SMTP password has been configured.
+     */
+    passConfigured: boolean;
+};
+
+export type SystemSettingsDto = {
+    /**
+     * Application settings
+     */
+    app: AppSettingsDto;
+    /**
+     * SMTP settings
+     */
+    smtp: SmtpSettingsDto;
+};
+
+export type UpdateAppSettingsDto = {
+    /**
+     * Frontend URL used for redirects and links.
+     */
+    frontendUrl?: string;
+    /**
+     * Backend/base URL used for callbacks and API links.
+     */
+    backendUrl?: string;
+    /**
+     * Public URL used for external callbacks.
+     */
+    publicInternetUrl?: string;
+    /**
+     * License key to use for license validation.
+     */
+    licenseKey?: string;
+};
+
+export type UpdateSmtpSettingsDto = {
+    /**
+     * SMTP provider type. An email provider is required.
+     */
+    service: SmtpServiceType;
+    /**
+     * SMTP host.
+     */
+    host: string;
+    /**
+     * SMTP port.
+     */
+    port: number;
+    /**
+     * Whether to use a secure SMTP connection.
+     */
+    secure?: boolean;
+    /**
+     * SMTP username.
+     */
+    user: string;
+    /**
+     * SMTP password.
+     */
+    pass?: string;
+    /**
+     * Default FROM address.
+     */
+    from: string;
+};
+
+export type UpdateSystemSettingsDto = {
+    /**
+     * Application settings update
+     */
+    app?: UpdateAppSettingsDto;
+    /**
+     * SMTP settings update
+     */
+    smtp?: UpdateSmtpSettingsDto;
+};
+
+export type FirstTimeSetupStepsDto = {
+    /**
+     * Whether the app settings step (URLs and license) is completed.
+     */
+    app: boolean;
+    /**
+     * Whether the SMTP settings step is completed.
+     */
+    smtp: boolean;
+    /**
+     * Whether at least one admin user has been created.
+     */
+    admin: boolean;
+};
+
+export type FirstTimeSetupStatusDto = {
+    /**
+     * Whether first-time setup is still available (no users exist yet).
+     */
+    available: boolean;
+    /**
+     * Which wizard steps are already completed. Used to open the first incomplete step.
+     */
+    stepsCompleted: FirstTimeSetupStepsDto;
+};
+
 export type LicenseDataDto = {
     /**
      * Whether the license is valid
@@ -1918,6 +2074,120 @@ export type CreateMaintenanceDto = {
     reason?: string;
 };
 
+/**
+ * The type of trigger for this schedule
+ */
+export enum ResourceMaintenanceScheduleTriggerType {
+    USAGE_HOURS = 'USAGE_HOURS',
+    USAGE_COUNT = 'USAGE_COUNT',
+    TIME_INTERVAL = 'TIME_INTERVAL'
+}
+
+/**
+ * Unit for duration (MINUTES, HOURS, or DAYS)
+ */
+export enum UsageDurationUnit {
+    MINUTES = 'MINUTES',
+    HOURS = 'HOURS',
+    DAYS = 'DAYS'
+}
+
+export type ResourceMaintenanceScheduleUsageHoursConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Duration value (combined with unit) for usage threshold
+     */
+    duration: number;
+    /**
+     * Unit for duration (MINUTES, HOURS, or DAYS)
+     */
+    unit: UsageDurationUnit;
+};
+
+export type ResourceMaintenanceScheduleUsageCountConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Trigger after this many usage sessions (since last maintenance done for this schedule)
+     */
+    thresholdSessions: number;
+};
+
+export type ResourceMaintenanceScheduleTimeIntervalConfig = {
+    /**
+     * Unique identifier
+     */
+    id: number;
+    /**
+     * Schedule this config belongs to
+     */
+    scheduleId: number;
+    /**
+     * Duration value (combined with unit)
+     */
+    duration: number;
+    /**
+     * Unit for duration (MINUTES, HOURS, or DAYS)
+     */
+    unit: UsageDurationUnit;
+};
+
+export type ResourceMaintenanceSchedule = {
+    /**
+     * The unique identifier of the maintenance schedule
+     */
+    id: number;
+    /**
+     * When the schedule was created
+     */
+    createdAt: string;
+    /**
+     * When the schedule was last updated
+     */
+    updatedAt: string;
+    /**
+     * The ID of the resource
+     */
+    resourceId: number;
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Config when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: ResourceMaintenanceScheduleUsageHoursConfig;
+    /**
+     * Config when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: ResourceMaintenanceScheduleUsageCountConfig;
+    /**
+     * Config when triggerType is TIME_INTERVAL
+     */
+    timeIntervalConfig?: ResourceMaintenanceScheduleTimeIntervalConfig;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled: boolean;
+};
+
 export type ResourceMaintenance = {
     /**
      * The unique identifier of the maintenance
@@ -1947,6 +2217,26 @@ export type ResourceMaintenance = {
      * The reason for the maintenance
      */
     reason?: string;
+    /**
+     * The user who created/started the maintenance record
+     */
+    createdByUser?: {
+        [key: string]: unknown;
+    };
+    /**
+     * The user who marked the maintenance as done
+     */
+    completedByUser?: {
+        [key: string]: unknown;
+    };
+    /**
+     * When the maintenance was marked as done
+     */
+    completedAt?: string | null;
+    /**
+     * The schedule that triggered this maintenance (null for manual)
+     */
+    maintenanceSchedule?: ResourceMaintenanceSchedule;
 };
 
 export type PaginatedMaintenanceResponse = {
@@ -1959,19 +2249,94 @@ export type PaginatedMaintenanceResponse = {
     data: Array<ResourceMaintenance>;
 };
 
-export type UpdateMaintenanceDto = {
+export type FinishMaintenanceDto = {
     /**
-     * When the maintenance starts (must be in the future)
+     * Optional notes when marking the maintenance as done
      */
-    startTime?: string;
+    notes?: string;
+};
+
+export type UsageHoursTriggerConfigDto = {
     /**
-     * When the maintenance ends (optional)
+     * Duration value (combined with unit) for usage threshold
      */
-    endTime?: string | null;
+    duration: number;
     /**
-     * The reason for the maintenance
+     * Unit for duration (MINUTES, HOURS, or DAYS)
      */
-    reason?: string;
+    unit: UsageDurationUnit;
+};
+
+export type UsageCountTriggerConfigDto = {
+    /**
+     * Trigger after this many usage sessions (since last maintenance done for this schedule)
+     */
+    thresholdSessions: number;
+};
+
+export type TimeIntervalTriggerConfigDto = {
+    /**
+     * Duration value (combined with unit)
+     */
+    duration: number;
+    /**
+     * Unit for duration (MINUTES, HOURS, or DAYS)
+     */
+    unit: UsageDurationUnit;
+};
+
+export type CreateMaintenanceScheduleDto = {
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Required when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: UsageHoursTriggerConfigDto;
+    /**
+     * Required when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: UsageCountTriggerConfigDto;
+    /**
+     * Required when triggerType is TIME_INTERVAL (duration, unit, mode)
+     */
+    timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled?: boolean;
+};
+
+export type UpdateMaintenanceScheduleDto = {
+    /**
+     * Optional human-readable label for the schedule
+     */
+    name?: string;
+    /**
+     * The type of trigger for this schedule
+     */
+    triggerType?: ResourceMaintenanceScheduleTriggerType;
+    /**
+     * Required when triggerType is USAGE_HOURS
+     */
+    usageHoursConfig?: UsageHoursTriggerConfigDto;
+    /**
+     * Required when triggerType is USAGE_COUNT
+     */
+    usageCountConfig?: UsageCountTriggerConfigDto;
+    /**
+     * Required when triggerType is TIME_INTERVAL (duration, unit, mode)
+     */
+    timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+    /**
+     * Whether the schedule is enabled
+     */
+    enabled?: boolean;
 };
 
 export type BalanceDto = {
@@ -3707,6 +4072,22 @@ export type EmailTemplateControllerUpdateData = {
 
 export type EmailTemplateControllerUpdateResponse = EmailTemplate;
 
+export type GetSystemSettingsResponse = SystemSettingsDto;
+
+export type UpdateSystemSettingsData = {
+    requestBody: UpdateSystemSettingsDto;
+};
+
+export type UpdateSystemSettingsResponse = SystemSettingsDto;
+
+export type GetFirstTimeSetupStatusResponse = FirstTimeSetupStatusDto;
+
+export type ApplyFirstTimeSetupSettingsData = {
+    requestBody: UpdateSystemSettingsDto;
+};
+
+export type ApplyFirstTimeSetupSettingsResponse = SystemSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
 
 export type CreateOneResourceData = {
@@ -4156,32 +4537,78 @@ export type GetMaintenanceData = {
 
 export type GetMaintenanceResponse = ResourceMaintenance;
 
-export type UpdateMaintenanceData = {
+export type FinishMaintenanceData = {
     /**
      * The ID of the maintenance
      */
     maintenanceId: number;
-    requestBody: UpdateMaintenanceDto;
+    requestBody: FinishMaintenanceDto;
     /**
      * The ID of the resource
      */
     resourceId: number;
 };
 
-export type UpdateMaintenanceResponse = ResourceMaintenance;
+export type FinishMaintenanceResponse = ResourceMaintenance;
 
-export type CancelMaintenanceData = {
+export type FindMaintenanceSchedulesData = {
     /**
-     * The ID of the maintenance
-     */
-    maintenanceId: number;
-    /**
-     * The ID of the resource
+     * Resource ID
      */
     resourceId: number;
 };
 
-export type CancelMaintenanceResponse = void;
+export type FindMaintenanceSchedulesResponse = Array<ResourceMaintenanceSchedule>;
+
+export type CreateMaintenanceScheduleData = {
+    requestBody: CreateMaintenanceScheduleDto;
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+};
+
+export type CreateMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type GetMaintenanceScheduleData = {
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type GetMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type UpdateMaintenanceScheduleData = {
+    requestBody: UpdateMaintenanceScheduleDto;
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type UpdateMaintenanceScheduleResponse = ResourceMaintenanceSchedule;
+
+export type DeleteMaintenanceScheduleData = {
+    /**
+     * Resource ID
+     */
+    resourceId: number;
+    /**
+     * Schedule ID
+     */
+    scheduleId: number;
+};
+
+export type DeleteMaintenanceScheduleResponse = void;
 
 export type GetBillingBalanceData = {
     userId: number;
@@ -5605,6 +6032,56 @@ export type $OpenApiTs = {
             };
         };
     };
+    '/api/settings': {
+        get: {
+            res: {
+                /**
+                 * Current system settings.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateSystemSettingsData;
+            res: {
+                /**
+                 * System settings updated.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/first-time-setup': {
+        get: {
+            res: {
+                /**
+                 * First-time setup status and steps completed.
+                 */
+                200: FirstTimeSetupStatusDto;
+            };
+        };
+        post: {
+            req: ApplyFirstTimeSetupSettingsData;
+            res: {
+                /**
+                 * System settings updated.
+                 */
+                200: SystemSettingsDto;
+                /**
+                 * First-time setup is not available.
+                 */
+                403: unknown;
+            };
+        };
+    };
     '/api/license-data': {
         get: {
             res: {
@@ -6420,15 +6897,17 @@ export type $OpenApiTs = {
                 404: unknown;
             };
         };
-        put: {
-            req: UpdateMaintenanceData;
+    };
+    '/api/resources/{resourceId}/maintenances/{maintenanceId}/finish': {
+        post: {
+            req: FinishMaintenanceData;
             res: {
                 /**
-                 * Maintenance updated successfully
+                 * Maintenance marked as done successfully
                  */
                 200: ResourceMaintenance;
                 /**
-                 * Bad request - invalid maintenance data
+                 * Bad request - maintenance is already finished
                  */
                 400: unknown;
                 /**
@@ -6445,23 +6924,111 @@ export type $OpenApiTs = {
                 404: unknown;
             };
         };
-        delete: {
-            req: CancelMaintenanceData;
+    };
+    '/api/resources/{resourceId}/maintenance-schedules': {
+        get: {
+            req: FindMaintenanceSchedulesData;
             res: {
                 /**
-                 * Maintenance cancelled successfully
+                 * List of schedules
                  */
-                204: void;
+                200: Array<ResourceMaintenanceSchedule>;
                 /**
-                 * Unauthorized - User is not authenticated
+                 * Unauthorized
                  */
                 401: unknown;
                 /**
-                 * Forbidden - User does not have permission to manage maintenances for this resource
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+        post: {
+            req: CreateMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule created
+                 */
+                201: ResourceMaintenanceSchedule;
+                /**
+                 * Bad request
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
                  */
                 403: unknown;
                 /**
-                 * Maintenance not found
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/maintenance-schedules/{scheduleId}': {
+        get: {
+            req: GetMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule
+                 */
+                200: ResourceMaintenanceSchedule;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Schedule not found
+                 */
+                404: unknown;
+            };
+        };
+        put: {
+            req: UpdateMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule updated
+                 */
+                200: ResourceMaintenanceSchedule;
+                /**
+                 * Bad request
+                 */
+                400: unknown;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
+                /**
+                 * Schedule not found
+                 */
+                404: unknown;
+            };
+        };
+        delete: {
+            req: DeleteMaintenanceScheduleData;
+            res: {
+                /**
+                 * Schedule deleted
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden
+                 */
+                403: unknown;
+                /**
+                 * Schedule not found
                  */
                 404: unknown;
             };

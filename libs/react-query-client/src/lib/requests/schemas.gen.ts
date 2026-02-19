@@ -644,7 +644,8 @@ export const $SSOProviderOIDCConfiguration = {
         clientSecret: {
             type: 'string',
             description: 'The client secret of the provider',
-            example: '1234567890'
+            example: '1234567890',
+            writeOnly: true
         },
         scopes: {
             description: 'Optional list of OIDC scopes to request',
@@ -755,7 +756,8 @@ export const $SSOProviderSAMLConfiguration = {
         provisioningSecret: {
             type: 'string',
             description: 'Shared secret used to authorize SAML provisioning requests',
-            nullable: true
+            nullable: true,
+            writeOnly: true
         },
         permissionMappings: {
             type: 'object',
@@ -773,7 +775,8 @@ export const $SSOProviderSAMLConfiguration = {
         spSigningKeyEncrypted: {
             type: 'string',
             description: 'Encrypted Service Provider private key used for signing AuthnRequests',
-            nullable: true
+            nullable: true,
+            writeOnly: true
         },
         spSigningKeyEncryptionKeyId: {
             type: 'string',
@@ -1405,6 +1408,251 @@ export const $UpdateEmailTemplateDto = {
             description: 'MJML content of the email body'
         }
     }
+} as const;
+
+export const $AppSettingsDto = {
+    type: 'object',
+    properties: {
+        frontendUrl: {
+            type: 'string',
+            description: 'The frontend URL used for redirects and links.',
+            example: 'https://frontend.example',
+            nullable: true
+        },
+        backendUrl: {
+            type: 'string',
+            description: 'The backend/base URL used for callbacks and API links.',
+            example: 'https://api.example',
+            nullable: true
+        },
+        publicInternetUrl: {
+            type: 'string',
+            description: 'Optional public URL used for external callbacks (e.g., SumUp).',
+            example: 'https://public.example',
+            nullable: true
+        },
+        licenseKeyConfigured: {
+            type: 'boolean',
+            description: 'Whether a license key has been configured.',
+            example: true
+        }
+    },
+    required: ['frontendUrl', 'backendUrl', 'publicInternetUrl', 'licenseKeyConfigured']
+} as const;
+
+export const $SmtpServiceType = {
+    type: 'string',
+    enum: ['SMTP', 'Outlook365'],
+    description: 'Selected SMTP provider type.'
+} as const;
+
+export const $SmtpSettingsDto = {
+    type: 'object',
+    properties: {
+        service: {
+            description: 'Selected SMTP provider type.',
+            nullable: true,
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpServiceType'
+                }
+            ]
+        },
+        host: {
+            type: 'string',
+            description: 'SMTP host for direct SMTP connections.',
+            example: 'smtp.example.com',
+            nullable: true
+        },
+        port: {
+            type: 'number',
+            description: 'SMTP port for direct SMTP connections.',
+            example: 587,
+            nullable: true
+        },
+        secure: {
+            type: 'boolean',
+            description: 'Whether to use a secure SMTP connection.',
+            example: false,
+            nullable: true
+        },
+        user: {
+            type: 'string',
+            description: 'SMTP username.',
+            example: 'no-reply@example.com',
+            nullable: true
+        },
+        from: {
+            type: 'string',
+            description: 'Default FROM address for outgoing emails.',
+            example: 'no-reply@example.com',
+            nullable: true
+        },
+        passConfigured: {
+            type: 'boolean',
+            description: 'Whether an SMTP password has been configured.',
+            example: true
+        }
+    },
+    required: ['service', 'host', 'port', 'secure', 'user', 'from', 'passConfigured']
+} as const;
+
+export const $SystemSettingsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            description: 'Application settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/AppSettingsDto'
+                }
+            ]
+        },
+        smtp: {
+            description: 'SMTP settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpSettingsDto'
+                }
+            ]
+        }
+    },
+    required: ['app', 'smtp']
+} as const;
+
+export const $UpdateAppSettingsDto = {
+    type: 'object',
+    properties: {
+        frontendUrl: {
+            type: 'string',
+            description: 'Frontend URL used for redirects and links.',
+            example: 'https://frontend.example'
+        },
+        backendUrl: {
+            type: 'string',
+            description: 'Backend/base URL used for callbacks and API links.',
+            example: 'https://api.example'
+        },
+        publicInternetUrl: {
+            type: 'string',
+            description: 'Public URL used for external callbacks.',
+            example: 'https://public.example'
+        },
+        licenseKey: {
+            type: 'string',
+            description: 'License key to use for license validation.',
+            example: 'LICENSE_KEY'
+        }
+    }
+} as const;
+
+export const $UpdateSmtpSettingsDto = {
+    type: 'object',
+    properties: {
+        service: {
+            description: 'SMTP provider type. An email provider is required.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/SmtpServiceType'
+                }
+            ]
+        },
+        host: {
+            type: 'string',
+            description: 'SMTP host.',
+            example: 'smtp.example.com'
+        },
+        port: {
+            type: 'number',
+            description: 'SMTP port.',
+            example: 587
+        },
+        secure: {
+            type: 'boolean',
+            description: 'Whether to use a secure SMTP connection.',
+            example: false
+        },
+        user: {
+            type: 'string',
+            description: 'SMTP username.',
+            example: 'no-reply@example.com'
+        },
+        pass: {
+            type: 'string',
+            description: 'SMTP password.',
+            example: 'secret'
+        },
+        from: {
+            type: 'string',
+            description: 'Default FROM address.',
+            example: 'no-reply@example.com'
+        }
+    },
+    required: ['service', 'host', 'port', 'user', 'from']
+} as const;
+
+export const $UpdateSystemSettingsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            description: 'Application settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateAppSettingsDto'
+                }
+            ]
+        },
+        smtp: {
+            description: 'SMTP settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateSmtpSettingsDto'
+                }
+            ]
+        }
+    }
+} as const;
+
+export const $FirstTimeSetupStepsDto = {
+    type: 'object',
+    properties: {
+        app: {
+            type: 'boolean',
+            description: 'Whether the app settings step (URLs and license) is completed.',
+            example: true
+        },
+        smtp: {
+            type: 'boolean',
+            description: 'Whether the SMTP settings step is completed.',
+            example: false
+        },
+        admin: {
+            type: 'boolean',
+            description: 'Whether at least one admin user has been created.',
+            example: false
+        }
+    },
+    required: ['app', 'smtp', 'admin']
+} as const;
+
+export const $FirstTimeSetupStatusDto = {
+    type: 'object',
+    properties: {
+        available: {
+            type: 'boolean',
+            description: 'Whether first-time setup is still available (no users exist yet).',
+            example: true
+        },
+        stepsCompleted: {
+            description: 'Which wizard steps are already completed. Used to open the first incomplete step.',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/FirstTimeSetupStepsDto'
+                }
+            ]
+        }
+    },
+    required: ['available', 'stepsCompleted']
 } as const;
 
 export const $LicenseDataDto = {
@@ -2270,7 +2518,8 @@ export const $MqttServer = {
         password: {
             type: 'string',
             description: 'Optional authentication password',
-            example: 'password123'
+            example: 'password123',
+            writeOnly: true
         },
         clientId: {
             type: 'string',
@@ -2853,6 +3102,169 @@ export const $CreateMaintenanceDto = {
     required: ['startTime']
 } as const;
 
+export const $ResourceMaintenanceScheduleTriggerType = {
+    type: 'string',
+    enum: ['USAGE_HOURS', 'USAGE_COUNT', 'TIME_INTERVAL'],
+    description: 'The type of trigger for this schedule'
+} as const;
+
+export const $UsageDurationUnit = {
+    type: 'string',
+    enum: ['MINUTES', 'HOURS', 'DAYS'],
+    description: 'Unit for duration (MINUTES, HOURS, or DAYS)'
+} as const;
+
+export const $ResourceMaintenanceScheduleUsageHoursConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        duration: {
+            type: 'number',
+            description: 'Duration value (combined with unit) for usage threshold',
+            example: 100
+        },
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
+        }
+    },
+    required: ['id', 'scheduleId', 'duration', 'unit']
+} as const;
+
+export const $ResourceMaintenanceScheduleUsageCountConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        thresholdSessions: {
+            type: 'number',
+            description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)',
+            example: 50
+        }
+    },
+    required: ['id', 'scheduleId', 'thresholdSessions']
+} as const;
+
+export const $ResourceMaintenanceScheduleTimeIntervalConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Unique identifier',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule this config belongs to',
+            example: 1
+        },
+        duration: {
+            type: 'number',
+            description: 'Duration value (combined with unit)',
+            example: 30
+        },
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
+        }
+    },
+    required: ['id', 'scheduleId', 'duration', 'unit']
+} as const;
+
+export const $ResourceMaintenanceSchedule = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the maintenance schedule',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the schedule was created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the schedule was last updated'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource',
+            example: 1
+        },
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Config when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleUsageHoursConfig'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Config when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleUsageCountConfig'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Config when triggerType is TIME_INTERVAL',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTimeIntervalConfig'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled',
+            example: true,
+            default: true
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'triggerType', 'enabled']
+} as const;
+
 export const $ResourceMaintenance = {
     type: 'object',
     properties: {
@@ -2892,6 +3304,28 @@ export const $ResourceMaintenance = {
         reason: {
             type: 'string',
             description: 'The reason for the maintenance'
+        },
+        createdByUser: {
+            type: 'object',
+            description: 'The user who created/started the maintenance record'
+        },
+        completedByUser: {
+            type: 'object',
+            description: 'The user who marked the maintenance as done'
+        },
+        completedAt: {
+            type: 'string',
+            description: 'When the maintenance was marked as done',
+            nullable: true,
+            format: 'date-time'
+        },
+        maintenanceSchedule: {
+            description: 'The schedule that triggered this maintenance (null for manual)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceSchedule'
+                }
+            ]
         }
     },
     required: ['id', 'createdAt', 'updatedAt', 'resourceId', 'startTime']
@@ -2920,26 +3354,163 @@ export const $PaginatedMaintenanceResponse = {
     required: ['total', 'page', 'limit', 'data']
 } as const;
 
-export const $UpdateMaintenanceDto = {
+export const $FinishMaintenanceDto = {
     type: 'object',
     properties: {
-        startTime: {
+        notes: {
             type: 'string',
-            description: 'When the maintenance starts (must be in the future)',
-            format: 'date-time',
-            example: '2025-01-01T10:00:00.000Z'
+            description: 'Optional notes when marking the maintenance as done',
+            example: 'Replaced filter, cleaned nozzle'
+        }
+    }
+} as const;
+
+export const $UsageHoursTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        duration: {
+            type: 'number',
+            description: 'Duration value (combined with unit) for usage threshold',
+            example: 100,
+            minimum: 1
         },
-        endTime: {
-            type: 'string',
-            description: 'When the maintenance ends (optional)',
-            format: 'date-time',
-            example: '2025-01-01T18:00:00.000Z',
-            nullable: true
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
+        }
+    },
+    required: ['duration', 'unit']
+} as const;
+
+export const $UsageCountTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        thresholdSessions: {
+            type: 'number',
+            description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)',
+            example: 50,
+            minimum: 1
+        }
+    },
+    required: ['thresholdSessions']
+} as const;
+
+export const $TimeIntervalTriggerConfigDto = {
+    type: 'object',
+    properties: {
+        duration: {
+            type: 'number',
+            description: 'Duration value (combined with unit)',
+            example: 500,
+            minimum: 1
         },
-        reason: {
+        unit: {
+            description: 'Unit for duration (MINUTES, HOURS, or DAYS)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageDurationUnit'
+                }
+            ]
+        }
+    },
+    required: ['duration', 'unit']
+} as const;
+
+export const $CreateMaintenanceScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
             type: 'string',
-            description: 'The reason for the maintenance',
-            example: 'Scheduled maintenance for software updates'
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Required when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageHoursTriggerConfigDto'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Required when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageCountTriggerConfigDto'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Required when triggerType is TIME_INTERVAL (duration, unit, mode)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled',
+            example: true,
+            default: true
+        }
+    },
+    required: ['triggerType']
+} as const;
+
+export const $UpdateMaintenanceScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label for the schedule'
+        },
+        triggerType: {
+            description: 'The type of trigger for this schedule',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceMaintenanceScheduleTriggerType'
+                }
+            ]
+        },
+        usageHoursConfig: {
+            description: 'Required when triggerType is USAGE_HOURS',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageHoursTriggerConfigDto'
+                }
+            ]
+        },
+        usageCountConfig: {
+            description: 'Required when triggerType is USAGE_COUNT',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UsageCountTriggerConfigDto'
+                }
+            ]
+        },
+        timeIntervalConfig: {
+            description: 'Required when triggerType is TIME_INTERVAL (duration, unit, mode)',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/TimeIntervalTriggerConfigDto'
+                }
+            ]
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Whether the schedule is enabled'
         }
     }
 } as const;

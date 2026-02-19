@@ -18,6 +18,7 @@ import { join } from 'path';
 import { StorageConfigType } from './config/storage.config';
 import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { SettingsService } from './settings/settings.service';
 
 async function generateSelfSignedCertificates(storageDir: string, domain: string) {
   const ca = await createCA({
@@ -52,6 +53,8 @@ export async function bootstrap() {
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
+  const settingsService = appForConfig.get(SettingsService);
+  const backendUrlFromDb = await settingsService.getBackendUrl();
   await appForConfig.close();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
@@ -61,8 +64,12 @@ export async function bootstrap() {
 
   if (appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES) {
     const storageDir = storageConfig.root;
-
-    const host = appConfig.ATTRACCESS_URL;
+    const host = backendUrlFromDb ?? appConfig.ATTRACCESS_URL;
+    if (!host) {
+      throw new Error(
+        'Backend URL is required to generate self-signed certificates. Configure it in Settings or set ATTRACCESS_URL.',
+      );
+    }
     const hostUrl = new URL(host);
     const domain = hostUrl.hostname;
 
@@ -92,8 +99,20 @@ export async function bootstrap() {
 
   app.use(cookieParser());
 
+  const appSettingsService = app.get(SettingsService);
   app.enableCors({
-    origin: appConfig.ATTRACCESS_FRONTEND_URL,
+    origin: (origin, callback) => {
+      appSettingsService
+        .getFrontendUrl()
+        .then((frontendUrl) => {
+          if (!frontendUrl || !origin || origin === frontendUrl) {
+            callback(null, true);
+            return;
+          }
+          callback(new Error('Not allowed by CORS'));
+        })
+        .catch((error) => callback(error));
+    },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
     credentials: true, // Allow cookies to be sent

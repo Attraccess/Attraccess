@@ -23,7 +23,8 @@
         "emailTemplates": "E-Mail-Vorlagen",
         "mqttServers": "MQTT-Server",
         "csvExport": "CSV-Export",
-        "balena": "Balena"
+        "balena": "Balena",
+        "settings": "Einstellungen"
       }
     }
   },

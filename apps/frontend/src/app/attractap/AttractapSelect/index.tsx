@@ -6,6 +6,7 @@ interface Props {
   selection: number | null | undefined;
   onSelectionChange: (selection: number) => void;
   label?: string;
+  ariaLabel?: string;
   placeholder?: string;
   requiredCapabilities?: Partial<AttractapCapabilities>;
 }
@@ -39,6 +40,7 @@ export function AttractapSelect(props: Props) {
     <Select
       items={(connectedReaders ?? []).map((r) => ({ key: r.id.toString(), label: r.name }))}
       label={props.label}
+      aria-label={props.ariaLabel}
       placeholder={readers?.find((r) => r.id === props.selection)?.name ?? props.placeholder}
       selectedKey={props.selection ? props.selection.toString() : ''}
       onSelectionChange={(key) => props.onSelectionChange(Number(key))}

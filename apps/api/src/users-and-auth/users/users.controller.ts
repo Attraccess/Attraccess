@@ -67,6 +67,7 @@ import { EntityManager } from 'typeorm';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { SSOService } from '../auth/sso/sso.service';
 import { hasConfiguredPermissionMapping } from '../auth/sso/permission-mapping';
+import { TokenHashService } from '../../encryption/token-hash.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -81,6 +82,7 @@ export class UsersController {
     private readonly ssoService: SSOService,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
+    private readonly tokenHashService: TokenHashService,
   ) { }
 
   private mapEmailSendError(error: unknown): never {
@@ -690,7 +692,8 @@ export class UsersController {
       throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
 
-    if (user.passwordResetToken !== body.token) {
+    const expected = this.tokenHashService.hashToken(body.token);
+    if (user.passwordResetToken !== expected && user.passwordResetToken !== body.token) {
       this.logger.debug(`Invalid token for user ID: ${userId}`);
       throw new ForbiddenException('Invalid token');
     }

@@ -1,0 +1,22 @@
+{
+  "name": "Firmware Attractap Specialist",
+  "domain": "firmware-attractap",
+  "expertise": ["platformio", "esp32-c3", "esptool", "flash", "upload"],
+  "location": "apps/attractap-firmware",
+  "requirements": {
+    "python": "Python 3 and pip",
+    "tools": "PlatformIO Core, esptool (for manual flashing)"
+  },
+  "install": "python3 -m pip install --user -U platformio esptool (ensure ~/.local/bin in PATH on Linux)",
+  "verify": ["pio --version", "esptool.py --help"],
+  "build": "cd apps/attractap-firmware && pio run -e attractap",
+  "upload": "pio run -e attractap -t upload (device connected)",
+  "manual_flash": {
+    "command": "esptool.py --chip esp32c3 --port <PORT> --baud 921600 write_flash 0x0 merged-firmware.bin",
+    "ports": {
+      "linux": "/dev/ttyUSB0 or /dev/ttyACM0",
+      "macos": "/dev/tty.usbserial-*",
+      "windows": "COM3, COM4, etc."
+    }
+  }
+}

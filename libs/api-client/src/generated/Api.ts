@@ -77,6 +77,20 @@ export enum BillingTransactionStatus {
   Failed = "failed",
 }
 
+/** Unit for duration (MINUTES, HOURS, or DAYS) */
+export enum UsageDurationUnit {
+  MINUTES = "MINUTES",
+  HOURS = "HOURS",
+  DAYS = "DAYS",
+}
+
+/** The type of trigger for this schedule */
+export enum ResourceMaintenanceScheduleTriggerType {
+  USAGE_HOURS = "USAGE_HOURS",
+  USAGE_COUNT = "USAGE_COUNT",
+  TIME_INTERVAL = "TIME_INTERVAL",
+}
+
 /** The action performed (revoke or grant) */
 export enum IntroductionHistoryAction {
   Revoke = "revoke",
@@ -122,6 +136,12 @@ export enum DocumentationType {
 export enum ResourceType {
   Machine = "machine",
   Door = "door",
+}
+
+/** Selected SMTP provider type. */
+export enum SmtpServiceType {
+  SMTP = "SMTP",
+  Outlook365 = "Outlook365",
 }
 
 /** Template type/key used by the system */
@@ -242,6 +262,8 @@ export interface User {
    * @format date-time
    */
   deletedAt?: string;
+  /** Authentication details linked to the user */
+  authenticationDetails?: any[][];
   /**
    * The external (origin) identifier of the user, if the user is authenticated via SSO
    * @example "1234567890"
@@ -1056,6 +1078,164 @@ export interface UpdateEmailTemplateDto {
   subject?: string;
   /** MJML content of the email body */
   body?: string;
+}
+
+export interface AppSettingsDto {
+  /**
+   * The frontend URL used for redirects and links.
+   * @example "https://frontend.example"
+   */
+  frontendUrl: string | null;
+  /**
+   * The backend/base URL used for callbacks and API links.
+   * @example "https://api.example"
+   */
+  backendUrl: string | null;
+  /**
+   * Optional public URL used for external callbacks (e.g., SumUp).
+   * @example "https://public.example"
+   */
+  publicInternetUrl: string | null;
+  /**
+   * Whether a license key has been configured.
+   * @example true
+   */
+  licenseKeyConfigured: boolean;
+}
+
+export interface SmtpSettingsDto {
+  /** Selected SMTP provider type. */
+  service: SmtpServiceType | null;
+  /**
+   * SMTP host for direct SMTP connections.
+   * @example "smtp.example.com"
+   */
+  host: string | null;
+  /**
+   * SMTP port for direct SMTP connections.
+   * @example 587
+   */
+  port: number | null;
+  /**
+   * Whether to use a secure SMTP connection.
+   * @example false
+   */
+  secure: boolean | null;
+  /**
+   * SMTP username.
+   * @example "no-reply@example.com"
+   */
+  user: string | null;
+  /**
+   * Default FROM address for outgoing emails.
+   * @example "no-reply@example.com"
+   */
+  from: string | null;
+  /**
+   * Whether an SMTP password has been configured.
+   * @example true
+   */
+  passConfigured: boolean;
+}
+
+export interface SystemSettingsDto {
+  /** Application settings */
+  app: AppSettingsDto;
+  /** SMTP settings */
+  smtp: SmtpSettingsDto;
+}
+
+export interface UpdateAppSettingsDto {
+  /**
+   * Frontend URL used for redirects and links.
+   * @example "https://frontend.example"
+   */
+  frontendUrl?: string;
+  /**
+   * Backend/base URL used for callbacks and API links.
+   * @example "https://api.example"
+   */
+  backendUrl?: string;
+  /**
+   * Public URL used for external callbacks.
+   * @example "https://public.example"
+   */
+  publicInternetUrl?: string;
+  /**
+   * License key to use for license validation.
+   * @example "LICENSE_KEY"
+   */
+  licenseKey?: string;
+}
+
+export interface UpdateSmtpSettingsDto {
+  /** SMTP provider type. An email provider is required. */
+  service: SmtpServiceType;
+  /**
+   * SMTP host.
+   * @example "smtp.example.com"
+   */
+  host: string;
+  /**
+   * SMTP port.
+   * @example 587
+   */
+  port: number;
+  /**
+   * Whether to use a secure SMTP connection.
+   * @example false
+   */
+  secure?: boolean;
+  /**
+   * SMTP username.
+   * @example "no-reply@example.com"
+   */
+  user: string;
+  /**
+   * SMTP password.
+   * @example "secret"
+   */
+  pass?: string;
+  /**
+   * Default FROM address.
+   * @example "no-reply@example.com"
+   */
+  from: string;
+}
+
+export interface UpdateSystemSettingsDto {
+  /** Application settings update */
+  app?: UpdateAppSettingsDto;
+  /** SMTP settings update */
+  smtp?: UpdateSmtpSettingsDto;
+}
+
+export interface FirstTimeSetupStepsDto {
+  /**
+   * Whether the app settings step (URLs and license) is completed.
+   * @example true
+   */
+  app: boolean;
+  /**
+   * Whether the SMTP settings step is completed.
+   * @example false
+   */
+  smtp: boolean;
+  /**
+   * Whether at least one admin user has been created.
+   * @example false
+   */
+  admin: boolean;
+}
+
+export interface FirstTimeSetupStatusDto {
+  /**
+   * Whether first-time setup is still available (no users exist yet).
+   * @example true
+   */
+  available: boolean;
+  /** Which wizard steps are already completed. Used to open the first incomplete step. */
+  stepsCompleted: FirstTimeSetupStepsDto;
 }
 
 export interface LicenseDataDto {
@@ -1956,6 +2136,103 @@ export interface CreateMaintenanceDto {
   reason?: string;
 }
 
+export interface ResourceMaintenanceScheduleUsageHoursConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Duration value (combined with unit) for usage threshold
+   * @example 100
+   */
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface ResourceMaintenanceScheduleUsageCountConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Trigger after this many usage sessions (since last maintenance done for this schedule)
+   * @example 50
+   */
+  thresholdSessions: number;
+}
+
+export interface ResourceMaintenanceScheduleTimeIntervalConfig {
+  /**
+   * Unique identifier
+   * @example 1
+   */
+  id: number;
+  /**
+   * Schedule this config belongs to
+   * @example 1
+   */
+  scheduleId: number;
+  /**
+   * Duration value (combined with unit)
+   * @example 30
+   */
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface ResourceMaintenanceSchedule {
+  /**
+   * The unique identifier of the maintenance schedule
+   * @example 1
+   */
+  id: number;
+  /**
+   * When the schedule was created
+   * @format date-time
+   */
+  createdAt: string;
+  /**
+   * When the schedule was last updated
+   * @format date-time
+   */
+  updatedAt: string;
+  /**
+   * The ID of the resource
+   * @example 1
+   */
+  resourceId: number;
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType: ResourceMaintenanceScheduleTriggerType;
+  /** Config when triggerType is USAGE_HOURS */
+  usageHoursConfig?: ResourceMaintenanceScheduleUsageHoursConfig;
+  /** Config when triggerType is USAGE_COUNT */
+  usageCountConfig?: ResourceMaintenanceScheduleUsageCountConfig;
+  /** Config when triggerType is TIME_INTERVAL */
+  timeIntervalConfig?: ResourceMaintenanceScheduleTimeIntervalConfig;
+  /**
+   * Whether the schedule is enabled
+   * @default true
+   * @example true
+   */
+  enabled: boolean;
+}
+
 export interface ResourceMaintenance {
   /**
    * The unique identifier of the maintenance
@@ -1991,6 +2268,17 @@ export interface ResourceMaintenance {
   endTime?: string | null;
   /** The reason for the maintenance */
   reason?: string;
+  /** The user who created/started the maintenance record */
+  createdByUser?: object;
+  /** The user who marked the maintenance as done */
+  completedByUser?: object;
+  /**
+   * When the maintenance was marked as done
+   * @format date-time
+   */
+  completedAt?: string | null;
+  /** The schedule that triggered this maintenance (null for manual) */
+  maintenanceSchedule?: ResourceMaintenanceSchedule;
 }
 
 export interface PaginatedMaintenanceResponse {
@@ -2001,24 +2289,77 @@ export interface PaginatedMaintenanceResponse {
   data: ResourceMaintenance[];
 }
 
-export interface UpdateMaintenanceDto {
+export interface FinishMaintenanceDto {
   /**
-   * When the maintenance starts (must be in the future)
-   * @format date-time
-   * @example "2025-01-01T10:00:00.000Z"
+   * Optional notes when marking the maintenance as done
+   * @example "Replaced filter, cleaned nozzle"
    */
-  startTime?: string;
+  notes?: string;
+}
+
+export interface UsageHoursTriggerConfigDto {
   /**
-   * When the maintenance ends (optional)
-   * @format date-time
-   * @example "2025-01-01T18:00:00.000Z"
+   * Duration value (combined with unit) for usage threshold
+   * @min 1
+   * @example 100
    */
-  endTime?: string | null;
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface UsageCountTriggerConfigDto {
   /**
-   * The reason for the maintenance
-   * @example "Scheduled maintenance for software updates"
+   * Trigger after this many usage sessions (since last maintenance done for this schedule)
+   * @min 1
+   * @example 50
    */
-  reason?: string;
+  thresholdSessions: number;
+}
+
+export interface TimeIntervalTriggerConfigDto {
+  /**
+   * Duration value (combined with unit)
+   * @min 1
+   * @example 500
+   */
+  duration: number;
+  /** Unit for duration (MINUTES, HOURS, or DAYS) */
+  unit: UsageDurationUnit;
+}
+
+export interface CreateMaintenanceScheduleDto {
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType: ResourceMaintenanceScheduleTriggerType;
+  /** Required when triggerType is USAGE_HOURS */
+  usageHoursConfig?: UsageHoursTriggerConfigDto;
+  /** Required when triggerType is USAGE_COUNT */
+  usageCountConfig?: UsageCountTriggerConfigDto;
+  /** Required when triggerType is TIME_INTERVAL (duration, unit, mode) */
+  timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+  /**
+   * Whether the schedule is enabled
+   * @default true
+   * @example true
+   */
+  enabled?: boolean;
+}
+
+export interface UpdateMaintenanceScheduleDto {
+  /** Optional human-readable label for the schedule */
+  name?: string;
+  /** The type of trigger for this schedule */
+  triggerType?: ResourceMaintenanceScheduleTriggerType;
+  /** Required when triggerType is USAGE_HOURS */
+  usageHoursConfig?: UsageHoursTriggerConfigDto;
+  /** Required when triggerType is USAGE_COUNT */
+  usageCountConfig?: UsageCountTriggerConfigDto;
+  /** Required when triggerType is TIME_INTERVAL (duration, unit, mode) */
+  timeIntervalConfig?: TimeIntervalTriggerConfigDto;
+  /** Whether the schedule is enabled */
+  enabled?: boolean;
 }
 
 export interface BalanceDto {
@@ -3415,6 +3756,14 @@ export type EmailTemplateControllerFindOneData = EmailTemplate;
 
 export type EmailTemplateControllerUpdateData = EmailTemplate;
 
+export type GetSystemSettingsData = SystemSettingsDto;
+
+export type UpdateSystemSettingsData = SystemSettingsDto;
+
+export type GetFirstTimeSetupStatusData = FirstTimeSetupStatusDto;
+
+export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
+
 export type GetLicenseInformationData = LicenseDataDto;
 
 export type CreateOneResourceData = Resource;
@@ -3604,9 +3953,17 @@ export type FindMaintenancesData = PaginatedMaintenanceResponse;
 
 export type GetMaintenanceData = ResourceMaintenance;
 
-export type UpdateMaintenanceData = ResourceMaintenance;
+export type FinishMaintenanceData = ResourceMaintenance;
 
-export type CancelMaintenanceData = any;
+export type FindMaintenanceSchedulesData = ResourceMaintenanceSchedule[];
+
+export type CreateMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type GetMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type UpdateMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export type DeleteMaintenanceScheduleData = any;
 
 export type GetBillingBalanceData = BalanceDto;
 
@@ -4970,6 +5327,70 @@ export namespace EmailTemplates {
   }
 }
 
+export namespace Settings {
+  /**
+   * No description
+   * @tags Settings
+   * @name GetSystemSettings
+   * @summary Get system settings
+   * @request GET:/api/settings
+   * @secure
+   */
+  export namespace GetSystemSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetSystemSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name UpdateSystemSettings
+   * @summary Update system settings
+   * @request PATCH:/api/settings
+   * @secure
+   */
+  export namespace UpdateSystemSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateSystemSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateSystemSettingsData;
+  }
+
+  /**
+   * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
+   * @tags Settings
+   * @name GetFirstTimeSetupStatus
+   * @summary Get first-time setup status
+   * @request GET:/api/settings/first-time-setup
+   */
+  export namespace GetFirstTimeSetupStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetFirstTimeSetupStatusData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name ApplyFirstTimeSetupSettings
+   * @summary Apply first-time setup settings
+   * @request POST:/api/settings/first-time-setup
+   */
+  export namespace ApplyFirstTimeSetupSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateSystemSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ApplyFirstTimeSetupSettingsData;
+  }
+}
+
 export namespace License {
   /**
    * No description
@@ -5952,14 +6373,14 @@ export namespace ResourceMaintenances {
   }
 
   /**
-   * @description Update a maintenance with new start time, end time, and/or reason
+   * @description Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.
    * @tags Resource Maintenances
-   * @name UpdateMaintenance
-   * @summary Update a maintenance
-   * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @name FinishMaintenance
+   * @summary Mark a maintenance as done
+   * @request POST:/api/resources/{resourceId}/maintenances/{maintenanceId}/finish
    * @secure
    */
-  export namespace UpdateMaintenance {
+  export namespace FinishMaintenance {
     export type RequestParams = {
       /** The ID of the resource */
       resourceId: number;
@@ -5967,30 +6388,112 @@ export namespace ResourceMaintenances {
       maintenanceId: number;
     };
     export type RequestQuery = {};
-    export type RequestBody = UpdateMaintenanceDto;
+    export type RequestBody = FinishMaintenanceDto;
     export type RequestHeaders = {};
-    export type ResponseBody = UpdateMaintenanceData;
+    export type ResponseBody = FinishMaintenanceData;
   }
+}
 
+export namespace ResourceMaintenanceSchedules {
   /**
-   * @description Delete a maintenance (cancel it)
-   * @tags Resource Maintenances
-   * @name CancelMaintenance
-   * @summary Cancel a maintenance
-   * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+   * @description Get all maintenance schedules for the given resource
+   * @tags Resource Maintenance Schedules
+   * @name FindMaintenanceSchedules
+   * @summary List maintenance schedules for a resource
+   * @request GET:/api/resources/{resourceId}/maintenance-schedules
    * @secure
    */
-  export namespace CancelMaintenance {
+  export namespace FindMaintenanceSchedules {
     export type RequestParams = {
-      /** The ID of the resource */
+      /** Resource ID */
       resourceId: number;
-      /** The ID of the maintenance */
-      maintenanceId: number;
     };
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = CancelMaintenanceData;
+    export type ResponseBody = FindMaintenanceSchedulesData;
+  }
+
+  /**
+   * @description Create a new maintenance schedule for the resource
+   * @tags Resource Maintenance Schedules
+   * @name CreateMaintenanceSchedule
+   * @summary Create a maintenance schedule
+   * @request POST:/api/resources/{resourceId}/maintenance-schedules
+   * @secure
+   */
+  export namespace CreateMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CreateMaintenanceScheduleDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Get a single maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name GetMaintenanceSchedule
+   * @summary Get a maintenance schedule by ID
+   * @request GET:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace GetMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Update an existing maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name UpdateMaintenanceSchedule
+   * @summary Update a maintenance schedule
+   * @request PUT:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace UpdateMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = UpdateMaintenanceScheduleDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = UpdateMaintenanceScheduleData;
+  }
+
+  /**
+   * @description Delete a maintenance schedule
+   * @tags Resource Maintenance Schedules
+   * @name DeleteMaintenanceSchedule
+   * @summary Delete a maintenance schedule
+   * @request DELETE:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+   * @secure
+   */
+  export namespace DeleteMaintenanceSchedule {
+    export type RequestParams = {
+      /** Resource ID */
+      resourceId: number;
+      /** Schedule ID */
+      scheduleId: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteMaintenanceScheduleData;
   }
 }
 
@@ -8715,6 +9218,85 @@ export class Api<
         ...params,
       }),
   };
+  settings = {
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetSystemSettings
+     * @summary Get system settings
+     * @request GET:/api/settings
+     * @secure
+     */
+    getSystemSettings: (params: RequestParams = {}) =>
+      this.request<GetSystemSettingsData, void>({
+        path: `/api/settings`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name UpdateSystemSettings
+     * @summary Update system settings
+     * @request PATCH:/api/settings
+     * @secure
+     */
+    updateSystemSettings: (
+      data: UpdateSystemSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateSystemSettingsData, void>({
+        path: `/api/settings`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Returns whether first-time setup is available and which wizard steps are already completed. Unauthenticated.
+     *
+     * @tags Settings
+     * @name GetFirstTimeSetupStatus
+     * @summary Get first-time setup status
+     * @request GET:/api/settings/first-time-setup
+     */
+    getFirstTimeSetupStatus: (params: RequestParams = {}) =>
+      this.request<GetFirstTimeSetupStatusData, any>({
+        path: `/api/settings/first-time-setup`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name ApplyFirstTimeSetupSettings
+     * @summary Apply first-time setup settings
+     * @request POST:/api/settings/first-time-setup
+     */
+    applyFirstTimeSetupSettings: (
+      data: UpdateSystemSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ApplyFirstTimeSetupSettingsData, void>({
+        path: `/api/settings/first-time-setup`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
   license = {
     /**
      * No description
@@ -9732,22 +10314,115 @@ export class Api<
       }),
 
     /**
-     * @description Update a maintenance with new start time, end time, and/or reason
+     * @description Finish an active maintenance (set end time, completedAt, completedBy). Only maintenance users can call this.
      *
      * @tags Resource Maintenances
-     * @name UpdateMaintenance
-     * @summary Update a maintenance
-     * @request PUT:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @name FinishMaintenance
+     * @summary Mark a maintenance as done
+     * @request POST:/api/resources/{resourceId}/maintenances/{maintenanceId}/finish
      * @secure
      */
-    updateMaintenance: (
+    finishMaintenance: (
       resourceId: number,
       maintenanceId: number,
-      data: UpdateMaintenanceDto,
+      data: FinishMaintenanceDto,
       params: RequestParams = {},
     ) =>
-      this.request<UpdateMaintenanceData, void>({
-        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+      this.request<FinishMaintenanceData, void>({
+        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}/finish`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
+  resourceMaintenanceSchedules = {
+    /**
+     * @description Get all maintenance schedules for the given resource
+     *
+     * @tags Resource Maintenance Schedules
+     * @name FindMaintenanceSchedules
+     * @summary List maintenance schedules for a resource
+     * @request GET:/api/resources/{resourceId}/maintenance-schedules
+     * @secure
+     */
+    findMaintenanceSchedules: (
+      resourceId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<FindMaintenanceSchedulesData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Create a new maintenance schedule for the resource
+     *
+     * @tags Resource Maintenance Schedules
+     * @name CreateMaintenanceSchedule
+     * @summary Create a maintenance schedule
+     * @request POST:/api/resources/{resourceId}/maintenance-schedules
+     * @secure
+     */
+    createMaintenanceSchedule: (
+      resourceId: number,
+      data: CreateMaintenanceScheduleDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CreateMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get a single maintenance schedule
+     *
+     * @tags Resource Maintenance Schedules
+     * @name GetMaintenanceSchedule
+     * @summary Get a maintenance schedule by ID
+     * @request GET:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+     * @secure
+     */
+    getMaintenanceSchedule: (
+      resourceId: number,
+      scheduleId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Update an existing maintenance schedule
+     *
+     * @tags Resource Maintenance Schedules
+     * @name UpdateMaintenanceSchedule
+     * @summary Update a maintenance schedule
+     * @request PUT:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
+     * @secure
+     */
+    updateMaintenanceSchedule: (
+      resourceId: number,
+      scheduleId: number,
+      data: UpdateMaintenanceScheduleDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<UpdateMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
         method: "PUT",
         body: data,
         secure: true,
@@ -9757,21 +10432,21 @@ export class Api<
       }),
 
     /**
-     * @description Delete a maintenance (cancel it)
+     * @description Delete a maintenance schedule
      *
-     * @tags Resource Maintenances
-     * @name CancelMaintenance
-     * @summary Cancel a maintenance
-     * @request DELETE:/api/resources/{resourceId}/maintenances/{maintenanceId}
+     * @tags Resource Maintenance Schedules
+     * @name DeleteMaintenanceSchedule
+     * @summary Delete a maintenance schedule
+     * @request DELETE:/api/resources/{resourceId}/maintenance-schedules/{scheduleId}
      * @secure
      */
-    cancelMaintenance: (
+    deleteMaintenanceSchedule: (
       resourceId: number,
-      maintenanceId: number,
+      scheduleId: number,
       params: RequestParams = {},
     ) =>
-      this.request<CancelMaintenanceData, void>({
-        path: `/api/resources/${resourceId}/maintenances/${maintenanceId}`,
+      this.request<DeleteMaintenanceScheduleData, void>({
+        path: `/api/resources/${resourceId}/maintenance-schedules/${scheduleId}`,
         method: "DELETE",
         secure: true,
         ...params,

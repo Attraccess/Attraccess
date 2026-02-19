@@ -1,5 +1,5 @@
-import React, { ReactElement } from 'react';
-import { TableColumn } from '@heroui/react';
+import { type ReactElement } from 'react';
+import { TableColumn, type TableColumnProps, type TableHeaderProps } from '@heroui/react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { Resource } from '@attraccess/react-query-client';
 
@@ -11,8 +11,8 @@ export function generateHeaderColumns(
   resource: Resource,
   showAllUsers: boolean,
   canManageResources: boolean,
-): ReactElement[] {
-  const headers: ReactElement[] = [];
+): TableHeaderProps<unknown>['children'] {
+  const headers: ReactElement<TableColumnProps<unknown>>[] = [];
 
   // Only show user column if we're showing all users (requires canManageResources)
   if (canManageResources && showAllUsers) {

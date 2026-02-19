@@ -12,6 +12,7 @@ import {
   MailIcon,
   NfcIcon,
   PackageIcon,
+  Settings2Icon,
   ServerIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -101,6 +102,11 @@ export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
           path: '/email-templates',
           translationKey: 'emailTemplates',
           icon: MailIcon,
+        },
+        {
+          path: '/settings',
+          translationKey: 'settings',
+          icon: Settings2Icon,
         },
         {
           path: '/csv-export',
