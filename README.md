@@ -15,6 +15,30 @@ A comprehensive resource management system for tracking and managing access to s
 
 If you are looking for user documentation, take a look at https://docs.attraccess.org
 
+## Developer Setup (full environment)
+
+To run `pnpm precommit:all` and `pnpm services` (Docker dev services), you need:
+
+| Dependency | Purpose |
+|------------|---------|
+| **Docker** | `pnpm services` – mailpit, authentik, keycloak, etc. |
+| **Node.js** ≥20.10 | From `.nvmrc` (v24.13) |
+| **pnpm** ≥8 | Package manager |
+| **Python 3 + pip** | For PlatformIO |
+| **PlatformIO + esptool** | Firmware build (attractap-firmware) |
+
+**Quick setup:**
+
+```bash
+./scripts/setup-dev-dependencies.sh
+```
+
+This installs Node (via nvm if needed), pnpm, and project deps. You must install **Docker** and **pip/PlatformIO** manually if missing:
+
+- **Docker:** `curl -fsSL https://get.docker.com | sh` then `sudo usermod -aG docker $USER` (log out/in)
+- **pip:** `sudo apt install python3-pip`
+- **PlatformIO:** `pip3 install --user platformio esptool` (ensure `~/.local/bin` in PATH)
+
 ## Installation
 
 1. Clone the repository
