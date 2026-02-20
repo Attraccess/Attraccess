@@ -5,7 +5,8 @@
 #   COOLIFY_API_TOKEN - API token from Coolify Security → API Tokens
 #
 # Optional variables:
-#   COOLIFY_APP_NAME  - Application name in Coolify (default: attraccess)
+#   COOLIFY_APP_NAME     - Application name in Coolify (default: attraccess)
+#   DEPLOY_ALLOWED_USERS - Comma-separated GitHub usernames who may trigger (required)
 #
 # Usage:
 #   - From PR: comment "/deploy" on the PR to trigger deployment
@@ -28,7 +29,7 @@ permissions:
   issues: read
 
 jobs:
-  # Only run when: manual trigger, or comment "/deploy" on a PR
+  # Only run when: allowed user + (manual trigger, or comment "/deploy" on a PR)
   filter:
     runs-on: ubuntu-latest
     outputs:
@@ -37,7 +38,26 @@ jobs:
     steps:
       - name: Filter
         id: filter
+        env:
+          DEPLOY_ALLOWED_USERS: ${{ vars.DEPLOY_ALLOWED_USERS }}
         run: |
+          ALLOWED="$DEPLOY_ALLOWED_USERS"
+          if [ -z "$ALLOWED" ]; then
+            echo "::error::DEPLOY_ALLOWED_USERS variable is not set. Add it in repo Settings → Variables."
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ACTOR="${{ github.actor }}"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            ACTOR="${{ github.event.comment.user.login }}"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if ! echo ",$ALLOWED," | grep -q ",$ACTOR,"; then
+            echo "::error::User $ACTOR is not allowed to trigger deployment. Allowed: $ALLOWED"
+            exit 1
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "pr_number=${{ inputs.pr_number }}" >> $GITHUB_OUTPUT
             echo "should_run=true" >> $GITHUB_OUTPUT
@@ -52,8 +72,6 @@ jobs:
             fi
             echo "pr_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
             echo "should_run=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
   deploy:
