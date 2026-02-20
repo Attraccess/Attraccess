@@ -32,7 +32,7 @@ import { Request, Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
-import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
+import { getRedirectToFromRequest } from './oidc/oidc-cookie-state-store';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
 import { SSOSamlGuard } from './saml/saml.guard';
@@ -627,10 +627,10 @@ export class SSOController {
     @Query('redirectTo') redirectToQuery: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
-    // redirectTo comes from OIDC state param (fixed callback URI); fallback to query for backward compat
-    const redirectTo =
-      (request as unknown as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] as string | undefined ??
-      redirectToQuery;
+    const redirectTo = getRedirectToFromRequest(
+      request as unknown as Record<string, unknown>,
+      redirectToQuery,
+    );
     return this.finalizeLogin(request, response, redirectTo);
   }
 
