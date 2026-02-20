@@ -7,6 +7,9 @@ import { AppConfigType } from '../../../../config/app.config';
 
 export const OIDC_STATE_COOKIE_NAME = 'oidc-state';
 
+/** Request key where redirectTo from OIDC state is attached after callback verification. */
+export const SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY = '_ssoOidcRedirectFromState';
+
 /** How long (ms) the oidc-state cookie is valid — enough to complete the IdP login flow. */
 const OIDC_STATE_COOKIE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -151,6 +154,11 @@ export class OidcCookieStateStore {
       maxAge: payload.ctx.maxAge,
       issued: payload.ctx.issued ? new Date(payload.ctx.issued) : undefined,
     };
+
+    if (payload.appState && typeof payload.appState === 'object' && 'redirectTo' in (payload.appState as object)) {
+      (req as unknown as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] =
+        (payload.appState as { redirectTo?: string }).redirectTo;
+    }
 
     cb(null, ctx, payload.appState);
   }

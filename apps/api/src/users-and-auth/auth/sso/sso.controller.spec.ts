@@ -17,6 +17,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { LicenseService } from '../../../license/license.service';
 import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
+import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-state-store';
 
 describe('SsoController', () => {
   let controller: SSOController;
@@ -440,6 +441,21 @@ describe('SsoController', () => {
       expect(mockResponse.cookie).not.toHaveBeenCalled();
       expect(mockResponse.redirect).toHaveBeenCalledWith(
         expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user))),
+      );
+    });
+
+    it('should prefer redirectTo from OIDC state over query param (fixed callback URI)', async () => {
+      const redirectFromState = 'https://app.example.com/from-state';
+      (mockRequest as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] = redirectFromState;
+
+      await controller.oidcLoginCallback(
+        mockRequest as unknown as AuthenticatedRequest,
+        'https://app.example.com/from-query',
+        mockResponse as unknown as Response,
+      );
+
+      expect(mockResponse.redirect).toHaveBeenCalledWith(
+        expect.stringContaining(redirectFromState),
       );
     });
   });

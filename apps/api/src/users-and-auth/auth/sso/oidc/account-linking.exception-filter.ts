@@ -2,6 +2,7 @@ import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { SSOLinkTokenService } from '../link-token.service';
+import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc-cookie-state-store';
 
 @Catch(AccountLinkingRequiredException)
 export class AccountLinkingExceptionFilter implements ExceptionFilter {
@@ -16,8 +17,10 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
 
     this.logger.log(`Account linking required for email: ${exception.email}`);
 
-    // Get the original redirectTo from query params
-    const redirectTo = request.query.redirectTo as string;
+    // redirectTo from OIDC state param (fixed callback URI) or query (SAML/legacy)
+    const redirectTo =
+      (request as unknown as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] as string | undefined ??
+      (request.query.redirectTo as string | undefined);
     this.logger.debug('Original query: ', request.query);
 
     if (redirectTo) {
