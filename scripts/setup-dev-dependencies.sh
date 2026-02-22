@@ -149,9 +149,13 @@ install_python() {
             sudo apt-get update
             sudo apt-get install -y python3 python3-pip python3-venv
         else
-            echo "  Please install Python 3 manually"
+            echo "  Please install Python 3 manually for your distribution ($ID)"
             return 1
         fi
+    else
+        echo "Could not detect OS (missing /etc/os-release)."
+        echo "  Please install Python 3 manually and ensure 'python3' is on your PATH."
+        return 1
     fi
 }
 
