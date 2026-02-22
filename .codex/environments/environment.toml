@@ -4,3 +4,11 @@ name = "Attraccess"
 
 [setup]
 script = "pnpm install"
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = '''
+pnpm install
+pnpm nx run-many -t serve --projects=api,frontend
+'''
