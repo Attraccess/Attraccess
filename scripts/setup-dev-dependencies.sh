@@ -98,7 +98,38 @@ check_pnpm() {
 
 install_pnpm() {
     echo "Installing pnpm..."
-    npm install -g pnpm
+
+    # Prefer corepack if available
+    if command -v corepack &>/dev/null; then
+        echo "Using corepack to enable pnpm..."
+        if corepack enable pnpm; then
+            if command -v pnpm &>/dev/null; then
+                echo "✓ pnpm $(pnpm -v) is installed via corepack"
+                return 0
+            else
+                echo "Warning: 'corepack enable pnpm' completed but pnpm is not on PATH." >&2
+            fi
+        else
+            echo "Warning: Failed to enable pnpm via corepack, will try npm if available." >&2
+        fi
+    fi
+
+    # Fallback to npm global install if npm is available
+    if command -v npm &>/dev/null; then
+        echo "Falling back to npm to install pnpm globally..."
+        if npm install -g pnpm; then
+            echo "✓ pnpm $(pnpm -v) is installed via npm"
+            return 0
+        else
+            echo "Error: npm failed to install pnpm globally." >&2
+            return 1
+        fi
+    fi
+
+    # Neither corepack nor npm is available
+    echo "Error: Neither 'corepack' nor 'npm' is available on PATH; cannot install pnpm." >&2
+    echo "Please install npm or enable corepack for your Node.js installation and re-run this script." >&2
+    return 1
 }
 
 # --- Python ---
