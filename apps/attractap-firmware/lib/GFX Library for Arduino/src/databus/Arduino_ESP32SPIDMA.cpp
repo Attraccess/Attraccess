@@ -60,7 +60,11 @@ bool Arduino_ESP32SPIDMA::begin(int32_t speed, int8_t dataMode)
 
   if (!_div)
   {
+#if CONFIG_IDF_TARGET_ESP32P4
+    _div = spiFrequencyToClockDiv(nullptr, (uint32_t)_speed);
+#else
     _div = spiFrequencyToClockDiv(_speed);
+#endif
   }
 
   // set pin mode
