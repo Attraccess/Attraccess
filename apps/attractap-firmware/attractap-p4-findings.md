@@ -5,6 +5,23 @@ Ref: [Reddit thread](https://www.reddit.com/r/homeassistant/s/7yXRVO9815), [esph
 
 ---
 
+## POC vs Full Application
+
+**Status: POC (proof of concept).** Display and touch work, but this is not the full Attractap application.
+
+| POC (current) | Full application |
+|---------------|------------------|
+| `main_p4.cpp` – minimal entry | `main.cpp` – full app entry |
+| `display_p4.cpp` + `display_p4.hpp` – P4-only display | `display.cpp` – full display with all screens |
+| Boot screen only | Application, API, network, NFC, etc. |
+| Excluded: application/, api/, network/, nfc/, most screens | All of the above included |
+
+**Build filter** excludes `main.cpp` and `display.cpp`; includes `main_p4.cpp` and `display_p4.cpp`. Many screens and modules are excluded.
+
+**Next step:** Merge P4 support into the full app – unify display.cpp to support P4 DSI driver via build flags, switch main entry by target, re-enable application/network/etc for P4.
+
+---
+
 ## Status
 
 **Serial:** Working (ARDUINO_USB_MODE=1 → HWCDCSerial)  
@@ -66,10 +83,12 @@ User must be in `dialout` for serial: `sudo usermod -a -G dialout $USER`
 
 | File | Purpose |
 |------|---------|
-| `platformio.ini` | `[env:attractap-p4]` |
-| `src/main_p4.cpp` | P4 entry point |
-| `src/display/display_p4.cpp` | P4 display + boot screen |
-| `src/display/driver/p4_dsi/p4_dsi_gt911_driver.cpp` | DSI + GT911 |
-| `include/display_p4.hpp` | P4 display header |
+| `platformio.ini` | `[env:attractap-p4]` + build_src_filter |
+| `src/main_p4.cpp` | **POC** – alternate main (replaces main.cpp) |
+| `src/display/display_p4.cpp` | **POC** – alternate display (replaces display.cpp) |
+| `include/display_p4.hpp` | **POC** – P4 display header |
+| `src/display/driver/p4_dsi/` | **Reusable** – DSI + GT911 driver (to merge into full app) |
 | `lib/GFX Library for Arduino/.../Arduino_ESP32SPIDMA.cpp` | ESP32-P4 SPI fix |
 | `tools/patch_esp32p4_toolchain.py` | RISC-V toolchain patch |
+
+**Actual application code** (excluded in POC): `main.cpp`, `display.cpp`, `application/`, `api/`, `network/`, `nfc/`, most screens.
