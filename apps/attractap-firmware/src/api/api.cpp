@@ -220,13 +220,19 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
 
     this->logger.info("Starting OTA firmware update");
 
+    // Set inProgress immediately to suppress heartbeats and avoid WebSocket send contention.
+    // processIncomingMessage runs in the WebSocket task; the main loop runs in a different task.
+    // Without this, sendHeartbeat could run concurrently and fail (esp_websocket_client_send_text
+    // returns -1 when called from multiple tasks or during heavy receive processing).
+    this->ota.inProgress = true;
+
     this->ota.totalSize = firmwareMeta["totalSize"].is<uint32_t>() ? firmwareMeta["totalSize"].as<uint32_t>() : 0;
     this->ota.bytesWritten = 0;
-    this->ota.inProgress = false;
 
     if (this->ota.totalSize == 0)
     {
         this->logger.error("Invalid firmware meta (totalSize)");
+        this->ota.inProgress = false;
         return;
     }
 
@@ -234,15 +240,16 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
     if (!this->ota.updatePartition)
     {
         this->logger.error("OTA: no update partition found");
+        this->ota.inProgress = false;
         return;
     }
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)
     {
         this->logger.error((String("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
+        this->ota.inProgress = false;
         return;
     }
-    this->ota.inProgress = true;
     this->ota.lastReportedPercent = -1;
 
     String availableVersion = firmwareMeta["version"].as<String>();

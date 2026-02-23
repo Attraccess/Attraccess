@@ -91,6 +91,29 @@ The GitHub Actions workflow:
 
 The manifest.json file contains the necessary information for ESP Web Tools to install the firmware, including the URL to the firmware binary and the chip family (ESP32-C3).
 
+## Attractap Lite LED Animations
+
+The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
+
+### LED States (for developers)
+
+| State | Color | When used |
+|-------|-------|-----------|
+| `LED_STATE_CONFIG_REQUIRED` | Orange | Device needs configuration |
+| `LED_STATE_INIT` | Blue | Booting / connecting |
+| `LED_STATE_WAIT_FOR_CARD` | Green | Ready for card tap |
+| `LED_STATE_AUTHENTICATE_CARD` | Cyan | Card being read |
+| `LED_STATE_NO_RESOURCES` | Orange | No resources assigned |
+| `LED_STATE_FIRMWARE_UPDATE` | Rainbow | Firmware update in progress |
+
+### LED Triggers
+
+| Trigger | Color | When used |
+|---------|-------|-----------|
+| `triggerSuccess()` | Green | Auth succeeded |
+| `triggerError()` | Red flash | Auth failed |
+| `triggerIndicate()` | Yellow flash | Card held too long |
+
 ## License
 
 [Specify your license here]
