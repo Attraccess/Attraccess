@@ -1,7 +1,41 @@
 # P4 Merge Plan – Handoff for Next Phase
 
-**Last updated:** After Phase 1 completion  
-**Next phase:** Phase 2 – Unify Main Entry Point
+**Last updated:** After Phase 2 completion  
+**Next phase:** Phase 3 – Re-enable Full Application for P4
+
+---
+
+## Phase 2 Status: COMPLETE
+
+Phase 2 has been implemented.
+
+### What Was Done
+
+1. **`src/main.cpp`** – Added conditional minimal mode:
+   - When `DISPLAY_DRIVER_P4_DSI` is defined and `ATTACTAP_P4_FULL_APP` is not set: minimal flow (Wire init, `Display::setup()`, `Display::loop()`) using `display_p4.hpp`
+   - Else: full application flow (unchanged)
+
+2. **`platformio.ini`** – [env:attractap-p4] `build_src_filter`:
+   - Removed `-<main.cpp>`
+   - Added `-<main_p4.cpp>`
+
+P4 now uses `main.cpp` instead of `main_p4.cpp`. The minimal branch matches the former `main_p4.cpp` behavior.
+
+### Verification Steps
+
+1. **Build:** `pio run -e attractap-p4` (and attractap-touch, attractap-touch-ethernet)
+2. **Flash:** `pio run -e attractap-p4 -t upload`
+3. **Serial:** Use Python script from "How to Get Serial Logs" below; expect same boot sequence as Phase 1
+4. **Visual:** BootScreen should show "Attraccess" and "Attractap P4 v1.2.1"; touch should work
+5. **Snapshot:** `./scripts/snapshot.sh` if available
+
+### Verification Results (Phase 2)
+
+- **Build:** All three envs build successfully
+- **Upload:** Verified on ESP32-P4 (USB-Serial-JTAG on /dev/ttyACM0)
+- **Serial:** Boot sequence matches expected output; main.cpp minimal branch confirmed
+- **Display:** BootScreen shows black background with "Attraccess" and version in white (centered) – expected
+- **Stuck on BootScreen:** Expected. Minimal build excludes Application and all other screens; BootScreen is the only screen. Phase 3 will re-enable full app flow.
 
 ---
 
@@ -149,13 +183,12 @@ EOF
 
 ---
 
-## Current State for Phase 2
+## Current State for Phase 3
 
-- **P4 build uses:** `main_p4.cpp`, `display_p4.cpp` (excludes `main.cpp`, `display.cpp`)
+- **P4 build uses:** `main.cpp` (minimal branch), `display_p4.cpp` (excludes `main_p4.cpp`, `display.cpp`)
 - **P4 shows:** BootScreen only; display and touch work
-- **`display.cpp`:** Contains P4 driver branch (ready for Phase 3)
-
-Phase 2 will switch P4 to use `main.cpp` instead of `main_p4.cpp`, with minimal mode (Wire init, Display::setup, Display::loop) when `DISPLAY_DRIVER_P4_DSI` is defined and the full Application is excluded.
+- **`display.cpp`:** Contains P4 driver branch (ready for Phase 3 display unification)
+- **`main_p4.cpp`:** Still present but excluded from P4 build; will be deleted in Phase 4
 
 ---
 
