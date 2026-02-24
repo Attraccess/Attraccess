@@ -2,6 +2,8 @@
 
 Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support into the main Attractap application. This document is intended for a future developer or agent to execute the merge without prior context.
 
+**Handoff doc (Phase 1 complete):** See `P4_HANDOFF.md` for current status, serial log instructions, and stability notes.
+
 ---
 
 ## Overview

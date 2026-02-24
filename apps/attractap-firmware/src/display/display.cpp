@@ -6,6 +6,9 @@
 #if defined(DISPLAY_DRIVER_QUALIA)
 #include "driver/qualia/qualia_ft_cst_driver.hpp"
 #endif
+#if defined(DISPLAY_DRIVER_P4_DSI)
+#include "driver/p4_dsi/p4_dsi_gt911_driver.hpp"
+#endif
 
 // Static member definitions
 Logger Display::logger("Display");
@@ -123,6 +126,8 @@ void Display::setup()
     Display::driver = new RgbGt911Driver(Display::logger);
 #elif defined(DISPLAY_DRIVER_QUALIA)
     Display::driver = new QualiaFtCstDriver(Display::logger);
+#elif defined(DISPLAY_DRIVER_P4_DSI)
+    Display::driver = new P4DsiGt911Driver(Display::logger);
 #else
     Display::driver = nullptr;
 #endif
