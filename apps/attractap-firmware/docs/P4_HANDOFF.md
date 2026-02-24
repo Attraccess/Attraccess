@@ -1,7 +1,40 @@
 # P4 Merge Plan – Handoff for Next Phase
 
-**Last updated:** After Phase 3 completion  
-**Next phase:** Phase 4 – Remove P4 Alternate Files and Document
+**Last updated:** After Phase 4 completion  
+**Next phase:** Phase 5 – WiFi via ESP-Hosted (C6)
+
+---
+
+## Phase 4 Status: COMPLETE
+
+Phase 4 has been implemented.
+
+### What Was Done
+
+1. **Deleted P4 alternate files:** `main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp`
+2. **`src/main.cpp`** – Removed minimal-mode branch; P4 uses full application flow only
+3. **`platformio.ini`** – Removed `-<main_p4.cpp>` and `-<display/display_p4.cpp>` from all envs; added `-<nfc/nfc_p4_stub.cpp>` to attractap-touch and attractap-touch-ethernet
+4. **`docs/P4_SETUP.md`** – P4 setup guide (hardware, build, upload, serial, toolchain troubleshooting)
+5. **`attractap-p4-findings.md`** – Updated status to Phase 4 complete; POC is full app; removed Legacy section
+6. **Build fix** – `tools/patch_pioarduino_framework_dir.py` patches platform when FRAMEWORK_DIR is None (P4 uses framework-arduinoespressif32-libs)
+7. **intelhex** – Documented fix for pipx-installed PlatformIO: `~/.local/share/pipx/venvs/platformio/bin/python -m pip install intelhex`
+
+### Verification (Phase 4 – completed)
+
+| Step | Result |
+|------|--------|
+| Build | `pio run -e attractap-p4` – SUCCESS |
+| Upload | `pio run -e attractap-p4 -t upload` – SUCCESS |
+| Serial | BootScreen → ConnectionConfigurationScreen |
+| Camera | ConnectionConfigurationScreen (WLAN tab) visible |
+
+### Follow-up Phases (5–8)
+
+Defined in `P4_MERGE_PLAN.md`:
+- **Phase 5:** WiFi via ESP-Hosted (C6)
+- **Phase 6:** WebSocket (real connection)
+- **Phase 7:** NFC (required) + error screen on init failure
+- **Phase 8:** Ethernet (optional, if hardware)
 
 ---
 
@@ -259,12 +292,12 @@ EOF
 
 ---
 
-## Current State for Phase 4
+## Current State (Post Phase 4)
 
-- **P4 build uses:** `main.cpp` (full-app branch), `display.cpp` (unified; excludes `display_p4.cpp`)
-- **P4 shows:** Full Attractap flow – BootScreen → Init/ConnectionConfig/Lockscreen; websocket stub (no real connection on P4)
-- **`display.cpp`:** Contains P4 driver branch; used for full app
-- **`main_p4.cpp`:** Still present but excluded; will be deleted in Phase 4
+- **P4 build uses:** `main.cpp` (full-app only), `display.cpp` (unified)
+- **P4 shows:** Full Attractap flow – BootScreen → ConnectionConfigurationScreen; websocket/NFC stubs; WiFi fails (ESP-Hosted)
+- **P4 alternate files:** Removed (`main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp`)
+- **Next:** Phase 5 – WiFi via ESP-Hosted (C6)
 
 ---
 

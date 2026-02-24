@@ -2,18 +2,33 @@
 
 Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support into the main Attractap application. This document is intended for a future developer or agent to execute the merge without prior context.
 
-**Handoff doc (Phase 1 complete):** See `P4_HANDOFF.md` for current status, serial log instructions, and stability notes.
+**Handoff doc:** See `P4_HANDOFF.md` for current status, serial log instructions, and stability notes.
 
 ---
 
 ## Overview
 
-### Current State
+### Current State (Phases 1–4 complete)
 
-- **POC (Proof of Concept):** Display and touch work on ESP32-P4 with Guition JC1060P470 7" 1024×600 DSI touchscreen.
-- **POC uses alternate files:** `main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp` instead of `main.cpp`, `display.cpp`, `display.hpp`.
-- **POC excludes most application:** `application/`, `api/`, `network/`, `nfc/`, `settings/`, `state/`, `websocket/`, `serial/`, `ioexpander/`, and most screens.
-- **Build filter** in `platformio.ini` [env:attractap-p4] explicitly excludes these and includes the P4 alternates.
+- **Display and touch:** Working on ESP32-P4 with Guition JC1060P470 7" 1024×600 DSI touchscreen.
+- **Full app flow:** BootScreen → ConnectionConfigurationScreen. Uses unified `main.cpp` and `display.cpp`.
+- **Stubs:** Websocket, NFC use stubs (no real connection/card detection).
+- **WiFi:** Fails – ESP-Hosted/C6 transport not initialized.
+- **Ethernet:** Excluded for P4.
+- **Follow-up phases (5–8):** WiFi, WebSocket, NFC, Ethernet – see below.
+
+### Phase Summary
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | P4 driver in display.cpp | ✅ Complete |
+| 2 | Unify main entry | ✅ Complete |
+| 3 | Re-enable full app (stubs) | ✅ Complete |
+| 4 | Remove alternate files, document | ✅ Complete |
+| 5 | WiFi via ESP-Hosted/C6 | Pending |
+| 6 | WebSocket (real connection) | Pending |
+| 7 | NFC (required) + error screen on init failure | Pending |
+| 8 | Ethernet (optional, if hardware) | Pending |
 
 ### Merge Approach
 
@@ -194,6 +209,153 @@ Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support in
 - No P4-specific alternate source files remain
 - P4 setup is documented for future developers
 - Findings doc is current
+
+---
+
+## Phase 5: WiFi via ESP-Hosted (C6 Coprocessor)
+
+### Scope
+
+- **In scope:** Initialize ESP-Hosted transport so P4 can use the C6 coprocessor for WiFi. Call `esp_hosted_init()` before WiFi init. Configure transport (SPI/UART) for P4↔C6 link. Enable WiFi scan, connect, and network connectivity.
+- **Out of scope:** Ethernet; boards without C6.
+
+### Dependencies
+
+- Phase 4 complete
+
+### Background
+
+P4 uses C6 coprocessor for WiFi. Current error: `H_API: Transport not initialized, call esp_hosted_init() first`. The ESP-Hosted component (`espressif__esp_hosted`) is present but the transport (SPI or UART between P4 and C6) is not initialized. Guition JC1060P470 has P4+C6; C6 handles WiFi.
+
+### Deliverables
+
+1. **ESP-Hosted init** – Add `esp_hosted_init()` (or equivalent) before `Network::setup()` or `Wifi::setup()`. Determine correct transport config (SPI vs UART) for Guition board from board schematic, ESP-Hosted docs, or Espressif examples.
+2. **Transport config** – Pin assignments, clock speed, and transport type for P4↔C6. May require `sdkconfig` or runtime config.
+3. **`docs/P4_SETUP.md`** – Document ESP-Hosted init, transport pins, and any board-specific steps.
+
+### Test Requirements
+
+- `pio run -e attractap-p4 -t upload`
+- WiFi scan lists networks
+- WiFi connect succeeds with valid credentials
+- Device obtains IP and can reach network
+
+### Acceptance Criteria
+
+- WiFi scan works
+- WiFi connect works
+- No `Transport not initialized` errors
+- ConnectionConfigurationScreen can complete WLAN setup
+
+---
+
+## Phase 6: WebSocket (Real Connection)
+
+### Scope
+
+- **In scope:** Replace WebSocket stub with real WebSocket connection on P4. Use `esp_websocket_client` if available in P4 framework, or alternative (e.g. `libwebsockets`, raw TCP with WebSocket framing, or platform-specific API).
+- **Out of scope:** Changing API protocol; NFC.
+
+### Dependencies
+
+- Phase 5 complete (WiFi must work for WebSocket)
+
+### Background
+
+Current: `esp_websocket_client` not available on P4; stub in `websocket.cpp`. Check if pioarduino/ESP-IDF 5.5+ adds WebSocket support for P4. If not, evaluate alternatives.
+
+### Deliverables
+
+1. **WebSocket implementation** – Remove stub; implement `connectWebSocket`, `sendMessage`, event handling using P4-compatible API.
+2. **`websocket.hpp/cpp`** – Remove `CONFIG_IDF_TARGET_ESP32P4` stub branch; use real implementation.
+3. **TLS/certs** – Ensure `AdaptiveCertManager` and TLS work on P4 for wss://.
+
+### Test Requirements
+
+- Device connects to configured API host via WebSocket
+- Send/receive messages
+- Reconnect on disconnect
+- No stub logs
+
+### Acceptance Criteria
+
+- WebSocket connects when WiFi is up and API host is configured
+- API communication works (state sync, commands)
+- Lockscreen and other API-dependent screens function
+
+---
+
+## Phase 7: NFC (Card Detection and NTAG424)
+
+### Scope
+
+- **In scope:** Replace NFC stub with real NFC on P4. NFC is a core requirement for all targets. Resolve mbedtls/NTAG424 compatibility. Support card detection, authentication, enrollment. When NFC hardware is not found or not connected, display error/warning screen with Reboot and Retry buttons instead of silently stubbing.
+- **Out of scope:** Making NFC optional; silent stub fallback.
+
+### Dependencies
+
+- Phase 6 complete (API needed for enrollment flow)
+
+### Background
+
+Current: `nfc_p4_stub` – mbedtls/NTAG424 libs incompatible with P4. NFC is the core Attractap feature; all targets must support it. Options: (a) port or replace mbedtls for P4, (b) use P4-compatible NTAG424 implementation, (c) use different NFC stack. PN532 over I2C/SPI; pins TBD per board. When hardware init fails (not found, not connected), show user-facing error with recovery actions.
+
+### Deliverables
+
+1. **NFC implementation** – Replace stub with real NFC on P4. Resolve mbedtls/NTAG424 build for P4. Include `nfc.cpp`, `Adafruit_PN532_NTAG424`, `mbedtlscmac` in P4 build.
+2. **Error/warning screen** – When NFC hardware is not found or init fails: display a dedicated screen with error message, Reboot button, and Retry button. No silent stub; user must be informed and given recovery options.
+3. **`application.hpp`** – Use real `nfc.hpp` for all P4 builds; remove `nfc_p4_stub` conditional.
+4. **Build filter** – Remove NFC exclusions for P4; include full NFC stack.
+
+### Test Requirements
+
+- Card tap detected when hardware present
+- Card authentication works
+- Enrollment flow works (if API configured)
+- When NFC hardware absent or disconnected: error screen shown with Reboot/Retry
+- Retry re-attempts NFC init; Reboot restarts device
+
+### Acceptance Criteria
+
+- NFC is required and built for all P4 targets
+- NFC card detection works on P4 when hardware present
+- Full Attractap access-control flow: tap → authenticate → unlock
+- Hardware-not-found / init-failure shows error screen with Reboot and Retry buttons
+
+---
+
+## Phase 8: Ethernet (Optional – If Hardware Supports)
+
+### Scope
+
+- **In scope:** Add Ethernet support for P4 boards that have an external PHY (e.g. W5500, LAN8720). Most P4+C6 boards (including Guition JC1060P470) do not have Ethernet; this phase is optional.
+- **Out of scope:** Boards without Ethernet hardware; changing WiFi path.
+
+### Dependencies
+
+- Phase 5 complete
+- Hardware with Ethernet PHY
+
+### Background
+
+Current: Ethernet excluded for P4 (`#if !defined(CONFIG_IDF_TARGET_ESP32P4)` in `network.hpp`; `-<network/ethernet/>` in build filter). ETH_W5500_DEFAULT_CONFIG API may differ on P4. If a P4 board adds Ethernet, re-enable and fix API compatibility.
+
+### Deliverables
+
+1. **Ethernet on P4** – Remove P4 exclusion; fix `ethernet.cpp` and any ETH_* API differences for P4.
+2. **Network selection** – User can choose WiFi or Ethernet in ConnectionConfigurationScreen when both available.
+3. **`platformio.ini`** – Remove `-<network/ethernet/>` for P4 when Ethernet enabled; add board-specific env if needed (e.g. `attractap-p4-ethernet`).
+
+### Test Requirements
+
+- Ethernet connect works on P4 board with PHY
+- Network selection (WiFi vs Ethernet) works
+- API/WebSocket work over Ethernet
+
+### Acceptance Criteria
+
+- Ethernet supported on P4 when hardware present
+- No impact on WiFi-only P4 boards
 
 ---
 

@@ -5,9 +5,9 @@ Ref: [Reddit thread](https://www.reddit.com/r/homeassistant/s/7yXRVO9815), [esph
 
 ---
 
-## Status: Full Application (Phase 3 complete)
+## Status: Full Application (Phase 4 complete)
 
-**Full Attractap flow runs on P4.** BootScreen → ConnectionConfigurationScreen. Display and touch work. Websocket and NFC use stubs (no real connection/card detection). Ethernet excluded. WiFi init fails (ESP-Hosted/C6 link not up – see Known limitations).
+**POC is now the full app.** Full Attractap flow runs on P4: BootScreen → ConnectionConfigurationScreen. Display and touch work. Websocket and NFC use stubs (no real connection/card detection). Ethernet excluded. WiFi init fails (ESP-Hosted/C6 link not up – see Known limitations). P4 alternate files (`main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp`) have been removed; P4 uses unified `main.cpp` and `display.cpp`.
 
 | Component | Status |
 |-----------|--------|
@@ -97,8 +97,7 @@ User must be in `dialout` for serial: `sudo usermod -a -G dialout $USER`
 | `src/websocket/websocket.cpp` | Websocket stub (P4 branch) |
 | `lib/GFX Library for Arduino/.../Arduino_ESP32SPIDMA.cpp` | ESP32-P4 SPI fix |
 | `tools/patch_esp32p4_toolchain.py` | RISC-V toolchain patch |
-
-**Legacy (Phase 4 will remove):** `main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp` – excluded from P4 build.
+| `docs/P4_SETUP.md` | P4 setup guide (build, upload, serial, toolchain) |
 
 ---
 
