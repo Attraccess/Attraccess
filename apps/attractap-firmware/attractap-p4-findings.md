@@ -45,6 +45,8 @@ Ref: [Reddit thread](https://www.reddit.com/r/homeassistant/s/7yXRVO9815), [esph
 
 Build flag: `P4_LCD_BL_ACTIVE_HIGH=1`
 
+**Display rotation:** User requested portrait mode. Screen and touch rotated +90° (rotation 1) in `p4_dsi_gt911_driver.cpp`. Logical resolution 600×1024. Verified via flash and camera snapshot.
+
 ---
 
 ## Hardware Pins (Guition JC1060P470)
@@ -67,6 +69,7 @@ Build flag: `P4_LCD_BL_ACTIVE_HIGH=1`
 3. **Backlight** – PWM active-high (ESPHome config says active-low; this board uses active-high)
 4. **Display reset** – GPIO05 (ESPHome uses 5; Arduino_GFX example uses 27)
 5. **HSYNC** – 20 (ESPHome; Arduino_GFX uses 40)
+6. **Portrait rotation** – User requested -90° for portrait use. Set rotation 1 (+90°) in `p4_dsi_gt911_driver.cpp`; touch mapping in `readTouch()` handles rotation. Verified with camera snapshot.
 
 ---
 
