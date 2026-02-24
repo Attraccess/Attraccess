@@ -3,7 +3,9 @@
 #include <Arduino.h>
 #include "esp_netif.h"
 #include "wifi/wifi.hpp"
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
 #include "ethernet/ethernet.hpp"
+#endif
 #include "../logger/logger.hpp"
 
 /**

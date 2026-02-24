@@ -8,6 +8,7 @@
 #include "../utils.hpp"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
+#include "esp_app_format.h"
 
 class API
 {

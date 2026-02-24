@@ -23,8 +23,10 @@ void Network::setup()
     logger.info("Starting WiFi interface");
     Wifi::setup();
 
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     logger.info("Starting Ethernet interface");
     Ethernet::setup();
+#endif
 
     logger.info("Configuring SNTP time server...");
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
@@ -65,5 +67,7 @@ void Network::initSharedComponents()
 void Network::loop()
 {
     Wifi::loop();
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     Ethernet::loop();
+#endif
 }

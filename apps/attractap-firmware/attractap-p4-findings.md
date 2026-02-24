@@ -5,28 +5,31 @@ Ref: [Reddit thread](https://www.reddit.com/r/homeassistant/s/7yXRVO9815), [esph
 
 ---
 
-## POC vs Full Application
+## Status: Full Application (Phase 3 complete)
 
-**Status: POC (proof of concept).** Display and touch work, but this is not the full Attractap application.
+**Full Attractap flow runs on P4.** BootScreen → ConnectionConfigurationScreen. Display and touch work. Websocket and NFC use stubs (no real connection/card detection). Ethernet excluded. WiFi init fails (ESP-Hosted/C6 link not up – see Known limitations).
 
-| POC (current) | Full application |
-|---------------|------------------|
-| `main_p4.cpp` – minimal entry | `main.cpp` – full app entry |
-| `display_p4.cpp` + `display_p4.hpp` – P4-only display | `display.cpp` – full display with all screens |
-| Boot screen only | Application, API, network, NFC, etc. |
-| Excluded: application/, api/, network/, nfc/, most screens | All of the above included |
-
-**Build filter** excludes `main.cpp` and `display.cpp`; includes `main_p4.cpp` and `display_p4.cpp`. Many screens and modules are excluded.
-
-**Next step:** Merge P4 support into the full app – unify display.cpp to support P4 DSI driver via build flags, switch main entry by target, re-enable application/network/etc for P4.
+| Component | Status |
+|-----------|--------|
+| Display | ✅ Working (DSI, GT911 touch) |
+| Application flow | ✅ BootScreen → ConnectionConfigurationScreen |
+| Websocket | Stub (esp_websocket_client not available on P4) |
+| NFC | Stub (mbedtls/NTAG424 incompatible with P4) |
+| Ethernet | Excluded (no Ethernet on P4) |
+| WiFi | ❌ Fails – ESP-Hosted transport not initialized |
 
 ---
 
-## Status
+## Current State
 
 **Serial:** Working (ARDUINO_USB_MODE=1 → HWCDCSerial)  
 **Display:** ✅ Working  
 **Touch:** GT911 OK
+
+**Known limitations:**
+- **WiFi:** `E (2150) H_API: Transport not initialized, call esp_hosted_init() first` – P4 uses C6 coprocessor for WiFi (ESP-Hosted). The ESP-Hosted link is not up; WiFi init and scan fail. May require board-specific C6/ESP-Hosted initialization.
+- **Websocket:** Stub only – no real connection on P4.
+- **NFC:** Stub only – no card detection on P4.
 
 ---
 
@@ -84,11 +87,24 @@ User must be in `dialout` for serial: `sudo usermod -a -G dialout $USER`
 | File | Purpose |
 |------|---------|
 | `platformio.ini` | `[env:attractap-p4]` + build_src_filter |
-| `src/main_p4.cpp` | **POC** – alternate main (replaces main.cpp) |
-| `src/display/display_p4.cpp` | **POC** – alternate display (replaces display.cpp) |
-| `include/display_p4.hpp` | **POC** – P4 display header |
-| `src/display/driver/p4_dsi/` | **Reusable** – DSI + GT911 driver (to merge into full app) |
+| `src/main.cpp` | Full app entry (ATTACTAP_P4_FULL_APP=1) |
+| `src/display/display.cpp` | Unified display (P4 driver branch) |
+| `src/display/driver/p4_dsi/` | DSI + GT911 driver |
+| `src/nfc/nfc_p4_stub.hpp/cpp` | NFC stub for P4 |
+| `src/websocket/websocket.cpp` | Websocket stub (P4 branch) |
 | `lib/GFX Library for Arduino/.../Arduino_ESP32SPIDMA.cpp` | ESP32-P4 SPI fix |
 | `tools/patch_esp32p4_toolchain.py` | RISC-V toolchain patch |
 
-**Actual application code** (excluded in POC): `main.cpp`, `display.cpp`, `application/`, `api/`, `network/`, `nfc/`, most screens.
+**Legacy (Phase 4 will remove):** `main_p4.cpp`, `display_p4.cpp`, `display_p4.hpp` – excluded from P4 build.
+
+---
+
+## Process (Phase 3)
+
+1. **Platformio.ini** – Set `ATTACTAP_P4_FULL_APP=1`, updated `build_src_filter` to include full app sources, exclude Ethernet/NFC, use `display.cpp` instead of `display_p4.cpp`.
+2. **Websocket stub** – `esp_websocket_client` not available on P4; added stub types and conditional compilation in `websocket.hpp/cpp`.
+3. **NFC stub** – mbedtls/NTAG424 incompatible; added `nfc_p4_stub.hpp/cpp`, conditional include in `application.hpp`.
+4. **Ethernet** – Wrapped in `#if !defined(CONFIG_IDF_TARGET_ESP32P4)`; excluded `network/ethernet/` from P4 build.
+5. **Build fixes** – `esp_app_format.h` for api.hpp; PIN_* defines for P4; esptool reinstall if ModuleNotFoundError.
+6. **Toolchain** – `pio pkg update` or remove/reinstall `toolchain-riscv32-esp*` if cc1plus/riscv32-esp-elf-g++ errors.
+7. **Verification** – Build, upload, serial capture (Python 115200 baud), camera snapshot (`./scripts/snapshot.sh`).

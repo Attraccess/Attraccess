@@ -1,12 +1,25 @@
 #pragma once
 
 #include <Arduino.h>
-#include "esp_websocket_client.h"
 #include "../settings/settings.hpp"
 #include <functional>
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "certManager/AdaptiveCertManager.hpp"
+
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+// P4 stub: esp_websocket_client not available on ESP32-P4 platform yet
+struct esp_websocket_event_data_t
+{
+    void *data_ptr;
+    size_t data_len;
+    size_t payload_len;
+    size_t payload_offset;
+};
+using esp_websocket_client_handle_t = void *;
+#else
+#include "esp_websocket_client.h"
+#endif
 
 class Websocket
 {
@@ -50,10 +63,12 @@ private:
     ConnectionState _state = INIT;
     void setState(ConnectionState state);
 
-    esp_websocket_client_handle_t ws_client;
+    esp_websocket_client_handle_t ws_client = nullptr;
 
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
     void processWebSocketEvent(esp_event_base_t base, int32_t event_id, void *event_data);
+#endif
 
     Logger logger;
 };

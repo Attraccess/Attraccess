@@ -4,6 +4,9 @@ void Websocket::setup()
 {
     logger.info("Websocket setup");
     this->_certManager.begin();
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    logger.info("WebSocket: ESP32-P4 stub (esp_websocket_client not available)");
+#endif
 }
 
 void Websocket::loop()
@@ -14,6 +17,12 @@ void Websocket::loop()
     }
 
     this->updateInfoFromAppState();
+
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    // P4 stub: never connect; websocket stays in INIT
+    (void)_lastApiConfig;
+    return;
+#endif
 
     if (!network_is_connected)
     {
@@ -48,6 +57,12 @@ void Websocket::updateInfoFromAppState()
 
 void Websocket::connectWebSocket()
 {
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    // P4 stub: esp_websocket_client not available
+    logger.info("connectWebSocket: skipped on ESP32-P4 (no esp_websocket_client)");
+    setState(INIT);
+    return;
+#else
     if (!connectionAttemptsEnabled)
     {
         return;
@@ -148,6 +163,7 @@ void Websocket::connectWebSocket()
     }
 
     logger.info("connectWebSocket: WebSocket started");
+#endif // !CONFIG_IDF_TARGET_ESP32P4
 }
 
 bool Websocket::shouldReconnect()
@@ -155,6 +171,7 @@ bool Websocket::shouldReconnect()
     return millis() - this->lastReconnectAttemptTime >= this->RECONNECT_INTERVAL_MS;
 }
 
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
 void Websocket::websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     Websocket *websocket = (Websocket *)handler_args;
@@ -222,9 +239,14 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         break;
     }
 }
+#endif // !CONFIG_IDF_TARGET_ESP32P4
 
 void Websocket::sendMessage(const String &message)
 {
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    (void)message;
+    return;
+#else
     this->logger.debug(("sendMessage: " + message).c_str());
     int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
 
@@ -232,10 +254,16 @@ void Websocket::sendMessage(const String &message)
     {
         logger.error("sendMessage: failed");
     }
+#endif
 }
 
 void Websocket::sendMessage(const char *message, size_t length)
 {
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    (void)message;
+    (void)length;
+    return;
+#else
     if (!ws_client)
     {
         logger.error("sendMessage(raw): ws_client not initialized");
@@ -246,6 +274,7 @@ void Websocket::sendMessage(const char *message, size_t length)
     {
         logger.error("sendMessage(raw): failed");
     }
+#endif
 }
 
 void Websocket::setState(ConnectionState state)
@@ -274,11 +303,13 @@ void Websocket::disableConnectionAttempts()
 {
     this->connectionAttemptsEnabled = false;
 
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     if (ws_client)
     {
         esp_websocket_client_destroy(ws_client);
         ws_client = nullptr;
     }
+#endif
 
     setState(INIT);
 }

@@ -1,7 +1,68 @@
 # P4 Merge Plan – Handoff for Next Phase
 
-**Last updated:** After Phase 2 completion  
-**Next phase:** Phase 3 – Re-enable Full Application for P4
+**Last updated:** After Phase 3 completion  
+**Next phase:** Phase 4 – Remove P4 Alternate Files and Document
+
+---
+
+## Phase 3 Status: COMPLETE
+
+Phase 3 has been implemented.
+
+### What Was Done
+
+1. **`platformio.ini`** – [env:attractap-p4]:
+   - Added `ATTACTAP_P4_FULL_APP=1` to build_flags
+   - Removed exclusions for application/, api/, network/, nfc/, state/, settings/, websocket/, serial/, certs/, and all display screens
+   - Switched from display_p4.cpp to display.cpp (excluded display_p4.cpp)
+   - Added lib_deps: bblanchon/ArduinoJson@^7.4.2, arduino-libraries/Arduino_CRC32@^1.0.0
+   - Kept exclusions: -<display/driver/qualia/>, -<display/driver/gt911/>, -<display/images/>, -<ioexpander/>
+
+2. **`src/main.cpp`** – No changes needed; full-app branch uses Application which includes display/display.hpp
+
+3. **Websocket P4 stub** – esp_websocket_client.h not available on ESP32-P4 platform:
+   - `src/websocket/websocket.hpp`: Added CONFIG_IDF_TARGET_ESP32P4 stub types (esp_websocket_event_data_t, esp_websocket_client_handle_t)
+   - `src/websocket/websocket.cpp`: P4 stub – setup/loop/connectWebSocket/sendMessage/disableConnectionAttempts skip real websocket; event handler excluded
+   - `src/websocket/certManager/AdaptiveCertManager.hpp`: Removed unused esp_websocket_client.h include
+
+4. **NFC P4 stub** – mbedtls/NTAG424 incompatible with P4 framework:
+   - `src/nfc/nfc_p4_stub.hpp`, `src/nfc/nfc_p4_stub.cpp`: Stub NFC class; Application uses stub when CONFIG_IDF_TARGET_ESP32P4
+   - Excluded real NFC (mbedtlscmac, Adafruit_PN532_NTAG424, nfc.cpp) from P4 build
+
+5. **Ethernet excluded** – ETH_W5500_DEFAULT_CONFIG API differs on P4; P4 has no Ethernet:
+   - `src/network/network.hpp/cpp`: #if !defined(CONFIG_IDF_TARGET_ESP32P4) around Ethernet
+   - `build_src_filter`: -<network/ethernet/>
+
+6. **Build fixes** – PIN_PN532_IRQ, PIN_ETH_*, esp_app_format.h for api.cpp; esptool: `~/.platformio/penv/bin/pip install --force-reinstall esptool` if ModuleNotFoundError
+
+### Verification (Phase 3 – completed)
+
+| Step | Result |
+|------|--------|
+| Build | `pio run -e attractap-p4` – SUCCESS |
+| Upload | `pio run -e attractap-p4 -t upload` – SUCCESS (ESP32-P4 on /dev/ttyACM0) |
+| Serial | Python script, 115200 baud, 30s capture – boot sequence captured |
+| Camera | `./scripts/snapshot.sh` – ConnectionConfigurationScreen (WLAN tab) visible |
+
+**Boot sequence observed:**
+
+```
+[Main] INFO: Welcome to Attractap
+[Main] INFO: Firmware: Attractap P4, Variant: Display, Version: 1.2.1
+[Settings] INFO: Setting up...
+[Network] INFO: Starting WiFi interface
+[WiFi] ERROR: Failed to initialize WiFi: ESP_FAIL  (ESP-Hosted/C6 link not up)
+[Display] INFO: GT911 touch init OK
+[Display] INFO: Transitioning to screen: BootScreen
+[NFC] INFO: NFC stub (ESP32-P4): no NFC hardware support
+[Websocket] INFO: WebSocket: ESP32-P4 stub (esp_websocket_client not available)
+[Application] DEBUG: Connection is not configured, showing connection configuration screen
+[Display] INFO: Transitioning to screen: ConnectionConfigurationScreen
+```
+
+**Visual:** BootScreen → ConnectionConfigurationScreen. WLAN tab shows "Keine Netzwerke gefunden" (WiFi scan fails; ESP-Hosted not initialized). No crashes in 30s run.
+
+**Known limitation:** WiFi fails with `H_API: Transport not initialized, call esp_hosted_init() first` – P4 uses C6 coprocessor for WiFi (ESP-Hosted); link init may need board-specific setup.
 
 ---
 
@@ -102,6 +163,21 @@ After that, no further logs (expected for P4 POC – display+touch only, no appl
 
 ---
 
+## Verification Process
+
+1. **Build:** `pio run -e attractap-p4`  
+   - If toolchain error (`cc1plus` or `riscv32-esp-elf-g++: not found`): run `pio pkg update`; or `rm -rf ~/.platformio/packages/toolchain-riscv32-esp*` and rebuild.  
+   - If `ModuleNotFoundError: esptool`: `~/.platformio/penv/bin/pip install --force-reinstall esptool`
+
+2. **Upload:** `pio run -e attractap-p4 -t upload`  
+   - Device typically on `/dev/ttyACM0` (USB-Serial-JTAG)
+
+3. **Serial capture:** Use Python script below (115200 baud). DTR reset triggers fresh boot. Capture 30–60s to see boot + Application flow.
+
+4. **Camera snapshot:** `./scripts/snapshot.sh` from workspace root. Output: `/tmp/camera-snapshot.XXXXXX/frame.png`. Expect ConnectionConfigurationScreen (WLAN tab) after BootScreen.
+
+---
+
 ## How to Get Serial Logs
 
 ### Option 1: Python script (recommended)
@@ -183,12 +259,12 @@ EOF
 
 ---
 
-## Current State for Phase 3
+## Current State for Phase 4
 
-- **P4 build uses:** `main.cpp` (minimal branch), `display_p4.cpp` (excludes `main_p4.cpp`, `display.cpp`)
-- **P4 shows:** BootScreen only; display and touch work
-- **`display.cpp`:** Contains P4 driver branch (ready for Phase 3 display unification)
-- **`main_p4.cpp`:** Still present but excluded from P4 build; will be deleted in Phase 4
+- **P4 build uses:** `main.cpp` (full-app branch), `display.cpp` (unified; excludes `display_p4.cpp`)
+- **P4 shows:** Full Attractap flow – BootScreen → Init/ConnectionConfig/Lockscreen; websocket stub (no real connection on P4)
+- **`display.cpp`:** Contains P4 driver branch; used for full app
+- **`main_p4.cpp`:** Still present but excluded; will be deleted in Phase 4
 
 ---
 
