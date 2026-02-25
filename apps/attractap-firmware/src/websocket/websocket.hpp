@@ -49,7 +49,7 @@ private:
 
     bool network_is_connected = false;
 
-    AttraaccessApiConfig _lastApiConfig;
+    AttraccessApiConfig _lastApiConfig;
 
     ConnectionState _state = INIT;
     void setState(ConnectionState state);

@@ -588,13 +588,22 @@ void ResourceDetailsScreen::updateSessionTimeoutIndicator()
       remainingSeconds = 0;
    if (remainingSeconds > 30)
       remainingSeconds = 30;
-   lv_bar_set_value(this->sessionTimeoutIndicator, remainingSeconds, LV_ANIM_ON);
+   lv_bar_set_value(this->sessionTimeoutIndicator, remainingSeconds, LV_ANIM_OFF);
 }
 
 void ResourceDetailsScreen::loop()
 {
-   this->updateElapsedTimeDisplay();
-   this->updateSessionTimeoutIndicator();
+   uint32_t now = millis();
+   if (now - this->lastElapsedTimeUpdateMs >= ELAPSED_TIME_UPDATE_INTERVAL_MS)
+   {
+      this->lastElapsedTimeUpdateMs = now;
+      this->updateElapsedTimeDisplay();
+   }
+   if (now - this->lastSessionTimeoutUpdateMs >= SESSION_TIMEOUT_UPDATE_INTERVAL_MS)
+   {
+      this->lastSessionTimeoutUpdateMs = now;
+      this->updateSessionTimeoutIndicator();
+   }
 }
 
 void ResourceDetailsScreen::destroy()

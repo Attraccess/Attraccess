@@ -24,6 +24,7 @@ private:
     lv_obj_t *devicePin;
     lv_obj_t *keyboardForDevicePin;
     lv_obj_t *labelForDevicePin;
+    bool lastValidState = false;
 
     static void onKeyboardEvent(lv_event_t *e);
     static void onTextChanged(lv_event_t *e);

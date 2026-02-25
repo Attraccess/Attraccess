@@ -1,4 +1,5 @@
 #include "pinInputPage.hpp"
+#include <cstring>
 
 lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
 {
@@ -52,7 +53,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     this->keyboardForDevicePin = lv_keyboard_create(this->screen);
     lv_keyboard_set_mode(this->keyboardForDevicePin, LV_KEYBOARD_MODE_NUMBER);
     lv_obj_set_width(this->keyboardForDevicePin, lv_pct(100));
-    lv_obj_set_height(this->keyboardForDevicePin, lv_pct(70));
+    lv_obj_set_height(this->keyboardForDevicePin, lv_pct(45));
     lv_obj_set_x(this->keyboardForDevicePin, -48);
     lv_obj_set_y(this->keyboardForDevicePin, 45);
     lv_obj_set_align(this->keyboardForDevicePin, LV_ALIGN_CENTER);
@@ -120,23 +121,17 @@ void PinInputPage::onKeyboardEvent(lv_event_t *e)
 void PinInputPage::onTextChanged(lv_event_t *e)
 {
     PinInputPage *self = static_cast<PinInputPage *>(lv_event_get_user_data(e));
-    if (self == nullptr)
-    {
+    if (self == nullptr || self->labelForDevicePin == nullptr)
         return;
-    }
-
-    if (self->labelForDevicePin == nullptr)
-    {
-        return;
-    }
 
     const char *text = lv_textarea_get_text(self->devicePin);
-    if (text != nullptr && String(text).length() >= 4)
-    {
-        lv_obj_set_style_text_color(self->labelForDevicePin, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-    else
-    {
-        lv_obj_set_style_text_color(self->labelForDevicePin, lv_color_hex(0xFF4D4D), LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
+    size_t len = text ? strlen(text) : 0;
+    bool valid = len >= 4;
+    if (valid == self->lastValidState)
+        return;
+    self->lastValidState = valid;
+
+    lv_obj_set_style_text_color(self->labelForDevicePin,
+                                valid ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xFF4D4D),
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
 }

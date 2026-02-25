@@ -157,11 +157,15 @@ private:
 
     void updateElapsedTimeDisplay();
     lv_obj_t *elapsedTime = nullptr;
+    uint32_t lastElapsedTimeUpdateMs = 0;
+    static constexpr uint32_t ELAPSED_TIME_UPDATE_INTERVAL_MS = 1000;
 
     uint32_t sessionTimeoutTime = 0;
     bool sessionTimeoutPaused = false;
     uint32_t pauseFrozenAtMs = 0;
     lv_obj_t *sessionTimeoutIndicator = nullptr;
+    uint32_t lastSessionTimeoutUpdateMs = 0;
+    static constexpr uint32_t SESSION_TIMEOUT_UPDATE_INTERVAL_MS = 250;
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;

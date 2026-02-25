@@ -65,7 +65,12 @@ void EnrollmentScreen::init()
 
 void EnrollmentScreen::loop()
 {
-   this->updateTimeoutBar();
+   uint32_t now = millis();
+   if (now - this->lastTimeoutBarUpdateMs >= TIMEOUT_BAR_UPDATE_INTERVAL_MS)
+   {
+      this->lastTimeoutBarUpdateMs = now;
+      this->updateTimeoutBar();
+   }
 }
 
 void EnrollmentScreen::updateTimeoutBar()
@@ -80,7 +85,7 @@ void EnrollmentScreen::updateTimeoutBar()
     {
        remainingTime = this->enrollmentTimeoutTime - now;
     }
-    lv_bar_set_value(this->timeoutBar, remainingTime, LV_ANIM_ON);
+    lv_bar_set_value(this->timeoutBar, remainingTime, LV_ANIM_OFF);
 }
 
 lv_obj_t *EnrollmentScreen::getScreen()

@@ -3,6 +3,7 @@
 #include "../serial/serialCommandHandler.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "freertos/task.h"
 #endif
 
 void Application::networkTask(void *parameter) {
@@ -403,6 +404,7 @@ void Application::loop() {
   /* Run display/touch first so input feels responsive before any blocking work
    */
   Display::loop();
+  taskYIELD(); /* Yield to other FreeRTOS tasks when loop is fast */
 #endif
 
 #ifdef DEBUG_LOOP_TIMING

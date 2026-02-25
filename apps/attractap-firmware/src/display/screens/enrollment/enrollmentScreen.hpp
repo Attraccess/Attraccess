@@ -28,5 +28,7 @@ private:
     String userNameCache;
 
     uint32_t enrollmentTimeoutTime;
+    uint32_t lastTimeoutBarUpdateMs = 0;
+    static constexpr uint32_t TIMEOUT_BAR_UPDATE_INTERVAL_MS = 250;
     void updateTimeoutBar();
 };

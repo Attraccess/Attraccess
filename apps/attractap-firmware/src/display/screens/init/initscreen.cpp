@@ -1,4 +1,5 @@
 #include "initscreen.hpp"
+#include "../../../network/wifi/wifi.hpp"
 
 void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color)
 {
@@ -204,6 +205,13 @@ void InitScreen::init()
    lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
+
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+   // P4 WiFi uses C6 via ESP-Hosted; transport may not be ready at boot. A scan
+   // primes the stack so ensureConnection() can succeed. Without this, WiFi
+   // only connects after user opens settings (which triggers a scan).
+   Wifi::startScan();
+#endif
 }
 
 void InitScreen::onOpenSettingsButtonEvent(lv_event_t *e)
