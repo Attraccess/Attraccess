@@ -49,12 +49,14 @@ public:
   static void showInsufficientBalancePopup(
       std::function<void(uint32_t amountCents)> onStart,
       std::function<void()> onCancel);
+  static void showNfcInitErrorPopup(const String &title, const String &message,
+                                   std::function<void()> onRetry,
+                                   std::function<void()> onReboot);
   static void hidePopup();
 
 private:
   static std::function<void(int16_t, int16_t)> touchCallback;
   static const int TRANSITION_DURATION = 50;
-  // static const int TRANSITION_DURATION = 50;
   static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_NONE;
   static uint32_t transitionStartTime;
   static bool transitionComplete;

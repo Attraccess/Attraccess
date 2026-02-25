@@ -33,7 +33,18 @@ void Application::setup() {
   Display::setup();
 #endif
 
-  this->nfc.setup();
+  if (!this->nfc.setup()) {
+#ifdef HAS_LVGL_DISPLAY
+    this->state = APPLICATION_STATE_NFC_INIT_FAILED;
+    Display::showNfcInitErrorPopup(
+        "NFC Error", "NFC hardware not found. Check connection and retry.",
+        [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
+#else
+    this->logger.error("NFC hardware not found, restarting in 5 seconds");
+    delay(5000);
+    ESP.restart();
+#endif
+  }
   this->api.setup();
 
 #ifdef HAS_LVGL_DISPLAY
@@ -443,7 +454,25 @@ void Application::loop() {
 #endif
 }
 
+#ifdef HAS_LVGL_DISPLAY
+void Application::retryNfcSetup() {
+  if (this->nfc.setup()) {
+    this->state = APPLICATION_STATE_INIT;
+  } else {
+    Display::showNfcInitErrorPopup(
+        "NFC Error", "NFC hardware not found. Check connection and retry.",
+        [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
+  }
+}
+#endif
+
 void Application::processState() {
+#ifdef HAS_LVGL_DISPLAY
+  if (this->state == APPLICATION_STATE_NFC_INIT_FAILED) {
+    return;
+  }
+#endif
+
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
   bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
                                 attraccessApiConfig.hostname != "" &&

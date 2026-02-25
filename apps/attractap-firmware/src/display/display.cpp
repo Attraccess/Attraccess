@@ -290,7 +290,7 @@ void Display::transitionToScreen(IScreen *screen,
   /* Remove target from pending destroy if it was queued (e.g. rapid A→B→A) */
   Display::pendingDestroyScreens.erase(
       std::remove(Display::pendingDestroyScreens.begin(),
-                 Display::pendingDestroyScreens.end(), screen),
+                  Display::pendingDestroyScreens.end(), screen),
       Display::pendingDestroyScreens.end());
 
   lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION,
@@ -392,6 +392,115 @@ void Display::showErrorPopup(const String &title, const String &message) {
         }
       },
       LV_EVENT_CLICKED, NULL);
+
+  Display::activePopup = overlay;
+}
+
+void Display::showNfcInitErrorPopup(const String &title, const String &message,
+                                   std::function<void()> onRetry,
+                                   std::function<void()> onReboot) {
+  Display::hidePopup();
+  if (Display::popupAutoCloseTimer) {
+    lv_timer_del(Display::popupAutoCloseTimer);
+    Display::popupAutoCloseTimer = nullptr;
+  }
+
+  struct NfcErrorPayload {
+    std::function<void()> onRetry;
+    std::function<void()> onReboot;
+  };
+  NfcErrorPayload *payload = new NfcErrorPayload{onRetry, onReboot};
+
+  lv_obj_t *top = lv_layer_top();
+  lv_obj_t *overlay = lv_obj_create(top);
+  lv_obj_remove_style_all(overlay);
+  lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
+  lv_obj_set_align(overlay, LV_ALIGN_CENTER);
+  lv_obj_set_style_bg_color(overlay, lv_color_black(),
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(overlay, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t *dialog = lv_obj_create(overlay);
+  lv_obj_remove_style_all(dialog);
+  lv_obj_set_width(dialog, lv_pct(80));
+  lv_obj_set_height(dialog, LV_SIZE_CONTENT);
+  lv_obj_set_align(dialog, LV_ALIGN_CENTER);
+  lv_obj_set_style_bg_color(dialog, lv_color_hex(0x2A2A2A),
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(dialog, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_radius(dialog, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_all(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_START);
+
+  lv_obj_t *titleLbl = lv_label_create(dialog);
+  lv_label_set_text(titleLbl, title.c_str());
+  lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF),
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18,
+                             LV_PART_MAIN | LV_STATE_DEFAULT);
+
+  lv_obj_t *msgLbl = lv_label_create(dialog);
+  lv_label_set_text(msgLbl, message.c_str());
+  lv_obj_set_style_text_color(msgLbl, lv_color_hex(0xFFFFFF),
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14,
+                             LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_width(msgLbl, lv_pct(100));
+
+  lv_obj_t *footer = lv_obj_create(dialog);
+  lv_obj_remove_style_all(footer);
+  lv_obj_set_width(footer, lv_pct(100));
+  lv_obj_set_height(footer, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_START);
+  lv_obj_set_style_pad_column(footer, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+  lv_obj_t *retryBtn = lv_button_create(footer);
+  lv_obj_set_height(retryBtn, LV_SIZE_CONTENT);
+  lv_obj_set_width(retryBtn, LV_SIZE_CONTENT);
+  lv_obj_set_style_bg_color(retryBtn, lv_color_hex(0x4CAF50),
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(retryBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_t *retryLbl = lv_label_create(retryBtn);
+  lv_label_set_text(retryLbl, "Retry");
+  lv_obj_add_event_cb(
+      retryBtn,
+      [](lv_event_t *e) {
+        if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+          auto *p = (NfcErrorPayload *)lv_event_get_user_data(e);
+          if (p && p->onRetry) {
+            Display::hidePopup();
+            p->onRetry();
+          }
+          delete p;
+        }
+      },
+      LV_EVENT_CLICKED, payload);
+
+  lv_obj_t *rebootBtn = lv_button_create(footer);
+  lv_obj_set_height(rebootBtn, LV_SIZE_CONTENT);
+  lv_obj_set_width(rebootBtn, LV_SIZE_CONTENT);
+  lv_obj_set_style_bg_color(rebootBtn, lv_color_hex(0xF31260),
+                            LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(rebootBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_t *rebootLbl = lv_label_create(rebootBtn);
+  lv_label_set_text(rebootLbl, "Reboot");
+  lv_obj_add_event_cb(
+      rebootBtn,
+      [](lv_event_t *e) {
+        if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+          auto *p = (NfcErrorPayload *)lv_event_get_user_data(e);
+          if (p && p->onReboot) {
+            Display::hidePopup();
+            p->onReboot(); // never returns (ESP.restart)
+          }
+        }
+      },
+      LV_EVENT_CLICKED, payload);
 
   Display::activePopup = overlay;
 }
