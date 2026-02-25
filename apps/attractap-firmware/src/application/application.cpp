@@ -405,7 +405,6 @@ void Application::processState()
 
     if (!connectionIsConfigured)
     {
-        this->logger.debug("Connection is not configured, showing connection configuration screen");
         if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
             this->logger.debug("Connection is not configured, showing connection configuration screen");
@@ -423,6 +422,7 @@ void Application::processState()
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
         this->api.enableConnectionAttempts();
+        return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
@@ -461,7 +461,7 @@ void Application::processState()
 #ifdef HAS_LVGL_DISPLAY
         this->resetSessionOnDisconnect();
 #endif
-        if (this->state == APPLICATION_STATE_INIT)
+        if (this->state == APPLICATION_STATE_INIT || this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
             return;
         }

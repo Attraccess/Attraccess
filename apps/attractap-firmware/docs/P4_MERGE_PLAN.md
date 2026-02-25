@@ -103,9 +103,9 @@ Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support in
 
 ### Deliverables
 
-1. **`src/main.cpp`** – Wrap Application usage in a conditional. When `DISPLAY_DRIVER_P4_DSI` is defined and Application-related code is excluded (or when a new flag `ATTACTAP_P4_FULL_APP` is not set), use minimal flow:
+1. **`src/main.cpp`** – Wrap Application usage in a conditional. When `DISPLAY_DRIVER_P4_DSI` is defined and Application-related code is excluded (or when a new flag `ATTRACTAP_P4_FULL_APP` is not set), use minimal flow:
    ```cpp
-   #if defined(DISPLAY_DRIVER_P4_DSI) && !defined(ATTACTAP_P4_FULL_APP)
+   #if defined(DISPLAY_DRIVER_P4_DSI) && !defined(ATTRACTAP_P4_FULL_APP)
    // Minimal P4: display+touch only (no Application)
    #include "display_p4.hpp"  // or display.hpp if Display is unified
    void setup() { ... Wire, Display::setup(); }
@@ -140,7 +140,7 @@ Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support in
 
 ### Scope
 
-- **In scope:** Re-enable `application/`, `api/`, `network/`, `nfc/`, `state/`, `settings/`, `websocket/`, `serial/`, `certs/`, `ioexpander/` (or exclude if P4 has no hardware), and all display screens in [env:attractap-p4] `build_src_filter`. Switch from `display_p4.cpp` to `display.cpp`. Add missing lib_deps (ArduinoJson, Arduino_CRC32). Resolve compile and link errors. Add `ATTACTAP_P4_FULL_APP=1` so `main.cpp` uses Application.
+- **In scope:** Re-enable `application/`, `api/`, `network/`, `nfc/`, `state/`, `settings/`, `websocket/`, `serial/`, `certs/`, `ioexpander/` (or exclude if P4 has no hardware), and all display screens in [env:attractap-p4] `build_src_filter`. Switch from `display_p4.cpp` to `display.cpp`. Add missing lib_deps (ArduinoJson, Arduino_CRC32). Resolve compile and link errors. Add `ATTRACTAP_P4_FULL_APP=1` so `main.cpp` uses Application.
 - **Out of scope:** NFC hardware support on P4 (if hardware differs); ioexpander (exclude if not present).
 
 ### Dependencies
@@ -150,13 +150,13 @@ Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support in
 ### Deliverables
 
 1. **`platformio.ini`** – [env:attractap-p4]:
-   - Set `ATTACTAP_P4_FULL_APP=1` in build_flags
+   - Set `ATTRACTAP_P4_FULL_APP=1` in build_flags
    - Remove exclusions: `-<application/>`, `-<api/>`, `-<network/>`, `-<nfc/>`, `-<state/>`, `-<settings/>`, `-<websocket/>`, `-<serial/>`, `-<certs/>`, and all `-<display/screens/...>`, `-<display/shared/>`
    - Remove `-<display/display.cpp>` and add `-<display/display_p4.cpp>` (switch to unified display)
    - Add `lib_deps`: `bblanchon/ArduinoJson@^7.4.2`, `arduino-libraries/Arduino_CRC32@^1.0.0`
    - Keep `-<display/driver/qualia/>`, `-<display/driver/gt911/>`, `-<display/images/>` (or include images if needed)
    - Evaluate `ioexpander/`: exclude if P4 hardware has no TCA9554
-2. **`src/main.cpp`** – Ensure `#include "display/display.hpp"` (or correct path) when `ATTACTAP_P4_FULL_APP` is set; remove `display_p4.hpp` from minimal branch if no longer needed
+2. **`src/main.cpp`** – Ensure `#include "display/display.hpp"` (or correct path) when `ATTRACTAP_P4_FULL_APP` is set; remove `display_p4.hpp` from minimal branch if no longer needed
 3. **Resolve build errors** – Address any P4-specific compile issues (e.g. `pre:tools/build_adaptive_certs_wrapper.py` may need P4 handling; NFC/network code may need `#ifdef` for ESP32-P4)
 
 ### Test Requirements
@@ -377,7 +377,7 @@ Current: Ethernet excluded for P4 (`#if !defined(CONFIG_IDF_TARGET_ESP32P4)` in 
 - `DISPLAY_DRIVER_P4_DSI=1`
 - `P4_PANEL_JC1060P470=1`
 - `P4_LCD_BL_ACTIVE_HIGH=1`
-- `ATTACTAP_P4_FULL_APP=1` (Phase 3+)
+- `ATTRACTAP_P4_FULL_APP=1` (Phase 3+)
 
 ---
 

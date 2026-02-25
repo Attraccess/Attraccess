@@ -64,7 +64,7 @@ bool P4DsiGt911Driver::begin()
         DSI_PREFER_SPEED, DSI_LANE_RATE);
 
     gfx = new Arduino_DSI_Display(
-        PANEL_WIDTH, PANEL_HEIGHT, dsipanel, 0 /* rotation */, true /* auto_flush */,
+        PANEL_WIDTH, PANEL_HEIGHT, dsipanel, 3 /* rotation: 3 = 270° portrait (opposite direction) */, true /* auto_flush */,
         PIN_LCD_RST, jd9165_init_operations,
         sizeof(jd9165_init_operations) / sizeof(lcd_init_cmd_t));
 

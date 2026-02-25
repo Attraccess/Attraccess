@@ -8,7 +8,19 @@ void Lockscreen::init()
     }
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_row(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_column(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    /* Background image as first child, scaled to cover full screen (P4 has larger display) */
+    lv_obj_t *bg_img = lv_image_create(this->screen);
+    lv_image_set_src(bg_img, &lockscreen_background_image);
+    lv_obj_set_size(bg_img, lv_pct(100), lv_pct(100));
+    lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_set_pos(bg_img, 0, 0);
+    lv_image_set_inner_align(bg_img, LV_IMAGE_ALIGN_COVER);
 
     lv_obj_t *label = lv_label_create(this->screen);
     lv_obj_set_width(label, LV_SIZE_CONTENT);

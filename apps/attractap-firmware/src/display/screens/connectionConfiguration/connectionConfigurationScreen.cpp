@@ -91,6 +91,7 @@ void ConnectionConfigurationScreen::init()
    lv_textarea_set_text(this->wifiPassword, networkConfig.password.c_str());
 
    lv_obj_t *containerForSaveButtonWifi = this->createSaveContainer(wifiTab);
+   this->createCloseButton(containerForSaveButtonWifi);
    this->createSaveButton(containerForSaveButtonWifi);
 
    this->startWifiScan();
@@ -155,6 +156,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
+   this->createCloseButton(containerForSaveButton);
    this->createSaveButton(containerForSaveButton);
 
    // Also add a save button to the API tab header/footer container for consistency
@@ -196,6 +198,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_state(this->beeperEnabled, LV_STATE_CHECKED, deviceConfig.beeperEnabled);
 
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
+   this->createCloseButton(containerForSaveButtonDevice);
    this->createSaveButton(containerForSaveButtonDevice);
 
    this->keyboard = lv_keyboard_create(this->screen);
@@ -455,6 +458,17 @@ static bool pinLooksValid(const char *text)
    return true;
 }
 
+void ConnectionConfigurationScreen::onCloseButtonEvent(lv_event_t *e)
+{
+   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
+   if (!self)
+      return;
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+      return;
+   if (self->onCancelPinLockCallback)
+      self->onCancelPinLockCallback();
+}
+
 void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
 {
    ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
@@ -521,7 +535,7 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       return;
    }
 
-   // All valid -> call callback if provided
+   // All valid -> call callback if provided, then close
    if (self->onSaveCallback)
    {
       ConnectionConfigurationScreen::ConnectionConfig cfg;
@@ -532,6 +546,8 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
       cfg.devicePin = String(devicePinText);
       cfg.beeperEnabled = lv_obj_has_state(self->beeperEnabled, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);
+      if (self->onCancelPinLockCallback)
+         self->onCancelPinLockCallback();
    }
 }
 
@@ -605,6 +621,29 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
    return save;
 }
 
+lv_obj_t *ConnectionConfigurationScreen::createCloseButton(lv_obj_t *parent)
+{
+   lv_obj_t *close = lv_button_create(parent);
+   lv_obj_set_width(close, 100);
+   lv_obj_set_height(close, 50);
+   lv_obj_set_align(close, LV_ALIGN_CENTER);
+   lv_obj_add_flag(close, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(close, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(close, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(close, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(close, &ConnectionConfigurationScreen::onCloseButtonEvent, LV_EVENT_CLICKED, this);
+
+   lv_obj_t *label = lv_label_create(close);
+   lv_obj_set_width(label, LV_SIZE_CONTENT);
+   lv_obj_set_height(label, LV_SIZE_CONTENT);
+   lv_obj_set_align(label, LV_ALIGN_CENTER);
+   lv_label_set_text(label, "Schliessen");
+   lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   return close;
+}
+
 lv_obj_t *ConnectionConfigurationScreen::createSaveContainer(lv_obj_t *parent)
 {
    lv_obj_t *container = lv_obj_create(parent);
@@ -613,7 +652,8 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveContainer(lv_obj_t *parent)
    lv_obj_set_height(container, LV_SIZE_CONTENT);
    lv_obj_set_align(container, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(container, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_set_flex_align(container, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_set_style_pad_column(container, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(container, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(container, LV_OBJ_FLAG_SCROLLABLE);
    return container;

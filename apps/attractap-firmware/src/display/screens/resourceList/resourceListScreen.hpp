@@ -26,6 +26,7 @@ public:
 private:
     Logger logger;
     lv_obj_t *screen = nullptr;
+    lv_obj_t *contentContainer = nullptr;
     lv_obj_t *resourceContainer = nullptr;
     API::ResourceList cachedResourceList{};
     bool hasCachedResourceList = false;

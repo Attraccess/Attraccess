@@ -10,12 +10,33 @@ void ResourceListScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_width(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *logo = lv_image_create(this->screen);
+   /* Background image as first child, scaled to cover full screen (P4 has larger display) */
+   lv_obj_t *bg_img = lv_image_create(this->screen);
+   lv_image_set_src(bg_img, &lockscreen_background_image);
+   lv_obj_set_size(bg_img, lv_pct(100), lv_pct(100));
+   lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_set_pos(bg_img, 0, 0);
+   lv_image_set_inner_align(bg_img, LV_IMAGE_ALIGN_COVER);
+
+   this->contentContainer = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(this->contentContainer);
+   lv_obj_set_width(this->contentContainer, lv_pct(100));
+   lv_obj_set_height(this->contentContainer, LV_SIZE_CONTENT);
+   lv_obj_set_flex_grow(this->contentContainer, 1);
+   lv_obj_set_flex_flow(this->contentContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->contentContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->contentContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_left(this->contentContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(this->contentContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(this->contentContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *logo = lv_image_create(this->contentContainer);
    lv_image_set_src(logo, &logo_40h);
    lv_obj_set_height(logo, 40);
    lv_obj_set_width(logo, lv_pct(100));
@@ -23,7 +44,7 @@ void ResourceListScreen::init()
    lv_obj_add_flag(logo, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(logo, LV_OBJ_FLAG_SCROLLABLE);
 
-   this->resourceContainer = lv_obj_create(this->screen);
+   this->resourceContainer = lv_obj_create(this->contentContainer);
    lv_obj_remove_style_all(resourceContainer);
    lv_obj_set_width(resourceContainer, lv_pct(100));
    lv_obj_set_height(resourceContainer, 380);
@@ -125,7 +146,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
 
 void ResourceListScreen::setNoResourcesMessage()
 {
-   lv_obj_t *noResourcesMessage = lv_label_create(this->screen);
+   lv_obj_t *noResourcesMessage = lv_label_create(this->contentContainer);
    lv_obj_set_width(noResourcesMessage, lv_pct(100));
    lv_obj_set_height(noResourcesMessage, LV_SIZE_CONTENT);
    lv_obj_set_align(noResourcesMessage, LV_ALIGN_CENTER);
@@ -195,5 +216,6 @@ void ResourceListScreen::destroy()
    }
    lv_obj_del(this->screen);
    this->screen = nullptr;
+   this->contentContainer = nullptr;
    this->resourceContainer = nullptr;
 }

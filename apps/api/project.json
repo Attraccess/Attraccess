@@ -22,7 +22,7 @@
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": [
+      "not_dependsOn": [
         "copy-attractap-firmware-into-assets"
       ],
       "inputs": [

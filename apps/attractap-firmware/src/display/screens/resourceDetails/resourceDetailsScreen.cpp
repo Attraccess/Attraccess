@@ -18,13 +18,34 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_width(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *loginContainer = lv_obj_create(this->screen);
+   /* Background image as first child, scaled to cover full screen (P4 has larger display) */
+   lv_obj_t *bg_img = lv_image_create(this->screen);
+   lv_image_set_src(bg_img, &lockscreen_background_image);
+   lv_obj_set_size(bg_img, lv_pct(100), lv_pct(100));
+   lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT);
+   lv_obj_set_pos(bg_img, 0, 0);
+   lv_image_set_inner_align(bg_img, LV_IMAGE_ALIGN_COVER);
+
+   lv_obj_t *content = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(content);
+   lv_obj_set_width(content, lv_pct(100));
+   lv_obj_set_height(content, LV_SIZE_CONTENT);
+   lv_obj_set_flex_grow(content, 1);
+   lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_left(content, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_right(content, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(content, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_bottom(content, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   lv_obj_t *loginContainer = lv_obj_create(content);
    lv_obj_remove_style_all(loginContainer);
    lv_obj_set_width(loginContainer, lv_pct(100));
    lv_obj_set_height(loginContainer, LV_SIZE_CONTENT);
@@ -92,7 +113,7 @@ void ResourceDetailsScreen::init()
    if (lv_obj_get_style_pad_top(this->sessionTimeoutIndicator, LV_PART_MAIN) > 0)
       lv_obj_set_style_pad_right(this->sessionTimeoutIndicator, lv_obj_get_style_pad_right(this->sessionTimeoutIndicator, LV_PART_MAIN) + 1, LV_PART_MAIN);
 
-   lv_obj_t *header = lv_obj_create(this->screen);
+   lv_obj_t *header = lv_obj_create(content);
    lv_obj_remove_style_all(header);
    lv_obj_set_width(header, lv_pct(100));
    lv_obj_set_height(header, LV_SIZE_CONTENT);
@@ -129,7 +150,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->sessionDetailsContainer = lv_obj_create(this->screen);
+   this->sessionDetailsContainer = lv_obj_create(content);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
    lv_obj_set_width(this->sessionDetailsContainer, lv_pct(100));
    lv_obj_set_height(this->sessionDetailsContainer, LV_SIZE_CONTENT);
@@ -219,7 +240,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->elapsedTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->sessionControls = lv_obj_create(this->screen);
+   this->sessionControls = lv_obj_create(content);
    lv_obj_remove_style_all(this->sessionControls);
    lv_obj_set_width(this->sessionControls, lv_pct(100));
    lv_obj_set_height(this->sessionControls, LV_SIZE_CONTENT);
@@ -370,7 +391,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_SCROLLABLE);
 
-   this->noIntroductionPanel = lv_obj_create(this->screen);
+   this->noIntroductionPanel = lv_obj_create(content);
    lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
    lv_obj_set_height(this->noIntroductionPanel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->noIntroductionPanel, LV_ALIGN_CENTER);

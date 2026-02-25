@@ -59,6 +59,7 @@ private:
     static void onTextAreaEvent(lv_event_t *e);
     static void onKeyboardEvent(lv_event_t *e);
     static void onSaveButtonEvent(lv_event_t *e);
+    static void onCloseButtonEvent(lv_event_t *e);
     static void onWifiDropdownEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();
@@ -79,5 +80,6 @@ private:
     bool wifiDropdownHasNetworks = false;
 
     lv_obj_t *createSaveButton(lv_obj_t *parent);
+    lv_obj_t *createCloseButton(lv_obj_t *parent);
     lv_obj_t *createSaveContainer(lv_obj_t *parent);
 };

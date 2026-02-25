@@ -9,3 +9,4 @@ firmware_output/*
 src/certs/
 
 platformio_temp.ini
+.cache/

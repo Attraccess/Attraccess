@@ -784,6 +784,59 @@
     #define LV_DEMO_MUSIC_AUTO_PLAY 0
 #endif
 
+/*====================
+ * P4 TARGET OVERRIDES
+ *====================*/
+#if defined(ATTRACTAP_P4)
+/* ESP32-P4 has 768KB SRAM + 16–32MB PSRAM – use higher limits for smoother UI */
+
+/* Faster refresh: 5ms = 200Hz vs default 10ms = 100Hz */
+#undef LV_DISP_DEF_REFR_PERIOD
+#define LV_DISP_DEF_REFR_PERIOD 5
+
+/* Faster touch polling */
+#undef LV_INDEV_DEF_READ_PERIOD
+#define LV_INDEV_DEF_READ_PERIOD 5
+
+/* More intermediate buffers for rendering */
+#undef LV_MEM_BUF_MAX_NUM
+#define LV_MEM_BUF_MAX_NUM 32
+
+/* Shadow cache for smoother shadows (RAM cost: size^2) */
+#undef LV_SHADOW_CACHE_SIZE
+#define LV_SHADOW_CACHE_SIZE 8
+
+/* More circle cache for rounded corners/arcs */
+#undef LV_CIRCLE_CACHE_SIZE
+#define LV_CIRCLE_CACHE_SIZE 8
+
+/* Larger layer buffers for opacity/transforms */
+#undef LV_LAYER_SIMPLE_BUF_SIZE
+#define LV_LAYER_SIMPLE_BUF_SIZE (24 * 1024)
+#undef LV_LAYER_SIMPLE_FALLBACK_BUF_SIZE
+#define LV_LAYER_SIMPLE_FALLBACK_BUF_SIZE (8 * 1024)
+
+/* Enable image cache (PNG/JPG if used) */
+#undef LV_IMG_CACHE_DEF_SIZE
+#define LV_IMG_CACHE_DEF_SIZE 4
+
+/* Gradient cache for smoother gradients */
+#undef LV_GRAD_CACHE_DEF_SIZE
+#define LV_GRAD_CACHE_DEF_SIZE 2048
+
+/* Smoother theme transitions */
+#undef LV_THEME_DEFAULT_TRANSITION_TIME
+#define LV_THEME_DEFAULT_TRANSITION_TIME 120
+
+/* Label features (text selection, long-text hint) – smoother text rendering */
+#if LV_USE_LABEL
+#undef LV_LABEL_TEXT_SELECTION
+#define LV_LABEL_TEXT_SELECTION 1
+#undef LV_LABEL_LONG_TXT_HINT
+#define LV_LABEL_LONG_TXT_HINT 1
+#endif
+#endif /* ATTRACTAP_P4 */
+
 /*--END OF LV_CONF_H--*/
 
 #endif /*LV_CONF_H*/

@@ -112,7 +112,6 @@ If WiFi scan shows no networks or "Transport not initialized":
 
 | Issue | Fix |
 |-------|-----|
-| `FRAMEWORK_DIR` / `Path(...) returns NoneType` | The project applies `tools/patch_pioarduino_framework_dir.py` automatically. If it fails, manually patch `~/.platformio/platforms/espressif32/builder/frameworks/arduino.py`: when `FRAMEWORK_DIR` is None, use `FRAMEWORK_LIB_DIR/chip_variant/pioarduino-build.py` (see the script for the exact patch). |
 | `cc1plus` or `riscv32-esp-elf-g++: not found` | Run `pio pkg update` or remove `~/.platformio/packages/toolchain-riscv32-esp*` and rebuild |
 | `ModuleNotFoundError: No module named 'intelhex'` | esptool needs intelhex for bootloader conversion. If PlatformIO was installed via pipx: `~/.local/share/pipx/venvs/platformio/bin/python -m pip install intelhex`. Otherwise: `~/.platformio/penv/bin/pip install intelhex` |
 | `ModuleNotFoundError: esptool` | `~/.platformio/penv/bin/pip install --force-reinstall esptool` |

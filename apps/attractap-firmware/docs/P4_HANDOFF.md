@@ -66,8 +66,7 @@ Phase 4 has been implemented.
 3. **`platformio.ini`** – Removed `-<main_p4.cpp>` and `-<display/display_p4.cpp>` from all envs; added `-<nfc/nfc_p4_stub.cpp>` to attractap-touch and attractap-touch-ethernet
 4. **`docs/P4_SETUP.md`** – P4 setup guide (hardware, build, upload, serial, toolchain troubleshooting)
 5. **`attractap-p4-findings.md`** – Updated status to Phase 4 complete; POC is full app; removed Legacy section
-6. **Build fix** – `tools/patch_pioarduino_framework_dir.py` patches platform when FRAMEWORK_DIR is None (P4 uses framework-arduinoespressif32-libs)
-7. **intelhex** – Documented fix for pipx-installed PlatformIO: `~/.local/share/pipx/venvs/platformio/bin/python -m pip install intelhex`
+6. **intelhex** – Documented fix for pipx-installed PlatformIO: `~/.local/share/pipx/venvs/platformio/bin/python -m pip install intelhex`
 
 ### Verification (Phase 4 – completed)
 
@@ -95,7 +94,7 @@ Phase 3 has been implemented.
 ### What Was Done
 
 1. **`platformio.ini`** – [env:attractap-p4]:
-   - Added `ATTACTAP_P4_FULL_APP=1` to build_flags
+   - Added `ATTRACTAP_P4_FULL_APP=1` to build_flags
    - Removed exclusions for application/, api/, network/, nfc/, state/, settings/, websocket/, serial/, certs/, and all display screens
    - Switched from display_p4.cpp to display.cpp (excluded display_p4.cpp)
    - Added lib_deps: bblanchon/ArduinoJson@^7.4.2, arduino-libraries/Arduino_CRC32@^1.0.0
@@ -156,7 +155,7 @@ Phase 2 has been implemented.
 ### What Was Done
 
 1. **`src/main.cpp`** – Added conditional minimal mode:
-   - When `DISPLAY_DRIVER_P4_DSI` is defined and `ATTACTAP_P4_FULL_APP` is not set: minimal flow (Wire init, `Display::setup()`, `Display::loop()`) using `display_p4.hpp`
+   - When `DISPLAY_DRIVER_P4_DSI` is defined and `ATTRACTAP_P4_FULL_APP` is not set: minimal flow (Wire init, `Display::setup()`, `Display::loop()`) using `display_p4.hpp`
    - Else: full application flow (unchanged)
 
 2. **`platformio.ini`** – [env:attractap-p4] `build_src_filter`:
