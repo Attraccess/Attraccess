@@ -37,15 +37,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.e
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
-
-type PermissionMappings = Record<string, string[]>;
-
-const hasConfiguredPermissionMapping = (mapping?: PermissionMappings | null): boolean => {
-  if (!mapping) {
-    return false;
-  }
-  return Object.values(mapping).some((value) => Array.isArray(value) && value.length > 0);
-};
+import { hasConfiguredPermissionMapping } from '@attraaccess/shared';
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -106,11 +98,12 @@ export function UserManagementDetailsPage() {
         return;
       }
 
-      const permissionMappings = (detail.providerType === SSOProviderType.OIDC
-        ? provider.oidcConfiguration?.permissionMappings
-        : detail.providerType === SSOProviderType.SAML
-          ? provider.samlConfiguration?.permissionMappings
-          : undefined) as PermissionMappings | null | undefined;
+      const permissionMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.permissionMappings
+          : detail.providerType === SSOProviderType.SAML
+            ? provider.samlConfiguration?.permissionMappings
+            : undefined;
 
       if (hasConfiguredPermissionMapping(permissionMappings)) {
         labels.add(provider.name ?? `${detail.providerType} #${detail.providerId}`);

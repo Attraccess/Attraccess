@@ -969,7 +969,10 @@ export class UsersController {
         continue;
       }
 
-      await this.ensurePermissionsNotManagedBySso(user);
+      if (await this.isPermissionsManagedBySso(user)) {
+        this.logger.warn(`Permissions update skipped for SSO-managed user ID: ${user.id}`);
+        continue;
+      }
       updateCandidates.push({ update, user });
     }
 

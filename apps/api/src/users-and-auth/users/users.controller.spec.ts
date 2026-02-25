@@ -368,8 +368,8 @@ describe('UsersController', () => {
       expect(usersService.updateOne).not.toHaveBeenCalled();
     });
 
-    it('blocks bulkUpdatePermissions when SSO permission mappings exist', async () => {
-      const targetUser = {
+    it('skips SSO-managed users in bulkUpdatePermissions instead of 403', async () => {
+      const ssoManagedUser = {
         id: 2,
         systemPermissions: {
           canManageResources: false,
@@ -385,8 +385,22 @@ describe('UsersController', () => {
           },
         ],
       } as User;
+      const normalUser = {
+        id: 3,
+        systemPermissions: {
+          canManageResources: false,
+          canManageSystemConfiguration: false,
+          canManageUsers: false,
+          canManageBilling: false,
+        },
+        authenticationDetails: [],
+      } as User;
 
-      jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+      jest
+        .spyOn(usersService, 'findOne')
+        .mockImplementation(({ id }) =>
+          Promise.resolve(id === 2 ? ssoManagedUser : id === 3 ? normalUser : null),
+        );
       jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
         oidcConfiguration: {
           permissionMappings: {
@@ -395,21 +409,20 @@ describe('UsersController', () => {
         },
       } as never);
 
-      await expect(
-        controller.bulkUpdatePermissions(
-          {
-            updates: [
-              {
-                userId: targetUser.id,
-                permissions: { canManageResources: true },
-              },
-            ],
-          },
-          { user: requestUser } as AuthenticatedRequest,
-        ),
-      ).rejects.toThrow('UserPermissionsManagedBySSO');
+      const result = await controller.bulkUpdatePermissions(
+        {
+          updates: [
+            { userId: ssoManagedUser.id, permissions: { canManageResources: true } },
+            { userId: normalUser.id, permissions: { canManageResources: true } },
+          ],
+        },
+        { user: requestUser } as AuthenticatedRequest,
+      );
 
-      expect(usersService.updateOne).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(ssoManagedUser.id).not.toBe(result[0].id);
+      expect(result[0].id).toBe(normalUser.id);
+      expect(usersService.updateOne).toHaveBeenCalledTimes(1);
     });
   });
 });
