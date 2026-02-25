@@ -796,7 +796,7 @@
 
 /* Faster touch polling */
 #undef LV_INDEV_DEF_READ_PERIOD
-#define LV_INDEV_DEF_READ_PERIOD 5
+#define LV_INDEV_DEF_READ_PERIOD 3
 
 /* More intermediate buffers for rendering */
 #undef LV_MEM_BUF_MAX_NUM
@@ -826,7 +826,11 @@
 
 /* Smoother theme transitions */
 #undef LV_THEME_DEFAULT_TRANSITION_TIME
-#define LV_THEME_DEFAULT_TRANSITION_TIME 120
+#define LV_THEME_DEFAULT_TRANSITION_TIME 50
+
+/* Disable grow-on-press to reduce render cost and improve button reactivity */
+#undef LV_THEME_DEFAULT_GROW
+#define LV_THEME_DEFAULT_GROW 0
 
 /* Label features (text selection, long-text hint) – smoother text rendering */
 #if LV_USE_LABEL

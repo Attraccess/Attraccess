@@ -41,6 +41,10 @@ private:
     std::function<void()> onCancelPinLockCallback;
     bool onPinLockConfirmCallback(String pin);
 
+    lv_timer_t *pinWrongCooldownTimer = nullptr;
+    lv_obj_t *pinCooldownOverlay = nullptr;
+    static void onPinCooldownTimer(lv_timer_t *t);
+
     lv_obj_t *tabs = nullptr;
     lv_obj_t *keyboard = nullptr;
     lv_obj_t *wifiSSID = nullptr;

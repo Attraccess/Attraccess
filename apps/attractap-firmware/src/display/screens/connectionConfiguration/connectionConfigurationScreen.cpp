@@ -680,6 +680,20 @@ void ConnectionConfigurationScreen::enablePinLock()
    lv_obj_clear_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 
+void ConnectionConfigurationScreen::onPinCooldownTimer(lv_timer_t *t)
+{
+   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_timer_get_user_data(t));
+   if (!self)
+      return;
+   if (self->pinCooldownOverlay)
+   {
+      lv_obj_del(self->pinCooldownOverlay);
+      self->pinCooldownOverlay = nullptr;
+   }
+   lv_timer_del(t);
+   self->pinWrongCooldownTimer = nullptr;
+}
+
 bool ConnectionConfigurationScreen::onPinLockConfirmCallback(String pin)
 {
    String devicePin = Settings::getDeviceConfig().passCode;
@@ -687,8 +701,27 @@ bool ConnectionConfigurationScreen::onPinLockConfirmCallback(String pin)
 
    if (!matches)
    {
-      // delay to slow down brute force attacks
-      delay(5000);
+      if (this->pinWrongCooldownTimer)
+         return false; /* cooldown already in progress */
+
+      if (!this->pinLockOverlay)
+         return false;
+
+      this->pinCooldownOverlay = lv_obj_create(this->pinLockOverlay);
+      lv_obj_set_size(this->pinCooldownOverlay, lv_pct(100), lv_pct(100));
+      lv_obj_set_align(this->pinCooldownOverlay, LV_ALIGN_CENTER);
+      lv_obj_set_style_bg_color(this->pinCooldownOverlay, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_bg_opa(this->pinCooldownOverlay, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_remove_flag(this->pinCooldownOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+      lv_obj_t *label = lv_label_create(this->pinCooldownOverlay);
+      lv_label_set_text(label, "Falscher PIN.\nBitte 5s warten.");
+      lv_obj_set_style_text_color(label, lv_color_hex(0xFF4D4D), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_font(label, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_center(label);
+
+      this->pinWrongCooldownTimer = lv_timer_create(onPinCooldownTimer, 5000, this);
+      lv_timer_set_repeat_count(this->pinWrongCooldownTimer, 1);
       return false;
    }
 
@@ -716,6 +749,12 @@ void ConnectionConfigurationScreen::destroy()
    {
       return;
    }
+   if (this->pinWrongCooldownTimer)
+   {
+      lv_timer_del(this->pinWrongCooldownTimer);
+      this->pinWrongCooldownTimer = nullptr;
+   }
+   this->pinCooldownOverlay = nullptr;
    lv_obj_del(this->screen);
    this->screen = nullptr;
    this->pinLockOverlay = nullptr;
