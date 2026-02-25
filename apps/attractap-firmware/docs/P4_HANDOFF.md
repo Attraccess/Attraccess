@@ -1,7 +1,29 @@
 # P4 Merge Plan – Handoff for Next Phase
 
-**Last updated:** After Phase 5 completion  
-**Next phase:** Phase 6 – WebSocket (real connection)
+**Last updated:** After Phase 6 completion  
+**Next phase:** Phase 7 – NFC (real NFC + error screen)
+
+---
+
+## Phase 6 Status: COMPLETE
+
+Phase 6 (WebSocket real connection) has been implemented.
+
+### What Was Done
+
+1. **`src/websocket/websocket_p4.hpp`** – P4 WebSocket class using WiFiClient/WiFiClientSecure; RFC 6455 handshake and framing.
+2. **`src/websocket/websocket_p4.cpp`** – Full implementation: TCP connect, HTTP upgrade, send/receive frames (text, binary, ping/pong, close).
+3. **`src/websocket/websocket.hpp`** – Conditional: P4 uses `websocket_p4.hpp`, non-P4 uses `esp_websocket_client.h`.
+4. **`platformio.ini`** – P4 env: `-<websocket/websocket.cpp>` so P4 uses `websocket_p4.cpp` only.
+
+### Verification (Phase 6)
+
+| Step | Result |
+|------|--------|
+| Build | `pio run -e attractap-p4` – SUCCESS |
+| Upload | `pio run -e attractap-p4 -t upload` – (verify on hardware) |
+| Serial | Expect "Websocket setup (P4 native)" instead of stub |
+| Camera | Configure WiFi + API; WebSocket connects when network up |
 
 ---
 

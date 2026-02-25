@@ -10,7 +10,8 @@ Ref: [Reddit thread](https://www.reddit.com/r/homeassistant/s/7yXRVO9815), [esph
 **Serial:** Working (ARDUINO_USB_MODE=1 → HWCDCSerial)  
 **Display:** ✅ Working  
 **Touch:** GT911 OK  
-**WiFi:** ✅ ESP-Hosted init added (Phase 5); verify scan/connect on hardware
+**WiFi:** ✅ ESP-Hosted init added (Phase 5); verify scan/connect on hardware  
+**WebSocket:** ✅ Phase 6 – native P4 implementation (WiFiClient/WiFiClientSecure + RFC 6455)
 
 ---
 

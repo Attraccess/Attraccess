@@ -2,9 +2,6 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#if !defined(CONFIG_IDF_TARGET_ESP32P4)
-#include <esp_websocket_client.h>
-#endif
 #include "../../certs/ca_index.hpp"
 #include "../../logger/logger.hpp"
 
