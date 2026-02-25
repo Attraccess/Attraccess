@@ -3,9 +3,10 @@
 void Websocket::setup()
 {
     logger.info("Websocket setup");
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     this->_certManager.begin();
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    logger.info("WebSocket: ESP32-P4 stub (esp_websocket_client not available)");
+#else
+    logger.info("WebSocket stub (P4 - esp_websocket_client not available)");
 #endif
 }
 
@@ -17,12 +18,6 @@ void Websocket::loop()
     }
 
     this->updateInfoFromAppState();
-
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    // P4 stub: never connect; websocket stays in INIT
-    (void)_lastApiConfig;
-    return;
-#endif
 
     if (!network_is_connected)
     {
@@ -57,12 +52,6 @@ void Websocket::updateInfoFromAppState()
 
 void Websocket::connectWebSocket()
 {
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    // P4 stub: esp_websocket_client not available
-    logger.info("connectWebSocket: skipped on ESP32-P4 (no esp_websocket_client)");
-    setState(INIT);
-    return;
-#else
     if (!connectionAttemptsEnabled)
     {
         return;
@@ -74,6 +63,11 @@ void Websocket::connectWebSocket()
     }
     lastReconnectAttemptTime = millis();
 
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    logger.info("connectWebSocket: P4 stub - WebSocket not available");
+    setState(INIT);
+    return;
+#else
     logger.info("connectWebSocket");
 
     if (!network_is_connected)
@@ -163,7 +157,7 @@ void Websocket::connectWebSocket()
     }
 
     logger.info("connectWebSocket: WebSocket started");
-#endif // !CONFIG_IDF_TARGET_ESP32P4
+#endif
 }
 
 bool Websocket::shouldReconnect()
@@ -171,15 +165,17 @@ bool Websocket::shouldReconnect()
     return millis() - this->lastReconnectAttemptTime >= this->RECONNECT_INTERVAL_MS;
 }
 
-#if !defined(CONFIG_IDF_TARGET_ESP32P4)
 void Websocket::websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     Websocket *websocket = (Websocket *)handler_args;
     websocket->processWebSocketEvent(base, event_id, event_data);
+#endif
 }
 
 void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, void *event_data)
 {
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
@@ -238,15 +234,12 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         logger.error(("Unknown event: " + String(event_id)).c_str());
         break;
     }
+#endif
 }
-#endif // !CONFIG_IDF_TARGET_ESP32P4
 
 void Websocket::sendMessage(const String &message)
 {
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    (void)message;
-    return;
-#else
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     this->logger.debug(("sendMessage: " + message).c_str());
     int ret = esp_websocket_client_send_text(ws_client, message.c_str(), message.length(), pdMS_TO_TICKS(5000));
 
@@ -259,11 +252,7 @@ void Websocket::sendMessage(const String &message)
 
 void Websocket::sendMessage(const char *message, size_t length)
 {
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    (void)message;
-    (void)length;
-    return;
-#else
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     if (!ws_client)
     {
         logger.error("sendMessage(raw): ws_client not initialized");

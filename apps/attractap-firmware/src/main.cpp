@@ -5,13 +5,13 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-SET_LOOP_TASK_STACK_SIZE(16 * 1024); // 16KB
-
-Logger mainLogger("Main");
-
 #include "application/application.hpp"
 
+SET_LOOP_TASK_STACK_SIZE(16 * 1024); // 16KB
+
 Application application;
+
+Logger mainLogger("Main");
 
 #ifdef LOG_MEMORY_DEBUG
 void logLoopStackUsage()

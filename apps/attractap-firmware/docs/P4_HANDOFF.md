@@ -1,7 +1,35 @@
 # P4 Merge Plan – Handoff for Next Phase
 
-**Last updated:** After Phase 4 completion  
-**Next phase:** Phase 5 – WiFi via ESP-Hosted (C6)
+**Last updated:** After Phase 5 completion  
+**Next phase:** Phase 6 – WebSocket (real connection)
+
+---
+
+## Phase 5 Status: COMPLETE
+
+Phase 5 (WiFi via ESP-Hosted) has been implemented.
+
+### What Was Done
+
+1. **`src/network/network.cpp`** – Added ESP-Hosted init before WiFi:
+   - `esp_hosted_init()` – initializes SDIO transport between P4 and C6
+   - `esp_hosted_connect_to_slave()` – connects to C6 coprocessor
+   - Only compiled when `CONFIG_IDF_TARGET_ESP32P4` is defined
+2. **Transport:** SDIO 4-bit (framework defaults match Guition: CMD=19, CLK=18, D0–D3=14–17, Reset=54)
+3. **`src/idf_component.yml`** – Added esp_hosted and esp_wifi_remote for P4 target
+4. **`docs/P4_SETUP.md`** – Documented ESP-Hosted init, transport pins, troubleshooting
+5. **`attractap-p4-findings.md`** – Updated WiFi status and ESP-Hosted pins
+6. **Full app for P4** – Enabled main.cpp, application, network, websocket stub, NFC stub; excluded ethernet, real NFC, mbedtlscmac
+
+### Verification (Phase 5)
+
+| Step | Result |
+|------|--------|
+| Build | `pio run -e attractap-p4` – SUCCESS |
+| Upload | `pio run -e attractap-p4 -t upload` – (verify on hardware) |
+| WiFi | ESP-Hosted init runs before WiFi; no "Transport not initialized" in code path |
+
+**Hardware verification:** Flash firmware, open ConnectionConfigurationScreen WLAN tab, run WiFi scan. If C6 has ESP-Hosted slave firmware, scan should list networks.
 
 ---
 

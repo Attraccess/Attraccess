@@ -1,25 +1,24 @@
 #pragma once
 
 #include <Arduino.h>
+#if !defined(CONFIG_IDF_TARGET_ESP32P4)
+#include "esp_websocket_client.h"
+#else
+// P4 stub: esp_websocket_client not available; use placeholder types
+typedef void *esp_websocket_client_handle_t;
+struct esp_websocket_event_data_t {
+    void *data_ptr;
+    int data_len;
+    size_t payload_len;
+    size_t payload_offset;
+    uint8_t op_code;
+};
+#endif
 #include "../settings/settings.hpp"
 #include <functional>
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "certManager/AdaptiveCertManager.hpp"
-
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-// P4 stub: esp_websocket_client not available on ESP32-P4 platform yet
-struct esp_websocket_event_data_t
-{
-    void *data_ptr;
-    size_t data_len;
-    size_t payload_len;
-    size_t payload_offset;
-};
-using esp_websocket_client_handle_t = void *;
-#else
-#include "esp_websocket_client.h"
-#endif
 
 class Websocket
 {
@@ -63,12 +62,10 @@ private:
     ConnectionState _state = INIT;
     void setState(ConnectionState state);
 
-    esp_websocket_client_handle_t ws_client = nullptr;
+    esp_websocket_client_handle_t ws_client;
 
-#if !defined(CONFIG_IDF_TARGET_ESP32P4)
     static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
     void processWebSocketEvent(esp_event_base_t base, int32_t event_id, void *event_data);
-#endif
 
     Logger logger;
 };

@@ -1,6 +1,7 @@
 #include "api.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_app_format.h"
 #include <memory>
 
 constexpr size_t API::MAX_PROJECTS_PER_PAGE;

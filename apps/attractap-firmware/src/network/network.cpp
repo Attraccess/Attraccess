@@ -3,6 +3,12 @@
 #include "esp_log.h"
 #include <time.h>
 
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+#include "esp_hosted.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
+
 // Static member definitions
 bool Network::_sharedComponentsInitialized = false;
 Logger Network::logger("Network");
@@ -18,6 +24,28 @@ void Network::setup()
     delay(100);
 
     logger.info("Shared components initialized");
+
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    // P4 uses C6 coprocessor for WiFi via ESP-Hosted; must init transport before WiFi
+    logger.info("Initializing ESP-Hosted (P4↔C6 transport)");
+    int hosted_ret = esp_hosted_init();
+    if (hosted_ret != 0) {
+        logger.error("ESP-Hosted init failed - WiFi will not work");
+    } else {
+        xTaskCreate(
+            [](void *) {
+                int r = esp_hosted_connect_to_slave();
+                if (r == 0) {
+                    ESP_LOGI("Network", "ESP-Hosted transport ready");
+                } else {
+                    ESP_LOGE("Network", "ESP-Hosted connect failed");
+                }
+                vTaskDelete(NULL);
+            },
+            "hosted_conn", 4096, NULL, 5, NULL);
+        delay(2500);  // Give C6 time to respond before WiFi init
+    }
+#endif
 
     // Initialize both network interfaces
     logger.info("Starting WiFi interface");

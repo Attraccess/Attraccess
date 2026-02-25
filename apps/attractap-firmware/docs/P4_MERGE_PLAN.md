@@ -25,7 +25,7 @@ Implementation plan for merging ESP32-P4 + Guition JC1060P470 display support in
 | 2 | Unify main entry | ✅ Complete |
 | 3 | Re-enable full app (stubs) | ✅ Complete |
 | 4 | Remove alternate files, document | ✅ Complete |
-| 5 | WiFi via ESP-Hosted/C6 | Pending |
+| 5 | WiFi via ESP-Hosted/C6 | ✅ Complete |
 | 6 | WebSocket (real connection) | Pending |
 | 7 | NFC (required) + error screen on init failure | Pending |
 | 8 | Ethernet (optional, if hardware) | Pending |
