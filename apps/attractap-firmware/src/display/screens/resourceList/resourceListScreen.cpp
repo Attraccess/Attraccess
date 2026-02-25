@@ -1,4 +1,5 @@
 #include "resourceListScreen.hpp"
+#include "../../backgroundImage.hpp"
 
 void ResourceListScreen::init()
 {
@@ -23,6 +24,7 @@ void ResourceListScreen::init()
    lv_obj_add_flag(bg_img, LV_OBJ_FLAG_IGNORE_LAYOUT);
    lv_obj_set_pos(bg_img, 0, 0);
    lv_image_set_inner_align(bg_img, LV_IMAGE_ALIGN_COVER);
+   lv_image_cover_left_align(bg_img);
 
    this->contentContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->contentContainer);

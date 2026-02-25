@@ -30,6 +30,19 @@ def resolve_platformio_python(platformio_home):
         return penv_python
     return None
 
+
+def resolve_platformio_cmd():
+    """Use penv's platformio (has intelhex for tool-esptoolpy 2.4+); Homebrew pio uses different Python."""
+    for home in filter(None, [
+        os.environ.get("PLATFORMIO_HOME_DIR"),
+        os.path.join(os.path.expanduser("~"), ".platformio"),
+    ]):
+        pio = os.path.join(home, "penv", "bin", "platformio") if sys.platform != "win32" else os.path.join(home, "penv", "Scripts", "platformio.exe")
+        if os.path.exists(pio):
+            return pio
+    return "platformio"
+
+
 def extract_define_value(flags, define_name):
     """Extract a -D define value from build_flags"""
     pattern = fr'-D\s*{define_name}=(["\']?)(.*?)\1(?:\s|$)'
@@ -98,19 +111,25 @@ def main():
         sys.exit(1)
     
     try:
-        # Find all environments first
-        environments = []
+        # Find all environments first. Build P4 first to avoid platform-switch Path bug
+        # (esp32 platform -> p4 platform mid-session causes NoneType in pathlib)
+        env_order = []
+        p4_envs = []
         for section in config.sections():
             if section.startswith('env:'):
-                env_name = section[4:]  # Remove 'env:' prefix
-                environments.append(env_name)
-        
+                env_name = section[4:]
+                if 'p4' in env_name.lower():
+                    p4_envs.append(env_name)
+                else:
+                    env_order.append(env_name)
+        environments = p4_envs + env_order
+
         if not environments:
             print("Error: No environments found in platformio.ini")
             sys.exit(1)
             
         print(f"Found environments: {environments}")
-        
+
         # Get base firmware information from [env] section and/or first environment
         # Values can be in the base [env] section or in environment-specific sections
         base_build_flags = config['env'].get('build_flags', '') if 'env' in config else ''
@@ -209,8 +228,9 @@ def main():
                 print(f"  BOARD_FAMILY define: {board_family}")
             
             # Build firmware using temporary config with production build type
+            pio_cmd = resolve_platformio_cmd()
             try:
-                subprocess.run(['platformio', 'run', '-c', temp_config_path, '-e', env], check=True)
+                subprocess.run([pio_cmd, 'run', '-c', temp_config_path, '-e', env], check=True)
             except subprocess.CalledProcessError:
                 print(f"Error: Build failed for environment '{env}'")
                 sys.exit(1)
