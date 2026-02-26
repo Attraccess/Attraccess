@@ -90,7 +90,7 @@ Acceptance:
 
 ### Phase 3 - Auth/session vertical slice migration
 
-Status: `Not started`
+Status: `In progress`
 
 Scope:
 
@@ -173,7 +173,7 @@ Update this table as work lands.
 | 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
 | 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
 | 2     | Codex + Jappy | In progress | 2026-02-26 |          | Moved NFC/API loops from `Application::loop` into dedicated worker tasks |
-| 3     |       | Not started |            |          |       |
+| 3     | Codex + Jappy | In progress | 2026-02-26 |          | Introduced `AuthController` and started migrating auth decision logic out of `Application` |
 | 4     |       | Not started |            |          |       |
 | 5     |       | Not started |            |          |       |
 | 6     |       | Not started |            |          |       |
@@ -229,4 +229,5 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Moved `api.loop()` and `nfc.loop()` off UI loop path into dedicated FreeRTOS tasks (`ApiTask`, `NfcTask`).
 - Added app-thread event queue marshalling for API callbacks to reduce cross-thread shared-state writes.
 - Added event-queue backpressure policy and queue-health telemetry (`APP_EVT` counters/high-water/drop count).
+- Started Phase 3 with an `AuthController` extraction slice and moved card-auth decision logic to the controller.
 

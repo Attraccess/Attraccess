@@ -4,6 +4,7 @@
 #include "../api/api.hpp"
 #include "../app/adapters/api_adapter.hpp"
 #include "../app/adapters/nfc_adapter.hpp"
+#include "../app/domain/auth/auth_controller.hpp"
 #ifdef HAS_LVGL_DISPLAY
 #include "../app/adapters/ui_adapter.hpp"
 #endif
@@ -52,6 +53,7 @@ private:
   ApiAdapter apiAdapter;
   INfcPort &nfc;
   IApiPort &api;
+  AuthController authController;
   Logger logger;
 #ifdef HAS_LVGL_DISPLAY
   UiAdapter uiAdapter;

@@ -125,31 +125,39 @@ void Application::processAppEvents() {
       auto *payload =
           static_cast<API::CardAuthenticationDetailsResponse *>(evt.payload);
       if (payload) {
-        if (payload->error.length() > 0) {
-          this->logger.errorf("Authentication failed: %s", payload->error.c_str());
+        AuthController::CardDetailsDecision d =
+            this->authController.handleCardDetails(*payload,
+                                                   this->currentProjectsUser);
+        if (d.shouldBeepError) {
+          if (payload->error.length() > 0) {
+            this->logger.errorf("Authentication failed: %s",
+                                payload->error.c_str());
+          } else {
+            this->logger.error("Invalid key bytes provided");
+          }
           this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-          break;
         }
-
-        if (payload->keyLen != 16) {
-          this->logger.error("Invalid key bytes provided");
-          this->beeper.errorBeep();
+        if (d.shouldEnableCardDetection) {
           this->nfc.enableCardDetection();
+        }
+        if (!d.valid) {
           this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
           break;
         }
 
         this->cardAuthenticationData = *payload;
 #ifdef HAS_LVGL_DISPLAY
-        if (this->currentProjectsUser != payload->username) {
+        if (d.shouldClearProjectSelection) {
           this->clearProjectSelection();
         }
-        this->currentProjectsUser = payload->username;
-        this->requestProjectsPage(1);
+        this->currentProjectsUser = d.username;
+        if (d.shouldRequestProjects) {
+          this->requestProjectsPage(1);
+        }
 #endif
-        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+        if (d.shouldSetExternalAuthenticateState) {
+          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+        }
       }
       break;
     }
@@ -1080,7 +1088,8 @@ void Application::handleResourceListUpdate(
 void Application::processCardAuthenticationData() {
   this->logger.infof("Trying to authenticate with keyNo: %u",
                      this->cardAuthenticationData.keyNo);
-  if (this->cardAuthenticationData.keyLen != 16) {
+  if (!this->authController.isCardAuthKeyLengthValid(
+          this->cardAuthenticationData.keyLen)) {
     this->logger.error("Invalid key bytes provided");
     this->beeper.errorBeep();
     this->nfc.enableCardDetection();
