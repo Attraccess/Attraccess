@@ -65,6 +65,7 @@ private:
     static void onSaveButtonEvent(lv_event_t *e);
     static void onCloseButtonEvent(lv_event_t *e);
     static void onWifiDropdownEvent(lv_event_t *e);
+    static void onRefreshWifiButtonEvent(lv_event_t *e);
     void showKeyboardFor(lv_obj_t *targetTextArea);
     void hideKeyboardIfNoFocus();
 

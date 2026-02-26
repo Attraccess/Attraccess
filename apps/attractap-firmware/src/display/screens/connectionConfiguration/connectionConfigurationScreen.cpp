@@ -47,13 +47,35 @@ void ConnectionConfigurationScreen::init()
    lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
    lv_obj_set_style_text_color(labelForWifiSelectNetwork, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
+   lv_obj_t *wifiSelectContainer = lv_obj_create(wifiTab);
+   lv_obj_remove_style_all(wifiSelectContainer);
+   lv_obj_set_width(wifiSelectContainer, lv_pct(100));
+   lv_obj_set_height(wifiSelectContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(wifiSelectContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(wifiSelectContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(wifiSelectContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_set_style_pad_column(wifiSelectContainer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_remove_flag(wifiSelectContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(wifiSelectContainer, LV_OBJ_FLAG_SCROLLABLE);
+
+   this->wifiSelectNetwork = lv_dropdown_create(wifiSelectContainer);
    lv_dropdown_set_options(this->wifiSelectNetwork, WIFI_DROPDOWN_LOADING);
-   lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
+   lv_obj_set_width(this->wifiSelectNetwork, 1);
    lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->wifiSelectNetwork, LV_ALIGN_CENTER);
+   lv_obj_set_flex_grow(this->wifiSelectNetwork, 1);
    lv_obj_add_flag(this->wifiSelectNetwork, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_add_event_cb(this->wifiSelectNetwork, &ConnectionConfigurationScreen::onWifiDropdownEvent, LV_EVENT_VALUE_CHANGED, this);
+
+   lv_obj_t *refreshWifiButton = lv_button_create(wifiSelectContainer);
+   lv_obj_set_size(refreshWifiButton, 46, 46);
+   lv_obj_set_style_pad_all(refreshWifiButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(refreshWifiButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(refreshWifiButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_add_event_cb(refreshWifiButton, &ConnectionConfigurationScreen::onRefreshWifiButtonEvent, LV_EVENT_CLICKED, this);
+
+   lv_obj_t *refreshWifiButtonLabel = lv_label_create(refreshWifiButton);
+   lv_obj_center(refreshWifiButtonLabel);
+   lv_label_set_text(refreshWifiButtonLabel, LV_SYMBOL_REFRESH);
 
    this->labelForWifiSSID = lv_label_create(wifiTab);
    lv_obj_set_width(this->labelForWifiSSID, LV_SIZE_CONTENT);
@@ -394,6 +416,22 @@ void ConnectionConfigurationScreen::onWifiDropdownEvent(lv_event_t *e)
    }
 
    lv_textarea_set_text(self->wifiSSID, selected);
+}
+
+void ConnectionConfigurationScreen::onRefreshWifiButtonEvent(lv_event_t *e)
+{
+   ConnectionConfigurationScreen *self = static_cast<ConnectionConfigurationScreen *>(lv_event_get_user_data(e));
+   if (!self)
+   {
+      return;
+   }
+
+   if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+   {
+      return;
+   }
+
+   self->startWifiScan();
 }
 
 void ConnectionConfigurationScreen::onKeyboardEvent(lv_event_t *e)
