@@ -1,5 +1,5 @@
 import { SystemPermission, SystemPermissions } from '@attraccess/database-entities';
-import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraaccess/shared';
+import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraccess/shared';
 
 export type SSOPermissionMapping = Partial<Record<SystemPermission, string[]>>;
 

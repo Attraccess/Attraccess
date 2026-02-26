@@ -37,7 +37,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.e
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
-import { hasConfiguredPermissionMapping } from '@attraaccess/shared';
+import { hasConfiguredPermissionMapping } from '@attraccess/shared';
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();

@@ -1,7 +1,7 @@
 {
   "name": "@attraccess/api",
   "dependencies": {
-    "@attraaccess/shared": "workspace:*",
+    "@attraccess/shared": "workspace:*",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.2",
