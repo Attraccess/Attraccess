@@ -227,13 +227,27 @@ def main():
             if board_family:
                 print(f"  BOARD_FAMILY define: {board_family}")
             
-            # Build firmware using temporary config with production build type
-            pio_cmd = resolve_platformio_cmd()
-            try:
-                subprocess.run([pio_cmd, 'run', '-c', temp_config_path, '-e', env], check=True)
-            except subprocess.CalledProcessError:
-                print(f"Error: Build failed for environment '{env}'")
-                sys.exit(1)
+            # Build firmware using temporary config with production build type.
+            # Prefer PlatformIO penv binary, but fall back to system `platformio`
+            # if the preferred binary fails (seen with intermittent penv/runtime issues).
+            preferred_pio_cmd = resolve_platformio_cmd()
+            pio_candidates = []
+            for candidate in [preferred_pio_cmd, "platformio"]:
+                if candidate not in pio_candidates:
+                    pio_candidates.append(candidate)
+
+            build_succeeded = False
+            for idx, pio_cmd in enumerate(pio_candidates):
+                try:
+                    subprocess.run([pio_cmd, 'run', '-c', temp_config_path, '-e', env], check=True)
+                    build_succeeded = True
+                    break
+                except subprocess.CalledProcessError:
+                    if idx < len(pio_candidates) - 1:
+                        print(f"Warning: Build with '{pio_cmd}' failed for '{env}', retrying with '{pio_candidates[idx + 1]}'...")
+                        continue
+                    print(f"Error: Build failed for environment '{env}'")
+                    sys.exit(1)
             
             # Check firmware files
             firmware_path = f".pio/build/{env}/firmware.bin"

@@ -18,7 +18,11 @@
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_SPIDevice.h>
 #include "mbedtls/aes.h"
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+#include "mbedtls/cmac.h"
+#else
 #include "mbedtlscmac.h"
+#endif
 #include <Arduino_CRC32.h>
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3

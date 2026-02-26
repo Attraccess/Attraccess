@@ -22,6 +22,7 @@ struct LoopTiming {
   uint32_t total_ms = 0;
 
   void logIfSlow() {
+    return;
     if (total_ms >= LOOP_SLOW_THRESHOLD_MS) {
       Serial.printf(
           "[LoopTiming] slow=%ums disp=%u ser=%u nfc=%u api=%u proc=%u\n",

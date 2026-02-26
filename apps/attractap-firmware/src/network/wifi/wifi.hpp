@@ -55,6 +55,7 @@ private:
     static WifiState _state;
     static bool is_setup;
     static bool is_scanning;
+    static bool sta_started;
     static uint8_t current_reconnect_attempts_count;
     static uint32_t last_reconnect_attempt_time_ms;
     static const uint32_t RECONNECT_INTERVAL_MS;

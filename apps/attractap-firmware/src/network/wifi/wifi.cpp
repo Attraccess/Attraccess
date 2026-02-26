@@ -12,6 +12,7 @@ uint32_t Wifi::last_reconnect_attempt_time_ms = 0;
 const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
 
 bool Wifi::is_scanning = false;
+bool Wifi::sta_started = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
 
@@ -180,6 +181,13 @@ void Wifi::setup()
         return;
     }
 
+    // ESP-Hosted links can miss DHCP traffic under modem sleep.
+    esp_err_t ps_result = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (ps_result != ESP_OK)
+    {
+        logger.error((String("Failed to disable WiFi power save: ") + esp_err_to_name(ps_result)).c_str());
+    }
+
     is_setup = true;
 }
 
@@ -189,6 +197,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     {
     case WIFI_EVENT_STA_START:
         logger.debug("STA start");
+        sta_started = true;
         break;
 
     case WIFI_EVENT_STA_CONNECTED:
@@ -196,6 +205,22 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
         auto *ev = (wifi_event_sta_connected_t *)event_data;
         String ssid = String(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
         logger.infof("Associated with SSID '%s' BSSID %s on channel %d", ssid.c_str(), formatMac(ev->bssid).c_str(), ev->channel);
+
+        // On ESP-Hosted P4 builds, DHCP occasionally stays stopped after reassociation.
+        // Ensure DHCP client is running each time STA reconnects.
+        if (wifi_interface != NULL)
+        {
+            esp_netif_dhcp_status_t dhcp_status = ESP_NETIF_DHCP_STOPPED;
+            if (esp_netif_dhcpc_get_status(wifi_interface, &dhcp_status) == ESP_OK && dhcp_status != ESP_NETIF_DHCP_STARTED)
+            {
+                esp_netif_dhcpc_stop(wifi_interface);
+                esp_err_t dhcp_start_err = esp_netif_dhcpc_start(wifi_interface);
+                if (dhcp_start_err != ESP_OK && dhcp_start_err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED)
+                {
+                    logger.error((String("Failed to start DHCP client: ") + esp_err_to_name(dhcp_start_err)).c_str());
+                }
+            }
+        }
 
         if (_state != WIFI_STATE_CONNECTED)
         {
@@ -292,6 +317,10 @@ void Wifi::ensureConnection()
     {
         return;
     }
+    if (!sta_started)
+    {
+        return;
+    }
 
     uint32_t currentTime = millis();
     if (!hasSavedCredentials())
@@ -305,8 +334,9 @@ void Wifi::ensureConnection()
         return;
     }
 
-    // Check if it's time to attempt reconnection
-    bool shouldAttemptReconnect = currentTime - last_reconnect_attempt_time_ms >= RECONNECT_INTERVAL_MS;
+    // First connect attempt should be immediate on boot.
+    bool shouldAttemptReconnect = current_reconnect_attempts_count == 0 ||
+                                  currentTime - last_reconnect_attempt_time_ms >= RECONNECT_INTERVAL_MS;
 
     if (!shouldAttemptReconnect)
     {
@@ -357,13 +387,11 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
     wifi_config_t wifi_config = {};
     // Copy SSID
     strncpy((char *)wifi_config.sta.ssid, ssid.c_str(), sizeof(wifi_config.sta.ssid) - 1);
-    vTaskDelay(1); // Yield to prevent watchdog
     // Copy password if provided
     if (password.length() > 0)
     {
         strncpy((char *)wifi_config.sta.password, password.c_str(), sizeof(wifi_config.sta.password) - 1);
     }
-    vTaskDelay(1); // Yield to prevent watchdog
 
     // Set threshold for weakest authmode to accept (more permissive)
     wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
@@ -374,7 +402,6 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
     wifi_config.sta.scan_method = WIFI_FAST_SCAN;
     wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
     wifi_config.sta.failure_retry_cnt = 3;
-    vTaskDelay(1); // Yield to prevent watchdog
 
     esp_err_t wifi_set_config_result = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (wifi_set_config_result != ESP_OK)
@@ -383,9 +410,6 @@ void Wifi::connectToNetwork(const String &ssid, const String &password)
         setState(WIFI_STATE_CONNECT_FAILED);
         return;
     }
-
-    // Give WiFi stack time to process the config before connecting
-    vTaskDelay(pdMS_TO_TICKS(100));
 
     esp_err_t wifi_connect_result = esp_wifi_connect();
 
@@ -425,6 +449,14 @@ void Wifi::startScan()
         return;
     }
 
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_err_t mode_err = esp_wifi_get_mode(&mode);
+    if (mode_err != ESP_OK || mode == WIFI_MODE_NULL)
+    {
+        logger.debug("Skipping scan: WiFi stack not ready");
+        return;
+    }
+
     logger.info("Starting WiFi scan");
     Wifi::is_scanning = true;
 
@@ -442,6 +474,7 @@ void Wifi::startScan()
     {
         logger.error((String("Failed to start scan: ") + esp_err_to_name(err)).c_str());
         Wifi::is_scanning = false;
+        return;
     }
     logger.debug("WiFi scan started");
 }
@@ -533,7 +566,7 @@ void Wifi::handleScanComplete()
 
 void Wifi::handleTimeout()
 {
-    if (isConnected())
+    if (_state == WIFI_STATE_CONNECTING && isConnected())
     {
         return;
     }
@@ -541,9 +574,17 @@ void Wifi::handleTimeout()
     uint32_t currentTime = millis();
     uint32_t elapsed = currentTime - last_reconnect_attempt_time_ms;
 
-    if (elapsed > 15000)
-    { // 15 second timeout
+    if (_state == WIFI_STATE_CONNECTING && elapsed > 15000)
+    {
         logger.info("Connection timeout - stopping connection attempt");
+        esp_wifi_disconnect();
+        setState(WIFI_STATE_CONNECT_FAILED);
+        return;
+    }
+
+    if (_state == WIFI_STATE_CONNECTED_WAITING_FOR_IP && elapsed > 30000)
+    {
+        logger.info("IP acquisition timeout - reconnecting WiFi");
         esp_wifi_disconnect();
         setState(WIFI_STATE_CONNECT_FAILED);
         return;

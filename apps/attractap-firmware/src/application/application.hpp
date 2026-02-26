@@ -1,11 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-#include "../nfc/nfc_p4_stub.hpp"
-#else
 #include "../nfc/nfc.hpp"
-#endif
 #include "../api/api.hpp"
 #include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"

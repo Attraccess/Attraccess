@@ -28,14 +28,6 @@ bool NFC::setup() {
 void NFC::enableCardDetection() {
   this->logger.info("Enabling card detection");
   (void)this->checkHardware();
-  /*pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
-  auto irqHandler = [this]
-  {
-      this->onCardDetectedInterruptHandler();
-  };
-  attachInterrupt(digitalPinToInterrupt(PIN_PN532_IRQ), irqHandler, FALLING);
-  this->pn532.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
-  this->timeOfCardDetectionEnabledMs = millis();*/
   this->cardDetectionEnabled = true;
 }
 

@@ -4,7 +4,6 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "Adafruit_PN532_NTAG424.h"
-#include "FunctionalInterrupt.h"
 #include <Arduino.h>
 #include <Wire.h>
 

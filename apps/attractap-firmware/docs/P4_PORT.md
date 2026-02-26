@@ -117,7 +117,6 @@ pio run -e attractap-p4 -t upload
 | NFC stub          | `src/nfc/nfc_p4_stub.cpp`, `nfc_p4_stub.hpp`              |
 | P4 sdkconfig      | `sdkconfig.p4.defaults`                                   |
 | GFX P4 fix        | `lib/GFX Library for Arduino/.../Arduino_ESP32SPIDMA.cpp` |
-| Toolchain patch   | `tools/patch_esp32p4_toolchain.py`                        |
 
 
 ---
