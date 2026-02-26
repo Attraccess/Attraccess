@@ -1,8 +1,8 @@
-# Touch + Render Performance Research (ESP32-P4)
+# System Smoothness Research (ESP32-P4)
 
 ## Goal
 
-Investigate why touch/keyboard interaction feels slow (up to ~1s per keypress, missed presses), and propose architecture-level fixes.
+Investigate end-to-end smoothness (touch/render + app state + server communication), and propose architecture-level fixes with measurable proof.
 
 ## Executive verdict
 
@@ -65,11 +65,27 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 1. **Reduce/disable blocking work while typing/config screens are active**
    - Disable NFC polling when screen/state does not need card detection.
    - In `CONFIGURATION_REQUIRED` and other non-card screens: `nfc.disableCardDetection()`.
+   - Treat this as the default policy: NFC is opt-in per state, not always-on.
 2. **Lower logging overhead for production/perf runs**
    - Default build to `INFO` or `WARN`.
    - Disable `DEBUG_LOOP_TIMING` except targeted profiling sessions.
 3. **Shrink NFC poll timeout aggressively**
    - Replace 100ms passive read timeout with very small timeout or non-blocking/IRQ-based approach.
+
+### State-aware responsiveness policy
+
+Not every state needs the same responsiveness target.
+
+1. **UI-reactive states (strict latency)**
+   - Examples: keyboard entry, settings/forms editing, resource browsing.
+   - Policy: NFC polling off.
+   - Goal: maximize touch/render responsiveness.
+2. **NFC-centric states (relaxed UI latency allowed)**
+   - Examples: wait-for-card/auth/enroll flows.
+   - Policy: NFC polling on; some blocking is acceptable if bounded.
+   - Goal: reliable card detection/auth over UI fluidity.
+
+This matches product behavior: when user is typing/configuring, responsiveness is critical; when waiting for card, UI interactivity is secondary.
 
 ### Phase 2: Structural fix (recommended)
 
@@ -110,6 +126,14 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 
 ## Measurement plan (before/after proof)
 
+### Scope
+
+We treat smoothness as an end-to-end property across:
+
+1. UI input/render path.
+2. Internal app-state processing path.
+3. Network/websocket/server path.
+
 ### What to measure (core KPIs)
 
 1. **UI loop cadence**
@@ -127,6 +151,20 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 5. **Render/flush cost**
    - Metric: display flush duration and bytes/chunk per flush.
    - Report: p50/p95/max flush time and frame-time spikes.
+6. **State transition latency**
+   - Metric: time from triggering event to target app state/UI screen ready.
+   - Examples: card detected -> unlock screen; settings save -> connected/authenticated.
+   - Report: p50, p95, max.
+7. **Server roundtrip latency**
+   - Metric: request send timestamp -> matching ACK/event response timestamp.
+   - Examples: `REQUEST_CARD_AUTHENTICATION_DATA`, session start/stop, project fetch.
+   - Report: p50, p95, p99, timeout rate.
+8. **Reconnect recovery time**
+   - Metric: disconnect detected -> websocket reconnected -> API authenticated.
+   - Report: p50/p95 and failure rate.
+9. **Backpressure / queue health**
+   - Metric: pending outbound messages, dropped/skipped events, async queue depth peaks.
+   - Report: max queue depth, overflow count, event age p95.
 
 ### Instrumentation points (minimal code hooks)
 
@@ -140,6 +178,13 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
    - On `VALUE_CHANGED`, compute `millis() - lastTouchDownTs` for touch-to-text latency.
 5. Display driver flush callback
    - Timestamp before/after `driver->flush(...)`, store duration and area size.
+6. API/WebSocket send+receive
+   - Add correlation IDs for measured requests (or reuse message IDs).
+   - Track send ts, ack ts, response ts.
+7. `Application::processState()` and screen transitions
+   - Mark transition start/end and originating trigger.
+8. Connection state changes
+   - Record timestamps for wifi up/down, websocket up/down, API authenticated.
 
 ### How to capture data
 
@@ -148,7 +193,7 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
    - `perf-change-X`: one optimization at a time + same metrics.
 2. **Logging format**
    - Emit compact CSV-like lines every 5s (not per event) to avoid perturbation:
-   - Example: `PERF,window_ms=5000,ui_gap_p95=...,touch2ui_p95=...,drop_rate=...,nfc_p95=...`
+   - Example: `PERF,window_ms=5000,ui_gap_p95=...,touch2ui_p95=...,drop_rate=...,nfc_p95=...,state_p95=...,ws_rtt_p95=...,reconnect_p95=...,qdepth_max=...`
 3. **Sampling windows**
    - Warmup 10s, then collect 60s steady-state per scenario.
 
@@ -162,6 +207,10 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
    - Trigger reconnect attempts while typing.
 4. **Combined worst case**
    - Typing + NFC polling + network reconnect in parallel.
+5. **State churn**
+   - Rapid resource updates + project/form updates while user interacts.
+6. **Server delay/fault injection**
+   - Artificial server delay/jitter (e.g. +50/100/300ms), intermittent timeout, reconnect storms.
 
 ### Pass/fail targets
 
@@ -169,6 +218,21 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 2. Touch-to-UI: p95 < 80ms, p99 < 120ms.
 3. Dropped input: < 1% in 100-tap run (target 0%).
 4. No repeated >300ms stalls during 60s run.
+5. Request/response RTT p95 < 250ms on healthy LAN test setup.
+6. Reconnect-to-authenticated p95 < 5s on transient disconnect test.
+7. State transition p95 < 200ms for local transitions; <500ms when server ack required.
+8. Zero queue overflow/dropped critical events.
+
+### Mode-specific acceptance (important)
+
+Use different budgets per state category:
+
+1. **UI-reactive states**
+   - Must meet strict touch/UI targets above.
+   - NFC must remain disabled throughout these scenarios.
+2. **NFC-centric states**
+   - Allow higher UI latency if card detection/auth reliability improves.
+   - Still track max stalls and ensure no watchdog-risk behavior.
 
 ### Change-evaluation method
 
@@ -189,6 +253,15 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 | phase1-log-info | keyboard stress |  |  |  |  |  |
 | phase1-nfc-timeout-short | keyboard stress |  |  |  |  |  |
 
+### Suggested system-level table template
+
+| Build | Scenario | State p95 (ms) | WS RTT p95 (ms) | Reconnect p95 (ms) | Queue max depth | Timeout rate (%) |
+|---|---|---:|---:|---:|---:|---:|
+| baseline | normal ops |  |  |  |  |  |
+| baseline | delay injection 100ms |  |  |  |  |  |
+| change-X | normal ops |  |  |  |  |  |
+| change-X | delay injection 100ms |  |  |  |  |  |
+
 ### Bias controls
 
 1. Same hardware, power supply, firmware config, and display brightness.
@@ -204,4 +277,4 @@ Keyboard typing needs frequent touch scans + fast LVGL event/render turnaround. 
 
 ## Bottom line
 
-The firmware can be made much faster without major UI redesign. The biggest gain will come from removing blocking NFC/API/logging behavior from the UI execution path and enforcing a dedicated, periodic UI task.
+The firmware can be made much smoother without major UI redesign. The biggest gain will come from removing blocking NFC/API/logging behavior from the UI execution path, adding end-to-end telemetry, and validating improvements against both UI and server/state KPIs.
