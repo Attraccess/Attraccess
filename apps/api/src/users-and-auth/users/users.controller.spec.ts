@@ -401,6 +401,7 @@ describe('UsersController', () => {
         .mockImplementation(({ id }) =>
           Promise.resolve(id === 2 ? ssoManagedUser : id === 3 ? normalUser : null),
         );
+      jest.spyOn(usersService, 'updateOne').mockResolvedValue(normalUser);
       jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
         oidcConfiguration: {
           permissionMappings: {
