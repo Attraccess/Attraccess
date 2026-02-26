@@ -15,7 +15,7 @@ Single doc for P4 port status, setup, and remaining work. Target: **Guition JC10
 | Full app flow   | ✅ main.cpp, display.cpp (unified)                    |
 | WiFi            | ✅ ESP-Hosted (C6, SDIO 4-bit)                        |
 | WebSocket       | ✅ Native P4 impl (WiFiClientSecure + RFC 6455)       |
-| NFC             | ⏳ Stub + init-fail UI (mbedtls/NTAG424 incompatible) |
+| NFC             | ✅ Real NFC compiled (PN532/NTAG424) + init-fail UI    |
 | Ethernet        | ⏳ Excluded (ETH API differs on P4; hardware present) |
 
 
@@ -68,7 +68,7 @@ pio run -e attractap-p4 -t upload
 - **P4 DSI driver:** `src/display/driver/p4_dsi/p4_dsi_gt911_driver.cpp`.
 - **WiFi:** `esp_hosted_init()` + `esp_hosted_connect_to_slave()` in `network.cpp` before WiFi; SDIO transport.
 - **WebSocket:** `websocket_p4.cpp` (WiFiClientSecure, RFC 6455); `websocket.cpp` excluded for P4.
-- **NFC stub:** `nfc_p4_stub.cpp` returns `false` from `setup()`; app shows init-fail popup (Retry/Reboot). Real NFC excluded (mbedtlscmac, Adafruit_PN532_NTAG424).
+- **NFC:** P4 build includes `nfc.cpp` + `Adafruit_PN532_NTAG424.cpp`; app shows init-fail popup (Retry/Reboot) when setup fails. P4 uses `mbedtls/cmac.h` and excludes legacy `mbedtlscmac.c`.
 - **Ethernet:** Excluded – board has Ethernet PHY (works in demo firmware); code excluded due to `ETH_W5500_DEFAULT_CONFIG` API differences on P4.
 - **Build:** `platformio.ini` [env:attractap-p4]; `sdkconfig.p4.defaults`.
 
@@ -78,16 +78,15 @@ pio run -e attractap-p4 -t upload
 
 ### Phase 7: NFC (required)
 
-**Current:** `nfc_p4_stub` – mbedtls/NTAG424 libs incompatible with P4.
+**Current:** P4 build compiles real NFC (`nfc.cpp`, `Adafruit_PN532_NTAG424.cpp`) and includes CMAC config in `sdkconfig.p4.defaults`. UI fallback on NFC init failure is implemented.
 
 **Goal:** Real NFC on P4; card detection, auth, enrollment. When hardware absent or init fails: error screen with Reboot/Retry Button (no silent stub).
 
-**Plan:**
+**What remains:**
 
-1. **Resolve mbedtls/NTAG424 on P4:** Port or replace mbedtls; or use P4-compatible NTAG424 impl; or different NFC stack. PN532 over I2C: SDA=7, SCL=8 (shared with touch).
-2. **Error screen:** Done – `showNfcInitErrorPopup()` with Retry/Reboot.
-3. **Build:** Remove `nfc_p4_stub` conditional in `application.hpp`; include `nfc.cpp`, Adafruit_PN532_NTAG424, mbedtlscmac in P4 build.
-4. **Filter:** Remove `-<nfc/nfc.cpp>`, `-<nfc/mbedtlscmac.c>`, `-<nfc/Adafruit_PN532_NTAG424.cpp>` from P4 build_src_filter.
+1. **Hardware validation sweep:** Verify on-device for tap detection, auth, enrollment, and retry/reboot popup path.
+2. **Stability/perf check:** Confirm shared I2C bus behavior (touch + PN532 on SDA=7/SCL=8) under long-run usage.
+3. **Regression tests:** Validate non-P4 targets still build/run with existing NFC path and legacy CMAC include.
 
 **Acceptance:** Card tap; auth; enrollment; hardware-not-found → error screen with Reboot/Retry Button.
 
@@ -114,7 +113,8 @@ pio run -e attractap-p4 -t upload
 | P4 DSI driver     | `src/display/driver/p4_dsi/p4_dsi_gt911_driver.cpp`       |
 | Display (unified) | `src/display/display.cpp`, `display.hpp`                  |
 | WebSocket P4      | `src/websocket/websocket_p4.cpp`, `websocket_p4.hpp`      |
-| NFC stub          | `src/nfc/nfc_p4_stub.cpp`, `nfc_p4_stub.hpp`              |
+| NFC               | `src/nfc/nfc.cpp`, `src/nfc/Adafruit_PN532_NTAG424.cpp`   |
+| NFC fallback UI   | `Display::showNfcInitErrorPopup()` in `src/display/display.cpp` |
 | P4 sdkconfig      | `sdkconfig.p4.defaults`                                   |
 | GFX P4 fix        | `lib/GFX Library for Arduino/.../Arduino_ESP32SPIDMA.cpp` |
 
