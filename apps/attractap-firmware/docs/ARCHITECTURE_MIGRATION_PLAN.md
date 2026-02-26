@@ -227,4 +227,5 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Phase 1 completed.
 - Started Phase 2.
 - Moved `api.loop()` and `nfc.loop()` off UI loop path into dedicated FreeRTOS tasks (`ApiTask`, `NfcTask`).
+- Added app-thread event queue marshalling for API callbacks to reduce cross-thread shared-state writes.
 

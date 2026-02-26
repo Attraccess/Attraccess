@@ -39,6 +39,173 @@ void Application::nfcTask(void *parameter) {
   }
 }
 
+bool Application::enqueueAppEvent(AppEventType type, void *payload) {
+  if (!this->appEventQueue) {
+    this->freeAppEventPayload(type, payload);
+    return false;
+  }
+  AppEvent evt = {.type = type, .payload = payload};
+  if (xQueueSend(this->appEventQueue, &evt, 0) != pdTRUE) {
+    this->freeAppEventPayload(type, payload);
+    return false;
+  }
+  return true;
+}
+
+void Application::freeAppEventPayload(AppEventType type, void *payload) {
+  if (!payload) {
+    return;
+  }
+  switch (type) {
+  case APP_EVENT_RESOURCE_LIST_UPDATED:
+    delete static_cast<API::ResourceList *>(payload);
+    break;
+  case APP_EVENT_CARD_AUTH_DETAILS:
+    delete static_cast<API::CardAuthenticationDetailsResponse *>(payload);
+    break;
+  case APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO:
+    delete static_cast<EnrollGetAvailableEventPayload *>(payload);
+    break;
+  case APP_EVENT_ENROLL_NEW_CARD:
+    delete static_cast<EnrollNewCardEventPayload *>(payload);
+    break;
+  case APP_EVENT_PROJECTS_RESPONSE:
+    delete static_cast<API::ProjectsOfUserResponse *>(payload);
+    break;
+  case APP_EVENT_RESOURCE_FORMS_REQUEST:
+    delete static_cast<API::ResourceUsageFormRequest *>(payload);
+    break;
+  case APP_EVENT_FIRMWARE_META:
+    delete static_cast<FirmwareMetaEventPayload *>(payload);
+    break;
+  case APP_EVENT_FIRMWARE_PROGRESS:
+    delete static_cast<FirmwareProgressEventPayload *>(payload);
+    break;
+  }
+}
+
+void Application::processAppEvents() {
+  if (!this->appEventQueue) {
+    return;
+  }
+
+  AppEvent evt;
+  while (xQueueReceive(this->appEventQueue, &evt, 0) == pdTRUE) {
+    switch (evt.type) {
+    case APP_EVENT_RESOURCE_LIST_UPDATED: {
+      auto *payload = static_cast<API::ResourceList *>(evt.payload);
+#ifdef HAS_LVGL_DISPLAY
+      if (payload) {
+        this->handleResourceListUpdate(*payload);
+      }
+#else
+      if (payload && payload->count > 0) {
+        this->selectedResourceId = payload->items[0].id;
+        this->resourceIsDoor = payload->items[0].type == 1;
+      }
+#endif
+      break;
+    }
+    case APP_EVENT_CARD_AUTH_DETAILS: {
+      auto *payload =
+          static_cast<API::CardAuthenticationDetailsResponse *>(evt.payload);
+      if (payload) {
+        if (payload->error.length() > 0) {
+          this->logger.errorf("Authentication failed: %s", payload->error.c_str());
+          this->beeper.errorBeep();
+          this->nfc.enableCardDetection();
+          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+          break;
+        }
+
+        if (payload->keyLen != 16) {
+          this->logger.error("Invalid key bytes provided");
+          this->beeper.errorBeep();
+          this->nfc.enableCardDetection();
+          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+          break;
+        }
+
+        this->cardAuthenticationData = *payload;
+#ifdef HAS_LVGL_DISPLAY
+        if (this->currentProjectsUser != payload->username) {
+          this->clearProjectSelection();
+        }
+        this->currentProjectsUser = payload->username;
+        this->requestProjectsPage(1);
+#endif
+        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+      }
+      break;
+    }
+#ifdef HAS_LVGL_DISPLAY
+    case APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO: {
+      auto *payload = static_cast<EnrollGetAvailableEventPayload *>(evt.payload);
+      if (payload) {
+        this->apiEnrollNewCardGetAvailableKeyNoData = {
+            .username = payload->username,
+        };
+        this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
+      }
+      break;
+    }
+    case APP_EVENT_ENROLL_NEW_CARD: {
+      auto *payload = static_cast<EnrollNewCardEventPayload *>(evt.payload);
+      if (payload) {
+        uint8_t keyBytes[16] = {0};
+        stringToHexArray(payload->key, keyBytes, 16);
+        this->apiEnrollNewCardData = {
+            .keyNo = payload->keyNo,
+            .keyBytes = {0},
+        };
+        memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
+        this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD;
+      }
+      break;
+    }
+    case APP_EVENT_PROJECTS_RESPONSE: {
+      auto *payload = static_cast<API::ProjectsOfUserResponse *>(evt.payload);
+      if (payload) {
+        this->projectsOfUserResponse = *payload;
+        this->projectsCurrentPage = payload->page;
+        this->projectsTotalCount = payload->total;
+        this->projectsHasMore = payload->hasMore;
+        this->projectsOfUserResponseUpdated = true;
+      }
+      break;
+    }
+    case APP_EVENT_RESOURCE_FORMS_REQUEST: {
+      auto *payload = static_cast<API::ResourceUsageFormRequest *>(evt.payload);
+      if (payload) {
+        this->pendingFormRequest = *payload;
+        this->handleFormsRequest(this->pendingFormRequest);
+      }
+      break;
+    }
+#endif
+    case APP_EVENT_FIRMWARE_META: {
+      auto *payload = static_cast<FirmwareMetaEventPayload *>(evt.payload);
+      if (payload) {
+        this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+        this->availableFirmwareVersion = payload->availableVersion;
+      }
+      break;
+    }
+    case APP_EVENT_FIRMWARE_PROGRESS: {
+      auto *payload = static_cast<FirmwareProgressEventPayload *>(evt.payload);
+      if (payload) {
+        this->logger.debugf("Got firmware update pct %d", payload->progressPct);
+        this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+        this->firmwareUpdateProgressPct = payload->progressPct;
+      }
+      break;
+    }
+    }
+
+    this->freeAppEventPayload(evt.type, evt.payload);
+  }
+}
+
 void Application::setup() {
   // Confirm OTA image on first boot after update to avoid rollback
   const esp_partition_t *running = esp_ota_get_running_partition();
@@ -72,6 +239,7 @@ void Application::setup() {
 #endif
   }
   this->api.setup();
+  this->appEventQueue = xQueueCreate(24, sizeof(AppEvent));
 
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
@@ -79,50 +247,20 @@ void Application::setup() {
 #endif
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
-#ifdef HAS_LVGL_DISPLAY
-        struct ResourceListAsyncPayload {
-          Application *self;
-          API::ResourceList list;
-        };
-
-        this->handleResourceListUpdate(resourceList);
-#else
-        if (resourceList.count > 0) {
-          this->selectedResourceId = resourceList.items[0].id;
-          this->resourceIsDoor = resourceList.items[0].type == 1;
+        auto *payload = new API::ResourceList(resourceList);
+        if (!payload) {
+          return;
         }
-#endif
+        this->enqueueAppEvent(APP_EVENT_RESOURCE_LIST_UPDATED, payload);
       });
 
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
-        if (response.error.length() > 0) {
-          this->logger.errorf("Authentication failed: %s",
-                              response.error.c_str());
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+        auto *payload = new API::CardAuthenticationDetailsResponse(response);
+        if (!payload) {
           return;
         }
-
-        if (response.keyLen != 16) {
-          this->logger.error("Invalid key bytes provided");
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-          return;
-        }
-
-        this->cardAuthenticationData = response;
-#ifdef HAS_LVGL_DISPLAY
-        if (this->currentProjectsUser != response.username) {
-          this->clearProjectSelection();
-        }
-        this->currentProjectsUser = response.username;
-        this->requestProjectsPage(1);
-#endif
-
-        this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+        this->enqueueAppEvent(APP_EVENT_CARD_AUTH_DETAILS, payload);
       });
 
 #ifdef HAS_LVGL_DISPLAY
@@ -249,14 +387,21 @@ void Application::setup() {
 #endif
 
   this->api.setFirmwareUpdateMetaCallback([this](String availableVersion) {
-    this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->availableFirmwareVersion = String(availableVersion);
+    auto *payload = new FirmwareMetaEventPayload();
+    if (!payload) {
+      return;
+    }
+    payload->availableVersion = availableVersion;
+    this->enqueueAppEvent(APP_EVENT_FIRMWARE_META, payload);
   });
 
   this->api.setFirmwareUpdateProgressCallback([this](int percent) {
-    this->logger.debugf("Got firmware update pct %d", percent);
-    this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-    this->firmwareUpdateProgressPct = percent;
+    auto *payload = new FirmwareProgressEventPayload();
+    if (!payload) {
+      return;
+    }
+    payload->progressPct = percent;
+    this->enqueueAppEvent(APP_EVENT_FIRMWARE_PROGRESS, payload);
   });
 
 #ifdef HAS_LVGL_DISPLAY
@@ -308,54 +453,40 @@ void Application::setup() {
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
 
   this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username) {
-    this->apiEnrollNewCardGetAvailableKeyNoData = {
-        username = username,
-    };
-    this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
+    auto *payload = new EnrollGetAvailableEventPayload();
+    if (!payload) {
+      return;
+    }
+    payload->username = username;
+    this->enqueueAppEvent(APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO, payload);
   });
 
   this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key) {
-    uint8_t keyBytes[16] = {0};
-    stringToHexArray(key, keyBytes, 16);
-
-    this->apiEnrollNewCardData = {
-        .keyNo = keyNo,
-        .keyBytes = {0},
-    };
-    memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
-
-    this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD;
+    auto *payload = new EnrollNewCardEventPayload();
+    if (!payload) {
+      return;
+    }
+    payload->keyNo = keyNo;
+    payload->key = key;
+    this->enqueueAppEvent(APP_EVENT_ENROLL_NEW_CARD, payload);
   });
 
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
-        this->projectsOfUserResponse = projectsOfUserResponse;
-        this->projectsCurrentPage = projectsOfUserResponse.page;
-        this->projectsTotalCount = projectsOfUserResponse.total;
-        this->projectsHasMore = projectsOfUserResponse.hasMore;
-        this->projectsOfUserResponseUpdated = true;
+        auto *payload = new API::ProjectsOfUserResponse(projectsOfUserResponse);
+        if (!payload) {
+          return;
+        }
+        this->enqueueAppEvent(APP_EVENT_PROJECTS_RESPONSE, payload);
       });
 
   this->api.setResourceFormsRequestCallback(
       [this](const API::ResourceUsageFormRequest &request) {
-        // DO NOT copy the large struct here - websocket task has limited
-        // stack/heap. Just set a flag; the LVGL async handler will do the copy
-        // on the main thread.
-        (void)request; // The data is in api.getFormRequestScratch()
-        this->pendingFormRequestReady = true;
-        // Schedule the copy + UI update on LVGL thread
-        lv_async_call(
-            [](void *u) {
-              auto *self = static_cast<Application *>(u);
-              if (self && self->pendingFormRequestReady) {
-                self->pendingFormRequestReady = false;
-                // Copy from API's scratch buffer on the main thread (safe
-                // stack/heap)
-                self->pendingFormRequest = self->api.getFormRequestScratch();
-                self->handleFormsRequest(self->pendingFormRequest);
-              }
-            },
-            this);
+        auto *payload = new API::ResourceUsageFormRequest(request);
+        if (!payload) {
+          return;
+        }
+        this->enqueueAppEvent(APP_EVENT_RESOURCE_FORMS_REQUEST, payload);
       });
 #endif
 
@@ -459,6 +590,8 @@ void Application::loop() {
   t.serial_ms = loopTimingNow() - t0;
   t0 = loopTimingNow();
 #endif
+
+  this->processAppEvents();
 
   // NFC/API loops run in dedicated worker tasks in phase 2.
 #if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)

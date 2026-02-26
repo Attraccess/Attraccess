@@ -13,6 +13,9 @@
 #include "../nfc/nfc.hpp"
 #include "../utils.hpp"
 #include "settings/settings.hpp"
+#ifdef ESP_PLATFORM
+#include "freertos/queue.h"
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
@@ -90,6 +93,44 @@ private:
   static void networkTask(void *parameter);
   static void apiTask(void *parameter);
   static void nfcTask(void *parameter);
+
+  enum AppEventType {
+    APP_EVENT_RESOURCE_LIST_UPDATED,
+    APP_EVENT_CARD_AUTH_DETAILS,
+    APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO,
+    APP_EVENT_ENROLL_NEW_CARD,
+    APP_EVENT_PROJECTS_RESPONSE,
+    APP_EVENT_RESOURCE_FORMS_REQUEST,
+    APP_EVENT_FIRMWARE_META,
+    APP_EVENT_FIRMWARE_PROGRESS,
+  };
+
+  struct AppEvent {
+    AppEventType type;
+    void *payload;
+  };
+
+  QueueHandle_t appEventQueue = nullptr;
+  bool enqueueAppEvent(AppEventType type, void *payload);
+  void processAppEvents();
+  void freeAppEventPayload(AppEventType type, void *payload);
+
+  struct EnrollGetAvailableEventPayload {
+    String username;
+  };
+
+  struct EnrollNewCardEventPayload {
+    uint8_t keyNo = 0;
+    String key;
+  };
+
+  struct FirmwareMetaEventPayload {
+    String availableVersion;
+  };
+
+  struct FirmwareProgressEventPayload {
+    int progressPct = 0;
+  };
 
   void processState();
 #ifdef HAS_LVGL_DISPLAY
