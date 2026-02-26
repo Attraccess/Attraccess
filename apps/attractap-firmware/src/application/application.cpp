@@ -45,11 +45,26 @@ bool Application::enqueueAppEvent(AppEventType type, void *payload) {
     return false;
   }
   AppEvent evt = {.type = type, .payload = payload};
-  if (xQueueSend(this->appEventQueue, &evt, 0) != pdTRUE) {
+  TickType_t sendWaitTicks = this->isBestEffortEvent(type) ? 0 : pdMS_TO_TICKS(5);
+  if (xQueueSend(this->appEventQueue, &evt, sendWaitTicks) != pdTRUE) {
+    this->appEventEnqueueDropCount++;
+    this->logger.warnf("Dropping app event type=%d (queue full)",
+                       static_cast<int>(type));
     this->freeAppEventPayload(type, payload);
     return false;
   }
+  this->appEventEnqueueOkCount++;
+  UBaseType_t queued = uxQueueMessagesWaiting(this->appEventQueue);
+  if (queued > this->appEventQueueHighWater) {
+    this->appEventQueueHighWater = queued;
+  }
   return true;
+}
+
+bool Application::isBestEffortEvent(AppEventType type) const {
+  return type == APP_EVENT_RESOURCE_LIST_UPDATED ||
+         type == APP_EVENT_PROJECTS_RESPONSE ||
+         type == APP_EVENT_FIRMWARE_PROGRESS;
 }
 
 void Application::freeAppEventPayload(AppEventType type, void *payload) {
@@ -204,6 +219,21 @@ void Application::processAppEvents() {
 
     this->freeAppEventPayload(evt.type, evt.payload);
   }
+}
+
+void Application::logAppEventQueueHealth() {
+  uint32_t now = millis();
+  if (now - this->lastAppEventHealthLogMs < 5000) {
+    return;
+  }
+  this->lastAppEventHealthLogMs = now;
+  UBaseType_t queued =
+      this->appEventQueue ? uxQueueMessagesWaiting(this->appEventQueue) : 0;
+  this->logger.infof("APP_EVT,queued=%u,high_water=%u,enq_ok=%u,enq_drop=%u",
+                     static_cast<unsigned>(queued),
+                     static_cast<unsigned>(this->appEventQueueHighWater),
+                     static_cast<unsigned>(this->appEventEnqueueOkCount),
+                     static_cast<unsigned>(this->appEventEnqueueDropCount));
 }
 
 void Application::setup() {
@@ -592,6 +622,7 @@ void Application::loop() {
 #endif
 
   this->processAppEvents();
+  this->logAppEventQueueHealth();
 
   // NFC/API loops run in dedicated worker tasks in phase 2.
 #if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)

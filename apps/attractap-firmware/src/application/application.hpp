@@ -14,6 +14,7 @@
 #include "../utils.hpp"
 #include "settings/settings.hpp"
 #ifdef ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #endif
 
@@ -114,6 +115,12 @@ private:
   bool enqueueAppEvent(AppEventType type, void *payload);
   void processAppEvents();
   void freeAppEventPayload(AppEventType type, void *payload);
+  void logAppEventQueueHealth();
+  bool isBestEffortEvent(AppEventType type) const;
+  uint32_t appEventEnqueueOkCount = 0;
+  uint32_t appEventEnqueueDropCount = 0;
+  UBaseType_t appEventQueueHighWater = 0;
+  uint32_t lastAppEventHealthLogMs = 0;
 
   struct EnrollGetAvailableEventPayload {
     String username;
