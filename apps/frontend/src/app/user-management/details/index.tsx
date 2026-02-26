@@ -37,11 +37,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.e
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
-
-const hasConfiguredPermissionMapping = (mapping?: Record<string, string[] | undefined> | null): boolean => {
-  if (!mapping) return false;
-  return Object.values(mapping).some((v) => Array.isArray(v) && v.length > 0);
-};
+import { hasConfiguredPermissionMapping } from '@attraaccess/shared';
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
