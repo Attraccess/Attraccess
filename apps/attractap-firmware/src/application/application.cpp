@@ -31,13 +31,13 @@ void Application::setup() {
   this->beeper.setup();
 
 #ifdef HAS_LVGL_DISPLAY
-  Display::setup();
+  this->ui.setup();
 #endif
 
   if (!this->nfc.setup()) {
 #ifdef HAS_LVGL_DISPLAY
     this->state = APPLICATION_STATE_NFC_INIT_FAILED;
-    Display::showNfcInitErrorPopup(
+    this->ui.showNfcInitErrorPopup(
         "NFC Error", "NFC hardware not found. Check connection and retry.",
         [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
 #else
@@ -50,7 +50,7 @@ void Application::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
-      [this](String deviceName) { Display::setDeviceName(deviceName); });
+      [this](String deviceName) { this->ui.setDeviceName(deviceName); });
 #endif
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
@@ -121,15 +121,15 @@ void Application::setup() {
             return;
           }
           p->self->endActionPause();
-          Display::resourceDetailsScreen.hideActionProgress();
+          p->self->ui.resourceDetailsHideActionProgress();
           if (p->enabled) {
-            Display::showInsufficientBalancePopup(
+            p->self->ui.showInsufficientBalancePopup(
                 [self = p->self](uint32_t amountCents) {
                   self->api.requestBillingTopup(amountCents);
                 },
                 []() {});
           } else {
-            Display::showErrorPopup("Fehler", "INSUFFICIENT_BALANCE");
+            p->self->ui.showErrorPopup("Fehler", "INSUFFICIENT_BALANCE");
           }
           delete p;
         },
@@ -172,12 +172,12 @@ void Application::setup() {
             return;
           }
           pl->self->endActionPause();
-          Display::resourceDetailsScreen.hideActionProgress();
-          Display::showErrorPopup(pl->t, pl->m);
+          pl->self->ui.resourceDetailsHideActionProgress();
+          pl->self->ui.showErrorPopup(pl->t, pl->m);
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
             pl->self->hasPendingFormRequest = false;
-            Display::resourceDetailsScreen.hideFormsModal();
+            pl->self->ui.resourceDetailsHideFormsModal();
           }
           delete pl;
         },
@@ -208,9 +208,9 @@ void Application::setup() {
           if (pl && pl->self) {
             pl->self->endActionPause();
           }
-          Display::resourceDetailsScreen.hideActionProgress();
+          pl->self->ui.resourceDetailsHideActionProgress();
           if (pl && pl->ok) {
-            Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
+            pl->self->ui.resourceDetailsShowSuccessToast("Erfolgreich");
           }
           if (pl && pl->self && pl->ok) {
             pl->self->onActionResult(pl->eventType);
@@ -235,51 +235,51 @@ void Application::setup() {
   });
 
 #ifdef HAS_LVGL_DISPLAY
-  Display::resourceDetailsScreen.setButtonClickCallback(
+  this->ui.resourceDetailsSetButtonClickCallback(
       [this](ResourceDetailsScreen::ButtonClickEventData evt) {
         this->handleResourceDetailsButtonClick(evt);
       });
 
-  Display::resourceDetailsScreen.setProjectsPageRequestCallback(
+  this->ui.resourceDetailsSetProjectsPageRequestCallback(
       [this](uint32_t page) { this->requestProjectsPage(page); });
-  Display::resourceDetailsScreen.setProjectSelectionCallback(
+  this->ui.resourceDetailsSetProjectSelectionCallback(
       [this](uint32_t projectId, const String &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
-  Display::resourceDetailsScreen.setFormsSubmitCallback(
+  this->ui.resourceDetailsSetFormsSubmitCallback(
       [this](const API::FormSubmissionList &submissions) {
         this->handleFormsSubmit(submissions);
       });
-  Display::resourceDetailsScreen.setFormsCancelCallback(
+  this->ui.resourceDetailsSetFormsCancelCallback(
       [this]() { this->handleFormsCancel(); });
 
-  Display::setPinScreen.setOnPinConfirmedCallback(
+  this->ui.setPinOnConfirmedCallback(
       [this](String pin) { Settings::setDevicePin(pin); });
 
-  Display::connectionConfigurationScreen.setOnCancelPinLockCallback([this]() {
-    Display::transitionToScreen(&Display::initScreen);
+  this->ui.connectionConfigOnCancelPinLock([this]() {
+    this->ui.transitionToInitScreen();
     this->state = APPLICATION_STATE_BOOT;
     this->api.enableConnectionAttempts();
   });
 
-  Display::connectionConfigurationScreen.setOnSaveCallback(
+  this->ui.connectionConfigOnSaveCallback(
       [this](const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
         this->handleConnectionConfigurationSave(cfg);
       });
 
-  Display::initScreen.setOnOpenSettingsCallback([this]() {
+  this->ui.initScreenOnOpenSettings([this]() {
     this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
     this->api.disableConnectionAttempts();
-    Display::connectionConfigurationScreen.enablePinLock();
-    Display::transitionToScreen(&Display::connectionConfigurationScreen);
+    this->ui.connectionConfigEnablePinLock();
+    this->ui.transitionToConnectionConfigurationScreen();
   });
 
-  Display::resourceListScreen.setResourceSelectionCallback(
+  this->ui.resourceListSetSelectionCallback(
       [this](const API::ResourceBrief &resource) {
         this->selectResource(resource);
       });
 
-  Display::setTouchCallback(
+  this->ui.setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
 
   this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username) {
@@ -415,7 +415,7 @@ void Application::loop() {
 #ifdef HAS_LVGL_DISPLAY
   /* Run display/touch first so input feels responsive before any blocking work
    */
-  Display::loop();
+  this->ui.loop();
   taskYIELD(); /* Yield to other FreeRTOS tasks when loop is fast */
 #endif
 
@@ -477,7 +477,7 @@ void Application::retryNfcSetup() {
   if (this->nfc.setup()) {
     this->state = APPLICATION_STATE_INIT;
   } else {
-    Display::showNfcInitErrorPopup(
+    this->ui.showNfcInitErrorPopup(
         "NFC Error", "NFC hardware not found. Check connection and retry.",
         [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
   }
@@ -504,8 +504,8 @@ void Application::processState() {
       this->api.disableConnectionAttempts();
 
 #ifdef HAS_LVGL_DISPLAY
-      Display::connectionConfigurationScreen.disablePinLock();
-      Display::transitionToScreen(&Display::connectionConfigurationScreen);
+      this->ui.connectionConfigDisablePinLock();
+      this->ui.transitionToConnectionConfigurationScreen();
 #endif
     }
 
@@ -538,7 +538,7 @@ void Application::processState() {
     this->logger.debug("PIN is not set, showing pin screen");
     this->state = APPLICATION_STATE_PIN_NOT_SET;
 
-    Display::transitionToScreen(&Display::setPinScreen);
+    this->ui.transitionToSetPinScreen();
     return;
   }
 #endif
@@ -563,7 +563,7 @@ void Application::processState() {
     this->state = APPLICATION_STATE_INIT;
 
 #ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::initScreen);
+    this->ui.transitionToInitScreen();
 #endif
     return;
   }
@@ -594,14 +594,14 @@ void Application::processState() {
 
     this->nfc.disableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
-    Display::enrollmentScreen.setUserName(
+    this->ui.enrollmentSetUserName(
         this->apiEnrollNewCardGetAvailableKeyNoData.username);
 #endif
     this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
 #ifdef HAS_LVGL_DISPLAY
-    Display::enrollmentScreen.setEnrollmentTimeoutTime(
+    this->ui.enrollmentSetTimeoutTime(
         this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
-    Display::transitionToScreen(&Display::enrollmentScreen);
+    this->ui.transitionToEnrollmentScreen();
 #endif
 
     this->state = APPLICATION_STATE_ENROLLMENT;
@@ -638,7 +638,7 @@ void Application::processState() {
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    Display::resourceDetailsScreen.setUserDetails(
+    this->ui.resourceDetailsSetUserDetails(
         ResourceDetailsScreen::UserDetails{
             .username = this->cardAuthenticationData.username,
             .canManageResource = this->cardAuthenticationData.canManageResource,
@@ -663,16 +663,14 @@ void Application::processState() {
       this->logger.debugf("Updating firmware update progress %d",
                           this->firmwareUpdateProgressPct);
 #ifdef HAS_LVGL_DISPLAY
-      Display::firmwareUpdateScreen.setProgress(
-          this->firmwareUpdateProgressPct);
-      Display::firmwareUpdateScreen.setAvailableVersion(
-          this->availableFirmwareVersion);
+      this->ui.firmwareUpdateSetProgress(this->firmwareUpdateProgressPct);
+      this->ui.firmwareUpdateSetAvailableVersion(this->availableFirmwareVersion);
 #endif
       return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::firmwareUpdateScreen);
+    this->ui.transitionToFirmwareUpdateScreen();
 #endif
     this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
     return;
@@ -687,7 +685,7 @@ void Application::processState() {
     this->logger.debug("Resource count is 0, showing no resources screen");
     this->state = APPLICATION_STATE_NO_RESOURCES;
 
-    Display::transitionToScreen(&Display::noResourcesScreen);
+    this->ui.transitionToNoResourcesScreen();
     return;
   }
 
@@ -702,7 +700,7 @@ void Application::processState() {
     if (this->resourceListUpdated) {
 // Update UI with the list
 #ifdef HAS_LVGL_DISPLAY
-      Display::resourceListScreen.setResourceList(this->resourceList);
+      this->ui.resourceListSetResourceList(this->resourceList);
 #endif
       this->resourceListUpdated = false;
     }
@@ -715,7 +713,7 @@ void Application::processState() {
                        "selected, showing resource list");
     this->state = APPLICATION_STATE_RESOURCE_LIST;
 #ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::resourceListScreen);
+    this->ui.transitionToResourceListScreen();
 #endif
     return;
   }
@@ -725,13 +723,13 @@ void Application::processState() {
       if (this->resourceList.items[i].id == this->selectedResourceId) {
         API::ResourceBrief resource = this->resourceList.items[i];
 
-        Display::lockscreen.setResourceName(resource.name);
-        Display::lockscreen.setUsageInfo(resource.hasActiveUsage,
-                                         resource.activeUser);
+        this->ui.lockscreenSetResourceName(resource.name);
+        this->ui.lockscreenSetUsageInfo(resource.hasActiveUsage,
+                                        resource.activeUser);
 
         // Directly pass the native struct to the screen so it can avoid String
         // conversions
-        Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+        this->ui.resourceDetailsSetResourceAndUsageDetails(resource);
 
         break;
       }
@@ -755,7 +753,7 @@ void Application::processState() {
     this->logger.debug("Card is not detected, showing lockscreen");
     this->state = APPLICATION_STATE_LOCKED;
 #ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::lockscreen, [this]() {
+    this->ui.transitionToLockscreen([this]() {
       this->logger.debug(
           "Lockscreen transition complete, enabling card detection");
       this->nfc.enableCardDetection();
@@ -782,8 +780,8 @@ void Application::processState() {
 
     if (this->projectsOfUserResponseUpdated) {
 #ifdef HAS_LVGL_DISPLAY
-      Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
-      Display::resourceDetailsScreen.setSelectedProject(
+      this->ui.resourceDetailsSetProjects(this->projectsOfUserResponse);
+      this->ui.resourceDetailsSetSelectedProject(
           this->selectedProjectId, this->selectedProjectName.c_str());
 #endif
       this->projectsOfUserResponseUpdated = false;
@@ -796,7 +794,7 @@ void Application::processState() {
   this->state = APPLICATION_STATE_UNLOCKED;
   this->restartSessionTimeout();
 
-  Display::transitionToScreen(&Display::resourceDetailsScreen);
+  this->ui.transitionToResourceDetailsScreen();
 #else
 
   // Process unlocked card actions for non-display mode
@@ -957,15 +955,14 @@ void Application::clearProjectSelection() {
   this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
   this->projectsOfUserResponse.hasMore = false;
   this->projectsOfUserResponseUpdated = true;
-  Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
+  this->ui.resourceDetailsSetSelectedProject(0, nullptr);
 }
 
 void Application::handleProjectSelection(uint32_t projectId,
                                          const String &projectName) {
   this->selectedProjectId = projectId;
   this->selectedProjectName = projectName;
-  Display::resourceDetailsScreen.setSelectedProject(projectId,
-                                                    projectName.c_str());
+  this->ui.resourceDetailsSetSelectedProject(projectId, projectName.c_str());
 }
 
 void Application::handleFormsRequest(
@@ -976,9 +973,9 @@ void Application::handleFormsRequest(
   (void)request; // Suppress unused parameter warning; we use pendingFormRequest
                  // directly
   this->hasPendingFormRequest = true;
-  Display::resourceDetailsScreen.hideActionProgress();
+  this->ui.resourceDetailsHideActionProgress();
   // Pass the stored copy since showFormsModal stores a pointer
-  Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
+  this->ui.resourceDetailsShowFormsModal(this->pendingFormRequest);
 }
 
 void Application::handleFormsSubmit(
@@ -990,8 +987,8 @@ void Application::handleFormsSubmit(
 
   this->formSubmissionBuffer = submissions;
   this->hasPendingFormRequest = false;
-  Display::resourceDetailsScreen.hideFormsModal();
-  Display::resourceDetailsScreen.showActionProgress("Sende Formular");
+  this->ui.resourceDetailsHideFormsModal();
+  this->ui.resourceDetailsShowActionProgress("Sende Formular");
 
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
@@ -1009,8 +1006,8 @@ void Application::handleFormsCancel() {
   }
   this->hasPendingFormRequest = false;
   this->pendingActionType = PENDING_ACTION_NONE;
-  Display::resourceDetailsScreen.hideFormsModal();
-  Display::resourceDetailsScreen.hideActionProgress();
+  this->ui.resourceDetailsHideFormsModal();
+  this->ui.resourceDetailsHideActionProgress();
   this->endActionPause();
 }
 
@@ -1019,7 +1016,7 @@ void Application::onActionResult(const String &eventType) {
       eventType == "STOP_RESOURCE_USAGE_SESSION") {
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->ui.resourceDetailsHideFormsModal();
   }
 }
 
@@ -1031,8 +1028,7 @@ void Application::handleTouch(int16_t x, int16_t y) {
 
 void Application::restartSessionTimeout() {
   uint32_t now = millis();
-  Display::resourceDetailsScreen.setSessionTimeoutTime(
-      now + this->UNLOCKED_TIMEOUT_MS);
+  this->ui.resourceDetailsSetSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
   this->timeOfUnlockedMs = now;
   this->resetPauseAccounting();
 }
@@ -1048,7 +1044,7 @@ void Application::handleResourceDetailsButtonClick(
 
   switch (evt.buttonClickType) {
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
-    Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+    this->ui.resourceDetailsShowActionProgress("Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -1058,7 +1054,7 @@ void Application::handleResourceDetailsButtonClick(
                                         this->selectedProjectId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
-    Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
+    this->ui.resourceDetailsShowActionProgress("Beende Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -1067,22 +1063,22 @@ void Application::handleResourceDetailsButtonClick(
     this->api.stopResourceUsageSession(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
+    this->ui.resourceDetailsShowActionProgress("Sperre Tuer");
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
+    this->ui.resourceDetailsShowActionProgress("Entsperre Tuer");
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
+    this->ui.resourceDetailsShowActionProgress("Oeffne Tuer-Riegel");
     this->beginActionPause();
     this->api.unlatchDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
-    Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
+    this->ui.resourceDetailsShowActionProgress("Aktion Ausfuehren");
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
@@ -1095,7 +1091,7 @@ void Application::handleResourceDetailsButtonClick(
     this->clearProjectSelection();
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->ui.resourceDetailsHideFormsModal();
     break;
   }
 }
@@ -1110,7 +1106,7 @@ void Application::beginActionPause() {
   if (this->actionInProgressCount == 1) {
     this->pauseStartMs = millis();
     // Freeze the UI indicator
-    Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
+    this->ui.resourceDetailsSetSessionTimeoutPaused(true);
   }
 }
 
@@ -1125,8 +1121,8 @@ void Application::endActionPause() {
         (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
     this->accumulatedPauseMs += delta;
     // Extend the UI deadline by the same delta and unfreeze
-    Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
-    Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+    this->ui.resourceDetailsExtendSessionTimeoutBy(delta);
+    this->ui.resourceDetailsSetSessionTimeoutPaused(false);
   }
 }
 
@@ -1135,7 +1131,7 @@ void Application::resetPauseAccounting() {
   this->accumulatedPauseMs = 0;
   this->actionInProgressCount = 0;
   // Ensure not paused visually
-  Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+  this->ui.resourceDetailsSetSessionTimeoutPaused(false);
 }
 
 void Application::resetSessionOnDisconnect() {
@@ -1152,8 +1148,8 @@ void Application::resetSessionOnDisconnect() {
   this->logger.info("Connectivity lost; resetting session state");
 
   // Ensure any in-progress UI overlays are dismissed
-  Display::resourceDetailsScreen.hideActionProgress();
-  Display::resourceDetailsScreen.hideFormsModal();
+  this->ui.resourceDetailsHideActionProgress();
+  this->ui.resourceDetailsHideFormsModal();
   this->resetPauseAccounting();
 
   this->pendingActionType = PENDING_ACTION_NONE;

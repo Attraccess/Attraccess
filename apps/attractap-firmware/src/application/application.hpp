@@ -4,6 +4,9 @@
 #include "../api/api.hpp"
 #include "../app/adapters/api_adapter.hpp"
 #include "../app/adapters/nfc_adapter.hpp"
+#ifdef HAS_LVGL_DISPLAY
+#include "../app/adapters/ui_adapter.hpp"
+#endif
 #include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"
 #include "../network/network.hpp"
@@ -23,8 +26,12 @@ class Application {
 public:
   Application()
       : nfcAdapter(), apiAdapter(), nfc(nfcAdapter), api(apiAdapter),
-        logger("Application"), externalState(EXTERNAL_STATE_NONE),
-        firmwareUpdateProgressPct(0), unlocked(false)
+        logger("Application"),
+#ifdef HAS_LVGL_DISPLAY
+        uiAdapter(), ui(uiAdapter),
+#endif
+        externalState(EXTERNAL_STATE_NONE), firmwareUpdateProgressPct(0),
+        unlocked(false)
 #ifdef HAS_LVGL_DISPLAY
         ,
         resourceCount(0), resourceIsSelected(false), bootDone(false),
@@ -42,6 +49,10 @@ private:
   INfcPort &nfc;
   IApiPort &api;
   Logger logger;
+#ifdef HAS_LVGL_DISPLAY
+  UiAdapter uiAdapter;
+  IUiPort &ui;
+#endif
   Beeper beeper;
 
   enum ExternalStates_t {

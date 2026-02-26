@@ -51,7 +51,7 @@ Acceptance:
 
 ### Phase 1 - Ports/adapters extraction (no behavior change)
 
-Status: `In progress`
+Status: `Completed`
 
 Scope:
 
@@ -171,7 +171,7 @@ Update this table as work lands.
 | Phase | Owner | Status      | Start date | End date | Notes |
 | ----- | ----- | ----------- | ---------- | -------- | ----- |
 | 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
-| 1     | Codex + Jappy | In progress | 2026-02-26 |          | Added `INfcPort`/`IApiPort` and adapters; `Application` now depends on interfaces |
+| 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
 | 2     |       | Not started |            |          |       |
 | 3     |       | Not started |            |          |       |
 | 4     |       | Not started |            |          |       |
@@ -220,4 +220,9 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Started Phase 1.
 - Added `INfcPort`/`IApiPort` interfaces and `NfcAdapter`/`ApiAdapter`.
 - Rewired `Application` to depend on port interfaces (no behavior change intended).
+- Added `IUiPort`/`UiAdapter`.
+- Migrated core UI lifecycle and screen transitions in `Application` from direct `Display::*` calls to `UiPort`.
+- Re-built and re-flashed `attractap-p4` successfully after `UiPort` migration.
+- Migrated remaining `resourceDetailsScreen`/callback/UI bindings to `UiPort`; `Application` now has zero `Display::*` calls.
+- Phase 1 completed.
 
