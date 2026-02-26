@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include "../app/runtime/telemetry/loop_metrics.hpp"
 #include "../debug/loopTiming.hpp"
 #include "../serial/serialCommandHandler.hpp"
 #ifdef ESP_PLATFORM
@@ -359,8 +360,8 @@ void Application::setup() {
     if (this->state == APPLICATION_STATE_ENROLLMENT) {
 
       bool success = this->nfc.changeKey(
-          this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-          this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes);
+          this->apiEnrollNewCardData.keyNo, NFC::FACTORY_KEY, NFC::FACTORY_KEY,
+          this->apiEnrollNewCardData.keyBytes);
 
       if (success) {
         this->beeper.successBeep();
@@ -406,7 +407,7 @@ void Application::setup() {
 }
 
 void Application::loop() {
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   LoopTiming t;
   uint32_t t0 = loopTimingNow();
 #endif
@@ -418,39 +419,56 @@ void Application::loop() {
   taskYIELD(); /* Yield to other FreeRTOS tasks when loop is fast */
 #endif
 
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.display_ms = loopTimingNow() - t0;
   t0 = loopTimingNow();
 #endif
 
   SerialCommandHandler::loop();
 
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.serial_ms = loopTimingNow() - t0;
   t0 = loopTimingNow();
 #endif
 
   nfc.loop();
 
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.nfc_ms = loopTimingNow() - t0;
   t0 = loopTimingNow();
 #endif
 
   this->api.loop();
 
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.api_ms = loopTimingNow() - t0;
   t0 = loopTimingNow();
 #endif
 
   this->processState();
 
-#ifdef DEBUG_LOOP_TIMING
+#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.processState_ms = loopTimingNow() - t0;
   t.total_ms =
       t.display_ms + t.serial_ms + t.nfc_ms + t.api_ms + t.processState_ms;
+#endif
+
+#ifdef DEBUG_LOOP_TIMING
   t.logIfSlow();
+#endif
+
+#if defined(PERF_BASELINE_METRICS) && defined(HAS_LVGL_DISPLAY)
+  static LoopMetricsWindow metricsWindow;
+  LoopBucketDurations d = {
+      .display_ms = t.display_ms,
+      .serial_ms = t.serial_ms,
+      .nfc_ms = t.nfc_ms,
+      .api_ms = t.api_ms,
+      .process_state_ms = t.processState_ms,
+      .total_ms = t.total_ms,
+  };
+  metricsWindow.record(d);
+  metricsWindow.maybeLogAndReset(millis());
 #endif
 }
 

@@ -1,0 +1,223 @@
+# Attractap Firmware Architecture Migration Plan
+
+## Goal
+
+Migrate from the current interleaved `Application::processState` design to a clean event-driven structure, **part by part**, without feature flags and without a big-bang rewrite.
+
+## Rules
+
+- No feature flags.
+- Migrate one vertical slice at a time.
+- Keep firmware shippable after every phase.
+- Do not start next phase until current phase passes acceptance checks.
+- UI loop must stay non-blocking throughout migration.
+
+## Target Architecture (end state)
+
+- `AppKernel`: startup wiring and lifecycle only.
+- `EventBus`: typed events between modules.
+- Domain controllers:
+  - `SessionController`
+  - `AuthController`
+  - `ResourceController`
+  - `ConnectivityController`
+  - `UpdateController`
+- Ports/adapters split:
+  - Ports: interfaces (`NfcPort`, `ApiPort`, `UiPort`, etc.)
+  - Adapters: concrete implementations (NFC/API/Display)
+- Runtime tasks:
+  - UI task: render/input only
+  - NFC/API/network tasks: background workers publishing events
+
+## Phase Plan
+
+### Phase 0 - Baseline + scaffolding
+
+Status: `Completed`
+
+Scope:
+
+- Add migration document, acceptance checklist, and progress log.
+- Add minimal telemetry hooks for loop cadence and major latency buckets.
+- Create empty architecture folders/files (kernel/events/domain/ports/adapters/runtime).
+
+Acceptance:
+
+- Existing behavior unchanged.
+- Build passes.
+- Baseline perf numbers captured and written into this file.
+
+---
+
+### Phase 1 - Ports/adapters extraction (no behavior change)
+
+Status: `In progress`
+
+Scope:
+
+- Extract interfaces from direct dependencies in `Application`:
+  - NFC access -> `NfcPort`
+  - API access -> `ApiPort`
+  - UI/screen actions -> `UiPort`
+  - Beeper/settings wrappers as needed
+- Keep call order and behavior identical.
+
+Acceptance:
+
+- `Application` depends on interfaces, not concrete subsystem classes.
+- No user-visible behavior change.
+- Build + smoke tests pass.
+
+---
+
+### Phase 2 - Scheduling split (UI isolation)
+
+Status: `Not started`
+
+Scope:
+
+- Move NFC/API/network loops off the UI execution path.
+- Keep UI loop focused on display/touch cadence.
+- Introduce event queue handoff from worker tasks to app/controller layer.
+
+Acceptance:
+
+- No blocking NFC/API calls on UI task path.
+- Typing responsiveness improved or unchanged vs baseline.
+- No regressions in card auth/reconnect basics.
+
+---
+
+### Phase 3 - Auth/session vertical slice migration
+
+Status: `Not started`
+
+Scope:
+
+- Implement `AuthController` + `SessionController`.
+- Migrate states/events for:
+  - lock -> card detect -> auth -> unlock
+  - unlock timeout / relock
+- Remove migrated auth/session branches from legacy `processState`.
+
+Acceptance:
+
+- Auth flow parity with current behavior.
+- Timeouts and beeps match expected behavior.
+- Legacy auth/session branch code removed.
+
+---
+
+### Phase 4 - Resource/actions vertical slice migration
+
+Status: `Not started`
+
+Scope:
+
+- Implement `ResourceController`.
+- Migrate:
+  - resource list/update/select
+  - start/stop session actions
+  - forms request/submit/cancel
+- Remove `pendingAction`* orchestration from legacy monolith after parity.
+
+Acceptance:
+
+- Resource and form flows parity.
+- No stuck overlays/modals.
+- Legacy resource/action branch code removed.
+
+---
+
+### Phase 5 - Connectivity + update migration
+
+Status: `Not started`
+
+Scope:
+
+- Implement `ConnectivityController` and `UpdateController`.
+- Migrate reconnect/authenticated transitions and firmware update flow.
+- Remove corresponding legacy branches.
+
+Acceptance:
+
+- Reconnect and init-screen transitions parity.
+- Firmware update progress/display parity.
+- Legacy connectivity/update branch code removed.
+
+---
+
+### Phase 6 - Legacy orchestrator retirement
+
+Status: `Not started`
+
+Scope:
+
+- Remove monolithic `Application::processState` state orchestration.
+- Keep `Application`/`AppKernel` as wiring + loop ownership only.
+- Enforce event-driven boundaries across modules.
+
+Acceptance:
+
+- No state logic left in legacy orchestrator.
+- Controllers own transitions.
+- Final architecture docs updated.
+
+## Progress Tracker
+
+Update this table as work lands.
+
+
+| Phase | Owner | Status      | Start date | End date | Notes |
+| ----- | ----- | ----------- | ---------- | -------- | ----- |
+| 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
+| 1     | Codex + Jappy | In progress | 2026-02-26 |          | Added `INfcPort`/`IApiPort` and adapters; `Application` now depends on interfaces |
+| 2     |       | Not started |            |          |       |
+| 3     |       | Not started |            |          |       |
+| 4     |       | Not started |            |          |       |
+| 5     |       | Not started |            |          |       |
+| 6     |       | Not started |            |          |       |
+
+
+## Checklist (gated per phase)
+
+- Build succeeds.
+- Boot flow works.
+- Card auth flow works.
+- Resource list/select works.
+- Start/stop session works.
+- Forms flow works.
+- Reconnect flow works.
+- Firmware update flow works.
+- UI responsiveness check recorded.
+
+## Baseline Metrics (fill before Phase 1)
+
+- UI loop gap p95: TBD (needs dedicated UI-gap metric; not yet emitted)
+- Touch-to-UI p95:
+- Dropped input rate:
+- Max stall: 10059 ms (network connect stall observed in total loop baseline)
+- Reconnect p95:
+
+Initial runtime sample (2026-02-26, flashed `attractap-p4`):
+
+- `PERF,window_ms=5031,samples=97,total_avg_ms=51,total_max_ms=54,...`
+- `PERF,window_ms=5036,samples=97,total_avg_ms=51,total_max_ms=58,...`
+- `...,total_p95_ms=10059,total_p99_ms=10059,total_max_ms=10059,display_p95_ms=51,...,api_max_ms=10002,...`
+
+## Change Log
+
+### 2026-02-26
+
+- Created migration plan.
+- Decided: no feature flags; strict sequential migration.
+- Started Phase 0 implementation.
+- Added `src/app` migration scaffold and telemetry window hook in `Application::loop`.
+- Built `attractap-p4` successfully.
+- Flashed device successfully on `/dev/cu.usbmodem101`.
+- Captured runtime serial logs including baseline `PERF` windows.
+- Upgraded baseline telemetry to include `total_p95_ms` and `total_p99_ms`.
+- Started Phase 1.
+- Added `INfcPort`/`IApiPort` interfaces and `NfcAdapter`/`ApiAdapter`.
+- Rewired `Application` to depend on port interfaces (no behavior change intended).
+

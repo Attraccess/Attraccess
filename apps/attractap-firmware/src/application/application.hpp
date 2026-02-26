@@ -1,11 +1,13 @@
 #pragma once
 
 #include <Arduino.h>
-#include "../nfc/nfc.hpp"
 #include "../api/api.hpp"
+#include "../app/adapters/api_adapter.hpp"
+#include "../app/adapters/nfc_adapter.hpp"
 #include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"
 #include "../network/network.hpp"
+#include "../nfc/nfc.hpp"
 #include "../utils.hpp"
 #include "settings/settings.hpp"
 
@@ -20,7 +22,8 @@
 class Application {
 public:
   Application()
-      : logger("Application"), api(), externalState(EXTERNAL_STATE_NONE),
+      : nfcAdapter(), apiAdapter(), nfc(nfcAdapter), api(apiAdapter),
+        logger("Application"), externalState(EXTERNAL_STATE_NONE),
         firmwareUpdateProgressPct(0), unlocked(false)
 #ifdef HAS_LVGL_DISPLAY
         ,
@@ -34,9 +37,11 @@ public:
   void loop();
 
 private:
-  NFC nfc;
+  NfcAdapter nfcAdapter;
+  ApiAdapter apiAdapter;
+  INfcPort &nfc;
+  IApiPort &api;
   Logger logger;
-  API api;
   Beeper beeper;
 
   enum ExternalStates_t {
