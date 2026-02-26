@@ -72,7 +72,7 @@ Acceptance:
 
 ### Phase 2 - Scheduling split (UI isolation)
 
-Status: `Not started`
+Status: `In progress`
 
 Scope:
 
@@ -172,7 +172,7 @@ Update this table as work lands.
 | ----- | ----- | ----------- | ---------- | -------- | ----- |
 | 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
 | 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
-| 2     |       | Not started |            |          |       |
+| 2     | Codex + Jappy | In progress | 2026-02-26 |          | Moved NFC/API loops from `Application::loop` into dedicated worker tasks |
 | 3     |       | Not started |            |          |       |
 | 4     |       | Not started |            |          |       |
 | 5     |       | Not started |            |          |       |
@@ -225,4 +225,6 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Re-built and re-flashed `attractap-p4` successfully after `UiPort` migration.
 - Migrated remaining `resourceDetailsScreen`/callback/UI bindings to `UiPort`; `Application` now has zero `Display::*` calls.
 - Phase 1 completed.
+- Started Phase 2.
+- Moved `api.loop()` and `nfc.loop()` off UI loop path into dedicated FreeRTOS tasks (`ApiTask`, `NfcTask`).
 

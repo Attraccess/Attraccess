@@ -8,9 +8,34 @@
 #endif
 
 void Application::networkTask(void *parameter) {
+  (void)parameter;
   while (true) {
     Network::loop();
     vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+}
+
+void Application::apiTask(void *parameter) {
+  auto *self = static_cast<Application *>(parameter);
+  if (!self) {
+    vTaskDelete(nullptr);
+    return;
+  }
+  while (true) {
+    self->api.loop();
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+  }
+}
+
+void Application::nfcTask(void *parameter) {
+  auto *self = static_cast<Application *>(parameter);
+  if (!self) {
+    vTaskDelete(nullptr);
+    return;
+  }
+  while (true) {
+    self->nfc.loop();
+    vTaskDelay(5 / portTICK_PERIOD_MS);
   }
 }
 
@@ -400,6 +425,10 @@ void Application::setup() {
 
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
+  xTaskCreate(Application::apiTask, "ApiTask", 6144, this, tskIDLE_PRIORITY + 1,
+              nullptr);
+  xTaskCreate(Application::nfcTask, "NfcTask", 4096, this, tskIDLE_PRIORITY + 1,
+              nullptr);
 
 #ifdef HAS_LVGL_DISPLAY
   this->bootTime = millis();
@@ -431,17 +460,10 @@ void Application::loop() {
   t0 = loopTimingNow();
 #endif
 
-  nfc.loop();
-
+  // NFC/API loops run in dedicated worker tasks in phase 2.
 #if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
-  t.nfc_ms = loopTimingNow() - t0;
-  t0 = loopTimingNow();
-#endif
-
-  this->api.loop();
-
-#if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
-  t.api_ms = loopTimingNow() - t0;
+  t.nfc_ms = 0;
+  t.api_ms = 0;
   t0 = loopTimingNow();
 #endif
 

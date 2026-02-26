@@ -88,6 +88,8 @@ private:
   String availableFirmwareVersion;
 
   static void networkTask(void *parameter);
+  static void apiTask(void *parameter);
+  static void nfcTask(void *parameter);
 
   void processState();
 #ifdef HAS_LVGL_DISPLAY
