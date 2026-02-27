@@ -933,40 +933,44 @@ void Application::processState() {
 
   uint32_t now = millis();
   if (!this->unlocked) {
-    if (this->state == APPLICATION_STATE_LOCKED) {
-      if (this->sessionController.shouldExpireResourceSelection(
-              now, this->timeOfResourceSelectionMs,
-              this->RESOURCE_SELECTION_TIMEOUT_MS)) {
-        this->logger.debug(
-            "Resource selection timeout reached, showing resource list");
-        this->resourceIsSelected = false;
-      }
+    SessionController::LockedStateDecision lockedDecision =
+        this->sessionController.evaluateLockedState(
+            this->unlocked, this->state == APPLICATION_STATE_LOCKED, now,
+            this->timeOfResourceSelectionMs, this->RESOURCE_SELECTION_TIMEOUT_MS);
+    if (lockedDecision.shouldClearResourceSelection) {
+      this->logger.debug(
+          "Resource selection timeout reached, showing resource list");
+      this->resourceIsSelected = false;
+    }
+    if (lockedDecision.shouldReturnEarly) {
       return;
     }
-
-    this->logger.debug("Card is not detected, showing lockscreen");
-    this->state = APPLICATION_STATE_LOCKED;
+    if (lockedDecision.shouldTransitionToLocked) {
+      this->logger.debug("Card is not detected, showing lockscreen");
+      this->state = APPLICATION_STATE_LOCKED;
 #ifdef HAS_LVGL_DISPLAY
-    this->ui.transitionToLockscreen([this]() {
-      this->logger.debug(
-          "Lockscreen transition complete, enabling card detection");
-      this->nfc.enableCardDetection();
-    });
+      this->ui.transitionToLockscreen([this]() {
+        this->logger.debug(
+            "Lockscreen transition complete, enabling card detection");
+        this->nfc.enableCardDetection();
+      });
 #else
-    this->nfc.enableCardDetection();
+      this->nfc.enableCardDetection();
 #endif
+    }
     return;
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
-    if (this->sessionController.shouldAutoRelock(
-            now, this->timeOfUnlockedMs, this->accumulatedPauseMs,
-            this->UNLOCKED_TIMEOUT_MS)) {
+    SessionController::UnlockedStateDecision unlockedDecision =
+        this->sessionController.evaluateUnlockedState(
+            this->unlocked, this->state == APPLICATION_STATE_UNLOCKED, now,
+            this->timeOfUnlockedMs, this->accumulatedPauseMs,
+            this->UNLOCKED_TIMEOUT_MS, this->resourceCount);
+    if (unlockedDecision.shouldRelock) {
       this->logger.debug("Unlocked timeout reached, locking");
       this->unlocked = false;
-      this->resourceIsSelected =
-          this->sessionController.shouldKeepResourceSelectedOnRelock(
-              this->resourceCount);
+      this->resourceIsSelected = unlockedDecision.keepResourceSelectedOnRelock;
     }
 
     if (this->projectsOfUserResponseUpdated) {
@@ -989,19 +993,15 @@ void Application::processState() {
 #else
 
   // Process unlocked card actions for non-display mode
-  if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
-    if (!this->cardDetected) {
-      return;
-    }
-
-    if (!this->unlocked) {
-      return;
-    }
-
-    if (!this->cardRemoved) {
-      return;
-    }
-
+  SessionController::NonDisplayFlowDecision nonDisplayDecision =
+      this->sessionController.evaluateNonDisplayFlow(
+          this->state == APPLICATION_STATE_AUTHENTICATE_CARD,
+          this->state == APPLICATION_STATE_WAIT_FOR_CARD, this->cardDetected,
+          this->unlocked, this->cardRemoved);
+  if (nonDisplayDecision.shouldReturnEarly) {
+    return;
+  }
+  if (nonDisplayDecision.shouldProcessAction) {
     this->logger.debug("Card detected and removed and unlocked, processing");
 
     // Reset state flags before triggering action
@@ -1009,18 +1009,25 @@ void Application::processState() {
     this->cardDetected = false;
     this->cardRemoved = false;
 
-    if (this->resourceIsDoor) {
-      if (this->cardPresentationWasLong) {
-        this->api.lockDoor(this->selectedResourceId);
-      } else {
-        this->api.unlockDoor(this->selectedResourceId);
-      }
-    } else {
-      if (this->cardPresentationWasLong) {
-        this->api.stopResourceUsageSession(this->selectedResourceId);
-      } else {
-        this->api.startResourceUsageSession(this->selectedResourceId);
-      }
+    SessionController::NonDisplayActionType actionType =
+        this->sessionController.selectNonDisplayAction(
+            this->resourceIsDoor, this->cardPresentationWasLong);
+    switch (actionType) {
+    case SessionController::NON_DISPLAY_ACTION_LOCK_DOOR:
+      this->api.lockDoor(this->selectedResourceId);
+      break;
+    case SessionController::NON_DISPLAY_ACTION_UNLOCK_DOOR:
+      this->api.unlockDoor(this->selectedResourceId);
+      break;
+    case SessionController::NON_DISPLAY_ACTION_STOP_SESSION:
+      this->api.stopResourceUsageSession(this->selectedResourceId);
+      break;
+    case SessionController::NON_DISPLAY_ACTION_START_SESSION:
+      this->api.startResourceUsageSession(this->selectedResourceId);
+      break;
+    case SessionController::NON_DISPLAY_ACTION_NONE:
+    default:
+      return;
     }
 
     // Reset state back to waiting for card
@@ -1029,7 +1036,7 @@ void Application::processState() {
     return;
   }
 
-  if (this->state != APPLICATION_STATE_WAIT_FOR_CARD) {
+  if (nonDisplayDecision.shouldTransitionToWaitForCard) {
     this->logger.debug("Waiting for card detection");
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;
     this->nfc.enableCardDetection();
@@ -1220,7 +1227,9 @@ void Application::handleTouch(int16_t x, int16_t y) {
 
 void Application::restartSessionTimeout() {
   uint32_t now = millis();
-  this->ui.resourceDetailsSetSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
+  this->ui.resourceDetailsSetSessionTimeoutTime(
+      this->sessionController.computeSessionTimeoutDeadlineMs(
+          now, this->UNLOCKED_TIMEOUT_MS));
   this->timeOfUnlockedMs = now;
   this->resetPauseAccounting();
 }
@@ -1296,7 +1305,8 @@ void Application::restartResourceSelectionTimeout() {
 
 void Application::beginActionPause() {
   this->actionInProgressCount++;
-  if (this->actionInProgressCount == 1) {
+  if (this->sessionController.shouldPauseSessionTimeoutOnActionBegin(
+          this->actionInProgressCount)) {
     this->pauseStartMs = millis();
     // Freeze the UI indicator
     this->ui.resourceDetailsSetSessionTimeoutPaused(true);
@@ -1304,14 +1314,16 @@ void Application::beginActionPause() {
 }
 
 void Application::endActionPause() {
-  if (this->actionInProgressCount == 0) {
+  if (this->sessionController.shouldIgnoreActionPauseEnd(
+          this->actionInProgressCount)) {
     return;
   }
   this->actionInProgressCount--;
-  if (this->actionInProgressCount == 0) {
+  if (this->sessionController.shouldApplyPauseDeltaOnActionEnd(
+          this->actionInProgressCount)) {
     uint32_t now = millis();
     uint32_t delta =
-        (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
+        this->sessionController.computePauseDeltaMs(now, this->pauseStartMs);
     this->accumulatedPauseMs += delta;
     // Extend the UI deadline by the same delta and unfreeze
     this->ui.resourceDetailsExtendSessionTimeoutBy(delta);
@@ -1320,9 +1332,8 @@ void Application::endActionPause() {
 }
 
 void Application::resetPauseAccounting() {
-  this->pauseStartMs = 0;
-  this->accumulatedPauseMs = 0;
-  this->actionInProgressCount = 0;
+  this->sessionController.resetPauseAccounting(
+      this->pauseStartMs, this->accumulatedPauseMs, this->actionInProgressCount);
   // Ensure not paused visually
   this->ui.resourceDetailsSetSessionTimeoutPaused(false);
 }

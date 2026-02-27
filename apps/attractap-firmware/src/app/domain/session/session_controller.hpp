@@ -4,6 +4,97 @@
 
 class SessionController {
 public:
+  struct LockedStateDecision {
+    bool shouldClearResourceSelection = false;
+    bool shouldReturnEarly = false;
+    bool shouldTransitionToLocked = false;
+  };
+
+  struct UnlockedStateDecision {
+    bool shouldRelock = false;
+    bool keepResourceSelectedOnRelock = false;
+  };
+
+  enum NonDisplayActionType {
+    NON_DISPLAY_ACTION_NONE = 0,
+    NON_DISPLAY_ACTION_LOCK_DOOR,
+    NON_DISPLAY_ACTION_UNLOCK_DOOR,
+    NON_DISPLAY_ACTION_STOP_SESSION,
+    NON_DISPLAY_ACTION_START_SESSION,
+  };
+
+  struct NonDisplayFlowDecision {
+    bool shouldReturnEarly = false;
+    bool shouldProcessAction = false;
+    bool shouldTransitionToWaitForCard = false;
+  };
+
+  LockedStateDecision
+  evaluateLockedState(bool unlocked, bool currentlyLocked, uint32_t nowMs,
+                      uint32_t selectedAtMs, uint32_t selectionTimeoutMs) const {
+    LockedStateDecision d;
+    if (unlocked) {
+      return d;
+    }
+    if (currentlyLocked) {
+      d.shouldReturnEarly = true;
+      d.shouldClearResourceSelection =
+          this->shouldExpireResourceSelection(nowMs, selectedAtMs,
+                                              selectionTimeoutMs);
+      return d;
+    }
+    d.shouldTransitionToLocked = true;
+    return d;
+  }
+
+  UnlockedStateDecision
+  evaluateUnlockedState(bool unlocked, bool currentlyUnlocked, uint32_t nowMs,
+                        uint32_t unlockedAtMs, uint32_t accumulatedPauseMs,
+                        uint32_t unlockedTimeoutMs,
+                        uint8_t resourceCount) const {
+    UnlockedStateDecision d;
+    if (!unlocked || !currentlyUnlocked) {
+      return d;
+    }
+    if (this->shouldAutoRelock(nowMs, unlockedAtMs, accumulatedPauseMs,
+                               unlockedTimeoutMs)) {
+      d.shouldRelock = true;
+      d.keepResourceSelectedOnRelock =
+          this->shouldKeepResourceSelectedOnRelock(resourceCount);
+    }
+    return d;
+  }
+
+  NonDisplayFlowDecision
+  evaluateNonDisplayFlow(bool currentlyAuthenticateCard, bool currentlyWaitForCard,
+                         bool cardDetected, bool unlocked,
+                         bool cardRemoved) const {
+    NonDisplayFlowDecision d;
+    if (currentlyAuthenticateCard) {
+      if (!cardDetected || !unlocked || !cardRemoved) {
+        d.shouldReturnEarly = true;
+        return d;
+      }
+      d.shouldProcessAction = true;
+      return d;
+    }
+    if (!currentlyWaitForCard) {
+      d.shouldTransitionToWaitForCard = true;
+      return d;
+    }
+    return d;
+  }
+
+  NonDisplayActionType selectNonDisplayAction(bool resourceIsDoor,
+                                              bool cardPresentationWasLong) const {
+    if (resourceIsDoor) {
+      return cardPresentationWasLong ? NON_DISPLAY_ACTION_LOCK_DOOR
+                                     : NON_DISPLAY_ACTION_UNLOCK_DOOR;
+    }
+    return cardPresentationWasLong ? NON_DISPLAY_ACTION_STOP_SESSION
+                                   : NON_DISPLAY_ACTION_START_SESSION;
+  }
+
   bool shouldExpireResourceSelection(uint32_t nowMs, uint32_t selectedAtMs,
                                      uint32_t selectionTimeoutMs) const {
     return nowMs - selectedAtMs > selectionTimeoutMs;
@@ -36,5 +127,34 @@ public:
     return unlocked || resourceIsSelected || hasPendingAction ||
            hasPendingFormRequest || pendingFormRequestReady ||
            hasCurrentProjectsUser;
+  }
+
+  bool shouldPauseSessionTimeoutOnActionBegin(
+      uint16_t actionInProgressCount) const {
+    return actionInProgressCount == 1;
+  }
+
+  bool shouldIgnoreActionPauseEnd(uint16_t actionInProgressCount) const {
+    return actionInProgressCount == 0;
+  }
+
+  bool shouldApplyPauseDeltaOnActionEnd(uint16_t actionInProgressCount) const {
+    return actionInProgressCount == 0;
+  }
+
+  uint32_t computePauseDeltaMs(uint32_t nowMs, uint32_t pauseStartMs) const {
+    return (nowMs >= pauseStartMs) ? (nowMs - pauseStartMs) : 0;
+  }
+
+  uint32_t computeSessionTimeoutDeadlineMs(uint32_t nowMs,
+                                           uint32_t unlockedTimeoutMs) const {
+    return nowMs + unlockedTimeoutMs;
+  }
+
+  void resetPauseAccounting(uint32_t &pauseStartMs, uint32_t &accumulatedPauseMs,
+                            uint16_t &actionInProgressCount) const {
+    pauseStartMs = 0;
+    accumulatedPauseMs = 0;
+    actionInProgressCount = 0;
   }
 };
