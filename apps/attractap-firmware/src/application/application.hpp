@@ -9,6 +9,7 @@
 #include "../app/domain/resource/resource_controller.hpp"
 #include "../app/domain/session/session_controller.hpp"
 #include "../app/domain/update/update_controller.hpp"
+#include "../app/events/event_bus.hpp"
 #ifdef HAS_LVGL_DISPLAY
 #include "../app/adapters/ui_adapter.hpp"
 #endif
@@ -18,10 +19,6 @@
 #include "../nfc/nfc.hpp"
 #include "../utils.hpp"
 #include "settings/settings.hpp"
-#ifdef ESP_PLATFORM
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#endif
 
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
@@ -35,7 +32,7 @@ class Application {
 public:
   Application()
       : nfcAdapter(), apiAdapter(), nfc(nfcAdapter), api(apiAdapter),
-        logger("Application"),
+        logger("Application"), eventBus(24),
 #ifdef HAS_LVGL_DISPLAY
         uiAdapter(), ui(uiAdapter),
 #endif
@@ -63,6 +60,7 @@ private:
   SessionController sessionController;
   UpdateController updateController;
   Logger logger;
+  app::events::EventBus eventBus;
 #ifdef HAS_LVGL_DISPLAY
   UiAdapter uiAdapter;
   IUiPort &ui;
@@ -104,50 +102,9 @@ private:
   static void networkTask(void *parameter);
   static void apiTask(void *parameter);
   static void nfcTask(void *parameter);
-
-  enum AppEventType {
-    APP_EVENT_RESOURCE_LIST_UPDATED,
-    APP_EVENT_CARD_AUTH_DETAILS,
-    APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO,
-    APP_EVENT_ENROLL_NEW_CARD,
-    APP_EVENT_PROJECTS_RESPONSE,
-    APP_EVENT_RESOURCE_FORMS_REQUEST,
-    APP_EVENT_FIRMWARE_META,
-    APP_EVENT_FIRMWARE_PROGRESS,
-  };
-
-  struct AppEvent {
-    AppEventType type;
-    void *payload;
-  };
-
-  QueueHandle_t appEventQueue = nullptr;
-  bool enqueueAppEvent(AppEventType type, void *payload);
+  void bindEventHandlers();
   void processAppEvents();
-  void freeAppEventPayload(AppEventType type, void *payload);
   void logAppEventQueueHealth();
-  bool isBestEffortEvent(AppEventType type) const;
-  uint32_t appEventEnqueueOkCount = 0;
-  uint32_t appEventEnqueueDropCount = 0;
-  UBaseType_t appEventQueueHighWater = 0;
-  uint32_t lastAppEventHealthLogMs = 0;
-
-  struct EnrollGetAvailableEventPayload {
-    String username;
-  };
-
-  struct EnrollNewCardEventPayload {
-    uint8_t keyNo = 0;
-    String key;
-  };
-
-  struct FirmwareMetaEventPayload {
-    String availableVersion;
-  };
-
-  struct FirmwareProgressEventPayload {
-    int progressPct = 0;
-  };
 
   void processState();
   bool handleConfigurationAndConnectivityGates();

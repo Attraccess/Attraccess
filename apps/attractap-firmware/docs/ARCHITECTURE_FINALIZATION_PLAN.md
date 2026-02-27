@@ -65,7 +65,7 @@ What is still missing:
 
 ### Phase A - Contract freeze and architecture invariants
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -83,7 +83,7 @@ Acceptance:
 
 ### Phase B - Implement typed EventBus module
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -104,7 +104,7 @@ Acceptance:
 
 ### Phase C - Introduce AppKernel composition root
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -201,9 +201,9 @@ Update this table as work lands.
 
 | Phase | Owner | Status | Start date | End date | Notes |
 | ----- | ----- | ------ | ---------- | -------- | ----- |
-| A     | Codex + Jappy | Not started |            |          |       |
-| B     | Codex + Jappy | Not started |            |          |       |
-| C     | Codex + Jappy | Not started |            |          |       |
+| A     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Contract/docs finalized and architecture invariants aligned for finalization. |
+| B     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added typed EventBus in `app/events` and removed `Application` app-event enum/void* payload API. |
+| C     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `AppKernel` and switched `main.cpp` lifecycle wiring to kernel. |
 | D     | Codex + Jappy | Not started |            |          |       |
 | E     | Codex + Jappy | Not started |            |          |       |
 | F     | Codex + Jappy | Not started |            |          |       |
@@ -216,6 +216,10 @@ Update this table as work lands.
 - Created finalization follow-up plan to close remaining architecture gaps after phase-based migration.
 - Added full gap inventory and A-G implementation phases with acceptance criteria.
 - Added progress tracker and notes sections for ongoing status updates.
+- Implemented concrete `app/events/event_bus.hpp` typed contracts + queue/backpressure + health metrics.
+- Implemented concrete `app/kernel/app_kernel.{hpp,cpp}` composition root and lifecycle ownership.
+- Rewired `Application` callback marshalling to EventBus publish/subscribe handlers.
+- Updated websocket task stack (`websocket_cfg.task_stack=16384`) to prevent canary overflow during websocket resource-list callback path.
 
 ## Execution Rules
 

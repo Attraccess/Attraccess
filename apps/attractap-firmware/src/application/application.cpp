@@ -39,99 +39,28 @@ void Application::nfcTask(void *parameter) {
   }
 }
 
-bool Application::enqueueAppEvent(AppEventType type, void *payload) {
-  if (!this->appEventQueue) {
-    this->freeAppEventPayload(type, payload);
-    return false;
-  }
-  AppEvent evt = {.type = type, .payload = payload};
-  TickType_t sendWaitTicks = this->isBestEffortEvent(type) ? 0 : pdMS_TO_TICKS(5);
-  if (xQueueSend(this->appEventQueue, &evt, sendWaitTicks) != pdTRUE) {
-    this->appEventEnqueueDropCount++;
-    this->logger.warnf("Dropping app event type=%d (queue full)",
-                       static_cast<int>(type));
-    this->freeAppEventPayload(type, payload);
-    return false;
-  }
-  this->appEventEnqueueOkCount++;
-  UBaseType_t queued = uxQueueMessagesWaiting(this->appEventQueue);
-  if (queued > this->appEventQueueHighWater) {
-    this->appEventQueueHighWater = queued;
-  }
-  return true;
-}
-
-bool Application::isBestEffortEvent(AppEventType type) const {
-  return type == APP_EVENT_RESOURCE_LIST_UPDATED ||
-         type == APP_EVENT_PROJECTS_RESPONSE ||
-         type == APP_EVENT_FIRMWARE_PROGRESS;
-}
-
-void Application::freeAppEventPayload(AppEventType type, void *payload) {
-  if (!payload) {
-    return;
-  }
-  switch (type) {
-  case APP_EVENT_RESOURCE_LIST_UPDATED:
-    delete static_cast<API::ResourceList *>(payload);
-    break;
-  case APP_EVENT_CARD_AUTH_DETAILS:
-    delete static_cast<API::CardAuthenticationDetailsResponse *>(payload);
-    break;
-  case APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO:
-    delete static_cast<EnrollGetAvailableEventPayload *>(payload);
-    break;
-  case APP_EVENT_ENROLL_NEW_CARD:
-    delete static_cast<EnrollNewCardEventPayload *>(payload);
-    break;
-  case APP_EVENT_PROJECTS_RESPONSE:
-    delete static_cast<API::ProjectsOfUserResponse *>(payload);
-    break;
-  case APP_EVENT_RESOURCE_FORMS_REQUEST:
-    delete static_cast<API::ResourceUsageFormRequest *>(payload);
-    break;
-  case APP_EVENT_FIRMWARE_META:
-    delete static_cast<FirmwareMetaEventPayload *>(payload);
-    break;
-  case APP_EVENT_FIRMWARE_PROGRESS:
-    delete static_cast<FirmwareProgressEventPayload *>(payload);
-    break;
-  }
-}
-
-void Application::processAppEvents() {
-  if (!this->appEventQueue) {
-    return;
-  }
-
-  AppEvent evt;
-  while (xQueueReceive(this->appEventQueue, &evt, 0) == pdTRUE) {
-    switch (evt.type) {
-    case APP_EVENT_RESOURCE_LIST_UPDATED: {
-      auto *payload = static_cast<API::ResourceList *>(evt.payload);
+void Application::bindEventHandlers() {
+  this->eventBus.onResourceListUpdated(
+      [this](const app::events::ResourceListUpdatedEvent &event) {
 #ifdef HAS_LVGL_DISPLAY
-      if (payload) {
-        this->handleResourceListUpdate(*payload);
-      }
+        this->handleResourceListUpdate(event.resourceList);
 #else
-      if (payload && payload->count > 0) {
-        this->selectedResourceId = payload->items[0].id;
-        this->resourceIsDoor = payload->items[0].type == 1;
-      }
+        if (event.resourceList.count > 0) {
+          this->selectedResourceId = event.resourceList.items[0].id;
+          this->resourceIsDoor = event.resourceList.items[0].type == 1;
+        }
 #endif
-      break;
-    }
-    case APP_EVENT_CARD_AUTH_DETAILS: {
-      auto *payload =
-          static_cast<API::CardAuthenticationDetailsResponse *>(evt.payload);
-      if (payload) {
+      });
+
+  this->eventBus.onCardAuthDetails(
+      [this](const app::events::CardAuthDetailsEvent &event) {
         AuthController::CardDetailsDecision d =
-            this->authController.handleCardDetails(*payload,
+            this->authController.handleCardDetails(event.response,
                                                    this->currentProjectsUser);
         if (d.shouldBeepError) {
-          if (payload->error.length() > 0) {
+          if (event.response.error.length() > 0) {
             this->logger.errorf("Authentication failed: %s",
-                                payload->error.c_str());
+                                event.response.error.c_str());
           } else {
             this->logger.error("Invalid key bytes provided");
           }
@@ -142,10 +71,10 @@ void Application::processAppEvents() {
         }
         if (!d.valid) {
           this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-          break;
+          return;
         }
 
-        this->cardAuthenticationData = *payload;
+        this->cardAuthenticationData = event.response;
 #ifdef HAS_LVGL_DISPLAY
         if (d.shouldClearProjectSelection) {
           this->clearProjectSelection();
@@ -158,101 +87,75 @@ void Application::processAppEvents() {
         if (d.shouldSetExternalAuthenticateState) {
           this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
         }
-      }
-      break;
-    }
+      });
+
 #ifdef HAS_LVGL_DISPLAY
-    case APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO: {
-      auto *payload = static_cast<EnrollGetAvailableEventPayload *>(evt.payload);
-      if (payload) {
+  this->eventBus.onEnrollGetAvailableKeyNo(
+      [this](const app::events::EnrollGetAvailableKeyNoEvent &event) {
         this->apiEnrollNewCardGetAvailableKeyNoData = {
-            .username = payload->username,
+            .username = event.username,
         };
         this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
-      }
-      break;
-    }
-    case APP_EVENT_ENROLL_NEW_CARD: {
-      auto *payload = static_cast<EnrollNewCardEventPayload *>(evt.payload);
-      if (payload) {
+      });
+
+  this->eventBus.onEnrollNewCard(
+      [this](const app::events::EnrollNewCardEvent &event) {
         uint8_t keyBytes[16] = {0};
-        stringToHexArray(payload->key, keyBytes, 16);
+        stringToHexArray(event.key, keyBytes, 16);
         this->apiEnrollNewCardData = {
-            .keyNo = payload->keyNo,
+            .keyNo = event.keyNo,
             .keyBytes = {0},
         };
         memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
         this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD;
-      }
-      break;
-    }
-    case APP_EVENT_PROJECTS_RESPONSE: {
-      auto *payload = static_cast<API::ProjectsOfUserResponse *>(evt.payload);
-      if (payload) {
-        this->projectsOfUserResponse = *payload;
-        this->projectsCurrentPage = payload->page;
-        this->projectsTotalCount = payload->total;
-        this->projectsHasMore = payload->hasMore;
+      });
+
+  this->eventBus.onProjectsResponse(
+      [this](const app::events::ProjectsResponseEvent &event) {
+        this->projectsOfUserResponse = event.response;
+        this->projectsCurrentPage = event.response.page;
+        this->projectsTotalCount = event.response.total;
+        this->projectsHasMore = event.response.hasMore;
         this->projectsOfUserResponseUpdated = true;
-      }
-      break;
-    }
-    case APP_EVENT_RESOURCE_FORMS_REQUEST: {
-      auto *payload = static_cast<API::ResourceUsageFormRequest *>(evt.payload);
-      if (payload) {
-        this->pendingFormRequest = *payload;
+      });
+
+  this->eventBus.onResourceFormsRequest(
+      [this](const app::events::ResourceFormsRequestEvent &event) {
+        this->pendingFormRequest = event.request;
         this->handleFormsRequest(this->pendingFormRequest);
-      }
-      break;
-    }
+      });
 #endif
-    case APP_EVENT_FIRMWARE_META: {
-      auto *payload = static_cast<FirmwareMetaEventPayload *>(evt.payload);
-      UpdateController::FirmwareMetaEventDecision decision =
-          this->updateController.evaluateFirmwareMetaEvent(payload != nullptr);
-      if (payload && decision.shouldSetExternalFirmwareUpdateState) {
-        this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-      }
-      if (payload && decision.shouldStoreAvailableVersion) {
-        this->availableFirmwareVersion = payload->availableVersion;
-      }
-      break;
-    }
-    case APP_EVENT_FIRMWARE_PROGRESS: {
-      auto *payload = static_cast<FirmwareProgressEventPayload *>(evt.payload);
-      UpdateController::FirmwareProgressEventDecision decision =
-          this->updateController.evaluateFirmwareProgressEvent(payload != nullptr);
-      if (payload && decision.shouldLogProgress) {
-        this->logger.debugf("Got firmware update pct %d", payload->progressPct);
-      }
-      if (payload && decision.shouldSetExternalFirmwareUpdateState) {
-        this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
-      }
-      if (payload && decision.shouldStoreProgress) {
-        this->firmwareUpdateProgressPct = payload->progressPct;
-      }
-      break;
-    }
-    }
 
-    this->freeAppEventPayload(evt.type, evt.payload);
-  }
+  this->eventBus.onFirmwareMeta([this](const app::events::FirmwareMetaEvent &event) {
+    UpdateController::FirmwareMetaEventDecision decision =
+        this->updateController.evaluateFirmwareMetaEvent(true);
+    if (decision.shouldSetExternalFirmwareUpdateState) {
+      this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+    }
+    if (decision.shouldStoreAvailableVersion) {
+      this->availableFirmwareVersion = event.availableVersion;
+    }
+  });
+
+  this->eventBus.onFirmwareProgress(
+      [this](const app::events::FirmwareProgressEvent &event) {
+        UpdateController::FirmwareProgressEventDecision decision =
+            this->updateController.evaluateFirmwareProgressEvent(true);
+        if (decision.shouldLogProgress) {
+          this->logger.debugf("Got firmware update pct %d", event.progressPct);
+        }
+        if (decision.shouldSetExternalFirmwareUpdateState) {
+          this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+        }
+        if (decision.shouldStoreProgress) {
+          this->firmwareUpdateProgressPct = event.progressPct;
+        }
+      });
 }
 
-void Application::logAppEventQueueHealth() {
-  uint32_t now = millis();
-  if (now - this->lastAppEventHealthLogMs < 5000) {
-    return;
-  }
-  this->lastAppEventHealthLogMs = now;
-  UBaseType_t queued =
-      this->appEventQueue ? uxQueueMessagesWaiting(this->appEventQueue) : 0;
-  this->logger.infof("APP_EVT,queued=%u,high_water=%u,enq_ok=%u,enq_drop=%u",
-                     static_cast<unsigned>(queued),
-                     static_cast<unsigned>(this->appEventQueueHighWater),
-                     static_cast<unsigned>(this->appEventEnqueueOkCount),
-                     static_cast<unsigned>(this->appEventEnqueueDropCount));
-}
+void Application::processAppEvents() { this->eventBus.poll(); }
+
+void Application::logAppEventQueueHealth() { this->eventBus.logHealth(); }
 
 void Application::setup() {
   // Confirm OTA image on first boot after update to avoid rollback
@@ -287,7 +190,10 @@ void Application::setup() {
 #endif
   }
   this->api.setup();
-  this->appEventQueue = xQueueCreate(24, sizeof(AppEvent));
+  if (!this->eventBus.setup()) {
+    this->logger.error("EventBus queue init failed");
+  }
+  this->bindEventHandlers();
 
 #ifdef HAS_LVGL_DISPLAY
   this->api.onDeviceName(
@@ -295,20 +201,16 @@ void Application::setup() {
 #endif
   this->api.setResourceListUpdateCallback(
       [this](const API::ResourceList &resourceList) {
-        auto *payload = new API::ResourceList(resourceList);
-        if (!payload) {
-          return;
-        }
-        this->enqueueAppEvent(APP_EVENT_RESOURCE_LIST_UPDATED, payload);
+        app::events::ResourceListUpdatedEvent event;
+        event.resourceList = resourceList;
+        this->eventBus.publish(event);
       });
 
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
-        auto *payload = new API::CardAuthenticationDetailsResponse(response);
-        if (!payload) {
-          return;
-        }
-        this->enqueueAppEvent(APP_EVENT_CARD_AUTH_DETAILS, payload);
+        app::events::CardAuthDetailsEvent event;
+        event.response = response;
+        this->eventBus.publish(event);
       });
 
 #ifdef HAS_LVGL_DISPLAY
@@ -435,21 +337,15 @@ void Application::setup() {
 #endif
 
   this->api.setFirmwareUpdateMetaCallback([this](String availableVersion) {
-    auto *payload = new FirmwareMetaEventPayload();
-    if (!payload) {
-      return;
-    }
-    payload->availableVersion = availableVersion;
-    this->enqueueAppEvent(APP_EVENT_FIRMWARE_META, payload);
+    app::events::FirmwareMetaEvent event;
+    event.availableVersion = availableVersion;
+    this->eventBus.publish(event);
   });
 
   this->api.setFirmwareUpdateProgressCallback([this](int percent) {
-    auto *payload = new FirmwareProgressEventPayload();
-    if (!payload) {
-      return;
-    }
-    payload->progressPct = percent;
-    this->enqueueAppEvent(APP_EVENT_FIRMWARE_PROGRESS, payload);
+    app::events::FirmwareProgressEvent event;
+    event.progressPct = percent;
+    this->eventBus.publish(event);
   });
 
 #ifdef HAS_LVGL_DISPLAY
@@ -519,40 +415,30 @@ void Application::setup() {
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
 
   this->api.setEnrollNewCardGetAvailableKeyNoCallback([this](String username) {
-    auto *payload = new EnrollGetAvailableEventPayload();
-    if (!payload) {
-      return;
-    }
-    payload->username = username;
-    this->enqueueAppEvent(APP_EVENT_ENROLL_GET_AVAILABLE_KEY_NO, payload);
+    app::events::EnrollGetAvailableKeyNoEvent event;
+    event.username = username;
+    this->eventBus.publish(event);
   });
 
   this->api.setEnrollNewCardCallback([this](uint8_t keyNo, String key) {
-    auto *payload = new EnrollNewCardEventPayload();
-    if (!payload) {
-      return;
-    }
-    payload->keyNo = keyNo;
-    payload->key = key;
-    this->enqueueAppEvent(APP_EVENT_ENROLL_NEW_CARD, payload);
+    app::events::EnrollNewCardEvent event;
+    event.keyNo = keyNo;
+    event.key = key;
+    this->eventBus.publish(event);
   });
 
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
-        auto *payload = new API::ProjectsOfUserResponse(projectsOfUserResponse);
-        if (!payload) {
-          return;
-        }
-        this->enqueueAppEvent(APP_EVENT_PROJECTS_RESPONSE, payload);
+        app::events::ProjectsResponseEvent event;
+        event.response = projectsOfUserResponse;
+        this->eventBus.publish(event);
       });
 
   this->api.setResourceFormsRequestCallback(
       [this](const API::ResourceUsageFormRequest &request) {
-        auto *payload = new API::ResourceUsageFormRequest(request);
-        if (!payload) {
-          return;
-        }
-        this->enqueueAppEvent(APP_EVENT_RESOURCE_FORMS_REQUEST, payload);
+        app::events::ResourceFormsRequestEvent event;
+        event.request = request;
+        this->eventBus.publish(event);
       });
 #endif
 

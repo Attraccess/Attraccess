@@ -1,15 +1,14 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "app/kernel/app_kernel.hpp"
 #include "logger/logger.hpp"
 #include <Arduino.h>
 #include <Wire.h>
 
-#include "application/application.hpp"
-
 SET_LOOP_TASK_STACK_SIZE(16 * 1024); // 16KB
 
-Application application;
+AppKernel appKernel;
 
 Logger mainLogger("Main");
 
@@ -49,7 +48,7 @@ void setup() {
   Wire.setTimeOut(50);
 
   mainLogger.info("Attractap starting...");
-  application.setup();
+  appKernel.setup();
 }
 
 void loop() {
@@ -57,5 +56,5 @@ void loop() {
   logLoopStackUsage();
 #endif
 
-  application.loop();
+  appKernel.loop();
 }
