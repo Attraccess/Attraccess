@@ -150,6 +150,20 @@ private:
   };
 
   void processState();
+  bool handleConfigurationAndConnectivityGates();
+#ifdef HAS_LVGL_DISPLAY
+  bool handleDisplayBootAndPinGates();
+  bool handleEnrollmentTransitions();
+#else
+  void handleNonDisplayPresentationSignal();
+#endif
+  bool handleExternalAuthTransition();
+  bool handleExternalFirmwareUpdateTransition();
+#ifdef HAS_LVGL_DISPLAY
+  bool handleDisplayResourceAndSessionFlow();
+#else
+  bool handleNonDisplayActionFlow();
+#endif
 #ifdef HAS_LVGL_DISPLAY
   void retryNfcSetup();
 #endif

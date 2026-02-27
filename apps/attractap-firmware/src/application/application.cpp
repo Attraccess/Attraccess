@@ -723,13 +723,7 @@ void Application::retryNfcSetup() {
 }
 #endif
 
-void Application::processState() {
-#ifdef HAS_LVGL_DISPLAY
-  if (this->state == APPLICATION_STATE_NFC_INIT_FAILED) {
-    return;
-  }
-#endif
-
+bool Application::handleConfigurationAndConnectivityGates() {
   AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
   bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
                                 attraccessApiConfig.hostname != "" &&
@@ -762,36 +756,8 @@ void Application::processState() {
       this->ui.transitionToConnectionConfigurationScreen();
     }
 #endif
-    if (configDecision.shouldReturnEarly) {
-      return;
-    }
-    return;
+    return true;
   }
-
-#ifdef HAS_LVGL_DISPLAY
-  if (!this->bootDone &&
-      millis() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION) {
-    this->logger.debug("Boot screen duration reached, hiding boot screen");
-    this->bootDone = true;
-  }
-
-  if (!this->bootDone) {
-    return;
-  }
-
-  bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
-  if (!pinIsSet) {
-    if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
-      return;
-    }
-
-    this->logger.debug("PIN is not set, showing pin screen");
-    this->state = APPLICATION_STATE_PIN_NOT_SET;
-
-    this->ui.transitionToSetPinScreen();
-    return;
-  }
-#endif
 
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
@@ -808,44 +774,63 @@ void Application::processState() {
           false
 #endif
       );
-  if (connectivityDecision.shouldHandleDisconnectedState) {
+  if (!connectivityDecision.shouldHandleDisconnectedState) {
+    return false;
+  }
 #ifdef HAS_LVGL_DISPLAY
-    if (connectivityDecision.shouldResetSessionOnDisconnect) {
-      this->resetSessionOnDisconnect();
-    }
+  if (connectivityDecision.shouldResetSessionOnDisconnect) {
+    this->resetSessionOnDisconnect();
+  }
 #endif
-    if (connectivityDecision.shouldReturnEarly) {
-      return;
-    }
-
-    if (connectivityDecision.shouldEnterInitState) {
-      this->logger.debug(
-          "API/network/websocket disconnected, showing init screen");
-      this->state = APPLICATION_STATE_INIT;
-    }
+  if (connectivityDecision.shouldEnterInitState) {
+    this->logger.debug("API/network/websocket disconnected, showing init screen");
+    this->state = APPLICATION_STATE_INIT;
+  }
+#ifdef HAS_LVGL_DISPLAY
+  if (connectivityDecision.shouldTransitionToInitScreen) {
+    this->ui.transitionToInitScreen();
+  }
+#endif
+  return true;
+}
 
 #ifdef HAS_LVGL_DISPLAY
-    if (connectivityDecision.shouldTransitionToInitScreen) {
-      this->ui.transitionToInitScreen();
-    }
-#endif
-    return;
+bool Application::handleDisplayBootAndPinGates() {
+  if (!this->bootDone &&
+      millis() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION) {
+    this->logger.debug("Boot screen duration reached, hiding boot screen");
+    this->bootDone = true;
   }
 
-#ifdef HAS_LVGL_DISPLAY
-  AuthController::EnrollGetAvailableTransitionDecision
-      enrollGetAvailableDecision =
-          this->authController.evaluateEnrollGetAvailableTransition(
-              this->externalState ==
-                  EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-              this->state == APPLICATION_STATE_ENROLLMENT, millis(),
-              this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs, 30000);
+  if (!this->bootDone) {
+    return true;
+  }
+
+  bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
+  if (pinIsSet) {
+    return false;
+  }
+  if (this->state == APPLICATION_STATE_PIN_NOT_SET) {
+    return true;
+  }
+
+  this->logger.debug("PIN is not set, showing pin screen");
+  this->state = APPLICATION_STATE_PIN_NOT_SET;
+  this->ui.transitionToSetPinScreen();
+  return true;
+}
+
+bool Application::handleEnrollmentTransitions() {
+  AuthController::EnrollGetAvailableTransitionDecision enrollGetAvailableDecision =
+      this->authController.evaluateEnrollGetAvailableTransition(
+          this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
+          this->state == APPLICATION_STATE_ENROLLMENT, millis(),
+          this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs, 30000);
   if (enrollGetAvailableDecision.shouldHandle) {
     if (enrollGetAvailableDecision.shouldTimeout) {
-      this->logger.error(
-          "Enroll new card get available key number timeout reached");
+      this->logger.error("Enroll new card get available key number timeout reached");
       this->externalState = EXTERNAL_STATE_NONE;
-      return;
+      return true;
     }
     if (enrollGetAvailableDecision.shouldTryGetAvailableKeyNo) {
       uint8_t uid[7] = {0};
@@ -860,133 +845,131 @@ void Application::processState() {
       if (keyReadDecision.shouldClearExternalState) {
         this->externalState = EXTERNAL_STATE_NONE;
       }
-      return;
+      return true;
     }
     if (enrollGetAvailableDecision.shouldPrepareEnrollment) {
       this->nfc.disableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
       this->ui.enrollmentSetUserName(
           this->apiEnrollNewCardGetAvailableKeyNoData.username);
-#endif
       this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
-#ifdef HAS_LVGL_DISPLAY
       this->ui.enrollmentSetTimeoutTime(
           this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
       this->ui.transitionToEnrollmentScreen();
-#endif
     }
     if (enrollGetAvailableDecision.shouldEnterEnrollmentState) {
       this->state = APPLICATION_STATE_ENROLLMENT;
     }
-    return;
+    return true;
   }
 
   AuthController::EnrollNewCardTransitionDecision enrollNewCardDecision =
       this->authController.evaluateEnrollNewCardTransition(
           this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD,
           this->state == APPLICATION_STATE_ENROLLMENT);
-  if (enrollNewCardDecision.shouldHandle) {
-    if (enrollNewCardDecision.shouldReturnEarly) {
-      return;
-    }
-    if (enrollNewCardDecision.shouldEnableCardDetection) {
-      this->nfc.enableCardDetection();
-    }
-    if (enrollNewCardDecision.shouldEnterEnrollmentState) {
-      this->state = APPLICATION_STATE_ENROLLMENT;
-    }
-    return;
+  if (!enrollNewCardDecision.shouldHandle) {
+    return false;
   }
-#endif
-
-#ifndef HAS_LVGL_DISPLAY
+  if (enrollNewCardDecision.shouldEnableCardDetection) {
+    this->nfc.enableCardDetection();
+  }
+  if (enrollNewCardDecision.shouldEnterEnrollmentState) {
+    this->state = APPLICATION_STATE_ENROLLMENT;
+  }
+  return true;
+}
+#else
+void Application::handleNonDisplayPresentationSignal() {
   SessionController::NonDisplayPresentationDecision nonDisplayPresentation =
       this->sessionController.evaluateNonDisplayPresentation(
-          this->cardDetected, this->cardRemoved, millis(),
-          this->cardDetectionTimeMs, NFC_CARD_LONG_PRESENTATION_TIME_MS,
-          this->cardPresentationWasLong);
+          this->cardDetected, this->cardRemoved, millis(), this->cardDetectionTimeMs,
+          NFC_CARD_LONG_PRESENTATION_TIME_MS, this->cardPresentationWasLong);
   if (nonDisplayPresentation.shouldIndicateLongPresentation) {
     this->beeper.indicateBeep();
   }
   if (nonDisplayPresentation.shouldMarkLongPresentation) {
     this->cardPresentationWasLong = true;
   }
+}
 #endif
 
-  if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD) {
-    AuthController::ExternalAuthTransitionDecision authTransitionDecision =
-        this->authController.evaluateExternalAuthenticateTransition(
-            this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD,
-            this->state == APPLICATION_STATE_AUTHENTICATE_CARD,
-#ifdef HAS_LVGL_DISPLAY
-            true
-#else
-            false
-#endif
-        );
-    if (authTransitionDecision.shouldReturnEarly) {
-      return;
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    if (authTransitionDecision.shouldPopulateUserDetails) {
-      this->ui.resourceDetailsSetUserDetails(
-          ResourceDetailsScreen::UserDetails{
-              .username = this->cardAuthenticationData.username,
-              .canManageResource = this->cardAuthenticationData.canManageResource,
-              .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-              .isIntroducer = this->cardAuthenticationData.isIntroducer});
-    }
-#endif
-
-    if (authTransitionDecision.shouldEnterAuthenticateState) {
-      this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
-    }
-
-    if (authTransitionDecision.shouldProcessCardAuthenticationNow) {
-      // For non-display mode, process authentication immediately since the card
-      // is still present and won't trigger another detection event
-      this->processCardAuthenticationData();
-    }
-    if (authTransitionDecision.shouldEnableCardDetection) {
-      this->nfc.enableCardDetection();
-    }
-    return;
+bool Application::handleExternalAuthTransition() {
+  if (this->externalState != EXTERNAL_STATE_AUTHENTICATE_CARD) {
+    return false;
   }
-
-  if (this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE) {
-    UpdateController::ExternalFirmwareUpdateDecision firmwareDecision =
-        this->updateController.evaluateExternalFirmwareUpdateTransition(
-            this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE,
-            this->state == APPLICATION_STATE_FIRMWARE_UPDATE,
+  AuthController::ExternalAuthTransitionDecision authTransitionDecision =
+      this->authController.evaluateExternalAuthenticateTransition(
+          this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD,
+          this->state == APPLICATION_STATE_AUTHENTICATE_CARD,
 #ifdef HAS_LVGL_DISPLAY
-            true
+          true
 #else
-            false
+          false
 #endif
-        );
-    if (firmwareDecision.shouldHandle) {
-      if (firmwareDecision.shouldUpdateProgress) {
-        this->logger.debugf("Updating firmware update progress %d",
-                            this->firmwareUpdateProgressPct);
-#ifdef HAS_LVGL_DISPLAY
-        this->ui.firmwareUpdateSetProgress(this->firmwareUpdateProgressPct);
-        this->ui.firmwareUpdateSetAvailableVersion(this->availableFirmwareVersion);
-#endif
-      }
-#ifdef HAS_LVGL_DISPLAY
-      if (firmwareDecision.shouldTransitionToFirmwareScreen) {
-        this->ui.transitionToFirmwareUpdateScreen();
-      }
-#endif
-      if (firmwareDecision.shouldEnterFirmwareUpdateState) {
-        this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
-      }
-      return;
-    }
+      );
+  if (authTransitionDecision.shouldReturnEarly) {
+    return true;
   }
 
 #ifdef HAS_LVGL_DISPLAY
+  if (authTransitionDecision.shouldPopulateUserDetails) {
+    this->ui.resourceDetailsSetUserDetails(
+        ResourceDetailsScreen::UserDetails{
+            .username = this->cardAuthenticationData.username,
+            .canManageResource = this->cardAuthenticationData.canManageResource,
+            .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
+            .isIntroducer = this->cardAuthenticationData.isIntroducer});
+  }
+#endif
+  if (authTransitionDecision.shouldEnterAuthenticateState) {
+    this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+  }
+  if (authTransitionDecision.shouldProcessCardAuthenticationNow) {
+    this->processCardAuthenticationData();
+  }
+  if (authTransitionDecision.shouldEnableCardDetection) {
+    this->nfc.enableCardDetection();
+  }
+  return true;
+}
+
+bool Application::handleExternalFirmwareUpdateTransition() {
+  if (this->externalState != EXTERNAL_STATE_FIRMWARE_UPDATE) {
+    return false;
+  }
+  UpdateController::ExternalFirmwareUpdateDecision firmwareDecision =
+      this->updateController.evaluateExternalFirmwareUpdateTransition(
+          this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE,
+          this->state == APPLICATION_STATE_FIRMWARE_UPDATE,
+#ifdef HAS_LVGL_DISPLAY
+          true
+#else
+          false
+#endif
+      );
+  if (!firmwareDecision.shouldHandle) {
+    return false;
+  }
+  if (firmwareDecision.shouldUpdateProgress) {
+    this->logger.debugf("Updating firmware update progress %d",
+                        this->firmwareUpdateProgressPct);
+#ifdef HAS_LVGL_DISPLAY
+    this->ui.firmwareUpdateSetProgress(this->firmwareUpdateProgressPct);
+    this->ui.firmwareUpdateSetAvailableVersion(this->availableFirmwareVersion);
+#endif
+  }
+#ifdef HAS_LVGL_DISPLAY
+  if (firmwareDecision.shouldTransitionToFirmwareScreen) {
+    this->ui.transitionToFirmwareUpdateScreen();
+  }
+#endif
+  if (firmwareDecision.shouldEnterFirmwareUpdateState) {
+    this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+  }
+  return true;
+}
+
+#ifdef HAS_LVGL_DISPLAY
+bool Application::handleDisplayResourceAndSessionFlow() {
   ResourceController::ResourceAvailabilityDecision resourceDecision =
       this->resourceController.evaluateResourceAvailability(
           this->resourceCount, this->resourceIsSelected, this->resourceListUpdated,
@@ -996,42 +979,36 @@ void Application::processState() {
     this->logger.debug("Resource count is 0, showing no resources screen");
     this->state = APPLICATION_STATE_NO_RESOURCES;
     this->ui.transitionToNoResourcesScreen();
-    return;
+    return true;
   }
   if (resourceDecision.shouldAutoSelectSingleResource) {
     this->logger.debug(
         "Resource count is 1 and resource is not selected, selecting resource");
     this->selectResource(resourceList.items[0]);
-    return;
+    return true;
   }
   if (resourceDecision.shouldUpdateResourceListUi) {
     this->ui.resourceListSetResourceList(this->resourceList);
     this->resourceListUpdated = false;
   }
   if (resourceDecision.shouldReturnEarly) {
-    return;
+    return true;
   }
   if (resourceDecision.shouldShowResourceList) {
     this->logger.debug("Resource count is greater than 0 and resource is not "
                        "selected, showing resource list");
     this->state = APPLICATION_STATE_RESOURCE_LIST;
     this->ui.transitionToResourceListScreen();
-    return;
+    return true;
   }
 
   if (this->selectedResourceChanged) {
     for (uint16_t i = 0; i < this->resourceList.count; ++i) {
       if (this->resourceList.items[i].id == this->selectedResourceId) {
         API::ResourceBrief resource = this->resourceList.items[i];
-
         this->ui.lockscreenSetResourceName(resource.name);
-        this->ui.lockscreenSetUsageInfo(resource.hasActiveUsage,
-                                        resource.activeUser);
-
-        // Directly pass the native struct to the screen so it can avoid String
-        // conversions
+        this->ui.lockscreenSetUsageInfo(resource.hasActiveUsage, resource.activeUser);
         this->ui.resourceDetailsSetResourceAndUsageDetails(resource);
-
         break;
       }
     }
@@ -1045,27 +1022,22 @@ void Application::processState() {
             this->unlocked, this->state == APPLICATION_STATE_LOCKED, now,
             this->timeOfResourceSelectionMs, this->RESOURCE_SELECTION_TIMEOUT_MS);
     if (lockedDecision.shouldClearResourceSelection) {
-      this->logger.debug(
-          "Resource selection timeout reached, showing resource list");
+      this->logger.debug("Resource selection timeout reached, showing resource list");
       this->resourceIsSelected = false;
     }
     if (lockedDecision.shouldReturnEarly) {
-      return;
+      return true;
     }
     if (lockedDecision.shouldTransitionToLocked) {
       this->logger.debug("Card is not detected, showing lockscreen");
       this->state = APPLICATION_STATE_LOCKED;
-#ifdef HAS_LVGL_DISPLAY
       this->ui.transitionToLockscreen([this]() {
         this->logger.debug(
             "Lockscreen transition complete, enabling card detection");
         this->nfc.enableCardDetection();
       });
-#else
-      this->nfc.enableCardDetection();
-#endif
     }
-    return;
+    return true;
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
@@ -1079,39 +1051,33 @@ void Application::processState() {
       this->unlocked = false;
       this->resourceIsSelected = unlockedDecision.keepResourceSelectedOnRelock;
     }
-
     if (this->projectsOfUserResponseUpdated) {
-#ifdef HAS_LVGL_DISPLAY
       this->ui.resourceDetailsSetProjects(this->projectsOfUserResponse);
       this->ui.resourceDetailsSetSelectedProject(
           this->selectedProjectId, this->selectedProjectName.c_str());
-#endif
       this->projectsOfUserResponseUpdated = false;
     }
-
-    return;
+    return true;
   }
 
   this->logger.debug("Resource is unlocked, showing resource details screen");
   this->state = APPLICATION_STATE_UNLOCKED;
   this->restartSessionTimeout();
-
   this->ui.transitionToResourceDetailsScreen();
+  return true;
+}
 #else
-
-  // Process unlocked card actions for non-display mode
+bool Application::handleNonDisplayActionFlow() {
   SessionController::NonDisplayFlowDecision nonDisplayDecision =
       this->sessionController.evaluateNonDisplayFlow(
           this->state == APPLICATION_STATE_AUTHENTICATE_CARD,
           this->state == APPLICATION_STATE_WAIT_FOR_CARD, this->cardDetected,
           this->unlocked, this->cardRemoved);
   if (nonDisplayDecision.shouldReturnEarly) {
-    return;
+    return true;
   }
   if (nonDisplayDecision.shouldProcessAction) {
     this->logger.debug("Card detected and removed and unlocked, processing");
-
-    // Reset state flags before triggering action
     this->unlocked = false;
     this->cardDetected = false;
     this->cardRemoved = false;
@@ -1134,21 +1100,56 @@ void Application::processState() {
       break;
     case SessionController::NON_DISPLAY_ACTION_NONE:
     default:
-      return;
+      return true;
     }
 
-    // Reset state back to waiting for card
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;
     this->nfc.enableCardDetection();
-    return;
+    return true;
   }
-
   if (nonDisplayDecision.shouldTransitionToWaitForCard) {
     this->logger.debug("Waiting for card detection");
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;
     this->nfc.enableCardDetection();
+    return true;
+  }
+  return false;
+}
+#endif
+
+void Application::processState() {
+#ifdef HAS_LVGL_DISPLAY
+  if (this->state == APPLICATION_STATE_NFC_INIT_FAILED) {
     return;
   }
+#endif
+
+  if (this->handleConfigurationAndConnectivityGates()) {
+    return;
+  }
+
+#ifdef HAS_LVGL_DISPLAY
+  if (this->handleDisplayBootAndPinGates()) {
+    return;
+  }
+  if (this->handleEnrollmentTransitions()) {
+    return;
+  }
+#else
+  this->handleNonDisplayPresentationSignal();
+#endif
+
+  if (this->handleExternalAuthTransition()) {
+    return;
+  }
+  if (this->handleExternalFirmwareUpdateTransition()) {
+    return;
+  }
+
+#ifdef HAS_LVGL_DISPLAY
+  (void)this->handleDisplayResourceAndSessionFlow();
+#else
+  (void)this->handleNonDisplayActionFlow();
 #endif
 }
 

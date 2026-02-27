@@ -149,7 +149,7 @@ Acceptance:
 
 ### Phase 6 - Legacy orchestrator retirement
 
-Status: `Not started`
+Status: `Completed`
 
 Scope:
 
@@ -168,15 +168,15 @@ Acceptance:
 Update this table as work lands.
 
 
-| Phase | Owner | Status      | Start date | End date | Notes |
-| ----- | ----- | ----------- | ---------- | -------- | ----- |
-| 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
-| 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
-| 2     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | NFC/API loops moved to dedicated worker tasks with app-thread event marshalling and queue telemetry |
-| 3     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Auth/session transitions, timeout/relock, non-display action flow, and auth execution moved into controllers |
-| 4     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Resource availability, resource action intent handling, and forms submit/cancel/result orchestration moved into `ResourceController` |
-| 5     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Connectivity configuration/reconnect transitions and firmware update event+state transitions migrated into controllers |
-| 6     |       | Not started |            |          |       |
+| Phase | Owner         | Status      | Start date | End date   | Notes                                                                                                                                |
+| ----- | ------------- | ----------- | ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured                                                                         |
+| 1     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters                                             |
+| 2     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | NFC/API loops moved to dedicated worker tasks with app-thread event marshalling and queue telemetry                                  |
+| 3     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | Auth/session transitions, timeout/relock, non-display action flow, and auth execution moved into controllers                         |
+| 4     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | Resource availability, resource action intent handling, and forms submit/cancel/result orchestration moved into `ResourceController` |
+| 5     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | Connectivity configuration/reconnect transitions and firmware update event+state transitions migrated into controllers               |
+| 6     | Codex + Jappy | Completed   | 2026-02-26 | 2026-02-26 | `processState` converted to thin orchestrator delegating to domain-scoped handlers; legacy monolithic branch logic retired          |
 
 
 ## Checklist (gated per phase)
@@ -221,7 +221,7 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Added `INfcPort`/`IApiPort` interfaces and `NfcAdapter`/`ApiAdapter`.
 - Rewired `Application` to depend on port interfaces (no behavior change intended).
 - Added `IUiPort`/`UiAdapter`.
-- Migrated core UI lifecycle and screen transitions in `Application` from direct `Display::*` calls to `UiPort`.
+- Migrated core UI lifecycle and screen transitions in `Application` from direct `Display::`* calls to `UiPort`.
 - Re-built and re-flashed `attractap-p4` successfully after `UiPort` migration.
 - Migrated remaining `resourceDetailsScreen`/callback/UI bindings to `UiPort`; `Application` now has zero `Display::*` calls.
 - Phase 1 completed.
@@ -252,4 +252,7 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Migrated init-screen settings and cancel-pin-lock connectivity transitions into `ConnectivityController`.
 - Migrated firmware update meta/progress event ingestion decisions into `UpdateController`.
 - Phase 5 completed after successful `attractap-touch` build and flash to `/dev/cu.usbmodem101`.
+- Completed Phase 6 by retiring monolithic `Application::processState` branches into dedicated domain handlers (connectivity, auth, update, resource/session).
+- `Application::processState` now acts as a thin orchestrator calling domain-owned transition handlers.
+- Phase 6 validated with successful `attractap-touch` build and flash to `/dev/cu.usbmodem101`.
 
