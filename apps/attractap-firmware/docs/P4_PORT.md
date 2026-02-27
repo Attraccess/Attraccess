@@ -63,8 +63,8 @@ pio run -e attractap-p4 -t upload
 
 ## What’s Done
 
-- **Unified entry:** `main.cpp` for all targets; `main_p4.cpp` excluded (dead code).
-- **Unified display:** `display.cpp` with `DISPLAY_DRIVER_P4_DSI` branch; `display_p4.cpp` excluded (dead code).
+- **Unified entry:** `main.cpp` for all targets.
+- **Unified display:** `display.cpp` with `DISPLAY_DRIVER_P4_DSI` branch.
 - **P4 DSI driver:** `src/display/driver/p4_dsi/p4_dsi_gt911_driver.cpp`.
 - **WiFi:** `esp_hosted_init()` + `esp_hosted_connect_to_slave()` in `network.cpp` before WiFi; SDIO transport.
 - **WebSocket:** `websocket_p4.cpp` (WiFiClientSecure, RFC 6455); `websocket.cpp` excluded for P4.
@@ -131,11 +131,7 @@ pio run -e attractap-p4 -t upload
 
 ---
 
-## Cleanup (optional)
+## Cleanup
 
-These files exist but are excluded from the P4 build; safe to delete:
-
-- `src/main_p4.cpp`
-- `src/display/display_p4.cpp`
-- `include/display_p4.hpp`
+Legacy dead files (`src/main_p4.cpp`, `src/display/display_p4.cpp`, `include/display_p4.hpp`, and P4 NFC stubs) were removed.
 
