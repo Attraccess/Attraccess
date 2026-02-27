@@ -231,7 +231,7 @@ Implementation checklist (ordered):
 
 ### Phase G - Structural cleanup, tests, and final docs
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -259,6 +259,42 @@ Acceptance:
 - `AppRuntime` is composition-oriented (thin coordinator), not a logic sink.
 - Display/non-display divergence is isolated to dedicated modules/strategies instead of broad inline branching.
 
+Implementation checklist (ordered):
+
+1. Introduce runtime composition context:
+   - add `app/runtime/runtime_context.{hpp,cpp}` (or equivalent) to hold stable references used across runtime modules,
+   - keep this context app-owned (ports/controllers/event bus/runtime state), not legacy-type-owned.
+
+2. Split startup/bootstrap responsibilities:
+   - create `app/runtime/bootstrap/*` for callback registration, worker startup, and one-time wiring,
+   - move startup-only logic out of `app_runtime.cpp`.
+
+3. Extract typed event handling module set:
+   - create `app/runtime/events/*` and move EventBus subscription callback logic there,
+   - keep event-handler modules stateless where possible (state passed via `RuntimeContext`).
+
+4. Extract state-machine progression logic:
+   - create `app/runtime/state_machine/*` for transition/gate logic currently embedded in runtime loop paths,
+   - keep domain decisions in controllers; state-machine modules coordinate sequencing only.
+
+5. Extract flow-specific orchestration:
+   - create `app/runtime/flows/{auth,resource,update,connectivity}_flow.*`,
+   - move UI/non-UI action completion paths out of central runtime file.
+
+6. Isolate display divergence:
+   - introduce display/headless strategy modules so `HAS_LVGL_DISPLAY` branching is localized,
+   - keep shared flow/state-machine logic display-agnostic.
+
+7. Shrink `app_runtime.cpp` to thin composition:
+   - file should mainly construct runtime modules, wire dependencies, and forward lifecycle calls.
+
+8. Add architecture tests for extracted boundaries:
+   - event-router dispatch tests,
+   - flow contract tests (inputs/outputs),
+   - queue/backpressure behavior tests with deterministic harnesses.
+
+9. Update docs/diagrams to match module ownership after code split lands.
+
 ---
 
 ### Phase H - Contract hardening and app-owned schemas
@@ -279,6 +315,30 @@ Acceptance:
 - Type translation is centralized in adapters/translators with focused tests.
 - Runtime behavior parity preserved.
 - Migration matrix is complete and approved as the authoritative delete plan.
+
+Implementation checklist (ordered):
+
+1. Create app-owned contracts package:
+   - add `app/contracts/*` grouped by domain (`auth`, `resource`, `update`, `connectivity`, shared primitives),
+   - define minimal DTOs/enums needed by runtime/domain/events boundaries.
+
+2. Introduce translation seams at adapters:
+   - add translator modules under `app/adapters/translators/*`,
+   - keep legacy DTO conversion in adapter layer only.
+
+3. Refactor ports to app contracts:
+   - update high-traffic ports first (API/display/network-facing ports) to consume/emit app contracts,
+   - avoid broad signature churn by migrating port-by-port.
+
+4. Remove legacy includes from app headers:
+   - prioritize `app/runtime/*.hpp`, `app/domain/*.hpp`, `app/events/*.hpp`,
+   - allow legacy includes only in adapters/translators and glue boundaries.
+
+5. Add contract translation tests:
+   - verify app<->legacy mapping for each migrated adapter path.
+
+6. Publish migration matrix artifact:
+   - legacy folder -> app module owner -> translator location -> delete criteria.
 
 ---
 
@@ -305,6 +365,31 @@ Acceptance:
 - Build + flash + smoke checks pass.
 - For each completed slice, corresponding legacy implementation files are removed or reduced to glue-only stubs.
 
+Implementation checklist (ordered):
+
+1. Decompose `src/api` internally:
+   - separate request transport/client, callback routing, retry/backoff policy, and protocol payload shaping.
+
+2. Decompose `src/display` internally:
+   - separate navigation/state decisions from rendering/view update plumbing.
+
+3. Decompose `src/network` internally:
+   - separate connection loop/transport from reconnection policy and connectivity-state ownership.
+
+4. Decompose `src/settings` internally:
+   - separate persistence I/O, defaulting, and validation/normalization.
+
+5. Reduce static/global mutable ownership:
+   - move mutable state into explicit instances where safe,
+   - keep compatibility facades only as temporary pass-through layers.
+
+6. Execute deletion slices:
+   - for each subsystem slice, migrate calls to app-owned module + adapter/translator path,
+   - delete replaced legacy files immediately after parity checks.
+
+7. Record per-slice parity evidence:
+   - build/flash/smoke notes tied to each delete step in progress notes.
+
 ---
 
 ### Phase J - Final legacy retirement and architecture lock
@@ -328,6 +413,25 @@ Acceptance:
 - Guardrails prevent regression to old coupling patterns.
 - Final acceptance checklist passes end-to-end.
 
+Implementation checklist (ordered):
+
+1. Remove temporary compatibility layers introduced during G/H/I once parity is proven.
+
+2. Add include-boundary guardrails:
+   - CI check that blocks non-adapter `src/app/*` includes of legacy subsystem headers.
+
+3. Add global-usage guardrails:
+   - CI/review check that blocks new direct static/global singleton usage in runtime/domain/events code.
+
+4. Add app-ownership guardrail:
+   - CI check that blocks new app/business logic files outside `src/app/*`.
+
+5. Finalize architecture docs/diagrams:
+   - ensure docs reflect actual ownership boundaries after deletions.
+
+6. Run final acceptance gate:
+   - build + flash + smoke path + architecture guardrail checks all green.
+
 ## Progress Tracker
 
 Update this table as work lands.
@@ -340,7 +444,7 @@ Update this table as work lands.
 | D     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/runtime/runtime_workers.*`; `Application` now delegates worker task lifecycle to runtime. |
 | E     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added ports/adapters for settings/system/beeper/network/serial/connectivity-state; orchestration no longer uses static globals directly. |
 | F     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added app_runtime_state, event_router, app_runtime; Application is wiring-only facade. |
-| G     | Codex + Jappy | Not started |            |          | Expanded scope to include AppRuntime modularization and maintainability gates. |
+| G     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Split `app_runtime.cpp` into runtime modules (`bootstrap`, `events`, `state_machine`, `flows`) and added `RuntimeContext` composition object. |
 | H     | Codex + Jappy | Not started |            |          | Add app-owned contracts and remove legacy-type coupling from app runtime/domain/events boundaries. |
 | I     | Codex + Jappy | Not started |            |          | Decompose legacy subsystems internally and reduce static/global ownership concentration. |
 | J     | Codex + Jappy | Not started |            |          | Retire compatibility leftovers and lock boundaries with architecture guardrails. |
@@ -365,6 +469,9 @@ Update this table as work lands.
 - Updated Phase G scope to explicitly decompose large `app_runtime.cpp` into maintainable runtime modules (bootstrap/events/state-machine/flows + display/headless split) with concrete acceptance criteria.
 - Added phases H/I/J to finish modernization after runtime extraction: app-owned contracts, legacy subsystem decomposition, and final architecture guardrails.
 - Tightened end-state invariant: all app/business logic must live in `src/app/*`, with explicit legacy-folder burn-down and deletion gates.
+- Added concrete implementation checklists for phases G/H/I/J to make remaining modernization work executable as ordered slices.
+- Completed Phase G runtime modularization: extracted `AppRuntime` responsibilities into `app/runtime/bootstrap`, `app/runtime/events`, `app/runtime/state_machine`, and `app/runtime/flows`, with display/headless split files and a shared `runtime_context`.
+- Validated post-Phase-G behavior with `npx nx build attractap-firmware` (all firmware environments built and merged successfully).
 
 ## Execution Rules
 

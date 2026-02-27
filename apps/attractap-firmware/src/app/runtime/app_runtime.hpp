@@ -24,6 +24,7 @@
 #include "../ports/system_port.hpp"
 #include "app_runtime_state.hpp"
 #include "event_router.hpp"
+#include "runtime_context.hpp"
 #include "runtime_workers.hpp"
 #include "../../api/api.hpp"
 #include "../../logger/logger.hpp"
@@ -33,8 +34,6 @@
 #include "../ports/ui_port.hpp"
 #include "../../display/screens/connectionConfiguration/connectionConfigurationScreen.hpp"
 #include "../../display/screens/resourceDetails/resourceDetailsScreen.hpp"
-#else
-#define NFC_CARD_LONG_PRESENTATION_TIME_MS 1500
 #endif
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
@@ -103,6 +102,7 @@ private:
 #endif
 
   AppRuntimeState state_;
+  RuntimeContext context_;
   EventRouter eventRouter_;
   Logger logger_{"AppRuntime"};
 
