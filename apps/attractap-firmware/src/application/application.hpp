@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-#include "../api/api.hpp"
 #include "../app/adapters/api_adapter.hpp"
 #include "../app/adapters/beeper_adapter.hpp"
 #include "../app/adapters/connectivity_state_adapter.hpp"
@@ -16,20 +14,11 @@
 #include "../app/domain/session/session_controller.hpp"
 #include "../app/domain/update/update_controller.hpp"
 #include "../app/events/event_bus.hpp"
+#include "../app/runtime/app_runtime.hpp"
 #include "../app/runtime/runtime_workers.hpp"
 #ifdef HAS_LVGL_DISPLAY
 #include "../app/adapters/ui_adapter.hpp"
 #endif
-#include "../logger/logger.hpp"
-#include "../utils.hpp"
-
-#ifdef HAS_LVGL_DISPLAY
-#include "../display/display.hpp"
-#else
-#define NFC_CARD_LONG_PRESENTATION_TIME_MS 1500
-#endif
-
-#define APPLICATION_BOOT_SCREEN_DURATION 2000
 
 class Application {
 public:
@@ -39,20 +28,21 @@ public:
         connectivityStateAdapter(), nfc(nfcAdapter), api(apiAdapter),
         beeper(beeperAdapter), settings(settingsAdapter), system(systemAdapter),
         network(networkAdapter), serialCommand(serialCommandAdapter),
-        connectivityState(connectivityStateAdapter), logger("Application"),
-        eventBus(24),
+        connectivityState(connectivityStateAdapter), authController(),
+        connectivityController(), resourceController(), sessionController(),
+        updateController(), eventBus(24), runtimeWorkers(),
 #ifdef HAS_LVGL_DISPLAY
         uiAdapter(), ui(uiAdapter),
 #endif
-        externalState(EXTERNAL_STATE_NONE), firmwareUpdateProgressPct(0),
-        unlocked(false)
+        appRuntime(nfc, api, beeper, settings, system, network, serialCommand,
+                   connectivityState, authController, connectivityController,
+                   resourceController, sessionController, updateController,
+                   eventBus, runtimeWorkers
 #ifdef HAS_LVGL_DISPLAY
-        ,
-        resourceCount(0), resourceIsSelected(false), bootDone(false),
-        resourceListUpdated(false), selectedResourceChanged(false)
+                   ,
+                   ui
 #endif
-  {
-  }
+        ) {}
 
   void setup();
   void loop();
@@ -79,187 +69,12 @@ private:
   ResourceController resourceController;
   SessionController sessionController;
   UpdateController updateController;
-  Logger logger;
   app::events::EventBus eventBus;
+  app::runtime::RuntimeWorkers runtimeWorkers;
 #ifdef HAS_LVGL_DISPLAY
   UiAdapter uiAdapter;
   IUiPort &ui;
 #endif
-  enum ExternalStates_t {
-    EXTERNAL_STATE_NONE,
-#ifdef HAS_LVGL_DISPLAY
-    EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-    EXTERNAL_STATE_ENROLL_NEW_CARD,
-#endif
-    EXTERNAL_STATE_AUTHENTICATE_CARD,
-    EXTERNAL_STATE_FIRMWARE_UPDATE,
-  };
 
-  ExternalStates_t externalState;
-
-#ifdef HAS_LVGL_DISPLAY
-  struct ApiEnrollNewCardGetAvailableKeyNoData_t {
-    String username;
-  };
-  ApiEnrollNewCardGetAvailableKeyNoData_t apiEnrollNewCardGetAvailableKeyNoData;
-  uint32_t apiEnrollNewCardGetAvailableKeyNoStartTimeMs;
-
-  struct ApiEnrollNewCardData_t {
-    uint8_t keyNo;
-    uint8_t keyBytes[16];
-  };
-  ApiEnrollNewCardData_t apiEnrollNewCardData;
-#endif
-
-  API::CardAuthenticationDetailsResponse cardAuthenticationData;
-
-  int firmwareUpdateProgressPct;
-
-  String availableFirmwareVersion;
-
-  app::runtime::RuntimeWorkers runtimeWorkers;
-  void bindEventHandlers();
-  void processAppEvents();
-  void logAppEventQueueHealth();
-
-  void processState();
-  bool handleConfigurationAndConnectivityGates();
-#ifdef HAS_LVGL_DISPLAY
-  bool handleDisplayBootAndPinGates();
-  bool handleEnrollmentTransitions();
-#else
-  void handleNonDisplayPresentationSignal();
-#endif
-  bool handleExternalAuthTransition();
-  bool handleExternalFirmwareUpdateTransition();
-#ifdef HAS_LVGL_DISPLAY
-  bool handleDisplayResourceAndSessionFlow();
-#else
-  bool handleNonDisplayActionFlow();
-#endif
-#ifdef HAS_LVGL_DISPLAY
-  void retryNfcSetup();
-#endif
-
-#ifdef HAS_LVGL_DISPLAY
-  void handleConnectionConfigurationSave(
-      const ConnectionConfigurationScreen::ConnectionConfig &cfg);
-
-  void handleTouch(int16_t x, int16_t y);
-
-  uint32_t bootTime;
-  bool bootDone;
-
-#endif
-  bool unlocked;
-#ifdef HAS_LVGL_DISPLAY
-
-  uint32_t timeOfUnlockedMs;
-  const uint32_t UNLOCKED_TIMEOUT_MS = 30000;
-  void restartSessionTimeout();
-  void resetPauseAccounting();
-  void resetSessionOnDisconnect();
-
-  uint32_t timeOfResourceSelectionMs;
-  const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
-  void restartResourceSelectionTimeout();
-
-  uint8_t resourceCount;
-  bool resourceIsSelected;
-#else
-  bool resourceIsDoor = false;
-#endif
-  uint32_t selectedResourceId;
-
-#ifndef HAS_LVGL_DISPLAY
-  bool cardDetected = false;
-  bool cardRemoved = false;
-  unsigned long cardDetectionTimeMs = 0;
-  bool cardPresentationWasLong = false;
-#endif
-
-#ifdef HAS_LVGL_DISPLAY
-  bool selectedResourceChanged;
-  // Own a persistent copy of the latest resource list to avoid dangling
-  // references
-  API::ResourceList resourceList;
-  bool resourceListUpdated;
-
-  API::ProjectsOfUserResponse projectsOfUserResponse;
-  bool projectsOfUserResponseUpdated = false;
-  uint32_t selectedProjectId = 0;
-  String selectedProjectName;
-  uint32_t projectsCurrentPage = 1;
-  uint32_t projectsTotalCount = 0;
-  bool projectsHasMore = false;
-  String currentProjectsUser;
-
-  enum pending_action_t {
-    PENDING_ACTION_NONE,
-    PENDING_ACTION_START_SESSION,
-    PENDING_ACTION_STOP_SESSION,
-  };
-  pending_action_t pendingActionType = PENDING_ACTION_NONE;
-  uint32_t pendingActionResourceId = 0;
-  uint32_t pendingActionProjectId = 0;
-  bool hasPendingFormRequest = false;
-  // Flag set by websocket callback when a form request arrives; processed by
-  // main loop
-  volatile bool pendingFormRequestReady = false;
-  API::ResourceUsageFormRequest pendingFormRequest;
-  API::FormSubmissionList formSubmissionBuffer;
-
-  void selectResource(const API::ResourceBrief &resource);
-
-  void requestProjectsPage(uint32_t page);
-  void clearProjectSelection();
-  void handleProjectSelection(uint32_t projectId, const String &projectName);
-  void handleFormsRequest(const API::ResourceUsageFormRequest &request);
-  void handleFormsSubmit(const API::FormSubmissionList &submissions);
-  void handleFormsCancel();
-  void onActionResult(const String &eventType);
-#endif
-
-  enum applicationState_t {
-#ifdef HAS_LVGL_DISPLAY
-    APPLICATION_STATE_BOOT,
-    APPLICATION_STATE_PIN_NOT_SET,
-    APPLICATION_STATE_NFC_INIT_FAILED,
-#endif
-    APPLICATION_STATE_CONFIGURATION_REQUIRED,
-    APPLICATION_STATE_INIT,
-    APPLICATION_STATE_CUSTOM,
-#ifdef HAS_LVGL_DISPLAY
-    APPLICATION_STATE_LOCKED,
-#endif
-    APPLICATION_STATE_AUTHENTICATE_CARD,
-    APPLICATION_STATE_NO_RESOURCES,
-#ifdef HAS_LVGL_DISPLAY
-    APPLICATION_STATE_RESOURCE_LIST,
-    APPLICATION_STATE_UNLOCKED,
-    APPLICATION_STATE_ENROLLMENT,
-#else
-    APPLICATION_STATE_WAIT_FOR_CARD,
-#endif
-    APPLICATION_STATE_FIRMWARE_UPDATE
-  };
-  applicationState_t state;
-
-#ifdef HAS_LVGL_DISPLAY
-  void handleResourceListUpdate(const API::ResourceList &resourceList);
-#endif
-  void processCardAuthenticationData();
-
-#ifdef HAS_LVGL_DISPLAY
-  void handleResourceDetailsButtonClick(
-      ResourceDetailsScreen::ButtonClickEventData evt);
-
-  // Action pause tracking (while server actions are running)
-  void beginActionPause();
-  void endActionPause();
-
-  uint32_t pauseStartMs = 0;
-  uint32_t accumulatedPauseMs = 0;
-  uint16_t actionInProgressCount = 0;
-#endif
+  app::runtime::AppRuntime appRuntime;
 };

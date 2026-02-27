@@ -61,6 +61,10 @@ What is still missing:
 - No explicit architecture-conformance tests (event routing, reducer determinism, queue contract tests).
 - No final acceptance gate that proves `Application` is wiring-only.
 
+8) **Runtime maintainability gap**
+- `app/runtime/app_runtime.cpp` is a large multi-responsibility unit (setup wiring, event handlers, state machine, UI/non-UI flows, side-effect dispatch).
+- Heavy `HAS_LVGL_DISPLAY` branching inside one file makes ownership boundaries harder to reason about and change safely.
+
 ## Finalization Phases
 
 ### Phase A - Contract freeze and architecture invariants
@@ -161,7 +165,7 @@ Acceptance:
 
 ### Phase F - Shift orchestration ownership from Application
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -174,6 +178,37 @@ Acceptance:
 - `Application` is wiring-only or removed.
 - No business transition state machine logic remains in `Application`.
 
+Implementation checklist (ordered):
+
+1. Introduce `app/runtime/app_runtime_state.{hpp,cpp}`:
+   - move mutable orchestration state from `Application`:
+     - selected resource/project IDs,
+     - pending action/form state,
+     - auth/update/connectivity snapshots needed for transitions.
+   - expose focused getters/setters only for required handlers.
+
+2. Introduce `app/runtime/event_router.{hpp,cpp}`:
+   - subscribe to typed EventBus events,
+   - route each event to a domain-specific handler module,
+   - remove event switchboard logic from `Application`.
+
+3. Split `Application::processState()` into runtime/domain handlers:
+   - `runtime/auth_runtime_handler.*`,
+   - `runtime/resource_runtime_handler.*`,
+   - `runtime/update_runtime_handler.*`.
+   - handlers operate on `AppRuntimeState` + ports/controllers.
+
+4. Move command execution edges behind runtime handlers:
+   - API command dispatch for resource actions,
+   - UI transition decisions tied to domain outputs,
+   - pending-action/forms completion paths.
+
+5. Collapse `Application`:
+   - keep facade with compatibility forwarding only (temporary), or
+   - delete `Application` if `AppKernel + runtime handlers` fully cover lifecycle.
+
+6. Delete obsolete `Application` state members/methods after parity checks.
+
 ---
 
 ### Phase G - Structural cleanup, tests, and final docs
@@ -183,10 +218,18 @@ Status: `Not started`
 Scope:
 
 - Remove obsolete legacy glue and dead compatibility paths.
+- Split `app/runtime/app_runtime.cpp` into focused modules with stable boundaries:
+  - `runtime/bootstrap/*` (startup wiring + callback registration),
+  - `runtime/events/*` (typed event handlers),
+  - `runtime/state_machine/*` (state progression/gates),
+  - `runtime/flows/*` (auth/resource/update/connectivity flows),
+  - display/non-display strategy modules to minimize compile-time branching in each file.
+- Introduce shared `RuntimeContext` (or equivalent) to avoid broad constructor/method parameter sprawl and centralize dependencies.
 - Add architecture tests:
   - reducer/controller deterministic tests,
   - event routing tests,
-  - runtime queue/backpressure tests.
+  - runtime queue/backpressure tests,
+  - orchestration module boundary tests (state-machine + flow contracts).
 - Finalize architecture docs and migration record.
 
 Acceptance:
@@ -194,6 +237,9 @@ Acceptance:
 - Final target architecture represented in both code and docs.
 - CI includes architecture-level verification.
 - End-to-end smoke checks pass (boot/auth/resource/forms/reconnect/fw-update).
+- No single runtime orchestration file is monolithic; responsibilities are split by module ownership.
+- `AppRuntime` is composition-oriented (thin coordinator), not a logic sink.
+- Display/non-display divergence is isolated to dedicated modules/strategies instead of broad inline branching.
 
 ## Progress Tracker
 
@@ -206,8 +252,8 @@ Update this table as work lands.
 | C     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `AppKernel` and switched `main.cpp` lifecycle wiring to kernel. |
 | D     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/runtime/runtime_workers.*`; `Application` now delegates worker task lifecycle to runtime. |
 | E     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added ports/adapters for settings/system/beeper/network/serial/connectivity-state; orchestration no longer uses static globals directly. |
-| F     | Codex + Jappy | Not started |            |          |       |
-| G     | Codex + Jappy | Not started |            |          |       |
+| F     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added app_runtime_state, event_router, app_runtime; Application is wiring-only facade. |
+| G     | Codex + Jappy | Not started |            |          | Expanded scope to include AppRuntime modularization and maintainability gates. |
 
 ## Progress Notes
 
@@ -224,6 +270,9 @@ Update this table as work lands.
 - Started Phase E by adding `app/ports/{settings_port,system_port}.hpp` + adapters and routing `Application` through those interfaces for settings persistence and timing/restart side effects.
 - Continued Phase E by adding `app/ports/beeper_port.hpp` + `app/adapters/beeper_adapter.hpp` and routing `Application` beeping through `IBeeperPort`.
 - Completed Phase E with `network`, `serial-command`, and `connectivity-state` ports/adapters; removed remaining direct `Network::`, `SerialCommandHandler::`, and `State::` calls from orchestration/runtime logic.
+- Started Phase F by expanding the plan into concrete runtime-state + event-router extraction steps and setting phase status to `In progress`.
+- Completed Phase F: added `app/runtime/app_runtime_state.hpp`, `event_router.{hpp,cpp}`, `app_runtime.{hpp,cpp}`; moved orchestration from Application to AppRuntime; Application is now thin facade (setup/loop forward only).
+- Updated Phase G scope to explicitly decompose large `app_runtime.cpp` into maintainable runtime modules (bootstrap/events/state-machine/flows + display/headless split) with concrete acceptance criteria.
 
 ## Execution Rules
 
@@ -237,7 +286,7 @@ Update this table as work lands.
 1. A -> B first (contracts and event substrate)
 2. C -> D (kernel + runtime extraction)
 3. E -> F (boundary completion + orchestration retirement)
-4. G final (cleanup/tests/docs lock-in)
+4. G final (runtime decomposition + cleanup/tests/docs lock-in)
 
 ## Final Acceptance Checklist
 
@@ -246,5 +295,6 @@ Update this table as work lands.
 - `app/runtime` owns worker task lifecycle.
 - Domain controllers own transitions; orchestration is not monolithic.
 - `Application` no longer holds primary business orchestration state.
+- Runtime orchestration is modularized into focused files; `AppRuntime` remains thin and compositional.
 - Build + flash validation succeeds on active target.
 - Architecture docs reflect actual code structure.
