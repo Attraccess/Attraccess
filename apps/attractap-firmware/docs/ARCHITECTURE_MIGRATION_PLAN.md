@@ -236,4 +236,7 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Moved session-timeout deadline and pause-accounting reset calculations into `SessionController`.
 - Moved locked/unlocked session transition decisions in `processState` into `SessionController` decision structs.
 - Moved non-display auth/session transition + action selection decisions into `SessionController`.
+- Moved logout/disconnect reset decisions into `SessionController` decision structs.
+- Moved external authenticate-card transition decisions into `AuthController`.
+- Moved external firmware-update transition decisions into `UpdateController`.
 

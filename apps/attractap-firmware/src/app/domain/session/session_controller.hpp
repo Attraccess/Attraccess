@@ -29,6 +29,31 @@ public:
     bool shouldTransitionToWaitForCard = false;
   };
 
+  struct LogoutDecision {
+    bool shouldClearResourceSelection = false;
+    bool shouldLock = true;
+    bool shouldClearProjectsUser = true;
+    bool shouldClearProjectSelection = true;
+    bool shouldResetPendingAction = true;
+    bool shouldClearPendingFormRequest = true;
+    bool shouldHideFormsModal = true;
+  };
+
+  struct DisconnectResetDecision {
+    bool shouldResetSession = false;
+    bool shouldHideActionProgress = true;
+    bool shouldHideFormsModal = true;
+    bool shouldResetPauseAccounting = true;
+    bool shouldResetPendingAction = true;
+    bool shouldClearPendingFormRequest = true;
+    bool shouldClearProjectSelection = true;
+    bool shouldClearProjectsUser = true;
+    bool shouldClearSelection = true;
+    bool shouldLock = true;
+    bool shouldClearExternalState = true;
+    bool shouldEnableCardDetection = true;
+  };
+
   LockedStateDecision
   evaluateLockedState(bool unlocked, bool currentlyLocked, uint32_t nowMs,
                       uint32_t selectedAtMs, uint32_t selectionTimeoutMs) const {
@@ -93,6 +118,25 @@ public:
     }
     return cardPresentationWasLong ? NON_DISPLAY_ACTION_STOP_SESSION
                                    : NON_DISPLAY_ACTION_START_SESSION;
+  }
+
+  LogoutDecision evaluateLogout(uint8_t resourceCount) const {
+    LogoutDecision d;
+    d.shouldClearResourceSelection =
+        this->shouldClearResourceSelectionOnLogout(resourceCount);
+    return d;
+  }
+
+  DisconnectResetDecision
+  evaluateDisconnectReset(bool unlocked, bool resourceIsSelected,
+                          bool hasPendingAction, bool hasPendingFormRequest,
+                          bool pendingFormRequestReady,
+                          bool hasCurrentProjectsUser) const {
+    DisconnectResetDecision d;
+    d.shouldResetSession = this->isSessionActive(
+        unlocked, resourceIsSelected, hasPendingAction, hasPendingFormRequest,
+        pendingFormRequestReady, hasCurrentProjectsUser);
+    return d;
   }
 
   bool shouldExpireResourceSelection(uint32_t nowMs, uint32_t selectedAtMs,

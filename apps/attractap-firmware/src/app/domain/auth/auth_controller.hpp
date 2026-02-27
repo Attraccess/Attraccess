@@ -4,6 +4,14 @@
 
 class AuthController {
 public:
+  struct ExternalAuthTransitionDecision {
+    bool shouldReturnEarly = false;
+    bool shouldPopulateUserDetails = false;
+    bool shouldEnterAuthenticateState = false;
+    bool shouldEnableCardDetection = false;
+    bool shouldProcessCardAuthenticationNow = false;
+  };
+
   struct CardDetailsDecision {
     bool valid = false;
     bool shouldClearProjectSelection = false;
@@ -36,6 +44,25 @@ public:
     d.shouldSetExternalAuthenticateState = true;
     d.shouldRequestProjects = true;
     d.shouldClearProjectSelection = currentProjectsUser != response.username;
+    return d;
+  }
+
+  ExternalAuthTransitionDecision
+  evaluateExternalAuthenticateTransition(bool externalAuthenticateRequested,
+                                         bool currentlyAuthenticating,
+                                         bool hasDisplay) const {
+    ExternalAuthTransitionDecision d;
+    if (!externalAuthenticateRequested) {
+      return d;
+    }
+    if (currentlyAuthenticating) {
+      d.shouldReturnEarly = true;
+      return d;
+    }
+    d.shouldEnterAuthenticateState = true;
+    d.shouldPopulateUserDetails = hasDisplay;
+    d.shouldEnableCardDetection = hasDisplay;
+    d.shouldProcessCardAuthenticationNow = !hasDisplay;
     return d;
   }
 

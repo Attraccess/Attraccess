@@ -827,47 +827,76 @@ void Application::processState() {
 #endif
 
   if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD) {
-    if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
+    AuthController::ExternalAuthTransitionDecision authTransitionDecision =
+        this->authController.evaluateExternalAuthenticateTransition(
+            this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD,
+            this->state == APPLICATION_STATE_AUTHENTICATE_CARD,
+#ifdef HAS_LVGL_DISPLAY
+            true
+#else
+            false
+#endif
+        );
+    if (authTransitionDecision.shouldReturnEarly) {
       return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    this->ui.resourceDetailsSetUserDetails(
-        ResourceDetailsScreen::UserDetails{
-            .username = this->cardAuthenticationData.username,
-            .canManageResource = this->cardAuthenticationData.canManageResource,
-            .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
-            .isIntroducer = this->cardAuthenticationData.isIntroducer});
+    if (authTransitionDecision.shouldPopulateUserDetails) {
+      this->ui.resourceDetailsSetUserDetails(
+          ResourceDetailsScreen::UserDetails{
+              .username = this->cardAuthenticationData.username,
+              .canManageResource = this->cardAuthenticationData.canManageResource,
+              .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
+              .isIntroducer = this->cardAuthenticationData.isIntroducer});
+    }
 #endif
 
-    this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+    if (authTransitionDecision.shouldEnterAuthenticateState) {
+      this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
+    }
 
-#ifndef HAS_LVGL_DISPLAY
-    // For non-display mode, process authentication immediately since the card
-    // is still present and won't trigger another detection event
-    this->processCardAuthenticationData();
-#else
-    this->nfc.enableCardDetection();
-#endif
+    if (authTransitionDecision.shouldProcessCardAuthenticationNow) {
+      // For non-display mode, process authentication immediately since the card
+      // is still present and won't trigger another detection event
+      this->processCardAuthenticationData();
+    }
+    if (authTransitionDecision.shouldEnableCardDetection) {
+      this->nfc.enableCardDetection();
+    }
     return;
   }
 
   if (this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE) {
-    if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE) {
-      this->logger.debugf("Updating firmware update progress %d",
-                          this->firmwareUpdateProgressPct);
+    UpdateController::ExternalFirmwareUpdateDecision firmwareDecision =
+        this->updateController.evaluateExternalFirmwareUpdateTransition(
+            this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE,
+            this->state == APPLICATION_STATE_FIRMWARE_UPDATE,
 #ifdef HAS_LVGL_DISPLAY
-      this->ui.firmwareUpdateSetProgress(this->firmwareUpdateProgressPct);
-      this->ui.firmwareUpdateSetAvailableVersion(this->availableFirmwareVersion);
+            true
+#else
+            false
 #endif
+        );
+    if (firmwareDecision.shouldHandle) {
+      if (firmwareDecision.shouldUpdateProgress) {
+        this->logger.debugf("Updating firmware update progress %d",
+                            this->firmwareUpdateProgressPct);
+#ifdef HAS_LVGL_DISPLAY
+        this->ui.firmwareUpdateSetProgress(this->firmwareUpdateProgressPct);
+        this->ui.firmwareUpdateSetAvailableVersion(this->availableFirmwareVersion);
+#endif
+      }
+#ifdef HAS_LVGL_DISPLAY
+      if (firmwareDecision.shouldTransitionToFirmwareScreen) {
+        this->ui.transitionToFirmwareUpdateScreen();
+      }
+#endif
+      if (firmwareDecision.shouldEnterFirmwareUpdateState) {
+        this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+      }
       return;
     }
-
-#ifdef HAS_LVGL_DISPLAY
-    this->ui.transitionToFirmwareUpdateScreen();
-#endif
-    this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
-    return;
   }
 
 #ifdef HAS_LVGL_DISPLAY
@@ -1284,16 +1313,31 @@ void Application::handleResourceDetailsButtonClick(
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    if (this->sessionController.shouldClearResourceSelectionOnLogout(
-            this->resourceCount)) {
-      this->resourceIsSelected = false;
+    {
+      SessionController::LogoutDecision logoutDecision =
+          this->sessionController.evaluateLogout(this->resourceCount);
+      if (logoutDecision.shouldClearResourceSelection) {
+        this->resourceIsSelected = false;
+      }
+      if (logoutDecision.shouldLock) {
+        this->unlocked = false;
+      }
+      if (logoutDecision.shouldClearProjectsUser) {
+        this->currentProjectsUser = "";
+      }
+      if (logoutDecision.shouldClearProjectSelection) {
+        this->clearProjectSelection();
+      }
+      if (logoutDecision.shouldResetPendingAction) {
+        this->pendingActionType = PENDING_ACTION_NONE;
+      }
+      if (logoutDecision.shouldClearPendingFormRequest) {
+        this->hasPendingFormRequest = false;
+      }
+      if (logoutDecision.shouldHideFormsModal) {
+        this->ui.resourceDetailsHideFormsModal();
+      }
     }
-    this->unlocked = false;
-    this->currentProjectsUser = "";
-    this->clearProjectSelection();
-    this->pendingActionType = PENDING_ACTION_NONE;
-    this->hasPendingFormRequest = false;
-    this->ui.resourceDetailsHideFormsModal();
     break;
   }
 }
@@ -1339,37 +1383,57 @@ void Application::resetPauseAccounting() {
 }
 
 void Application::resetSessionOnDisconnect() {
-  bool sessionActive = this->sessionController.isSessionActive(
-      this->unlocked, this->resourceIsSelected,
-      this->pendingActionType != PENDING_ACTION_NONE, this->hasPendingFormRequest,
-      this->pendingFormRequestReady, this->currentProjectsUser.length() > 0);
+  SessionController::DisconnectResetDecision disconnectResetDecision =
+      this->sessionController.evaluateDisconnectReset(
+          this->unlocked, this->resourceIsSelected,
+          this->pendingActionType != PENDING_ACTION_NONE,
+          this->hasPendingFormRequest, this->pendingFormRequestReady,
+          this->currentProjectsUser.length() > 0);
 
-  if (!sessionActive) {
+  if (!disconnectResetDecision.shouldResetSession) {
     return;
   }
 
   this->logger.info("Connectivity lost; resetting session state");
 
-  // Ensure any in-progress UI overlays are dismissed
-  this->ui.resourceDetailsHideActionProgress();
-  this->ui.resourceDetailsHideFormsModal();
-  this->resetPauseAccounting();
+  if (disconnectResetDecision.shouldHideActionProgress) {
+    this->ui.resourceDetailsHideActionProgress();
+  }
+  if (disconnectResetDecision.shouldHideFormsModal) {
+    this->ui.resourceDetailsHideFormsModal();
+  }
+  if (disconnectResetDecision.shouldResetPauseAccounting) {
+    this->resetPauseAccounting();
+  }
 
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->pendingActionResourceId = 0;
-  this->pendingActionProjectId = 0;
-  this->hasPendingFormRequest = false;
-  this->pendingFormRequestReady = false;
-
-  this->clearProjectSelection();
-  this->currentProjectsUser = "";
-
-  this->selectedResourceId = 0;
-  this->resourceIsSelected = false;
-  this->selectedResourceChanged = false;
-
-  this->unlocked = false;
-  this->externalState = EXTERNAL_STATE_NONE;
-  this->nfc.enableCardDetection();
+  if (disconnectResetDecision.shouldResetPendingAction) {
+    this->pendingActionType = PENDING_ACTION_NONE;
+    this->pendingActionResourceId = 0;
+    this->pendingActionProjectId = 0;
+  }
+  if (disconnectResetDecision.shouldClearPendingFormRequest) {
+    this->hasPendingFormRequest = false;
+    this->pendingFormRequestReady = false;
+  }
+  if (disconnectResetDecision.shouldClearProjectSelection) {
+    this->clearProjectSelection();
+  }
+  if (disconnectResetDecision.shouldClearProjectsUser) {
+    this->currentProjectsUser = "";
+  }
+  if (disconnectResetDecision.shouldClearSelection) {
+    this->selectedResourceId = 0;
+    this->resourceIsSelected = false;
+    this->selectedResourceChanged = false;
+  }
+  if (disconnectResetDecision.shouldLock) {
+    this->unlocked = false;
+  }
+  if (disconnectResetDecision.shouldClearExternalState) {
+    this->externalState = EXTERNAL_STATE_NONE;
+  }
+  if (disconnectResetDecision.shouldEnableCardDetection) {
+    this->nfc.enableCardDetection();
+  }
 }
 #endif
