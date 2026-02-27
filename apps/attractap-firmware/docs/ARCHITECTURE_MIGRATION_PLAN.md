@@ -131,7 +131,7 @@ Acceptance:
 
 ### Phase 5 - Connectivity + update migration
 
-Status: `Not started`
+Status: `Completed`
 
 Scope:
 
@@ -175,7 +175,7 @@ Update this table as work lands.
 | 2     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | NFC/API loops moved to dedicated worker tasks with app-thread event marshalling and queue telemetry |
 | 3     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Auth/session transitions, timeout/relock, non-display action flow, and auth execution moved into controllers |
 | 4     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Resource availability, resource action intent handling, and forms submit/cancel/result orchestration moved into `ResourceController` |
-| 5     |       | Not started |            |          |       |
+| 5     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Connectivity configuration/reconnect transitions and firmware update event+state transitions migrated into controllers |
 | 6     |       | Not started |            |          |       |
 
 
@@ -248,4 +248,8 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Moved resource action intent decisions (start/stop session, door actions, flow button, logout effects) into `ResourceController`.
 - Moved forms submit/cancel and session-action-result decisions into `ResourceController`.
 - Phase 2, 3, and 4 marked complete after successful `attractap-touch` build and flash to `/dev/cu.usbmodem101`.
+- Started Phase 5 by introducing `ConnectivityController` and migrating connection-config + disconnected-state decisions out of `Application::processState`.
+- Migrated init-screen settings and cancel-pin-lock connectivity transitions into `ConnectivityController`.
+- Migrated firmware update meta/progress event ingestion decisions into `UpdateController`.
+- Phase 5 completed after successful `attractap-touch` build and flash to `/dev/cu.usbmodem101`.
 

@@ -208,17 +208,27 @@ void Application::processAppEvents() {
 #endif
     case APP_EVENT_FIRMWARE_META: {
       auto *payload = static_cast<FirmwareMetaEventPayload *>(evt.payload);
-      if (payload) {
+      UpdateController::FirmwareMetaEventDecision decision =
+          this->updateController.evaluateFirmwareMetaEvent(payload != nullptr);
+      if (payload && decision.shouldSetExternalFirmwareUpdateState) {
         this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+      }
+      if (payload && decision.shouldStoreAvailableVersion) {
         this->availableFirmwareVersion = payload->availableVersion;
       }
       break;
     }
     case APP_EVENT_FIRMWARE_PROGRESS: {
       auto *payload = static_cast<FirmwareProgressEventPayload *>(evt.payload);
-      if (payload) {
+      UpdateController::FirmwareProgressEventDecision decision =
+          this->updateController.evaluateFirmwareProgressEvent(payload != nullptr);
+      if (payload && decision.shouldLogProgress) {
         this->logger.debugf("Got firmware update pct %d", payload->progressPct);
+      }
+      if (payload && decision.shouldSetExternalFirmwareUpdateState) {
         this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
+      }
+      if (payload && decision.shouldStoreProgress) {
         this->firmwareUpdateProgressPct = payload->progressPct;
       }
       break;
@@ -465,9 +475,17 @@ void Application::setup() {
       [this](String pin) { Settings::setDevicePin(pin); });
 
   this->ui.connectionConfigOnCancelPinLock([this]() {
-    this->ui.transitionToInitScreen();
-    this->state = APPLICATION_STATE_BOOT;
-    this->api.enableConnectionAttempts();
+    ConnectivityController::CancelPinLockDecision decision =
+        this->connectivityController.evaluateCancelPinLock(true);
+    if (decision.shouldTransitionToInitScreen) {
+      this->ui.transitionToInitScreen();
+    }
+    if (decision.shouldEnterBootState) {
+      this->state = APPLICATION_STATE_BOOT;
+    }
+    if (decision.shouldEnableConnectionAttempts) {
+      this->api.enableConnectionAttempts();
+    }
   });
 
   this->ui.connectionConfigOnSaveCallback(
@@ -476,10 +494,20 @@ void Application::setup() {
       });
 
   this->ui.initScreenOnOpenSettings([this]() {
-    this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-    this->api.disableConnectionAttempts();
-    this->ui.connectionConfigEnablePinLock();
-    this->ui.transitionToConnectionConfigurationScreen();
+    ConnectivityController::OpenSettingsDecision decision =
+        this->connectivityController.evaluateOpenSettingsRequest(true);
+    if (decision.shouldEnterConfigurationRequiredState) {
+      this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
+    }
+    if (decision.shouldDisableConnectionAttempts) {
+      this->api.disableConnectionAttempts();
+    }
+    if (decision.shouldEnablePinLock) {
+      this->ui.connectionConfigEnablePinLock();
+    }
+    if (decision.shouldTransitionToConnectionConfigurationScreen) {
+      this->ui.transitionToConnectionConfigurationScreen();
+    }
   });
 
   this->ui.resourceListSetSelectionCallback(
@@ -707,25 +735,36 @@ void Application::processState() {
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
 
-  if (!connectionIsConfigured) {
-    if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED) {
+  ConnectivityController::ConnectionConfigurationDecision configDecision =
+      this->connectivityController.evaluateConnectionConfiguration(
+          connectionIsConfigured,
+          this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED,
+#ifdef HAS_LVGL_DISPLAY
+          true
+#else
+          false
+#endif
+      );
+  if (configDecision.shouldHandle) {
+    if (configDecision.shouldEnterConfigurationRequiredState) {
       this->logger.debug("Connection is not configured, showing connection "
                          "configuration screen");
       this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
-      this->api.disableConnectionAttempts();
-
-#ifdef HAS_LVGL_DISPLAY
-      this->ui.connectionConfigDisablePinLock();
-      this->ui.transitionToConnectionConfigurationScreen();
-#endif
     }
-
-    return;
-  }
-
-  if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED) {
-    /* Stay on settings screen; connection attempts remain disabled for UI
-     * performance */
+    if (configDecision.shouldDisableConnectionAttempts) {
+      this->api.disableConnectionAttempts();
+    }
+#ifdef HAS_LVGL_DISPLAY
+    if (configDecision.shouldDisablePinLock) {
+      this->ui.connectionConfigDisablePinLock();
+    }
+    if (configDecision.shouldTransitionToConnectionConfigurationScreen) {
+      this->ui.transitionToConnectionConfigurationScreen();
+    }
+#endif
+    if (configDecision.shouldReturnEarly) {
+      return;
+    }
     return;
   }
 
@@ -757,24 +796,38 @@ void Application::processState() {
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
   State::WebsocketState websocketState = State::getWebsocketState();
-  if (!apiState.authenticated ||
-      (!networkState.ethernet_connected && !networkState.wifi_connected) ||
-      !websocketState.connected) {
+  ConnectivityController::ConnectivityStateDecision connectivityDecision =
+      this->connectivityController.evaluateConnectivityState(
+          apiState.authenticated,
+          (networkState.ethernet_connected || networkState.wifi_connected),
+          websocketState.connected, this->state == APPLICATION_STATE_INIT,
+          this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED,
 #ifdef HAS_LVGL_DISPLAY
-    this->resetSessionOnDisconnect();
+          true
+#else
+          false
 #endif
-    if (this->state == APPLICATION_STATE_INIT ||
-        this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED) {
+      );
+  if (connectivityDecision.shouldHandleDisconnectedState) {
+#ifdef HAS_LVGL_DISPLAY
+    if (connectivityDecision.shouldResetSessionOnDisconnect) {
+      this->resetSessionOnDisconnect();
+    }
+#endif
+    if (connectivityDecision.shouldReturnEarly) {
       return;
     }
 
-    this->logger.debug(
-        "API state is not authenticated, network state is not connected, "
-        "websocket state is not connected, showing init screen");
-    this->state = APPLICATION_STATE_INIT;
+    if (connectivityDecision.shouldEnterInitState) {
+      this->logger.debug(
+          "API/network/websocket disconnected, showing init screen");
+      this->state = APPLICATION_STATE_INIT;
+    }
 
 #ifdef HAS_LVGL_DISPLAY
-    this->ui.transitionToInitScreen();
+    if (connectivityDecision.shouldTransitionToInitScreen) {
+      this->ui.transitionToInitScreen();
+    }
 #endif
     return;
   }

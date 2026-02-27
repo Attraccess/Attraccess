@@ -5,6 +5,7 @@
 #include "../app/adapters/api_adapter.hpp"
 #include "../app/adapters/nfc_adapter.hpp"
 #include "../app/domain/auth/auth_controller.hpp"
+#include "../app/domain/connectivity/connectivity_controller.hpp"
 #include "../app/domain/resource/resource_controller.hpp"
 #include "../app/domain/session/session_controller.hpp"
 #include "../app/domain/update/update_controller.hpp"
@@ -57,6 +58,7 @@ private:
   INfcPort &nfc;
   IApiPort &api;
   AuthController authController;
+  ConnectivityController connectivityController;
   ResourceController resourceController;
   SessionController sessionController;
   UpdateController updateController;
