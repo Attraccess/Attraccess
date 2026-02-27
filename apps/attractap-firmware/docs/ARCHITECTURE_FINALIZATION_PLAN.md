@@ -195,6 +195,28 @@ Acceptance:
 - CI includes architecture-level verification.
 - End-to-end smoke checks pass (boot/auth/resource/forms/reconnect/fw-update).
 
+## Progress Tracker
+
+Update this table as work lands.
+
+| Phase | Owner | Status | Start date | End date | Notes |
+| ----- | ----- | ------ | ---------- | -------- | ----- |
+| A     | Codex + Jappy | Not started |            |          |       |
+| B     | Codex + Jappy | Not started |            |          |       |
+| C     | Codex + Jappy | Not started |            |          |       |
+| D     | Codex + Jappy | Not started |            |          |       |
+| E     | Codex + Jappy | Not started |            |          |       |
+| F     | Codex + Jappy | Not started |            |          |       |
+| G     | Codex + Jappy | Not started |            |          |       |
+
+## Progress Notes
+
+### 2026-02-27
+
+- Created finalization follow-up plan to close remaining architecture gaps after phase-based migration.
+- Added full gap inventory and A-G implementation phases with acceptance criteria.
+- Added progress tracker and notes sections for ongoing status updates.
+
 ## Execution Rules
 
 - No feature flags.
