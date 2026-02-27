@@ -4,6 +4,12 @@
 
 Migrate from the current interleaved `Application::processState` design to a clean event-driven structure, **part by part**, without feature flags and without a big-bang rewrite.
 
+## Follow-up
+
+This migration plan is now complemented by a finalization plan for remaining end-state architecture gaps:
+
+- `docs/ARCHITECTURE_FINALIZATION_PLAN.md`
+
 ## Rules
 
 - No feature flags.
