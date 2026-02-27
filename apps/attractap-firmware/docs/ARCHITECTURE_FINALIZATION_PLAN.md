@@ -123,7 +123,7 @@ Acceptance:
 
 ### Phase D - Move runtime workers out of Application
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -140,7 +140,7 @@ Acceptance:
 
 ### Phase E - Port completion + side-effect isolation
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -204,8 +204,8 @@ Update this table as work lands.
 | A     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Contract/docs finalized and architecture invariants aligned for finalization. |
 | B     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added typed EventBus in `app/events` and removed `Application` app-event enum/void* payload API. |
 | C     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `AppKernel` and switched `main.cpp` lifecycle wiring to kernel. |
-| D     | Codex + Jappy | Not started |            |          |       |
-| E     | Codex + Jappy | Not started |            |          |       |
+| D     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/runtime/runtime_workers.*`; `Application` now delegates worker task lifecycle to runtime. |
+| E     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added ports/adapters for settings/system/beeper/network/serial/connectivity-state; orchestration no longer uses static globals directly. |
 | F     | Codex + Jappy | Not started |            |          |       |
 | G     | Codex + Jappy | Not started |            |          |       |
 
@@ -220,6 +220,10 @@ Update this table as work lands.
 - Implemented concrete `app/kernel/app_kernel.{hpp,cpp}` composition root and lifecycle ownership.
 - Rewired `Application` callback marshalling to EventBus publish/subscribe handlers.
 - Updated websocket task stack (`websocket_cfg.task_stack=16384`) to prevent canary overflow during websocket resource-list callback path.
+- Implemented `app/runtime/runtime_workers.{hpp,cpp}` for `network/api/nfc` task ownership and moved `xTaskCreate` calls out of `Application`.
+- Started Phase E by adding `app/ports/{settings_port,system_port}.hpp` + adapters and routing `Application` through those interfaces for settings persistence and timing/restart side effects.
+- Continued Phase E by adding `app/ports/beeper_port.hpp` + `app/adapters/beeper_adapter.hpp` and routing `Application` beeping through `IBeeperPort`.
+- Completed Phase E with `network`, `serial-command`, and `connectivity-state` ports/adapters; removed remaining direct `Network::`, `SerialCommandHandler::`, and `State::` calls from orchestration/runtime logic.
 
 ## Execution Rules
 

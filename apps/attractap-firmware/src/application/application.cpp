@@ -1,43 +1,10 @@
 #include "application.hpp"
 #include "../app/runtime/telemetry/loop_metrics.hpp"
 #include "../debug/loopTiming.hpp"
-#include "../serial/serialCommandHandler.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "freertos/task.h"
 #endif
-
-void Application::networkTask(void *parameter) {
-  (void)parameter;
-  while (true) {
-    Network::loop();
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-  }
-}
-
-void Application::apiTask(void *parameter) {
-  auto *self = static_cast<Application *>(parameter);
-  if (!self) {
-    vTaskDelete(nullptr);
-    return;
-  }
-  while (true) {
-    self->api.loop();
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-  }
-}
-
-void Application::nfcTask(void *parameter) {
-  auto *self = static_cast<Application *>(parameter);
-  if (!self) {
-    vTaskDelete(nullptr);
-    return;
-  }
-  while (true) {
-    self->nfc.loop();
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-  }
-}
 
 void Application::bindEventHandlers() {
   this->eventBus.onResourceListUpdated(
@@ -168,9 +135,9 @@ void Application::setup() {
     }
   }
 
-  Settings::setup();
-  SerialCommandHandler::setup();
-  Network::setup();
+  this->settings.setup();
+  this->serialCommand.setup();
+  this->network.setup();
   this->beeper.setup();
 
 #ifdef HAS_LVGL_DISPLAY
@@ -182,11 +149,11 @@ void Application::setup() {
     this->state = APPLICATION_STATE_NFC_INIT_FAILED;
     this->ui.showNfcInitErrorPopup(
         "NFC Error", "NFC hardware not found. Check connection and retry.",
-        [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
+        [this]() { this->retryNfcSetup(); }, [this]() { this->system.restart(); });
 #else
     this->logger.error("NFC hardware not found, restarting in 5 seconds");
-    delay(5000);
-    ESP.restart();
+    this->system.delayMs(5000);
+    this->system.restart();
 #endif
   }
   this->api.setup();
@@ -368,7 +335,7 @@ void Application::setup() {
       [this]() { this->handleFormsCancel(); });
 
   this->ui.setPinOnConfirmedCallback(
-      [this](String pin) { Settings::setDevicePin(pin); });
+      [this](String pin) { this->settings.setDevicePin(pin); });
 
   this->ui.connectionConfigOnCancelPinLock([this]() {
     ConnectivityController::CancelPinLockDecision decision =
@@ -450,7 +417,7 @@ void Application::setup() {
     this->cardDetected = true;
     this->cardRemoved = false;
     this->cardPresentationWasLong = false;
-    this->cardDetectionTimeMs = millis();
+    this->cardDetectionTimeMs = this->system.nowMs();
 #endif
 
     bool currentlyLocked = false;
@@ -523,15 +490,10 @@ void Application::setup() {
   });
 #endif
 
-  xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
-              tskIDLE_PRIORITY, nullptr);
-  xTaskCreate(Application::apiTask, "ApiTask", 6144, this, tskIDLE_PRIORITY + 1,
-              nullptr);
-  xTaskCreate(Application::nfcTask, "NfcTask", 4096, this, tskIDLE_PRIORITY + 1,
-              nullptr);
+  this->runtimeWorkers.start(this->network, this->api, this->nfc);
 
 #ifdef HAS_LVGL_DISPLAY
-  this->bootTime = millis();
+  this->bootTime = this->system.nowMs();
 #endif
 }
 
@@ -553,7 +515,7 @@ void Application::loop() {
   t0 = loopTimingNow();
 #endif
 
-  SerialCommandHandler::loop();
+  this->serialCommand.loop();
 
 #if defined(DEBUG_LOOP_TIMING) || defined(PERF_BASELINE_METRICS)
   t.serial_ms = loopTimingNow() - t0;
@@ -593,7 +555,7 @@ void Application::loop() {
       .total_ms = t.total_ms,
   };
   metricsWindow.record(d);
-  metricsWindow.maybeLogAndReset(millis());
+  metricsWindow.maybeLogAndReset(this->system.nowMs());
 #endif
 }
 
@@ -604,13 +566,13 @@ void Application::retryNfcSetup() {
   } else {
     this->ui.showNfcInitErrorPopup(
         "NFC Error", "NFC hardware not found. Check connection and retry.",
-        [this]() { this->retryNfcSetup(); }, []() { ESP.restart(); });
+        [this]() { this->retryNfcSetup(); }, [this]() { this->system.restart(); });
   }
 }
 #endif
 
 bool Application::handleConfigurationAndConnectivityGates() {
-  AttraccessApiConfig attraccessApiConfig = Settings::getAttraccessApiConfig();
+  AttraccessApiConfig attraccessApiConfig = this->settings.getAttraccessApiConfig();
   bool connectionIsConfigured = !attraccessApiConfig.hostname.isEmpty() &&
                                 attraccessApiConfig.hostname != "" &&
                                 attraccessApiConfig.port > 0;
@@ -645,14 +607,13 @@ bool Application::handleConfigurationAndConnectivityGates() {
     return true;
   }
 
-  State::ApiState apiState = State::getApiState();
-  State::NetworkState networkState = State::getNetworkState();
-  State::WebsocketState websocketState = State::getWebsocketState();
+  ConnectivitySnapshot connectivitySnapshot = this->connectivityState.getSnapshot();
   ConnectivityController::ConnectivityStateDecision connectivityDecision =
       this->connectivityController.evaluateConnectivityState(
-          apiState.authenticated,
-          (networkState.ethernet_connected || networkState.wifi_connected),
-          websocketState.connected, this->state == APPLICATION_STATE_INIT,
+          connectivitySnapshot.apiAuthenticated,
+          connectivitySnapshot.networkConnected,
+          connectivitySnapshot.websocketConnected,
+          this->state == APPLICATION_STATE_INIT,
           this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED,
 #ifdef HAS_LVGL_DISPLAY
           true
@@ -683,7 +644,7 @@ bool Application::handleConfigurationAndConnectivityGates() {
 #ifdef HAS_LVGL_DISPLAY
 bool Application::handleDisplayBootAndPinGates() {
   if (!this->bootDone &&
-      millis() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION) {
+      this->system.nowMs() - this->bootTime > APPLICATION_BOOT_SCREEN_DURATION) {
     this->logger.debug("Boot screen duration reached, hiding boot screen");
     this->bootDone = true;
   }
@@ -692,7 +653,7 @@ bool Application::handleDisplayBootAndPinGates() {
     return true;
   }
 
-  bool pinIsSet = Settings::getDeviceConfig().passCode != "0000";
+  bool pinIsSet = this->settings.getDeviceConfig().passCode != "0000";
   if (pinIsSet) {
     return false;
   }
@@ -710,7 +671,7 @@ bool Application::handleEnrollmentTransitions() {
   AuthController::EnrollGetAvailableTransitionDecision enrollGetAvailableDecision =
       this->authController.evaluateEnrollGetAvailableTransition(
           this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
-          this->state == APPLICATION_STATE_ENROLLMENT, millis(),
+          this->state == APPLICATION_STATE_ENROLLMENT, this->system.nowMs(),
           this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs, 30000);
   if (enrollGetAvailableDecision.shouldHandle) {
     if (enrollGetAvailableDecision.shouldTimeout) {
@@ -737,7 +698,7 @@ bool Application::handleEnrollmentTransitions() {
       this->nfc.disableCardDetection();
       this->ui.enrollmentSetUserName(
           this->apiEnrollNewCardGetAvailableKeyNoData.username);
-      this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+      this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = this->system.nowMs();
       this->ui.enrollmentSetTimeoutTime(
           this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
       this->ui.transitionToEnrollmentScreen();
@@ -767,7 +728,8 @@ bool Application::handleEnrollmentTransitions() {
 void Application::handleNonDisplayPresentationSignal() {
   SessionController::NonDisplayPresentationDecision nonDisplayPresentation =
       this->sessionController.evaluateNonDisplayPresentation(
-          this->cardDetected, this->cardRemoved, millis(), this->cardDetectionTimeMs,
+          this->cardDetected, this->cardRemoved, this->system.nowMs(),
+          this->cardDetectionTimeMs,
           NFC_CARD_LONG_PRESENTATION_TIME_MS, this->cardPresentationWasLong);
   if (nonDisplayPresentation.shouldIndicateLongPresentation) {
     this->beeper.indicateBeep();
@@ -901,7 +863,7 @@ bool Application::handleDisplayResourceAndSessionFlow() {
     this->selectedResourceChanged = false;
   }
 
-  uint32_t now = millis();
+  uint32_t now = this->system.nowMs();
   if (!this->unlocked) {
     SessionController::LockedStateDecision lockedDecision =
         this->sessionController.evaluateLockedState(
@@ -1049,11 +1011,11 @@ void Application::handleConnectionConfigurationSave(
     hostname = cfg.host.substring(0, cfg.host.indexOf(":"));
     port = cfg.host.substring(cfg.host.indexOf(":") + 1);
   }
-  Settings::saveNetworkConfig(cfg.ssid, cfg.password);
-  Settings::saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
+  this->settings.saveNetworkConfig(cfg.ssid, cfg.password);
+  this->settings.saveAttraccessApiConfig(hostname, port.toInt(), cfg.useSSL);
 
-  Settings::setDevicePin(cfg.devicePin);
-  Settings::setBeeperEnabled(cfg.beeperEnabled);
+  this->settings.setDevicePin(cfg.devicePin);
+  this->settings.setBeeperEnabled(cfg.beeperEnabled);
 };
 
 void Application::handleResourceListUpdate(
@@ -1264,7 +1226,7 @@ void Application::handleTouch(int16_t x, int16_t y) {
 }
 
 void Application::restartSessionTimeout() {
-  uint32_t now = millis();
+  uint32_t now = this->system.nowMs();
   this->ui.resourceDetailsSetSessionTimeoutTime(
       this->sessionController.computeSessionTimeoutDeadlineMs(
           now, this->UNLOCKED_TIMEOUT_MS));
@@ -1361,7 +1323,7 @@ void Application::handleResourceDetailsButtonClick(
 }
 
 void Application::restartResourceSelectionTimeout() {
-  uint32_t now = millis();
+  uint32_t now = this->system.nowMs();
   this->timeOfResourceSelectionMs = now;
 }
 
@@ -1369,7 +1331,7 @@ void Application::beginActionPause() {
   this->actionInProgressCount++;
   if (this->sessionController.shouldPauseSessionTimeoutOnActionBegin(
           this->actionInProgressCount)) {
-    this->pauseStartMs = millis();
+    this->pauseStartMs = this->system.nowMs();
     // Freeze the UI indicator
     this->ui.resourceDetailsSetSessionTimeoutPaused(true);
   }
@@ -1383,7 +1345,7 @@ void Application::endActionPause() {
   this->actionInProgressCount--;
   if (this->sessionController.shouldApplyPauseDeltaOnActionEnd(
           this->actionInProgressCount)) {
-    uint32_t now = millis();
+    uint32_t now = this->system.nowMs();
     uint32_t delta =
         this->sessionController.computePauseDeltaMs(now, this->pauseStartMs);
     this->accumulatedPauseMs += delta;

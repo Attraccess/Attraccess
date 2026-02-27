@@ -3,22 +3,25 @@
 #include <Arduino.h>
 #include "../api/api.hpp"
 #include "../app/adapters/api_adapter.hpp"
+#include "../app/adapters/beeper_adapter.hpp"
+#include "../app/adapters/connectivity_state_adapter.hpp"
 #include "../app/adapters/nfc_adapter.hpp"
+#include "../app/adapters/network_adapter.hpp"
+#include "../app/adapters/serial_command_adapter.hpp"
+#include "../app/adapters/settings_adapter.hpp"
+#include "../app/adapters/system_adapter.hpp"
 #include "../app/domain/auth/auth_controller.hpp"
 #include "../app/domain/connectivity/connectivity_controller.hpp"
 #include "../app/domain/resource/resource_controller.hpp"
 #include "../app/domain/session/session_controller.hpp"
 #include "../app/domain/update/update_controller.hpp"
 #include "../app/events/event_bus.hpp"
+#include "../app/runtime/runtime_workers.hpp"
 #ifdef HAS_LVGL_DISPLAY
 #include "../app/adapters/ui_adapter.hpp"
 #endif
-#include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"
-#include "../network/network.hpp"
-#include "../nfc/nfc.hpp"
 #include "../utils.hpp"
-#include "settings/settings.hpp"
 
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
@@ -31,8 +34,13 @@
 class Application {
 public:
   Application()
-      : nfcAdapter(), apiAdapter(), nfc(nfcAdapter), api(apiAdapter),
-        logger("Application"), eventBus(24),
+      : nfcAdapter(), apiAdapter(), beeperAdapter(), settingsAdapter(),
+        systemAdapter(), networkAdapter(), serialCommandAdapter(),
+        connectivityStateAdapter(), nfc(nfcAdapter), api(apiAdapter),
+        beeper(beeperAdapter), settings(settingsAdapter), system(systemAdapter),
+        network(networkAdapter), serialCommand(serialCommandAdapter),
+        connectivityState(connectivityStateAdapter), logger("Application"),
+        eventBus(24),
 #ifdef HAS_LVGL_DISPLAY
         uiAdapter(), ui(uiAdapter),
 #endif
@@ -52,8 +60,20 @@ public:
 private:
   NfcAdapter nfcAdapter;
   ApiAdapter apiAdapter;
+  BeeperAdapter beeperAdapter;
+  SettingsAdapter settingsAdapter;
+  SystemAdapter systemAdapter;
+  NetworkAdapter networkAdapter;
+  SerialCommandAdapter serialCommandAdapter;
+  ConnectivityStateAdapter connectivityStateAdapter;
   INfcPort &nfc;
   IApiPort &api;
+  IBeeperPort &beeper;
+  ISettingsPort &settings;
+  ISystemPort &system;
+  INetworkPort &network;
+  ISerialCommandPort &serialCommand;
+  IConnectivityStatePort &connectivityState;
   AuthController authController;
   ConnectivityController connectivityController;
   ResourceController resourceController;
@@ -65,8 +85,6 @@ private:
   UiAdapter uiAdapter;
   IUiPort &ui;
 #endif
-  Beeper beeper;
-
   enum ExternalStates_t {
     EXTERNAL_STATE_NONE,
 #ifdef HAS_LVGL_DISPLAY
@@ -99,9 +117,7 @@ private:
 
   String availableFirmwareVersion;
 
-  static void networkTask(void *parameter);
-  static void apiTask(void *parameter);
-  static void nfcTask(void *parameter);
+  app::runtime::RuntimeWorkers runtimeWorkers;
   void bindEventHandlers();
   void processAppEvents();
   void logAppEventQueueHealth();
