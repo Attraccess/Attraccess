@@ -24,4 +24,17 @@ public:
   bool shouldKeepResourceSelectedOnRelock(uint8_t resourceCount) const {
     return resourceCount == 1;
   }
+
+  bool shouldClearResourceSelectionOnLogout(uint8_t resourceCount) const {
+    return resourceCount > 1;
+  }
+
+  bool isSessionActive(bool unlocked, bool resourceIsSelected,
+                       bool hasPendingAction, bool hasPendingFormRequest,
+                       bool pendingFormRequestReady,
+                       bool hasCurrentProjectsUser) const {
+    return unlocked || resourceIsSelected || hasPendingAction ||
+           hasPendingFormRequest || pendingFormRequestReady ||
+           hasCurrentProjectsUser;
+  }
 };

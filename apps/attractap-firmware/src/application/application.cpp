@@ -1275,7 +1275,8 @@ void Application::handleResourceDetailsButtonClick(
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    if (this->resourceCount > 1) {
+    if (this->sessionController.shouldClearResourceSelectionOnLogout(
+            this->resourceCount)) {
       this->resourceIsSelected = false;
     }
     this->unlocked = false;
@@ -1327,11 +1328,10 @@ void Application::resetPauseAccounting() {
 }
 
 void Application::resetSessionOnDisconnect() {
-  bool sessionActive = this->unlocked || this->resourceIsSelected ||
-                       this->pendingActionType != PENDING_ACTION_NONE ||
-                       this->hasPendingFormRequest ||
-                       this->pendingFormRequestReady ||
-                       this->currentProjectsUser.length() > 0;
+  bool sessionActive = this->sessionController.isSessionActive(
+      this->unlocked, this->resourceIsSelected,
+      this->pendingActionType != PENDING_ACTION_NONE, this->hasPendingFormRequest,
+      this->pendingFormRequestReady, this->currentProjectsUser.length() > 0);
 
   if (!sessionActive) {
     return;

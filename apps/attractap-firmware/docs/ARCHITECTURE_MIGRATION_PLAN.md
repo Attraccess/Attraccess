@@ -231,4 +231,5 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Added event-queue backpressure policy and queue-health telemetry (`APP_EVT` counters/high-water/drop count).
 - Started Phase 3 with an `AuthController` extraction slice and moved card-auth decision logic to the controller.
 - Added a `SessionController` extraction slice for unlock-timeout and relock decisions.
+- Moved logout/disconnect session-active decisions into `SessionController`.
 
