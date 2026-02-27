@@ -9,6 +9,17 @@ Close all remaining gaps between the current migrated state and the intended end
 - Domain controllers own transition logic and emit commands.
 - Ports/adapters fully isolate side effects.
 - Runtime workers live under `app/runtime`, not `Application`.
+- All app/business logic lives under `src/app/*`; legacy app logic outside `src/app` is migrated or removed.
+
+## Legacy Eradication Invariant (strict)
+
+Target end state for this plan:
+
+- `src/app/*` is the only location for application/runtime/domain/event orchestration logic.
+- Legacy folders outside `src/app` (for example `src/api`, `src/display`, `src/network`, `src/nfc`, `src/settings`, `src/state`, `src/serial`, `src/websocket`) must be either:
+  - fully migrated into `src/app/*` and deleted, or
+  - reduced to minimal hardware/framework glue with zero business/orchestration logic.
+- New app features or behavior changes must not be implemented outside `src/app/*`.
 
 ## Why this follow-up exists
 
@@ -25,11 +36,10 @@ What exists:
 
 What is still missing:
 
-- No concrete `app/kernel` implementation.
-- No typed `app/events` module implementation.
-- Runtime queue/task ownership still inside `Application`.
-- `Application` still owns large shared state and event dispatch plumbing.
-- Several side effects still bypass port boundaries (settings/network/time/logger/beeper/task primitives).
+- Runtime decomposition is incomplete (`app_runtime.cpp` still large and mixed-responsibility).
+- App-layer contracts still leak legacy concrete schemas/types in several boundaries.
+- Legacy subsystems remain internally monolithic despite adapter wrapping.
+- Architecture guardrails/tests are not yet complete for long-term regression prevention.
 
 ## Gap Inventory
 
@@ -64,6 +74,14 @@ What is still missing:
 8) **Runtime maintainability gap**
 - `app/runtime/app_runtime.cpp` is a large multi-responsibility unit (setup wiring, event handlers, state machine, UI/non-UI flows, side-effect dispatch).
 - Heavy `HAS_LVGL_DISPLAY` branching inside one file makes ownership boundaries harder to reason about and change safely.
+
+9) **Legacy-type coupling gap**
+- `app/*` boundaries still depend on legacy concrete module types (`API::*` DTOs, display screen event structs, NFC legacy constants/types) instead of app-owned contracts.
+- Modern runtime/domain/event modules remain schema-coupled to old implementation types.
+
+10) **Legacy-subsystem modernization gap**
+- Legacy static/global subsystems (`Display`, `API`, `Network`, `Settings`, `State`) are wrapped by adapters but remain internally monolithic.
+- Adapter adoption reduced call-site coupling, but not yet internal legacy complexity/ownership risks.
 
 ## Finalization Phases
 
@@ -241,6 +259,75 @@ Acceptance:
 - `AppRuntime` is composition-oriented (thin coordinator), not a logic sink.
 - Display/non-display divergence is isolated to dedicated modules/strategies instead of broad inline branching.
 
+---
+
+### Phase H - Contract hardening and app-owned schemas
+
+Status: `Not started`
+
+Scope:
+
+- Introduce app-owned contracts under `app/contracts/*` for runtime/domain/event exchange.
+- Refactor port interfaces to prefer app contracts over legacy module structs where practical.
+- Keep all legacy<->app type translation in adapter/translator layer only.
+- Remove direct legacy includes from `app/runtime`, `app/domain`, and `app/events` headers where possible.
+- Produce a per-folder migration matrix (`legacy folder` -> `new app module` -> `delete criteria`).
+
+Acceptance:
+
+- App-layer modules are contract/port-driven and do not require legacy headers for core orchestration logic.
+- Type translation is centralized in adapters/translators with focused tests.
+- Runtime behavior parity preserved.
+- Migration matrix is complete and approved as the authoritative delete plan.
+
+---
+
+### Phase I - Legacy subsystem decomposition
+
+Status: `Not started`
+
+Scope:
+
+- Decompose legacy modules internally (without broad API breakage):
+  - `api/`: split protocol/client/retry/callback routing responsibilities,
+  - `display/`: split navigation/state/render orchestration responsibilities,
+  - `network/`: split transport loop and reconnection policy/state concerns,
+  - `settings/`: split persistence, defaulting, and validation concerns.
+- Reduce static/global mutable ownership where feasible; prefer explicit instances.
+- Keep adapter interfaces stable during this phase to reduce migration risk.
+- Execute migration matrix slices and delete legacy code as each slice reaches parity (no "decompose only" without deletion).
+
+Acceptance:
+
+- Legacy modules are no longer monolithic logic sinks internally.
+- Ownership boundaries are explicit and documented.
+- No new global mutable singletons introduced; existing global usage reduced or isolated.
+- Build + flash + smoke checks pass.
+- For each completed slice, corresponding legacy implementation files are removed or reduced to glue-only stubs.
+
+---
+
+### Phase J - Final legacy retirement and architecture lock
+
+Status: `Not started`
+
+Scope:
+
+- Remove dead compatibility paths and obsolete wrappers after H/I parity validation.
+- Add architecture guardrails (CI/review checks):
+  - block non-adapter includes from `app/*` into legacy subsystem headers,
+  - block new direct static singleton usage in runtime/domain code,
+  - block new app/business logic files outside `src/app/*`.
+- Finalize architecture docs/diagrams to reflect real ownership boundaries.
+
+Acceptance:
+
+- App layer is legacy-agnostic except adapters/translators.
+- Legacy folders outside `src/app/*` contain no business/orchestration logic.
+- Remaining non-`src/app` code is hardware/framework glue only, or legacy folders are fully removed.
+- Guardrails prevent regression to old coupling patterns.
+- Final acceptance checklist passes end-to-end.
+
 ## Progress Tracker
 
 Update this table as work lands.
@@ -254,6 +341,9 @@ Update this table as work lands.
 | E     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added ports/adapters for settings/system/beeper/network/serial/connectivity-state; orchestration no longer uses static globals directly. |
 | F     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added app_runtime_state, event_router, app_runtime; Application is wiring-only facade. |
 | G     | Codex + Jappy | Not started |            |          | Expanded scope to include AppRuntime modularization and maintainability gates. |
+| H     | Codex + Jappy | Not started |            |          | Add app-owned contracts and remove legacy-type coupling from app runtime/domain/events boundaries. |
+| I     | Codex + Jappy | Not started |            |          | Decompose legacy subsystems internally and reduce static/global ownership concentration. |
+| J     | Codex + Jappy | Not started |            |          | Retire compatibility leftovers and lock boundaries with architecture guardrails. |
 
 ## Progress Notes
 
@@ -273,6 +363,8 @@ Update this table as work lands.
 - Started Phase F by expanding the plan into concrete runtime-state + event-router extraction steps and setting phase status to `In progress`.
 - Completed Phase F: added `app/runtime/app_runtime_state.hpp`, `event_router.{hpp,cpp}`, `app_runtime.{hpp,cpp}`; moved orchestration from Application to AppRuntime; Application is now thin facade (setup/loop forward only).
 - Updated Phase G scope to explicitly decompose large `app_runtime.cpp` into maintainable runtime modules (bootstrap/events/state-machine/flows + display/headless split) with concrete acceptance criteria.
+- Added phases H/I/J to finish modernization after runtime extraction: app-owned contracts, legacy subsystem decomposition, and final architecture guardrails.
+- Tightened end-state invariant: all app/business logic must live in `src/app/*`, with explicit legacy-folder burn-down and deletion gates.
 
 ## Execution Rules
 
@@ -286,7 +378,10 @@ Update this table as work lands.
 1. A -> B first (contracts and event substrate)
 2. C -> D (kernel + runtime extraction)
 3. E -> F (boundary completion + orchestration retirement)
-4. G final (runtime decomposition + cleanup/tests/docs lock-in)
+4. G (runtime decomposition + cleanup/tests/docs)
+5. H (contract hardening and legacy-type decoupling)
+6. I (legacy subsystem decomposition)
+7. J final (legacy retirement + architecture lock)
 
 ## Final Acceptance Checklist
 
@@ -296,5 +391,8 @@ Update this table as work lands.
 - Domain controllers own transitions; orchestration is not monolithic.
 - `Application` no longer holds primary business orchestration state.
 - Runtime orchestration is modularized into focused files; `AppRuntime` remains thin and compositional.
+- App-layer contracts and ports isolate runtime/domain/events from legacy concrete schemas.
+- Legacy subsystems are decomposed to maintainable internal components with reduced static/global ownership.
+- Non-`src/app` legacy folders contain no business/orchestration logic (deleted or glue-only).
 - Build + flash validation succeeds on active target.
 - Architecture docs reflect actual code structure.
