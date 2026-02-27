@@ -934,9 +934,9 @@ void Application::processState() {
   uint32_t now = millis();
   if (!this->unlocked) {
     if (this->state == APPLICATION_STATE_LOCKED) {
-
-      if (now - this->timeOfResourceSelectionMs >
-          this->RESOURCE_SELECTION_TIMEOUT_MS) {
+      if (this->sessionController.shouldExpireResourceSelection(
+              now, this->timeOfResourceSelectionMs,
+              this->RESOURCE_SELECTION_TIMEOUT_MS)) {
         this->logger.debug(
             "Resource selection timeout reached, showing resource list");
         this->resourceIsSelected = false;
@@ -959,17 +959,14 @@ void Application::processState() {
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
-    // Subtract any accumulated pause time while actions were in-progress
-    uint32_t effectiveElapsed = now - this->timeOfUnlockedMs;
-    if (effectiveElapsed > this->accumulatedPauseMs) {
-      effectiveElapsed -= this->accumulatedPauseMs;
-    } else {
-      effectiveElapsed = 0;
-    }
-    if (effectiveElapsed > this->UNLOCKED_TIMEOUT_MS) {
+    if (this->sessionController.shouldAutoRelock(
+            now, this->timeOfUnlockedMs, this->accumulatedPauseMs,
+            this->UNLOCKED_TIMEOUT_MS)) {
       this->logger.debug("Unlocked timeout reached, locking");
       this->unlocked = false;
-      this->resourceIsSelected = this->resourceCount == 1;
+      this->resourceIsSelected =
+          this->sessionController.shouldKeepResourceSelectedOnRelock(
+              this->resourceCount);
     }
 
     if (this->projectsOfUserResponseUpdated) {
