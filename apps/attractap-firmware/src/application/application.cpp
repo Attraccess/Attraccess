@@ -1250,42 +1250,69 @@ void Application::handleFormsRequest(
 
 void Application::handleFormsSubmit(
     const API::FormSubmissionList &submissions) {
-  if (this->pendingActionType == PENDING_ACTION_NONE) {
+  ResourceController::FormsSubmitDecision d =
+      this->resourceController.evaluateFormsSubmit(this->pendingActionType);
+  if (d.shouldCancelInstead) {
     this->handleFormsCancel();
     return;
   }
 
-  this->formSubmissionBuffer = submissions;
-  this->hasPendingFormRequest = false;
-  this->ui.resourceDetailsHideFormsModal();
-  this->ui.resourceDetailsShowActionProgress("Sende Formular");
+  if (d.shouldStoreSubmissionBuffer) {
+    this->formSubmissionBuffer = submissions;
+    this->hasPendingFormRequest = false;
+  }
+  if (d.shouldHideFormsModal) {
+    this->ui.resourceDetailsHideFormsModal();
+  }
+  if (d.shouldShowActionProgress && d.actionProgressMessage) {
+    this->ui.resourceDetailsShowActionProgress(d.actionProgressMessage);
+  }
 
-  if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
+  if (d.shouldSendStartSession) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
                                         this->pendingActionProjectId,
                                         &this->formSubmissionBuffer);
-  } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
+  } else if (d.shouldSendStopSession) {
     this->api.stopResourceUsageSession(this->pendingActionResourceId,
                                        &this->formSubmissionBuffer);
   }
 }
 
 void Application::handleFormsCancel() {
-  if (!this->hasPendingFormRequest) {
+  ResourceController::FormsCancelDecision d =
+      this->resourceController.evaluateFormsCancel(this->hasPendingFormRequest);
+  if (d.shouldReturnEarly) {
     return;
   }
-  this->hasPendingFormRequest = false;
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->ui.resourceDetailsHideFormsModal();
-  this->ui.resourceDetailsHideActionProgress();
-  this->endActionPause();
+  if (d.shouldClearPendingFormRequest) {
+    this->hasPendingFormRequest = false;
+  }
+  if (d.shouldResetPendingAction) {
+    this->pendingActionType = PENDING_ACTION_NONE;
+  }
+  if (d.shouldHideFormsModal) {
+    this->ui.resourceDetailsHideFormsModal();
+  }
+  if (d.shouldHideActionProgress) {
+    this->ui.resourceDetailsHideActionProgress();
+  }
+  if (d.shouldEndActionPause) {
+    this->endActionPause();
+  }
 }
 
 void Application::onActionResult(const String &eventType) {
-  if (eventType == "START_RESOURCE_USAGE_SESSION" ||
-      eventType == "STOP_RESOURCE_USAGE_SESSION") {
+  ResourceController::SessionActionResultDecision d =
+      this->resourceController.evaluateSessionActionResult(
+          eventType == "START_RESOURCE_USAGE_SESSION" ||
+          eventType == "STOP_RESOURCE_USAGE_SESSION");
+  if (d.shouldResetPendingAction) {
     this->pendingActionType = PENDING_ACTION_NONE;
+  }
+  if (d.shouldClearPendingFormRequest) {
     this->hasPendingFormRequest = false;
+  }
+  if (d.shouldHideFormsModal) {
     this->ui.resourceDetailsHideFormsModal();
   }
 }
@@ -1310,77 +1337,86 @@ void Application::handleResourceDetailsButtonClick(
   this->logger.infof("Resource details button clicked: %d",
                      evt.buttonClickType);
 
-  if (this->state != APPLICATION_STATE_UNLOCKED) {
+  ResourceController::ActionIntent intent = ResourceController::ACTION_INTENT_NONE;
+  switch (evt.buttonClickType) {
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+    intent = ResourceController::ACTION_INTENT_START_SESSION;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+    intent = ResourceController::ACTION_INTENT_STOP_SESSION;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+    intent = ResourceController::ACTION_INTENT_LOCK_DOOR;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+    intent = ResourceController::ACTION_INTENT_UNLOCK_DOOR;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+    intent = ResourceController::ACTION_INTENT_UNLATCH_DOOR;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+    intent = ResourceController::ACTION_INTENT_FLOW_BUTTON;
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+    intent = ResourceController::ACTION_INTENT_LOGOUT;
+    break;
+  }
+
+  ResourceController::ActionIntentDecision d =
+      this->resourceController.evaluateActionIntent(
+          intent, this->state == APPLICATION_STATE_UNLOCKED, this->resourceCount);
+  if (d.shouldIgnore) {
     return;
   }
 
-  switch (evt.buttonClickType) {
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
-    this->ui.resourceDetailsShowActionProgress("Starte Sitzung");
+  if (d.shouldShowActionProgress && d.actionProgressMessage) {
+    this->ui.resourceDetailsShowActionProgress(d.actionProgressMessage);
+  }
+  if (d.shouldBeginActionPause) {
     this->beginActionPause();
-    this->pendingActionType = PENDING_ACTION_START_SESSION;
+  }
+  if (d.shouldSetPendingAction) {
+    this->pendingActionType = (pending_action_t)d.pendingActionType;
+  }
+  if (d.pendingActionType == PENDING_ACTION_START_SESSION) {
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = this->selectedProjectId;
-    this->hasPendingFormRequest = false;
-    this->api.startResourceUsageSession(this->selectedResourceId,
-                                        this->selectedProjectId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
-    this->ui.resourceDetailsShowActionProgress("Beende Sitzung");
-    this->beginActionPause();
-    this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+  } else if (d.pendingActionType == PENDING_ACTION_STOP_SESSION) {
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
+  }
+  if (d.shouldResetPendingFormRequest) {
     this->hasPendingFormRequest = false;
+  }
+  if (d.shouldClearResourceSelection) {
+    this->resourceIsSelected = false;
+  }
+  if (d.shouldLock) {
+    this->unlocked = false;
+  }
+  if (d.shouldClearProjectsUser) {
+    this->currentProjectsUser = "";
+  }
+  if (d.shouldClearProjectSelection) {
+    this->clearProjectSelection();
+  }
+  if (d.shouldHideFormsModal) {
+    this->ui.resourceDetailsHideFormsModal();
+  }
+
+  if (d.shouldApiStartSession) {
+    this->api.startResourceUsageSession(this->selectedResourceId,
+                                        this->selectedProjectId);
+  } else if (d.shouldApiStopSession) {
     this->api.stopResourceUsageSession(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
-    this->ui.resourceDetailsShowActionProgress("Sperre Tuer");
-    this->beginActionPause();
+  } else if (d.shouldApiLockDoor) {
     this->api.lockDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
-    this->ui.resourceDetailsShowActionProgress("Entsperre Tuer");
-    this->beginActionPause();
+  } else if (d.shouldApiUnlockDoor) {
     this->api.unlockDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
-    this->ui.resourceDetailsShowActionProgress("Oeffne Tuer-Riegel");
-    this->beginActionPause();
+  } else if (d.shouldApiUnlatchDoor) {
     this->api.unlatchDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
-    this->ui.resourceDetailsShowActionProgress("Aktion Ausfuehren");
-    this->beginActionPause();
+  } else if (d.shouldApiTriggerFlowButton) {
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    {
-      SessionController::LogoutDecision logoutDecision =
-          this->sessionController.evaluateLogout(this->resourceCount);
-      if (logoutDecision.shouldClearResourceSelection) {
-        this->resourceIsSelected = false;
-      }
-      if (logoutDecision.shouldLock) {
-        this->unlocked = false;
-      }
-      if (logoutDecision.shouldClearProjectsUser) {
-        this->currentProjectsUser = "";
-      }
-      if (logoutDecision.shouldClearProjectSelection) {
-        this->clearProjectSelection();
-      }
-      if (logoutDecision.shouldResetPendingAction) {
-        this->pendingActionType = PENDING_ACTION_NONE;
-      }
-      if (logoutDecision.shouldClearPendingFormRequest) {
-        this->hasPendingFormRequest = false;
-      }
-      if (logoutDecision.shouldHideFormsModal) {
-        this->ui.resourceDetailsHideFormsModal();
-      }
-    }
-    break;
   }
 }
 

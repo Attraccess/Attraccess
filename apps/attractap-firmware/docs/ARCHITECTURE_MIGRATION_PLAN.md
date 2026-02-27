@@ -72,7 +72,7 @@ Acceptance:
 
 ### Phase 2 - Scheduling split (UI isolation)
 
-Status: `In progress`
+Status: `Completed`
 
 Scope:
 
@@ -90,7 +90,7 @@ Acceptance:
 
 ### Phase 3 - Auth/session vertical slice migration
 
-Status: `In progress`
+Status: `Completed`
 
 Scope:
 
@@ -110,7 +110,7 @@ Acceptance:
 
 ### Phase 4 - Resource/actions vertical slice migration
 
-Status: `In progress`
+Status: `Completed`
 
 Scope:
 
@@ -172,9 +172,9 @@ Update this table as work lands.
 | ----- | ----- | ----------- | ---------- | -------- | ----- |
 | 0     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Scaffold + telemetry, build/flash, runtime baseline captured |
 | 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
-| 2     | Codex + Jappy | In progress | 2026-02-26 |          | Moved NFC/API loops from `Application::loop` into dedicated worker tasks |
-| 3     | Codex + Jappy | In progress | 2026-02-26 |          | Introduced `AuthController` and started migrating auth decision logic out of `Application` |
-| 4     | Codex + Jappy | In progress | 2026-02-27 |          | Started `ResourceController` extraction for resource availability/list transition decisions |
+| 2     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | NFC/API loops moved to dedicated worker tasks with app-thread event marshalling and queue telemetry |
+| 3     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Auth/session transitions, timeout/relock, non-display action flow, and auth execution moved into controllers |
+| 4     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | Resource availability, resource action intent handling, and forms submit/cancel/result orchestration moved into `ResourceController` |
 | 5     |       | Not started |            |          |       |
 | 6     |       | Not started |            |          |       |
 
@@ -245,4 +245,7 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Moved enrollment external-state transition decisions into `AuthController`.
 - Moved enrollment key-read/card-write result decisions into `AuthController`.
 - Started Phase 4 by moving resource availability/list transition decisions into `ResourceController`.
+- Moved resource action intent decisions (start/stop session, door actions, flow button, logout effects) into `ResourceController`.
+- Moved forms submit/cancel and session-action-result decisions into `ResourceController`.
+- Phase 2, 3, and 4 marked complete after successful `attractap-touch` build and flash to `/dev/cu.usbmodem101`.
 
