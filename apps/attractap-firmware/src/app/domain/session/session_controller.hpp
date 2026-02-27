@@ -29,6 +29,11 @@ public:
     bool shouldTransitionToWaitForCard = false;
   };
 
+  struct NonDisplayPresentationDecision {
+    bool shouldIndicateLongPresentation = false;
+    bool shouldMarkLongPresentation = false;
+  };
+
   struct LogoutDecision {
     bool shouldClearResourceSelection = false;
     bool shouldLock = true;
@@ -118,6 +123,23 @@ public:
     }
     return cardPresentationWasLong ? NON_DISPLAY_ACTION_STOP_SESSION
                                    : NON_DISPLAY_ACTION_START_SESSION;
+  }
+
+  NonDisplayPresentationDecision evaluateNonDisplayPresentation(
+      bool cardDetected, bool cardRemoved, uint32_t nowMs,
+      uint32_t cardDetectionTimeMs, uint32_t longPresentationThresholdMs,
+      bool cardPresentationWasLong) const {
+    NonDisplayPresentationDecision d;
+    if (!cardDetected || cardRemoved) {
+      return d;
+    }
+    uint32_t currentPresentationDurationMs = nowMs - cardDetectionTimeMs;
+    if (currentPresentationDurationMs > longPresentationThresholdMs &&
+        !cardPresentationWasLong) {
+      d.shouldIndicateLongPresentation = true;
+      d.shouldMarkLongPresentation = true;
+    }
+    return d;
   }
 
   LogoutDecision evaluateLogout(uint8_t resourceCount) const {

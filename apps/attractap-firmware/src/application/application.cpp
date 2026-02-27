@@ -539,39 +539,56 @@ void Application::setup() {
     this->cardDetectionTimeMs = millis();
 #endif
 
+    bool currentlyLocked = false;
+    bool currentlyWaitForCard = false;
+    bool currentlyEnrollment = false;
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
+    currentlyLocked = this->state == APPLICATION_STATE_LOCKED;
+    currentlyEnrollment = this->state == APPLICATION_STATE_ENROLLMENT;
 #else
-    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
+    currentlyWaitForCard = this->state == APPLICATION_STATE_WAIT_FOR_CARD;
 #endif
-    {
+    AuthController::CardDetectionDecision cardDetectionDecision =
+        this->authController.evaluateCardDetection(
+#ifdef HAS_LVGL_DISPLAY
+            true,
+#else
+            false,
+#endif
+            currentlyLocked, currentlyWaitForCard, currentlyEnrollment,
+            this->state == APPLICATION_STATE_AUTHENTICATE_CARD);
+
+    if (cardDetectionDecision.shouldRequestCardAuthenticationData) {
       this->api.requestCardAuthenticationData(uid, uidLength,
                                               this->selectedResourceId);
       return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-
+    if (cardDetectionDecision.shouldHandleEnrollmentCard) {
       bool success = this->nfc.changeKey(
           this->apiEnrollNewCardData.keyNo, NFC::FACTORY_KEY, NFC::FACTORY_KEY,
           this->apiEnrollNewCardData.keyBytes);
 
-      if (success) {
+      AuthController::EnrollCardWriteDecision enrollWriteDecision =
+          this->authController.evaluateEnrollCardWriteResult(success);
+      if (enrollWriteDecision.shouldSuccessBeep) {
         this->beeper.successBeep();
-        this->externalState = EXTERNAL_STATE_NONE;
-      } else {
+      }
+      if (enrollWriteDecision.shouldErrorBeep) {
         this->beeper.errorBeep();
       }
-
-      this->api.sendEnrollNewCard(success);
-
-      this->externalState = EXTERNAL_STATE_NONE;
+      if (enrollWriteDecision.shouldSendEnrollResult) {
+        this->api.sendEnrollNewCard(success);
+      }
+      if (enrollWriteDecision.shouldClearExternalState) {
+        this->externalState = EXTERNAL_STATE_NONE;
+      }
       return;
     }
 #endif
 
-    if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
+    if (cardDetectionDecision.shouldProcessCardAuthenticationNow) {
       this->processCardAuthenticationData();
       return;
     }
@@ -763,66 +780,83 @@ void Application::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
-  if (this->externalState ==
-      EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO) {
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
-      uint32_t now = millis();
-      if (now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs > 30000) {
-        this->logger.error(
-            "Enroll new card get available key number timeout reached");
-        this->externalState = EXTERNAL_STATE_NONE;
-        return;
-      }
-
+  AuthController::EnrollGetAvailableTransitionDecision
+      enrollGetAvailableDecision =
+          this->authController.evaluateEnrollGetAvailableTransition(
+              this->externalState ==
+                  EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
+              this->state == APPLICATION_STATE_ENROLLMENT, millis(),
+              this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs, 30000);
+  if (enrollGetAvailableDecision.shouldHandle) {
+    if (enrollGetAvailableDecision.shouldTimeout) {
+      this->logger.error(
+          "Enroll new card get available key number timeout reached");
+      this->externalState = EXTERNAL_STATE_NONE;
+      return;
+    }
+    if (enrollGetAvailableDecision.shouldTryGetAvailableKeyNo) {
       uint8_t uid[7] = {0};
       uint8_t uidLength = 0;
       uint8_t keyNo = 0;
       bool success = this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo);
-
-      if (success) {
+      AuthController::EnrollAvailableKeyReadDecision keyReadDecision =
+          this->authController.evaluateEnrollAvailableKeyRead(success);
+      if (keyReadDecision.shouldSendAvailableKeyNo) {
         this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
+      }
+      if (keyReadDecision.shouldClearExternalState) {
         this->externalState = EXTERNAL_STATE_NONE;
       }
       return;
     }
-
-    this->nfc.disableCardDetection();
+    if (enrollGetAvailableDecision.shouldPrepareEnrollment) {
+      this->nfc.disableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
-    this->ui.enrollmentSetUserName(
-        this->apiEnrollNewCardGetAvailableKeyNoData.username);
+      this->ui.enrollmentSetUserName(
+          this->apiEnrollNewCardGetAvailableKeyNoData.username);
 #endif
-    this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
+      this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs = millis();
 #ifdef HAS_LVGL_DISPLAY
-    this->ui.enrollmentSetTimeoutTime(
-        this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
-    this->ui.transitionToEnrollmentScreen();
+      this->ui.enrollmentSetTimeoutTime(
+          this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs + 30000);
+      this->ui.transitionToEnrollmentScreen();
 #endif
-
-    this->state = APPLICATION_STATE_ENROLLMENT;
-
+    }
+    if (enrollGetAvailableDecision.shouldEnterEnrollmentState) {
+      this->state = APPLICATION_STATE_ENROLLMENT;
+    }
     return;
   }
 
-  if (this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD) {
-    if (this->state == APPLICATION_STATE_ENROLLMENT) {
+  AuthController::EnrollNewCardTransitionDecision enrollNewCardDecision =
+      this->authController.evaluateEnrollNewCardTransition(
+          this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD,
+          this->state == APPLICATION_STATE_ENROLLMENT);
+  if (enrollNewCardDecision.shouldHandle) {
+    if (enrollNewCardDecision.shouldReturnEarly) {
       return;
     }
-
-    this->nfc.enableCardDetection();
-    this->state = APPLICATION_STATE_ENROLLMENT;
+    if (enrollNewCardDecision.shouldEnableCardDetection) {
+      this->nfc.enableCardDetection();
+    }
+    if (enrollNewCardDecision.shouldEnterEnrollmentState) {
+      this->state = APPLICATION_STATE_ENROLLMENT;
+    }
     return;
   }
 #endif
 
 #ifndef HAS_LVGL_DISPLAY
-  if (this->cardDetected && !this->cardRemoved) {
-    unsigned long currentPresentationDurationMs =
-        millis() - this->cardDetectionTimeMs;
-    if (currentPresentationDurationMs > NFC_CARD_LONG_PRESENTATION_TIME_MS &&
-        !this->cardPresentationWasLong) {
-      this->beeper.indicateBeep();
-      this->cardPresentationWasLong = true;
-    }
+  SessionController::NonDisplayPresentationDecision nonDisplayPresentation =
+      this->sessionController.evaluateNonDisplayPresentation(
+          this->cardDetected, this->cardRemoved, millis(),
+          this->cardDetectionTimeMs, NFC_CARD_LONG_PRESENTATION_TIME_MS,
+          this->cardPresentationWasLong);
+  if (nonDisplayPresentation.shouldIndicateLongPresentation) {
+    this->beeper.indicateBeep();
+  }
+  if (nonDisplayPresentation.shouldMarkLongPresentation) {
+    this->cardPresentationWasLong = true;
   }
 #endif
 
@@ -900,44 +934,35 @@ void Application::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
-  if (this->resourceCount == 0) {
-    if (this->state == APPLICATION_STATE_NO_RESOURCES) {
-      return;
-    }
-
+  ResourceController::ResourceAvailabilityDecision resourceDecision =
+      this->resourceController.evaluateResourceAvailability(
+          this->resourceCount, this->resourceIsSelected, this->resourceListUpdated,
+          this->state == APPLICATION_STATE_NO_RESOURCES,
+          this->state == APPLICATION_STATE_RESOURCE_LIST);
+  if (resourceDecision.shouldShowNoResources) {
     this->logger.debug("Resource count is 0, showing no resources screen");
     this->state = APPLICATION_STATE_NO_RESOURCES;
-
     this->ui.transitionToNoResourcesScreen();
     return;
   }
-
-  if (this->resourceCount == 1 && !this->resourceIsSelected) {
+  if (resourceDecision.shouldAutoSelectSingleResource) {
     this->logger.debug(
         "Resource count is 1 and resource is not selected, selecting resource");
     this->selectResource(resourceList.items[0]);
     return;
   }
-
-  if (this->resourceCount > 0 && !this->resourceIsSelected) {
-    if (this->resourceListUpdated) {
-// Update UI with the list
-#ifdef HAS_LVGL_DISPLAY
-      this->ui.resourceListSetResourceList(this->resourceList);
-#endif
-      this->resourceListUpdated = false;
-    }
-
-    if (this->state == APPLICATION_STATE_RESOURCE_LIST) {
-      return;
-    }
-
+  if (resourceDecision.shouldUpdateResourceListUi) {
+    this->ui.resourceListSetResourceList(this->resourceList);
+    this->resourceListUpdated = false;
+  }
+  if (resourceDecision.shouldReturnEarly) {
+    return;
+  }
+  if (resourceDecision.shouldShowResourceList) {
     this->logger.debug("Resource count is greater than 0 and resource is not "
                        "selected, showing resource list");
     this->state = APPLICATION_STATE_RESOURCE_LIST;
-#ifdef HAS_LVGL_DISPLAY
     this->ui.transitionToResourceListScreen();
-#endif
     return;
   }
 
@@ -1121,38 +1146,55 @@ void Application::handleResourceListUpdate(
 void Application::processCardAuthenticationData() {
   this->logger.infof("Trying to authenticate with keyNo: %u",
                      this->cardAuthenticationData.keyNo);
-  if (!this->authController.isCardAuthKeyLengthValid(
-          this->cardAuthenticationData.keyLen)) {
-    this->logger.error("Invalid key bytes provided");
-    this->beeper.errorBeep();
-    this->nfc.enableCardDetection();
-    this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-    return;
-  }
+  bool keyLenValid = this->authController.isCardAuthKeyLengthValid(
+      this->cardAuthenticationData.keyLen);
 
-  bool authenticated =
+  bool authenticated = false;
+  if (keyLenValid) {
+    authenticated =
       this->nfc.authenticate(this->cardAuthenticationData.keyNo,
                              this->cardAuthenticationData.keyBytes);
+  }
 
-  if (!authenticated) {
+  AuthController::CardAuthenticationExecutionDecision authDecision =
+      this->authController.evaluateCardAuthenticationExecution(
+          keyLenValid, authenticated,
+#ifdef HAS_LVGL_DISPLAY
+          true
+#else
+          false
+#endif
+      );
+
+  if (authDecision.shouldLogInvalidKey) {
+    this->logger.error("Invalid key bytes provided");
+  }
+  if (authDecision.shouldLogAuthFailed) {
     this->logger.error("Authentication failed");
+  }
+  if (authDecision.shouldErrorBeep) {
     this->beeper.errorBeep();
+  }
+  if (authDecision.shouldEnableCardDetection) {
     this->nfc.enableCardDetection();
+  }
+  if (authDecision.shouldKeepExternalAuthenticateState) {
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+  }
+  if (authDecision.shouldFail) {
     return;
   }
 
-  this->beeper.successBeep();
-  this->logger.info("Authentication successful");
-
-  this->externalState = EXTERNAL_STATE_NONE;
-
-  this->unlocked = true;
-
-#ifndef HAS_LVGL_DISPLAY
-  // Enable card detection to detect card removal in non-display mode
-  this->nfc.enableCardDetection();
-#endif
+  if (authDecision.shouldSuccessBeep) {
+    this->beeper.successBeep();
+    this->logger.info("Authentication successful");
+  }
+  if (authDecision.shouldClearExternalState) {
+    this->externalState = EXTERNAL_STATE_NONE;
+  }
+  if (authDecision.shouldUnlock) {
+    this->unlocked = true;
+  }
 }
 
 #ifdef HAS_LVGL_DISPLAY

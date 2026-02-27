@@ -110,7 +110,7 @@ Acceptance:
 
 ### Phase 4 - Resource/actions vertical slice migration
 
-Status: `Not started`
+Status: `In progress`
 
 Scope:
 
@@ -174,7 +174,7 @@ Update this table as work lands.
 | 1     | Codex + Jappy | Completed | 2026-02-26 | 2026-02-26 | `Application` fully migrated off direct concrete NFC/API/Display calls to ports/adapters |
 | 2     | Codex + Jappy | In progress | 2026-02-26 |          | Moved NFC/API loops from `Application::loop` into dedicated worker tasks |
 | 3     | Codex + Jappy | In progress | 2026-02-26 |          | Introduced `AuthController` and started migrating auth decision logic out of `Application` |
-| 4     |       | Not started |            |          |       |
+| 4     | Codex + Jappy | In progress | 2026-02-27 |          | Started `ResourceController` extraction for resource availability/list transition decisions |
 | 5     |       | Not started |            |          |       |
 | 6     |       | Not started |            |          |       |
 
@@ -239,4 +239,10 @@ Initial runtime sample (2026-02-26, flashed `attractap-p4`):
 - Moved logout/disconnect reset decisions into `SessionController` decision structs.
 - Moved external authenticate-card transition decisions into `AuthController`.
 - Moved external firmware-update transition decisions into `UpdateController`.
+- Moved `processCardAuthenticationData` success/failure execution decisions into `AuthController`.
+- Moved non-display long-presentation timing decision into `SessionController`.
+- Moved card-detection state-gating decisions in NFC callback into `AuthController`.
+- Moved enrollment external-state transition decisions into `AuthController`.
+- Moved enrollment key-read/card-write result decisions into `AuthController`.
+- Started Phase 4 by moving resource availability/list transition decisions into `ResourceController`.
 
