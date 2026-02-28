@@ -964,6 +964,20 @@ void API::onResourceUsageFormRequest(JsonObject data)
     request.action = this->parseFormAction(payload["action"].as<const char *>());
 
     JsonArray forms = payload["forms"].as<JsonArray>();
+    if (!forms.isNull() && forms.size() > MAX_FORMS_PER_REQUEST)
+    {
+        String msg = String("Zu viele Formulare (") + String(forms.size()) +
+                     String("). Maximal unterstuetzt: ") + String(MAX_FORMS_PER_REQUEST);
+        this->logger.error(msg.c_str());
+        if (this->errorCallback)
+        {
+            this->errorCallback("Fehler", msg.c_str());
+        }
+        return;
+    }
+    this->logger.infof("RESOURCE_USAGE_FORM_REQUEST received: formCount=%u",
+                       forms.isNull() ? 0 : forms.size());
+
     uint8_t formIndex = 0;
     if (!forms.isNull())
     {
@@ -1010,6 +1024,8 @@ void API::onResourceUsageFormRequest(JsonObject data)
                 }
             }
             form.fieldCount = fieldIndex;
+            this->logger.infof("RESOURCE_USAGE_FORM_REQUEST form[%u]: id=%u fieldCount=%u",
+                               formIndex, form.id, form.fieldCount);
             formIndex++;
         }
     }
@@ -1202,17 +1218,22 @@ void API::serializeFormSubmissions(JsonObject payload, const FormSubmissionList 
 {
     if (!formSubmissions || formSubmissions->submissionCount == 0)
     {
+        this->logger.info("serializeFormSubmissions: no submissions");
         return;
     }
 
     JsonArray submissions = payload.createNestedArray("formSubmissions");
+    this->logger.infof("serializeFormSubmissions: submissionCount=%u", formSubmissions->submissionCount);
     for (uint8_t i = 0; i < formSubmissions->submissionCount; ++i)
     {
         const FormSubmission &submission = formSubmissions->submissions[i];
         if (submission.formId == 0)
         {
+            this->logger.infof("serializeFormSubmissions: skipping submission[%u] with formId=0", i);
             continue;
         }
+        this->logger.infof("serializeFormSubmissions: submission[%u] formId=%u answerCount=%u",
+                           i, submission.formId, submission.answerCount);
         JsonObject submissionObj = submissions.createNestedObject();
         submissionObj["formId"] = submission.formId;
         JsonArray answers = submissionObj.createNestedArray("answers");

@@ -652,7 +652,7 @@ void ResourceDetailsScreen::destroy()
    this->introducersListLabel = nullptr;
    this->actionOverlayLabel = nullptr;
    this->successToast = nullptr;
-   this->formsModalRequest = nullptr;
+   this->hasFormsModalRequest = false;
    this->formFieldWidgetCount = 0;
 }
 
@@ -687,7 +687,7 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsModalList = nullptr;
    this->formsModalErrorLabel = nullptr;
    this->formsKeyboard = nullptr;
-   this->formsModalRequest = nullptr;
+   this->hasFormsModalRequest = false;
    this->formFieldWidgetCount = 0;
 }
 
@@ -1089,7 +1089,8 @@ void ResourceDetailsScreen::setSelectedProject(uint32_t projectId, const char *p
 
 void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &request)
 {
-   this->formsModalRequest = &request;
+   this->formsModalRequest = request;
+   this->hasFormsModalRequest = true;
    this->ensureFormsModal();
    this->rebuildFormsModal();
    if (this->formsModalContent)
@@ -1522,24 +1523,24 @@ void ResourceDetailsScreen::rebuildFormsModal()
    String pageTitle = "Bitte Formular ausfuellen";
    String resourceName = "";
 
-   if (this->formsModalRequest)
+   if (this->hasFormsModalRequest)
    {
-      if (this->formsModalRequest->action == API::ResourceUsageFormActionType::START)
+      if (this->formsModalRequest.action == API::ResourceUsageFormActionType::START)
       {
          pageTitle = "Bitte vor dem Start ausfuellen";
       }
-      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::END)
+      else if (this->formsModalRequest.action == API::ResourceUsageFormActionType::END)
       {
          pageTitle = "Bitte vor dem Ende ausfuellen";
       }
-      else if (this->formsModalRequest->action == API::ResourceUsageFormActionType::TAKEOVER)
+      else if (this->formsModalRequest.action == API::ResourceUsageFormActionType::TAKEOVER)
       {
          pageTitle = "Bitte vor der Uebernahme ausfuellen";
       }
 
-      if (this->formsModalRequest->resourceName.length() > 0)
+      if (this->formsModalRequest.resourceName.length() > 0)
       {
-         resourceName = this->formsModalRequest->resourceName;
+         resourceName = this->formsModalRequest.resourceName;
       }
    }
 
@@ -1554,11 +1555,11 @@ void ResourceDetailsScreen::rebuildFormsModal()
    lv_obj_set_style_width(resourceNameLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_WRAP);
 
-   if (!this->formsModalRequest)
+   if (!this->hasFormsModalRequest)
       return;
-   for (uint8_t i = 0; i < this->formsModalRequest->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
+   for (uint8_t i = 0; i < this->formsModalRequest.formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
    {
-      const API::ResourceUsageForm &form = this->formsModalRequest->forms[i];
+      const API::ResourceUsageForm &form = this->formsModalRequest.forms[i];
       lv_obj_t *formCard = lv_obj_create(this->formsModalList);
       lv_obj_remove_style_all(formCard);
       lv_obj_remove_flag(formCard, LV_OBJ_FLAG_SCROLLABLE);
@@ -1742,12 +1743,12 @@ bool ResourceDetailsScreen::collectFormSubmissions(API::FormSubmissionList &outS
    outSubmissions.submissionCount = 0;
    this->clearFormFieldErrors();
 
-   if (!this->formsModalRequest)
+   if (!this->hasFormsModalRequest)
       return false;
-   for (uint8_t i = 0; i < this->formsModalRequest->formCount && i < API::MAX_FORM_SUBMISSIONS; ++i)
+   for (uint8_t i = 0; i < this->formsModalRequest.formCount && i < API::MAX_FORM_SUBMISSIONS; ++i)
    {
       API::FormSubmission &submission = outSubmissions.submissions[outSubmissions.submissionCount++];
-      submission.formId = this->formsModalRequest->forms[i].id;
+      submission.formId = this->formsModalRequest.forms[i].id;
       submission.answerCount = 0;
    }
 

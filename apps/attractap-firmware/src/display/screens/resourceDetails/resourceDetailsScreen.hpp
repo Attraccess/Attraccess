@@ -125,7 +125,8 @@ private:
     lv_obj_t *formsModalList = nullptr;
     lv_obj_t *formsModalErrorLabel = nullptr;
     lv_obj_t *formsKeyboard = nullptr;
-    const API::ResourceUsageFormRequest *formsModalRequest = nullptr;
+    API::ResourceUsageFormRequest formsModalRequest{};
+    bool hasFormsModalRequest = false;
     struct SelectOptionEventData
     {
         ResourceDetailsScreen *self;
