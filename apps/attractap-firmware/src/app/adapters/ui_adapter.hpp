@@ -2,6 +2,7 @@
 
 #ifdef HAS_LVGL_DISPLAY
 
+#include "translators/api_contracts_translator.hpp"
 #include "../ports/ui_port.hpp"
 
 class UiAdapter : public IUiPort {
@@ -78,11 +79,17 @@ public:
     Display::setTouchCallback(callback);
   }
   void resourceListSetSelectionCallback(
-      std::function<void(const API::ResourceBrief &)> callback) override {
-    Display::resourceListScreen.setResourceSelectionCallback(callback);
+      std::function<void(const app::contracts::ResourceBrief &)> callback)
+      override {
+    Display::resourceListScreen.setResourceSelectionCallback(
+        [callback](const API::ResourceBrief &resource) {
+          callback(app::adapters::translators::toContract(resource));
+        });
   }
-  void resourceListSetResourceList(const API::ResourceList &list) override {
-    Display::resourceListScreen.setResourceList(list);
+  void resourceListSetResourceList(
+      const app::contracts::ResourceList &list) override {
+    API::ResourceList legacy = app::adapters::translators::toLegacy(list);
+    Display::resourceListScreen.setResourceList(legacy);
   }
   void enrollmentSetUserName(const String &username) override {
     Display::enrollmentScreen.setUserName(username);
@@ -108,24 +115,31 @@ public:
     Display::resourceDetailsScreen.setProjectSelectionCallback(callback);
   }
   void resourceDetailsSetFormsSubmitCallback(
-      std::function<void(const API::FormSubmissionList &)> callback) override {
-    Display::resourceDetailsScreen.setFormsSubmitCallback(callback);
+      std::function<void(const app::contracts::FormSubmissionList &)> callback)
+      override {
+    Display::resourceDetailsScreen.setFormsSubmitCallback(
+        [callback](const API::FormSubmissionList &list) {
+          callback(app::adapters::translators::toContract(list));
+        });
   }
   void resourceDetailsSetFormsCancelCallback(
       std::function<void()> callback) override {
     Display::resourceDetailsScreen.setFormsCancelCallback(callback);
   }
   void resourceDetailsSetProjects(
-      const API::ProjectsOfUserResponse &projects) override {
-    Display::resourceDetailsScreen.setProjects(projects);
+      const app::contracts::ProjectsOfUserResponse &projects) override {
+    API::ProjectsOfUserResponse legacy =
+        app::adapters::translators::toLegacy(projects);
+    Display::resourceDetailsScreen.setProjects(legacy);
   }
   void resourceDetailsSetSelectedProject(uint32_t projectId,
                                          const char *projectName) override {
     Display::resourceDetailsScreen.setSelectedProject(projectId, projectName);
   }
   void resourceDetailsSetResourceAndUsageDetails(
-      const API::ResourceBrief &resource) override {
-    Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+      const app::contracts::ResourceBrief &resource) override {
+    API::ResourceBrief legacy = app::adapters::translators::toLegacy(resource);
+    Display::resourceDetailsScreen.setResourceAndUsageDetails(legacy);
   }
   void resourceDetailsHideActionProgress() override {
     Display::resourceDetailsScreen.hideActionProgress();
@@ -134,8 +148,10 @@ public:
     Display::resourceDetailsScreen.hideFormsModal();
   }
   void resourceDetailsShowFormsModal(
-      const API::ResourceUsageFormRequest &request) override {
-    Display::resourceDetailsScreen.showFormsModal(request);
+      const app::contracts::ResourceUsageFormRequest &request) override {
+    API::ResourceUsageFormRequest legacy =
+        app::adapters::translators::toLegacy(request);
+    Display::resourceDetailsScreen.showFormsModal(legacy);
   }
   void resourceDetailsShowActionProgress(const char *message) override {
     Display::resourceDetailsScreen.showActionProgress(message);

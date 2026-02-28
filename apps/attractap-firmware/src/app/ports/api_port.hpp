@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../../api/api.hpp"
+#include "../contracts/api_contracts.hpp"
+#include <functional>
 
 class IApiPort {
 public:
@@ -9,11 +10,11 @@ public:
   virtual void setup() = 0;
   virtual void loop() = 0;
   virtual void setResourceListUpdateCallback(
-      std::function<void(const API::ResourceList &)> callback) = 0;
+      std::function<void(const app::contracts::ResourceList &)> callback) = 0;
   virtual void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength,
                                              uint32_t resourceId) = 0;
   virtual void setCardAuthenticationDetailsResponseCallback(
-      std::function<void(API::CardAuthenticationDetailsResponse)> callback) = 0;
+      std::function<void(app::contracts::CardAuthenticationDetails)> callback) = 0;
   virtual void setEnrollNewCardGetAvailableKeyNoCallback(
       std::function<void(String username)> callback) = 0;
   virtual void
@@ -23,10 +24,10 @@ public:
   virtual void sendEnrollNewCard(bool success) = 0;
   virtual void startResourceUsageSession(
       uint32_t resourceId, uint32_t projectId = 0,
-      const API::FormSubmissionList *formSubmissions = nullptr) = 0;
+      const app::contracts::FormSubmissionList *formSubmissions = nullptr) = 0;
   virtual void stopResourceUsageSession(
       uint32_t resourceId,
-      const API::FormSubmissionList *formSubmissions = nullptr) = 0;
+      const app::contracts::FormSubmissionList *formSubmissions = nullptr) = 0;
   virtual void lockDoor(uint32_t resourceId) = 0;
   virtual void unlockDoor(uint32_t resourceId) = 0;
   virtual void unlatchDoor(uint32_t resourceId) = 0;
@@ -44,10 +45,9 @@ public:
   setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)>) = 0;
   virtual void requestProjectsOfUser(uint32_t page) = 0;
   virtual void setProjectsOfUserResponseCallback(
-      std::function<void(const API::ProjectsOfUserResponse &)> callback) = 0;
+      std::function<void(const app::contracts::ProjectsOfUserResponse &)> callback) = 0;
   virtual void setResourceFormsRequestCallback(
-      std::function<void(const API::ResourceUsageFormRequest &)> callback) = 0;
-  virtual const API::ResourceUsageFormRequest &getFormRequestScratch() const = 0;
+      std::function<void(const app::contracts::ResourceUsageFormRequest &)> callback) = 0;
   virtual void setFirmwareUpdateProgressCallback(
       std::function<void(int)> callback) = 0;
   virtual void setFirmwareUpdateMetaCallback(

@@ -40,7 +40,7 @@ bool AppRuntime::handleDisplayResourceAndSessionFlow() {
   if (state_.selectedResourceChanged) {
     for (uint16_t i = 0; i < state_.resourceList.count; ++i) {
       if (state_.resourceList.items[i].id == state_.selectedResourceId) {
-        API::ResourceBrief resource = state_.resourceList.items[i];
+        app::contracts::ResourceBrief resource = state_.resourceList.items[i];
         ui_.lockscreenSetResourceName(resource.name);
         ui_.lockscreenSetUsageInfo(resource.hasActiveUsage, resource.activeUser);
         ui_.resourceDetailsSetResourceAndUsageDetails(resource);
@@ -121,7 +121,7 @@ void AppRuntime::handleConnectionConfigurationSave(
 }
 
 void AppRuntime::handleResourceListUpdate(
-    const API::ResourceList &resourceList) {
+    const app::contracts::ResourceList &resourceList) {
   logger_.infof("Resource list updated: %d resources", resourceList.count);
 
   state_.resourceList = resourceList;
@@ -143,7 +143,7 @@ void AppRuntime::handleResourceListUpdate(
   }
 }
 
-void AppRuntime::selectResource(const API::ResourceBrief &resource) {
+void AppRuntime::selectResource(const app::contracts::ResourceBrief &resource) {
   logger_.infof("Resource selected: %s", resource.name);
   state_.resourceIsSelected = true;
   state_.selectedResourceId = resource.id;
@@ -167,7 +167,7 @@ void AppRuntime::clearProjectSelection() {
   state_.projectsOfUserResponse.count = 0;
   state_.projectsOfUserResponse.page = 1;
   state_.projectsOfUserResponse.total = 0;
-  state_.projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
+  state_.projectsOfUserResponse.limit = app::contracts::MAX_PROJECTS_PER_PAGE;
   state_.projectsOfUserResponse.hasMore = false;
   state_.projectsOfUserResponseUpdated = true;
   ui_.resourceDetailsSetSelectedProject(0, nullptr);
@@ -181,7 +181,7 @@ void AppRuntime::handleProjectSelection(uint32_t projectId,
 }
 
 void AppRuntime::handleFormsRequest(
-    const API::ResourceUsageFormRequest &request) {
+    const app::contracts::ResourceUsageFormRequest &request) {
   (void)request;
   state_.hasPendingFormRequest = true;
   ui_.resourceDetailsHideActionProgress();
@@ -189,7 +189,7 @@ void AppRuntime::handleFormsRequest(
 }
 
 void AppRuntime::handleFormsSubmit(
-    const API::FormSubmissionList &submissions) {
+    const app::contracts::FormSubmissionList &submissions) {
   ResourceController::FormsSubmitDecision d =
       resourceController_.evaluateFormsSubmit(state_.pendingActionType);
   if (d.shouldCancelInstead) {

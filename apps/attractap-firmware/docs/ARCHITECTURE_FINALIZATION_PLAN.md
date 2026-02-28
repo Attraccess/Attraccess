@@ -299,7 +299,7 @@ Implementation checklist (ordered):
 
 ### Phase H - Contract hardening and app-owned schemas
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -339,6 +339,19 @@ Implementation checklist (ordered):
 
 6. Publish migration matrix artifact:
    - legacy folder -> app module owner -> translator location -> delete criteria.
+
+Migration matrix (authoritative for Phase I/J delete slices):
+
+| Legacy folder | App module owner | Translator location | Delete criteria |
+| ----- | ----- | ----- | ----- |
+| `src/api` | `src/app/ports/api_port.hpp` + `src/app/runtime/*` | `src/app/adapters/translators/api_contracts_translator.hpp` | All app-facing API port methods consume/emit `app::contracts::*`; `app/runtime`, `app/domain`, and `app/events` headers do not include `api/api.hpp`. |
+| `src/display` | `src/app/ports/ui_port.hpp` + `src/app/runtime/flows/*` | `src/app/adapters/translators/api_contracts_translator.hpp` (through `ui_adapter.hpp`) | UI port surface uses app contracts for resource/projects/forms payloads; legacy display structs remain adapter-only. |
+| `src/nfc` | `src/app/ports/nfc_port.hpp` + `src/app/runtime/*` | n/a (no app-contract payloads introduced in H) | NFC key/card constants and card I/O stay adapter/port bounded; no new legacy includes in app runtime/domain/events headers. |
+| `src/network` | `src/app/ports/network_port.hpp` + `src/app/domain/connectivity/*` | n/a (status primitives already app-owned) | Connectivity orchestration remains contract/port-driven with no direct `Network::*` calls in app orchestration modules. |
+| `src/settings` | `src/app/ports/settings_port.hpp` + `src/app/runtime/*` | n/a (settings structs already app-owned via port) | App runtime/domain uses `ISettingsPort` only; no direct `Settings::*` calls in orchestration modules. |
+| `src/state` | `src/app/ports/connectivity_state_port.hpp` + `src/app/domain/connectivity/*` | n/a (adapter normalizes to app enums) | App modules consume only `ConnectivitySnapshot`; no direct `State::*` access outside adapter layer. |
+| `src/serial` | `src/app/ports/serial_command_port.hpp` + `src/app/runtime/*` | n/a | App runtime starts/loops serial handler via port only; no direct legacy singleton access. |
+| `src/websocket` | `src/api/*` implementation boundary | n/a (still internal to legacy API client) | No app headers include websocket internals; websocket evolution proceeds behind API adapter boundary until Phase I decomposition. |
 
 ---
 
@@ -445,7 +458,7 @@ Update this table as work lands.
 | E     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added ports/adapters for settings/system/beeper/network/serial/connectivity-state; orchestration no longer uses static globals directly. |
 | F     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added app_runtime_state, event_router, app_runtime; Application is wiring-only facade. |
 | G     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Split `app_runtime.cpp` into runtime modules (`bootstrap`, `events`, `state_machine`, `flows`) and added `RuntimeContext` composition object. |
-| H     | Codex + Jappy | Not started |            |          | Add app-owned contracts and remove legacy-type coupling from app runtime/domain/events boundaries. |
+| H     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/contracts` + adapter translators; runtime/domain/events headers no longer include legacy `api/api.hpp`; validated with build + upload + 2-minute serial stability log. |
 | I     | Codex + Jappy | Not started |            |          | Decompose legacy subsystems internally and reduce static/global ownership concentration. |
 | J     | Codex + Jappy | Not started |            |          | Retire compatibility leftovers and lock boundaries with architecture guardrails. |
 
@@ -472,6 +485,10 @@ Update this table as work lands.
 - Added concrete implementation checklists for phases G/H/I/J to make remaining modernization work executable as ordered slices.
 - Completed Phase G runtime modularization: extracted `AppRuntime` responsibilities into `app/runtime/bootstrap`, `app/runtime/events`, `app/runtime/state_machine`, and `app/runtime/flows`, with display/headless split files and a shared `runtime_context`.
 - Validated post-Phase-G behavior with `npx nx build attractap-firmware` (all firmware environments built and merged successfully).
+- Completed Phase H contract hardening: introduced `app/contracts/api_contracts.hpp`, migrated high-traffic app boundaries (`IApiPort`, `IUiPort`, `EventBus`, `AppRuntimeState`, and auth/runtime headers) to app-owned contracts, and centralized app<->legacy mapping in `app/adapters/translators/api_contracts_translator.hpp`.
+- Added Phase H migration matrix in this plan as the authoritative `legacy folder -> app owner -> translator -> delete criteria` artifact.
+- Lint/static analysis check: `pio check -e attractap-touch` completed successfully (existing third-party/dependency warnings only; no new app-layer lint blockers introduced by Phase H changes).
+- Flash/stability validation on `attractap-touch` (`/dev/cu.usbmodem21301`): after initial stack-canary regressions in `websocket_task`, fixed large resource-list callback stack usage by removing large stack copies in callback/event publish path; re-flashed and captured 130s serial logs with no panic/reset/reboot signatures.
 
 ## Execution Rules
 

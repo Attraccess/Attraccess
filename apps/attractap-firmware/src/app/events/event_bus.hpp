@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../api/api.hpp"
+#include "../contracts/api_contracts.hpp"
 #include "../../logger/logger.hpp"
 #ifdef ESP_PLATFORM
 #include "freertos/FreeRTOS.h"
@@ -12,11 +12,11 @@ namespace app {
 namespace events {
 
 struct ResourceListUpdatedEvent {
-  API::ResourceList resourceList;
+  app::contracts::ResourceList resourceList;
 };
 
 struct CardAuthDetailsEvent {
-  API::CardAuthenticationDetailsResponse response;
+  app::contracts::CardAuthenticationDetails response;
 };
 
 struct EnrollGetAvailableKeyNoEvent {
@@ -29,11 +29,11 @@ struct EnrollNewCardEvent {
 };
 
 struct ProjectsResponseEvent {
-  API::ProjectsOfUserResponse response;
+  app::contracts::ProjectsOfUserResponse response;
 };
 
 struct ResourceFormsRequestEvent {
-  API::ResourceUsageFormRequest request;
+  app::contracts::ResourceUsageFormRequest request;
 };
 
 struct FirmwareMetaEvent {
@@ -58,11 +58,16 @@ public:
   }
 
   bool publish(const ResourceListUpdatedEvent &event) {
+    return this->publishResourceListUpdated(event.resourceList);
+  }
+
+  bool publishResourceListUpdated(
+      const app::contracts::ResourceList &resourceList) {
     ResourceListUpdatedEvent *payload = new ResourceListUpdatedEvent();
     if (!payload) {
       return false;
     }
-    payload->resourceList = event.resourceList;
+    payload->resourceList = resourceList;
     return this->publishPrepared<EventKind::ResourceListUpdated, true>(payload);
   }
 

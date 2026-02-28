@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../api/api.hpp"
+#include "../../contracts/api_contracts.hpp"
 
 class AuthController {
 public:
@@ -69,7 +69,7 @@ public:
   };
 
   CardDetailsDecision handleCardDetails(
-      const API::CardAuthenticationDetailsResponse &response,
+      const app::contracts::CardAuthenticationDetails &response,
       const String &currentProjectsUser) const {
     CardDetailsDecision d;
     if (response.error.length() > 0) {

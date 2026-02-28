@@ -55,14 +55,12 @@ void AppRuntime::setup() {
       [this](String deviceName) { ui_.setDeviceName(deviceName); });
 #endif
   api_.setResourceListUpdateCallback(
-      [this](const API::ResourceList &resourceList) {
-        app::events::ResourceListUpdatedEvent event;
-        event.resourceList = resourceList;
-        eventBus_.publish(event);
+      [this](const app::contracts::ResourceList &resourceList) {
+        eventBus_.publishResourceListUpdated(resourceList);
       });
 
   api_.setCardAuthenticationDetailsResponseCallback(
-      [this](API::CardAuthenticationDetailsResponse response) {
+      [this](app::contracts::CardAuthenticationDetails response) {
         app::events::CardAuthDetailsEvent event;
         event.response = response;
         eventBus_.publish(event);
@@ -212,7 +210,7 @@ void AppRuntime::setup() {
         handleProjectSelection(projectId, projectName);
       });
   ui_.resourceDetailsSetFormsSubmitCallback(
-      [this](const API::FormSubmissionList &submissions) {
+      [this](const app::contracts::FormSubmissionList &submissions) {
         handleFormsSubmit(submissions);
       });
   ui_.resourceDetailsSetFormsCancelCallback([this]() { handleFormsCancel(); });
@@ -257,7 +255,9 @@ void AppRuntime::setup() {
   });
 
   ui_.resourceListSetSelectionCallback(
-      [this](const API::ResourceBrief &resource) { selectResource(resource); });
+      [this](const app::contracts::ResourceBrief &resource) {
+        selectResource(resource);
+      });
 
   ui_.setTouchCallback([this](int16_t x, int16_t y) { handleTouch(x, y); });
 
@@ -275,14 +275,14 @@ void AppRuntime::setup() {
   });
 
   api_.setProjectsOfUserResponseCallback(
-      [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
+      [this](const app::contracts::ProjectsOfUserResponse &projectsOfUserResponse) {
         app::events::ProjectsResponseEvent event;
         event.response = projectsOfUserResponse;
         eventBus_.publish(event);
       });
 
   api_.setResourceFormsRequestCallback(
-      [this](const API::ResourceUsageFormRequest &request) {
+      [this](const app::contracts::ResourceUsageFormRequest &request) {
         app::events::ResourceFormsRequestEvent event;
         event.request = request;
         eventBus_.publish(event);

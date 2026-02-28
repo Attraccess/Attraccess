@@ -2,6 +2,7 @@
 
 #ifdef HAS_LVGL_DISPLAY
 
+#include "../contracts/api_contracts.hpp"
 #include "../../display/display.hpp"
 
 class IUiPort {
@@ -40,8 +41,9 @@ public:
   virtual void setTouchCallback(
       std::function<void(int16_t, int16_t)> callback) = 0;
   virtual void resourceListSetSelectionCallback(
-      std::function<void(const API::ResourceBrief &)> callback) = 0;
-  virtual void resourceListSetResourceList(const API::ResourceList &list) = 0;
+      std::function<void(const app::contracts::ResourceBrief &)> callback) = 0;
+  virtual void
+  resourceListSetResourceList(const app::contracts::ResourceList &list) = 0;
   virtual void enrollmentSetUserName(const String &username) = 0;
   virtual void enrollmentSetTimeoutTime(uint32_t timeoutTimeMs) = 0;
   virtual void resourceDetailsSetUserDetails(
@@ -54,19 +56,19 @@ public:
   virtual void resourceDetailsSetProjectSelectionCallback(
       std::function<void(uint32_t, const String &)> callback) = 0;
   virtual void resourceDetailsSetFormsSubmitCallback(
-      std::function<void(const API::FormSubmissionList &)> callback) = 0;
+      std::function<void(const app::contracts::FormSubmissionList &)> callback) = 0;
   virtual void resourceDetailsSetFormsCancelCallback(
       std::function<void()> callback) = 0;
   virtual void resourceDetailsSetProjects(
-      const API::ProjectsOfUserResponse &projects) = 0;
+      const app::contracts::ProjectsOfUserResponse &projects) = 0;
   virtual void resourceDetailsSetSelectedProject(uint32_t projectId,
                                                  const char *projectName) = 0;
   virtual void resourceDetailsSetResourceAndUsageDetails(
-      const API::ResourceBrief &resource) = 0;
+      const app::contracts::ResourceBrief &resource) = 0;
   virtual void resourceDetailsHideActionProgress() = 0;
   virtual void resourceDetailsHideFormsModal() = 0;
   virtual void resourceDetailsShowFormsModal(
-      const API::ResourceUsageFormRequest &request) = 0;
+      const app::contracts::ResourceUsageFormRequest &request) = 0;
   virtual void resourceDetailsShowActionProgress(const char *message) = 0;
   virtual void resourceDetailsShowSuccessToast(const char *message) = 0;
   virtual void resourceDetailsSetSessionTimeoutTime(uint32_t timeoutTimeMs) = 0;

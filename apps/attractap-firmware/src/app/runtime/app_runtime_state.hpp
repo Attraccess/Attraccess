@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../api/api.hpp"
+#include "../contracts/api_contracts.hpp"
 
 namespace app::runtime {
 
@@ -30,7 +30,7 @@ struct AppRuntimeState {
   ApiEnrollNewCardData_t apiEnrollNewCardData;
 #endif
 
-  API::CardAuthenticationDetailsResponse cardAuthenticationData;
+  app::contracts::CardAuthenticationDetails cardAuthenticationData;
   int firmwareUpdateProgressPct = 0;
   String availableFirmwareVersion;
   bool unlocked = false;
@@ -62,10 +62,10 @@ struct AppRuntimeState {
 
 #ifdef HAS_LVGL_DISPLAY
   bool selectedResourceChanged = false;
-  API::ResourceList resourceList;
+  app::contracts::ResourceList resourceList;
   bool resourceListUpdated = false;
 
-  API::ProjectsOfUserResponse projectsOfUserResponse;
+  app::contracts::ProjectsOfUserResponse projectsOfUserResponse;
   bool projectsOfUserResponseUpdated = false;
   uint32_t selectedProjectId = 0;
   String selectedProjectName;
@@ -83,8 +83,8 @@ struct AppRuntimeState {
   uint32_t pendingActionProjectId = 0;
   bool hasPendingFormRequest = false;
   volatile bool pendingFormRequestReady = false;
-  API::ResourceUsageFormRequest pendingFormRequest;
-  API::FormSubmissionList formSubmissionBuffer;
+  app::contracts::ResourceUsageFormRequest pendingFormRequest;
+  app::contracts::FormSubmissionList formSubmissionBuffer;
 
   uint32_t pauseStartMs = 0;
   uint32_t accumulatedPauseMs = 0;

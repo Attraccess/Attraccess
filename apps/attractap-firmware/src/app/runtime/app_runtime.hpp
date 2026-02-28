@@ -8,6 +8,7 @@
 #include "../adapters/serial_command_adapter.hpp"
 #include "../adapters/settings_adapter.hpp"
 #include "../adapters/system_adapter.hpp"
+#include "../contracts/api_contracts.hpp"
 #include "../domain/auth/auth_controller.hpp"
 #include "../domain/connectivity/connectivity_controller.hpp"
 #include "../domain/resource/resource_controller.hpp"
@@ -26,7 +27,6 @@
 #include "event_router.hpp"
 #include "runtime_context.hpp"
 #include "runtime_workers.hpp"
-#include "../../api/api.hpp"
 #include "../../logger/logger.hpp"
 
 #ifdef HAS_LVGL_DISPLAY
@@ -127,13 +127,15 @@ private:
 #ifdef HAS_LVGL_DISPLAY
   void handleConnectionConfigurationSave(
       const ConnectionConfigurationScreen::ConnectionConfig &cfg);
-  void handleResourceListUpdate(const API::ResourceList &resourceList);
-  void selectResource(const API::ResourceBrief &resource);
+  void handleResourceListUpdate(
+      const app::contracts::ResourceList &resourceList);
+  void selectResource(const app::contracts::ResourceBrief &resource);
   void requestProjectsPage(uint32_t page);
   void clearProjectSelection();
   void handleProjectSelection(uint32_t projectId, const String &projectName);
-  void handleFormsRequest(const API::ResourceUsageFormRequest &request);
-  void handleFormsSubmit(const API::FormSubmissionList &submissions);
+  void handleFormsRequest(
+      const app::contracts::ResourceUsageFormRequest &request);
+  void handleFormsSubmit(const app::contracts::FormSubmissionList &submissions);
   void handleFormsCancel();
   void onActionResult(const String &eventType);
   void handleTouch(int16_t x, int16_t y);
