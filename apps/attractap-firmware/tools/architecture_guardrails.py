@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Architecture guardrails for attractap firmware app boundaries."""
+"""Architecture guardrails for attractap firmware flat src layout."""
 
 from __future__ import annotations
 
@@ -10,9 +10,27 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FW_ROOT = REPO_ROOT / "apps" / "attractap-firmware"
 SRC_ROOT = FW_ROOT / "src"
-APP_ROOT = SRC_ROOT / "app"
-
-LEGACY_ROOTS = {"api", "display", "network", "settings", "state", "nfc", "serial", "websocket"}
+ADAPTERS_ROOT = SRC_ROOT / "adapters"
+FLAT_ARCH_SCOPES = (
+    SRC_ROOT / "runtime",
+    SRC_ROOT / "domain",
+    SRC_ROOT / "events",
+    SRC_ROOT / "kernel",
+    SRC_ROOT / "ports",
+    SRC_ROOT / "contracts",
+)
+FORBIDDEN_IMPL_ROOTS = {
+    "api",
+    "display",
+    "network",
+    "settings",
+    "state",
+    "nfc",
+    "serial",
+    "websocket",
+    "beeper",
+    "ioexpander",
+}
 LEGACY_STATIC_GLOBALS = (
     "Settings::",
     "State::",
@@ -22,9 +40,9 @@ LEGACY_STATIC_GLOBALS = (
     "NFC::",
     "SerialCommandHandler::",
 )
-GLOBAL_GUARDRAIL_SCOPES = (APP_ROOT / "runtime", APP_ROOT / "domain", APP_ROOT / "events")
+GLOBAL_GUARDRAIL_SCOPES = (SRC_ROOT / "runtime", SRC_ROOT / "domain", SRC_ROOT / "events")
 
-INCLUDE_RE = re.compile(r'^\s*#include\s+"([^"]+)"')
+INCLUDE_RE = re.compile(r'^\s*#include\s*[<"]([^">]+)[">]')
 
 
 def iter_code_files(root: Path):
@@ -34,7 +52,7 @@ def iter_code_files(root: Path):
 
 
 def is_adapter_path(path: Path) -> bool:
-    return "adapters" in path.relative_to(APP_ROOT).parts
+    return ADAPTERS_ROOT in path.parents
 
 
 def resolve_include_target(source_file: Path, include_path: str) -> Path:
@@ -42,24 +60,35 @@ def resolve_include_target(source_file: Path, include_path: str) -> Path:
 
 
 def check_include_boundaries(violations: list[str]) -> None:
-    for path in iter_code_files(APP_ROOT):
-        if is_adapter_path(path):
+    for scope in FLAT_ARCH_SCOPES:
+        if not scope.exists():
             continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        for idx, line in enumerate(text.splitlines(), start=1):
-            m = INCLUDE_RE.match(line)
-            if not m:
+        for path in iter_code_files(scope):
+            if is_adapter_path(path):
                 continue
-            include_path = m.group(1)
-            target = resolve_include_target(path, include_path)
-            try:
-                rel_to_src = target.relative_to(SRC_ROOT)
-            except ValueError:
-                continue
-            if rel_to_src.parts and rel_to_src.parts[0] in LEGACY_ROOTS:
-                violations.append(
-                    f"{path.relative_to(REPO_ROOT)}:{idx} includes legacy header '{include_path}' outside adapters"
-                )
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for idx, line in enumerate(text.splitlines(), start=1):
+                m = INCLUDE_RE.match(line)
+                if not m:
+                    continue
+                include_path = m.group(1)
+                first = include_path.split("/", 1)[0]
+                if first in FORBIDDEN_IMPL_ROOTS:
+                    candidate = SRC_ROOT / include_path
+                    if candidate.exists():
+                        violations.append(
+                            f"{path.relative_to(REPO_ROOT)}:{idx} includes impl header '{include_path}' outside adapters"
+                        )
+                        continue
+                target = resolve_include_target(path, include_path)
+                try:
+                    rel_to_src = target.relative_to(SRC_ROOT)
+                except ValueError:
+                    continue
+                if rel_to_src.parts and rel_to_src.parts[0] in FORBIDDEN_IMPL_ROOTS:
+                    violations.append(
+                        f"{path.relative_to(REPO_ROOT)}:{idx} includes impl header '{include_path}' outside adapters"
+                    )
 
 
 def check_static_global_usage(violations: list[str]) -> None:
@@ -80,22 +109,37 @@ def check_static_global_usage(violations: list[str]) -> None:
                         )
 
 
-def check_app_ownership(violations: list[str]) -> None:
+def check_no_app_prefixed_includes(violations: list[str]) -> None:
     for path in iter_code_files(SRC_ROOT):
-        if APP_ROOT in path.parents:
-            continue
         text = path.read_text(encoding="utf-8", errors="ignore")
-        if "namespace app::" in text:
+        for idx, line in enumerate(text.splitlines(), start=1):
+            m = INCLUDE_RE.match(line)
+            if not m:
+                continue
+            include_path = m.group(1)
+            if include_path.startswith("app/"):
+                violations.append(
+                    f"{path.relative_to(REPO_ROOT)}:{idx} uses obsolete app-prefixed include '{include_path}'"
+                )
+
+
+def check_flat_layout(violations: list[str]) -> None:
+    app_root = SRC_ROOT / "app"
+    if app_root.exists():
+        app_code = list(iter_code_files(app_root))
+        if app_code:
             violations.append(
-                f"{path.relative_to(REPO_ROOT)} defines app namespace outside src/app"
+                "src/app still contains code files; flat src layout expected"
             )
 
 
 def main() -> int:
+    _require_flat_layout = "--require-flat-layout" in sys.argv[1:]
     violations: list[str] = []
     check_include_boundaries(violations)
     check_static_global_usage(violations)
-    check_app_ownership(violations)
+    check_no_app_prefixed_includes(violations)
+    check_flat_layout(violations)
 
     if violations:
         print("Architecture guardrail violations detected:")

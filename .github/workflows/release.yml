@@ -53,6 +53,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio esptool
 
+      - name: Firmware guardrails
+        run: pnpm nx run attractap-firmware:guardrails
+
       - name: Run everything
         env:
           NODE_ENV: production

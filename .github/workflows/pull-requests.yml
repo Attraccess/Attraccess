@@ -55,6 +55,9 @@ jobs:
       - name: Run precommit checks
         run: pnpm precommit
 
+      - name: Firmware guardrails
+        run: pnpm nx run attractap-firmware:guardrails
+
       - name: Ensure precommit does not modify files
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
