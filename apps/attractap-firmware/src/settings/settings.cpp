@@ -12,8 +12,14 @@ String Settings::_hostname;
 void Settings::setup()
 {
     logger.info("Setting up...");
+    loadFromPreferences();
+    validateLoadedConfig();
 
-    // load settings from preferences
+    logger.info("Setup complete.");
+}
+
+void Settings::loadFromPreferences()
+{
     preferences.begin("settings", true);
 
     _deviceConfig.passCode = preferences.getString("device.passCode", "0000");
@@ -32,8 +38,42 @@ void Settings::setup()
     _hostname = preferences.getString("hostname", "");
 
     preferences.end();
+}
 
-    logger.info("Setup complete.");
+void Settings::validateLoadedConfig()
+{
+    if (_deviceConfig.passCode.length() == 0)
+    {
+        _deviceConfig.passCode = "0000";
+    }
+}
+
+void Settings::persistString(const char *key, const String &value)
+{
+    preferences.begin("settings", false);
+    preferences.putString(key, value);
+    preferences.end();
+}
+
+void Settings::persistBool(const char *key, bool value)
+{
+    preferences.begin("settings", false);
+    preferences.putBool(key, value);
+    preferences.end();
+}
+
+void Settings::persistUShort(const char *key, uint16_t value)
+{
+    preferences.begin("settings", false);
+    preferences.putUShort(key, value);
+    preferences.end();
+}
+
+void Settings::persistUInt(const char *key, uint32_t value)
+{
+    preferences.begin("settings", false);
+    preferences.putUInt(key, value);
+    preferences.end();
 }
 
 DeviceConfig Settings::getDeviceConfig()
@@ -45,9 +85,7 @@ void Settings::setDevicePin(String passCode)
 {
     logger.info("Setting device pin...");
     _deviceConfig.passCode = passCode;
-    preferences.begin("settings", false);
-    preferences.putString("device.passCode", passCode);
-    preferences.end();
+    persistString("device.passCode", passCode);
     logger.info("Device pin set.");
 }
 
@@ -55,9 +93,7 @@ void Settings::setBeeperEnabled(bool beeperEnabled)
 {
     logger.info("Saving device config...");
     _deviceConfig.beeperEnabled = beeperEnabled;
-    preferences.begin("settings", false);
-    preferences.putBool("device.beeper", beeperEnabled);
-    preferences.end();
+    persistBool("device.beeper", beeperEnabled);
     logger.info("Device beeper enabled set.");
 }
 
@@ -69,15 +105,10 @@ NetworkConfig Settings::getNetworkConfig()
 void Settings::saveNetworkConfig(String ssid, String password)
 {
     logger.info("Saving network config...");
-    preferences.begin("settings", false);
-
-    preferences.putString("wifi.ssid", ssid);
     _networkConfig.ssid = ssid;
-
-    preferences.putString("wifi.pass", password);
     _networkConfig.password = password;
-
-    preferences.end();
+    persistString("wifi.ssid", ssid);
+    persistString("wifi.pass", password);
 }
 
 AttraccessApiConfig Settings::getAttraccessApiConfig()
@@ -88,18 +119,12 @@ AttraccessApiConfig Settings::getAttraccessApiConfig()
 void Settings::saveAttraccessApiConfig(String hostname, uint16_t port, bool useSSL)
 {
     logger.info("Saving attraccess api config...");
-    preferences.begin("settings", false);
-
-    preferences.putString("api.host", hostname);
     _attraccessApiConfig.hostname = hostname;
-
-    preferences.putUShort("api.port", port);
     _attraccessApiConfig.port = port;
-
-    preferences.putBool("api.useSSL", useSSL);
     _attraccessApiConfig.useSSL = useSSL;
-
-    preferences.end();
+    persistString("api.host", hostname);
+    persistUShort("api.port", port);
+    persistBool("api.useSSL", useSSL);
 }
 
 AttraccessAuthConfig Settings::getAttraccessAuthConfig()
@@ -110,15 +135,10 @@ AttraccessAuthConfig Settings::getAttraccessAuthConfig()
 void Settings::saveAttraccessAuthConfig(String apiKey, uint32_t readerId)
 {
     logger.info("Saving attraccess auth config...");
-    preferences.begin("settings", false);
-
-    preferences.putString("api.key", apiKey);
     _attraccessAuthConfig.apiKey = apiKey;
-
-    preferences.putUInt("api.readerId", readerId);
     _attraccessAuthConfig.readerId = readerId;
-
-    preferences.end();
+    persistString("api.key", apiKey);
+    persistUInt("api.readerId", readerId);
 }
 
 void Settings::clearAttraccessAuthConfig()
@@ -141,9 +161,7 @@ String Settings::getHostname()
     {
         String randomSuffix = String(random(1000, 9999));
         _hostname = String(FIRMWARE_FRIENDLY_NAME) + "-" + String(FIRMWARE_VARIANT_FRIENDLY_NAME) + "-" + randomSuffix;
-        preferences.begin("settings", false);
-        preferences.putString("hostname", _hostname);
-        preferences.end();
+        persistString("hostname", _hostname);
     }
 
     return _hostname;

@@ -25,27 +25,7 @@ void Network::setup()
 
     logger.info("Shared components initialized");
 
-#if defined(CONFIG_IDF_TARGET_ESP32P4)
-    // P4 uses C6 coprocessor for WiFi via ESP-Hosted; must init transport before WiFi
-    logger.info("Initializing ESP-Hosted (P4↔C6 transport)");
-    int hosted_ret = esp_hosted_init();
-    if (hosted_ret != 0) {
-        logger.error("ESP-Hosted init failed - WiFi will not work");
-    } else {
-        xTaskCreate(
-            [](void *) {
-                int r = esp_hosted_connect_to_slave();
-                if (r == 0) {
-                    ESP_LOGI("Network", "ESP-Hosted transport ready");
-                } else {
-                    ESP_LOGE("Network", "ESP-Hosted connect failed");
-                }
-                vTaskDelete(NULL);
-            },
-            "hosted_conn", 4096, NULL, 5, NULL);
-        delay(2500);  // Give C6 time to respond before WiFi init
-    }
-#endif
+    setupHostedTransport();
 
     // Initialize both network interfaces
     logger.info("Starting WiFi interface");
@@ -56,10 +36,41 @@ void Network::setup()
     Ethernet::setup();
 #endif
 
-    logger.info("Configuring SNTP time server...");
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    setupTimeSync();
 
     logger.info("initialization complete");
+}
+
+void Network::setupHostedTransport()
+{
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+    // P4 uses C6 coprocessor for WiFi via ESP-Hosted; must init transport before WiFi
+    logger.info("Initializing ESP-Hosted (P4↔C6 transport)");
+    int hosted_ret = esp_hosted_init();
+    if (hosted_ret != 0) {
+        logger.error("ESP-Hosted init failed - WiFi will not work");
+        return;
+    }
+
+    xTaskCreate(
+        [](void *) {
+            int r = esp_hosted_connect_to_slave();
+            if (r == 0) {
+                ESP_LOGI("Network", "ESP-Hosted transport ready");
+            } else {
+                ESP_LOGE("Network", "ESP-Hosted connect failed");
+            }
+            vTaskDelete(NULL);
+        },
+        "hosted_conn", 4096, NULL, 5, NULL);
+    delay(2500);  // Give C6 time to respond before WiFi init
+#endif
+}
+
+void Network::setupTimeSync()
+{
+    logger.info("Configuring SNTP time server...");
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 }
 
 void Network::initSharedComponents()

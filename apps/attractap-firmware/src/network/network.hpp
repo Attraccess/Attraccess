@@ -21,6 +21,8 @@ public:
 
 private:
     static void initSharedComponents();
+    static void setupHostedTransport();
+    static void setupTimeSync();
 
     // Initialization flag
     static bool _sharedComponentsInitialized;

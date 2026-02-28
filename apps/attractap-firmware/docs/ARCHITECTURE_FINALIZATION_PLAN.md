@@ -357,7 +357,7 @@ Migration matrix (authoritative for Phase I/J delete slices):
 
 ### Phase I - Legacy subsystem decomposition
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -459,7 +459,7 @@ Update this table as work lands.
 | F     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added app_runtime_state, event_router, app_runtime; Application is wiring-only facade. |
 | G     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Split `app_runtime.cpp` into runtime modules (`bootstrap`, `events`, `state_machine`, `flows`) and added `RuntimeContext` composition object. |
 | H     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/contracts` + adapter translators; runtime/domain/events headers no longer include legacy `api/api.hpp`; validated with build + upload + 2-minute serial stability log. |
-| I     | Codex + Jappy | Not started |            |          | Decompose legacy subsystems internally and reduce static/global ownership concentration. |
+| I     | Codex + Jappy | Done | 2026-02-28 | 2026-02-28 | Decomposed legacy internals (`api`, `display`, `network`, `settings`) into focused modules while preserving public interfaces; validated with lint/build/flash + serial stability. |
 | J     | Codex + Jappy | Not started |            |          | Retire compatibility leftovers and lock boundaries with architecture guardrails. |
 
 ## Progress Notes
@@ -489,6 +489,20 @@ Update this table as work lands.
 - Added Phase H migration matrix in this plan as the authoritative `legacy folder -> app owner -> translator -> delete criteria` artifact.
 - Lint/static analysis check: `pio check -e attractap-touch` completed successfully (existing third-party/dependency warnings only; no new app-layer lint blockers introduced by Phase H changes).
 - Flash/stability validation on `attractap-touch` (`/dev/cu.usbmodem21301`): after initial stack-canary regressions in `websocket_task`, fixed large resource-list callback stack usage by removing large stack copies in callback/event publish path; re-flashed and captured 130s serial logs with no panic/reset/reboot signatures.
+
+### 2026-02-28
+
+- Completed Phase I legacy subsystem decomposition without broad API breaks:
+  - `src/api`: split command/callback dispatch path from monolithic implementation into `src/api/api_actions.cpp` while preserving `API` interface and behavior.
+  - `src/display`: moved popup/orchestration responsibilities into `src/display/display_popups.cpp` to reduce central `display.cpp` ownership concentration.
+  - `src/network`: separated hosted transport bootstrap and SNTP setup into dedicated internal methods (`setupHostedTransport`, `setupTimeSync`) to clarify transport vs policy concerns.
+  - `src/settings`: separated persistence/default-loading/validation concerns with focused helper methods (`loadFromPreferences`, `validateLoadedConfig`, `persist*`).
+- Lint/static-analysis evidence:
+  - `ReadLints` on touched files: no IDE diagnostics for new changes.
+  - `pio check -e attractap-touch --skip-packages --src-filters="+<src/api/> +<src/display/> +<src/network/> +<src/settings/>"` passed (existing third-party/dependency warnings remain, no new blocking errors introduced by this slice).
+- Build/flash/smoke evidence:
+  - `pio run -e attractap-touch -t upload --upload-port /dev/cu.usbmodem21301` succeeded.
+  - Captured 130s serial runtime logs on `attractap-touch` via PlatformIO Python serial reader; no panic/reset/reboot tokens detected (`panic_hits=0`).
 
 ## Execution Rules
 

@@ -51,6 +51,13 @@ public:
     static String getHostname();
 
 private:
+    static void loadFromPreferences();
+    static void validateLoadedConfig();
+    static void persistString(const char *key, const String &value);
+    static void persistBool(const char *key, bool value);
+    static void persistUShort(const char *key, uint16_t value);
+    static void persistUInt(const char *key, uint32_t value);
+
     static Preferences preferences;
     static Logger logger;
 
