@@ -11,6 +11,9 @@ Close all remaining gaps between the current migrated state and the intended end
 - Runtime workers live under `app/runtime`, not `Application`.
 - All app/business logic lives under `src/app/*`; legacy app logic outside `src/app` is migrated or removed.
 
+Note (2026-02-28 post-migration): codebase has been flattened from `src/app/*` to `src/*`.
+Path references to `src/app/*` in this document describe the pre-flatten migration target/state.
+
 ## Legacy Eradication Invariant (strict)
 
 Target end state for this plan:
@@ -24,6 +27,10 @@ Target end state for this plan:
 ## Why this follow-up exists
 
 The previous plan completed the vertical-slice migration phases, but did not fully realize the structural end-state. In particular, `kernel/` and `events/` remain scaffold-only, and orchestration/runtime ownership still lives in `Application`.
+
+Post-completion re-audit and closure phases:
+
+- `docs/ARCHITECTURE_FOLLOWUP_GAP_ANALYSIS.md`
 
 ## Current State Snapshot (verified)
 
