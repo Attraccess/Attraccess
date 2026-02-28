@@ -5,8 +5,16 @@
   "projectType": "application",
   "tags": [],
   "targets": {
+    "guardrails": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/attractap-firmware && python3 tools/architecture_guardrails.py",
+        "cwd": "."
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
+      "dependsOn": ["guardrails"],
       "options": {
         "command": "cd apps/attractap-firmware && python3 build_firmwares.py",
         "cwd": "."

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../ports/nfc_port.hpp"
+#include "../../nfc/nfc.hpp"
 
 class NfcAdapter : public INfcPort {
 public:
@@ -27,6 +28,7 @@ public:
                          uint8_t *keyNo) override {
     return this->nfc.getAvailableKeyNo(uid, uidLength, keyNo);
   }
+  uint8_t *factoryKey() override { return const_cast<uint8_t *>(NFC::FACTORY_KEY); }
 
 private:
   NFC nfc;

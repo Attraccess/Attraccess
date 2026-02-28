@@ -9,6 +9,8 @@
 #include "../adapters/settings_adapter.hpp"
 #include "../adapters/system_adapter.hpp"
 #include "../contracts/api_contracts.hpp"
+#include "../contracts/settings_contracts.hpp"
+#include "../contracts/ui_contracts.hpp"
 #include "../domain/auth/auth_controller.hpp"
 #include "../domain/connectivity/connectivity_controller.hpp"
 #include "../domain/resource/resource_controller.hpp"
@@ -32,8 +34,6 @@
 #ifdef HAS_LVGL_DISPLAY
 #include "../adapters/ui_adapter.hpp"
 #include "../ports/ui_port.hpp"
-#include "../../display/screens/connectionConfiguration/connectionConfigurationScreen.hpp"
-#include "../../display/screens/resourceDetails/resourceDetailsScreen.hpp"
 #endif
 
 #define APPLICATION_BOOT_SCREEN_DURATION 2000
@@ -126,7 +126,7 @@ private:
 
 #ifdef HAS_LVGL_DISPLAY
   void handleConnectionConfigurationSave(
-      const ConnectionConfigurationScreen::ConnectionConfig &cfg);
+      const app::contracts::ConnectionConfig &cfg);
   void handleResourceListUpdate(
       const app::contracts::ResourceList &resourceList);
   void selectResource(const app::contracts::ResourceBrief &resource);
@@ -141,7 +141,7 @@ private:
   void handleTouch(int16_t x, int16_t y);
   void restartSessionTimeout();
   void handleResourceDetailsButtonClick(
-      ResourceDetailsScreen::ButtonClickEventData evt);
+      app::contracts::ResourceDetailsButtonClickEventData evt);
   void restartResourceSelectionTimeout();
   void beginActionPause();
   void endActionPause();

@@ -1,13 +1,25 @@
 #pragma once
 
 #include "../ports/settings_port.hpp"
+#include "../../settings/settings.hpp"
 
 class SettingsAdapter : public ISettingsPort {
 public:
   void setup() override { Settings::setup(); }
-  DeviceConfig getDeviceConfig() override { return Settings::getDeviceConfig(); }
-  AttraccessApiConfig getAttraccessApiConfig() override {
-    return Settings::getAttraccessApiConfig();
+  app::contracts::DeviceConfig getDeviceConfig() override {
+    DeviceConfig cfg = Settings::getDeviceConfig();
+    app::contracts::DeviceConfig out;
+    out.passCode = cfg.passCode;
+    out.beeperEnabled = cfg.beeperEnabled;
+    return out;
+  }
+  app::contracts::AttraccessApiConfig getAttraccessApiConfig() override {
+    AttraccessApiConfig cfg = Settings::getAttraccessApiConfig();
+    app::contracts::AttraccessApiConfig out;
+    out.hostname = cfg.hostname;
+    out.port = cfg.port;
+    out.useSSL = cfg.useSSL;
+    return out;
   }
   void saveNetworkConfig(const String &ssid, const String &password) override {
     Settings::saveNetworkConfig(ssid, password);

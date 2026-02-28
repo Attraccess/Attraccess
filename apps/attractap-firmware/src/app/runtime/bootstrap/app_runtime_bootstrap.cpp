@@ -199,7 +199,7 @@ void AppRuntime::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   ui_.resourceDetailsSetButtonClickCallback(
-      [this](ResourceDetailsScreen::ButtonClickEventData evt) {
+      [this](app::contracts::ResourceDetailsButtonClickEventData evt) {
         handleResourceDetailsButtonClick(evt);
       });
 
@@ -233,7 +233,7 @@ void AppRuntime::setup() {
   });
 
   ui_.connectionConfigOnSaveCallback(
-      [this](const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
+      [this](const app::contracts::ConnectionConfig &cfg) {
         handleConnectionConfigurationSave(cfg);
       });
 
@@ -329,7 +329,7 @@ void AppRuntime::setup() {
 #ifdef HAS_LVGL_DISPLAY
     if (cardDetectionDecision.shouldHandleEnrollmentCard) {
       bool success = nfc_.changeKey(
-          state_.apiEnrollNewCardData.keyNo, NFC::FACTORY_KEY, NFC::FACTORY_KEY,
+          state_.apiEnrollNewCardData.keyNo, nfc_.factoryKey(), nfc_.factoryKey(),
           state_.apiEnrollNewCardData.keyBytes);
 
       AuthController::EnrollCardWriteDecision enrollWriteDecision =

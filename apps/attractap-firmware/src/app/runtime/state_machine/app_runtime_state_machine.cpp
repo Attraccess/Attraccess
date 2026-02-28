@@ -3,7 +3,7 @@
 namespace app::runtime {
 
 bool AppRuntime::handleConfigurationAndConnectivityGates() {
-  AttraccessApiConfig attraaccessApiConfig =
+  app::contracts::AttraccessApiConfig attraaccessApiConfig =
       settings_.getAttraccessApiConfig();
   bool connectionIsConfigured = !attraaccessApiConfig.hostname.isEmpty() &&
                                 attraaccessApiConfig.hostname != "" &&
@@ -94,12 +94,13 @@ bool AppRuntime::handleExternalAuthTransition() {
 
 #ifdef HAS_LVGL_DISPLAY
   if (authTransitionDecision.shouldPopulateUserDetails) {
-    ui_.resourceDetailsSetUserDetails(
-        ResourceDetailsScreen::UserDetails{
-            .username = state_.cardAuthenticationData.username,
-            .canManageResource = state_.cardAuthenticationData.canManageResource,
-            .hasIntroduction = state_.cardAuthenticationData.hasIntroduction,
-            .isIntroducer = state_.cardAuthenticationData.isIntroducer});
+    app::contracts::ResourceDetailsUserDetails userDetails;
+    userDetails.username = state_.cardAuthenticationData.username;
+    userDetails.canManageResource =
+        state_.cardAuthenticationData.canManageResource;
+    userDetails.hasIntroduction = state_.cardAuthenticationData.hasIntroduction;
+    userDetails.isIntroducer = state_.cardAuthenticationData.isIntroducer;
+    ui_.resourceDetailsSetUserDetails(userDetails);
   }
 #endif
   if (authTransitionDecision.shouldEnterAuthenticateState) {

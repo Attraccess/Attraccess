@@ -407,7 +407,7 @@ Implementation checklist (ordered):
 
 ### Phase J - Final legacy retirement and architecture lock
 
-Status: `Not started`
+Status: `Done`
 
 Scope:
 
@@ -460,7 +460,7 @@ Update this table as work lands.
 | G     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Split `app_runtime.cpp` into runtime modules (`bootstrap`, `events`, `state_machine`, `flows`) and added `RuntimeContext` composition object. |
 | H     | Codex + Jappy | Done | 2026-02-27 | 2026-02-27 | Added `app/contracts` + adapter translators; runtime/domain/events headers no longer include legacy `api/api.hpp`; validated with build + upload + 2-minute serial stability log. |
 | I     | Codex + Jappy | Done | 2026-02-28 | 2026-02-28 | Decomposed legacy internals (`api`, `display`, `network`, `settings`) into focused modules while preserving public interfaces; validated with lint/build/flash + serial stability. |
-| J     | Codex + Jappy | Not started |            |          | Retire compatibility leftovers and lock boundaries with architecture guardrails. |
+| J     | Codex + Jappy | Done | 2026-02-28 | 2026-02-28 | Removed `Application` compatibility facade, migrated remaining app-layer legacy DTO leaks to app-owned contracts, and added CI guardrails for include/global/app-ownership boundaries. |
 
 ## Progress Notes
 
@@ -503,6 +503,19 @@ Update this table as work lands.
 - Build/flash/smoke evidence:
   - `pio run -e attractap-touch -t upload --upload-port /dev/cu.usbmodem21301` succeeded.
   - Captured 130s serial runtime logs on `attractap-touch` via PlatformIO Python serial reader; no panic/reset/reboot tokens detected (`panic_hits=0`).
+- Completed Phase J architecture lock:
+  - Removed temporary compatibility wrapper `src/application/Application` and made `app/kernel/AppKernel` directly own runtime composition/wiring.
+  - Eliminated remaining non-adapter legacy type/header leaks in app layer:
+    - `ISettingsPort` now uses app-owned `app::contracts::{DeviceConfig, AttraccessApiConfig}`.
+    - `IUiPort` now uses app-owned `app::contracts` UI DTOs/events instead of display screen structs.
+    - `INfcPort` no longer includes legacy NFC header and now exposes adapter-bounded factory key access.
+  - Added guardrail checker `tools/architecture_guardrails.py` and Nx target `attractap-firmware:guardrails`.
+  - Wired guardrails into CI workflows (`pull-requests.yml`, `release.yml`, `docker-nightly-latest.yml`) as required pre-build checks.
+- Phase J verification evidence:
+  - Guardrail checks passed locally: `python3 tools/architecture_guardrails.py` and `pnpm nx run attractap-firmware:guardrails`.
+  - Lint/static-analysis check: `pio check -e attractap-touch --skip-packages --src-filters="+<src/app/> +<src/api/> +<src/display/> +<src/network/> +<src/settings/>"` passed (known third-party/dependency warnings persist; no new blocking app-layer diagnostics introduced by Phase J edits).
+  - Flash check: `pio run -e attractap-touch -t upload --upload-port /dev/cu.usbmodem21301` succeeded after Phase J refactor.
+  - Serial stability check: captured 130.18s live logs on `attractap-touch` (`line_count=52`) with `panic_hits=0` (no panic/assert/reboot/backtrace tokens).
 
 ## Execution Rules
 

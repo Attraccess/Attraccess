@@ -6,10 +6,10 @@ void AppKernel::setup() {
   }
 
   this->logger.info("Kernel setup start");
-  this->application.setup();
+  this->appRuntime_.setup();
   this->initialized = true;
   this->logger.info("Kernel setup complete");
 }
 
-void AppKernel::loop() { this->application.loop(); }
+void AppKernel::loop() { this->appRuntime_.loop(); }
 

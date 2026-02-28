@@ -4,6 +4,8 @@
 
 #include "translators/api_contracts_translator.hpp"
 #include "../ports/ui_port.hpp"
+#include "../../display/display.hpp"
+#include <cstring>
 
 class UiAdapter : public IUiPort {
 public:
@@ -67,9 +69,19 @@ public:
     Display::connectionConfigurationScreen.setOnCancelPinLockCallback(callback);
   }
   void connectionConfigOnSaveCallback(
-      std::function<void(const ConnectionConfigurationScreen::ConnectionConfig &)>
+      std::function<void(const app::contracts::ConnectionConfig &)>
           callback) override {
-    Display::connectionConfigurationScreen.setOnSaveCallback(callback);
+    Display::connectionConfigurationScreen.setOnSaveCallback(
+        [callback](const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
+          app::contracts::ConnectionConfig mapped;
+          mapped.ssid = cfg.ssid;
+          mapped.password = cfg.password;
+          mapped.host = cfg.host;
+          mapped.useSSL = cfg.useSSL;
+          mapped.devicePin = cfg.devicePin;
+          mapped.beeperEnabled = cfg.beeperEnabled;
+          callback(mapped);
+        });
   }
   void initScreenOnOpenSettings(std::function<void()> callback) override {
     Display::initScreen.setOnOpenSettingsCallback(callback);
@@ -98,13 +110,52 @@ public:
     Display::enrollmentScreen.setEnrollmentTimeoutTime(timeoutTimeMs);
   }
   void resourceDetailsSetUserDetails(
-      const ResourceDetailsScreen::UserDetails &details) override {
-    Display::resourceDetailsScreen.setUserDetails(details);
+      const app::contracts::ResourceDetailsUserDetails &details) override {
+    ResourceDetailsScreen::UserDetails mapped;
+    mapped.username = details.username;
+    mapped.canManageResource = details.canManageResource;
+    mapped.hasIntroduction = details.hasIntroduction;
+    mapped.isIntroducer = details.isIntroducer;
+    Display::resourceDetailsScreen.setUserDetails(mapped);
   }
   void resourceDetailsSetButtonClickCallback(
-      std::function<void(ResourceDetailsScreen::ButtonClickEventData)>
+      std::function<void(app::contracts::ResourceDetailsButtonClickEventData)>
           callback) override {
-    Display::resourceDetailsScreen.setButtonClickCallback(callback);
+    Display::resourceDetailsScreen.setButtonClickCallback(
+        [callback](ResourceDetailsScreen::ButtonClickEventData evt) {
+          app::contracts::ResourceDetailsButtonClickType type =
+              app::contracts::ResourceDetailsButtonClickType::START_SESSION;
+          switch (evt.buttonClickType) {
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+            type = app::contracts::ResourceDetailsButtonClickType::START_SESSION;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+            type = app::contracts::ResourceDetailsButtonClickType::STOP_SESSION;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+            type = app::contracts::ResourceDetailsButtonClickType::LOCK_DOOR;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+            type = app::contracts::ResourceDetailsButtonClickType::UNLOCK_DOOR;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+            type = app::contracts::ResourceDetailsButtonClickType::UNLATCH_DOOR;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+            type = app::contracts::ResourceDetailsButtonClickType::FLOW_BUTTON;
+            break;
+          case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+            type = app::contracts::ResourceDetailsButtonClickType::LOGOUT;
+            break;
+          }
+
+          app::contracts::ResourceDetailsButtonClickEventData mapped;
+          mapped.type = type;
+          std::strncpy(mapped.flowButtonId, evt.flowButtonId,
+                       app::contracts::MAX_FLOW_BUTTON_ID_LEN - 1);
+          mapped.flowButtonId[app::contracts::MAX_FLOW_BUTTON_ID_LEN - 1] = '\0';
+          callback(mapped);
+        });
   }
   void resourceDetailsSetProjectsPageRequestCallback(
       std::function<void(uint32_t)> callback) override {

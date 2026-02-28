@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../../nfc/nfc.hpp"
+#include <cstdint>
+#include <functional>
 
 class INfcPort {
 public:
@@ -19,4 +20,5 @@ public:
   virtual void disableCardDetection() = 0;
   virtual bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength,
                                  uint8_t *keyNo) = 0;
+  virtual uint8_t *factoryKey() = 0;
 };

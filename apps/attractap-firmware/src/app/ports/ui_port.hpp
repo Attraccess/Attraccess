@@ -3,7 +3,7 @@
 #ifdef HAS_LVGL_DISPLAY
 
 #include "../contracts/api_contracts.hpp"
-#include "../../display/display.hpp"
+#include "../contracts/ui_contracts.hpp"
 
 class IUiPort {
 public:
@@ -35,7 +35,7 @@ public:
   virtual void connectionConfigOnCancelPinLock(
       std::function<void()> callback) = 0;
   virtual void connectionConfigOnSaveCallback(
-      std::function<void(const ConnectionConfigurationScreen::ConnectionConfig &)>
+      std::function<void(const app::contracts::ConnectionConfig &)>
           callback) = 0;
   virtual void initScreenOnOpenSettings(std::function<void()> callback) = 0;
   virtual void setTouchCallback(
@@ -47,10 +47,10 @@ public:
   virtual void enrollmentSetUserName(const String &username) = 0;
   virtual void enrollmentSetTimeoutTime(uint32_t timeoutTimeMs) = 0;
   virtual void resourceDetailsSetUserDetails(
-      const ResourceDetailsScreen::UserDetails &details) = 0;
+      const app::contracts::ResourceDetailsUserDetails &details) = 0;
   virtual void resourceDetailsSetButtonClickCallback(
-      std::function<void(ResourceDetailsScreen::ButtonClickEventData)> callback) =
-      0;
+      std::function<void(app::contracts::ResourceDetailsButtonClickEventData)>
+          callback) = 0;
   virtual void resourceDetailsSetProjectsPageRequestCallback(
       std::function<void(uint32_t)> callback) = 0;
   virtual void resourceDetailsSetProjectSelectionCallback(

@@ -107,7 +107,7 @@ bool AppRuntime::handleDisplayResourceAndSessionFlow() {
 }
 
 void AppRuntime::handleConnectionConfigurationSave(
-    const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
+    const app::contracts::ConnectionConfig &cfg) {
   String hostname = cfg.host;
   String port = "443";
   if (cfg.host.indexOf(":") != -1) {
@@ -275,31 +275,31 @@ void AppRuntime::restartSessionTimeout() {
 }
 
 void AppRuntime::handleResourceDetailsButtonClick(
-    ResourceDetailsScreen::ButtonClickEventData evt) {
-  logger_.infof("Resource details button clicked: %d", evt.buttonClickType);
+    app::contracts::ResourceDetailsButtonClickEventData evt) {
+  logger_.infof("Resource details button clicked: %d", static_cast<int>(evt.type));
 
   ResourceController::ActionIntent intent =
       ResourceController::ACTION_INTENT_NONE;
-  switch (evt.buttonClickType) {
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION:
+  switch (evt.type) {
+  case app::contracts::ResourceDetailsButtonClickType::START_SESSION:
     intent = ResourceController::ACTION_INTENT_START_SESSION;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+  case app::contracts::ResourceDetailsButtonClickType::STOP_SESSION:
     intent = ResourceController::ACTION_INTENT_STOP_SESSION;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+  case app::contracts::ResourceDetailsButtonClickType::LOCK_DOOR:
     intent = ResourceController::ACTION_INTENT_LOCK_DOOR;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+  case app::contracts::ResourceDetailsButtonClickType::UNLOCK_DOOR:
     intent = ResourceController::ACTION_INTENT_UNLOCK_DOOR;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+  case app::contracts::ResourceDetailsButtonClickType::UNLATCH_DOOR:
     intent = ResourceController::ACTION_INTENT_UNLATCH_DOOR;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+  case app::contracts::ResourceDetailsButtonClickType::FLOW_BUTTON:
     intent = ResourceController::ACTION_INTENT_FLOW_BUTTON;
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+  case app::contracts::ResourceDetailsButtonClickType::LOGOUT:
     intent = ResourceController::ACTION_INTENT_LOGOUT;
     break;
   }
