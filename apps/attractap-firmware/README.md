@@ -1,6 +1,6 @@
 # Attractap Firmware
 
-This directory contains the firmware for the Attractap device, an ESP32-C3 based RFID/NFC reader.
+This directory contains the firmware for Attractap devices across multiple hardware targets.
 
 ## Web Installation
 
@@ -9,7 +9,7 @@ You can install the firmware directly from your web browser using [ESP Web Tools
 ### Requirements
 
 - Chrome or Edge browser on desktop (Web Serial is not supported on mobile or Firefox)
-- ESP32-C3 based Attractap device
+- A supported Attractap device
 - USB connection to your computer
 
 ### Quick Installation
@@ -29,7 +29,7 @@ If the web installer doesn't work for you, you can download the firmware binary 
 pip install esptool
 
 # Flash the firmware
-esptool.py --chip esp32c3 --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 merged-firmware.bin
+esptool.py --chip <chip> --port /dev/ttyUSB0 --baud 921600 write_flash 0x0 merged-firmware.bin
 ```
 
 Replace `/dev/ttyUSB0` with the correct port for your device:
@@ -56,18 +56,30 @@ Replace `/dev/ttyUSB0` with the correct port for your device:
 
 ### Building
 
-To build the firmware, run:
+List available PlatformIO environments:
 
 ```bash
-pio run -e attractap
+pio project config | grep '^\[env:'
 ```
 
 ### Uploading During Development
 
-To upload the firmware to a connected device, run:
+Build a specific target:
 
 ```bash
-pio run -e attractap -t upload
+pio run -e <env>
+```
+
+Upload a specific target to a connected device:
+
+```bash
+pio run -e <env> -t upload
+```
+
+Monitor serial output:
+
+```bash
+pio device monitor -b 115200
 ```
 
 ## Continuous Integration
