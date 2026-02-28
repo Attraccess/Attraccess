@@ -9,7 +9,7 @@
 
 class NFC {
 public:
-  NFC() : logger("NFC"), pn532(PIN_PN532_IRQ, -1, &Wire) {}
+  NFC() : logger("NFC"), pn532Wire(1), pn532(PIN_PN532_IRQ, -1, &pn532Wire) {}
 
   bool setup();
   void loop();
@@ -32,6 +32,7 @@ public:
 
 private:
   Logger logger;
+  TwoWire pn532Wire;
   Adafruit_PN532 pn532;
   bool waitForCard(uint32_t timeoutMs = 10000);
 

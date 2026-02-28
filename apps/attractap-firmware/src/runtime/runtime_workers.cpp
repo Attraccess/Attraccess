@@ -64,9 +64,9 @@ void RuntimeWorkers::start(INetworkPort &network, IApiPort &api, INfcPort &nfc) 
 
   xTaskCreate(RuntimeWorkers::networkTask, "NetworkTask", 4096, &context,
               tskIDLE_PRIORITY, nullptr);
-  xTaskCreate(RuntimeWorkers::apiTask, "ApiTask", 6144, &context,
+  xTaskCreate(RuntimeWorkers::apiTask, "ApiTask", 10240, &context,
               tskIDLE_PRIORITY + 1, nullptr);
-  xTaskCreate(RuntimeWorkers::nfcTask, "NfcTask", 4096, &context,
+  xTaskCreate(RuntimeWorkers::nfcTask, "NfcTask", 8192, &context,
               tskIDLE_PRIORITY + 1, nullptr);
 
   this->started = true;

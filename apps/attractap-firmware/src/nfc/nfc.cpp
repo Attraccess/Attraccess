@@ -4,6 +4,17 @@ uint8_t NFC::FACTORY_KEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 bool NFC::setup() {
+  // Use a dedicated hardware I2C controller for PN532 to avoid contention
+  // with display/touch devices on the default Wire bus.
+#if defined(PIN_PN532_I2C_SDA) && defined(PIN_PN532_I2C_SCL)
+  this->pn532Wire.begin(PIN_PN532_I2C_SDA, PIN_PN532_I2C_SCL);
+#elif defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
+  this->pn532Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+#else
+  this->pn532Wire.begin(SDA, SCL);
+#endif
+  this->pn532Wire.setTimeOut(50);
+
   this->logger.info("Initializing PN532");
   this->pn532.begin();
 

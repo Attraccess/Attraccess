@@ -98,9 +98,8 @@ inline API::ResourceList toLegacy(const app::contracts::ResourceList &in) {
   return out;
 }
 
-inline app::contracts::ProjectsOfUserResponse
-toContract(const API::ProjectsOfUserResponse &in) {
-  app::contracts::ProjectsOfUserResponse out;
+inline void toContract(const API::ProjectsOfUserResponse &in,
+                       app::contracts::ProjectsOfUserResponse &out) {
   out.count = in.count > app::contracts::MAX_PROJECTS_PER_PAGE
                   ? app::contracts::MAX_PROJECTS_PER_PAGE
                   : in.count;
@@ -112,6 +111,12 @@ toContract(const API::ProjectsOfUserResponse &in) {
     out.items[i].id = in.items[i].id;
     out.items[i].name = in.items[i].name;
   }
+}
+
+inline app::contracts::ProjectsOfUserResponse
+toContract(const API::ProjectsOfUserResponse &in) {
+  app::contracts::ProjectsOfUserResponse out;
+  toContract(in, out);
   return out;
 }
 
@@ -132,9 +137,8 @@ toLegacy(const app::contracts::ProjectsOfUserResponse &in) {
   return out;
 }
 
-inline app::contracts::ResourceUsageFormRequest
-toContract(const API::ResourceUsageFormRequest &in) {
-  app::contracts::ResourceUsageFormRequest out;
+inline void toContract(const API::ResourceUsageFormRequest &in,
+                       app::contracts::ResourceUsageFormRequest &out) {
   out.resourceId = in.resourceId;
   out.action = static_cast<app::contracts::ResourceUsageFormActionType>(in.action);
   out.resourceName = in.resourceName;
@@ -189,6 +193,12 @@ toContract(const API::ResourceUsageFormRequest &in) {
       }
     }
   }
+}
+
+inline app::contracts::ResourceUsageFormRequest
+toContract(const API::ResourceUsageFormRequest &in) {
+  app::contracts::ResourceUsageFormRequest out;
+  toContract(in, out);
   return out;
 }
 

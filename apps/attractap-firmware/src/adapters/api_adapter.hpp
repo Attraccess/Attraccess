@@ -111,8 +111,10 @@ public:
           callback)
       override {
     this->api.setProjectsOfUserResponseCallback(
-        [callback](const API::ProjectsOfUserResponse &value) {
-          callback(app::adapters::translators::toContract(value));
+        [this, callback](const API::ProjectsOfUserResponse &value) {
+          app::adapters::translators::toContract(value,
+                                                 this->projectsOfUserScratch);
+          callback(this->projectsOfUserScratch);
         });
   }
   void setResourceFormsRequestCallback(
@@ -120,8 +122,10 @@ public:
           callback)
       override {
     this->api.setResourceFormsRequestCallback(
-        [callback](const API::ResourceUsageFormRequest &value) {
-          callback(app::adapters::translators::toContract(value));
+        [this, callback](const API::ResourceUsageFormRequest &value) {
+          app::adapters::translators::toContract(
+              value, this->resourceUsageFormRequestScratch);
+          callback(this->resourceUsageFormRequestScratch);
         });
   }
   void
@@ -136,4 +140,6 @@ public:
 private:
   API api;
   app::contracts::ResourceList resourceListScratch;
+  app::contracts::ProjectsOfUserResponse projectsOfUserScratch;
+  app::contracts::ResourceUsageFormRequest resourceUsageFormRequestScratch;
 };
