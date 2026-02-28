@@ -8,10 +8,12 @@ constexpr uint32_t APPLICATION_BOOT_SCREEN_DURATION_MS = 2000;
 }
 
 bool AppRuntime::handleDisplayBootAndPinGates() {
+  bool bootJustCompleted = false;
   if (!state_.bootDone &&
       system_.nowMs() - state_.bootTime > APPLICATION_BOOT_SCREEN_DURATION_MS) {
     logger_.debug("Boot screen duration reached, hiding boot screen");
     state_.bootDone = true;
+    bootJustCompleted = true;
   }
 
   if (!state_.bootDone) {
@@ -19,6 +21,12 @@ bool AppRuntime::handleDisplayBootAndPinGates() {
   }
 
   bool pinIsSet = settings_.getDeviceConfig().passCode != "0000";
+  if (bootJustCompleted && pinIsSet &&
+      state_.state == AppRuntimeState::APPLICATION_STATE_INIT) {
+    logger_.debug("Boot screen complete, showing init screen");
+    ui_.transitionToInitScreen();
+  }
+
   if (pinIsSet) {
     return false;
   }

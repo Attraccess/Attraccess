@@ -156,6 +156,9 @@ void AppRuntime::processState() {
   if (state_.state == AppRuntimeState::APPLICATION_STATE_NFC_INIT_FAILED) {
     return;
   }
+  if (handleDisplayBootAndPinGates()) {
+    return;
+  }
 #endif
 
   if (handleConfigurationAndConnectivityGates()) {
@@ -163,9 +166,6 @@ void AppRuntime::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
-  if (handleDisplayBootAndPinGates()) {
-    return;
-  }
   if (handleEnrollmentTransitions()) {
     return;
   }

@@ -4,6 +4,7 @@
 #include "mbedtls/sha1.h"
 #include "mbedtls/base64.h"
 #include <cstring>
+#include <time.h>
 
 static void generateWebSocketKey(char *out, size_t outLen)
 {
@@ -31,6 +32,13 @@ static String computeAcceptKey(const char *clientKey)
     mbedtls_base64_encode((unsigned char *)b64, sizeof(b64), &olen, hash, 20);
     b64[olen] = '\0';
     return String(b64);
+}
+
+static bool hasValidSystemTime()
+{
+    // Require wall clock to be reasonably recent before certificate validation.
+    // Jan 1, 2021 UTC = 1609459200
+    return time(nullptr) >= 1609459200;
 }
 
 void Websocket::setup()
@@ -140,6 +148,13 @@ void Websocket::connectWebSocket()
     useSSL = apiConfig.useSSL;
     if (useSSL)
     {
+        if (!hasValidSystemTime())
+        {
+            logger.warn("TLS connect deferred: system time not synced yet");
+            setState(INIT);
+            return;
+        }
+
         logger.info("connectWebSocket: using SSL");
         tcpClientSecure = new WiFiClientSecure();
         const char *certData = nullptr;
@@ -152,11 +167,21 @@ void Websocket::connectWebSocket()
             return;
         }
         tcpClientSecure->setCACert(certData);
+        tcpClientSecure->setHandshakeTimeout(10);
 
         if (!tcpClientSecure->connect(serverHostname.c_str(), serverPort, 10000))
         {
-            logger.error("TLS connect failed");
-            this->_certManager.markFailure();
+            char errBuf[128] = {0};
+            int tlsErr = tcpClientSecure->lastError(errBuf, sizeof(errBuf));
+            logger.errorf("TLS connect failed (err=%d: %s)", tlsErr, errBuf);
+            // Rotate certificates only when wall clock is valid, otherwise
+            // failures are likely due to missing SNTP sync.
+            bool certValidationFailed =
+                tlsErr <= 0 && strstr(errBuf, "X509") != nullptr;
+            if (hasValidSystemTime() && certValidationFailed)
+            {
+                this->_certManager.markFailure();
+            }
             delete tcpClientSecure;
             tcpClientSecure = nullptr;
             setState(INIT);
@@ -183,10 +208,6 @@ void Websocket::connectWebSocket()
 
     if (!performHandshake())
     {
-        if (useSSL)
-        {
-            this->_certManager.markFailure();
-        }
         disconnect();
         return;
     }
@@ -269,7 +290,9 @@ bool Websocket::performHandshake()
         return false;
     }
 
-    if (response.indexOf("Sec-WebSocket-Accept:") < 0)
+    String responseLower = response;
+    responseLower.toLowerCase();
+    if (responseLower.indexOf("sec-websocket-accept:") < 0)
     {
         logger.error("Missing Sec-WebSocket-Accept");
         return false;
