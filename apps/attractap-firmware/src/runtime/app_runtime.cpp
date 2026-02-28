@@ -1,5 +1,5 @@
 #include "app_runtime.hpp"
-#include "../../debug/loopTiming.hpp"
+#include "../debug/loopTiming.hpp"
 #include "telemetry/loop_metrics.hpp"
 
 #ifdef ESP_PLATFORM

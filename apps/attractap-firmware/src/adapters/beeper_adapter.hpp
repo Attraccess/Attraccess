@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ports/beeper_port.hpp"
-#include "../../beeper/beeper.hpp"
+#include "../beeper/beeper.hpp"
 
 class BeeperAdapter : public IBeeperPort {
 public:

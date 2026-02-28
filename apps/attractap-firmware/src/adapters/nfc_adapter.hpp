@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ports/nfc_port.hpp"
-#include "../../nfc/nfc.hpp"
+#include "../nfc/nfc.hpp"
 
 class NfcAdapter : public INfcPort {
 public:

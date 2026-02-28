@@ -16,7 +16,7 @@
 #include "../events/event_bus.hpp"
 #include "../runtime/app_runtime.hpp"
 #include "../runtime/runtime_workers.hpp"
-#include "../../logger/logger.hpp"
+#include "../logger/logger.hpp"
 #ifdef HAS_LVGL_DISPLAY
 #include "../adapters/ui_adapter.hpp"
 #endif

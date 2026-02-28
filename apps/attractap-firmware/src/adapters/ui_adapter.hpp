@@ -4,7 +4,7 @@
 
 #include "translators/api_contracts_translator.hpp"
 #include "../ports/ui_port.hpp"
-#include "../../display/display.hpp"
+#include "../display/display.hpp"
 #include <cstring>
 
 class UiAdapter : public IUiPort {

@@ -1,7 +1,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "app/kernel/app_kernel.hpp"
+#include "kernel/app_kernel.hpp"
 #include "logger/logger.hpp"
 #include <Arduino.h>
 #include <Wire.h>

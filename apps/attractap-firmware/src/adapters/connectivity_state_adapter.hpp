@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ports/connectivity_state_port.hpp"
-#include "../../state/state.hpp"
+#include "../state/state.hpp"
 
 class ConnectivityStateAdapter : public IConnectivityStatePort {
 public:

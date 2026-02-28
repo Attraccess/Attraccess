@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ports/settings_port.hpp"
-#include "../../settings/settings.hpp"
+#include "../settings/settings.hpp"
 
 class SettingsAdapter : public ISettingsPort {
 public:

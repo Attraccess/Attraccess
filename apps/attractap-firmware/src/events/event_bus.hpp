@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../contracts/api_contracts.hpp"
-#include "../../logger/logger.hpp"
+#include "../logger/logger.hpp"
 #ifdef ESP_PLATFORM
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
