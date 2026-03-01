@@ -30,9 +30,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY patches/ patches/
 
-# Install dependencies
-RUN corepack enable && corepack prepare && \
-    pnpm install --frozen-lockfile
+# Install dependencies (Corepack resolves pnpm from root package.json packageManager)
+RUN corepack enable && pnpm install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
@@ -58,6 +57,7 @@ RUN apk add --no-cache libstdc++ su-exec
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
+COPY --from=builder /app/package.json /tmp/root-package.json
 
 # Set environment variable to tell API about frontend location
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
@@ -71,15 +71,20 @@ ENV STORAGE_ROOT=/app/storage
 ENV PLUGIN_DIR=/app/storage/plugins
 
 # Install dependencies directly from the Nx-generated package.json
-WORKDIR /app/dist/api
+WORKDIR /app/dist/apps/api
 
-RUN corepack enable && corepack prepare && \
+# Keep pnpm patchedDependencies in sync with pruned lockfile expectations.
+RUN node -e "const fs=require('fs');const root=JSON.parse(fs.readFileSync('/tmp/root-package.json','utf8'));const appPath='/app/dist/apps/api/package.json';const app=JSON.parse(fs.readFileSync(appPath,'utf8'));if(root.pnpm&&root.pnpm.patchedDependencies){app.pnpm={...(app.pnpm||{}),patchedDependencies:root.pnpm.patchedDependencies};}fs.writeFileSync(appPath,JSON.stringify(app,null,2));" && \
+    mkdir -p /app/dist/apps/api/patches
+COPY --from=builder /app/patches /app/dist/apps/api/patches
+
+RUN corepack enable && \
+    corepack prepare "$(node -e "const p=require('/app/dist/apps/api/package.json'); process.stdout.write(p.packageManager)")" --activate && \
     pnpm install --frozen-lockfile
 
 # Back to app root for consistent starting dir
 WORKDIR /app
 
-COPY package.json package.json
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
