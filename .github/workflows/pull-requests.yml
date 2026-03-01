@@ -92,38 +92,21 @@ jobs:
           name: build-artifacts-${{ github.run_id }} # Match the upload name
           path: dist
 
-      # Login to GitHub Container Registry (retry once for transient network failures)
+      # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry (attempt 1)
         id: login-ghcr
-        continue-on-error: true
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to GitHub Container Registry (attempt 2)
-        if: steps.login-ghcr.outcome == 'failure'
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Login to Docker Hub (retry once for transient network failures)
-      - name: Login to Docker Hub (attempt 1)
+      # Login to Docker Hub
+      - name: Login to Docker Hub
         id: login-dockerhub
-        continue-on-error: true
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to Docker Hub (attempt 2)
-        if: steps.login-dockerhub.outcome == 'failure'
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }} 
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Read Node.js version from .nvmrc

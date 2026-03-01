@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libstdc++6 \
     git \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Optional: ESP tooling often used by firmware-related scripts
 # Create a virtual environment to avoid PEP 668 restrictions on Alpine
@@ -56,9 +56,7 @@ WORKDIR /app
 RUN apk add --no-cache libstdc++ su-exec
 
 # Copy the pre-built application (these will be built in the CI pipeline)
-COPY --from=builder /app/dist/apps/api dist/apps/api
-COPY --from=builder /app/dist/apps/frontend dist/apps/frontend
-COPY --from=builder /app/dist/libs/shared dist/libs/shared
+COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
 
 # Set environment variable to tell API about frontend location
@@ -72,12 +70,11 @@ RUN mkdir -p /app/storage/plugins
 ENV STORAGE_ROOT=/app/storage
 ENV PLUGIN_DIR=/app/storage/plugins
 
-# Install runtime deps from a minimal dist workspace so workspace:* dependencies resolve.
-RUN printf "packages:\n  - apps/*\n  - libs/*\n" > /app/dist/pnpm-workspace.yaml
-RUN printf "{ \"name\": \"dist-workspace\", \"private\": true }\n" > /app/dist/package.json
-WORKDIR /app/dist
+# Install dependencies directly from the Nx-generated package.json
+WORKDIR /app/dist/api
+
 RUN corepack enable && corepack prepare && \
-    pnpm install --prod --filter ./apps/api...
+    pnpm install --frozen-lockfile
 
 # Back to app root for consistent starting dir
 WORKDIR /app
