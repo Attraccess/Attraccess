@@ -165,11 +165,40 @@ export class SSOService {
     providerId: number,
     updateConfig: UpdateOIDCConfigurationDto,
   ): Promise<SSOProviderOIDCConfiguration> {
-    const payload: Partial<SSOProviderOIDCConfiguration> = { ...updateConfig };
+    const payload: Partial<SSOProviderOIDCConfiguration> = {};
+
+    if (typeof updateConfig.issuer !== 'undefined') {
+      payload.issuer = updateConfig.issuer;
+    }
+    if (typeof updateConfig.authorizationURL !== 'undefined') {
+      payload.authorizationURL = updateConfig.authorizationURL;
+    }
+    if (typeof updateConfig.tokenURL !== 'undefined') {
+      payload.tokenURL = updateConfig.tokenURL;
+    }
+    if (typeof updateConfig.userInfoURL !== 'undefined') {
+      payload.userInfoURL = updateConfig.userInfoURL;
+    }
+    if (typeof updateConfig.clientId !== 'undefined') {
+      payload.clientId = updateConfig.clientId;
+    }
     if (typeof updateConfig.clientSecret !== 'undefined') {
       const trimmed = updateConfig.clientSecret?.trim();
       payload.clientSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
     }
+    if (typeof updateConfig.scopes !== 'undefined') {
+      payload.scopes = updateConfig.scopes;
+    }
+    if (typeof updateConfig.usernameClaimPaths !== 'undefined') {
+      payload.usernameClaimPaths = updateConfig.usernameClaimPaths;
+    }
+    if (typeof updateConfig.emailClaimPaths !== 'undefined') {
+      payload.emailClaimPaths = updateConfig.emailClaimPaths;
+    }
+    if (typeof updateConfig.permissionMappings !== 'undefined') {
+      payload.permissionMappings = updateConfig.permissionMappings;
+    }
+
     await this.oidcConfigRepository.update({ ssoProviderId: providerId }, payload);
     return this.oidcConfigRepository.findOne({ where: { ssoProviderId: providerId } });
   }

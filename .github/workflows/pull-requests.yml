@@ -93,7 +93,7 @@ jobs:
           path: dist
 
       # Login to GitHub Container Registry
-      - name: Login to GitHub Container Registry (attempt 1)
+      - name: Login to GitHub Container Registry
         id: login-ghcr
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
