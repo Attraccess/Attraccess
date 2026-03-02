@@ -202,6 +202,56 @@ describe('SsoService', () => {
     });
   });
 
+  describe('updateOIDCConfiguration clientSecret handling', () => {
+    const baseOidcUpdate = {
+      issuer: 'https://test-issuer.com',
+      authorizationURL: 'https://test-issuer.com/auth',
+      tokenURL: 'https://test-issuer.com/token',
+      userInfoURL: 'https://test-issuer.com/userinfo',
+      clientId: 'test-client-id',
+    };
+
+    it('should not update clientSecret when it is an empty string (frontend placeholder)', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate, clientSecret: '' },
+      });
+
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).not.toHaveProperty('clientSecret');
+    });
+
+    it('should not update clientSecret when it is null', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate, clientSecret: null },
+      });
+
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).not.toHaveProperty('clientSecret');
+    });
+
+    it('should not update clientSecret when it is omitted', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate },
+      });
+
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).not.toHaveProperty('clientSecret');
+    });
+
+    it('should encrypt and update clientSecret when a new value is provided', async () => {
+      await service.updateProvider(1, {
+        oidcConfiguration: { ...baseOidcUpdate, clientSecret: 'new-secret' },
+      });
+
+      expect(encryptionService.encrypt).toHaveBeenCalledWith('new-secret');
+      const updateCall = (oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      expect(updateCall[1]).toHaveProperty('clientSecret', 'enc:new-secret');
+    });
+  });
+
   describe('deleteProvider', () => {
     it('should delete a provider and its OIDC configuration', async () => {
       await service.deleteProvider(1);

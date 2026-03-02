@@ -182,9 +182,12 @@ export class SSOService {
     if (typeof updateConfig.clientId !== 'undefined') {
       payload.clientId = updateConfig.clientId;
     }
-    if (typeof updateConfig.clientSecret !== 'undefined') {
-      const trimmed = updateConfig.clientSecret?.trim();
-      payload.clientSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
+    if (typeof updateConfig.clientSecret !== 'undefined' && updateConfig.clientSecret !== null) {
+      const trimmed = updateConfig.clientSecret.trim();
+      if (trimmed) {
+        payload.clientSecret = this.encryptionService.encrypt(trimmed);
+      }
+      // empty string means "unchanged" — the frontend never receives the real secret back
     }
     if (typeof updateConfig.scopes !== 'undefined') {
       payload.scopes = updateConfig.scopes;
