@@ -12,4 +12,8 @@ if [ -d "$STORAGE_ROOT" ]; then
   fi
 fi
 
-exec su-exec appuser "$@"
+if command -v su-exec >/dev/null 2>&1; then
+  exec su-exec appuser "$@"
+else
+  exec gosu appuser "$@"
+fi

@@ -38,26 +38,28 @@ COPY . .
 
 # Build the application
 RUN pnpm nx run-many -t build --projects=api,frontend
+RUN pnpm --filter ./dist/apps/api deploy --prod /app/deploy/api
+RUN cd /app/deploy/api && pnpm rebuild bcrypt sqlite3
 
 
-FROM node:${NODE_VERSION}-alpine
+FROM node:${NODE_VERSION}-${NODE_VERSION_NAME}
 
 ARG APP_UID=10001
 ARG APP_GID=10001
 
 # Create unprivileged user for runtime with fixed UID/GID
-RUN addgroup -g ${APP_GID} -S appuser && adduser -u ${APP_UID} -S -G appuser -h /app appuser
+RUN groupadd -g ${APP_GID} appuser && useradd -u ${APP_UID} -g ${APP_GID} -m -d /app -s /usr/sbin/nologin appuser
 
 # Set working directory
 WORKDIR /app
 
-# Minimal runtime libs for native Node modules and su-exec for privilege drop
-RUN apk add --no-cache libstdc++ su-exec
+# Minimal runtime libs for native Node modules and privilege drop
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 gosu && rm -rf /var/lib/apt/lists/*
 
 # Copy the pre-built application (these will be built in the CI pipeline)
 COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
-COPY --from=builder /app/package.json /tmp/root-package.json
+COPY --from=builder /app/deploy/api /app/dist/apps/api
 
 # Set environment variable to tell API about frontend location
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
@@ -69,18 +71,6 @@ ENV STATIC_DOCS_FILE_PATH=/app/docs
 RUN mkdir -p /app/storage/plugins
 ENV STORAGE_ROOT=/app/storage
 ENV PLUGIN_DIR=/app/storage/plugins
-
-# Install dependencies directly from the Nx-generated package.json
-WORKDIR /app/dist/apps/api
-
-# Keep pnpm patchedDependencies in sync with pruned lockfile expectations.
-RUN node -e "const fs=require('fs');const root=JSON.parse(fs.readFileSync('/tmp/root-package.json','utf8'));const appPath='/app/dist/apps/api/package.json';const app=JSON.parse(fs.readFileSync(appPath,'utf8'));if(root.pnpm&&root.pnpm.patchedDependencies){app.pnpm={...(app.pnpm||{}),patchedDependencies:root.pnpm.patchedDependencies};}fs.writeFileSync(appPath,JSON.stringify(app,null,2));" && \
-    mkdir -p /app/dist/apps/api/patches
-COPY --from=builder /app/patches /app/dist/apps/api/patches
-
-RUN corepack enable && \
-    corepack prepare "$(node -e "const p=require('/app/dist/apps/api/package.json'); process.stdout.write(p.packageManager)")" --activate && \
-    pnpm install --frozen-lockfile
 
 # Back to app root for consistent starting dir
 WORKDIR /app
