@@ -43,6 +43,7 @@ import {
   useAuthenticationServiceGetOneSsoProviderById,
   useAuthenticationServiceUpdateOneSsoProvider,
   useAuthenticationServiceGetAllSsoProvidersKey,
+  useAuthenticationServiceGetOneSsoProviderByIdKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -147,6 +148,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useAuthenticationServiceGetOneSsoProviderByIdKey],
       });
     },
   });
