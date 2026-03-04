@@ -430,6 +430,35 @@ describe('UsersController', () => {
         );
       });
 
+      it('saves canManageBilling when included in the request', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: true,
+            canManageSystemConfiguration: true,
+            canManageUsers: true,
+            canManageBilling: true,
+          },
+          authenticationDetails: [],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true, canManageSystemConfiguration: true, canManageUsers: true, canManageBilling: false },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        expect(usersService.updateOne).toHaveBeenCalledWith(
+          targetUser.id,
+          expect.objectContaining({
+            systemPermissions: expect.objectContaining({ canManageBilling: false }),
+          }),
+        );
+      });
+
       it('does not apply any changes when all requested permissions are SSO-managed', async () => {
         const targetUser = {
           id: 1,

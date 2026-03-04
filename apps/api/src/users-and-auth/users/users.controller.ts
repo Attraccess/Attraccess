@@ -910,6 +910,10 @@ export class UsersController {
       updates.systemPermissions.canManageUsers = body.canManageUsers;
     }
 
+    if (body.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
+      updates.systemPermissions.canManageBilling = body.canManageBilling;
+    }
+
     this.logger.debug(`Applying permission updates for user ID: ${id}: ${JSON.stringify(updates.systemPermissions)}`);
 
     // Update the user
@@ -986,6 +990,10 @@ export class UsersController {
 
         if (update.permissions.canManageUsers !== undefined && !ssoManagedPermissions.includes('canManageUsers')) {
           updates.systemPermissions.canManageUsers = update.permissions.canManageUsers;
+        }
+
+        if (update.permissions.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
+          updates.systemPermissions.canManageBilling = update.permissions.canManageBilling;
         }
 
         this.logger.debug(
