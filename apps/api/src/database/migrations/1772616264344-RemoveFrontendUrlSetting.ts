@@ -11,8 +11,9 @@ export class RemoveFrontendUrlSetting1772616264344 implements MigrationInterface
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        const backendUrl = await queryRunner.query(`SELECT "value" FROM "setting" WHERE "parent" = ? AND "key" = ?`, ['app', 'backend_url']);
-        await queryRunner.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`, ['app', 'frontend_url', backendUrl[0].value]);
+        const rows = await queryRunner.query(`SELECT "value" FROM "setting" WHERE "parent" = ? AND "key" = ?`, ['app', 'backend_url']);
+        const value = rows[0]?.value ?? '';
+        await queryRunner.query(`INSERT OR IGNORE INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`, ['app', 'frontend_url', value]);
     }
 
 }
