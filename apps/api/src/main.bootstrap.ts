@@ -101,9 +101,25 @@ export async function bootstrap() {
 
   const appSettingsService = app.get(SettingsService);
   // Fetch the configured app URL early so we can derive the `secure` flag for cookies
+  // and validate CORS origins.
   const appUrl = await appSettingsService.getUrl();
+  const allowedOrigin = appUrl ? new URL(appUrl).origin : null;
   app.enableCors({
-    origin: (requestOrigin, callback) => callback(null, requestOrigin),
+    origin: (requestOrigin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+      // If no app URL is configured yet (initial setup), allow any origin
+      if (!allowedOrigin) {
+        return callback(null, requestOrigin);
+      }
+      // Allow requests from the configured app URL origin
+      if (requestOrigin === allowedOrigin) {
+        return callback(null, requestOrigin);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
     credentials: true, // Allow cookies to be sent
