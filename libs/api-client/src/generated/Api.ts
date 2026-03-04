@@ -1100,7 +1100,7 @@ export interface AppSettingsDto {
    * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
    * @example "lax"
    */
-  cookieSameSite: 'lax' | 'strict' | 'none';
+  cookieSameSite: "lax" | "strict" | "none";
 }
 
 export interface SmtpSettingsDto {
@@ -1165,7 +1165,7 @@ export interface UpdateAppSettingsDto {
    * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
    * @example "lax"
    */
-  cookieSameSite?: 'lax' | 'strict' | 'none';
+  cookieSameSite?: "lax" | "strict" | "none";
 }
 
 export interface UpdateSmtpSettingsDto {
@@ -8001,7 +8001,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab

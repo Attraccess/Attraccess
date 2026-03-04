@@ -1432,8 +1432,8 @@ export const $AppSettingsDto = {
         },
         cookieSameSite: {
             type: 'string',
-            enum: ['lax', 'strict', 'none'],
             description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+            enum: ['lax', 'strict', 'none'],
             example: 'lax'
         }
     },
@@ -1540,8 +1540,8 @@ export const $UpdateAppSettingsDto = {
         },
         cookieSameSite: {
             type: 'string',
-            enum: ['lax', 'strict', 'none'],
             description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+            enum: ['lax', 'strict', 'none'],
             example: 'lax'
         }
     }

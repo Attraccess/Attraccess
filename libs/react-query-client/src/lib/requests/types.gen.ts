@@ -934,6 +934,15 @@ export type AppSettingsDto = {
 };
 
 /**
+ * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
+ */
+export enum cookieSameSite {
+    LAX = 'lax',
+    STRICT = 'strict',
+    NONE = 'none'
+}
+
+/**
  * Selected SMTP provider type.
  */
 export enum SmtpServiceType {
