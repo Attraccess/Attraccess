@@ -3,13 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { SessionConfigType } from '../../config/session.config';
 import { SettingsService } from '../../settings/settings.service';
-import { deriveCookieSecurity } from './cookie-security';
 
 export type CookieConfigType = {
   name: string;
   httpOnly: boolean;
   secure: boolean;
-  sameSite: 'lax' | 'strict' | 'none';
+  sameSite: 'strict';
   maxAge: number;
   path: string;
 };
@@ -17,7 +16,7 @@ export type CookieConfigType = {
 @Injectable()
 export class CookieConfigService {
   private readonly cookieName: string = 'auth-session';
-  private readonly cookieStaticOptions: Omit<CookieConfigType, 'secure' | 'sameSite'>;
+  private readonly cookieStaticOptions: Omit<CookieConfigType, 'secure'>;
 
   constructor(
     private readonly configService: ConfigService,
@@ -28,6 +27,7 @@ export class CookieConfigService {
     this.cookieStaticOptions = {
       name: this.cookieName,
       httpOnly: true,
+      sameSite: 'strict',
       maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
       path: '/',
     };
@@ -41,24 +41,22 @@ export class CookieConfigService {
     return this.cookieName;
   }
 
-  private async getCookieOptions(): Promise<Pick<CookieConfigType, 'secure' | 'sameSite'>> {
-    const [url, sameSite] = await Promise.all([
-      this.settingsService.getUrl(),
-      this.settingsService.getCookieSameSite(),
-    ]);
-    return deriveCookieSecurity(url, sameSite);
+  private async isSecure(): Promise<boolean> {
+    const url = await this.settingsService.getUrl();
+    return url?.startsWith('https://') ?? false;
   }
 
   /**
    * Sets authentication cookie on the response.
-   * secure and sameSite are derived from the configured URL and SameSite policy setting.
+   * The cookie is always SameSite=Strict (safe for SPA same-origin architecture).
+   * The `secure` flag is derived from the configured application URL.
    */
   async setAuthCookie(res: Response, token: string): Promise<void> {
-    const { secure, sameSite } = await this.getCookieOptions();
+    const secure = await this.isSecure();
     res.cookie(this.cookieStaticOptions.name, token, {
       httpOnly: this.cookieStaticOptions.httpOnly,
       secure,
-      sameSite,
+      sameSite: this.cookieStaticOptions.sameSite,
       maxAge: this.cookieStaticOptions.maxAge,
       path: this.cookieStaticOptions.path,
     });
@@ -68,11 +66,11 @@ export class CookieConfigService {
    * Clears authentication cookie from the response.
    */
   async clearAuthCookie(res: Response): Promise<void> {
-    const { secure, sameSite } = await this.getCookieOptions();
+    const secure = await this.isSecure();
     res.clearCookie(this.cookieStaticOptions.name, {
       httpOnly: this.cookieStaticOptions.httpOnly,
       secure,
-      sameSite,
+      sameSite: this.cookieStaticOptions.sameSite,
       path: this.cookieStaticOptions.path,
     });
   }

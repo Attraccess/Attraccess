@@ -100,3 +100,4 @@ export * from './1770236486649-seed-settings-from-env';
 export * from './1770485229439-maintenance-schedules';
 export * from './1772616264344-RemoveFrontendUrlSetting';
 export * from './1772617000000-add-cookie-same-site-setting';
+export * from './1772618000000-remove-cookie-same-site-setting';

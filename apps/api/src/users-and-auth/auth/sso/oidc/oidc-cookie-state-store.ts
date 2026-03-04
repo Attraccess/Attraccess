@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { SettingsService } from '../../../../settings/settings.service';
-import { deriveCookieSecurity } from '../../../../common/services/cookie-security';
 import { AppConfigType } from '../../../../config/app.config';
 
 export const OIDC_STATE_COOKIE_NAME = 'oidc-state';
@@ -28,10 +27,9 @@ interface OidcStateCookiePayload {
  * A cookie-based StateStore for passport-openidconnect.
  *
  * Replaces the default express-session store for OIDC state (state + nonce).
- * The cookie is **always** set with `SameSite=Lax` regardless of the global
- * `cookieSameSite` setting, because it must be present when the IdP redirects
- * the browser back to the app — a cross-site top-level GET navigation that
- * `SameSite=Strict` would silently block.
+ * The cookie is set with `SameSite=Lax` because it must be present when the
+ * IdP redirects the browser back to the app — a cross-site top-level GET
+ * navigation that `SameSite=Strict` would silently block.
  *
  * The cookie value is HMAC-SHA256 signed with `AUTH_SESSION_SECRET` to prevent
  * client-side forgery. It is single-use: cleared immediately on `verify()`.
@@ -88,8 +86,7 @@ export class OidcCookieStateStore {
     this.settingsService
       .getUrl()
       .then((url) => {
-        // Derive `secure` from the app URL but always force sameSite=lax
-        const { secure } = deriveCookieSecurity(url, 'lax');
+        const secure = url?.startsWith('https://') ?? false;
         const res = (req as Request & { res: Response }).res;
 
         res.cookie(OIDC_STATE_COOKIE_NAME, this.signPayload(payload), {

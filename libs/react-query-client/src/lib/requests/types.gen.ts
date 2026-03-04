@@ -257,6 +257,10 @@ export type UpdateUserPermissionsDto = {
      * Whether the user can manage users
      */
     canManageUsers?: boolean;
+    /**
+     * Whether the user can manage billing
+     */
+    canManageBilling?: boolean;
 };
 
 export type UserPermissionsUpdateItem = {
@@ -927,20 +931,7 @@ export type AppSettingsDto = {
      * Whether a license key has been configured.
      */
     licenseKeyConfigured: boolean;
-    /**
-     * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
-     */
-    cookieSameSite: 'lax' | 'strict' | 'none';
 };
-
-/**
- * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
- */
-export enum cookieSameSite {
-    LAX = 'lax',
-    STRICT = 'strict',
-    NONE = 'none'
-}
 
 /**
  * Selected SMTP provider type.
@@ -1005,10 +996,6 @@ export type UpdateAppSettingsDto = {
      * License key to use for license validation.
      */
     licenseKey?: string;
-    /**
-     * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
-     */
-    cookieSameSite?: 'lax' | 'strict' | 'none';
 };
 
 export type UpdateSmtpSettingsDto = {

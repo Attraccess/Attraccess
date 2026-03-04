@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CookieSameSitePolicy } from '../constants';
 
 export class AppSettingsDto {
   @ApiProperty({
@@ -21,12 +20,4 @@ export class AppSettingsDto {
     example: true,
   })
   licenseKeyConfigured!: boolean;
-
-  @ApiProperty({
-    description:
-      'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
-    enum: ['lax', 'strict', 'none'],
-    example: 'lax',
-  })
-  cookieSameSite!: CookieSameSitePolicy;
 }

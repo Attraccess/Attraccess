@@ -426,6 +426,11 @@ export const $UpdateUserPermissionsDto = {
             type: 'boolean',
             description: 'Whether the user can manage users',
             example: false
+        },
+        canManageBilling: {
+            type: 'boolean',
+            description: 'Whether the user can manage billing',
+            example: false
         }
     }
 } as const;
@@ -1429,15 +1434,9 @@ export const $AppSettingsDto = {
             type: 'boolean',
             description: 'Whether a license key has been configured.',
             example: true
-        },
-        cookieSameSite: {
-            type: 'string',
-            description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
-            enum: ['lax', 'strict', 'none'],
-            example: 'lax'
         }
     },
-    required: ['url', 'publicInternetUrl', 'licenseKeyConfigured', 'cookieSameSite']
+    required: ['url', 'publicInternetUrl', 'licenseKeyConfigured']
 } as const;
 
 export const $SmtpServiceType = {
@@ -1537,12 +1536,6 @@ export const $UpdateAppSettingsDto = {
             type: 'string',
             description: 'License key to use for license validation.',
             example: 'LICENSE_KEY'
-        },
-        cookieSameSite: {
-            type: 'string',
-            description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
-            enum: ['lax', 'strict', 'none'],
-            example: 'lax'
         }
     }
 } as const;

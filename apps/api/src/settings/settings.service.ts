@@ -9,7 +9,7 @@ import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
-import { APP_KEYS, APP_PARENT, COOKIE_SAME_SITE_VALUES, CookieSameSitePolicy, DEFAULT_COOKIE_SAME_SITE } from './constants';
+import { APP_KEYS, APP_PARENT } from './constants';
 import { SettingsStoreService } from './settings-store.service';
 import {
   FirstTimeSetupStatusDto,
@@ -70,20 +70,16 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    const [url, publicInternetUrl, licenseKey, cookieSameSite] = await Promise.all([
+    const [url, publicInternetUrl, licenseKey] = await Promise.all([
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
       this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
-      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.cookieSameSite),
     ]);
 
     return {
       url,
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
-      cookieSameSite: (COOKIE_SAME_SITE_VALUES.includes(cookieSameSite as CookieSameSitePolicy)
-        ? cookieSameSite
-        : DEFAULT_COOKIE_SAME_SITE) as CookieSameSitePolicy,
     };
   }
 
@@ -96,9 +92,6 @@ export class SettingsService {
     }
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
-    }
-    if (Object.prototype.hasOwnProperty.call(update, 'cookieSameSite')) {
-      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.cookieSameSite, update.cookieSameSite ?? null);
     }
   }
 
@@ -116,13 +109,6 @@ export class SettingsService {
 
   async getPublicInternetUrl(): Promise<string | null> {
     return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl);
-  }
-
-  async getCookieSameSite(): Promise<CookieSameSitePolicy> {
-    const raw = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.cookieSameSite);
-    return (COOKIE_SAME_SITE_VALUES.includes(raw as CookieSameSitePolicy)
-      ? raw
-      : DEFAULT_COOKIE_SAME_SITE) as CookieSameSitePolicy;
   }
 
   async getLicenseKey(): Promise<string | null> {

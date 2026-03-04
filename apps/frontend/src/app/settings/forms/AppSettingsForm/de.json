@@ -8,24 +8,6 @@
       "label": "Öffentliche Internet-URL",
       "description": "Optionale URL für externe Callbacks (z. B. SumUp)."
     },
-    "cookieSameSite": {
-      "label": "Auth-Session-Cookie SameSite-Richtlinie",
-      "description": "Steuert, wann das Auth-Session-Cookie bei Cross-Site-Anfragen gesendet wird. Das SSO-State-Cookie (verwendet beim OIDC-/SAML-Login) ist unabhängig von dieser Einstellung immer 'Lax'.",
-      "options": {
-        "lax": {
-          "label": "Lax (empfohlen)",
-          "description": "Session wird bei Top-Level-Navigation gesendet. Links in E-Mail-Benachrichtigungen und externe Links behalten den Login des Benutzers."
-        },
-        "strict": {
-          "label": "Strict",
-          "description": "Session wird bei keiner Cross-Site-Navigation gesendet. Der SSO-Login selbst funktioniert weiterhin, aber Benutzer erscheinen abgemeldet, wenn sie Links aus E-Mails oder externen Seiten folgen."
-        },
-        "none": {
-          "label": "None",
-          "description": "Session wird bei allen Cross-Site-Anfragen gesendet. Erfordert HTTPS (Secure-Flag)."
-        }
-      }
-    },
     "licenseKey": {
       "label": "Lizenzschlüssel",
       "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein."

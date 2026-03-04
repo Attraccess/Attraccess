@@ -444,6 +444,11 @@ export interface UpdateUserPermissionsDto {
    * @example false
    */
   canManageUsers?: boolean;
+  /**
+   * Whether the user can manage billing
+   * @example false
+   */
+  canManageBilling?: boolean;
 }
 
 export interface UserPermissionsUpdateItem {
@@ -1096,11 +1101,6 @@ export interface AppSettingsDto {
    * @example true
    */
   licenseKeyConfigured: boolean;
-  /**
-   * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
-   * @example "lax"
-   */
-  cookieSameSite: "lax" | "strict" | "none";
 }
 
 export interface SmtpSettingsDto {
@@ -1161,11 +1161,6 @@ export interface UpdateAppSettingsDto {
    * @example "LICENSE_KEY"
    */
   licenseKey?: string;
-  /**
-   * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
-   * @example "lax"
-   */
-  cookieSameSite?: "lax" | "strict" | "none";
 }
 
 export interface UpdateSmtpSettingsDto {
@@ -8001,7 +7996,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
