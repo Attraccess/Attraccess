@@ -4,7 +4,7 @@ import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from '../auth/sso/sso.service';
-import { User, AuthenticationType, Setting, SSOProviderType } from '@attraccess/database-entities';
+import { User, AuthenticationType, Setting, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -457,6 +457,48 @@ describe('UsersController', () => {
             systemPermissions: expect.objectContaining({ canManageBilling: false }),
           }),
         );
+      });
+
+      /**
+       * Regression guard: every key on SystemPermissions must round-trip through
+       * updatePermissions.  If a new permission is added to the entity but
+       * forgotten in UpdateUserPermissionsDto or the controller handler, this
+       * test will fail because the saved value will still reflect the original
+       * (all-true) state instead of the requested (all-false) state.
+       */
+      it('persists every SystemPermissions field — regression guard for missing DTO/handler entries', async () => {
+        const allTrue: SystemPermissions = {
+          canManageResources: true,
+          canManageSystemConfiguration: true,
+          canManageUsers: true,
+          canManageBilling: true,
+        };
+
+        const targetUser = {
+          id: 1,
+          systemPermissions: { ...allTrue },
+          authenticationDetails: [],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+
+        // Build a request that turns every permission off
+        const allFalse = Object.fromEntries(
+          (Object.keys(allTrue) as Array<keyof SystemPermissions>).map((k) => [k, false]),
+        ) as Record<keyof SystemPermissions, boolean>;
+
+        await controller.updatePermissions(
+          targetUser.id,
+          allFalse,
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        const saved = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
+
+        for (const key of Object.keys(allTrue) as Array<keyof SystemPermissions>) {
+          expect(saved[key]).toBe(false); // if this fails, the field is missing from the DTO or controller
+        }
       });
 
       it('does not apply any changes when all requested permissions are SSO-managed', async () => {
