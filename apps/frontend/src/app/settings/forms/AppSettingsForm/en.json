@@ -9,20 +9,20 @@
       "description": "Optional URL used for external callbacks (e.g. SumUp)."
     },
     "cookieSameSite": {
-      "label": "Cookie SameSite Policy",
-      "description": "Controls when session cookies are sent with cross-site requests. 'Lax' is recommended for most setups.",
+      "label": "Auth Session Cookie SameSite Policy",
+      "description": "Controls when the auth session cookie is sent with cross-site requests. The SSO state cookie (used during OIDC / SAML login) is always 'Lax' regardless of this setting.",
       "options": {
         "lax": {
           "label": "Lax (recommended)",
-          "description": "Cookies sent on top-level navigation. Works with SSO (OIDC / SAML)."
+          "description": "Session sent on top-level navigation. Email notification links and external links keep the user logged in."
         },
         "strict": {
           "label": "Strict",
-          "description": "Maximum isolation. Breaks SSO logins — IdP redirects will not carry the session cookie."
+          "description": "Session not sent on any cross-site navigation. SSO login itself still works, but users will appear logged out when following links from emails or external sites."
         },
         "none": {
           "label": "None",
-          "description": "Cookies sent on all cross-site requests. Requires HTTPS (Secure flag)."
+          "description": "Session sent on all cross-site requests. Requires HTTPS (Secure flag)."
         }
       }
     },

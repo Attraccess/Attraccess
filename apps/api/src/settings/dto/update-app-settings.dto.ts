@@ -35,7 +35,7 @@ export class UpdateAppSettingsDto {
   @IsEnum(COOKIE_SAME_SITE_VALUES)
   @ApiPropertyOptional({
     description:
-      'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+      'SameSite policy for the auth session cookie. The SSO state cookie (oidc-state) is always "lax" regardless of this setting. "strict" does not break SSO login callbacks, but users following links from emails or external sites will appear logged out.',
     enum: ['lax', 'strict', 'none'],
     example: 'lax',
   })
