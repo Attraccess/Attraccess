@@ -80,7 +80,7 @@ export class AuthController {
     @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
   ): Promise<CreateSessionResponse> {
     // Get current session token from cookie or header
-    const cookieToken = request.cookies?.[this.cookieConfigService.getConfig().name];
+    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
     const headerToken = request.headers.authorization?.startsWith('Bearer ')
       ? request.headers.authorization.substring(7)
       : null;
@@ -159,7 +159,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response
   ): Promise<void> {
     // Get session token from cookie or header
-    const cookieToken = request.cookies?.[this.cookieConfigService.getConfig().name];
+    const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
     const headerToken = request.headers.authorization?.startsWith('Bearer ')
       ? request.headers.authorization.substring(7)
       : null;

@@ -1,19 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { CookieSameSitePolicy } from '../constants';
 
 export class AppSettingsDto {
   @ApiProperty({
-    description: 'The frontend URL used for redirects and links.',
-    example: 'https://frontend.example',
+    description: 'The application URL used for redirects, links, and API callbacks.',
+    example: 'https://attraccess.example.com',
     nullable: true,
   })
-  frontendUrl!: string | null;
-
-  @ApiProperty({
-    description: 'The backend/base URL used for callbacks and API links.',
-    example: 'https://api.example',
-    nullable: true,
-  })
-  backendUrl!: string | null;
+  url!: string | null;
 
   @ApiProperty({
     description: 'Optional public URL used for external callbacks (e.g., SumUp).',
@@ -27,4 +21,12 @@ export class AppSettingsDto {
     example: true,
   })
   licenseKeyConfigured!: boolean;
+
+  @ApiProperty({
+    description:
+      'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+    enum: ['lax', 'strict', 'none'],
+    example: 'lax',
+  })
+  cookieSameSite!: CookieSameSitePolicy;
 }

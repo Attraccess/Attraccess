@@ -2,11 +2,16 @@ export const APP_PARENT = 'app';
 export const SMTP_PARENT = 'smtp';
 
 export const APP_KEYS = {
-  frontendUrl: 'frontend_url',
-  backendUrl: 'backend_url',
+  url: 'backend_url',
   publicInternetUrl: 'public_internet_url',
   licenseKey: 'license_key',
+  cookieSameSite: 'cookie_same_site',
 } as const;
+
+/** Valid values for the SameSite cookie attribute. */
+export type CookieSameSitePolicy = 'lax' | 'strict' | 'none';
+export const COOKIE_SAME_SITE_VALUES: CookieSameSitePolicy[] = ['lax', 'strict', 'none'];
+export const DEFAULT_COOKIE_SAME_SITE: CookieSameSitePolicy = 'lax';
 
 export const SMTP_KEYS = {
   service: 'service',

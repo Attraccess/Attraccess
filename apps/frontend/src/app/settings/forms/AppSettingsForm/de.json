@@ -1,16 +1,30 @@
 {
   "inputs": {
-    "frontendUrl": {
-      "label": "Frontend-URL",
-      "description": "URL, unter der Benutzer das Frontend erreichen."
-    },
-    "backendUrl": {
-      "label": "Backend-URL",
-      "description": "URL für API-Callbacks und interne Links."
+    "url": {
+      "label": "Anwendungs-URL",
+      "description": "URL, unter der Benutzer Attraccess erreichen (für Weiterleitungen, Links und API-Callbacks)."
     },
     "publicInternetUrl": {
       "label": "Öffentliche Internet-URL",
       "description": "Optionale URL für externe Callbacks (z. B. SumUp)."
+    },
+    "cookieSameSite": {
+      "label": "Cookie SameSite-Richtlinie",
+      "description": "Steuert, wann Session-Cookies bei Cross-Site-Anfragen gesendet werden. 'Lax' wird für die meisten Setups empfohlen.",
+      "options": {
+        "lax": {
+          "label": "Lax (empfohlen)",
+          "description": "Cookies werden bei Top-Level-Navigation gesendet. Funktioniert mit SSO (OIDC / SAML)."
+        },
+        "strict": {
+          "label": "Strict",
+          "description": "Maximale Isolation. Unterbricht SSO-Logins – IdP-Weiterleitungen übertragen das Session-Cookie nicht."
+        },
+        "none": {
+          "label": "None",
+          "description": "Cookies werden bei allen Cross-Site-Anfragen gesendet. Erfordert HTTPS (Secure-Flag)."
+        }
+      }
     },
     "licenseKey": {
       "label": "Lizenzschlüssel",

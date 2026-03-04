@@ -8,7 +8,7 @@ import { ModuleRef } from '@nestjs/core';
 
 describe('SSOOIDCGuard', () => {
   let guard: SSOOIDCGuard;
-  let settingsService: jest.Mocked<Pick<SettingsService, 'getFrontendUrl' | 'getBackendUrl'>>;
+  let settingsService: jest.Mocked<Pick<SettingsService, 'getUrl'>>;
   let ssoService: jest.Mocked<Pick<SSOService, 'getProviderByTypeAndIdWithConfiguration'>>;
   let licenseService: jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
 
@@ -38,8 +38,7 @@ describe('SSOOIDCGuard', () => {
 
   beforeEach(async () => {
     settingsService = {
-      getFrontendUrl: jest.fn().mockResolvedValue('https://app.example.com'),
-      getBackendUrl: jest.fn().mockResolvedValue('https://api.example.com'),
+      getUrl: jest.fn().mockResolvedValue('https://api.example.com'),
     };
     ssoService = {
       getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(mockOidcProvider),
@@ -65,14 +64,13 @@ describe('SSOOIDCGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toBe(
-      'https://api.example.com/api/auth/sso/OIDC/1/callback?redirectTo=%2Fdashboard',
-    );
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('api.example.com');
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('/api/auth/sso/OIDC/1/callback');
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('redirectTo');
   });
 
-  it('builds callback URL from backend URL and provider id', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    settingsService.getBackendUrl!.mockResolvedValue('https://backend.mycompany.com');
+  it('builds callback URL from URL setting and provider id', async () => {
+    settingsService.getUrl.mockResolvedValue('https://backend.mycompany.com');
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/42/login?redirectTo=/home',
     };

@@ -34,6 +34,7 @@ import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
 import { SSOOIDCGuard } from './auth/sso/oidc/oidc.guard';
+import { OidcCookieStateStore } from './auth/sso/oidc/oidc-cookie-state-store';
 import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
@@ -70,6 +71,7 @@ import { SettingsService } from '../settings/settings.service';
     SessionStrategy,
     SSOService,
     CookieConfigService,
+    OidcCookieStateStore,
     SSOOIDCGuard,
     SSOSamlGuard,
     SSOSamlStrategy,
@@ -77,7 +79,7 @@ import { SettingsService } from '../settings/settings.service';
     AccountLinkingExceptionFilter,
     {
       provide: SSOOIDCStrategy,
-      useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService) => {
+      useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService, stateStore: OidcCookieStateStore) => {
         // Placeholder config; actual OIDC providers are resolved at request time
         const config = new SSOProviderOIDCConfiguration();
         config.issuer = 'placeholder';
@@ -87,15 +89,15 @@ import { SettingsService } from '../settings/settings.service';
         config.clientId = 'placeholder';
         config.clientSecret = 'placeholder';
 
-        const frontendUrl = await settingsService.getFrontendUrl();
+        const appUrl = await settingsService.getUrl();
         // Use fallback during first-time setup when no settings exist; real callback is only needed when OIDC is used
-        const callbackURL = frontendUrl
-          ? frontendUrl.replace(/\/$/, '') + '/api/sso/OIDC/callback'
-          : 'http://localhost:4200/api/sso/OIDC/callback';
+        const callbackURL = appUrl
+          ? appUrl.replace(/\/$/, '') + '/api/sso/OIDC/callback'
+          : 'http://localhost:3000/api/sso/OIDC/callback';
 
-        return new SSOOIDCStrategy(moduleRef, config, callbackURL);
+        return new SSOOIDCStrategy(moduleRef, config, callbackURL, stateStore);
       },
-      inject: [ModuleRef, SettingsService],
+      inject: [ModuleRef, SettingsService, OidcCookieStateStore],
     },
   ],
   controllers: [UsersController, AuthController, TwoFactorController, SSOController],

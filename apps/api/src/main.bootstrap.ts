@@ -54,7 +54,7 @@ export async function bootstrap() {
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
   const settingsService = appForConfig.get(SettingsService);
-  const backendUrlFromDb = await settingsService.getBackendUrl();
+  const backendUrlFromDb = await settingsService.getUrl();
   await appForConfig.close();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
@@ -100,19 +100,10 @@ export async function bootstrap() {
   app.use(cookieParser());
 
   const appSettingsService = app.get(SettingsService);
+  // Fetch the configured app URL early so we can derive the `secure` flag for cookies
+  const appUrl = await appSettingsService.getUrl();
   app.enableCors({
-    origin: (origin, callback) => {
-      appSettingsService
-        .getFrontendUrl()
-        .then((frontendUrl) => {
-          if (!frontendUrl || !origin || origin === frontendUrl) {
-            callback(null, true);
-            return;
-          }
-          callback(new Error('Not allowed by CORS'));
-        })
-        .catch((error) => callback(error));
-    },
+    origin: (requestOrigin, callback) => callback(null, requestOrigin),
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
     credentials: true, // Allow cookies to be sent
@@ -166,14 +157,19 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  // We dont use this for actual sessions/authentication
-  // we need this for SSO logins since for those we need to persist some state between requests
-  // TODO: if possible, refactor to use cookies or other less "hacky" methods
+  // Session middleware is used for SAML SSO state persistence only (not for regular auth).
+  // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
+  // Cookie is explicitly SameSite=Lax so it survives IdP redirects (cross-site top-level navigations).
   app.use(
     session({
       secret: appConfig.AUTH_SESSION_SECRET,
       resave: false,
       saveUninitialized: false,
+      cookie: {
+        sameSite: 'lax', // must be lax — strict would block SAML IdP redirect callbacks
+        secure: appUrl?.startsWith('https://') ?? false,
+        httpOnly: true,
+      },
     })
   );
 

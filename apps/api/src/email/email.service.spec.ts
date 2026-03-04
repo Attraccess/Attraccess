@@ -43,8 +43,7 @@ describe('EmailService', () => {
     (createTransport as jest.Mock).mockReturnValue({ sendMail, close });
 
     const settingsService = {
-      getFrontendUrl: jest.fn().mockResolvedValue('https://frontend.example'),
-      getBackendUrl: jest.fn().mockResolvedValue('https://backend.example'),
+      getUrl: jest.fn().mockResolvedValue('https://frontend.example'),
       getSmtpConfiguration: jest.fn().mockResolvedValue({
         service: SmtpServiceType.SMTP,
         host: 'smtp.example.com',
@@ -119,8 +118,8 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('Hello alice');
     expect(callArg.html).toContain('old_alice');
     expect(callArg.html).toContain('alice'); // newUsername also equals current username
+    // host.frontend and host.backend both resolve to the single app URL
     expect(callArg.html).toContain('https://frontend.example');
-    expect(callArg.html).toContain('https://backend.example');
   });
 
   it('sends verification email with correct URL', async () => {

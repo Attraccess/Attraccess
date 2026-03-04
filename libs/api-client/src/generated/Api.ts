@@ -1082,15 +1082,10 @@ export interface UpdateEmailTemplateDto {
 
 export interface AppSettingsDto {
   /**
-   * The frontend URL used for redirects and links.
-   * @example "https://frontend.example"
+   * The application URL used for redirects, links, and API callbacks.
+   * @example "https://attraccess.example.com"
    */
-  frontendUrl: string | null;
-  /**
-   * The backend/base URL used for callbacks and API links.
-   * @example "https://api.example"
-   */
-  backendUrl: string | null;
+  url: string | null;
   /**
    * Optional public URL used for external callbacks (e.g., SumUp).
    * @example "https://public.example"
@@ -1101,6 +1096,11 @@ export interface AppSettingsDto {
    * @example true
    */
   licenseKeyConfigured: boolean;
+  /**
+   * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
+   * @example "lax"
+   */
+  cookieSameSite: 'lax' | 'strict' | 'none';
 }
 
 export interface SmtpSettingsDto {
@@ -1147,15 +1147,10 @@ export interface SystemSettingsDto {
 
 export interface UpdateAppSettingsDto {
   /**
-   * Frontend URL used for redirects and links.
-   * @example "https://frontend.example"
+   * Application URL used for redirects, links, and API callbacks.
+   * @example "https://attraccess.example.com"
    */
-  frontendUrl?: string;
-  /**
-   * Backend/base URL used for callbacks and API links.
-   * @example "https://api.example"
-   */
-  backendUrl?: string;
+  url?: string;
   /**
    * Public URL used for external callbacks.
    * @example "https://public.example"
@@ -1166,6 +1161,11 @@ export interface UpdateAppSettingsDto {
    * @example "LICENSE_KEY"
    */
   licenseKey?: string;
+  /**
+   * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
+   * @example "lax"
+   */
+  cookieSameSite?: 'lax' | 'strict' | 'none';
 }
 
 export interface UpdateSmtpSettingsDto {

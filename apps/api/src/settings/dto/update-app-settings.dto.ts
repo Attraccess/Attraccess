@@ -1,25 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { COOKIE_SAME_SITE_VALUES, CookieSameSitePolicy } from '../constants';
 
-/** Allow URLs without TLD (e.g. http://localhost:4200) for development. */
+/** Allow URLs without TLD (e.g. http://localhost:3000) for development. */
 const urlOptions = { require_tld: false };
 
 export class UpdateAppSettingsDto {
   @IsOptional()
   @IsUrl(urlOptions)
   @ApiPropertyOptional({
-    description: 'Frontend URL used for redirects and links.',
-    example: 'https://frontend.example',
+    description: 'Application URL used for redirects, links, and API callbacks.',
+    example: 'https://attraccess.example.com',
   })
-  frontendUrl?: string | null;
-
-  @IsOptional()
-  @IsUrl(urlOptions)
-  @ApiPropertyOptional({
-    description: 'Backend/base URL used for callbacks and API links.',
-    example: 'https://api.example',
-  })
-  backendUrl?: string | null;
+  url?: string | null;
 
   @IsOptional()
   @IsUrl(urlOptions)
@@ -37,4 +30,14 @@ export class UpdateAppSettingsDto {
     example: 'LICENSE_KEY',
   })
   licenseKey?: string;
+
+  @IsOptional()
+  @IsEnum(COOKIE_SAME_SITE_VALUES)
+  @ApiPropertyOptional({
+    description:
+      'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+    enum: ['lax', 'strict', 'none'],
+    example: 'lax',
+  })
+  cookieSameSite?: CookieSameSitePolicy;
 }

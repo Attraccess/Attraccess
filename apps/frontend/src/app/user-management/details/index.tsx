@@ -37,7 +37,7 @@ import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.e
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
 import { useMemo } from 'react';
-import { hasConfiguredPermissionMapping } from '@attraccess/shared';
+import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
 
 export function UserManagementDetailsPage() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -113,6 +113,32 @@ export function UserManagementDetailsPage() {
     return Array.from(labels);
   }, [providersById, ssoDetails]);
 
+  const ssoManagedPermissionKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    ssoDetails.forEach((detail) => {
+      if (!detail.providerId || !detail.providerType) {
+        return;
+      }
+
+      const provider = providersById.get(detail.providerId);
+      if (!provider) {
+        return;
+      }
+
+      const permissionMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.permissionMappings
+          : detail.providerType === SSOProviderType.SAML
+            ? provider.samlConfiguration?.permissionMappings
+            : undefined;
+
+      getSsoManagedPermissionKeys(permissionMappings).forEach((key) => keys.add(key));
+    });
+
+    return keys;
+  }, [providersById, ssoDetails]);
+
   const isSelf = !!me && !!user && me.id === user.id;
   const { mutate: deleteUser, isPending: isDeleting } = useUsersServiceDeleteUser({
     onSuccess: () => {
@@ -144,7 +170,7 @@ export function UserManagementDetailsPage() {
         {user && (
           <>
             <div className="w-full">
-              <UserPermissionForm user={user} ssoManagedProviders={ssoManagedProviders} />
+              <UserPermissionForm user={user} ssoManagedProviders={ssoManagedProviders} ssoManagedPermissionKeys={ssoManagedPermissionKeys} />
             </div>
             <Card className="w-full">
               <CardHeader>

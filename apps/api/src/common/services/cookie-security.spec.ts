@@ -1,107 +1,173 @@
-import { getHost, getBaseDomain, isSameSite, deriveCookieSecurity } from './cookie-security';
+import { Logger } from '@nestjs/common';
+import { deriveCookieSecurity } from './cookie-security';
 
-describe('cookie-security', () => {
-  describe('getHost', () => {
-    it('returns hostname from valid URL', () => {
-      expect(getHost('https://api.example.com/path')).toBe('api.example.com');
-      expect(getHost('http://localhost:3000')).toBe('localhost');
-      expect(getHost('https://sub.app.example.com')).toBe('sub.app.example.com');
+// Silence the logger during tests so warn() calls don't pollute output
+jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+describe('deriveCookieSecurity', () => {
+  // ─── secure flag (derived from URL scheme) ────────────────────────────────
+
+  describe('secure flag', () => {
+    it('is true when URL uses https', () => {
+      expect(deriveCookieSecurity('https://app.example.com', 'lax').secure).toBe(true);
+      expect(deriveCookieSecurity('https://app.example.com', 'strict').secure).toBe(true);
+      expect(deriveCookieSecurity('https://app.example.com', 'none').secure).toBe(true);
     });
 
-    it('returns lowercase hostname', () => {
-      expect(getHost('https://API.Example.COM')).toBe('api.example.com');
+    it('is false when URL uses http', () => {
+      expect(deriveCookieSecurity('http://localhost:3000', 'lax').secure).toBe(false);
+      expect(deriveCookieSecurity('http://localhost:3000', 'strict').secure).toBe(false);
     });
 
-    it('returns null for empty or invalid input', () => {
-      expect(getHost(null)).toBeNull();
-      expect(getHost('')).toBeNull();
-      expect(getHost('   ')).toBeNull();
-      expect(getHost('not-a-url')).toBeNull();
+    it('is false when URL is null', () => {
+      expect(deriveCookieSecurity(null, 'lax').secure).toBe(false);
     });
 
-    it('trims whitespace', () => {
-      expect(getHost('  https://host.com  ')).toBe('host.com');
-    });
-  });
-
-  describe('getBaseDomain', () => {
-    it('returns last two segments for multi-part hosts', () => {
-      expect(getBaseDomain('api.example.com')).toBe('example.com');
-      expect(getBaseDomain('app.example.com')).toBe('example.com');
-      expect(getBaseDomain('a.b.example.com')).toBe('example.com');
-    });
-
-    it('returns host as-is when two or fewer segments', () => {
-      expect(getBaseDomain('localhost')).toBe('localhost');
-      expect(getBaseDomain('example.com')).toBe('example.com');
+    it('is false when URL is an empty string', () => {
+      expect(deriveCookieSecurity('', 'lax').secure).toBe(false);
     });
   });
 
-  describe('isSameSite', () => {
-    it('returns true when both hosts are equal', () => {
-      expect(isSameSite('https://api.example.com', 'https://api.example.com')).toBe(true);
+  // ─── SameSite=Lax (default) ───────────────────────────────────────────────
+
+  describe("sameSite 'lax'", () => {
+    it('returns lax over https', () => {
+      const result = deriveCookieSecurity('https://app.example.com', 'lax');
+      expect(result).toEqual({ secure: true, sameSite: 'lax' });
     });
 
-    it('returns true when one host is subdomain of the other', () => {
-      expect(isSameSite('https://api.example.com', 'https://example.com')).toBe(true);
-      expect(isSameSite('https://example.com', 'https://api.example.com')).toBe(true);
-      expect(isSameSite('https://a.b.example.com', 'https://example.com')).toBe(true);
+    it('returns lax over http', () => {
+      const result = deriveCookieSecurity('http://localhost:3000', 'lax');
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
     });
 
-    it('returns true for sibling subdomains (same base domain)', () => {
-      expect(isSameSite('https://app.example.com', 'https://api.example.com')).toBe(true);
-      expect(isSameSite('https://front.vercel.app', 'https://api.vercel.app')).toBe(true);
+    it('returns lax when URL is null', () => {
+      const result = deriveCookieSecurity(null, 'lax');
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
     });
 
-    it('returns false for different registrable domains', () => {
-      expect(isSameSite('https://app.example.com', 'https://api.other.com')).toBe(false);
-      expect(isSameSite('https://frontend.vercel.app', 'https://api.mycompany.com')).toBe(false);
-    });
-
-    it('returns true when either URL is null (treat as same-site fallback)', () => {
-      expect(isSameSite(null, 'https://api.example.com')).toBe(true);
-      expect(isSameSite('https://api.example.com', null)).toBe(true);
-      expect(isSameSite(null, null)).toBe(true);
-    });
-
-    it('returns true for invalid URLs (no host)', () => {
-      expect(isSameSite('not-a-url', 'also-not')).toBe(true);
+    it('uses lax as the default when sameSite is omitted', () => {
+      const result = deriveCookieSecurity('https://app.example.com');
+      expect(result.sameSite).toBe('lax');
     });
   });
 
-  describe('deriveCookieSecurity', () => {
-    it('sets secure true when backend is https', () => {
-      expect(deriveCookieSecurity('https://app.example.com', 'https://api.example.com').secure).toBe(true);
-      expect(deriveCookieSecurity('http://app.example.com', 'https://api.example.com').secure).toBe(true);
+  // ─── SameSite=Strict ─────────────────────────────────────────────────────
+
+  describe("sameSite 'strict'", () => {
+    it('returns strict over https', () => {
+      const result = deriveCookieSecurity('https://app.example.com', 'strict');
+      expect(result).toEqual({ secure: true, sameSite: 'strict' });
     });
 
-    it('sets secure false when backend is http or missing', () => {
-      expect(deriveCookieSecurity('https://app.example.com', 'http://api.example.com').secure).toBe(false);
-      expect(deriveCookieSecurity('https://app.example.com', null).secure).toBe(false);
+    it('returns strict over http (no fallback needed for strict)', () => {
+      const result = deriveCookieSecurity('http://localhost:3000', 'strict');
+      expect(result).toEqual({ secure: false, sameSite: 'strict' });
     });
 
-    it('sets sameSite to lax when same site (subdomain of same base domain)', () => {
-      const r = deriveCookieSecurity('https://app.example.com', 'https://example.com');
-      expect(r.sameSite).toBe('lax');
-      expect(r.secure).toBe(true);
+    it('returns strict when URL is null', () => {
+      const result = deriveCookieSecurity(null, 'strict');
+      expect(result).toEqual({ secure: false, sameSite: 'strict' });
+    });
+  });
+
+  // ─── SameSite=None ───────────────────────────────────────────────────────
+
+  describe("sameSite 'none'", () => {
+    it('returns none + secure when URL is https (valid combination)', () => {
+      const result = deriveCookieSecurity('https://app.example.com', 'none');
+      expect(result).toEqual({ secure: true, sameSite: 'none' });
     });
 
-    it('sets sameSite to none when cross-site and backend is https', () => {
-      const r = deriveCookieSecurity('https://front.vercel.app', 'https://api.mycompany.com');
-      expect(r.sameSite).toBe('none');
-      expect(r.secure).toBe(true);
+    it('falls back to lax when URL is http (none requires HTTPS)', () => {
+      const result = deriveCookieSecurity('http://localhost:3000', 'none');
+      // browsers silently reject Non-Secure + None cookies, so we fall back
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
     });
 
-    it('sets sameSite to lax when cross-site but backend is http (none requires secure)', () => {
-      const r = deriveCookieSecurity('https://front.vercel.app', 'http://api.mycompany.com');
-      expect(r.sameSite).toBe('lax');
-      expect(r.secure).toBe(false);
+    it('falls back to lax when URL is null (cannot guarantee HTTPS)', () => {
+      const result = deriveCookieSecurity(null, 'none');
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
     });
 
-    it('handles null URLs with safe defaults', () => {
-      const r = deriveCookieSecurity(null, null);
-      expect(r.secure).toBe(false);
-      expect(r.sameSite).toBe('lax');
+    it('falls back to lax when URL is an empty string', () => {
+      const result = deriveCookieSecurity('', 'none');
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
     });
+
+    it('emits a logger warning when falling back from none to lax', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      deriveCookieSecurity('http://localhost', 'none');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('SameSite=None requires a Secure cookie'));
+    });
+
+    it('does NOT emit a logger warning for valid none+https', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockClear();
+      deriveCookieSecurity('https://app.example.com', 'none');
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Default (no sameSite arg) ────────────────────────────────────────────
+
+  describe('default sameSite (no argument)', () => {
+    it('defaults to lax over https', () => {
+      const result = deriveCookieSecurity('https://app.example.com');
+      expect(result).toEqual({ secure: true, sameSite: 'lax' });
+    });
+
+    it('defaults to lax over http', () => {
+      const result = deriveCookieSecurity('http://localhost:3000');
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
+    });
+
+    it('defaults to lax with null URL', () => {
+      const result = deriveCookieSecurity(null);
+      expect(result).toEqual({ secure: false, sameSite: 'lax' });
+    });
+  });
+
+  // ─── Exhaustive matrix ───────────────────────────────────────────────────
+  // Ensure every {url, sameSite} combination produces a valid (non-crashing) result
+
+  describe('exhaustive url × sameSite matrix', () => {
+    const urls = [
+      'https://prod.example.com',
+      'http://localhost:3000',
+      null,
+      '',
+    ] as const;
+    const policies = ['lax', 'strict', 'none'] as const;
+
+    for (const url of urls) {
+      for (const policy of policies) {
+        it(`url=${JSON.stringify(url)}, sameSite=${policy} → never throws`, () => {
+          expect(() => deriveCookieSecurity(url, policy)).not.toThrow();
+        });
+
+        it(`url=${JSON.stringify(url)}, sameSite=${policy} → result has valid shape`, () => {
+          const result = deriveCookieSecurity(url, policy);
+          expect(typeof result.secure).toBe('boolean');
+          expect(['lax', 'strict', 'none']).toContain(result.sameSite);
+        });
+
+        it(`url=${JSON.stringify(url)}, sameSite=${policy} → none+non-https always falls back to lax`, () => {
+          const isHttps = typeof url === 'string' && url.startsWith('https://');
+          const result = deriveCookieSecurity(url, policy);
+          if (policy === 'none' && !isHttps) {
+            expect(result.sameSite).toBe('lax');
+          }
+        });
+
+        it(`url=${JSON.stringify(url)}, sameSite=${policy} → none+https never falls back`, () => {
+          const isHttps = typeof url === 'string' && url.startsWith('https://');
+          const result = deriveCookieSecurity(url, policy);
+          if (policy === 'none' && isHttps) {
+            expect(result.sameSite).toBe('none');
+            expect(result.secure).toBe(true);
+          }
+        });
+      }
+    }
   });
 });

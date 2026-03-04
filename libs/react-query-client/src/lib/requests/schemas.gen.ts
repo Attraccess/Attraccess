@@ -1413,16 +1413,10 @@ export const $UpdateEmailTemplateDto = {
 export const $AppSettingsDto = {
     type: 'object',
     properties: {
-        frontendUrl: {
+        url: {
             type: 'string',
-            description: 'The frontend URL used for redirects and links.',
-            example: 'https://frontend.example',
-            nullable: true
-        },
-        backendUrl: {
-            type: 'string',
-            description: 'The backend/base URL used for callbacks and API links.',
-            example: 'https://api.example',
+            description: 'The application URL used for redirects, links, and API callbacks.',
+            example: 'https://attraccess.example.com',
             nullable: true
         },
         publicInternetUrl: {
@@ -1435,9 +1429,15 @@ export const $AppSettingsDto = {
             type: 'boolean',
             description: 'Whether a license key has been configured.',
             example: true
+        },
+        cookieSameSite: {
+            type: 'string',
+            enum: ['lax', 'strict', 'none'],
+            description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+            example: 'lax'
         }
     },
-    required: ['frontendUrl', 'backendUrl', 'publicInternetUrl', 'licenseKeyConfigured']
+    required: ['url', 'publicInternetUrl', 'licenseKeyConfigured', 'cookieSameSite']
 } as const;
 
 export const $SmtpServiceType = {
@@ -1523,15 +1523,10 @@ export const $SystemSettingsDto = {
 export const $UpdateAppSettingsDto = {
     type: 'object',
     properties: {
-        frontendUrl: {
+        url: {
             type: 'string',
-            description: 'Frontend URL used for redirects and links.',
-            example: 'https://frontend.example'
-        },
-        backendUrl: {
-            type: 'string',
-            description: 'Backend/base URL used for callbacks and API links.',
-            example: 'https://api.example'
+            description: 'Application URL used for redirects, links, and API callbacks.',
+            example: 'https://attraccess.example.com'
         },
         publicInternetUrl: {
             type: 'string',
@@ -1542,6 +1537,12 @@ export const $UpdateAppSettingsDto = {
             type: 'string',
             description: 'License key to use for license validation.',
             example: 'LICENSE_KEY'
+        },
+        cookieSameSite: {
+            type: 'string',
+            enum: ['lax', 'strict', 'none'],
+            description: 'SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.',
+            example: 'lax'
         }
     }
 } as const;

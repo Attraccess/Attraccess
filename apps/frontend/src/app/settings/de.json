@@ -31,13 +31,9 @@
         "missing": "Lizenz fehlt"
       },
       "inputs": {
-        "frontendUrl": {
-          "label": "Frontend-URL",
-          "description": "URL, unter der Benutzer das Frontend erreichen."
-        },
-        "backendUrl": {
-          "label": "Backend-URL",
-          "description": "URL für API-Callbacks und interne Links."
+        "url": {
+          "label": "Anwendungs-URL",
+          "description": "URL, unter der Benutzer Attraccess erreichen (für Weiterleitungen, Links und API-Callbacks)."
         },
         "publicInternetUrl": {
           "label": "Öffentliche Internet-URL",

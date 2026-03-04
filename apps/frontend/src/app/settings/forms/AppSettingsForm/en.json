@@ -1,16 +1,30 @@
 {
   "inputs": {
-    "frontendUrl": {
-      "label": "Frontend URL",
-      "description": "The URL users access the frontend at."
-    },
-    "backendUrl": {
-      "label": "Backend URL",
-      "description": "The URL used for API callbacks and internal links."
+    "url": {
+      "label": "Application URL",
+      "description": "The URL users access Attraccess at (used for redirects, links, and API callbacks)."
     },
     "publicInternetUrl": {
       "label": "Public Internet URL",
       "description": "Optional URL used for external callbacks (e.g. SumUp)."
+    },
+    "cookieSameSite": {
+      "label": "Cookie SameSite Policy",
+      "description": "Controls when session cookies are sent with cross-site requests. 'Lax' is recommended for most setups.",
+      "options": {
+        "lax": {
+          "label": "Lax (recommended)",
+          "description": "Cookies sent on top-level navigation. Works with SSO (OIDC / SAML)."
+        },
+        "strict": {
+          "label": "Strict",
+          "description": "Maximum isolation. Breaks SSO logins — IdP redirects will not carry the session cookie."
+        },
+        "none": {
+          "label": "None",
+          "description": "Cookies sent on all cross-site requests. Requires HTTPS (Secure flag)."
+        }
+      }
     },
     "licenseKey": {
       "label": "License Key",

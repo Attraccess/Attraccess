@@ -43,13 +43,12 @@ export class SSOOIDCGuard implements CanActivate {
     }
 
     this.logger.debug(`Request URL: ${req.url}`);
-    const frontendUrl = await this.settingsService.getFrontendUrl();
-    if (!frontendUrl) {
-      this.logger.error('Frontend URL not configured. Cannot construct URLs.');
-      // Consider throwing an InternalServerErrorException for clearer error handling upstream
+    const url = await this.settingsService.getUrl();
+    if (!url) {
+      this.logger.error('Application URL not configured. Cannot construct URLs.');
       return false;
     }
-    const requestURL = new URL(frontendUrl + req.url);
+    const requestURL = new URL(url + req.url);
 
     // e.g. something/sso/oidc/156/login
     const urlPathParts = requestURL.pathname.split('/');
@@ -89,17 +88,11 @@ export class SSOOIDCGuard implements CanActivate {
     }
     const redirectTo = requestURL.searchParams.get('redirectTo') ?? '';
 
-    const backendUrl = await this.settingsService.getBackendUrl();
-    if (!backendUrl) {
-      this.logger.error('Backend URL not configured. Cannot construct callback URLs.');
-      return false;
-    }
-    const callbackURL = new URL(backendUrl);
+    const callbackURL = new URL(url);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
     callbackURL.searchParams.set('redirectTo', redirectTo);
 
-    this.logger.debug(`Callback URL from query params: ${callbackURL}`);
-
+    this.logger.debug(`Callback URL: ${callbackURL}`);
     this.logger.debug(
       `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
     );

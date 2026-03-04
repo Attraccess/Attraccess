@@ -676,7 +676,7 @@ export class SSOController {
     @Query('RelayState') relayStateQuery: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
-    const defaultRedirect = await this.settingsService.getFrontendUrl();
+    const defaultRedirect = await this.settingsService.getUrl();
     const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
     return this.finalizeLogin(request, response, target);
   }

@@ -916,13 +916,9 @@ export type UpdateEmailTemplateDto = {
 
 export type AppSettingsDto = {
     /**
-     * The frontend URL used for redirects and links.
+     * The application URL used for redirects, links, and API callbacks.
      */
-    frontendUrl: string | null;
-    /**
-     * The backend/base URL used for callbacks and API links.
-     */
-    backendUrl: string | null;
+    url: string | null;
     /**
      * Optional public URL used for external callbacks (e.g., SumUp).
      */
@@ -931,6 +927,10 @@ export type AppSettingsDto = {
      * Whether a license key has been configured.
      */
     licenseKeyConfigured: boolean;
+    /**
+     * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
+     */
+    cookieSameSite: 'lax' | 'strict' | 'none';
 };
 
 /**
@@ -985,13 +985,9 @@ export type SystemSettingsDto = {
 
 export type UpdateAppSettingsDto = {
     /**
-     * Frontend URL used for redirects and links.
+     * Application URL used for redirects, links, and API callbacks.
      */
-    frontendUrl?: string;
-    /**
-     * Backend/base URL used for callbacks and API links.
-     */
-    backendUrl?: string;
+    url?: string;
     /**
      * Public URL used for external callbacks.
      */
@@ -1000,6 +996,10 @@ export type UpdateAppSettingsDto = {
      * License key to use for license validation.
      */
     licenseKey?: string;
+    /**
+     * SameSite cookie policy. "lax" (default) works with SSO. "strict" breaks SSO IdP redirects. "none" requires HTTPS.
+     */
+    cookieSameSite?: 'lax' | 'strict' | 'none';
 };
 
 export type UpdateSmtpSettingsDto = {

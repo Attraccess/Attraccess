@@ -77,7 +77,10 @@ export class EmailService {
   }
 
   private async getBaseContext(user: User) {
-    const { frontendUrl, backendUrl } = await this.getUrls();
+    const url = await this.settingsService.getUrl();
+    if (!url) {
+      throw new Error('Application URL not configured');
+    }
     return {
       user: {
         username: user.username,
@@ -85,16 +88,17 @@ export class EmailService {
         id: user.id,
       },
       host: {
-        frontend: frontendUrl,
-        backend: backendUrl,
+        frontend: url,
+        backend: url,
       },
-      url: frontendUrl,
+      url,
     } as const;
   }
 
   async sendVerificationEmail(user: User, verificationToken: string) {
-    const { frontendUrl } = await this.getUrls();
-    const verificationUrl = `${frontendUrl}/verify-email?email=${encodeURIComponent(
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(
       user.email,
     )}&token=${verificationToken}`;
 
@@ -107,8 +111,9 @@ export class EmailService {
   }
 
   async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
-    const { frontendUrl } = await this.getUrls();
-    const verificationUrl = `${frontendUrl}/accept-invitation?email=${encodeURIComponent(
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
       user.email,
     )}&token=${verificationToken}`;
 
@@ -121,8 +126,9 @@ export class EmailService {
   }
 
   async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {
-    const { frontendUrl } = await this.getUrls();
-    const invitationUrl = `${frontendUrl}/projects?invitationId=${invitation.id}`;
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const invitationUrl = `${url}/projects?invitationId=${invitation.id}`;
 
     const context = {
       ...(await this.getBaseContext(invitedUser)),
@@ -146,8 +152,9 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(user: User, resetToken: string) {
-    const { frontendUrl } = await this.getUrls();
-    const resetUrl = `${frontendUrl}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const resetUrl = `${url}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -158,8 +165,9 @@ export class EmailService {
   }
 
   async sendDeleteAccountConfirmationEmail(user: User, token: string) {
-    const { frontendUrl } = await this.getUrls();
-    const confirmUrl = `${frontendUrl}/confirm-delete-account?email=${encodeURIComponent(
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const confirmUrl = `${url}/confirm-delete-account?email=${encodeURIComponent(
       user.email,
     )}&token=${encodeURIComponent(token)}`;
 
@@ -233,22 +241,6 @@ export class EmailService {
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
-  }
-
-  private async getUrls(): Promise<{ frontendUrl: string; backendUrl: string }> {
-    const [frontendUrl, backendUrl] = await Promise.all([
-      this.settingsService.getFrontendUrl(),
-      this.settingsService.getBackendUrl(),
-    ]);
-
-    if (!frontendUrl) {
-      throw new Error('Frontend URL not configured');
-    }
-    if (!backendUrl) {
-      throw new Error('Backend URL not configured');
-    }
-
-    return { frontendUrl, backendUrl };
   }
 
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {

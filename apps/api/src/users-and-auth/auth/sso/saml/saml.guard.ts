@@ -39,13 +39,13 @@ export class SSOSamlGuard implements CanActivate {
       throw new ForbiddenException('SSO is not permitted by the current license');
     }
 
-    const frontendUrl = await this.settingsService.getFrontendUrl();
-    if (!frontendUrl) {
-      this.logger.error('Frontend URL not configured. Cannot construct URLs.');
+    const url = await this.settingsService.getUrl();
+    if (!url) {
+      this.logger.error('Application URL not configured. Cannot construct URLs.');
       return false;
     }
 
-    const requestURL = new URL(frontendUrl + req.url);
+    const requestURL = new URL(url + req.url);
     const urlPathParts = requestURL.pathname.split('/');
     const [, providerIdString, ssoType] = urlPathParts.reverse();
     const providerId = parseInt(providerIdString, 10);
@@ -68,19 +68,14 @@ export class SSOSamlGuard implements CanActivate {
 
     try {
       redirectTo = rawRedirect
-        ? new URL(rawRedirect, frontendUrl).toString()
-        : frontendUrl;
+        ? new URL(rawRedirect, url).toString()
+        : url;
     } catch {
       this.logger.warn(`Invalid redirectTo provided: ${rawRedirect ?? 'undefined'}`);
       throw new BadRequestException('Invalid redirectTo parameter');
     }
 
-    const backendUrl = await this.settingsService.getBackendUrl();
-    if (!backendUrl) {
-      this.logger.error('Backend URL not configured. Cannot construct callback URLs.');
-      return false;
-    }
-    const callbackURL = new URL(backendUrl);
+    const callbackURL = new URL(url);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
 
     // Persist RelayState for passport-saml to round-trip the redirect target

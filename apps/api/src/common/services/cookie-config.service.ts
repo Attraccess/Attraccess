@@ -16,15 +16,17 @@ export type CookieConfigType = {
 
 @Injectable()
 export class CookieConfigService {
-  private readonly cookieConfig: Omit<CookieConfigType, 'secure' | 'sameSite'>;
+  private readonly cookieName: string = 'auth-session';
+  private readonly cookieStaticOptions: Omit<CookieConfigType, 'secure' | 'sameSite'>;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly settingsService: SettingsService,
   ) {
     const sessionConfig = this.configService.get<SessionConfigType>('session');
-    this.cookieConfig = {
-      name: 'auth-session',
+
+    this.cookieStaticOptions = {
+      name: this.cookieName,
       httpOnly: true,
       maxAge: sessionConfig.SESSION_COOKIE_MAX_AGE,
       path: '/',
@@ -32,48 +34,46 @@ export class CookieConfigService {
   }
 
   /**
-   * Get the current cookie configuration (static options only; secure and sameSite are derived per-request from DB settings).
+   * Returns the name of the auth session cookie.
+   * Use this to look up the cookie value from an incoming request.
    */
-  getConfig(): CookieConfigType {
-    return {
-      ...this.cookieConfig,
-      sameSite: 'lax',
-      secure: false,
-    };
+  getCookieName(): string {
+    return this.cookieName;
   }
 
   private async getCookieOptions(): Promise<Pick<CookieConfigType, 'secure' | 'sameSite'>> {
-    const [frontendUrl, backendUrl] = await Promise.all([
-      this.settingsService.getFrontendUrl(),
-      this.settingsService.getBackendUrl(),
+    const [url, sameSite] = await Promise.all([
+      this.settingsService.getUrl(),
+      this.settingsService.getCookieSameSite(),
     ]);
-    return deriveCookieSecurity(frontendUrl, backendUrl);
+    return deriveCookieSecurity(url, sameSite);
   }
 
   /**
-   * Sets authentication cookie on the response. secure and sameSite are derived from configured frontend and backend URLs.
+   * Sets authentication cookie on the response.
+   * secure and sameSite are derived from the configured URL and SameSite policy setting.
    */
   async setAuthCookie(res: Response, token: string): Promise<void> {
     const { secure, sameSite } = await this.getCookieOptions();
-    res.cookie(this.cookieConfig.name, token, {
-      httpOnly: this.cookieConfig.httpOnly,
+    res.cookie(this.cookieStaticOptions.name, token, {
+      httpOnly: this.cookieStaticOptions.httpOnly,
       secure,
       sameSite,
-      maxAge: this.cookieConfig.maxAge,
-      path: this.cookieConfig.path,
+      maxAge: this.cookieStaticOptions.maxAge,
+      path: this.cookieStaticOptions.path,
     });
   }
 
   /**
-   * Clears authentication cookie from the response. secure and sameSite must match the values used when the cookie was set.
+   * Clears authentication cookie from the response.
    */
   async clearAuthCookie(res: Response): Promise<void> {
     const { secure, sameSite } = await this.getCookieOptions();
-    res.clearCookie(this.cookieConfig.name, {
-      httpOnly: this.cookieConfig.httpOnly,
+    res.clearCookie(this.cookieStaticOptions.name, {
+      httpOnly: this.cookieStaticOptions.httpOnly,
       secure,
       sameSite,
-      path: this.cookieConfig.path,
+      path: this.cookieStaticOptions.path,
     });
   }
 }
