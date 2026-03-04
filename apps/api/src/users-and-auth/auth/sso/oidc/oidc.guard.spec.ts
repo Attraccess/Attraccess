@@ -4,6 +4,7 @@ import { SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { SettingsService } from '../../../../settings/settings.service';
 import { SSOService } from '../sso.service';
 import { LicenseService } from '../../../../license/license.service';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { ModuleRef } from '@nestjs/core';
 
 describe('SSOOIDCGuard', () => {
@@ -52,6 +53,7 @@ describe('SSOOIDCGuard', () => {
       {} as ModuleRef,
       settingsService as unknown as SettingsService,
       licenseService as unknown as LicenseService,
+      {} as OidcCookieStateStore,
     );
   });
 

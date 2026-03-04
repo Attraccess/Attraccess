@@ -13,6 +13,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import type { Response, Request } from 'express';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
+import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { LicenseService } from '../../../license/license.service';
 import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
@@ -156,6 +157,10 @@ describe('SsoController', () => {
             verify: jest.fn(),
             issue: jest.fn(),
           },
+        },
+        {
+          provide: OidcCookieStateStore,
+          useValue: {},
         },
         SSOOIDCGuard,
       ],

@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
-import { SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
@@ -17,6 +17,7 @@ import {
   SSOProviderNotFoundException,
 } from '../errors';
 import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
 
 @Injectable()
 export class SSOOIDCGuard implements CanActivate {
@@ -26,7 +27,8 @@ export class SSOOIDCGuard implements CanActivate {
     private ssoService: SSOService,
     private moduleRef: ModuleRef,
     private settingsService: SettingsService,
-    private licenseService: LicenseService
+    private licenseService: LicenseService,
+    private stateStore: OidcCookieStateStore,
   ) { }
 
   async canActivate(context: ExecutionContext) {
@@ -96,7 +98,11 @@ export class SSOOIDCGuard implements CanActivate {
     this.logger.debug(
       `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
     );
-    // Pass callback URL to the strategy so it uses current settings (no restart needed when URLs change)
+    // Create a new strategy instance with the real provider config.
+    // This registers with passport under the 'sso-oidc' name, replacing the
+    // placeholder instance created at module startup.
+    new SSOOIDCStrategy(this.moduleRef, oidcConfig, callbackURL.toString(), this.stateStore);
+    // Also pass callback URL on the request as a backup for the strategy's authenticate() override
     (req as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] = callbackURL.toString();
     this.logger.debug(`OIDC Guard activation for ${routeAction} successful`);
     return true;
