@@ -15,7 +15,6 @@ describe('LicenseService', () => {
   let service: LicenseService;
   let configServiceGetMock: jest.Mock;
   let settingsServiceGetLicenseKeyMock: jest.Mock;
-  let settingsServiceGetFrontendUrlMock: jest.Mock;
   let settingsServiceGetBackendUrlMock: jest.Mock;
 
   beforeEach(async () => {
@@ -32,8 +31,7 @@ describe('LicenseService', () => {
           provide: SettingsService,
           useValue: {
             getLicenseKey: (settingsServiceGetLicenseKeyMock = jest.fn()),
-            getFrontendUrl: (settingsServiceGetFrontendUrlMock = jest.fn()),
-            getBackendUrl: (settingsServiceGetBackendUrlMock = jest.fn().mockResolvedValue(null)),
+            getUrl: (settingsServiceGetBackendUrlMock = jest.fn().mockResolvedValue(null)),
           },
         },
       ],
@@ -88,7 +86,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
     const data = await service.getLicenseData();
 
     expect(verifyLicense).toHaveBeenCalledWith('standard-key', 'public-key', 'frontend.example');
@@ -99,7 +97,7 @@ describe('LicenseService', () => {
     expect(data.usageLimits[LicenseUsageLimitType.USERS] ?? undefined).toBeUndefined();
   });
 
-  it('uses backend URL for licenso device id when frontend URL is null (DB settings fallback)', async () => {
+  it('uses app URL for licenso device id', async () => {
     (verifyLicense as jest.Mock).mockResolvedValue({
       valid: true,
       reason: undefined,
@@ -112,7 +110,6 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue(null);
     settingsServiceGetBackendUrlMock.mockResolvedValue('https://api.mycompany.com');
 
     const data = await service.getLicenseData();
@@ -129,7 +126,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense()).rejects.toThrow(LicenseError);
     await expect(service.verifyLicense()).rejects.toThrow('EXPIRED');
@@ -143,7 +140,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     const data = await service.verifyLicense();
     expect(data.valid).toBe(true);
@@ -157,7 +154,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense({ modules: [LicenseModuleType.SSO] })).rejects.toThrow(
       'Trying to use module(s) that are not included in the license: sso'
@@ -177,7 +174,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     const data = await service.verifyLicense({
       usageLimits: { [LicenseUsageLimitType.RESOURCES]: 4 },
@@ -198,7 +195,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense({ usageLimits: { [LicenseUsageLimitType.USERS]: 10 } })).rejects.toThrow(
       'Trying to use more than the allowed amount of users'
@@ -213,7 +210,7 @@ describe('LicenseService', () => {
     });
     configServiceGetMock.mockReturnValue({ ...baseAppConfig });
     settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
-    settingsServiceGetFrontendUrlMock.mockResolvedValue('https://frontend.example');
+    settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] })).resolves.toMatchObject({
       valid: true,

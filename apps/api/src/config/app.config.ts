@@ -21,7 +21,6 @@ const AppEnvSchema = z
       }),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
-    ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
@@ -60,21 +59,11 @@ export type AppConfigType = z.infer<typeof AppEnvSchema> & {
 
 const appConfigFactory = (): AppConfigType => {
   try {
-    // Optional env fallbacks for bootstrap/first-run (e.g. SSL cert generation).
-    // Primary source for URLs is now DB settings (SettingsService).
-    const FRONTEND_URL_ENV =
-      process.env.ATTRACCESS_FRONTEND_URL ??
-      process.env.FRONTEND_URL ??
-      process.env.ATTRACCESS_URL ??
-      process.env.VITE_ATTRACCESS_URL;
-
     const ATTRACCESS_URL_ENV = process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL;
-
     const ATTRACCESS_PUBLIC_INTERNET_URL_ENV = process.env.ATTRACCESS_PUBLIC_INTERNET_URL ?? ATTRACCESS_URL_ENV;
 
     const env = AppEnvSchema.parse({
       ...process.env,
-      ATTRACCESS_FRONTEND_URL: FRONTEND_URL_ENV,
       ATTRACCESS_URL: ATTRACCESS_URL_ENV,
       ATTRACCESS_PUBLIC_INTERNET_URL: ATTRACCESS_PUBLIC_INTERNET_URL_ENV,
     });

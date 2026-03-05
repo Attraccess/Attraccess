@@ -22,20 +22,8 @@ function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
   return `${parsedUrl.protocol}//${parsedUrl.hostname}${port}` as TUrl;
 }
 
-function getInferredApiUrl() {
-  return normalizeUrl(window.location.href);
-}
-
-function getEnvApiUrl() {
-  if (!import.meta.env.ATTRACCESS_URL) {
-    return undefined;
-  }
-
-  return normalizeUrl(import.meta.env.ATTRACCESS_URL as string | undefined);
-}
-
 export function getBaseUrl() {
-  return getEnvApiUrl() || getInferredApiUrl();
+  return normalizeUrl(window.location.href);
 }
 
 export function filenameToUrl(name?: string) {

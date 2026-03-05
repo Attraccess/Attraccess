@@ -39,8 +39,7 @@ export class SettingsService {
 
     const stepsCompleted: FirstTimeSetupStepsDto = {
       app:
-        !!app.frontendUrl?.trim() &&
-        !!app.backendUrl?.trim() &&
+        !!app.url?.trim() &&
         app.licenseKeyConfigured === true,
       smtp:
         !!smtp.service &&
@@ -71,27 +70,22 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    const [frontendUrl, backendUrl, publicInternetUrl, licenseKey] = await Promise.all([
-      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.frontendUrl),
-      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.backendUrl),
+    const [url, publicInternetUrl, licenseKey] = await Promise.all([
+      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
       this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
     ]);
 
     return {
-      frontendUrl,
-      backendUrl,
+      url,
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
     };
   }
 
   async updateAppSettings(update: UpdateAppSettingsDto): Promise<void> {
-    if (Object.prototype.hasOwnProperty.call(update, 'frontendUrl')) {
-      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.frontendUrl, update.frontendUrl ?? null);
-    }
-    if (Object.prototype.hasOwnProperty.call(update, 'backendUrl')) {
-      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.backendUrl, update.backendUrl ?? null);
+    if (Object.prototype.hasOwnProperty.call(update, 'url')) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.url, update.url ?? null);
     }
     if (Object.prototype.hasOwnProperty.call(update, 'publicInternetUrl')) {
       await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl, update.publicInternetUrl ?? null);
@@ -109,12 +103,8 @@ export class SettingsService {
     return this.smtpSettingsService.updateSettings(update);
   }
 
-  async getFrontendUrl(): Promise<string | null> {
-    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.frontendUrl);
-  }
-
-  async getBackendUrl(): Promise<string | null> {
-    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.backendUrl);
+  async getUrl(): Promise<string | null> {
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url);
   }
 
   async getPublicInternetUrl(): Promise<string | null> {

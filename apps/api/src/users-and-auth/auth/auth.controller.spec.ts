@@ -31,14 +31,7 @@ describe('AuthController', () => {
         {
           provide: CookieConfigService,
           useValue: {
-            getConfig: jest.fn().mockReturnValue({
-              name: 'auth-session',
-              httpOnly: true,
-              secure: true,
-              sameSite: 'lax',
-              maxAge: 24 * 60 * 60 * 1000,
-              path: '/',
-            }),
+            getCookieName: jest.fn().mockReturnValue('auth-session'),
             setAuthCookie: jest.fn(),
             clearAuthCookie: jest.fn(),
           },

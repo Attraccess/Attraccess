@@ -444,6 +444,11 @@ export interface UpdateUserPermissionsDto {
    * @example false
    */
   canManageUsers?: boolean;
+  /**
+   * Whether the user can manage billing
+   * @example false
+   */
+  canManageBilling?: boolean;
 }
 
 export interface UserPermissionsUpdateItem {
@@ -1082,15 +1087,10 @@ export interface UpdateEmailTemplateDto {
 
 export interface AppSettingsDto {
   /**
-   * The frontend URL used for redirects and links.
-   * @example "https://frontend.example"
+   * The application URL used for redirects, links, and API callbacks.
+   * @example "https://attraccess.example.com"
    */
-  frontendUrl: string | null;
-  /**
-   * The backend/base URL used for callbacks and API links.
-   * @example "https://api.example"
-   */
-  backendUrl: string | null;
+  url: string | null;
   /**
    * Optional public URL used for external callbacks (e.g., SumUp).
    * @example "https://public.example"
@@ -1147,15 +1147,10 @@ export interface SystemSettingsDto {
 
 export interface UpdateAppSettingsDto {
   /**
-   * Frontend URL used for redirects and links.
-   * @example "https://frontend.example"
+   * Application URL used for redirects, links, and API callbacks.
+   * @example "https://attraccess.example.com"
    */
-  frontendUrl?: string;
-  /**
-   * Backend/base URL used for callbacks and API links.
-   * @example "https://api.example"
-   */
-  backendUrl?: string;
+  url?: string;
   /**
    * Public URL used for external callbacks.
    * @example "https://public.example"

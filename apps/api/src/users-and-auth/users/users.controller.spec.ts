@@ -3,7 +3,8 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
-import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
+import { SSOService } from '../auth/sso/sso.service';
+import { User, AuthenticationType, Setting, SSOProviderType, SystemPermissions } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -17,6 +18,7 @@ describe('UsersController', () => {
   let usersService: UsersService;
   let authService: AuthService;
   let emailService: EmailService;
+  let ssoService: SSOService;
   let settingRepository: {
     findOne: jest.Mock;
     insert: jest.Mock;
@@ -33,6 +35,7 @@ describe('UsersController', () => {
             findOne: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
+            updateOne: jest.fn(),
             cleanupUsername: jest.fn((value: string) => value),
             validateUsernameOrThrow: jest.fn(),
           },
@@ -50,6 +53,12 @@ describe('UsersController', () => {
           provide: EmailService,
           useValue: {
             sendVerificationEmail: jest.fn(),
+          },
+        },
+        {
+          provide: SSOService,
+          useValue: {
+            getProviderByTypeAndIdWithConfiguration: jest.fn(),
           },
         },
         {
@@ -73,6 +82,7 @@ describe('UsersController', () => {
     usersService = module.get<UsersService>(UsersService);
     authService = module.get<AuthService>(AuthService);
     emailService = module.get<EmailService>(EmailService);
+    ssoService = module.get<SSOService>(SSOService);
     settingRepository = module.get(getRepositoryToken(Setting));
   });
 
@@ -306,6 +316,334 @@ describe('UsersController', () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
       const result = await controller.isLocalSignupEnabled();
       expect(result).toEqual({ value: true });
+    });
+  });
+
+  describe('permission updates with SSO mappings', () => {
+    const requestUser = {
+      id: 99,
+      systemPermissions: {
+        canManageResources: true,
+        canManageSystemConfiguration: true,
+        canManageUsers: true,
+        canManageBilling: true,
+      },
+    } as User;
+
+    describe('updatePermissions', () => {
+      it('allows updating non-SSO-mapped permissions when only some permissions have SSO mappings', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [
+            { type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 },
+          ],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+        // Only canManageUsers is SSO-managed; canManageResources is not
+        jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+          oidcConfiguration: { permissionMappings: { canManageUsers: ['admins'] } },
+        } as never);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        expect(usersService.updateOne).toHaveBeenCalledWith(
+          targetUser.id,
+          expect.objectContaining({
+            systemPermissions: expect.objectContaining({ canManageResources: true }),
+          }),
+        );
+      });
+
+      it('silently skips SSO-mapped permissions included in the request body', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [
+            { type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 },
+          ],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+        // canManageResources is SSO-managed; canManageSystemConfiguration is not
+        jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+          oidcConfiguration: { permissionMappings: { canManageResources: ['resource-admins'] } },
+        } as never);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true, canManageSystemConfiguration: true },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        const savedPermissions = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
+        expect(savedPermissions.canManageResources).toBe(false);        // SSO-managed: not changed
+        expect(savedPermissions.canManageSystemConfiguration).toBe(true); // not SSO-managed: applied
+      });
+
+      it('applies full update when user has no SSO permission mappings', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true, canManageUsers: true },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        expect(usersService.updateOne).toHaveBeenCalledWith(
+          targetUser.id,
+          expect.objectContaining({
+            systemPermissions: expect.objectContaining({
+              canManageResources: true,
+              canManageUsers: true,
+            }),
+          }),
+        );
+      });
+
+      it('saves canManageBilling when included in the request', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: true,
+            canManageSystemConfiguration: true,
+            canManageUsers: true,
+            canManageBilling: true,
+          },
+          authenticationDetails: [],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true, canManageSystemConfiguration: true, canManageUsers: true, canManageBilling: false },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        expect(usersService.updateOne).toHaveBeenCalledWith(
+          targetUser.id,
+          expect.objectContaining({
+            systemPermissions: expect.objectContaining({ canManageBilling: false }),
+          }),
+        );
+      });
+
+      /**
+       * Regression guard: every key on SystemPermissions must round-trip through
+       * updatePermissions.  If a new permission is added to the entity but
+       * forgotten in UpdateUserPermissionsDto or the controller handler, this
+       * test will fail because the saved value will still reflect the original
+       * (all-true) state instead of the requested (all-false) state.
+       */
+      it('persists every SystemPermissions field — regression guard for missing DTO/handler entries', async () => {
+        const allTrue: SystemPermissions = {
+          canManageResources: true,
+          canManageSystemConfiguration: true,
+          canManageUsers: true,
+          canManageBilling: true,
+        };
+
+        const targetUser = {
+          id: 1,
+          systemPermissions: { ...allTrue },
+          authenticationDetails: [],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+
+        // Build a request that turns every permission off
+        const allFalse = Object.fromEntries(
+          (Object.keys(allTrue) as Array<keyof SystemPermissions>).map((k) => [k, false]),
+        ) as Record<keyof SystemPermissions, boolean>;
+
+        await controller.updatePermissions(
+          targetUser.id,
+          allFalse,
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        const saved = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
+
+        for (const key of Object.keys(allTrue) as Array<keyof SystemPermissions>) {
+          expect(saved[key]).toBe(false); // if this fails, the field is missing from the DTO or controller
+        }
+      });
+
+      it('does not apply any changes when all requested permissions are SSO-managed', async () => {
+        const targetUser = {
+          id: 1,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [
+            { type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 42 },
+          ],
+        } as User;
+
+        jest.spyOn(usersService, 'findOne').mockResolvedValue(targetUser);
+        jest.spyOn(usersService, 'updateOne').mockResolvedValue(targetUser);
+        // All three dto-level permissions are SSO-managed
+        jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+          oidcConfiguration: {
+            permissionMappings: {
+              canManageResources: ['r'],
+              canManageUsers: ['u'],
+              canManageSystemConfiguration: ['s'],
+            },
+          },
+        } as never);
+
+        await controller.updatePermissions(
+          targetUser.id,
+          { canManageResources: true, canManageUsers: true, canManageSystemConfiguration: true },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        const savedPermissions = (usersService.updateOne as jest.Mock).mock.calls[0][1].systemPermissions;
+        expect(savedPermissions.canManageResources).toBe(false);
+        expect(savedPermissions.canManageUsers).toBe(false);
+        expect(savedPermissions.canManageSystemConfiguration).toBe(false);
+      });
+    });
+
+    describe('bulkUpdatePermissions', () => {
+      it('applies only non-SSO-managed permissions for SSO users in bulk update', async () => {
+        const ssoUser = {
+          id: 2,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [
+            { type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 7 },
+          ],
+        } as User;
+        const normalUser = {
+          id: 3,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [],
+        } as User;
+
+        jest
+          .spyOn(usersService, 'findOne')
+          .mockImplementation(({ id }) => Promise.resolve(id === 2 ? ssoUser : id === 3 ? normalUser : null));
+        jest
+          .spyOn(usersService, 'updateOne')
+          .mockImplementation(async (id) => (id === ssoUser.id ? ssoUser : normalUser));
+        // canManageResources is SSO-managed for the SSO user; canManageSystemConfiguration is not
+        jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+          oidcConfiguration: { permissionMappings: { canManageResources: ['resource-admins'] } },
+        } as never);
+
+        await controller.bulkUpdatePermissions(
+          {
+            updates: [
+              { userId: ssoUser.id, permissions: { canManageResources: true, canManageSystemConfiguration: true } },
+              { userId: normalUser.id, permissions: { canManageResources: true } },
+            ],
+          },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        const ssoCall = (usersService.updateOne as jest.Mock).mock.calls.find(([id]) => id === ssoUser.id);
+        expect(ssoCall).toBeDefined();
+        expect(ssoCall[1].systemPermissions.canManageResources).toBe(false);        // SSO-managed: not changed
+        expect(ssoCall[1].systemPermissions.canManageSystemConfiguration).toBe(true); // not SSO-managed: applied
+
+        const normalCall = (usersService.updateOne as jest.Mock).mock.calls.find(([id]) => id === normalUser.id);
+        expect(normalCall).toBeDefined();
+        expect(normalCall[1].systemPermissions.canManageResources).toBe(true);
+      });
+
+      it('includes SSO users in bulk result when their update contains non-SSO-managed permissions', async () => {
+        const ssoUser = {
+          id: 2,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [
+            { type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 7 },
+          ],
+        } as User;
+        const normalUser = {
+          id: 3,
+          systemPermissions: {
+            canManageResources: false,
+            canManageSystemConfiguration: false,
+            canManageUsers: false,
+            canManageBilling: false,
+          },
+          authenticationDetails: [],
+        } as User;
+
+        jest
+          .spyOn(usersService, 'findOne')
+          .mockImplementation(({ id }) => Promise.resolve(id === 2 ? ssoUser : id === 3 ? normalUser : null));
+        jest
+          .spyOn(usersService, 'updateOne')
+          .mockImplementation(async (id) => (id === ssoUser.id ? ssoUser : normalUser));
+        jest.spyOn(ssoService, 'getProviderByTypeAndIdWithConfiguration').mockResolvedValue({
+          oidcConfiguration: { permissionMappings: { canManageResources: ['admins'] } },
+        } as never);
+
+        const result = await controller.bulkUpdatePermissions(
+          {
+            updates: [
+              { userId: ssoUser.id, permissions: { canManageSystemConfiguration: true } }, // not SSO-managed
+              { userId: normalUser.id, permissions: { canManageResources: true } },
+            ],
+          },
+          { user: requestUser } as AuthenticatedRequest,
+        );
+
+        expect(result).toHaveLength(2);
+        expect(usersService.updateOne).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

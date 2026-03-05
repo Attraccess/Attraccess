@@ -257,6 +257,10 @@ export type UpdateUserPermissionsDto = {
      * Whether the user can manage users
      */
     canManageUsers?: boolean;
+    /**
+     * Whether the user can manage billing
+     */
+    canManageBilling?: boolean;
 };
 
 export type UserPermissionsUpdateItem = {
@@ -916,13 +920,9 @@ export type UpdateEmailTemplateDto = {
 
 export type AppSettingsDto = {
     /**
-     * The frontend URL used for redirects and links.
+     * The application URL used for redirects, links, and API callbacks.
      */
-    frontendUrl: string | null;
-    /**
-     * The backend/base URL used for callbacks and API links.
-     */
-    backendUrl: string | null;
+    url: string | null;
     /**
      * Optional public URL used for external callbacks (e.g., SumUp).
      */
@@ -985,13 +985,9 @@ export type SystemSettingsDto = {
 
 export type UpdateAppSettingsDto = {
     /**
-     * Frontend URL used for redirects and links.
+     * Application URL used for redirects, links, and API callbacks.
      */
-    frontendUrl?: string;
-    /**
-     * Backend/base URL used for callbacks and API links.
-     */
-    backendUrl?: string;
+    url?: string;
     /**
      * Public URL used for external callbacks.
      */

@@ -9,13 +9,27 @@ import { VitePWA } from 'vite-plugin-pwa';
 import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  const isDev = command === 'serve';
+  // In dev, proxy API requests through the Vite dev server so cookies are same-origin
+  // regardless of whether the browser uses localhost or 127.0.0.1.
+  const apiTarget = process.env.ATTRACCESS_URL ?? 'http://localhost:3000';
+
+  return {
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/frontend',
-  envPrefix: 'ATTRACCESS_',
   server: {
     port: 4200,
     host: '0.0.0.0',
+    ...(isDev ? {
+      proxy: {
+        '/api': {
+          target: apiTarget,
+          changeOrigin: true,
+          ws: true,
+        },
+      },
+    } : {}),
   },
   preview: {
     port: 4300,
@@ -80,4 +94,5 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
   },
+  };
 });

@@ -63,6 +63,10 @@
     "title": "Eigene Berechtigungen können nicht geändert werden",
     "description": "Sie können Ihre eigenen Berechtigungen nicht ändern. Bitten Sie einen anderen Administrator, diese anzupassen."
   },
+  "UserPermissionsManagedBySSO": {
+    "title": "Berechtigungen werden durch SSO verwaltet",
+    "description": "Die Berechtigungen dieses Benutzers werden durch den SSO-Anbieter verwaltet und können hier nicht geändert werden."
+  },
   "TwoFactorRequired": {
     "title": "Zwei-Faktor-Code erforderlich",
     "description": "Gib den Code aus deiner Authenticator-App ein, um fortzufahren."

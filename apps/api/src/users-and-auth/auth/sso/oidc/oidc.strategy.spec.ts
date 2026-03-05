@@ -1,6 +1,7 @@
 import { ModuleRef } from '@nestjs/core';
 import { Profile, Strategy } from 'passport-openidconnect';
 import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { AuthService } from '../../auth.service';
 import {
   AuthenticationType,
@@ -13,6 +14,7 @@ import { UsersService } from '../../../users/users.service';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {
   const callbackURL = 'http://localhost/cb';
+  const mockStateStore = { store: jest.fn(), verify: jest.fn() } as unknown as OidcCookieStateStore;
 
   function createStrategy(
     config: Partial<SSOProviderOIDCConfiguration>,
@@ -44,7 +46,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       ssoProvider: {} as SSOProvider,
     };
 
-    return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL);
+    return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL, mockStateStore);
   }
 
   it('resolves username using configured usernameClaimPaths', async () => {

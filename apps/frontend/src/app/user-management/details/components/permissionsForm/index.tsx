@@ -20,15 +20,27 @@ import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-er
 
 interface UserPermissionFormProps {
   user: User;
+  ssoManagedProviders?: string[];
+  ssoManagedPermissionKeys?: Set<string>;
 }
 
-export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) => {
+export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ssoManagedProviders, ssoManagedPermissionKeys }) => {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
+  const isSsoManaged = (ssoManagedProviders?.length ?? 0) > 0;
+  // If providers are set but no granular keys are provided, treat all permissions as SSO-managed
+  const isPermissionSsoManaged = (permission: string) => {
+    if (!isSsoManaged) return false;
+    if (ssoManagedPermissionKeys === undefined) return true;
+    return ssoManagedPermissionKeys.has(permission);
+  };
+  const ssoProvidersLabel = isSsoManaged
+    ? (ssoManagedProviders ?? []).join(', ')
+    : t('ssoManaged.providerFallback');
 
   const { data: userPermissions, isLoading } = useUsersServiceGetPermissions({ id: user.id });
   const { mutateAsync: savePermissions, isPending: isSavingPermissions } = useUsersServiceUpdatePermissions({
@@ -59,6 +71,9 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
     canManageBilling: false,
   });
 
+  const allPermissionsSsoManaged =
+    isSsoManaged && Object.keys(permissions).every((p) => isPermissionSsoManaged(p));
+
   // Update local state when permissions data is loaded
   useEffect(() => {
     if (userPermissions) {
@@ -79,6 +94,9 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
   };
 
   const handleSave = async () => {
+    if (allPermissionsSsoManaged) {
+      return;
+    }
     await savePermissions({
       id: user.id,
       requestBody: permissions,
@@ -102,12 +120,22 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
       </CardHeader>
 
       <CardBody className="flex flex-col gap-2">
+        {isSsoManaged ? (
+          <div
+            className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
+            data-cy="user-permission-form-sso-managed"
+          >
+            <p className="text-sm font-semibold">{t('ssoManaged.title')}</p>
+            <p className="text-sm">{t('ssoManaged.description', { providers: ssoProvidersLabel })}</p>
+          </div>
+        ) : null}
         {Object.keys(permissions).map((permission) => (
           <Switch
             key={permission}
             isSelected={permissions[permission as keyof SystemPermissions]}
             onValueChange={handlePermissionChange(permission as keyof SystemPermissions)}
             color="primary"
+            isDisabled={isPermissionSsoManaged(permission)}
             data-cy={`user-permission-form-${permission}-checkbox`}
           >
             {t(`permissions.${permission}`)}
@@ -120,6 +148,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user }) 
           color="primary"
           onPress={handleSave}
           isLoading={isSavingPermissions}
+          isDisabled={allPermissionsSsoManaged}
           data-cy="user-permission-form-save-button"
         >
           {t('actions.save')}

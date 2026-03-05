@@ -1,12 +1,8 @@
 {
   "inputs": {
-    "frontendUrl": {
-      "label": "Frontend URL",
-      "description": "The URL users access the frontend at."
-    },
-    "backendUrl": {
-      "label": "Backend URL",
-      "description": "The URL used for API callbacks and internal links."
+    "url": {
+      "label": "Application URL",
+      "description": "The URL users access Attraccess at (used for redirects, links, and API callbacks)."
     },
     "publicInternetUrl": {
       "label": "Public Internet URL",

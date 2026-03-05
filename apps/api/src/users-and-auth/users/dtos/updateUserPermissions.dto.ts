@@ -30,4 +30,13 @@ export class UpdateUserPermissionsDto {
   @IsBoolean()
   @IsOptional()
   canManageUsers?: boolean;
+
+  @ApiProperty({
+    description: 'Whether the user can manage billing',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  canManageBilling?: boolean;
 }

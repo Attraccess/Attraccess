@@ -1,4 +1,5 @@
 import { SystemPermission, SystemPermissions } from '@attraccess/database-entities';
+import { hasConfiguredPermissionMapping as hasConfiguredPermissionMappingShared } from '@attraccess/shared';
 
 export type SSOPermissionMapping = Partial<Record<SystemPermission, string[]>>;
 
@@ -13,13 +14,9 @@ export const normalizePermissionToken = (token: string): string => {
   return token.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
-export const hasConfiguredPermissionMapping = (mapping?: SSOPermissionMapping | null): boolean => {
-  if (!mapping) {
-    return false;
-  }
-
-  return Object.values(mapping).some((value) => Array.isArray(value) && value.length > 0);
-};
+export const hasConfiguredPermissionMapping = (
+  mapping?: SSOPermissionMapping | null,
+): boolean => hasConfiguredPermissionMappingShared(mapping);
 
 const normalizeRoleNames = (roleNames: string[]): Set<string> => {
   return new Set(roleNames.map(normalizePermissionToken).filter((value) => value.length > 0));

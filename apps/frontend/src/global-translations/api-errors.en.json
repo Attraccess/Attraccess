@@ -63,6 +63,10 @@
     "title": "Cannot update own permissions",
     "description": "You cannot change your own permissions. Ask another administrator to adjust them."
   },
+  "UserPermissionsManagedBySSO": {
+    "title": "Permissions managed by SSO",
+    "description": "This user's permissions are managed by the SSO provider and cannot be edited here."
+  },
   "TwoFactorRequired": {
     "title": "Two-factor code required",
     "description": "Enter the code from your authenticator app to continue."

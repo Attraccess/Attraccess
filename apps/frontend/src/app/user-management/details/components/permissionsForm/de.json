@@ -12,6 +12,11 @@
   "messages": {
     "updated": "Berechtigungen aktualisiert"
   },
+  "ssoManaged": {
+    "title": "Durch SSO verwaltet",
+    "description": "Diese Berechtigungen werden von {{providers}} verwaltet und können hier nicht geändert werden. Aktualisieren Sie die SSO-Berechtigungszuordnungen, um sie zu ändern.",
+    "providerFallback": "dem SSO-Anbieter"
+  },
   "errors": {
     "updateFailed": "Berechtigungen konnten nicht aktualisiert werden"
   }

@@ -2,8 +2,7 @@ export const APP_PARENT = 'app';
 export const SMTP_PARENT = 'smtp';
 
 export const APP_KEYS = {
-  frontendUrl: 'frontend_url',
-  backendUrl: 'backend_url',
+  url: 'backend_url',
   publicInternetUrl: 'public_internet_url',
   licenseKey: 'license_key',
 } as const;

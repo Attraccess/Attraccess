@@ -18,6 +18,7 @@ import {
   normalizePermissionToken,
   resolvePermissionsFromRoles,
 } from '../permission-mapping';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
 export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
@@ -31,6 +32,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     private moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
     callbackURL: string,
+    stateStore: OidcCookieStateStore,
   ) {
     super({
       issuer: config.issuer,
@@ -41,6 +43,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
       clientSecret: config.clientSecret,
       callbackURL,
       scope: config.scopes && config.scopes.length > 0 ? config.scopes : ['openid', 'email', 'profile'],
+      store: stateStore,
     });
 
     this.logger.log(`Initialized OIDC strategy with issuer: ${config.issuer} and callbackURL: ${callbackURL}`);

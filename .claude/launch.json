@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["nx", "serve", "api"],
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["nx", "serve", "frontend"],
+      "port": 4200,
+      "autoPort": false
+    }
+  ]
+}

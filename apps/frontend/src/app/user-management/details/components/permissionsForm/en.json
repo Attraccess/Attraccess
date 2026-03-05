@@ -12,6 +12,11 @@
   "messages": {
     "updated": "Permissions updated"
   },
+  "ssoManaged": {
+    "title": "Managed by SSO",
+    "description": "Permissions are managed by {{providers}} and cannot be edited here. Update the SSO permission mappings to change them.",
+    "providerFallback": "the SSO provider"
+  },
   "errors": {
     "updateFailed": "Unable to update permissions"
   }

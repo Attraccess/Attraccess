@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
-import { SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
@@ -17,6 +17,7 @@ import {
   SSOProviderNotFoundException,
 } from '../errors';
 import { LicenseModuleType, LicenseService } from '../../../../license/license.service';
+import { OidcCookieStateStore } from './oidc-cookie-state-store';
 
 @Injectable()
 export class SSOOIDCGuard implements CanActivate {
@@ -26,7 +27,8 @@ export class SSOOIDCGuard implements CanActivate {
     private ssoService: SSOService,
     private moduleRef: ModuleRef,
     private settingsService: SettingsService,
-    private licenseService: LicenseService
+    private licenseService: LicenseService,
+    private stateStore: OidcCookieStateStore,
   ) { }
 
   async canActivate(context: ExecutionContext) {
@@ -43,13 +45,12 @@ export class SSOOIDCGuard implements CanActivate {
     }
 
     this.logger.debug(`Request URL: ${req.url}`);
-    const frontendUrl = await this.settingsService.getFrontendUrl();
-    if (!frontendUrl) {
-      this.logger.error('Frontend URL not configured. Cannot construct URLs.');
-      // Consider throwing an InternalServerErrorException for clearer error handling upstream
+    const url = await this.settingsService.getUrl();
+    if (!url) {
+      this.logger.error('Application URL not configured. Cannot construct URLs.');
       return false;
     }
-    const requestURL = new URL(frontendUrl + req.url);
+    const requestURL = new URL(url + req.url);
 
     // e.g. something/sso/oidc/156/login
     const urlPathParts = requestURL.pathname.split('/');
@@ -89,21 +90,19 @@ export class SSOOIDCGuard implements CanActivate {
     }
     const redirectTo = requestURL.searchParams.get('redirectTo') ?? '';
 
-    const backendUrl = await this.settingsService.getBackendUrl();
-    if (!backendUrl) {
-      this.logger.error('Backend URL not configured. Cannot construct callback URLs.');
-      return false;
-    }
-    const callbackURL = new URL(backendUrl);
+    const callbackURL = new URL(url);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
     callbackURL.searchParams.set('redirectTo', redirectTo);
 
-    this.logger.debug(`Callback URL from query params: ${callbackURL}`);
-
+    this.logger.debug(`Callback URL: ${callbackURL}`);
     this.logger.debug(
       `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
     );
-    // Pass callback URL to the strategy so it uses current settings (no restart needed when URLs change)
+    // Create a new strategy instance with the real provider config.
+    // This registers with passport under the 'sso-oidc' name, replacing the
+    // placeholder instance created at module startup.
+    new SSOOIDCStrategy(this.moduleRef, oidcConfig, callbackURL.toString(), this.stateStore);
+    // Also pass callback URL on the request as a backup for the strategy's authenticate() override
     (req as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] = callbackURL.toString();
     this.logger.debug(`OIDC Guard activation for ${routeAction} successful`);
     return true;

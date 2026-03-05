@@ -1,25 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
 
-/** Allow URLs without TLD (e.g. http://localhost:4200) for development. */
+/** Allow URLs without TLD (e.g. http://localhost:3000) for development. */
 const urlOptions = { require_tld: false };
 
 export class UpdateAppSettingsDto {
   @IsOptional()
   @IsUrl(urlOptions)
   @ApiPropertyOptional({
-    description: 'Frontend URL used for redirects and links.',
-    example: 'https://frontend.example',
+    description: 'Application URL used for redirects, links, and API callbacks.',
+    example: 'https://attraccess.example.com',
   })
-  frontendUrl?: string | null;
-
-  @IsOptional()
-  @IsUrl(urlOptions)
-  @ApiPropertyOptional({
-    description: 'Backend/base URL used for callbacks and API links.',
-    example: 'https://api.example',
-  })
-  backendUrl?: string | null;
+  url?: string | null;
 
   @IsOptional()
   @IsUrl(urlOptions)

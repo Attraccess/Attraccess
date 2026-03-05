@@ -24,13 +24,13 @@ export class TwoFactorService {
   }
 
   private async resolveIssuer(): Promise<string> {
-    const backendUrl = await this.settingsService.getBackendUrl();
-    if (!backendUrl) {
+    const appUrl = await this.settingsService.getUrl();
+    if (!appUrl) {
       return 'Attraccess';
     }
 
     try {
-      const url = new URL(backendUrl);
+      const url = new URL(appUrl);
       return `Attraccess (${url.hostname})`;
     } catch (error) {
       this.logger.warn('Failed to parse backend URL for 2FA issuer', error as Error);

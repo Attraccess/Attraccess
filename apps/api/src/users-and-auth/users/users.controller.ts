@@ -30,6 +30,7 @@ import {
   SystemPermissions,
   Setting,
   AuthenticationType,
+  SSOProviderType,
 } from '@attraccess/database-entities';
 import { ApiTags, ApiResponse, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CreateUserDto } from './dtos/createUser.dto';
@@ -64,6 +65,8 @@ import { validate, isEmail } from 'class-validator';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { EntityManager } from 'typeorm';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
+import { SSOService } from '../auth/sso/sso.service';
+import { getSsoManagedPermissionKeys } from '@attraccess/shared';
 import { TokenHashService } from '../../encryption/token-hash.service';
 
 @ApiTags('Users')
@@ -76,6 +79,7 @@ export class UsersController {
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
+    private readonly ssoService: SSOService,
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly tokenHashService: TokenHashService,
@@ -87,6 +91,39 @@ export class UsersController {
       throw new ServiceUnavailableException('EmailSendFailed');
     }
     throw error;
+  }
+
+  private async getSsoManagedPermissions(user: User): Promise<string[]> {
+    const authenticationDetails = user.authenticationDetails ?? [];
+    const ssoDetails = authenticationDetails.filter(
+      (detail) => detail.type === AuthenticationType.SSO && detail.providerId && detail.providerType,
+    );
+
+    if (ssoDetails.length === 0) {
+      return [];
+    }
+
+    const ssoManagedKeys = new Set<string>();
+
+    for (const detail of ssoDetails) {
+      const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(
+        detail.providerType as SSOProviderType,
+        detail.providerId as number,
+      );
+
+      if (!provider) {
+        continue;
+      }
+
+      const permissionMappings =
+        detail.providerType === SSOProviderType.OIDC
+          ? provider.oidcConfiguration?.permissionMappings
+          : provider.samlConfiguration?.permissionMappings;
+
+      getSsoManagedPermissionKeys(permissionMappings).forEach((key) => ssoManagedKeys.add(key));
+    }
+
+    return Array.from(ssoManagedKeys);
   }
 
   private async inviteUsersTransactional(
@@ -845,11 +882,13 @@ export class UsersController {
     this.validateCanGrantPermissions(request.user, body);
 
     // Get the user to update
-    const user = await this.usersService.findOne({ id });
+    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);
     }
+
+    const ssoManagedPermissions = await this.getSsoManagedPermissions(user);
 
     // Create an update object with just the systemPermissions
     const updates: Partial<User> = {
@@ -858,17 +897,21 @@ export class UsersController {
       },
     };
 
-    // Update only the permissions that were specified in the request
-    if (body.canManageResources !== undefined) {
+    // Update only the permissions that were specified in the request AND are not managed by SSO
+    if (body.canManageResources !== undefined && !ssoManagedPermissions.includes('canManageResources')) {
       updates.systemPermissions.canManageResources = body.canManageResources;
     }
 
-    if (body.canManageSystemConfiguration !== undefined) {
+    if (body.canManageSystemConfiguration !== undefined && !ssoManagedPermissions.includes('canManageSystemConfiguration')) {
       updates.systemPermissions.canManageSystemConfiguration = body.canManageSystemConfiguration;
     }
 
-    if (body.canManageUsers !== undefined) {
+    if (body.canManageUsers !== undefined && !ssoManagedPermissions.includes('canManageUsers')) {
       updates.systemPermissions.canManageUsers = body.canManageUsers;
+    }
+
+    if (body.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
+      updates.systemPermissions.canManageBilling = body.canManageBilling;
     }
 
     this.logger.debug(`Applying permission updates for user ID: ${id}: ${JSON.stringify(updates.systemPermissions)}`);
@@ -908,6 +951,7 @@ export class UsersController {
     }
 
     const updatedUsers: User[] = [];
+    const updateCandidates: Array<{ update: BulkUpdateUserPermissionsDto['updates'][number]; user: User; ssoManagedPermissions: string[] }> = [];
 
     for (const update of body.updates) {
       // Skip if user is trying to update their own permissions
@@ -916,14 +960,18 @@ export class UsersController {
         continue;
       }
 
-      try {
-        // Get the user to update
-        const user = await this.usersService.findOne({ id: update.userId });
-        if (!user) {
-          this.logger.debug(`User not found with ID: ${update.userId}, skipping`);
-          continue;
-        }
+      const user = await this.usersService.findOne({ id: update.userId }, ['authenticationDetails']);
+      if (!user) {
+        this.logger.debug(`User not found with ID: ${update.userId}, skipping`);
+        continue;
+      }
 
+      const ssoManagedPermissions = await this.getSsoManagedPermissions(user);
+      updateCandidates.push({ update, user, ssoManagedPermissions });
+    }
+
+    for (const { update, user, ssoManagedPermissions } of updateCandidates) {
+      try {
         // Create an update object with just the systemPermissions
         const updates: Partial<User> = {
           systemPermissions: {
@@ -931,17 +979,21 @@ export class UsersController {
           },
         };
 
-        // Update only the permissions that were specified in the request
-        if (update.permissions.canManageResources !== undefined) {
+        // Update only the permissions that were specified in the request AND are not managed by SSO
+        if (update.permissions.canManageResources !== undefined && !ssoManagedPermissions.includes('canManageResources')) {
           updates.systemPermissions.canManageResources = update.permissions.canManageResources;
         }
 
-        if (update.permissions.canManageSystemConfiguration !== undefined) {
+        if (update.permissions.canManageSystemConfiguration !== undefined && !ssoManagedPermissions.includes('canManageSystemConfiguration')) {
           updates.systemPermissions.canManageSystemConfiguration = update.permissions.canManageSystemConfiguration;
         }
 
-        if (update.permissions.canManageUsers !== undefined) {
+        if (update.permissions.canManageUsers !== undefined && !ssoManagedPermissions.includes('canManageUsers')) {
           updates.systemPermissions.canManageUsers = update.permissions.canManageUsers;
+        }
+
+        if (update.permissions.canManageBilling !== undefined && !ssoManagedPermissions.includes('canManageBilling')) {
+          updates.systemPermissions.canManageBilling = update.permissions.canManageBilling;
         }
 
         this.logger.debug(
