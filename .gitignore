@@ -31,3 +31,4 @@ apps/api/src/assets/attractap-firmwares/
 secrets/
 
 .autopilot.json
+.mcp_data/
