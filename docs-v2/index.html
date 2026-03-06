@@ -353,6 +353,18 @@
       border-color: #1f2937 !important;
     }
 
+    /* GitHub corner — move to top-left to avoid overlap with lang/theme toggles */
+    .github-corner {
+      position: fixed !important;
+      top: 0;
+      right: auto !important;
+      left: 0;
+      z-index: 30;
+    }
+    .github-corner svg {
+      transform: scaleX(-1);
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .lang-switcher {
