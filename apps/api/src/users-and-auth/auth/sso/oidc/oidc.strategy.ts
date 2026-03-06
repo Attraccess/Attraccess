@@ -61,6 +61,9 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     const reqExt = req as unknown as Record<string, unknown>;
     const dynamicCallback = reqExt[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] as string | undefined;
     const stateFromGuard = reqExt[SSO_OIDC_STATE_REQUEST_KEY];
+    if (!dynamicCallback && !this.isOIDCAppState(stateFromGuard)) {
+      return super.authenticate(req, options);
+    }
     const opts = { ...options };
     if (dynamicCallback) opts.callbackURL = dynamicCallback;
     if (this.isOIDCAppState(stateFromGuard)) opts.state = stateFromGuard;
