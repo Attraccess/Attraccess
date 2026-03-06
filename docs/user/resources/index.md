@@ -1,3 +1,0 @@
-# Resources
-
-TODO: add docs

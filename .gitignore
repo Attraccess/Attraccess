@@ -32,3 +32,4 @@ secrets/
 
 .autopilot.json
 .mcp_data/
+.claude/worktrees/

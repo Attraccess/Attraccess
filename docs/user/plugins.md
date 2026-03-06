@@ -1,3 +1,0 @@
-# Plugins
-
-TODO: write docs
