@@ -9,7 +9,7 @@
   <link rel="icon" href="_media/favicon.ico">
 
   <!-- Docsify Themeable -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0.9.0/dist/css/theme-simple.css" integrity="sha384-IuZucGNxm+6VGvZLv3+oxh1kE70WlIXci7p3g/Dtchij0oKFb9s8zG9GYnIkl8CB" crossorigin="anonymous">
 
   <style>
     /* ===== Attraccess Light Theme (default) ===== */
@@ -395,7 +395,7 @@
   </div>
 
   <!-- Dark Mode Toggle -->
-  <button class="theme-toggle" id="themeToggle" title="Farbmodus wechseln">🌙</button>
+  <button class="theme-toggle" id="themeToggle" type="button" title="Farbmodus wechseln" aria-label="Farbmodus wechseln" aria-pressed="false">🌙</button>
 
   <script>
     // ===== i18n: language detected from localStorage or browser =====
@@ -483,10 +483,12 @@
         link.classList.toggle('active', link.getAttribute('data-lang') === currentLang);
       });
     }
+    updateLangSwitcher();
 
     document.getElementById('langSwitcher').addEventListener('click', function(e) {
       e.preventDefault();
-      var lang = e.target.getAttribute('data-lang');
+      var langEl = e.target.closest ? e.target.closest('a[data-lang]') : e.target;
+      var lang = langEl ? langEl.getAttribute('data-lang') : null;
       if (!lang || lang === currentLang) return;
       localStorage.setItem('attraccess-docs-lang', lang);
       window.location.reload();
@@ -495,6 +497,8 @@
     // ===== Theme Toggle — set on html element =====
     var toggleBtn = document.getElementById('themeToggle');
     toggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    toggleBtn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    toggleBtn.setAttribute('aria-label', currentLang === 'de' ? 'Farbmodus wechseln' : 'Toggle color mode');
 
     toggleBtn.addEventListener('click', function() {
       var current = document.documentElement.getAttribute('data-theme');
@@ -502,29 +506,30 @@
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('attraccess-docs-theme', next);
       toggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+      toggleBtn.setAttribute('aria-pressed', next === 'dark' ? 'true' : 'false');
     });
   </script>
 
   <!-- Docsify -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/docsify.min.js" integrity="sha384-KaHhgnx/OTLoJ4J33SSJsF4x1pk4I7q3s5ZOfIDHJYl6IG7Oyn2vNDsHiWJe46fD" crossorigin="anonymous"></script>
 
   <!-- Plugins -->
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/zoom-image.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2/dist/docsify-pagination.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1"></script>
-  <script src="https://unpkg.com/docsify-plugin-flexible-alerts"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-sidebar-collapse@1/dist/docsify-sidebar-collapse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/search.min.js" integrity="sha384-LthJPBJ4RGco78kBY+EmKz5rmISZ5vrtAu3+l2ALQ2mrZHOe6Wyf6knyKjeC4cL6" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4.13.1/lib/plugins/zoom-image.min.js" integrity="sha384-fYBaBAsdPMjWt1AuA+txMoztHnl+zLgObSvwddIabbfUp+36gf/vNOKx88f37zix" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2.1.1/dist/docsify-copy-code.min.js" integrity="sha384-t4d9b4/0dEBkoJ5e77XEPBrqJ790jbFQFmEaTbBqIlTDeGosM1AbZvC1NQwqTg+5" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination@2.10.1/dist/docsify-pagination.min.js" integrity="sha384-uFEp18/1vv2dYlO64J2lOcnbhirAQZPtruqAZZ7PZYoXenm5c+tIs3AqSMjVMRe8" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-tabs@1.5.2/dist/docsify-tabs.min.js" integrity="sha384-HDIipu8ms1FDLRotH7OldFKGJ9VBMz20a5b2xgQPSreYM7AGnFfRv3k9sKRgqRs5" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-plugin-flexible-alerts@1.1.1/dist/docsify-plugin-flexible-alerts.min.js" integrity="sha384-UwaoRTRxt1BoL/u+ucAgzz4PML/diz+5Jd69XmVMhl0pxqSUpm71h+4myV1gjm9h" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-sidebar-collapse@1.3.3/dist/docsify-sidebar-collapse.min.js" integrity="sha384-0QSd60AAYEZ+wryDHvqZ58jqMWuwUCbtfBsgg51Ks/1CjXMs1QJFk815X4w3nAbD" crossorigin="anonymous"></script>
 
   <!-- Syntax Highlighting -->
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-docker.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-c.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-cpp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js" integrity="sha384-9WmlN8ABpoFSSHvBGGjhvB3E/D8UkNB9HpLJjBQFC2VSQsM1odiQDv4NbEo+7l15" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js" integrity="sha384-RhrmFFMb0ZCHImjFMpR/UE3VEtIVTCtNrtKQqXCzqXZNJala02N3UbVhi+qzw3CY" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js" integrity="sha384-D44bgYYKvaiDh4cOGlj1dbSDpSctn2FSUj118HZGmZEShZcO2v//Q5vvhNy206pp" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js" integrity="sha384-PeOqKNW/piETaCg8rqKFy+Pm6KEk7e36/5YZE5XO/OaFdO+/Aw3O8qZ9qDPKVUgx" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js" integrity="sha384-AKAiycghK0jDCjD+aavMHzDkLzRR7Yzcwh3+xL/295cvyVMe+cxQfyQC8xxGGcI8" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-docker.min.js" integrity="sha384-44ggPevoK6FC5kDMdbbWoMCAFkSCwaRoXXtKMkslR2lf8Ra3OSzCRrFIyeK+TQBi" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-c.min.js" integrity="sha384-gaD4ncierlmWk42Z3BmTp37/z+Dqt8V4Wf74UjTvFeo+M+SgnEI6Ysd98pWhksQv" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js" integrity="sha384-NiOrAquf32LSG3Vuig99LKS03EZPUuM8a51NOp+XXsqx08hUVo3wbNWALY7K/2J8" crossorigin="anonymous"></script>
 </body>
 </html>

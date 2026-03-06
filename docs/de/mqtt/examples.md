@@ -21,7 +21,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 **Einschalten:**
 
 1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **Nutzung gestartet**
-2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT Publish**
+2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
 | Einstellung | Wert |
@@ -33,7 +33,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 **Ausschalten:**
 
 1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **Nutzung beendet**
-2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT Publish**
+2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
 | Einstellung | Wert |
@@ -60,7 +60,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 
 ### Flow-Einrichtung
 
-1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **MQTT Subscribe**
+1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **MQTT-Nachricht empfangen (MQTT Subscribe)**
 2. Konfigurieren Sie den MQTT-Knoten:
 
 | Einstellung | Wert |
@@ -75,7 +75,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 
 | Knoten | Konfiguration |
 |--------|--------------|
-| **MQTT Subscribe** | Topic: `werkstatt/3ddrucker/temperatur` |
+| **MQTT-Nachricht empfangen (MQTT Subscribe)** | Topic: `werkstatt/3ddrucker/temperatur` |
 | **Wenn-Bedingung** | `payload.value > 250` |
 | **HTTP-Anfrage** | Warnung an Ihren Benachrichtigungsdienst senden |
 

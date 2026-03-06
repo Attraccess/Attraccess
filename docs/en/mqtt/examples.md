@@ -21,7 +21,7 @@ Create a flow on the laser cutter resource with two paths:
 **Power On:**
 
 1. Add an **Input** node: **Usage Started**
-2. Connect it to an **Output** node: **MQTT Publish**
+2. Connect it to an **Output** node: **MQTT Send Message**
 3. Configure the MQTT node:
 
 | Setting | Value |
@@ -33,7 +33,7 @@ Create a flow on the laser cutter resource with two paths:
 **Power Off:**
 
 1. Add an **Input** node: **Usage Ended**
-2. Connect it to an **Output** node: **MQTT Publish**
+2. Connect it to an **Output** node: **MQTT Send Message**
 3. Configure the MQTT node:
 
 | Setting | Value |
@@ -60,7 +60,7 @@ Create a flow on the laser cutter resource with two paths:
 
 ### Flow Setup
 
-1. Add an **Input** node: **MQTT Subscribe**
+1. Add an **Input** node: **MQTT Message Received**
 2. Configure the MQTT node:
 
 | Setting | Value |
@@ -75,7 +75,7 @@ Create a flow on the laser cutter resource with two paths:
 
 | Node | Configuration |
 |------|--------------|
-| **MQTT Subscribe** | Topic: `workshop/3dprinter/temperature` |
+| **MQTT Message Received** | Topic: `workshop/3dprinter/temperature` |
 | **If Condition** | `payload.value > 250` |
 | **HTTP Request** | Send alert to your notification service |
 
