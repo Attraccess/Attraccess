@@ -292,26 +292,27 @@
   <button class="theme-toggle" id="themeToggle" title="Farbmodus wechseln">🌙</button>
 
   <script>
-    // ===== i18n Routing =====
+    // ===== i18n: language detected from localStorage or browser =====
     var currentLang = (function() {
-      var hash = window.location.hash || '';
-      var match = hash.match(/^#\/(de|en)\//);
-      if (match) return match[1];
       var stored = localStorage.getItem('attraccess-docs-lang');
-      if (stored) return stored;
+      if (stored === 'de' || stored === 'en') return stored;
       var browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-      return browserLang.startsWith('de') ? 'de' : browserLang.startsWith('en') ? 'en' : 'de';
+      return browserLang.startsWith('de') ? 'de' : 'en';
     })();
-
     localStorage.setItem('attraccess-docs-lang', currentLang);
 
-    // Ensure hash starts with lang prefix
-    if (window.location.hash && !window.location.hash.match(/^#\/(de|en)\//)) {
-      var path = window.location.hash.replace(/^#\/?/, '');
-      window.location.hash = '#/' + currentLang + '/' + path;
-    } else if (!window.location.hash || window.location.hash === '#/' || window.location.hash === '#') {
-      window.location.hash = '#/' + currentLang + '/';
-    }
+    // Strip language prefix from hash if present (basePath handles language routing)
+    (function() {
+      var hash = window.location.hash || '';
+      var match = hash.match(/^#\/(de|en)(\/.*)?$/);
+      if (match) {
+        // Also detect language from hash for first visit / shared links
+        currentLang = match[1];
+        localStorage.setItem('attraccess-docs-lang', currentLang);
+        var rest = match[2] || '/';
+        window.location.replace(window.location.pathname + '#' + rest);
+      }
+    })();
 
     // ===== Dark Mode =====
     var savedTheme = localStorage.getItem('attraccess-docs-theme');
@@ -320,8 +321,10 @@
     document.body.setAttribute('data-theme', theme);
 
     // ===== Docsify Configuration =====
+    // basePath points to the language directory — hash paths are language-free
+    // e.g. basePath=/de/ + hash=#/getting-started/overview → fetches /de/getting-started/overview.md
     window.$docsify = {
-      name: '<img src="_media/logo.png" alt="Logo" width="28"> Attraccess',
+      name: '<img src="/_media/logo.png" alt="Logo" width="28"> Attraccess',
       repo: 'https://github.com/Attraccess/Attraccess',
       homepage: 'home.md',
       loadSidebar: '_sidebar.md',
@@ -331,10 +334,6 @@
       subMaxLevel: 3,
       auto2top: true,
       basePath: '/' + currentLang + '/',
-      alias: {
-        '/.*/_sidebar.md': '/' + currentLang + '/_sidebar.md',
-        '/.*/_coverpage.md': '/' + currentLang + '/coverpage.md'
-      },
       search: {
         maxAge: 86400000,
         paths: 'auto',
@@ -364,18 +363,11 @@
         sync: true,
         theme: 'classic'
       },
-      // Handle navigation to add lang prefix
       routerMode: 'hash',
       plugins: [
         function(hook, vm) {
-          // Update language switcher state
           hook.doneEach(function() {
             updateLangSwitcher();
-          });
-
-          // Add lang prefix to all relative links
-          hook.afterEach(function(html) {
-            return html;
           });
         }
       ]
@@ -393,18 +385,8 @@
       e.preventDefault();
       var lang = e.target.getAttribute('data-lang');
       if (!lang || lang === currentLang) return;
-
-      var oldLang = currentLang;
-      currentLang = lang;
       localStorage.setItem('attraccess-docs-lang', lang);
-
-      // Switch to same page in other language
-      var hash = window.location.hash || '#/';
-      var newHash = hash.replace('#/' + oldLang + '/', '#/' + lang + '/');
-      if (newHash === hash) {
-        newHash = '#/' + lang + '/';
-      }
-      window.location.href = window.location.pathname + newHash;
+      // Reload — same hash path, different basePath on reload
       window.location.reload();
     });
 
