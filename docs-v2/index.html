@@ -22,7 +22,7 @@
       --theme-color-danger: #f31260;
 
       /* Cover */
-      --cover-background-image: url('_media/login-wallpaper-blue.jpg');
+      --cover-background-image: none;
       --cover-background-color: #006FEE;
       --cover-color: #fff;
       --cover-heading-color: #fff;
@@ -133,7 +133,8 @@
 
     /* ===== Cover Page ===== */
     .cover-main {
-      background-size: cover;
+      background-image: url('_media/login-wallpaper-blue.jpg') !important;
+      background-size: cover !important;
       background-position: center left;
     }
     .cover-main::before {
