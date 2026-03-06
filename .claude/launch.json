@@ -14,6 +14,13 @@
       "runtimeArgs": ["nx", "serve", "frontend"],
       "port": 4200,
       "autoPort": false
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["docsify", "serve", "docs", "--port", "4000"],
+      "port": 4000,
+      "autoPort": false
     }
   ]
 }
