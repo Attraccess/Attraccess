@@ -6,7 +6,7 @@
 
 - Manage resources, users and access permissions
 - Integrate NFC readers and IoT devices
-- Open source and self-hosted
+- Source-available and self-hosted (on-premise)
 
 [Get Started](getting-started/overview.md)
 [GitHub](https://github.com/Attraccess/Attraccess)
