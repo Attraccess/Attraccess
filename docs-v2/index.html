@@ -148,22 +148,32 @@
       --search-result-keyword-color: #338ef7;
     }
 
-    /* ===== Cover Page ===== */
-    .cover-main {
-      background-image: url('_media/login-wallpaper-blue.jpg') !important;
-      background-size: cover !important;
-      background-position: center left;
+    /* ===== Cover Page — fullscreen with parallax ===== */
+    section.cover {
+      background: none !important;
     }
-    .cover-main::before {
+    section.cover::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg, rgba(0,111,238,0.85) 0%, rgba(120,40,200,0.7) 100%);
       z-index: 0;
+      background: url('/_media/login-wallpaper-blue.jpg') center / cover no-repeat;
+      background-attachment: fixed;
     }
-    .cover-main > * {
-      position: relative;
+    section.cover::after {
+      content: '';
+      position: absolute;
+      inset: 0;
       z-index: 1;
+      background: linear-gradient(135deg, rgba(0,111,238,0.82) 0%, rgba(120,40,200,0.68) 100%);
+    }
+    section.cover .mask {
+      display: none !important;
+    }
+    section.cover .cover-main {
+      position: relative;
+      z-index: 2;
+      max-width: 700px;
     }
     section.cover .cover-main > p:last-child a {
       border-radius: 8px;
