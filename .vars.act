@@ -1,0 +1,2 @@
+GHCR_IMAGE_NAME=attraccess/attraccess
+DOCKERHUB_IMAGE_NAME=attraccess/attraccess
