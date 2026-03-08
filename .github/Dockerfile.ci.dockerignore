@@ -1,0 +1,18 @@
+# CI Dockerfile only needs: dist/, deploy/api/, docs/, entrypoint.sh
+# Exclude everything else to keep context small
+.git
+.nx
+node_modules
+**/node_modules
+apps
+libs
+tools
+patches
+coverage
+**/coverage
+**/*.spec.ts
+**/*.test.ts
+*.log
+.vscode
+.idea
+.cursor
