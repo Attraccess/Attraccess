@@ -61,17 +61,6 @@ jobs:
         env:
           NODE_ENV: production
         run: pnpm nx run-many --target=build --parallel=5
-      - name: Deploy API production dependencies
-        run: |
-          pnpm --filter ./dist/apps/api deploy --prod deploy/api
-          cd deploy/api && pnpm rebuild bcrypt sqlite3
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-${{ github.run_id }}
-          path: |
-            dist/
-            deploy/api/
 
   containerize:
     needs: [lint, typecheck, test, build]
@@ -79,11 +68,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts-${{ github.run_id }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
@@ -113,7 +97,6 @@ jobs:
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
         with:
           context: .
-          file: .github/Dockerfile.ci
           push: true
           tags: |
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:latest
