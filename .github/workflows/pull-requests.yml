@@ -82,7 +82,6 @@ jobs:
         run: pnpm nx run-many --target=build --parallel=5
 
   containerize:
-    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
