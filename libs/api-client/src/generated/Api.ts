@@ -3755,6 +3755,8 @@ export type GetSystemSettingsData = SystemSettingsDto;
 
 export type UpdateSystemSettingsData = SystemSettingsDto;
 
+export type TestSmtpSettingsData = any;
+
 export type GetFirstTimeSetupStatusData = FirstTimeSetupStatusDto;
 
 export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
@@ -5353,6 +5355,22 @@ export namespace Settings {
     export type RequestBody = UpdateSystemSettingsDto;
     export type RequestHeaders = {};
     export type ResponseBody = UpdateSystemSettingsData;
+  }
+
+  /**
+   * @description Sends a test email to the configured FROM address to verify that SMTP settings are correct and the server is reachable.
+   * @tags Settings
+   * @name TestSmtpSettings
+   * @summary Test SMTP settings by sending a test email
+   * @request POST:/api/settings/test-email
+   * @secure
+   */
+  export namespace TestSmtpSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UpdateSmtpSettingsDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = TestSmtpSettingsData;
   }
 
   /**
@@ -9252,6 +9270,28 @@ export class Api<
         secure: true,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Sends a test email to the configured FROM address to verify that SMTP settings are correct and the server is reachable.
+     *
+     * @tags Settings
+     * @name TestSmtpSettings
+     * @summary Test SMTP settings by sending a test email
+     * @request POST:/api/settings/test-email
+     * @secure
+     */
+    testSmtpSettings: (
+      data: UpdateSmtpSettingsDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<TestSmtpSettingsData, void>({
+        path: `/api/settings/test-email`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         ...params,
       }),
 

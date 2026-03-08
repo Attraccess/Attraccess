@@ -4076,6 +4076,12 @@ export type UpdateSystemSettingsData = {
 
 export type UpdateSystemSettingsResponse = SystemSettingsDto;
 
+export type TestSmtpSettingsData = {
+    requestBody: UpdateSmtpSettingsDto;
+};
+
+export type TestSmtpSettingsResponse = unknown;
+
 export type GetFirstTimeSetupStatusResponse = FirstTimeSetupStatusDto;
 
 export type ApplyFirstTimeSetupSettingsData = {
@@ -6048,6 +6054,25 @@ export type $OpenApiTs = {
                  * System settings updated.
                  */
                 200: SystemSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/test-email': {
+        post: {
+            req: TestSmtpSettingsData;
+            res: {
+                /**
+                 * Test email sent successfully.
+                 */
+                200: unknown;
+                /**
+                 * SMTP connection or email sending failed.
+                 */
+                400: unknown;
                 /**
                  * Unauthorized
                  */

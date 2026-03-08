@@ -1,10 +1,11 @@
-import { Body, Controller, ForbiddenException, Get, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from './settings.service';
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
+import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -25,6 +26,23 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'System settings updated.', type: SystemSettingsDto })
   async updateSystemSettings(@Body() body: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
     return this.settingsService.updateSystemSettings(body);
+  }
+
+  @Post('test-email')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({
+    summary: 'Test SMTP settings by sending a test email',
+    operationId: 'testSmtpSettings',
+    description: 'Sends a test email to the configured FROM address to verify that SMTP settings are correct and the server is reachable.',
+  })
+  @ApiResponse({ status: 200, description: 'Test email sent successfully.' })
+  @ApiResponse({ status: 400, description: 'SMTP connection or email sending failed.' })
+  async testSmtpSettings(@Body() body: UpdateSmtpSettingsDto): Promise<void> {
+    try {
+      await this.settingsService.testSmtpConnection(body);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'SMTP test failed');
+    }
   }
 
   @Get('first-time-setup')

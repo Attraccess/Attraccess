@@ -520,6 +520,7 @@ export type TwoFactorAuthenticationServiceVerifyTwoFactorMutationResult = Awaite
 export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.disableTwoFactor>>;
 export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setTwoFactorPolicy>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
+export type SettingsServiceTestSmtpSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.testSmtpSettings>>;
 export type SettingsServiceApplyFirstTimeSetupSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.applyFirstTimeSetupSettings>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;

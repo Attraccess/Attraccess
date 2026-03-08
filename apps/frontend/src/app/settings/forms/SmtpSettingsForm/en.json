@@ -34,11 +34,18 @@
   },
   "actions": {
     "save": "Save",
-    "next": "Next"
+    "next": "Next",
+    "test": "Send test email"
   },
   "loading": "Loading settings...",
   "success": {
     "title": "Settings saved",
     "description": "Your changes have been applied."
+  },
+  "test": {
+    "success": {
+      "title": "Test email sent",
+      "description": "A test email was sent to the from address. Check your inbox."
+    }
   }
 }

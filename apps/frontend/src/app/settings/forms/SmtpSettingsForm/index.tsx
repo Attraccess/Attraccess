@@ -8,6 +8,7 @@ import {
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
   useSettingsServiceUpdateSystemSettings,
   useSettingsServiceGetSystemSettingsKey,
+  useSettingsServiceTestSmtpSettings,
 } from '@attraccess/react-query-client';
 import { Button, Form, Input, Spinner, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -95,32 +96,58 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
   const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
 
+  const { mutate: testSmtp, isPending: isTesting } = useSettingsServiceTestSmtpSettings({
+    onSuccess() {
+      toast.success({
+        title: t('test.success.title'),
+        description: t('test.success.description'),
+      });
+    },
+    onError(error: Error) {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
+
+  const buildSmtpPayload = useCallback(() => {
+    if (smtpService !== SmtpServiceType.SMTP && smtpService !== SmtpServiceType.OUTLOOK365) return null;
+    return {
+      service: smtpService,
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: smtpSecure,
+      user: smtpUser,
+      pass: smtpPass,
+      from: smtpFrom,
+    };
+  }, [smtpService, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFrom]);
+
+  const handleTest = useCallback(() => {
+    if (!formRef.current?.checkValidity()) return;
+    const smtp = buildSmtpPayload();
+    if (!smtp) return;
+    testSmtp({ requestBody: smtp });
+  }, [buildSmtpPayload, testSmtp]);
 
   const handleSubmit = useCallback(() => {
     if (!formRef.current?.checkValidity()) return;
-    if (smtpService !== SmtpServiceType.SMTP && smtpService !== SmtpServiceType.OUTLOOK365) return;
+    const smtp = buildSmtpPayload();
+    if (!smtp) return;
 
-    const payload = {
-      requestBody: {
-        smtp: {
-          service: smtpService,
-          host: smtpHost,
-          port: Number(smtpPort),
-          secure: smtpSecure,
-          user: smtpUser,
-          pass: smtpPass,
-          from: smtpFrom,
-        },
-      },
-    }
+    const payload = { requestBody: { smtp } };
 
     if (endpoint === 'first-time-setup') {
       saveSettingsFirstTimeSetup(payload);
     } else {
       saveSettings(payload);
     }
-  }, [endpoint, smtpService, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFrom, saveSettings, saveSettingsFirstTimeSetup]);
+  }, [endpoint, buildSmtpPayload, saveSettings, saveSettingsFirstTimeSetup]);
 
   const smtpServiceOptions = [
     { key: SmtpServiceType.SMTP, label: t('service.smtp') },
@@ -207,14 +234,24 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         onValueChange={setSmtpFrom}
         isRequired
       />
-      <Button
-        color="primary"
-        onPress={handleSubmit}
-        isLoading={isSaving}
-        isDisabled={showLoading}
-      >
-        {variant === 'wizard' ? t('actions.next') : t('actions.save')}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          color="primary"
+          onPress={handleSubmit}
+          isLoading={isSaving}
+          isDisabled={showLoading || isTesting}
+        >
+          {variant === 'wizard' ? t('actions.next') : t('actions.save')}
+        </Button>
+        <Button
+          variant="bordered"
+          onPress={handleTest}
+          isLoading={isTesting}
+          isDisabled={showLoading || isSaving}
+        >
+          {t('actions.test')}
+        </Button>
+      </div>
       <input type="submit" hidden />
     </Form>
   );

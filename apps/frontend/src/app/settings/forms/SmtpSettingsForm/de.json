@@ -34,11 +34,18 @@
   },
   "actions": {
     "save": "Speichern",
-    "next": "Weiter"
+    "next": "Weiter",
+    "test": "Test-E-Mail senden"
   },
   "loading": "Einstellungen werden geladen...",
   "success": {
     "title": "Einstellungen gespeichert",
     "description": "Deine Änderungen wurden übernommen."
+  },
+  "test": {
+    "success": {
+      "title": "Test-E-Mail gesendet",
+      "description": "Eine Test-E-Mail wurde an die Absenderadresse gesendet. Prüfe dein Postfach."
+    }
   }
 }

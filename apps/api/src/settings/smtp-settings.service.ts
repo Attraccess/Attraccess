@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { createTransport } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { SmtpServiceType, SmtpSettingsDto } from './dto/smtp-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SettingsStoreService } from './settings-store.service';
@@ -17,6 +19,8 @@ export type SmtpSettingsInternal = {
 
 @Injectable()
 export class SmtpSettingsService {
+  private readonly logger = new Logger(SmtpSettingsService.name);
+
   constructor(private readonly settingsStore: SettingsStoreService) {}
 
   async getSettings(): Promise<SmtpSettingsDto> {
@@ -63,6 +67,47 @@ export class SmtpSettingsService {
     }
     if (Object.prototype.hasOwnProperty.call(update, 'from')) {
       await this.settingsStore.setPlainSetting(SMTP_PARENT, SMTP_KEYS.from, update.from ?? null);
+    }
+  }
+
+  async testConnection(dto: UpdateSmtpSettingsDto): Promise<void> {
+    let pass = dto.pass ?? null;
+    if (!pass) {
+      const stored = await this.settingsStore.getSecretSetting(SMTP_PARENT, SMTP_KEYS.pass);
+      pass = stored.value;
+    }
+
+    let transportOptions: SMTPTransport.Options;
+    if (dto.service === SmtpServiceType.Outlook365) {
+      transportOptions = {
+        service: 'Outlook365',
+        auth: dto.user || pass ? { user: dto.user ?? '', pass: pass ?? '' } : undefined,
+      };
+    } else {
+      transportOptions = {
+        host: dto.host,
+        port: dto.port,
+        secure: dto.secure ?? false,
+        auth: dto.user || pass ? { user: dto.user ?? '', pass: pass ?? '' } : undefined,
+      };
+    }
+
+    const transporter = createTransport(transportOptions);
+
+    try {
+      await transporter.verify();
+      this.logger.debug('SMTP connection verified, sending test email');
+
+      await transporter.sendMail({
+        from: dto.from,
+        to: dto.from,
+        subject: 'Attraccess SMTP Test',
+        text: 'This is a test email from Attraccess to verify your SMTP settings are configured correctly.',
+      });
+    } finally {
+      if (typeof transporter.close === 'function') {
+        transporter.close();
+      }
     }
   }
 

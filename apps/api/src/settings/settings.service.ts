@@ -116,6 +116,10 @@ export class SettingsService {
     return licenseKey.value;
   }
 
+  async testSmtpConnection(dto: UpdateSmtpSettingsDto): Promise<void> {
+    return this.smtpSettingsService.testConnection(dto);
+  }
+
   async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
     return this.smtpSettingsService.getConfiguration();
   }
