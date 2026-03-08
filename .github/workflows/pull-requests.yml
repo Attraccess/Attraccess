@@ -4,57 +4,28 @@ on:
   pull_request:
     types: [opened, synchronize]
 
-# Define environment variables
 env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-  # Enable Docker BuildKit
   DOCKER_BUILDKIT: 1
 
-# Define permissions
 permissions:
-  contents: read # Needed to checkout the code
-  packages: write # Needed to push images to GHCR
-  pull-requests: write # Needed to post comments on the PR
+  contents: read
+  packages: write
+  pull-requests: write
 
 jobs:
-  # Build and test to ensure everything is working before building the image
-  compile:
+  precommit-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # Fetch depth 0 needed for some build tools, keep if necessary
         with:
           fetch-depth: 0
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: v24.13.0
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # Install Python and PlatformIO
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install PlatformIO and ESP tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install platformio esptool
-
+      - uses: ./.github/actions/setup
       - name: Run precommit checks
         run: pnpm precommit
-
       - name: Ensure precommit does not modify files
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
@@ -64,76 +35,114 @@ jobs:
             exit 1
           fi
 
-      - name: Run build steps (adjust target as needed)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Lint affected projects
+        run: pnpm nx affected --target=lint --base=origin/${{ github.event.pull_request.base.ref }}
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Typecheck affected projects
+        run: pnpm nx affected --target=typecheck --base=origin/${{ github.event.pull_request.base.ref }}
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Test affected projects
+        run: pnpm nx affected --target=test,e2e --base=origin/${{ github.event.pull_request.base.ref }}
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build --exclude=attractap-firmware,attractap-touch-firmware # Assuming only build is needed for the image
-
-      # Upload build artifacts to be used in Docker build
+        run: pnpm nx run-many --target=build
+      - name: Deploy API production dependencies
+        run: |
+          pnpm --filter ./dist/apps/api deploy --prod deploy/api
+          cd deploy/api && pnpm rebuild bcrypt sqlite3
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-${{ github.run_id }} # Unique artifact name per run
+          name: build-artifacts-${{ github.run_id }}
           path: |
             dist/
+            deploy/api/
 
-  # Build and push Docker container
   containerize:
-    needs: compile
+    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Download build artifacts
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts-${{ github.run_id }} # Match the upload name
-          path: dist
+          name: build-artifacts-${{ github.run_id }}
 
-      # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry
-        id: login-ghcr
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Login to Docker Hub
       - name: Login to Docker Hub
-        id: login-dockerhub
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }} 
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Read Node.js version from .nvmrc
       - name: Get Node.js Version
         id: node-version
-        run: echo "NODE_VERSION=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+        run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
 
-      # Add step to get short SHA
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      # Build and push Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
         with:
           context: .
+          file: .github/Dockerfile.ci
           push: true
           tags: |
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
             ${{ env.DOCKERHUB_IMAGE_NAME }}:pr-${{ github.event.number }}-${{ steps.vars.outputs.SHORT_SHA }}
           build-args: |
             NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Optional: Add a comment to the PR with the image details
-      # Consider using actions like marocchino/sticky-pull-request-comment
       - name: Post image URL comment to PR
         uses: actions/github-script@v6
         with:
