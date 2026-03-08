@@ -704,15 +704,13 @@ export class SSOController {
     };
 
     if (redirectTo) {
-      const urlWithAuth = new URL(redirectTo);
-      urlWithAuth.searchParams.delete('accountLinking');
-      urlWithAuth.searchParams.delete('email');
-      urlWithAuth.searchParams.delete('ssoLinkToken');
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.delete('accountLinking');
+      redirectUrl.searchParams.delete('email');
+      redirectUrl.searchParams.delete('ssoLinkToken');
 
-      urlWithAuth.searchParams.set('user', JSON.stringify(auth.user));
-
-      this.logger.debug('Redirecting to', urlWithAuth.toString());
-      return response.redirect(urlWithAuth.toString());
+      this.logger.debug('Redirecting to', redirectUrl.toString());
+      return response.redirect(redirectUrl.toString());
     }
 
     return auth;
