@@ -1,16 +1,23 @@
 #include "beeper.hpp"
 
-void Beeper::setup()
-{
 #ifdef HAS_IO_EXPANDER_TCA9554
-    this->ioExpander.setup();
+#include "../ioexpander/ioexpander.hpp"
 #endif
 
+#ifdef HAS_IO_EXPANDER_TCA9554
+void Beeper::setup(IOExpander *expander)
+{
+    this->ioExpander = expander;
+}
+#else
+void Beeper::setup()
+{
 #ifdef BEEPER_PIN
     pinMode(BEEPER_PIN, OUTPUT);
     digitalWrite(BEEPER_PIN, LOW);
 #endif
 }
+#endif
 
 void Beeper::errorBeep()
 {
@@ -41,22 +48,36 @@ void Beeper::singleBeep()
         return;
     }
 
-    this->logger.debug("BEEP");
 #ifdef HAS_IO_EXPANDER_TCA9554
-    this->ioExpander.beeperOn();
+    if (this->ioExpander && this->ioExpander->hasAddressConflict())
+    {
+        return;
+    }
 #endif
 
-#ifdef BEEPER_PIN
+    this->logger.debug("BEEP");
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+    if (this->ioExpander)
+    {
+        this->ioExpander->beeperOn();
+    }
+#endif
+
+#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER_TCA9554)
     digitalWrite(BEEPER_PIN, HIGH);
 #endif
 
     delay(100);
 
 #ifdef HAS_IO_EXPANDER_TCA9554
-    this->ioExpander.beeperOff();
+    if (this->ioExpander)
+    {
+        this->ioExpander->beeperOff();
+    }
 #endif
 
-#ifdef BEEPER_PIN
+#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER_TCA9554)
     digitalWrite(BEEPER_PIN, LOW);
 #endif
 }

@@ -1,5 +1,9 @@
 #include "display.hpp"
 
+#ifdef HAS_IO_EXPANDER_TCA9554
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
 #endif
@@ -115,12 +119,20 @@ uint32_t Display::tick_cb()
     return millis();
 }
 
+#ifdef HAS_IO_EXPANDER_TCA9554
+void Display::setup(IOExpander *ioExpander)
+#else
 void Display::setup()
+#endif
 {
     Display::logger.info("Initializing");
 
 #if defined(DISPLAY_DRIVER_GT911)
+#ifdef HAS_IO_EXPANDER_TCA9554
+    Display::driver = new RgbGt911Driver(Display::logger, ioExpander);
+#else
     Display::driver = new RgbGt911Driver(Display::logger);
+#endif
 #elif defined(DISPLAY_DRIVER_QUALIA)
     Display::driver = new QualiaFtCstDriver(Display::logger);
 #else

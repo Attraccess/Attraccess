@@ -113,7 +113,10 @@ Adafruit_PN532::Adafruit_PN532(uint8_t irq, uint8_t reset, TwoWire *theWire)
     : _irq(irq), _reset(reset)
 {
   pinMode(_irq, INPUT);
-  pinMode(_reset, OUTPUT);
+  if (_reset >= 0)
+  {
+    pinMode(_reset, OUTPUT);
+  }
   i2c_dev = new Adafruit_I2CDevice(PN532_I2C_ADDRESS, theWire);
 }
 
@@ -143,7 +146,10 @@ Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
 Adafruit_PN532::Adafruit_PN532(uint8_t reset, HardwareSerial *theSer)
     : _reset(reset)
 {
-  pinMode(_reset, OUTPUT);
+  if (_reset >= 0)
+  {
+    pinMode(_reset, OUTPUT);
+  }
   ser_dev = theSer;
 }
 

@@ -9,6 +9,10 @@
 #include "../utils.hpp"
 #include "../beeper/beeper.hpp"
 
+#ifdef HAS_IO_EXPANDER_TCA9554
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
 #else
@@ -40,6 +44,9 @@ public:
     void loop();
 
 private:
+#ifdef HAS_IO_EXPANDER_TCA9554
+    IOExpander ioExpander;
+#endif
     NFC nfc;
     Logger logger;
     API api;
