@@ -3,7 +3,8 @@
 .git
 .nx
 node_modules
-**/node_modules
+# Exclude workspace node_modules but keep deploy/api/node_modules (production deps)
+!deploy/api/node_modules
 apps
 libs
 tools
