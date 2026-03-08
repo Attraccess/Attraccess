@@ -251,6 +251,17 @@ describe('SmtpSettingsService', () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
 
+    it('closes transporter after failed verify', async () => {
+      const { service, store } = setupService();
+      configureStoreWithSmtp(store, makeSmtpConfig());
+      const { close } = setupMockTransporter(
+        jest.fn().mockRejectedValue(Object.assign(new Error('refused'), { code: 'ECONNREFUSED' })),
+      );
+
+      await expect(service.updateSettings(makeUpdateDto())).rejects.toThrow(BadRequestException);
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
     it('persists all settings after successful verification', async () => {
       const { service, store } = setupService();
       configureStoreWithSmtp(store, makeSmtpConfig());

@@ -101,19 +101,22 @@ export class SmtpSettingsService {
   private async verifySmtpConnection(config: SmtpSettingsInternal): Promise<void> {
     const transportOptions = this.buildTransportOptions(config);
     const transporter = createTransport(transportOptions);
+    let phase: 'verify' | 'sendMail' = 'verify';
 
     try {
-      await Promise.race([
-        transporter.verify(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('SMTP verification timed out')), SMTP_VERIFY_TIMEOUT_MS),
-        ),
-      ]);
-    } catch (error) {
-      throw this.buildSmtpError('SMTP connection verification failed', error);
-    }
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(
+          () => reject(new Error('SMTP verification timed out')),
+          SMTP_VERIFY_TIMEOUT_MS,
+        );
 
-    try {
+        transporter
+          .verify()
+          .then(() => { clearTimeout(timeoutId); resolve(); })
+          .catch((err) => { clearTimeout(timeoutId); reject(err); });
+      });
+
+      phase = 'sendMail';
       await transporter.sendMail({
         from: config.from ?? '',
         to: config.from ?? '',
@@ -121,7 +124,10 @@ export class SmtpSettingsService {
         text: 'This is an automated test email to verify your SMTP configuration. If you received this email, your SMTP settings are working correctly.',
       });
     } catch (error) {
-      throw this.buildSmtpError('SMTP verification succeeded but sending a test email failed', error);
+      const prefix = phase === 'verify'
+        ? 'SMTP connection verification failed'
+        : 'SMTP verification succeeded but sending a test email failed';
+      throw this.buildSmtpError(prefix, error);
     } finally {
       if (typeof transporter.close === 'function') {
         transporter.close();
