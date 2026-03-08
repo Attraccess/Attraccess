@@ -1,0 +1,29 @@
+name: 'Setup Workspace'
+description: 'Install Node.js, pnpm, dependencies, Python, and PlatformIO. Must be called after actions/checkout.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup PNPM
+      uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install PlatformIO and ESP tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio esptool
+      shell: bash

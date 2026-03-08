@@ -1,87 +1,74 @@
 name: Release
 
 on:
-  # Trigger on release creation
   release:
     types: [published]
 
-# Define environment variables
 env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-  # Enable Docker BuildKit
   DOCKER_BUILDKIT: 1
-  # Determine release version
   RELEASE_VERSION: ${{ github.event.release.tag_name }}
 
-# Define permissions
 permissions:
   contents: write
   packages: write
 
 jobs:
-  # Build and test to ensure everything is working before release
-  compile:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup
+      - name: Lint all projects
+        run: pnpm nx run-many --target=lint --parallel=5
 
-      - name: Setup PNPM
-        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          node-version: v24.13.0
-          cache: 'pnpm'
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Typecheck all projects
+        run: pnpm nx run-many --target=typecheck --parallel=5
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          python-version: '3.x'
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Test all projects
+        run: pnpm nx run-many --target=test,e2e --parallel=5
 
-      - name: Install PlatformIO and ESP tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install platformio esptool
-
-      - name: Run everything
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=lint,typecheck,test,e2e,build --exclude=attractap-firmware,attractap-touch-firmware
+        run: pnpm nx run-many --target=build --parallel=5
 
-      # Upload build artifacts to be used in Docker build
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-${{ github.run_id }}
-          path: |
-            dist/
-
-  # Build and push Docker container
   containerize:
-    needs: compile
+    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Download build artifacts - Updated path to ensure dist directory structure is preserved
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts-${{ github.run_id }}
-          path: dist
-
-      # Login to GitHub Container Registry
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
@@ -89,24 +76,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Read Node.js version from .nvmrc
       - name: Get Node.js Version
         id: node-version
         run: echo "NODE_VERSION=$(cat .nvmrc | tr -d '[:space:]')" >> $GITHUB_OUTPUT
 
-      # Add step to get short SHA
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      # Build and push Docker image in one step
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push Docker image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25
         with:
@@ -121,10 +107,10 @@ jobs:
             ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ env.RELEASE_VERSION }}-${{ steps.vars.outputs.SHORT_SHA }}
           build-args: |
             NODE_VERSION=${{ steps.node-version.outputs.NODE_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Update GitHub Release with Docker image information
       - name: Update GitHub Release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -154,18 +140,16 @@ jobs:
           append_body: true
 
   balena:
-    needs: compile
+    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Add step to get short SHA
       - name: Get short SHA
         id: vars
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      # set balena.yml version to semver with build metadata: ${{ env.RELEASE_VERSION }}+${{ steps.vars.outputs.SHORT_SHA }}
       - name: Set balena.yml version
         run: |
           sed -i "s/{{VERSION_TO_BE_REPLACED}}/${{ env.RELEASE_VERSION }}/" balena.yml
@@ -174,7 +158,6 @@ jobs:
       - name: Balena Release
         run: |
           BALENA_CLI_VERSION=v22.4.9
-          # Install balena-cli via standlone zip to save install time
           wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
           balena/bin/balena login --token "${{ secrets.BALENA_TOKEN }}"
           balena/bin/balena push ${{ secrets.BALENA_FLEET }} --note 'Release ${{ env.RELEASE_VERSION }} @ ${{ steps.vars.outputs.SHORT_SHA }}'
