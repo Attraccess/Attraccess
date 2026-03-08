@@ -14,6 +14,7 @@ This page lists frequently encountered problems and their solutions.
 | Wrong callback URL | The callback URL configured in your SSO provider must match your Attraccess URL exactly. Check the provider settings. |
 | Clock out of sync | OIDC and SAML tokens are time-sensitive. Make sure the server clock is synchronized (use NTP). |
 | Cookie SameSite setting | If set to "strict", SSO redirects may fail. Change the cookie SameSite setting to "lax" in the system settings. |
+| Not redirected to original page after SSO login | Your identity provider may not be passing the OIDC `state` parameter back unchanged. Check your IdP's OIDC/OAuth settings and ensure the state parameter is preserved during the callback. |
 
 ## Emails Not Sending
 

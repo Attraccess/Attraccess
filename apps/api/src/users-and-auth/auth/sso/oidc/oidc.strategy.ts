@@ -18,10 +18,13 @@ import {
   normalizePermissionToken,
   resolvePermissionsFromRoles,
 } from '../permission-mapping';
-import { OidcCookieStateStore } from './oidc-cookie-state-store';
+import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
 /** Request key set by SSOOIDCGuard so the strategy uses the per-request callback URL (current settings, no restart needed). */
 export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
+
+/** Request key set by SSOOIDCGuard for login route: state to pass to OIDC (e.g. { redirectTo }). */
+export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true) {
@@ -51,12 +54,28 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
   }
 
   /**
-   * Use per-request callback URL from the guard when set (so frontend/backend URL changes apply without restart).
+   * Use per-request callback URL and state from the guard when set (so frontend/backend URL changes apply without restart).
+   * State encodes redirectTo for fixed callback URIs (OIDC spec: use state param instead of redirect_uri query).
    */
   authenticate(req: Parameters<InstanceType<typeof Strategy>['authenticate']>[0], options?: Parameters<InstanceType<typeof Strategy>['authenticate']>[1]): void {
-    const dynamicCallback = (req as unknown as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] as string | undefined;
-    const opts = dynamicCallback ? { ...options, callbackURL: dynamicCallback } : options;
+    const reqExt = req as unknown as Record<string, unknown>;
+    const dynamicCallback = reqExt[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] as string | undefined;
+    const stateFromGuard = reqExt[SSO_OIDC_STATE_REQUEST_KEY];
+    if (!dynamicCallback && !this.isOIDCAppState(stateFromGuard)) {
+      return super.authenticate(req, options);
+    }
+    const opts = { ...options };
+    if (dynamicCallback) opts.callbackURL = dynamicCallback;
+    if (this.isOIDCAppState(stateFromGuard)) opts.state = stateFromGuard;
     super.authenticate(req, opts);
+  }
+
+  private isOIDCAppState(value: unknown): value is OIDCAppState {
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      (!('redirectTo' in value) || typeof (value as OIDCAppState).redirectTo === 'string')
+    );
   }
 
   private firstNonEmptyStringFromPaths(paths: string[], sources: unknown[]): string | undefined {

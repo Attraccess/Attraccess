@@ -17,6 +17,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { LicenseService } from '../../../license/license.service';
 import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
+import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
 
 describe('SsoController', () => {
   let controller: SSOController;
@@ -409,7 +410,7 @@ describe('SsoController', () => {
       });
     });
 
-    it('should handle redirect with user data for web browsers', async () => {
+    it('should redirect without leaking user data in URL', async () => {
       const redirectTo = 'http://localhost:3000/dashboard';
 
       await controller.oidcLoginCallback(
@@ -419,17 +420,11 @@ describe('SsoController', () => {
       );
 
       expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
-      expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user))),
-      );
+      expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/dashboard');
     });
 
-    it('should handle redirect with auth data for programmatic requests', async () => {
-      // Modify request to look programmatic
-      mockRequest.headers.accept = 'application/json';
-      mockRequest.headers['user-agent'] = 'curl/7.68.0';
-
-      const redirectTo = 'http://localhost:3000/api/callback';
+    it('should strip account-linking params from redirect URL', async () => {
+      const redirectTo = 'http://localhost:3000/dashboard?accountLinking=true&email=test@x.com&ssoLinkToken=abc';
 
       await controller.oidcLoginCallback(
         mockRequest as unknown as AuthenticatedRequest,
@@ -437,9 +432,21 @@ describe('SsoController', () => {
         mockResponse as unknown as Response,
       );
 
-      expect(mockResponse.cookie).not.toHaveBeenCalled();
+      expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/dashboard');
+    });
+
+    it('should prefer redirectTo from OIDC state over query param (fixed callback URI)', async () => {
+      const redirectFromState = 'https://app.example.com/from-state';
+      (mockRequest as Record<string, unknown>)[SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY] = redirectFromState;
+
+      await controller.oidcLoginCallback(
+        mockRequest as unknown as AuthenticatedRequest,
+        'https://app.example.com/from-query',
+        mockResponse as unknown as Response,
+      );
+
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining('user=' + encodeURIComponent(JSON.stringify(mockRequest.user))),
+        expect.stringContaining(redirectFromState),
       );
     });
   });

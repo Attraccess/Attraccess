@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
-import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
 import { SSOProviderType } from '@attraccess/database-entities';
@@ -92,9 +92,9 @@ export class SSOOIDCGuard implements CanActivate {
 
     const callbackURL = new URL(url);
     callbackURL.pathname = `/api/auth/sso/${ssoType}/${providerId}/callback`;
-    callbackURL.searchParams.set('redirectTo', redirectTo);
 
-    this.logger.debug(`Callback URL: ${callbackURL}`);
+    this.logger.debug(`Callback URL (fixed): ${callbackURL}`);
+
     this.logger.debug(
       `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
     );
@@ -104,6 +104,10 @@ export class SSOOIDCGuard implements CanActivate {
     new SSOOIDCStrategy(this.moduleRef, oidcConfig, callbackURL.toString(), this.stateStore);
     // Also pass callback URL on the request as a backup for the strategy's authenticate() override
     (req as Record<string, unknown>)[SSO_OIDC_CALLBACK_URL_REQUEST_KEY] = callbackURL.toString();
+    // For login: pass redirectTo in state so it survives the IdP round-trip (OIDC spec)
+    if (!isCallbackRoute) {
+      (req as Record<string, unknown>)[SSO_OIDC_STATE_REQUEST_KEY] = { redirectTo };
+    }
     this.logger.debug(`OIDC Guard activation for ${routeAction} successful`);
     return true;
   }

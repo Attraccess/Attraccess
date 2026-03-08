@@ -58,6 +58,7 @@ import { SettingsService } from '../settings/settings.service';
           {
             rootPath: resolvedDocsPath,
             serveRoot: '/docs',
+            renderPath: '/__docs_noop__',
           },
         ];
       },
@@ -100,7 +101,7 @@ import { SettingsService } from '../settings/settings.service';
         return [
           {
             rootPath: resolvedFrontendPath,
-            // serveRoot: '/' // Default serveRoot is '/'
+            exclude: ['/api/{*path}', '/docs/{*path}'],
           },
         ];
       },
