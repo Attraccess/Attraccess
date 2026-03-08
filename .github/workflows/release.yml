@@ -66,7 +66,6 @@ jobs:
           pnpm --filter ./dist/apps/api deploy --prod deploy/api
           cd deploy/api && pnpm rebuild bcrypt sqlite3
       - name: Upload build artifacts
-        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ github.run_id }}
@@ -75,7 +74,6 @@ jobs:
             deploy/api/
 
   containerize:
-    if: ${{ !github.event.act }}
     needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
@@ -159,7 +157,6 @@ jobs:
           append_body: true
 
   balena:
-    if: ${{ !github.event.act }}
     needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:

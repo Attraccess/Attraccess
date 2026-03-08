@@ -27,7 +27,6 @@ jobs:
       - name: Run precommit checks
         run: pnpm precommit
       - name: Ensure precommit does not modify files
-        if: ${{ !env.ACT }}
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "pnpm precommit modified files. Please run it locally and commit the changes."
@@ -45,12 +44,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Lint affected projects
-        run: |
-          if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-            pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
-          else
-            pnpm nx run-many --target=lint --parallel=5
-          fi
+        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   typecheck:
     runs-on: ubuntu-latest
@@ -61,12 +55,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Typecheck affected projects
-        run: |
-          if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-            pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
-          else
-            pnpm nx run-many --target=typecheck --parallel=5
-          fi
+        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   test:
     runs-on: ubuntu-latest
@@ -77,12 +66,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Test affected projects
-        run: |
-          if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-            pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
-          else
-            pnpm nx run-many --target=test,e2e --parallel=5
-          fi
+        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   build:
     runs-on: ubuntu-latest
@@ -101,7 +85,6 @@ jobs:
           pnpm --filter ./dist/apps/api deploy --prod deploy/api
           cd deploy/api && pnpm rebuild bcrypt sqlite3
       - name: Upload build artifacts
-        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ github.run_id }}
@@ -110,7 +93,6 @@ jobs:
             deploy/api/
 
   containerize:
-    if: ${{ !github.event.act }}
     needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:

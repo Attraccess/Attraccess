@@ -33,7 +33,3 @@ secrets/
 .autopilot.json
 .mcp_data/
 .claude/worktrees/
-
-# act (local GitHub Actions runner)
-.secrets
-.artifacts/
