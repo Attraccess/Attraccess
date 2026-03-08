@@ -1,7 +1,7 @@
 {
   "generic": {
     "title": "Server Fehler",
-    "description": "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+    "description": "{{error}}"
   },
   "FLOW_EXECUTION_ERROR": {
     "title": "Fehler bei der Durchführung",

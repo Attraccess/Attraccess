@@ -1,7 +1,7 @@
 {
   "generic": {
     "title": "Server Error",
-    "description": "An error occurred. Please try again."
+    "description": "{{error}}"
   },
   "FLOW_EXECUTION_ERROR": {
     "title": "Error during execution",

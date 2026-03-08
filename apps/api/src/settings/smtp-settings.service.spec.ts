@@ -262,6 +262,37 @@ describe('SmtpSettingsService', () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
 
+    it('verifies and saves without auth when user and pass are null', async () => {
+      const { service, store } = setupService();
+      configureStoreWithSmtp(store, makeSmtpConfig({ user: null, pass: null, passConfigured: false }));
+      const { verify, sendMail } = setupMockTransporter();
+
+      const dto = makeUpdateDto();
+      delete (dto as unknown as Record<string, unknown>)['user'];
+      delete (dto as unknown as Record<string, unknown>)['pass'];
+
+      await service.updateSettings(dto);
+
+      expect(verify).toHaveBeenCalledTimes(1);
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(createTransport).toHaveBeenCalledWith(
+        expect.not.objectContaining({ auth: expect.anything() }),
+      );
+      expect(store.setPlainSetting).toHaveBeenCalled();
+    });
+
+    it('omits auth when user is explicitly null in update', async () => {
+      const { service, store } = setupService();
+      configureStoreWithSmtp(store, makeSmtpConfig({ user: null, pass: null, passConfigured: false }));
+      setupMockTransporter();
+
+      await service.updateSettings(makeUpdateDto({ user: null, pass: null }));
+
+      expect(createTransport).toHaveBeenCalledWith(
+        expect.not.objectContaining({ auth: expect.anything() }),
+      );
+    });
+
     it('persists all settings after successful verification', async () => {
       const { service, store } = setupService();
       configureStoreWithSmtp(store, makeSmtpConfig());
