@@ -157,7 +157,7 @@
       position: absolute;
       inset: 0;
       z-index: 0;
-      background: url('/_media/login-wallpaper-blue.jpg') center / cover no-repeat;
+      background: url('./_media/login-wallpaper-blue.jpg') center / cover no-repeat;
     }
     section.cover::after {
       content: '';
@@ -427,7 +427,7 @@
 
     // ===== Docsify Configuration =====
     window.$docsify = {
-      name: '<img src="/_media/logo.png" alt="Logo" width="28"> Attraccess',
+      name: '<img src="./_media/logo.png" alt="Logo" width="28"> Attraccess',
       repo: 'https://github.com/Attraccess/Attraccess',
       homepage: 'home.md',
       loadSidebar: '_sidebar.md',
@@ -436,7 +436,7 @@
       onlyCover: false,
       subMaxLevel: 3,
       auto2top: true,
-      basePath: '/' + currentLang + '/',
+      basePath: './' + currentLang + '/',
       search: {
         maxAge: 86400000,
         paths: 'auto',
