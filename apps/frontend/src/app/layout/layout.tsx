@@ -45,9 +45,8 @@ export function Layout({ children, noLayout }: LayoutProps) {
       isFirstRender.current = false;
       return;
     }
-    if (window.innerWidth < 768) {
-      setIsOpen(false);
-    }
+
+    setIsOpen(false);
   }, [location.pathname]);
 
   const { user: currentUser, isAuthenticated, needsTwoFactorSetup } = useAuth();
