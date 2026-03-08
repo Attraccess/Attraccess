@@ -77,6 +77,9 @@ https://your-attraccess-url.com/api/auth/sso/OIDC/{provider-id}/callback
 
 The provider ID is shown after creating the provider.
 
+> [!IMPORTANT]
+> The callback URL must match exactly — do not append query parameters. Attraccess uses the OIDC `state` parameter to track where users should be redirected after login. Make sure your identity provider passes the `state` parameter back unchanged during the callback.
+
 ## Testing
 
 1. Log out

@@ -14,6 +14,7 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 | Falsche Callback-URL | Die im SSO-Anbieter konfigurierte Callback-URL muss exakt mit Ihrer Attraccess-URL übereinstimmen. Prüfen Sie die Anbieter-Einstellungen. |
 | Uhr nicht synchron | OIDC- und SAML-Tokens sind zeitempfindlich. Stellen Sie sicher, dass die Serveruhr synchronisiert ist (NTP verwenden). |
 | Cookie-SameSite-Einstellung | Bei der Einstellung "strict" können SSO-Weiterleitungen fehlschlagen. Ändern Sie die Cookie-SameSite-Einstellung in den Systemeinstellungen auf "lax". |
+| Nach SSO-Anmeldung keine Weiterleitung zur ursprünglichen Seite | Ihr Identity Provider gibt möglicherweise den OIDC-`state`-Parameter nicht unverändert zurück. Prüfen Sie die OIDC-/OAuth-Einstellungen Ihres IdP und stellen Sie sicher, dass der State-Parameter beim Callback erhalten bleibt. |
 
 ## E-Mails werden nicht gesendet
 
