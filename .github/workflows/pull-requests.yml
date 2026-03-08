@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
 
-  lint:
+  lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,15 +45,6 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Lint affected projects
         run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup
       - name: Typecheck affected projects
         run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
@@ -67,19 +58,6 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Test affected projects
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup
-      - name: Build all projects
-        env:
-          NODE_ENV: production
-        run: pnpm nx run-many --target=build --parallel=5
 
   containerize:
     runs-on: ubuntu-latest
