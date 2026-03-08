@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=lint --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   typecheck:
     runs-on: ubuntu-latest
@@ -55,7 +55,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=typecheck --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   test:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Test affected projects
-        run: pnpm nx affected --target=test,e2e --base=origin/${{ github.event.pull_request.base.ref }}
+        run: pnpm nx affected --target=test,e2e --parallel=5 --base=origin/${{ github.event.pull_request.base.ref }}
 
   build:
     runs-on: ubuntu-latest
@@ -79,7 +79,7 @@ jobs:
       - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=build
+        run: pnpm nx run-many --target=build --parallel=5
       - name: Deploy API production dependencies
         run: |
           pnpm --filter ./dist/apps/api deploy --prod deploy/api
