@@ -54,6 +54,12 @@ describe('EmailService', () => {
         from: 'no-reply@example.com',
         passConfigured: true,
       }),
+      buildSmtpTransportOptions: jest.fn().mockReturnValue({
+        host: 'smtp.example.com',
+        port: 587,
+        secure: false,
+        auth: { user: 'mailer@example.com', pass: 'secret' },
+      }),
     };
     const emailTemplateService = {
       findOne: jest.fn().mockImplementation((type: EmailTemplateType) => {
