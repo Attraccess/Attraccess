@@ -207,7 +207,7 @@ export class AuthService {
     const token = nanoid();
     const storedToken = this.tokenHashService.hashToken(token);
 
-    this.logger.debug(`Setting email verification token for user ID: ${user.id} to: ${token}`);
+    this.logger.debug(`Setting email verification token for user ID: ${user.id}`);
     await this.usersService.updateOne(
       user.id,
       {
