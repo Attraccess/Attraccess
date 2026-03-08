@@ -1,6 +1,15 @@
 #include "rgb_gt911_driver.hpp"
 
+#ifdef HAS_IO_EXPANDER_TCA9554
+#include "../../../ioexpander/ioexpander.hpp"
+#endif
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+RgbGt911Driver::RgbGt911Driver(Logger &logger, IOExpander *ioExpander)
+    : logger(logger), ioExpander(ioExpander) {}
+#else
 RgbGt911Driver::RgbGt911Driver(Logger &logger) : logger(logger) {}
+#endif
 
 bool RgbGt911Driver::begin()
 {
@@ -20,13 +29,33 @@ bool RgbGt911Driver::begin()
         480 /* width */, 480 /* height */, rgbpanel, 2 /* rotation */, true /* auto_flush */,
         bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
 
-    touch.setPins(-1, 16);
-    if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7))
+    gfx->begin();
+    screenWidth = gfx->width();
+    screenHeight = gfx->height();
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+    if (this->ioExpander)
     {
-        logger.error("Failed to find GT911 - check your wiring!");
-        return false;
+        logger.info("Resetting GT911 via IO expander (EXIO0)");
+        this->ioExpander->resetTouchPanel();
+    }
+#endif
+
+    touch.setPins(-1, 16);
+    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7);
+    if (!touchFound)
+    {
+        logger.info("GT911 not at 0x5D, trying 0x14");
+        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, 15, 7);
+    }
+    if (!touchFound)
+    {
+        logger.error("GT911 not found — display will work without touch");
+        initialized = true;
+        return true;
     }
     logger.info("Init GT911 Sensor success!");
+    touchInitialized = true;
 
     touch.setHomeButtonCallback([](void *user_data)
                                 {
@@ -36,11 +65,8 @@ bool RgbGt911Driver::begin()
             lg->info("Home button pressed!");
         } },
                                 &logger);
-    touch.setMaxTouchPoint(1); // max is 5
+    touch.setMaxTouchPoint(1);
 
-    gfx->begin();
-    screenWidth = gfx->width();
-    screenHeight = gfx->height();
     initialized = true;
     return true;
 }
@@ -61,7 +87,7 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
 {
     point.pressed = false;
 
-    if (!initialized || !gfx)
+    if (!initialized || !gfx || !touchInitialized)
     {
         return false;
     }

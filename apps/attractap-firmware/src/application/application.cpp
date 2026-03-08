@@ -30,13 +30,31 @@ void Application::setup()
     Settings::setup();
     SerialCommandHandler::setup();
     Network::setup();
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+    this->ioExpander.setup();
+    this->beeper.setup(&this->ioExpander);
+#else
     this->beeper.setup();
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
+#ifdef HAS_IO_EXPANDER_TCA9554
+    Display::setup(&this->ioExpander);
+#else
     Display::setup();
+#endif
 #endif
 
     this->nfc.setup();
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+    if (this->ioExpander.hasAddressConflict())
+    {
+        this->ioExpander.fullRefresh();
+    }
+#endif
+
     this->api.setup();
 
 #ifdef HAS_LVGL_DISPLAY
@@ -393,6 +411,7 @@ void Application::loop()
 #endif
 
     nfc.loop();
+
     this->api.loop();
 
     this->processState();
@@ -405,10 +424,9 @@ void Application::processState()
 
     if (!connectionIsConfigured)
     {
-        this->logger.debug("Connection is not configured, showing connection configuration screen");
         if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
-            this->logger.debug("Connection is not configured, showing connection configuration screen");
+            this->logger.debug("Connection not configured, showing config screen");
             this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
 
 #ifdef HAS_LVGL_DISPLAY
