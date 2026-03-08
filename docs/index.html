@@ -370,17 +370,141 @@
       transform: scaleX(-1);
     }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-      .lang-switcher {
+    /* ===== Mobile Responsive ===== */
+    /* Use 767px to avoid conflict with Docsify's 768px sidebar breakpoint */
+    @media (max-width: 767px) {
+      /* Hide GitHub corner on mobile — it overlaps sidebar toggle and content */
+      .github-corner {
+        display: none !important;
+      }
+
+      /* Push content right to clear the sidebar toggle strip (32px wide) */
+      section.content {
+        padding-left: 40px !important;
+        padding-right: 8px !important;
+      }
+      .markdown-section {
+        padding: 0 8px !important;
+        max-width: 100% !important;
+        font-size: 15px;
+      }
+
+      /* Scale down headings for small screens */
+      .markdown-section h1 {
+        font-size: 1.6em;
+        word-break: break-word;
+      }
+      .markdown-section h2 {
+        font-size: 1.3em;
+        margin-top: 1.8em;
+      }
+      .markdown-section h3 {
+        font-size: 1.15em;
+      }
+      .markdown-section h4 {
+        font-size: 1.05em;
+      }
+
+      /* Tables: horizontal scroll on overflow */
+      .markdown-section table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+      }
+      .markdown-section table th,
+      .markdown-section table td {
+        padding: 8px 10px;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+
+      /* Code blocks: prevent overflow */
+      .markdown-section pre {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 6px;
+        padding: 12px !important;
+        font-size: 13px;
+      }
+      .markdown-section code {
+        word-break: break-word;
+      }
+
+      /* Images: constrain to viewport */
+      .markdown-section img {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* Cover page refinements */
+      section.cover {
+        padding: 20px 16px !important;
+      }
+      section.cover .cover-main {
+        max-width: 100%;
+        padding: 0 8px;
+      }
+      section.cover .cover-main h1 {
+        font-size: 2em !important;
+      }
+      section.cover img {
+        width: 80px;
+        border-radius: 12px;
+      }
+      section.cover .cover-main > p:last-child a {
+        display: block;
+        margin: 8px 0;
+        text-align: center;
+        padding: 12px 20px;
+      }
+
+      /* Lang switcher + theme toggle: bottom bar on mobile */
+      .lang-switcher,
+      .theme-toggle {
+        position: fixed;
         top: auto;
-        bottom: 12px;
-        right: 12px;
+        bottom: 16px;
+        z-index: 100;
+      }
+      .lang-switcher {
+        right: 16px;
+        left: auto;
       }
       .theme-toggle {
-        top: auto;
-        bottom: 12px;
-        right: 140px;
+        right: auto;
+        left: 16px;
+        padding: 6px 12px;
+      }
+
+      /* Alert/callout boxes: tighter padding */
+      .markdown-section .tip,
+      .markdown-section .warn,
+      .markdown-section .note {
+        padding: 12px 14px;
+      }
+
+      /* Blockquotes */
+      .markdown-section blockquote {
+        margin-left: 0;
+        margin-right: 0;
+        padding: 8px 14px;
+      }
+
+      /* Bottom padding so pagination clears the floating toggles */
+      .docsify-pagination-container {
+        margin-bottom: 56px !important;
+      }
+    }
+
+    /* Tablet adjustments (768px = Docsify sidebar visible breakpoint) */
+    @media (min-width: 768px) and (max-width: 1024px) {
+      .markdown-section {
+        max-width: 100%;
+        padding-right: 24px !important;
+      }
+      .markdown-section h1 {
+        font-size: 1.8em;
       }
     }
   </style>
