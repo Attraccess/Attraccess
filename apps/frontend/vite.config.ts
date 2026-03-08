@@ -11,9 +11,6 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
-  // In dev, proxy API requests through the Vite dev server so cookies are same-origin
-  // regardless of whether the browser uses localhost or 127.0.0.1.
-  const apiTarget = process.env.ATTRACCESS_URL ?? 'http://localhost:3000';
 
   return {
   root: __dirname,
@@ -24,7 +21,7 @@ export default defineConfig(({ command }) => {
     ...(isDev ? {
       proxy: {
         '/api': {
-          target: apiTarget,
+          target: 'http://localhost:3000',
           changeOrigin: true,
           ws: true,
         },

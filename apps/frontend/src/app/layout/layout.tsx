@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
@@ -36,6 +37,17 @@ export function Layout({ children, noLayout }: LayoutProps) {
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
+
+  const location = useLocation();
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const { user: currentUser, isAuthenticated, needsTwoFactorSetup } = useAuth();
   const queryClient = useQueryClient();
