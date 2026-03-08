@@ -32,6 +32,7 @@ import { Request, Response } from 'express';
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
 import { UsersService } from '../../users/users.service';
 import { AccountLinkingExceptionFilter } from './oidc/account-linking.exception-filter';
+import { getRedirectToFromRequest } from './oidc/oidc-cookie-state-store';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { ApiBadRequestResponse } from '@nestjs/swagger';
 import { SSOSamlGuard } from './saml/saml.guard';
@@ -623,9 +624,13 @@ export class SSOController {
   @UseFilters(AccountLinkingExceptionFilter)
   async oidcLoginCallback(
     @Req() request: AuthenticatedRequest,
-    @Query('redirectTo') redirectTo: string | undefined,
+    @Query('redirectTo') redirectToQuery: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateSessionResponse | void> {
+    const redirectTo = getRedirectToFromRequest(
+      request as unknown as Record<string, unknown>,
+      redirectToQuery,
+    );
     return this.finalizeLogin(request, response, redirectTo);
   }
 
@@ -699,15 +704,13 @@ export class SSOController {
     };
 
     if (redirectTo) {
-      const urlWithAuth = new URL(redirectTo);
-      urlWithAuth.searchParams.delete('accountLinking');
-      urlWithAuth.searchParams.delete('email');
-      urlWithAuth.searchParams.delete('ssoLinkToken');
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.delete('accountLinking');
+      redirectUrl.searchParams.delete('email');
+      redirectUrl.searchParams.delete('ssoLinkToken');
 
-      urlWithAuth.searchParams.set('user', JSON.stringify(auth.user));
-
-      this.logger.debug('Redirecting to', urlWithAuth.toString());
-      return response.redirect(urlWithAuth.toString());
+      this.logger.debug('Redirecting to', redirectUrl.toString());
+      return response.redirect(redirectUrl.toString());
     }
 
     return auth;

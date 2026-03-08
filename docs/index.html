@@ -157,7 +157,7 @@
       position: absolute;
       inset: 0;
       z-index: 0;
-      background: url('/_media/login-wallpaper-blue.jpg') center / cover no-repeat;
+      background: var(--cover-bg-image) center / cover no-repeat;
     }
     section.cover::after {
       content: '';
@@ -549,9 +549,17 @@
     var theme = savedTheme || (prefersDark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
 
+    // ===== Resolve base path: works at site root (GitHub Pages) and under /docs/ (Docker) =====
+    var docsBase = (function() {
+      var path = window.location.pathname;
+      if (path.charAt(path.length - 1) !== '/') path += '/';
+      return path;
+    })();
+    document.documentElement.style.setProperty('--cover-bg-image', "url('" + docsBase + "_media/login-wallpaper-blue.jpg')");
+
     // ===== Docsify Configuration =====
     window.$docsify = {
-      name: '<img src="/_media/logo.png" alt="Logo" width="28"> Attraccess',
+      name: '<img src="' + docsBase + '_media/logo.png" alt="Logo" width="28"> Attraccess',
       repo: 'https://github.com/Attraccess/Attraccess',
       homepage: 'home.md',
       loadSidebar: '_sidebar.md',
@@ -560,7 +568,7 @@
       onlyCover: false,
       subMaxLevel: 3,
       auto2top: true,
-      basePath: '/' + currentLang + '/',
+      basePath: docsBase + currentLang + '/',
       search: {
         maxAge: 86400000,
         paths: 'auto',

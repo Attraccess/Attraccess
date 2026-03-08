@@ -1,6 +1,6 @@
 import { ExecutionContext } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc.guard';
-import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
+import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy';
 import { SettingsService } from '../../../../settings/settings.service';
 import { SSOService } from '../sso.service';
 import { LicenseService } from '../../../../license/license.service';
@@ -78,7 +78,7 @@ describe('SSOOIDCGuard', () => {
     );
   });
 
-  it('sets per-request callback URL on request so strategy uses current settings (no restart needed)', async () => {
+  it('sets per-request callback URL (fixed, no query) and state with redirectTo on request', async () => {
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/1/login?redirectTo=/dashboard',
     };
@@ -87,12 +87,11 @@ describe('SSOOIDCGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('api.example.com');
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('/api/auth/sso/OIDC/1/callback');
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('redirectTo');
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toBe('https://api.example.com/api/auth/sso/OIDC/1/callback');
+    expect(req[SSO_OIDC_STATE_REQUEST_KEY]).toEqual({ redirectTo: '/dashboard' });
   });
 
-  it('builds callback URL from URL setting and provider id', async () => {
+  it('builds fixed callback URL from URL setting and provider id, passes redirectTo in state', async () => {
     settingsService.getUrl.mockResolvedValue('https://backend.mycompany.com');
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/42/login?redirectTo=/home',
@@ -101,12 +100,11 @@ describe('SSOOIDCGuard', () => {
 
     await guard.canActivate(context);
 
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('https://backend.mycompany.com');
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('/api/auth/sso/OIDC/42/callback');
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('redirectTo');
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toBe('https://backend.mycompany.com/api/auth/sso/OIDC/42/callback');
+    expect(req[SSO_OIDC_STATE_REQUEST_KEY]).toEqual({ redirectTo: '/home' });
   });
 
-  it('allows callback route without redirectTo (IdP may strip query params)', async () => {
+  it('allows callback route without redirectTo (redirectTo comes from state)', async () => {
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/1/callback?code=abc&state=xyz',
     };
@@ -115,7 +113,8 @@ describe('SSOOIDCGuard', () => {
     const result = await guard.canActivate(context);
 
     expect(result).toBe(true);
-    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toContain('/api/auth/sso/OIDC/1/callback');
+    expect(req[SSO_OIDC_CALLBACK_URL_REQUEST_KEY]).toBe('https://api.example.com/api/auth/sso/OIDC/1/callback');
+    expect(req[SSO_OIDC_STATE_REQUEST_KEY]).toBeUndefined();
   });
 
   // ─── Regression guards: strategy must be created per request with real config ──
