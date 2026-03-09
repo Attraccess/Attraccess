@@ -3567,6 +3567,35 @@ export type AttractapFirmware = {
     flashSize: string;
 };
 
+export type AiStatusDto = {
+    /**
+     * Whether AI features are enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether Ollama is reachable
+     */
+    ollamaConnected: boolean;
+    /**
+     * Whether all required models are downloaded and ready
+     */
+    modelsReady: boolean;
+    /**
+     * Whether models are currently being pulled
+     */
+    modelsPulling: boolean;
+    /**
+     * Progress of model pulls (model name to status string)
+     */
+    pullProgress?: {
+        [key: string]: (string);
+    };
+    /**
+     * Whether RAG document embeddings are indexed
+     */
+    embeddingIndexed: boolean;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -5059,6 +5088,24 @@ export type GetBillingTransactionsInDateRangeData = {
 };
 
 export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
+
+export type AiControllerChatResponse = unknown;
+
+export type AiControllerListConversationsResponse = unknown;
+
+export type AiControllerGetConversationMessagesData = {
+    uuid: string;
+};
+
+export type AiControllerGetConversationMessagesResponse = unknown;
+
+export type AiControllerGetStatusResponse = AiStatusDto;
+
+export type AiControllerClearConversationData = {
+    conversationId: string;
+};
+
+export type AiControllerClearConversationResponse = void;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -7936,6 +7983,58 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/ai/chat': {
+        post: {
+            res: {
+                /**
+                 * AI SDK data stream
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/ai/conversations': {
+        get: {
+            res: {
+                /**
+                 * List of conversations
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/ai/conversations/{uuid}/messages': {
+        get: {
+            req: AiControllerGetConversationMessagesData;
+            res: {
+                /**
+                 * Conversation messages
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/ai/status': {
+        get: {
+            res: {
+                /**
+                 * AI status information
+                 */
+                200: AiStatusDto;
+            };
+        };
+    };
+    '/api/ai/chat/{conversationId}': {
+        delete: {
+            req: AiControllerClearConversationData;
+            res: {
+                /**
+                 * Conversation cleared
+                 */
+                204: void;
             };
         };
     };

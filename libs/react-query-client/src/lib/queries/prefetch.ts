@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AiService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
@@ -252,3 +252,8 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
+export const prefetchUseAiServiceAiControllerListConversations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerListConversationsKeyFn(), queryFn: () => AiService.aiControllerListConversations() });
+export const prefetchUseAiServiceAiControllerGetConversationMessages = (queryClient: QueryClient, { uuid }: {
+  uuid: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerGetConversationMessagesKeyFn({ uuid }), queryFn: () => AiService.aiControllerGetConversationMessages({ uuid }) });
+export const prefetchUseAiServiceAiControllerGetStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerGetStatusKeyFn(), queryFn: () => AiService.aiControllerGetStatus() });

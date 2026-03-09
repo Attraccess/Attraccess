@@ -102,3 +102,4 @@ export * from './1772616264344-RemoveFrontendUrlSetting';
 export * from './1772617000000-add-cookie-same-site-setting';
 export * from './1772618000000-remove-cookie-same-site-setting';
 export * from './1772620000000-doc-embeddings';
+export * from './1772625000000-ai-conversations';

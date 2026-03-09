@@ -53,6 +53,7 @@ import {
   User,
   entities,
   UsageDurationUnit,
+  DocEmbedding,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -160,6 +161,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const formSubmissionRepo = dataSource.getRepository(FormSubmission);
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
+  const docEmbeddingRepo = dataSource.getRepository(DocEmbedding);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -447,6 +449,13 @@ const seedDatabase = async (dataSource: DataSource) => {
     subject: 'Verify your email',
     body: 'Hello {{name}}',
     variables: ['{{name}}', '{{url}}'],
+  }));
+
+  await ensureEntity(docEmbeddingRepo, () => ({
+    source: `seed-doc-${seedTag}`,
+    chunkIndex: 0,
+    content: 'Seed embedding content',
+    embedding: [0.1, 0.2, 0.3],
   }));
 };
 

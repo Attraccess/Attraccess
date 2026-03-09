@@ -51,6 +51,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         onPress={handleSend}
         isDisabled={disabled || !value.trim()}
         aria-label={t('aiChat.send')}
+        data-testid="ai-chat-send"
       >
         <Send size={16} />
       </Button>

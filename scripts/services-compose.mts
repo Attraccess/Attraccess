@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, render, useApp, useInput } from 'ink';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { existsSync } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -10,23 +10,11 @@ import { fileURLToPath } from 'url';
 const execFileAsync = promisify(execFile);
 const h = React.createElement;
 
+type ProgressCallback = (line: string) => void;
+
 type Action = 'up' | 'stop' | 'down' | 'status' | 'list';
 
 const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
-
-const SETS: Record<string, string[]> = {
-  mailpit: ['mailpit'],
-  authentik: [
-    'authentik-postgresql',
-    'authentik-redis',
-    'authentik-server',
-    'authentik-worker',
-  ],
-  keycloak: ['keycloak'],
-  'webhook-site': ['webhook-site'],
-  bunkerm: ['bunkerm'],
-  zigbee2mqtt: ['zigbee2mqtt'],
-};
 
 const DEFAULT_SETS = ['mailpit'];
 
@@ -34,44 +22,159 @@ const scriptPath = fileURLToPath(import.meta.url);
 const scriptDir = path.dirname(scriptPath);
 const repoRoot = path.resolve(scriptDir, '..');
 const composeFile = path.join(repoRoot, 'services.docker-compose.yml');
+const gpuOverrideFile = path.join(repoRoot, 'docker-compose.gpu.yml');
 
-function printUsage(): void {
-  console.log(`Usage: pnpm services -- [up|stop|down|status|list] [set|service ...]
+type GpuResult = { enabled: boolean; reason: string };
+
+async function detectGpu(): Promise<GpuResult> {
+  if (process.argv.includes('--no-gpu') || process.env.OLLAMA_GPU === '0') {
+    return { enabled: false, reason: 'GPU explicitly disabled' };
+  }
+
+  if (process.platform === 'darwin') {
+    return { enabled: false, reason: 'macOS Docker does not support GPU passthrough. For GPU acceleration, run Ollama natively (brew install ollama)' };
+  }
+
+  if (!existsSync(gpuOverrideFile)) {
+    return { enabled: false, reason: 'GPU override file not found' };
+  }
+
+  try {
+    const { stdout } = await execFileAsync('docker', ['info', '--format', '{{json .Runtimes}}']);
+    if (stdout.includes('nvidia')) {
+      return { enabled: true, reason: 'NVIDIA container runtime detected' };
+    }
+  } catch {
+    // docker info failed, fall through
+  }
+
+  try {
+    await execFileAsync('nvidia-smi');
+    return { enabled: true, reason: 'nvidia-smi found but nvidia container runtime not configured. Install nvidia-container-toolkit for Docker GPU support' };
+  } catch {
+    // no nvidia-smi
+  }
+
+  return { enabled: false, reason: 'No GPU runtime detected' };
+}
+
+let gpuResult: GpuResult | null = null;
+
+async function getGpuResult(): Promise<GpuResult> {
+  if (!gpuResult) {
+    gpuResult = await detectGpu();
+  }
+  return gpuResult;
+}
+
+async function composeArgs(): Promise<string[]> {
+  const args = ['-f', composeFile];
+  const gpu = await getGpuResult();
+  if (gpu.enabled) {
+    args.push('-f', gpuOverrideFile);
+  }
+  return args;
+}
+
+async function runCompose(
+  args: string[],
+  onProgress?: ProgressCallback
+): Promise<{ stdout: string; stderr: string }> {
+  const baseArgs = ['compose', ...(await composeArgs()), ...args];
+  if (!onProgress) {
+    const { stdout, stderr } = await execFileAsync(
+      'docker',
+      baseArgs,
+      { env: process.env, maxBuffer: 1024 * 1024 * 10 }
+    );
+    return { stdout, stderr };
+  }
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn('docker', baseArgs, {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    const handleData = (chunk: Buffer) => {
+      const text = chunk.toString();
+      stdout += text;
+      for (const line of text.split(/\r?\n/).filter(Boolean)) {
+        onProgress(line);
+      }
+    };
+
+    const handleStderr = (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      for (const line of text.split(/\r?\n/).filter(Boolean)) {
+        onProgress(line);
+      }
+    };
+
+    proc.stdout.on('data', handleData);
+    proc.stderr.on('data', handleStderr);
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || `docker compose exited with code ${code}`));
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
+
+async function getServicesAndSets(): Promise<{ allServices: string[]; sets: Record<string, string[]> }> {
+  const { stdout } = await runCompose(['config', '--format', 'json']);
+  const config = JSON.parse(stdout);
+  const sets: Record<string, string[]> = {};
+  const allServices: string[] = [];
+
+  for (const [name, service] of Object.entries(config.services ?? {})) {
+    allServices.push(name);
+    const setName =
+      (service as { labels?: Record<string, string> }).labels?.[
+        'attraccess.set'
+      ] ?? name;
+    if (!sets[setName]) {
+      sets[setName] = [];
+    }
+    sets[setName].push(name);
+  }
+
+  return { allServices, sets };
+}
+
+function printUsage(sets: Record<string, string[]>): void {
+  console.log(`Usage: pnpm services -- [up|stop|down|status|list] [set|service ...] [--no-gpu]
 
 Sets:
-  ${Object.keys(SETS).join(', ')}
+  ${Object.keys(sets).join(', ')}
+
+Options:
+  --no-gpu   Disable GPU auto-detection and run Ollama on CPU only.
+             Can also be disabled via OLLAMA_GPU=0 environment variable.
+             GPU is auto-detected and enabled by default when available.
 
 Examples:
   pnpm services
   pnpm services -- up mailpit authentik
+  pnpm services -- up ollama
+  pnpm services -- up ollama --no-gpu
   pnpm services -- up all
   pnpm services -- stop mailpit
   pnpm services -- down
 `);
 }
 
-async function runCompose(
-  args: string[]
-): Promise<{ stdout: string; stderr: string }> {
-  const { stdout, stderr } = await execFileAsync(
-    'docker',
-    ['compose', '-f', composeFile, ...args],
-    { env: process.env, maxBuffer: 1024 * 1024 * 10 }
-  );
-  return { stdout, stderr };
-}
-
-async function getComposeServices(): Promise<string[]> {
-  const { stdout } = await runCompose(['config', '--services']);
-  return stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 function resolveSelectedServices(
   tokens: string[],
-  allServices: string[]
+  allServices: string[],
+  sets: Record<string, string[]>
 ): string[] {
   if (tokens.includes('all')) {
     return [...allServices];
@@ -81,8 +184,8 @@ function resolveSelectedServices(
   const selected = new Set<string>();
 
   for (const token of tokens) {
-    if (SETS[token]) {
-      for (const service of SETS[token]) {
+    if (sets[token]) {
+      for (const service of sets[token]) {
         selected.add(service);
       }
       continue;
@@ -107,18 +210,23 @@ function buildStopList(
   return allServices.filter((service) => !selected.has(service));
 }
 
-async function handleAction(action: Action, tokens: string[]): Promise<string> {
+async function handleAction(
+  action: Action,
+  tokens: string[],
+  onProgress?: ProgressCallback
+): Promise<string> {
   if (!existsSync(composeFile)) {
     throw new Error(`Compose file not found: ${composeFile}`);
   }
 
-  const allServices = await getComposeServices();
+  const { allServices, sets } = await getServicesAndSets();
+
   if (allServices.length === 0) {
     throw new Error(`No services found in ${composeFile}`);
   }
 
   if (action === 'list') {
-    const setsList = Object.entries(SETS)
+    const setsList = Object.entries(sets)
       .map(([name, services]) => `  ${name}: ${services.join(' ')}`)
       .join('\n');
     const servicesList = allServices.map((svc) => `  ${svc}`).join('\n');
@@ -131,12 +239,17 @@ async function handleAction(action: Action, tokens: string[]): Promise<string> {
   }
 
   if (action === 'down') {
-    await runCompose(['down']);
+    onProgress?.('Stopping all services...');
+    await runCompose(['down'], onProgress);
     return 'All services stopped.';
   }
 
   const selectedTokens = tokens.length === 0 ? DEFAULT_SETS : tokens;
-  const selectedServices = resolveSelectedServices(selectedTokens, allServices);
+  const selectedServices = resolveSelectedServices(
+    selectedTokens,
+    allServices,
+    sets
+  );
 
   if (selectedServices.length === 0) {
     throw new Error('No services selected.');
@@ -145,14 +258,21 @@ async function handleAction(action: Action, tokens: string[]): Promise<string> {
   if (action === 'up') {
     const toStop = buildStopList(allServices, selectedServices);
     if (toStop.length > 0) {
-      await runCompose(['stop', ...toStop]);
+      onProgress?.(`Stopping ${toStop.length} other service(s)...`);
+      await runCompose(['stop', ...toStop], onProgress);
     }
-    await runCompose(['up', '-d', ...selectedServices]);
+    if (selectedServices.includes('ollama')) {
+      const gpu = await getGpuResult();
+      onProgress?.(`GPU: ${gpu.reason}${gpu.enabled ? ' (enabled)' : ''}`);
+    }
+    onProgress?.(`Starting: ${selectedServices.join(', ')}...`);
+    await runCompose(['up', '-d', ...selectedServices], onProgress);
     return `Started: ${selectedServices.join(', ')}`;
   }
 
   if (action === 'stop') {
-    await runCompose(['stop', ...selectedServices]);
+    onProgress?.(`Stopping: ${selectedServices.join(', ')}...`);
+    await runCompose(['stop', ...selectedServices], onProgress);
     return `Stopped: ${selectedServices.join(', ')}`;
   }
 
@@ -190,13 +310,15 @@ function ActionPicker({ onSelect }: { onSelect: (action: Action) => void }) {
 }
 
 function SetPicker({
+  sets,
   defaultSelected,
   onConfirm,
 }: {
+  sets: Record<string, string[]>;
   defaultSelected: string[];
   onConfirm: (sets: string[]) => void;
 }) {
-  const setNames = useMemo(() => Object.keys(SETS), []);
+  const setNames = useMemo(() => Object.keys(sets), [sets]);
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(defaultSelected)
@@ -287,11 +409,24 @@ function OutputScreen({
   );
 }
 
-function App() {
+function ProgressScreen({ lines }: { lines: string[] }) {
+  const visible = lines.slice(-10);
+  return h(
+    Box,
+    { flexDirection: 'column' },
+    h(Text, { color: 'yellow' }, 'Working...'),
+    ...visible.map((line, idx) =>
+      h(Text, { key: `${idx}-${line}`, dimColor: true }, line)
+    )
+  );
+}
+
+function App({ sets }: { sets: Record<string, string[]> }) {
   const [action, setAction] = useState<Action | null>(null);
   const [selectedSets, setSelectedSets] = useState<string[] | null>(null);
   const [output, setOutput] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [progressLines, setProgressLines] = useState<string[]>([]);
   const { exit } = useApp();
 
   useInput((input) => {
@@ -305,6 +440,11 @@ function App() {
     setSelectedSets(null);
     setOutput('');
     setError('');
+    setProgressLines([]);
+  };
+
+  const onProgress = (line: string) => {
+    setProgressLines((prev) => [...prev, line].slice(-20));
   };
 
   useEffect(() => {
@@ -313,7 +453,7 @@ function App() {
     if (action === 'down' || action === 'status' || action === 'list') {
       void (async () => {
         try {
-          const result = await handleAction(action, []);
+          const result = await handleAction(action, [], onProgress);
           setOutput(result);
         } catch (err) {
           setError(err instanceof Error ? err.message : String(err));
@@ -327,7 +467,7 @@ function App() {
 
     void (async () => {
       try {
-        const result = await handleAction(action, selectedSets);
+        const result = await handleAction(action, selectedSets, onProgress);
         setOutput(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -342,6 +482,7 @@ function App() {
   if (action === 'up' || action === 'stop') {
     if (!selectedSets) {
       return h(SetPicker, {
+        sets,
         defaultSelected: DEFAULT_SETS,
         onConfirm: setSelectedSets,
       });
@@ -361,15 +502,17 @@ function App() {
     return h(OutputScreen, { title: 'Done', output, onBack: resetToMenu });
   }
 
-  return h(Box, { flexDirection: 'column' }, h(Text, null, 'Working...'));
+  return h(ProgressScreen, { lines: progressLines });
 }
 
 async function runCli(): Promise<void> {
-  const [actionRaw, ...tokens] = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2).filter((arg) => arg !== '--gpu' && arg !== '--no-gpu');
+  const [actionRaw, ...tokens] = rawArgs;
   const action = (actionRaw || 'up') as Action;
 
   if (actionRaw === 'help' || actionRaw === '--help' || actionRaw === '-h') {
-    printUsage();
+    const { sets } = await getServicesAndSets();
+    printUsage(sets);
     return;
   }
 
@@ -397,7 +540,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  render(h(App, null));
+  const { sets } = await getServicesAndSets();
+  render(h(App, { sets }));
 }
 
 void main();

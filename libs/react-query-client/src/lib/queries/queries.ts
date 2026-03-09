@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseMutationOptions, UseQueryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AiService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 export const useSystemServiceInfo = <TData = Common.SystemServiceInfoDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceInfoKeyFn(queryKey), queryFn: () => SystemService.info() as TData, ...options });
@@ -252,6 +252,11 @@ export const useAnalyticsServiceGetBillingTransactionsInDateRange = <TData = Com
   end: string;
   start: string;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }, queryKey), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) as TData, ...options });
+export const useAiServiceAiControllerListConversations = <TData = Common.AiServiceAiControllerListConversationsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAiServiceAiControllerListConversationsKeyFn(queryKey), queryFn: () => AiService.aiControllerListConversations() as TData, ...options });
+export const useAiServiceAiControllerGetConversationMessages = <TData = Common.AiServiceAiControllerGetConversationMessagesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ uuid }: {
+  uuid: string;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAiServiceAiControllerGetConversationMessagesKeyFn({ uuid }, queryKey), queryFn: () => AiService.aiControllerGetConversationMessages({ uuid }) as TData, ...options });
+export const useAiServiceAiControllerGetStatus = <TData = Common.AiServiceAiControllerGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAiServiceAiControllerGetStatusKeyFn(queryKey), queryFn: () => AiService.aiControllerGetStatus() as TData, ...options });
 export const useSystemServiceRebootHost = <TData = Common.SystemServiceRebootHostMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SystemService.rebootHost() as unknown as Promise<TData>, ...options });
 export const useSystemServiceShutdownHost = <TData = Common.SystemServiceShutdownHostMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SystemService.shutdownHost() as unknown as Promise<TData>, ...options });
 export const useUsersServiceSetLocalSignupDomainWhitelist = <TData = Common.UsersServiceSetLocalSignupDomainWhitelistMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
@@ -654,6 +659,7 @@ export const useAttractapServiceGetAppKeyByUid = <TData = Common.AttractapServic
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: AppKeyRequestDto;
 }, TContext>({ mutationFn: ({ requestBody }) => AttractapService.getAppKeyByUid({ requestBody }) as unknown as Promise<TData>, ...options });
+export const useAiServiceAiControllerChat = <TData = Common.AiServiceAiControllerChatMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => AiService.aiControllerChat() as unknown as Promise<TData>, ...options });
 export const useAuthenticationServiceUpdateOneSsoProvider = <TData = Common.AuthenticationServiceUpdateOneSsoProviderMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;
   requestBody: UpdateSSOProviderDto;
@@ -891,3 +897,8 @@ export const useAttractapServiceDeleteReader = <TData = Common.AttractapServiceD
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   readerId: number;
 }, TContext>({ mutationFn: ({ readerId }) => AttractapService.deleteReader({ readerId }) as unknown as Promise<TData>, ...options });
+export const useAiServiceAiControllerClearConversation = <TData = Common.AiServiceAiControllerClearConversationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  conversationId: string;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  conversationId: string;
+}, TContext>({ mutationFn: ({ conversationId }) => AiService.aiControllerClearConversation({ conversationId }) as unknown as Promise<TData>, ...options });

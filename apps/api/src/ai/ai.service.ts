@@ -1,243 +1,186 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Subject } from 'rxjs';
-import { OllamaService, OllamaChatMessage } from './ollama.service';
-import { RagService } from './rag/rag.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
+import { createOllama } from 'ollama-ai-provider-v2';
+import { AiConversation, AiConversationMessage } from '@attraccess/database-entities';
+import { AppConfigType } from '../config/app.config';
+import { OllamaService } from './ollama.service';
 import { ToolRegistry } from './tools/tool-registry';
-import { ToolExecutor } from './tools/tool-executor';
-import { buildSystemPrompt } from './prompts/system-prompt';
-import { ChatEvent } from './dto/chat-event.dto';
-import { randomUUID } from 'crypto';
-
-interface Conversation {
-  messages: OllamaChatMessage[];
-  pendingToolCalls: Map<string, { name: string; arguments: Record<string, unknown> }>;
-  lastActivity: number;
-}
-
-interface MessageEvent {
-  data: ChatEvent;
-}
+import { SettingsService } from '../settings/settings.service';
+import { ResourcesService } from '../resources/resources.service';
+import { buildSystemPrompt, type ResourceInfo } from './prompts/system-prompt';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly conversations = new Map<string, Conversation>();
-  private readonly conversationTtlMs = 30 * 60 * 1000;
 
   constructor(
     private readonly ollamaService: OllamaService,
-    private readonly ragService: RagService,
     private readonly toolRegistry: ToolRegistry,
-    private readonly toolExecutor: ToolExecutor,
-  ) {
-    setInterval(() => this.cleanupConversations(), 5 * 60 * 1000);
-  }
+    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
+    private readonly resourcesService: ResourcesService,
+    @InjectRepository(AiConversation)
+    private readonly conversationRepo: Repository<AiConversation>,
+    @InjectRepository(AiConversationMessage)
+    private readonly messageRepo: Repository<AiConversationMessage>,
+  ) {}
 
   async chat(
     conversationId: string | undefined,
-    message: string,
+    messages: UIMessage[],
+    userId: number,
     userName: string | undefined,
     sessionCookie: string,
-  ): Promise<{ conversationId: string; stream: Subject<MessageEvent> }> {
-    const convId = conversationId || randomUUID();
-    const conversation = this.getOrCreateConversation(convId);
-    const subject = new Subject<MessageEvent>();
+  ): Promise<{ conversationId: string; result: ReturnType<typeof streamText> }> {
+    const convId = conversationId || crypto.randomUUID();
+    const dbConv = await this.getOrCreateConversation(convId, userId);
 
-    this.processChat(conversation, message, userName, sessionCookie, subject).catch((err) => {
-      this.logger.error('Chat processing error', err);
-      subject.next({ data: { type: 'error', message: err.message || 'Internal error' } });
-      subject.next({ data: { type: 'done' } });
-      subject.complete();
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    const lastUserText = lastUserMsg
+      ? lastUserMsg.parts.filter((p): p is { type: 'text'; text: string } => p.type === 'text').map((p) => p.text).join('')
+      : '';
+
+    if (lastUserMsg && lastUserText) {
+      await Promise.all([
+        this.saveMessage(dbConv.id, 'user', lastUserText),
+        this.updateConversationTitle(dbConv.id, lastUserText),
+      ]);
+    }
+
+    const appUrl = (await this.settingsService.getUrl()) || this.configService.get<AppConfigType>('app')?.ATTRACCESS_URL || '';
+    const resources = await this.fetchResourceContext(userId);
+    const systemPrompt = buildSystemPrompt({ userName, appUrl, resources });
+    const tools = this.toolRegistry.buildTools(sessionCookie);
+
+    const ollamaProvider = createOllama({ baseURL: this.ollamaService.baseUrl + '/api' });
+    const model = ollamaProvider.chat(this.ollamaService.modelName);
+
+    const modelMessages = await convertToModelMessages(messages);
+
+    this.logger.log(`Chat request: conv=${convId} user=${userId} messages=${messages.length} tools=${Object.keys(tools).join(',')}`);
+
+    const result = streamText({
+      model,
+      system: systemPrompt,
+      messages: modelMessages,
+      tools: tools as any,
+      stopWhen: stepCountIs(5),
+      providerOptions: { ollama: { think: true } },
+      onFinish: async ({ text, steps, finishReason, usage }) => {
+        const toolCalls = steps?.flatMap((s) => s.toolCalls || []) || [];
+        const toolResults = steps?.flatMap((s) => s.toolResults || []) || [];
+        this.logger.log(
+          `Chat finished: conv=${convId} reason=${finishReason} steps=${steps?.length ?? 0} toolCalls=${toolCalls.length} toolResults=${toolResults.length} tokens=${JSON.stringify(usage)}`,
+        );
+        for (const tc of toolCalls) {
+          this.logger.debug(`  Tool call: ${tc.toolName}(${JSON.stringify((tc as any).args).slice(0, 200)})`);
+        }
+        for (const tr of toolResults) {
+          const resultStr = JSON.stringify((tr as any).result ?? tr).slice(0, 300);
+          this.logger.debug(`  Tool result [${tr.toolName}]: ${resultStr}`);
+        }
+        if (text) {
+          await this.saveMessage(dbConv.id, 'assistant', text);
+        }
+      },
+      onError: (err) => {
+        const error = err.error instanceof Error ? err.error : err;
+        this.logger.error(`Chat stream error: conv=${convId} error=${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      },
     });
 
-    return { conversationId: convId, stream: subject };
+    return { conversationId: convId, result };
   }
 
-  async approveActions(
+  async clearConversation(conversationId: string, userId: number) {
+    const dbConv = await this.conversationRepo.findOne({ where: { uuid: conversationId, userId } });
+    if (dbConv) {
+      await this.conversationRepo.remove(dbConv);
+    }
+  }
+
+  async listConversations(userId: number): Promise<{ uuid: string; title: string | null; updatedAt: Date }[]> {
+    const conversations = await this.conversationRepo.find({
+      where: { userId },
+      order: { updatedAt: 'DESC' },
+      take: 50,
+    });
+    return conversations.map((c) => ({ uuid: c.uuid, title: c.title, updatedAt: c.updatedAt }));
+  }
+
+  async getConversationMessages(
     conversationId: string,
-    actionIds: string[],
-    sessionCookie: string,
-  ): Promise<Subject<MessageEvent>> {
-    const conversation = this.conversations.get(conversationId);
-    if (!conversation) {
-      const subject = new Subject<MessageEvent>();
-      subject.next({ data: { type: 'error', message: 'Conversation not found' } });
-      subject.next({ data: { type: 'done' } });
-      subject.complete();
-      return subject;
-    }
+    userId: number,
+  ): Promise<{ role: string; content: string; toolCalls?: unknown[]; createdAt: Date }[] | null> {
+    const dbConv = await this.conversationRepo.findOne({ where: { uuid: conversationId, userId } });
+    if (!dbConv) return null;
 
-    const subject = new Subject<MessageEvent>();
-
-    this.executeApprovedActions(conversation, actionIds, sessionCookie, subject).catch((err) => {
-      this.logger.error('Action execution error', err);
-      subject.next({ data: { type: 'error', message: err.message || 'Internal error' } });
-      subject.next({ data: { type: 'done' } });
-      subject.complete();
+    const messages = await this.messageRepo.find({
+      where: { conversationId: dbConv.id },
+      order: { createdAt: 'ASC' },
     });
 
-    return subject;
+    return messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        toolCalls: m.toolCalls || undefined,
+        createdAt: m.createdAt,
+      }));
   }
 
-  clearConversation(conversationId: string) {
-    this.conversations.delete(conversationId);
-  }
-
-  private async processChat(
-    conversation: Conversation,
-    message: string,
-    userName: string | undefined,
-    sessionCookie: string,
-    subject: Subject<MessageEvent>,
-  ) {
-    conversation.lastActivity = Date.now();
-    conversation.messages.push({ role: 'user', content: message });
-
-    let ragChunks: { source: string; content: string }[] = [];
+  private async fetchResourceContext(userId: number): Promise<{ resources: ResourceInfo[]; hasMore: boolean }> {
     try {
-      if (this.ragService.isIndexed) {
-        ragChunks = await this.ragService.search(message, 5);
-      }
-    } catch (err) {
-      this.logger.warn('RAG search failed, continuing without context', err);
-    }
+      const allResources = await this.resourcesService.listResources({ page: 1, limit: 100, returnUsingUser: true });
+      const accessibleRes = await this.resourcesService.listResources({ page: 1, limit: 100, onlyWithPermissionForUserId: userId });
+      const accessibleIds = new Set(accessibleRes.data.map((r) => r.id));
 
-    const systemPrompt = buildSystemPrompt({ ragChunks, userName });
-    const messagesWithSystem: OllamaChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...conversation.messages,
-    ];
-
-    const tools = this.toolRegistry.getTools();
-    let fullContent = '';
-
-    for await (const chunk of this.ollamaService.chatStream(messagesWithSystem, tools)) {
-      if (!chunk.message) continue;
-
-      if (chunk.message.tool_calls?.length) {
-        for (const toolCall of chunk.message.tool_calls) {
-          const callId = randomUUID();
-          const endpoint = this.toolRegistry.getEndpoint(toolCall.function.name);
-
-          conversation.pendingToolCalls.set(callId, {
-            name: toolCall.function.name,
-            arguments: toolCall.function.arguments,
-          });
-
-          subject.next({
-            data: {
-              type: 'tool-call',
-              id: callId,
-              name: toolCall.function.name,
-              description: endpoint ? `${toolCall.function.name}` : toolCall.function.name,
-              parameters: toolCall.function.arguments,
-            },
-          });
-        }
-      }
-
-      if (chunk.message.content) {
-        fullContent += chunk.message.content;
-        subject.next({ data: { type: 'text-delta', content: chunk.message.content } });
-      }
-    }
-
-    if (fullContent) {
-      conversation.messages.push({ role: 'assistant', content: fullContent });
-    }
-
-    subject.next({ data: { type: 'done' } });
-    subject.complete();
-  }
-
-  private async executeApprovedActions(
-    conversation: Conversation,
-    actionIds: string[],
-    sessionCookie: string,
-    subject: Subject<MessageEvent>,
-  ) {
-    conversation.lastActivity = Date.now();
-
-    for (const actionId of actionIds) {
-      const toolCall = conversation.pendingToolCalls.get(actionId);
-      if (!toolCall) continue;
-
-      const result = await this.toolExecutor.execute(toolCall.name, toolCall.arguments, sessionCookie);
-      conversation.pendingToolCalls.delete(actionId);
-
-      subject.next({ data: { type: 'tool-result', id: actionId, result } });
-
-      conversation.messages.push({
-        role: 'tool',
-        content: JSON.stringify(result),
+      const mapped: ResourceInfo[] = allResources.data.map((r) => {
+        const activeUsage = r.usages?.find((u) => !u.endTime);
+        return {
+          id: r.id,
+          name: r.name,
+          type: r.type,
+          userHasAccess: accessibleIds.has(r.id),
+          currentlyUsedBy: activeUsage?.user ? { id: activeUsage.user.id, name: activeUsage.user.username || `User #${activeUsage.user.id}` } : undefined,
+          isUsedByCurrentUser: activeUsage?.userId === userId,
+        };
       });
-    }
 
-    const systemPrompt = buildSystemPrompt({ ragChunks: [], userName: undefined });
-    const messagesWithSystem: OllamaChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...conversation.messages,
-    ];
+      mapped.sort((a, b) => {
+        if (a.isUsedByCurrentUser !== b.isUsedByCurrentUser) return a.isUsedByCurrentUser ? -1 : 1;
+        if (a.userHasAccess !== b.userHasAccess) return a.userHasAccess ? -1 : 1;
+        if (!!a.currentlyUsedBy !== !!b.currentlyUsedBy) return a.currentlyUsedBy ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
 
-    let fullContent = '';
-    const tools = this.toolRegistry.getTools();
-
-    for await (const chunk of this.ollamaService.chatStream(messagesWithSystem, tools)) {
-      if (!chunk.message) continue;
-
-      if (chunk.message.content) {
-        fullContent += chunk.message.content;
-        subject.next({ data: { type: 'text-delta', content: chunk.message.content } });
-      }
-
-      if (chunk.message.tool_calls?.length) {
-        for (const toolCall of chunk.message.tool_calls) {
-          const callId = randomUUID();
-          conversation.pendingToolCalls.set(callId, {
-            name: toolCall.function.name,
-            arguments: toolCall.function.arguments,
-          });
-
-          subject.next({
-            data: {
-              type: 'tool-call',
-              id: callId,
-              name: toolCall.function.name,
-              description: toolCall.function.name,
-              parameters: toolCall.function.arguments,
-            },
-          });
-        }
-      }
-    }
-
-    if (fullContent) {
-      conversation.messages.push({ role: 'assistant', content: fullContent });
-    }
-
-    subject.next({ data: { type: 'done' } });
-    subject.complete();
-  }
-
-  private getOrCreateConversation(conversationId: string): Conversation {
-    let conversation = this.conversations.get(conversationId);
-    if (!conversation) {
-      conversation = {
-        messages: [],
-        pendingToolCalls: new Map(),
-        lastActivity: Date.now(),
-      };
-      this.conversations.set(conversationId, conversation);
-    }
-    return conversation;
-  }
-
-  private cleanupConversations() {
-    const now = Date.now();
-    for (const [id, conv] of this.conversations) {
-      if (now - conv.lastActivity > this.conversationTtlMs) {
-        this.conversations.delete(id);
-      }
+      const limit = 15;
+      return { resources: mapped.slice(0, limit), hasMore: mapped.length > limit };
+    } catch (err) {
+      this.logger.warn('Failed to fetch resource context for AI', err);
+      return { resources: [], hasMore: false };
     }
   }
+
+  private async getOrCreateConversation(conversationId: string, userId: number): Promise<AiConversation> {
+    let dbConv = await this.conversationRepo.findOne({ where: { uuid: conversationId, userId } });
+    if (!dbConv) {
+      dbConv = await this.conversationRepo.save({ uuid: conversationId, userId, title: null });
+    }
+    return dbConv;
+  }
+
+  private async saveMessage(conversationDbId: number, role: string, content: string): Promise<void> {
+    await this.messageRepo.save({ conversationId: conversationDbId, role, content });
+  }
+
+  private async updateConversationTitle(dbId: number, firstMessage: string): Promise<void> {
+    const title = firstMessage.length > 50 ? firstMessage.slice(0, 50) + '...' : firstMessage;
+    await this.conversationRepo.update({ id: dbId, title: IsNull() }, { title });
+  }
+
 }

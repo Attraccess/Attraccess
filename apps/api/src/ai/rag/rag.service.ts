@@ -120,7 +120,51 @@ export class RagService implements OnModuleInit {
     this.logger.log(`Indexed ${chunks.length} chunks from ${relativePath}`);
   }
 
-  async search(query: string, topK: number = 5): Promise<SearchResult[]> {
+  async textSearch(
+    query: string,
+    maxResults = 10,
+  ): Promise<{ source: string; docsUrl: string; matches: string[] }[]> {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const docsPath = appConfig?.STATIC_DOCS_FILE_PATH;
+    if (!docsPath) return [];
+
+    const resolvedPath = path.resolve(docsPath);
+    if (!fs.existsSync(resolvedPath)) return [];
+
+    const mdFiles = this.findMarkdownFiles(resolvedPath);
+    const queryLower = query.toLowerCase();
+    const results: { source: string; docsUrl: string; matches: string[] }[] = [];
+
+    for (const filePath of mdFiles) {
+      const relativePath = path.relative(resolvedPath, filePath);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      const matchingContexts: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(queryLower)) {
+          const start = Math.max(0, i - 3);
+          const end = Math.min(lines.length, i + 4);
+          matchingContexts.push(lines.slice(start, end).join('\n'));
+        }
+      }
+
+      if (matchingContexts.length > 0) {
+        const docsUrlPath = relativePath.replace(/\.md$/, '').replace(/\\/g, '/');
+        results.push({
+          source: relativePath,
+          docsUrl: `/docs/#/${docsUrlPath}`,
+          matches: matchingContexts.slice(0, 3),
+        });
+      }
+
+      if (results.length >= maxResults) break;
+    }
+
+    return results;
+  }
+
+  async search(query: string, topK = 5): Promise<SearchResult[]> {
     const queryEmbedding = await this.ollamaService.embed(query);
     const allEmbeddings = await this.embeddingRepo.find();
 

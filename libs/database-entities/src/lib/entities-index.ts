@@ -61,6 +61,8 @@ import { ProjectMember, ProjectMemberRole } from './entities/project-member.enti
 import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
 import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
 import { DocEmbedding } from './entities/doc-embedding.entity';
+import { AiConversation } from './entities/ai-conversation.entity';
+import { AiConversationMessage } from './entities/ai-conversation-message.entity';
 
 // Export all entities individually
 export {
@@ -130,6 +132,8 @@ export {
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
   DocEmbedding,
+  AiConversation,
+  AiConversationMessage,
 };
 
 // Export the entities object
@@ -169,4 +173,6 @@ export const entities = {
   FormField,
   FormSubmission,
   DocEmbedding,
+  AiConversation,
+  AiConversationMessage,
 };
