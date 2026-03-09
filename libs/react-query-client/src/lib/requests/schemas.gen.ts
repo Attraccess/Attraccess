@@ -5575,3 +5575,59 @@ export const $AttractapFirmware = {
     },
     required: ['name', 'friendlyName', 'variant', 'variantFriendlyName', 'version', 'boardFamily', 'filename', 'filenameOTA', 'chip', 'flashMode', 'flashFreq', 'flashSize']
 } as const;
+
+export const $ChatMessageDto = {
+    type: 'object',
+    properties: {
+        conversationId: {
+            type: 'string',
+            description: 'Conversation ID for continuing a conversation'
+        },
+        message: {
+            type: 'string',
+            description: 'The user message to send to the AI'
+        },
+        approvedActions: {
+            description: 'IDs of approved tool calls to execute',
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        }
+    },
+    required: ['message']
+} as const;
+
+export const $AiStatusDto = {
+    type: 'object',
+    properties: {
+        enabled: {
+            type: 'boolean',
+            description: 'Whether AI features are enabled'
+        },
+        ollamaConnected: {
+            type: 'boolean',
+            description: 'Whether Ollama is reachable'
+        },
+        modelsReady: {
+            type: 'boolean',
+            description: 'Whether all required models are downloaded and ready'
+        },
+        modelsPulling: {
+            type: 'boolean',
+            description: 'Whether models are currently being pulled'
+        },
+        pullProgress: {
+            type: 'object',
+            description: 'Progress of model pulls (model name to status string)',
+            additionalProperties: {
+                type: 'string'
+            }
+        },
+        embeddingIndexed: {
+            type: 'boolean',
+            description: 'Whether RAG document embeddings are indexed'
+        }
+    },
+    required: ['enabled', 'ollamaConnected', 'modelsReady', 'modelsPulling', 'embeddingIndexed']
+} as const;

@@ -1,32 +1,13 @@
-import React, { useEffect, useState } from 'react';
 import { Button, Badge } from '@heroui/react';
 import { MessageCircle } from 'lucide-react';
 import { useAiChatStore } from './ai-chat.store';
-import { getBaseUrl } from '../../api';
+import { useAiServiceAiControllerGetStatus } from '@attraccess/react-query-client';
 
 export function AiChatButton() {
   const { toggle, pendingApprovals } = useAiChatStore();
-  const [aiEnabled, setAiEnabled] = useState(false);
+  const { data: status } = useAiServiceAiControllerGetStatus();
 
-  useEffect(() => {
-    const checkAiStatus = async () => {
-      try {
-        const res = await fetch(`${getBaseUrl()}/api/ai/status`, {
-          credentials: 'include',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAiEnabled(data.enabled);
-        }
-      } catch {
-        setAiEnabled(false);
-      }
-    };
-
-    checkAiStatus();
-  }, []);
-
-  if (!aiEnabled) return null;
+  if (!status?.enabled) return null;
 
   const pendingCount = pendingApprovals.filter((tc) => tc.status === 'pending').length;
 

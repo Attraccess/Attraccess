@@ -3567,6 +3567,50 @@ export type AttractapFirmware = {
     flashSize: string;
 };
 
+export type ChatMessageDto = {
+    /**
+     * Conversation ID for continuing a conversation
+     */
+    conversationId?: string;
+    /**
+     * The user message to send to the AI
+     */
+    message: string;
+    /**
+     * IDs of approved tool calls to execute
+     */
+    approvedActions?: Array<(string)>;
+};
+
+export type AiStatusDto = {
+    /**
+     * Whether AI features are enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether Ollama is reachable
+     */
+    ollamaConnected: boolean;
+    /**
+     * Whether all required models are downloaded and ready
+     */
+    modelsReady: boolean;
+    /**
+     * Whether models are currently being pulled
+     */
+    modelsPulling: boolean;
+    /**
+     * Progress of model pulls (model name to status string)
+     */
+    pullProgress?: {
+        [key: string]: (string);
+    };
+    /**
+     * Whether RAG document embeddings are indexed
+     */
+    embeddingIndexed: boolean;
+};
+
 export type InfoResponse = {
     name?: string;
     status?: string;
@@ -5059,6 +5103,26 @@ export type GetBillingTransactionsInDateRangeData = {
 };
 
 export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction>;
+
+export type AiControllerChatData = {
+    requestBody: ChatMessageDto;
+};
+
+export type AiControllerChatResponse = unknown;
+
+export type AiControllerApproveActionsData = {
+    conversationId: string;
+};
+
+export type AiControllerApproveActionsResponse = unknown;
+
+export type AiControllerGetStatusResponse = AiStatusDto;
+
+export type AiControllerClearConversationData = {
+    conversationId: string;
+};
+
+export type AiControllerClearConversationResponse = void;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -7936,6 +8000,49 @@ export type $OpenApiTs = {
                  * Unauthorized
                  */
                 401: unknown;
+            };
+        };
+    };
+    '/api/ai/chat': {
+        post: {
+            req: AiControllerChatData;
+            res: {
+                /**
+                 * SSE stream of chat events
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/ai/chat/{conversationId}/approve': {
+        post: {
+            req: AiControllerApproveActionsData;
+            res: {
+                /**
+                 * SSE stream of continued chat events
+                 */
+                200: unknown;
+            };
+        };
+    };
+    '/api/ai/status': {
+        get: {
+            res: {
+                /**
+                 * AI status information
+                 */
+                200: AiStatusDto;
+            };
+        };
+    };
+    '/api/ai/chat/{conversationId}': {
+        delete: {
+            req: AiControllerClearConversationData;
+            res: {
+                /**
+                 * Conversation cleared
+                 */
+                204: void;
             };
         };
     };
