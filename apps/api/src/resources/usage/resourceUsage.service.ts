@@ -570,7 +570,7 @@ export class ResourceUsageService {
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
-    this.eventEmitter.emit(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
+    await this.eventEmitter.emitAsync(ResourceUsageEvent.EVENT_NAME, new ResourceUsageEvent(usage));
   }
 
   private async handleDoorAction(resourceId: number, user: User, action: ResourceUsageAction): Promise<ResourceUsage> {

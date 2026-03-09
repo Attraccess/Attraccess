@@ -29,6 +29,7 @@ import { ResourceFlowsService } from '../../resources/flows/resource-flows.servi
 import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flows-executor.service';
 import { ResourceInUseError } from '../../resources/usage/errors/resource-in-use.error';
 import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
+import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import { ResourceFlowNodeType, ResourceFormAction } from '@attraccess/database-entities';
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
@@ -1083,8 +1084,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await this.resourceUsageService.lockDoor(resourceId, user);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { success: true }));
     } catch (error) {
-      this.logger.error(`Failed to lock door: ${error.message}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { error: error.message }));
+      const errorMessage = this.extractUserFacingError(error);
+      this.logger.error(`Failed to lock door: ${errorMessage}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.LOCK_DOOR, { error: errorMessage }));
     }
   }
 
@@ -1107,8 +1109,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await this.resourceUsageService.unlockDoor(resourceId, user);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { success: true }));
     } catch (error) {
-      this.logger.error(`Failed to unlock door: ${error.message}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { error: error.message }));
+      const errorMessage = this.extractUserFacingError(error);
+      this.logger.error(`Failed to unlock door: ${errorMessage}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLOCK_DOOR, { error: errorMessage }));
     }
   }
 
@@ -1131,8 +1134,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       await this.resourceUsageService.unlatchDoor(resourceId, user);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { success: true }));
     } catch (error) {
-      this.logger.error(`Failed to unlatch door: ${error.message}`);
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { error: error.message }));
+      const errorMessage = this.extractUserFacingError(error);
+      this.logger.error(`Failed to unlatch door: ${errorMessage}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.UNLATCH_DOOR, { error: errorMessage }));
     }
   }
 
@@ -1219,5 +1223,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const projects = await this.projectsService.findMany(userId, { page, limit });
     const total = await this.projectsService.getTotalCount(userId);
     await socket.sendMessage(new AttractapEvent(AttractapEventType.PROJECTS_OF_USER, { projects, page, limit, total }));
+  }
+
+  private extractUserFacingError(error: unknown): string {
+    if (error instanceof FlowExecutionError) {
+      return error.message.replace(/^FLOW_EXECUTION_ERROR:\s*/, '');
+    }
+    return error instanceof Error ? error.message : String(error);
   }
 }
