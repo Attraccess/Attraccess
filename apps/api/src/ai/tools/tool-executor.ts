@@ -60,7 +60,8 @@ export class ToolExecutor {
       return { success: true, data };
     } catch (err) {
       this.logger.error(`Tool execution failed for ${operationId}`, err);
-      return { success: false, error: `Failed to execute ${operationId}: ${err.message}` };
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Failed to execute ${operationId}: ${message}` };
     }
   }
 }

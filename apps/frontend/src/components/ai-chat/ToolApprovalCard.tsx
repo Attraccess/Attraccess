@@ -1,6 +1,9 @@
 import React from 'react';
-import { Button, Card, CardBody } from '@heroui/react';
+import { Button, Card, CardBody, Chip, Code } from '@heroui/react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ToolCallInfo } from './ai-chat.store';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface ToolApprovalCardProps {
   toolCall: ToolCallInfo;
@@ -12,33 +15,38 @@ export function ToolApprovalCard({ toolCall, onApprove, onReject }: ToolApproval
   const isPending = toolCall.status === 'pending';
   const isExecuted = toolCall.status === 'executed';
   const isRejected = toolCall.status === 'rejected';
+  const { t } = useTranslations({ en, de });
 
   return (
-    <Card className="mb-3 mx-2" shadow="sm">
-      <CardBody className="p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
-            {isExecuted ? 'Executed' : isRejected ? 'Rejected' : 'Proposed Action'}
-          </span>
+    <Card className="mb-3" shadow="sm">
+      <CardBody className="p-3 gap-2">
+        <div className="flex items-center gap-2">
+          <Chip
+            size="sm"
+            color={isExecuted ? 'success' : isRejected ? 'danger' : 'warning'}
+            variant="flat"
+          >
+            {isExecuted ? t('aiChat.toolResult') : isRejected ? t('aiChat.rejected') : t('aiChat.toolCall')}
+          </Chip>
         </div>
-        <p className="text-sm font-medium mb-1">{toolCall.name}</p>
+        <p className="text-sm font-medium">{toolCall.name}</p>
         {Object.keys(toolCall.parameters).length > 0 && (
-          <pre className="text-xs bg-gray-50 dark:bg-gray-800 rounded p-2 mb-2 overflow-x-auto">
+          <Code className="text-xs overflow-x-auto whitespace-pre-wrap block p-2">
             {JSON.stringify(toolCall.parameters, null, 2)}
-          </pre>
+          </Code>
         )}
         {toolCall.result !== undefined && (
-          <pre className="text-xs bg-green-50 dark:bg-green-900/20 rounded p-2 mb-2 overflow-x-auto">
+          <Code className="text-xs overflow-x-auto whitespace-pre-wrap block p-2" color="success">
             {JSON.stringify(toolCall.result, null, 2)}
-          </pre>
+          </Code>
         )}
         {isPending && (
-          <div className="flex gap-2 mt-2">
+          <div className="flex gap-2 mt-1">
             <Button size="sm" color="success" variant="flat" onPress={() => onApprove(toolCall.id)}>
-              Approve
+              {t('aiChat.approve')}
             </Button>
             <Button size="sm" color="danger" variant="flat" onPress={() => onReject(toolCall.id)}>
-              Reject
+              {t('aiChat.reject')}
             </Button>
           </div>
         )}

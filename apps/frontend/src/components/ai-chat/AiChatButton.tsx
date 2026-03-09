@@ -7,6 +7,7 @@ import { getBaseUrl } from '../../api';
 export function AiChatButton() {
   const { toggle, pendingApprovals } = useAiChatStore();
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkAiStatus = async () => {
@@ -16,17 +17,19 @@ export function AiChatButton() {
         });
         if (res.ok) {
           const data = await res.json();
-          setAiEnabled(data.enabled);
+          setAiEnabled(data.enabled && data.ollamaConnected);
         }
       } catch {
         setAiEnabled(false);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     checkAiStatus();
   }, []);
 
-  if (!aiEnabled) return null;
+  if (isLoading || !aiEnabled) return null;
 
   const pendingCount = pendingApprovals.filter((tc) => tc.status === 'pending').length;
 
