@@ -67,8 +67,7 @@ export class AiService {
       system: systemPrompt,
       messages: modelMessages,
       tools: tools as any,
-      stopWhen: stepCountIs(5),
-      providerOptions: { ollama: { think: true } },
+      stopWhen: stepCountIs(15),
       onFinish: async ({ text, steps, finishReason, usage }) => {
         const toolCalls = steps?.flatMap((s) => s.toolCalls || []) || [];
         const toolResults = steps?.flatMap((s) => s.toolResults || []) || [];

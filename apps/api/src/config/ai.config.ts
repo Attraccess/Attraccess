@@ -7,7 +7,7 @@ export const AiEnvSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   OLLAMA_BASE_URL: z.string().default('http://ollama:11434'),
-  OLLAMA_CHAT_MODEL: z.string().default('gemma3:4b'),
+  OLLAMA_CHAT_MODEL: z.string().default('qwen3.5:4b'),
   OLLAMA_EMBED_MODEL: z.string().default('nomic-embed-text'),
   AI_MAX_CONTEXT_CHUNKS: z.coerce.number().positive().default(5),
 });
