@@ -5,13 +5,16 @@
     "send": "Senden",
     "approve": "Genehmigen",
     "reject": "Ablehnen",
+    "rejected": "Abgelehnt",
     "clear": "Gespräch löschen",
     "close": "Schließen",
     "toolCall": "Vorgeschlagene Aktion",
-    "toolResult": "Aktionsergebnis",
+    "toolResult": "Ausgeführt",
     "connecting": "Verbinde mit KI...",
     "thinking": "Denke nach...",
+    "streaming": "Schreibt...",
     "error": "Etwas ist schiefgelaufen",
-    "unavailable": "KI-Assistent ist nicht verfügbar"
+    "unavailable": "KI-Assistent ist nicht verfügbar",
+    "emptyState": "Starte ein Gespräch mit dem KI-Assistenten"
   }
 }

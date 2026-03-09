@@ -5,13 +5,16 @@
     "send": "Send",
     "approve": "Approve",
     "reject": "Reject",
+    "rejected": "Rejected",
     "clear": "Clear conversation",
     "close": "Close",
     "toolCall": "Proposed action",
-    "toolResult": "Action result",
+    "toolResult": "Executed",
     "connecting": "Connecting to AI...",
     "thinking": "Thinking...",
+    "streaming": "Typing...",
     "error": "Something went wrong",
-    "unavailable": "AI assistant is not available"
+    "unavailable": "AI assistant is not available",
+    "emptyState": "Start a conversation with the AI assistant"
   }
 }

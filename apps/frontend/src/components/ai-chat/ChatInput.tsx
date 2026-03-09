@@ -1,15 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import { Button, Input } from '@heroui/react';
+import { Button, Textarea } from '@heroui/react';
 import { Send } from 'lucide-react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
-  placeholder?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
+export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const { t } = useTranslations({ en, de });
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
@@ -29,14 +32,16 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   );
 
   return (
-    <div className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700">
-      <Input
+    <div className="flex gap-2 p-3 w-full">
+      <Textarea
         value={value}
         onValueChange={setValue}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder || 'Ask me anything...'}
+        placeholder={t('aiChat.inputPlaceholder')}
         disabled={disabled}
         size="sm"
+        minRows={1}
+        maxRows={4}
         className="flex-1"
       />
       <Button
@@ -45,6 +50,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
         size="sm"
         onPress={handleSend}
         isDisabled={disabled || !value.trim()}
+        aria-label={t('aiChat.send')}
       >
         <Send size={16} />
       </Button>

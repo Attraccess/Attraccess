@@ -13,10 +13,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { AiService } from './ai.service';
 import { OllamaService } from './ollama.service';
 import { RagService } from './rag/rag.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { AiConfigType } from '../config/ai.config';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('AI')
@@ -29,6 +31,7 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly ollamaService: OllamaService,
     private readonly ragService: RagService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('chat')
@@ -114,9 +117,10 @@ export class AiController {
   @ApiOperation({ summary: 'Get AI feature status' })
   @ApiResponse({ status: 200, description: 'AI status information' })
   async getStatus() {
+    const aiConfig = this.configService.get<AiConfigType>('ai');
     const ollamaHealthy = await this.ollamaService.healthCheck();
     return {
-      enabled: true,
+      enabled: aiConfig?.enabled ?? false,
       ollamaConnected: ollamaHealthy,
       embeddingIndexed: this.ragService.isIndexed,
     };
