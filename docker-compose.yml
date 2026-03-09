@@ -126,6 +126,16 @@ services:
     env_file:
       - .env.docker-compose
 
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    expose:
+      - '11434'
+    volumes:
+      - ollama-data:/root/.ollama
+    env_file:
+      - .env.docker-compose
+
 volumes:
   proxy-data:
   proxy-letsencrypt:
@@ -134,3 +144,4 @@ volumes:
   rabbitmq_data:
   zigbee2mqtt:
   duplicati:
+  ollama-data:

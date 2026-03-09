@@ -132,6 +132,13 @@ services:
     volumes:
       - zigbee2mqtt:/app/data
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama-data:/root/.ollama
+
 volumes:
   authentik-database:
     driver: local
@@ -150,4 +157,6 @@ volumes:
   webhook-site:
     driver: local
   zigbee2mqtt:
+    driver: local
+  ollama-data:
     driver: local

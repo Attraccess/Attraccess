@@ -1,0 +1,17 @@
+{
+  "aiChat": {
+    "title": "KI-Assistent",
+    "inputPlaceholder": "Frag mich etwas über Attraccess...",
+    "send": "Senden",
+    "approve": "Genehmigen",
+    "reject": "Ablehnen",
+    "clear": "Gespräch löschen",
+    "close": "Schließen",
+    "toolCall": "Vorgeschlagene Aktion",
+    "toolResult": "Aktionsergebnis",
+    "connecting": "Verbinde mit KI...",
+    "thinking": "Denke nach...",
+    "error": "Etwas ist schiefgelaufen",
+    "unavailable": "KI-Assistent ist nicht verfügbar"
+  }
+}

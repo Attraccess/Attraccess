@@ -25,11 +25,13 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import aiConfig from '../config/ai.config';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [appConfiguration, storageConfigObject, sessionConfig],
+      load: [appConfiguration, storageConfigObject, sessionConfig, aiConfig],
       isGlobal: true,
     }),
 
@@ -114,6 +116,7 @@ import { SettingsService } from '../settings/settings.service';
     BillingModule,
     EncryptionModule,
     ProjectsModule,
+    ...(process.env.AI_ENABLED === 'true' ? [AiModule] : []),
   ],
   controllers: [AppController],
   providers: [AppService],

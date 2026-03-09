@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
+import { AiChatButton } from '../../components/ai-chat/AiChatButton';
+import { AiChatPanel } from '../../components/ai-chat/AiChatPanel';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -85,6 +87,10 @@ export function Layout({ children, noLayout }: LayoutProps) {
         {/* Global donation prompt for eligible users */}
         <DonationPrompt />
       </div>
+
+      {/* AI Chat */}
+      {isAuthenticated && <AiChatButton />}
+      {isAuthenticated && <AiChatPanel />}
     </div>
   );
 }

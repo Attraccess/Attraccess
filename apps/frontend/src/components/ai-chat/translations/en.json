@@ -1,0 +1,17 @@
+{
+  "aiChat": {
+    "title": "AI Assistant",
+    "inputPlaceholder": "Ask me anything about Attraccess...",
+    "send": "Send",
+    "approve": "Approve",
+    "reject": "Reject",
+    "clear": "Clear conversation",
+    "close": "Close",
+    "toolCall": "Proposed action",
+    "toolResult": "Action result",
+    "connecting": "Connecting to AI...",
+    "thinking": "Thinking...",
+    "error": "Something went wrong",
+    "unavailable": "AI assistant is not available"
+  }
+}
