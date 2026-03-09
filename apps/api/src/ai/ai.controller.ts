@@ -68,6 +68,13 @@ export class AiController {
     }
   }
 
+  @Get('conversations/active')
+  @ApiOperation({ summary: 'Get the active conversation within 24h window' })
+  @ApiResponse({ status: 200, description: 'Active conversation with messages, or null' })
+  async getActiveConversation(@Req() req: AuthenticatedRequest) {
+    return this.aiService.getActiveConversation(req.user.id);
+  }
+
   @Get('conversations')
   @ApiOperation({ summary: 'List conversations for the current user' })
   @ApiResponse({ status: 200, description: 'List of conversations' })

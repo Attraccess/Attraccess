@@ -1,14 +1,13 @@
 import { useCallback, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import type { UIMessage } from 'ai';
 import { useAiChatStore } from './ai-chat.store';
 
-export function useAiChat() {
+export function useAiChat(chatId: string, initialMessages: UIMessage[]) {
   const store = useAiChatStore();
   const storeRef = useRef(store);
   storeRef.current = store;
-
-  const chatIdRef = useRef(store.conversationId || crypto.randomUUID());
 
   const transportRef = useRef(
     new DefaultChatTransport({
@@ -30,8 +29,9 @@ export function useAiChat() {
   }, []);
 
   const chat = useChat({
-    id: chatIdRef.current,
+    id: chatId,
     transport: transportRef.current,
+    initialMessages,
     onError,
   });
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { createOllama } from 'ollama-ai-provider-v2';
@@ -92,6 +92,34 @@ export class AiService {
     });
 
     return { conversationId: convId, result };
+  }
+
+  async getActiveConversation(userId: number): Promise<{ uuid: string; title: string | null; messages: { role: string; content: string; createdAt: Date }[] } | null> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const conv = await this.conversationRepo.findOne({
+      where: { userId, updatedAt: MoreThan(cutoff) },
+      order: { updatedAt: 'DESC' },
+    });
+    if (!conv) return null;
+
+    const lastMsg = await this.messageRepo.findOne({
+      where: { conversationId: conv.id },
+      order: { createdAt: 'DESC' },
+    });
+    if (!lastMsg || lastMsg.createdAt < cutoff) return null;
+
+    const messages = await this.messageRepo.find({
+      where: { conversationId: conv.id },
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      uuid: conv.uuid,
+      title: conv.title,
+      messages: messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role, content: m.content, createdAt: m.createdAt })),
+    };
   }
 
   async clearConversation(conversationId: string, userId: number) {
