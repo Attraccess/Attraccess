@@ -133,6 +133,10 @@ services:
       - '11434'
     volumes:
       - ollama-data:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+    labels:
+      io.balena.features.gpu: '1'
     env_file:
       - .env.docker-compose
 

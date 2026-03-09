@@ -3523,6 +3523,30 @@ export interface AttractapFirmware {
   flashSize: string;
 }
 
+export interface ChatMessageDto {
+  /** Conversation ID for continuing a conversation */
+  conversationId?: string;
+  /** The user message to send to the AI */
+  message: string;
+  /** IDs of approved tool calls to execute */
+  approvedActions?: string[];
+}
+
+export interface AiStatusDto {
+  /** Whether AI features are enabled */
+  enabled: boolean;
+  /** Whether Ollama is reachable */
+  ollamaConnected: boolean;
+  /** Whether all required models are downloaded and ready */
+  modelsReady: boolean;
+  /** Whether models are currently being pulled */
+  modelsPulling: boolean;
+  /** Progress of model pulls (model name to status string) */
+  pullProgress?: Record<string, string>;
+  /** Whether RAG document embeddings are indexed */
+  embeddingIndexed: boolean;
+}
+
 export interface InfoData {
   /** @example "Attraccess API" */
   name?: string;
@@ -4236,6 +4260,14 @@ export interface GetBillingTransactionsInDateRangeParams {
 }
 
 export type GetBillingTransactionsInDateRangeData = BillingTransaction[];
+
+export type AiControllerChatData = any;
+
+export type AiControllerApproveActionsData = any;
+
+export type AiControllerGetStatusData = AiStatusDto;
+
+export type AiControllerClearConversationData = any;
 
 export namespace System {
   /**
@@ -7747,6 +7779,72 @@ export namespace Analytics {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = GetBillingTransactionsInDateRangeData;
+  }
+}
+
+export namespace Ai {
+  /**
+   * No description
+   * @tags AI
+   * @name AiControllerChat
+   * @summary Send a message to the AI assistant and receive a streaming response
+   * @request POST:/api/ai/chat
+   */
+  export namespace AiControllerChat {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ChatMessageDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = AiControllerChatData;
+  }
+
+  /**
+   * No description
+   * @tags AI
+   * @name AiControllerApproveActions
+   * @summary Approve pending tool calls and continue the conversation
+   * @request POST:/api/ai/chat/{conversationId}/approve
+   */
+  export namespace AiControllerApproveActions {
+    export type RequestParams = {
+      conversationId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = AiControllerApproveActionsData;
+  }
+
+  /**
+   * No description
+   * @tags AI
+   * @name AiControllerGetStatus
+   * @summary Get AI feature status
+   * @request GET:/api/ai/status
+   */
+  export namespace AiControllerGetStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = AiControllerGetStatusData;
+  }
+
+  /**
+   * No description
+   * @tags AI
+   * @name AiControllerClearConversation
+   * @summary Clear a conversation
+   * @request DELETE:/api/ai/chat/{conversationId}
+   */
+  export namespace AiControllerClearConversation {
+    export type RequestParams = {
+      conversationId: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = AiControllerClearConversationData;
   }
 }
 
@@ -11754,6 +11852,76 @@ export class Api<
         query: query,
         secure: true,
         format: "json",
+        ...params,
+      }),
+  };
+  ai = {
+    /**
+     * No description
+     *
+     * @tags AI
+     * @name AiControllerChat
+     * @summary Send a message to the AI assistant and receive a streaming response
+     * @request POST:/api/ai/chat
+     */
+    aiControllerChat: (data: ChatMessageDto, params: RequestParams = {}) =>
+      this.request<AiControllerChatData, any>({
+        path: `/api/ai/chat`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags AI
+     * @name AiControllerApproveActions
+     * @summary Approve pending tool calls and continue the conversation
+     * @request POST:/api/ai/chat/{conversationId}/approve
+     */
+    aiControllerApproveActions: (
+      conversationId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<AiControllerApproveActionsData, any>({
+        path: `/api/ai/chat/${conversationId}/approve`,
+        method: "POST",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags AI
+     * @name AiControllerGetStatus
+     * @summary Get AI feature status
+     * @request GET:/api/ai/status
+     */
+    aiControllerGetStatus: (params: RequestParams = {}) =>
+      this.request<AiControllerGetStatusData, any>({
+        path: `/api/ai/status`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags AI
+     * @name AiControllerClearConversation
+     * @summary Clear a conversation
+     * @request DELETE:/api/ai/chat/{conversationId}
+     */
+    aiControllerClearConversation: (
+      conversationId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<AiControllerClearConversationData, any>({
+        path: `/api/ai/chat/${conversationId}`,
+        method: "DELETE",
         ...params,
       }),
   };

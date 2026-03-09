@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AiService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -491,6 +491,10 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
+export type AiServiceAiControllerGetStatusDefaultResponse = Awaited<ReturnType<typeof AiService.aiControllerGetStatus>>;
+export type AiServiceAiControllerGetStatusQueryResult<TData = AiServiceAiControllerGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useAiServiceAiControllerGetStatusKey = "AiServiceAiControllerGetStatus";
+export const UseAiServiceAiControllerGetStatusKeyFn = (queryKey?: Array<unknown>) => [useAiServiceAiControllerGetStatusKey, ...(queryKey ?? [])];
 export type SystemServiceRebootHostMutationResult = Awaited<ReturnType<typeof SystemService.rebootHost>>;
 export type SystemServiceShutdownHostMutationResult = Awaited<ReturnType<typeof SystemService.shutdownHost>>;
 export type UsersServiceSetLocalSignupDomainWhitelistMutationResult = Awaited<ReturnType<typeof UsersService.setLocalSignupDomainWhitelist>>;
@@ -557,6 +561,8 @@ export type PluginsServiceUploadPluginMutationResult = Awaited<ReturnType<typeof
 export type AttractapServiceEnrollNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.enrollNfcCard>>;
 export type AttractapServiceResetNfcCardMutationResult = Awaited<ReturnType<typeof AttractapService.resetNfcCard>>;
 export type AttractapServiceGetAppKeyByUidMutationResult = Awaited<ReturnType<typeof AttractapService.getAppKeyByUid>>;
+export type AiServiceAiControllerChatMutationResult = Awaited<ReturnType<typeof AiService.aiControllerChat>>;
+export type AiServiceAiControllerApproveActionsMutationResult = Awaited<ReturnType<typeof AiService.aiControllerApproveActions>>;
 export type AuthenticationServiceUpdateOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.updateOneSsoProvider>>;
 export type ResourcesServiceUpdateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.updateOneResource>>;
 export type ResourcesServiceResourceGroupsUpdateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsUpdateOne>>;
@@ -594,3 +600,4 @@ export type ProjectsServiceCancelProjectInvitationMutationResult = Awaited<Retur
 export type ResourceFormsServiceResourceFormsDeleteMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsDelete>>;
 export type PluginsServiceDeletePluginMutationResult = Awaited<ReturnType<typeof PluginsService.deletePlugin>>;
 export type AttractapServiceDeleteReaderMutationResult = Awaited<ReturnType<typeof AttractapService.deleteReader>>;
+export type AiServiceAiControllerClearConversationMutationResult = Awaited<ReturnType<typeof AiService.aiControllerClearConversation>>;

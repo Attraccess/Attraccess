@@ -17,6 +17,7 @@ import { AiService } from './ai.service';
 import { OllamaService } from './ollama.service';
 import { RagService } from './rag/rag.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { AiStatusDto } from './dto/ai-status.dto';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('AI')
@@ -112,12 +113,15 @@ export class AiController {
 
   @Get('status')
   @ApiOperation({ summary: 'Get AI feature status' })
-  @ApiResponse({ status: 200, description: 'AI status information' })
-  async getStatus() {
+  @ApiResponse({ status: 200, description: 'AI status information', type: AiStatusDto })
+  async getStatus(): Promise<AiStatusDto> {
     const ollamaHealthy = await this.ollamaService.healthCheck();
     return {
       enabled: true,
       ollamaConnected: ollamaHealthy,
+      modelsReady: this.ollamaService.modelsReady,
+      modelsPulling: this.ollamaService.modelsPulling,
+      pullProgress: this.ollamaService.modelsPulling ? this.ollamaService.pullProgress : undefined,
       embeddingIndexed: this.ragService.isIndexed,
     };
   }
