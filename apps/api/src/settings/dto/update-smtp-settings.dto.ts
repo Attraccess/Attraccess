@@ -35,13 +35,14 @@ export class UpdateSmtpSettingsDto {
   })
   secure?: boolean | null;
 
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  @ApiProperty({
-    description: 'SMTP username.',
+  @ApiPropertyOptional({
+    description: 'SMTP username. Omit or set to null for servers that do not require authentication.',
     example: 'no-reply@example.com',
+    nullable: true,
   })
-  user!: string;
+  user?: string | null;
 
   @IsOptional()
   @IsString()

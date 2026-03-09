@@ -108,8 +108,8 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
           host: smtpHost,
           port: Number(smtpPort),
           secure: smtpSecure,
-          user: smtpUser,
-          pass: smtpPass,
+          user: smtpUser || undefined,
+          pass: smtpPass || undefined,
           from: smtpFrom,
         },
       },
@@ -191,7 +191,6 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         description={t('inputs.user.description')}
         value={smtpUser}
         onValueChange={setSmtpUser}
-        isRequired
       />
       <PasswordInput
         label={t('inputs.pass.label')}
