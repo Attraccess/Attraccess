@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { AppSettingsDto } from './dto/app-settings.dto';
 import { SmtpSettingsDto } from './dto/smtp-settings.dto';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
@@ -118,5 +119,9 @@ export class SettingsService {
 
   async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
     return this.smtpSettingsService.getConfiguration();
+  }
+
+  buildSmtpTransportOptions(config: SmtpSettingsInternal): SMTPTransport.Options {
+    return this.smtpSettingsService.buildTransportOptions(config);
   }
 }

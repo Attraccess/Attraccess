@@ -15,7 +15,11 @@
       "!{projectRoot}/**/*.cy.[jt]s?(x)",
       "!{projectRoot}/cypress.config.[jt]s"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"],
+    "sharedGlobals": [
+      "{workspaceRoot}/.github/workflows/pull-requests.yml",
+      "{workspaceRoot}/.github/workflows/release.yml",
+      "{workspaceRoot}/.github/workflows/docker-nightly-latest.yml"
+    ],
     "testing": ["default", "{workspaceRoot}/jest.preset.js"],
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
@@ -188,7 +192,7 @@
       "commitMessage": "chore(release): {version} [skip ci]"
     },
     "version": {
-      "preVersionCommand": "pnpm nx run-many -t build --exclude=attractap-firmware,attractap-touch-firmware",
+      "preVersionCommand": "pnpm nx run-many -t build",
       "conventionalCommits": true
     },
     "changelog": {
