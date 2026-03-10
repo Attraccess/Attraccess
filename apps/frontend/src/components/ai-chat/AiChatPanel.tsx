@@ -61,7 +61,7 @@ function AiChatContent({ chatId, initialMessages }: { chatId: string; initialMes
                   <div>
                     <p className="font-medium">{t('aiChat.downloadingModels')}</p>
                     {status.pullProgress && Object.entries(status.pullProgress).map(([model, progress]) => (
-                      <p key={model} className="text-xs mt-1">{model}: {progress}</p>
+                      <p key={model} className="text-xs mt-1">{model}: {String(progress)}</p>
                     ))}
                   </div>
                 </>
