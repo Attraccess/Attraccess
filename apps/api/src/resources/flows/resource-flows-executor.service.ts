@@ -345,6 +345,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       }
     } catch (error) {
       this.logger.error(`Failed to handle resource usage event`, error.stack);
+      throw error;
     }
   }
 

@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { createTransport } from 'nodemailer';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import {
   User,
   EmailTemplateType,
@@ -16,7 +15,6 @@ import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
-import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 
 @Injectable()
 export class EmailService {
@@ -249,22 +247,7 @@ export class EmailService {
       throw new Error('SMTP configuration not set');
     }
 
-    let transportOptions: SMTPTransport.Options;
-
-    if (smtpConfig.service === SmtpServiceType.Outlook365) {
-      transportOptions = {
-        service: 'Outlook365',
-        auth: smtpConfig.user || smtpConfig.pass ? { user: smtpConfig.user ?? '', pass: smtpConfig.pass ?? '' } : undefined,
-      };
-    } else {
-      transportOptions = {
-        host: smtpConfig.host ?? undefined,
-        port: smtpConfig.port ?? undefined,
-        secure: smtpConfig.secure ?? false,
-        auth: smtpConfig.user || smtpConfig.pass ? { user: smtpConfig.user ?? '', pass: smtpConfig.pass ?? '' } : undefined,
-      };
-    }
-
+    const transportOptions = this.settingsService.buildSmtpTransportOptions(smtpConfig);
     const transporter = createTransport(transportOptions);
     return { transporter, from: smtpConfig.from ?? '' };
   }

@@ -1043,9 +1043,9 @@ export type UpdateSmtpSettingsDto = {
      */
     secure?: boolean;
     /**
-     * SMTP username.
+     * SMTP username. Omit or set to null for servers that do not require authentication.
      */
-    user: string;
+    user?: string | null;
     /**
      * SMTP password.
      */

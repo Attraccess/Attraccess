@@ -73,6 +73,7 @@ describe('ResourceUsageService', () => {
 
   const mockEventEmitter = {
     emit: jest.fn(),
+    emitAsync: jest.fn().mockResolvedValue([]),
   };
 
   const mockResourcesService = {
@@ -370,9 +371,9 @@ describe('ResourceUsageService', () => {
         isFinalized: false,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
       expect(emitted).toBeDefined();
       const usageEvent = emitted?.[1] as ResourceUsageEvent;
       expect(usageEvent).toBeInstanceOf(ResourceUsageEvent);
@@ -516,11 +517,11 @@ describe('ResourceUsageService', () => {
       });
       expect(mockUpdateQueryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
       expect(mockInsertQueryBuilder.insert).toHaveBeenCalled();
-      // One event for the ended previous session and one takeover event
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      // One event for the ended previous session (emitAsync) and one takeover event (emit)
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
       expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageTakenOverEvent.EVENT_NAME, expect.any(Object));
 
-      const usageEmit = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const usageEmit = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
       const usagePayload = usageEmit?.[1] as ResourceUsageEvent;
       expect(usagePayload).toBeInstanceOf(ResourceUsageEvent);
       expect(usagePayload.usage).toMatchObject({ id: 1, userId: 2, endNotes: expect.stringContaining('takeover') });
@@ -779,7 +780,7 @@ describe('ResourceUsageService', () => {
       expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null, isFinalized: true });
       expect(billingService.handleResourceUsageStart).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
     });
   });
@@ -842,9 +843,9 @@ describe('ResourceUsageService', () => {
 
       expect(result).toBe(mockUpdatedSession);
       expect(resourceUsageRepository.manager.transaction).toHaveBeenCalled();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emit.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
+      const emitted = eventEmitter.emitAsync.mock.calls.find((c) => c[0] === ResourceUsageEvent.EVENT_NAME);
       const eventPayload = emitted?.[1] as ResourceUsageEvent;
       expect(eventPayload).toBeInstanceOf(ResourceUsageEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
@@ -900,7 +901,7 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroducersService.isIntroducer).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
@@ -1040,9 +1041,9 @@ describe('ResourceUsageService', () => {
       const result = await service.lockDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emit.mock.calls[0];
+      const emitted = eventEmitter.emitAsync.mock.calls[0];
       const payload = emitted[1] as ResourceUsageEvent;
       expect(payload).toBeInstanceOf(ResourceUsageEvent);
       expect(payload.usage).toMatchObject({
@@ -1071,9 +1072,9 @@ describe('ResourceUsageService', () => {
       const result = await service.unlockDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emit.mock.calls[0];
+      const emitted = eventEmitter.emitAsync.mock.calls[0];
       const payload = emitted[1] as ResourceUsageEvent;
       expect(payload).toBeInstanceOf(ResourceUsageEvent);
       expect(payload.usage).toMatchObject({
@@ -1102,9 +1103,9 @@ describe('ResourceUsageService', () => {
       const result = await service.unlatchDoor(10, mockUser);
 
       expect(result).toBe(saved);
-      expect(eventEmitter.emit).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
+      expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceUsageEvent.EVENT_NAME, expect.any(Object));
 
-      const emitted = eventEmitter.emit.mock.calls[0];
+      const emitted = eventEmitter.emitAsync.mock.calls[0];
       const payload = emitted[1] as ResourceUsageEvent;
       expect(payload).toBeInstanceOf(ResourceUsageEvent);
       expect(payload.usage).toMatchObject({
@@ -1113,6 +1114,57 @@ describe('ResourceUsageService', () => {
         resourceId: 10,
         userId: 5,
       });
+    });
+
+    it('should propagate emitAsync errors from door lock', async () => {
+      resourceRepository.findOne.mockResolvedValue(doorResource);
+      const saved = {
+        id: 100,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorLock,
+        startTime: new Date(),
+        endTime: new Date(),
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+      eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
+
+      await expect(service.lockDoor(10, mockUser)).rejects.toThrow('Flow error');
+    });
+
+    it('should propagate emitAsync errors from door unlock', async () => {
+      resourceRepository.findOne.mockResolvedValue(doorResource);
+      const saved = {
+        id: 101,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorUnlock,
+        startTime: new Date(),
+        endTime: new Date(),
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+      eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
+
+      await expect(service.unlockDoor(10, mockUser)).rejects.toThrow('Flow error');
+    });
+
+    it('should propagate emitAsync errors from door unlatch', async () => {
+      resourceRepository.findOne.mockResolvedValue({ ...doorResource, separateUnlockAndUnlatch: true } as Resource);
+      const saved = {
+        id: 102,
+        resourceId: 10,
+        userId: 5,
+        usageAction: ResourceUsageAction.DoorUnlatch,
+        startTime: new Date(),
+        endTime: new Date(),
+      } as unknown as ResourceUsage;
+      resourceUsageRepository.save.mockResolvedValue(saved);
+      resourceUsageRepository.findOne.mockResolvedValue(saved);
+      eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
+
+      await expect(service.unlatchDoor(10, mockUser)).rejects.toThrow('Flow error');
     });
 
     it('should throw when operating non-door resource', async () => {

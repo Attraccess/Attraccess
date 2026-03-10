@@ -1611,8 +1611,9 @@ export const $UpdateSmtpSettingsDto = {
         },
         user: {
             type: 'string',
-            description: 'SMTP username.',
-            example: 'no-reply@example.com'
+            description: 'SMTP username. Omit or set to null for servers that do not require authentication.',
+            example: 'no-reply@example.com',
+            nullable: true
         },
         pass: {
             type: 'string',
@@ -1625,7 +1626,7 @@ export const $UpdateSmtpSettingsDto = {
             example: 'no-reply@example.com'
         }
     },
-    required: ['service', 'host', 'port', 'user', 'from']
+    required: ['service', 'host', 'port', 'from']
 } as const;
 
 export const $UpdateAiSettingsDto = {
