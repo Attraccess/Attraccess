@@ -1,5 +1,6 @@
 export const APP_PARENT = 'app';
 export const SMTP_PARENT = 'smtp';
+export const AI_PARENT = 'ai';
 
 export const APP_KEYS = {
   url: 'backend_url',
@@ -15,6 +16,14 @@ export const SMTP_KEYS = {
   user: 'user',
   pass: 'pass',
   from: 'from',
+} as const;
+
+export const AI_KEYS = {
+  enabled: 'enabled',
+  ollamaBaseUrl: 'ollama_base_url',
+  chatModel: 'chat_model',
+  embedModel: 'embed_model',
+  maxContextChunks: 'max_context_chunks',
 } as const;
 
 /** Cache TTL for settings reads. Writes update cache immediately; this only affects reads when DB is changed outside this process. */

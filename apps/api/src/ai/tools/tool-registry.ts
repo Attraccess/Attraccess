@@ -34,6 +34,7 @@ export class ToolRegistry {
   buildTools(sessionCookie: string): Record<string, unknown> {
     const tools: Record<string, unknown> = {};
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchEndpoints'] = (tool as any)({
       description: 'Search for available API endpoints by keyword or intent. Use this to discover what API operations are available before calling them. Returns matching endpoints with their method, path, parameters, and description.',
       parameters: z.object({
@@ -51,6 +52,7 @@ export class ToolRegistry {
       },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['callEndpoint'] = (tool as any)({
       description: 'Call any API endpoint. First use searchEndpoints to find the right endpoint, then use this to execute it. Path parameters should be substituted directly in the path (e.g. /api/resources/5 not /api/resources/{id}).',
       parameters: z.object({
@@ -75,6 +77,7 @@ export class ToolRegistry {
       },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchDocs'] = (tool as any)({
       description: 'Full-text search through the Attraccess documentation markdown files. Use this to find specific terms or keywords in the docs. Returns matching text with surrounding context and file path.',
       parameters: z.object({
@@ -91,6 +94,7 @@ export class ToolRegistry {
       },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchDocumentation'] = (tool as any)({
       description: 'Semantic search through Attraccess documentation using embeddings. Use this to find documentation relevant to a topic or question by meaning, not just exact keywords. Returns the most relevant documentation chunks with their source file.',
       parameters: z.object({
@@ -133,6 +137,7 @@ export class ToolRegistry {
     const results = this.endpointIndex.search(query);
 
     if (results.length === 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return { endpoints: [], error: `No endpoints found matching "${query}". Try different keywords.` } as any;
     }
 

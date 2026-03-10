@@ -14,13 +14,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
-import { ConfigService } from '@nestjs/config';
 import type { UIMessage } from 'ai';
-import { AiConfigType } from '../config/ai.config';
 import { AiService } from './ai.service';
 import { OllamaService } from './ollama.service';
 import { RagService } from './rag/rag.service';
 import { AiStatusDto } from './dto/ai-status.dto';
+import { SettingsService } from '../settings/settings.service';
 import { DualAuthGuard, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('AI')
@@ -33,7 +32,7 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly ollamaService: OllamaService,
     private readonly ragService: RagService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Post('chat')
@@ -91,14 +90,19 @@ export class AiController {
   @ApiOperation({ summary: 'Get AI feature status' })
   @ApiResponse({ status: 200, description: 'AI status information', type: AiStatusDto })
   async getStatus(): Promise<AiStatusDto> {
-    const ollamaHealthy = await this.ollamaService.healthCheck();
+    const [aiConfig, ollamaHealthy] = await Promise.all([
+      this.settingsService.getAiConfiguration(),
+      this.ollamaService.healthCheck(),
+    ]);
     return {
-      enabled: this.configService.get<AiConfigType>('ai')?.enabled ?? false,
+      enabled: aiConfig.enabled,
       ollamaConnected: ollamaHealthy,
       modelsReady: this.ollamaService.modelsReady,
       modelsPulling: this.ollamaService.modelsPulling,
       pullProgress: this.ollamaService.modelsPulling ? this.ollamaService.pullProgress : undefined,
       embeddingIndexed: this.ragService.isIndexed,
+      chatModel: aiConfig.chatModel,
+      embedModel: aiConfig.embedModel,
     };
   }
 

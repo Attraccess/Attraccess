@@ -1,0 +1,31 @@
+{
+  "inputs": {
+    "enabled": {
+      "label": "Enable AI Assistant"
+    },
+    "ollamaBaseUrl": {
+      "label": "Ollama Base URL",
+      "description": "URL of the Ollama server (e.g. http://localhost:11434)."
+    },
+    "chatModel": {
+      "label": "Chat Model",
+      "description": "Ollama model used for chat conversations."
+    },
+    "embedModel": {
+      "label": "Embedding Model",
+      "description": "Ollama model used for document embeddings (RAG)."
+    },
+    "maxContextChunks": {
+      "label": "Max Context Chunks",
+      "description": "Maximum number of document chunks included as context."
+    }
+  },
+  "actions": {
+    "save": "Save"
+  },
+  "loading": "Loading settings...",
+  "success": {
+    "title": "Settings saved",
+    "description": "AI settings have been updated. Model changes will take effect shortly."
+  }
+}

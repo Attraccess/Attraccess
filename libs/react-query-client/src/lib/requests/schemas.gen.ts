@@ -1496,6 +1496,41 @@ export const $SmtpSettingsDto = {
     required: ['service', 'host', 'port', 'secure', 'user', 'from', 'passConfigured']
 } as const;
 
+export const $AiSettingsDto = {
+    type: 'object',
+    properties: {
+        enabled: {
+            type: 'boolean',
+            description: 'Whether AI features are enabled.'
+        },
+        ollamaBaseUrl: {
+            type: 'string',
+            description: 'Base URL of the Ollama server.',
+            example: 'http://localhost:11434',
+            nullable: true
+        },
+        chatModel: {
+            type: 'string',
+            description: 'Ollama chat model name.',
+            example: 'llama3.2',
+            nullable: true
+        },
+        embedModel: {
+            type: 'string',
+            description: 'Ollama embedding model name.',
+            example: 'nomic-embed-text',
+            nullable: true
+        },
+        maxContextChunks: {
+            type: 'number',
+            description: 'Maximum number of RAG context chunks to include.',
+            example: 5,
+            nullable: true
+        }
+    },
+    required: ['enabled', 'ollamaBaseUrl', 'chatModel', 'embedModel', 'maxContextChunks']
+} as const;
+
 export const $SystemSettingsDto = {
     type: 'object',
     properties: {
@@ -1514,9 +1549,17 @@ export const $SystemSettingsDto = {
                     '$ref': '#/components/schemas/SmtpSettingsDto'
                 }
             ]
+        },
+        ai: {
+            description: 'AI / Ollama settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/AiSettingsDto'
+                }
+            ]
         }
     },
-    required: ['app', 'smtp']
+    required: ['app', 'smtp', 'ai']
 } as const;
 
 export const $UpdateAppSettingsDto = {
@@ -1585,6 +1628,37 @@ export const $UpdateSmtpSettingsDto = {
     required: ['service', 'host', 'port', 'user', 'from']
 } as const;
 
+export const $UpdateAiSettingsDto = {
+    type: 'object',
+    properties: {
+        enabled: {
+            type: 'boolean',
+            description: 'Whether AI features are enabled.',
+            example: true
+        },
+        ollamaBaseUrl: {
+            type: 'string',
+            description: 'Base URL of the Ollama server.',
+            example: 'http://localhost:11434'
+        },
+        chatModel: {
+            type: 'string',
+            description: 'Ollama chat model name.',
+            example: 'llama3.2'
+        },
+        embedModel: {
+            type: 'string',
+            description: 'Ollama embedding model name.',
+            example: 'nomic-embed-text'
+        },
+        maxContextChunks: {
+            type: 'number',
+            description: 'Maximum number of RAG context chunks to include.',
+            example: 5
+        }
+    }
+} as const;
+
 export const $UpdateSystemSettingsDto = {
     type: 'object',
     properties: {
@@ -1601,6 +1675,14 @@ export const $UpdateSystemSettingsDto = {
             allOf: [
                 {
                     '$ref': '#/components/schemas/UpdateSmtpSettingsDto'
+                }
+            ]
+        },
+        ai: {
+            description: 'AI / Ollama settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateAiSettingsDto'
                 }
             ]
         }
@@ -5605,7 +5687,15 @@ export const $AiStatusDto = {
         embeddingIndexed: {
             type: 'boolean',
             description: 'Whether RAG document embeddings are indexed'
+        },
+        chatModel: {
+            type: 'string',
+            description: 'Currently configured chat model name'
+        },
+        embedModel: {
+            type: 'string',
+            description: 'Currently configured embedding model name'
         }
     },
-    required: ['enabled', 'ollamaConnected', 'modelsReady', 'modelsPulling', 'embeddingIndexed']
+    required: ['enabled', 'ollamaConnected', 'modelsReady', 'modelsPulling', 'embeddingIndexed', 'chatModel', 'embedModel']
 } as const;

@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Ollama } from 'ollama';
-import { AiConfigType } from '../config/ai.config';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class OllamaService implements OnModuleInit {
@@ -14,7 +13,7 @@ export class OllamaService implements OnModuleInit {
   private _modelsPulling = false;
   private _pullProgress: Record<string, string> = {};
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly settingsService: SettingsService) {}
 
   get modelsReady(): boolean {
     return this._modelsReady;
@@ -41,13 +40,36 @@ export class OllamaService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    const aiConfig = this.configService.get<AiConfigType>('ai')!;
-    this._baseUrl = aiConfig.ollamaBaseUrl;
-    this.chatModel = aiConfig.chatModel;
-    this.embedModel = aiConfig.embedModel;
+    const config = await this.settingsService.getAiConfiguration();
+    this._baseUrl = config.ollamaBaseUrl;
+    this.chatModel = config.chatModel;
+    this.embedModel = config.embedModel;
     this.client = new Ollama({ host: this._baseUrl });
-    this.logger.log(`Ollama configured at ${aiConfig.ollamaBaseUrl} with chat model ${this.chatModel}`);
-    this.ensureModels().catch((err) => this.logger.error('Failed to ensure models', err));
+    this.logger.log(`Ollama configured at ${this._baseUrl} with chat model ${this.chatModel}`);
+    if (config.enabled) {
+      this.ensureModels().catch((err) => this.logger.error('Failed to ensure models', err));
+    }
+  }
+
+  async reconfigure(): Promise<void> {
+    const config = await this.settingsService.getAiConfiguration();
+    const urlChanged = this._baseUrl !== config.ollamaBaseUrl;
+    const chatChanged = this.chatModel !== config.chatModel;
+    const embedChanged = this.embedModel !== config.embedModel;
+
+    this._baseUrl = config.ollamaBaseUrl;
+    this.chatModel = config.chatModel;
+    this.embedModel = config.embedModel;
+
+    if (urlChanged) {
+      this.client = new Ollama({ host: this._baseUrl });
+      this.logger.log(`Ollama reconnected to ${this._baseUrl}`);
+    }
+
+    if (config.enabled && (urlChanged || chatChanged || embedChanged)) {
+      this._modelsReady = false;
+      this.ensureModels().catch((err) => this.logger.error('Failed to ensure models after reconfigure', err));
+    }
   }
 
   private async ensureModels() {

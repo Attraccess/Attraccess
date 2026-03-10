@@ -66,6 +66,7 @@ export class AiService {
       model,
       system: systemPrompt,
       messages: modelMessages,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: tools as any,
       stopWhen: stepCountIs(15),
       onFinish: async ({ text, steps, finishReason, usage }) => {
@@ -75,9 +76,11 @@ export class AiService {
           `Chat finished: conv=${convId} reason=${finishReason} steps=${steps?.length ?? 0} toolCalls=${toolCalls.length} toolResults=${toolResults.length} tokens=${JSON.stringify(usage)}`,
         );
         for (const tc of toolCalls) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           this.logger.debug(`  Tool call: ${tc.toolName}(${JSON.stringify((tc as any).args).slice(0, 200)})`);
         }
         for (const tr of toolResults) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const resultStr = JSON.stringify((tr as any).result ?? tr).slice(0, 300);
           this.logger.debug(`  Tool result [${tr.toolName}]: ${resultStr}`);
         }

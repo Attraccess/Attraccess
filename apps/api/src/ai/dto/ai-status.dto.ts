@@ -22,4 +22,10 @@ export class AiStatusDto {
 
   @ApiProperty({ description: 'Whether RAG document embeddings are indexed' })
   embeddingIndexed: boolean;
+
+  @ApiProperty({ description: 'Currently configured chat model name' })
+  chatModel: string;
+
+  @ApiProperty({ description: 'Currently configured embedding model name' })
+  embedModel: string;
 }

@@ -4,11 +4,14 @@ import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { AppSettingsDto } from './dto/app-settings.dto';
 import { SmtpSettingsDto } from './dto/smtp-settings.dto';
+import { AiSettingsDto } from './dto/ai-settings.dto';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
+import { UpdateAiSettingsDto } from './dto/update-ai-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
+import { AiSettingsInternal, AiSettingsService } from './ai-settings.service';
 import { APP_KEYS, APP_PARENT } from './constants';
 import { SettingsStoreService } from './settings-store.service';
 import {
@@ -23,6 +26,7 @@ export class SettingsService {
     private readonly userRepository: Repository<User>,
     private readonly settingsStore: SettingsStoreService,
     private readonly smtpSettingsService: SmtpSettingsService,
+    private readonly aiSettingsService: AiSettingsService,
   ) {}
 
   async isFirstTimeSetupAvailable(): Promise<boolean> {
@@ -55,8 +59,12 @@ export class SettingsService {
   }
 
   async getSystemSettings(): Promise<SystemSettingsDto> {
-    const [app, smtp] = await Promise.all([this.getAppSettings(), this.smtpSettingsService.getSettings()]);
-    return { app, smtp };
+    const [app, smtp, ai] = await Promise.all([
+      this.getAppSettings(),
+      this.smtpSettingsService.getSettings(),
+      this.aiSettingsService.getSettings(),
+    ]);
+    return { app, smtp, ai };
   }
 
   async updateSystemSettings(update: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
@@ -65,6 +73,9 @@ export class SettingsService {
     }
     if (update.smtp) {
       await this.updateSmtpSettings(update.smtp);
+    }
+    if (update.ai) {
+      await this.updateAiSettings(update.ai);
     }
     return this.getSystemSettings();
   }
@@ -118,5 +129,17 @@ export class SettingsService {
 
   async getSmtpConfiguration(): Promise<SmtpSettingsInternal | null> {
     return this.smtpSettingsService.getConfiguration();
+  }
+
+  async getAiSettings(): Promise<AiSettingsDto> {
+    return this.aiSettingsService.getSettings();
+  }
+
+  async updateAiSettings(update: UpdateAiSettingsDto): Promise<void> {
+    return this.aiSettingsService.updateSettings(update);
+  }
+
+  async getAiConfiguration(): Promise<AiSettingsInternal> {
+    return this.aiSettingsService.getConfiguration();
   }
 }

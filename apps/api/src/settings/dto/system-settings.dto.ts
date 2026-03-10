@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AppSettingsDto } from './app-settings.dto';
 import { SmtpSettingsDto } from './smtp-settings.dto';
+import { AiSettingsDto } from './ai-settings.dto';
 
 export class SystemSettingsDto {
   @ApiProperty({ description: 'Application settings', type: AppSettingsDto })
@@ -8,4 +9,7 @@ export class SystemSettingsDto {
 
   @ApiProperty({ description: 'SMTP settings', type: SmtpSettingsDto })
   smtp!: SmtpSettingsDto;
+
+  @ApiProperty({ description: 'AI / Ollama settings', type: AiSettingsDto })
+  ai!: AiSettingsDto;
 }

@@ -1,0 +1,31 @@
+{
+  "inputs": {
+    "enabled": {
+      "label": "KI-Assistent aktivieren"
+    },
+    "ollamaBaseUrl": {
+      "label": "Ollama-Basis-URL",
+      "description": "URL des Ollama-Servers (z.B. http://localhost:11434)."
+    },
+    "chatModel": {
+      "label": "Chat-Modell",
+      "description": "Ollama-Modell für Chat-Konversationen."
+    },
+    "embedModel": {
+      "label": "Embedding-Modell",
+      "description": "Ollama-Modell für Dokument-Embeddings (RAG)."
+    },
+    "maxContextChunks": {
+      "label": "Max. Kontext-Chunks",
+      "description": "Maximale Anzahl von Dokument-Chunks als Kontext."
+    }
+  },
+  "actions": {
+    "save": "Speichern"
+  },
+  "loading": "Einstellungen werden geladen...",
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "KI-Einstellungen wurden aktualisiert. Modelländerungen werden in Kürze wirksam."
+  }
+}

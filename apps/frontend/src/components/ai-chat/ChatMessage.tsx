@@ -92,7 +92,7 @@ function ToolCallPart({ part }: {
       </button>
       {isExpanded && (
         <div className="px-2 pb-2 space-y-1">
-          {part.args && Object.keys(part.args as object).length > 0 && (
+          {part.args != null && Object.keys(part.args as object).length > 0 && (
             <Code className="text-[11px] overflow-x-auto whitespace-pre-wrap block p-1.5">
               {JSON.stringify(part.args, null, 2)}
             </Code>
@@ -114,7 +114,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const textContent = message.parts
     ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
     .map((p) => p.text)
-    .join('') || (typeof message.content === 'string' ? message.content : '');
+    .join('') || '';
 
   const reasoningParts = message.parts?.filter((p): p is { type: 'reasoning'; text: string; state?: 'streaming' | 'done' } => p.type === 'reasoning') || [];
   const reasoningText = reasoningParts.map((p) => p.text).join('');
@@ -137,6 +137,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {reasoningText && (
                 <ThinkingBlock content={reasoningText} isStreaming={isReasoningStreaming} />
               )}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {toolParts.map((part: any) => (
                 <ToolCallPart key={part.toolCallId} part={part} />
               ))}

@@ -1,0 +1,8 @@
+{
+  "title": "KI-Assistent (Ollama)",
+  "subtitle": "Konfiguration des KI-Chat-Assistenten",
+  "status": {
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert"
+  }
+}

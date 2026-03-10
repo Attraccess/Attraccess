@@ -54,6 +54,8 @@ import {
   entities,
   UsageDurationUnit,
   DocEmbedding,
+  AiConversation,
+  AiConversationMessage,
 } from '@attraccess/database-entities';
 
 jest.setTimeout(120_000);
@@ -162,6 +164,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const nfcCardRepo = dataSource.getRepository(NFCCard);
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
   const docEmbeddingRepo = dataSource.getRepository(DocEmbedding);
+  const aiConversationRepo = dataSource.getRepository(AiConversation);
+  const aiConversationMessageRepo = dataSource.getRepository(AiConversationMessage);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -456,6 +460,19 @@ const seedDatabase = async (dataSource: DataSource) => {
     chunkIndex: 0,
     content: 'Seed embedding content',
     embedding: [0.1, 0.2, 0.3],
+  }));
+
+  const aiConversation = await ensureEntity(aiConversationRepo, () => ({
+    uuid: `seed-conv-${seedTag}`,
+    userId: primaryUser.id,
+    title: 'Seed conversation',
+  }));
+
+  await ensureEntity(aiConversationMessageRepo, () => ({
+    conversationId: aiConversation.id,
+    role: 'user',
+    content: 'Seed message',
+    toolCalls: null,
   }));
 };
 

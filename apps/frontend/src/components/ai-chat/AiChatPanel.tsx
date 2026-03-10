@@ -90,7 +90,7 @@ export function AiChatPanel() {
                   <p className="text-xs mt-0.5 break-words">{chat.error.message}</p>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <Button size="sm" color="danger" variant="flat" onPress={() => chat.reload()}>
+                  <Button size="sm" color="danger" variant="flat" onPress={() => chat.regenerate()}>
                     {t('aiChat.retry')}
                   </Button>
                 </div>

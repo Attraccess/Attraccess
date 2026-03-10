@@ -40,5 +40,6 @@ export function DataTable({ data }: { data: DataTableData }) {
 }
 
 export function isDataTable(data: unknown): data is DataTableData {
-  return (data as any)?.type === 'data-table' && Array.isArray((data as any)?.columns);
+  const d = data as Record<string, unknown>;
+  return d?.type === 'data-table' && Array.isArray(d?.columns);
 }

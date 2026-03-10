@@ -972,6 +972,29 @@ export type SmtpSettingsDto = {
     passConfigured: boolean;
 };
 
+export type AiSettingsDto = {
+    /**
+     * Whether AI features are enabled.
+     */
+    enabled: boolean;
+    /**
+     * Base URL of the Ollama server.
+     */
+    ollamaBaseUrl: string | null;
+    /**
+     * Ollama chat model name.
+     */
+    chatModel: string | null;
+    /**
+     * Ollama embedding model name.
+     */
+    embedModel: string | null;
+    /**
+     * Maximum number of RAG context chunks to include.
+     */
+    maxContextChunks: number | null;
+};
+
 export type SystemSettingsDto = {
     /**
      * Application settings
@@ -981,6 +1004,10 @@ export type SystemSettingsDto = {
      * SMTP settings
      */
     smtp: SmtpSettingsDto;
+    /**
+     * AI / Ollama settings
+     */
+    ai: AiSettingsDto;
 };
 
 export type UpdateAppSettingsDto = {
@@ -1029,6 +1056,29 @@ export type UpdateSmtpSettingsDto = {
     from: string;
 };
 
+export type UpdateAiSettingsDto = {
+    /**
+     * Whether AI features are enabled.
+     */
+    enabled?: boolean;
+    /**
+     * Base URL of the Ollama server.
+     */
+    ollamaBaseUrl?: string;
+    /**
+     * Ollama chat model name.
+     */
+    chatModel?: string;
+    /**
+     * Ollama embedding model name.
+     */
+    embedModel?: string;
+    /**
+     * Maximum number of RAG context chunks to include.
+     */
+    maxContextChunks?: number;
+};
+
 export type UpdateSystemSettingsDto = {
     /**
      * Application settings update
@@ -1038,6 +1088,10 @@ export type UpdateSystemSettingsDto = {
      * SMTP settings update
      */
     smtp?: UpdateSmtpSettingsDto;
+    /**
+     * AI / Ollama settings update
+     */
+    ai?: UpdateAiSettingsDto;
 };
 
 export type FirstTimeSetupStepsDto = {
@@ -3594,6 +3648,14 @@ export type AiStatusDto = {
      * Whether RAG document embeddings are indexed
      */
     embeddingIndexed: boolean;
+    /**
+     * Currently configured chat model name
+     */
+    chatModel: string;
+    /**
+     * Currently configured embedding model name
+     */
+    embedModel: string;
 };
 
 export type InfoResponse = {

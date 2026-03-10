@@ -6,10 +6,11 @@ import { SettingsController } from './settings.controller';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { SettingsStoreService } from './settings-store.service';
 import { SmtpSettingsService } from './smtp-settings.service';
+import { AiSettingsService } from './ai-settings.service';
 
 @Module({
   imports: [EncryptionModule, TypeOrmModule.forFeature([Setting, User])],
-  providers: [SettingsStoreService, SmtpSettingsService, SettingsService],
+  providers: [SettingsStoreService, SmtpSettingsService, AiSettingsService, SettingsService],
   controllers: [SettingsController],
   exports: [SettingsService],
 })

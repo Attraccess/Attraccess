@@ -1,0 +1,8 @@
+{
+  "title": "AI Assistant (Ollama)",
+  "subtitle": "AI chat assistant configuration",
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  }
+}
