@@ -57,5 +57,6 @@ export function NavigationButtons({ data }: { data: NavigationButtonsData }) {
 }
 
 export function isNavigationButtons(data: unknown): data is NavigationButtonsData {
-  return (data as any)?.type === 'navigation-buttons' && Array.isArray((data as any)?.buttons);
+  const d = data as Record<string, unknown>;
+  return d?.type === 'navigation-buttons' && Array.isArray(d?.buttons);
 }

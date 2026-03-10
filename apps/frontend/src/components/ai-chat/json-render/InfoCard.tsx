@@ -35,5 +35,6 @@ export function InfoCard({ data }: { data: InfoCardData }) {
 }
 
 export function isInfoCard(data: unknown): data is InfoCardData {
-  return (data as any)?.type === 'info-card' && typeof (data as any)?.title === 'string';
+  const d = data as Record<string, unknown>;
+  return d?.type === 'info-card' && typeof d?.title === 'string';
 }
