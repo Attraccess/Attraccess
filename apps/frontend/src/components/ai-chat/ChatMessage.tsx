@@ -59,23 +59,42 @@ function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?
   );
 }
 
-function hasToolError(result: unknown): boolean {
-  if (!result || typeof result !== 'object') return false;
-  const r = result as Record<string, unknown>;
+function hasToolError(part: Record<string, unknown>): boolean {
+  if (part.state === 'output-error') return true;
+  if (part.errorText) return true;
+  const output = part.output ?? part.result;
+  if (!output || typeof output !== 'object') return false;
+  const r = output as Record<string, unknown>;
   return ('error' in r && !!r.error) || ('success' in r && r.success === false);
 }
 
-function ToolCallPart({ part }: {
-  part: { type: string; toolCallId: string; toolName: string; args?: unknown; state?: string; result?: unknown };
-}) {
+function getToolName(part: Record<string, unknown>): string {
+  if (part.toolName) return part.toolName as string;
+  const type = part.type as string;
+  if (type.startsWith('tool-')) return type.slice(5);
+  return type;
+}
+
+function getToolState(part: Record<string, unknown>): { isRunning: boolean; isDone: boolean } {
+  const state = part.state as string | undefined;
+  const isDone = state === 'output-available' || state === 'output-error' || state === 'output-denied' || state === 'result';
+  const isRunning = !isDone;
+  return { isRunning, isDone };
+}
+
+function ToolCallPart({ part }: { part: Record<string, unknown> }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { t } = useTranslations({ en, de });
 
-  const isResult = part.state === 'result';
-  const isError = isResult && hasToolError(part.result);
-  const isRunning = part.state === 'call' || part.state === 'partial-call';
-  const statusColor = isError ? 'danger' : isResult ? 'success' : 'warning';
-  const statusLabel = isError ? t('aiChat.toolError') : isResult ? t('aiChat.toolResult') : isRunning ? t('aiChat.toolRunning') : t('aiChat.toolCall');
+  const toolName = getToolName(part);
+  const isError = hasToolError(part);
+  const { isRunning, isDone } = getToolState(part);
+  const input = part.input ?? part.args;
+  const output = part.output ?? part.result;
+  const errorText = part.errorText as string | undefined;
+
+  const statusColor = isError ? 'danger' : isDone ? 'success' : 'warning';
+  const statusLabel = isError ? t('aiChat.toolError') : isDone ? t('aiChat.toolResult') : isRunning ? t('aiChat.toolRunning') : t('aiChat.toolCall');
 
   return (
     <div className={`my-1.5 rounded-lg bg-default-50 border overflow-hidden ${isError ? 'border-danger-300' : 'border-default-200'}`}>
@@ -87,19 +106,24 @@ function ToolCallPart({ part }: {
         <Chip size="sm" color={statusColor} variant="flat" className="h-5">
           {statusLabel}
         </Chip>
-        <span className="font-mono text-default-600 truncate">{part.toolName}</span>
+        <span className="font-mono text-default-600 truncate">{toolName}</span>
         <span className="ml-auto text-[10px] text-default-400">{isExpanded ? '\u25B2' : '\u25BC'}</span>
       </button>
       {isExpanded && (
         <div className="px-2 pb-2 space-y-1">
-          {part.args != null && Object.keys(part.args as object).length > 0 && (
+          {input != null && Object.keys(input as object).length > 0 && (
             <Code className="text-[11px] overflow-x-auto whitespace-pre-wrap block p-1.5">
-              {JSON.stringify(part.args, null, 2)}
+              {JSON.stringify(input, null, 2)}
             </Code>
           )}
-          {part.result !== undefined && (
+          {errorText && (
+            <Code className="text-[11px] overflow-x-auto whitespace-pre-wrap block p-1.5" color="danger">
+              {errorText}
+            </Code>
+          )}
+          {output !== undefined && (
             <Code className="text-[11px] overflow-x-auto whitespace-pre-wrap block p-1.5" color={isError ? 'danger' : 'success'}>
-              {JSON.stringify(part.result, null, 2)}
+              {JSON.stringify(output, null, 2)}
             </Code>
           )}
         </div>
@@ -108,60 +132,72 @@ function ToolCallPart({ part }: {
   );
 }
 
+function TextBlock({ text }: { text: string }) {
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className, children, ...props }) {
+            const match = /language-json-render/.exec(className || '');
+            if (match) {
+              const jsonStr = String(children).replace(/\n$/, '');
+              return <JsonRenderBlock jsonString={jsonStr} />;
+            }
+            return <code className={className} {...props}>{children}</code>;
+          },
+        }}
+      >
+        {text}
+      </Markdown>
+    </div>
+  );
+}
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
+  const parts = message.parts || [];
 
-  const textContent = message.parts
-    ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('') || '';
+  if (isUser) {
+    const textContent = parts
+      .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+      .map((p) => p.text)
+      .join('') || '';
 
-  const reasoningParts = message.parts?.filter((p): p is { type: 'reasoning'; text: string; state?: 'streaming' | 'done' } => p.type === 'reasoning') || [];
-  const reasoningText = reasoningParts.map((p) => p.text).join('');
-  const isReasoningStreaming = reasoningParts.some((p) => p.state === 'streaming');
-
-  const toolParts = message.parts?.filter((p) => p.type.startsWith('tool-')) || [];
+    return (
+      <div className="flex justify-end mb-3">
+        <Card className="max-w-[85%] bg-primary text-primary-foreground" shadow="sm" radius="lg">
+          <CardBody className="px-3 py-2 text-sm">
+            <p className="whitespace-pre-wrap">{textContent}</p>
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
-      <Card
-        className={`max-w-[85%] ${isUser ? 'bg-primary text-primary-foreground' : ''}`}
-        shadow="sm"
-        radius="lg"
-      >
+    <div className="flex justify-start mb-3">
+      <Card className="max-w-[85%]" shadow="sm" radius="lg">
         <CardBody className="px-3 py-2 text-sm">
-          {isUser ? (
-            <p className="whitespace-pre-wrap">{textContent}</p>
-          ) : (
-            <>
-              {reasoningText && (
-                <ThinkingBlock content={reasoningText} isStreaming={isReasoningStreaming} />
-              )}
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {toolParts.map((part: any) => (
-                <ToolCallPart key={part.toolCallId} part={part} />
-              ))}
-              {textContent && (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <Markdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      code({ className, children, ...props }) {
-                        const match = /language-json-render/.exec(className || '');
-                        if (match) {
-                          const jsonStr = String(children).replace(/\n$/, '');
-                          return <JsonRenderBlock jsonString={jsonStr} />;
-                        }
-                        return <code className={className} {...props}>{children}</code>;
-                      },
-                    }}
-                  >
-                    {textContent}
-                  </Markdown>
-                </div>
-              )}
-            </>
-          )}
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {parts.map((part: any, index: number) => {
+            if (part.type === 'reasoning') {
+              return (
+                <ThinkingBlock
+                  key={`reasoning-${index}`}
+                  content={part.text}
+                  isStreaming={part.state === 'streaming'}
+                />
+              );
+            }
+            if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
+              return <ToolCallPart key={part.toolCallId || `tool-${index}`} part={part} />;
+            }
+            if (part.type === 'text' && part.text) {
+              return <TextBlock key={`text-${index}`} text={part.text} />;
+            }
+            return null;
+          })}
         </CardBody>
       </Card>
     </div>

@@ -1138,11 +1138,38 @@ export interface SmtpSettingsDto {
   passConfigured: boolean;
 }
 
+export interface AiSettingsDto {
+  /** Whether AI features are enabled. */
+  enabled: boolean;
+  /**
+   * Base URL of the Ollama server.
+   * @example "http://localhost:11434"
+   */
+  ollamaBaseUrl: string | null;
+  /**
+   * Ollama chat model name.
+   * @example "llama3.2"
+   */
+  chatModel: string | null;
+  /**
+   * Ollama embedding model name.
+   * @example "nomic-embed-text"
+   */
+  embedModel: string | null;
+  /**
+   * Maximum number of RAG context chunks to include.
+   * @example 5
+   */
+  maxContextChunks: number | null;
+}
+
 export interface SystemSettingsDto {
   /** Application settings */
   app: AppSettingsDto;
   /** SMTP settings */
   smtp: SmtpSettingsDto;
+  /** AI / Ollama settings */
+  ai: AiSettingsDto;
 }
 
 export interface UpdateAppSettingsDto {
@@ -1182,10 +1209,10 @@ export interface UpdateSmtpSettingsDto {
    */
   secure?: boolean;
   /**
-   * SMTP username.
+   * SMTP username. Omit or set to null for servers that do not require authentication.
    * @example "no-reply@example.com"
    */
-  user: string;
+  user?: string | null;
   /**
    * SMTP password.
    * @example "secret"
@@ -1198,11 +1225,41 @@ export interface UpdateSmtpSettingsDto {
   from: string;
 }
 
+export interface UpdateAiSettingsDto {
+  /**
+   * Whether AI features are enabled.
+   * @example true
+   */
+  enabled?: boolean;
+  /**
+   * Base URL of the Ollama server.
+   * @example "http://localhost:11434"
+   */
+  ollamaBaseUrl?: string;
+  /**
+   * Ollama chat model name.
+   * @example "llama3.2"
+   */
+  chatModel?: string;
+  /**
+   * Ollama embedding model name.
+   * @example "nomic-embed-text"
+   */
+  embedModel?: string;
+  /**
+   * Maximum number of RAG context chunks to include.
+   * @example 5
+   */
+  maxContextChunks?: number;
+}
+
 export interface UpdateSystemSettingsDto {
   /** Application settings update */
   app?: UpdateAppSettingsDto;
   /** SMTP settings update */
   smtp?: UpdateSmtpSettingsDto;
+  /** AI / Ollama settings update */
+  ai?: UpdateAiSettingsDto;
 }
 
 export interface FirstTimeSetupStepsDto {
@@ -3536,6 +3593,10 @@ export interface AiStatusDto {
   pullProgress?: Record<string, string>;
   /** Whether RAG document embeddings are indexed */
   embeddingIndexed: boolean;
+  /** Currently configured chat model name */
+  chatModel: string;
+  /** Currently configured embedding model name */
+  embedModel: string;
 }
 
 export interface InfoData {
@@ -8102,7 +8163,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab

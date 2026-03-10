@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Ollama } from 'ollama';
 import { SettingsService } from '../settings/settings.service';
+import { AI_SETTINGS_UPDATED_EVENT } from '../settings/ai-settings.service';
 
 @Injectable()
 export class OllamaService implements OnModuleInit {
@@ -51,6 +53,7 @@ export class OllamaService implements OnModuleInit {
     }
   }
 
+  @OnEvent(AI_SETTINGS_UPDATED_EVENT)
   async reconfigure(): Promise<void> {
     const config = await this.settingsService.getAiConfiguration();
     const urlChanged = this._baseUrl !== config.ollamaBaseUrl;
@@ -66,7 +69,7 @@ export class OllamaService implements OnModuleInit {
       this.logger.log(`Ollama reconnected to ${this._baseUrl}`);
     }
 
-    if (config.enabled && (urlChanged || chatChanged || embedChanged)) {
+    if (config.enabled && (urlChanged || chatChanged || embedChanged || !this._modelsReady)) {
       this._modelsReady = false;
       this.ensureModels().catch((err) => this.logger.error('Failed to ensure models after reconfigure', err));
     }

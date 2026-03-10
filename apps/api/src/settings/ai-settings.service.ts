@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AiSettingsDto } from './dto/ai-settings.dto';
 import { UpdateAiSettingsDto } from './dto/update-ai-settings.dto';
 import { SettingsStoreService } from './settings-store.service';
 import { AI_KEYS, AI_PARENT } from './constants';
+
+export const AI_SETTINGS_UPDATED_EVENT = 'ai.settings.updated';
 
 export type AiSettingsInternal = {
   enabled: boolean;
@@ -22,7 +25,10 @@ const DEFAULTS: AiSettingsInternal = {
 
 @Injectable()
 export class AiSettingsService {
-  constructor(private readonly settingsStore: SettingsStoreService) {}
+  constructor(
+    private readonly settingsStore: SettingsStoreService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getSettings(): Promise<AiSettingsDto> {
     const [enabledRaw, ollamaBaseUrl, chatModel, embedModel, maxContextChunksRaw] =
@@ -68,6 +74,7 @@ export class AiSettingsService {
         val === null ? null : String(val),
       );
     }
+    this.eventEmitter.emit(AI_SETTINGS_UPDATED_EVENT);
   }
 
   async getConfiguration(): Promise<AiSettingsInternal> {
