@@ -3,7 +3,7 @@
     "title": "AI Assistant",
     "inputPlaceholder": "Ask me anything about Attraccess...",
     "send": "Send",
-    "clear": "Clear conversation",
+    "stop": "Stop generating",
     "close": "Close",
     "toolCall": "Tool call",
     "toolRunning": "Running...",
@@ -20,9 +20,16 @@
     "dismiss": "Dismiss",
     "unavailable": "AI assistant is not available",
     "emptyState": "Start a conversation with the AI assistant",
-    "restoring": "Restoring conversation...",
     "downloadingModels": "Downloading AI models...",
     "ollamaNotReachable": "Ollama is not reachable. Please ensure it is running.",
-    "preparingModels": "Preparing AI models..."
+    "preparingModels": "Preparing AI models...",
+    "copyChatLog": "Copy chat log (debug)",
+    "newChat": "New conversation",
+    "suggestedPrompts": {
+      "showResources": "Show available resources",
+      "checkBilling": "Check my billing balance",
+      "howToUse": "How do I use a resource?",
+      "myUsage": "Show my current usage"
+    }
   }
 }

@@ -5153,14 +5153,6 @@ export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction
 
 export type AiControllerChatResponse = unknown;
 
-export type AiControllerListConversationsResponse = unknown;
-
-export type AiControllerGetConversationMessagesData = {
-    uuid: string;
-};
-
-export type AiControllerGetConversationMessagesResponse = unknown;
-
 export type AiControllerGetStatusResponse = AiStatusDto;
 
 export type AiControllerClearConversationData = {
@@ -8053,27 +8045,6 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * AI SDK data stream
-                 */
-                200: unknown;
-            };
-        };
-    };
-    '/api/ai/conversations': {
-        get: {
-            res: {
-                /**
-                 * List of conversations
-                 */
-                200: unknown;
-            };
-        };
-    };
-    '/api/ai/conversations/{uuid}/messages': {
-        get: {
-            req: AiControllerGetConversationMessagesData;
-            res: {
-                /**
-                 * Conversation messages
                  */
                 200: unknown;
             };

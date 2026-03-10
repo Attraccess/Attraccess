@@ -1,16 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import { Button, Textarea } from '@heroui/react';
-import { Send } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
+  isStreaming?: boolean;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, disabled, isStreaming }: ChatInputProps) {
   const [value, setValue] = useState('');
   const { t } = useTranslations({ en, de });
 
@@ -38,23 +40,37 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         onValueChange={setValue}
         onKeyDown={handleKeyDown}
         placeholder={t('aiChat.inputPlaceholder')}
-        disabled={disabled}
+        disabled={disabled || isStreaming}
         size="sm"
         minRows={1}
         maxRows={4}
         className="flex-1"
       />
-      <Button
-        isIconOnly
-        color="primary"
-        size="sm"
-        onPress={handleSend}
-        isDisabled={disabled || !value.trim()}
-        aria-label={t('aiChat.send')}
-        data-testid="ai-chat-send"
-      >
-        <Send size={16} />
-      </Button>
+      {isStreaming ? (
+        <Button
+          isIconOnly
+          color="danger"
+          size="sm"
+          variant="flat"
+          onPress={onStop}
+          aria-label={t('aiChat.stop')}
+          data-testid="ai-chat-stop"
+        >
+          <Square size={16} />
+        </Button>
+      ) : (
+        <Button
+          isIconOnly
+          color="primary"
+          size="sm"
+          onPress={handleSend}
+          isDisabled={disabled || !value.trim()}
+          aria-label={t('aiChat.send')}
+          data-testid="ai-chat-send"
+        >
+          <Send size={16} />
+        </Button>
+      )}
     </div>
   );
 }

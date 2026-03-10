@@ -252,8 +252,4 @@ export const prefetchUseAnalyticsServiceGetBillingTransactionsInDateRange = (que
   end: string;
   start: string;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
-export const prefetchUseAiServiceAiControllerListConversations = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerListConversationsKeyFn(), queryFn: () => AiService.aiControllerListConversations() });
-export const prefetchUseAiServiceAiControllerGetConversationMessages = (queryClient: QueryClient, { uuid }: {
-  uuid: string;
-}) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerGetConversationMessagesKeyFn({ uuid }), queryFn: () => AiService.aiControllerGetConversationMessages({ uuid }) });
 export const prefetchUseAiServiceAiControllerGetStatus = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseAiServiceAiControllerGetStatusKeyFn(), queryFn: () => AiService.aiControllerGetStatus() });

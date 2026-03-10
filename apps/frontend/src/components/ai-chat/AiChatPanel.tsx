@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import { Button, Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, Spinner } from '@heroui/react';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { Button, Drawer, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, Spinner, Chip, Divider, Tooltip } from '@heroui/react';
+import { AlertTriangle, MessageSquarePlus, Copy, Check } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAiChatStore } from './ai-chat.store';
 import { useAiChat } from './useAiChat';
@@ -10,16 +10,52 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { useAiServiceAiControllerGetStatus } from '@attraccess/react-query-client';
 
+const SUGGESTED_PROMPT_KEYS = [
+  'showResources',
+  'checkBilling',
+  'howToUse',
+  'myUsage',
+] as const;
+
+function formatPartForLog(part: Record<string, unknown>): string {
+  if (part.type === 'text') return part.text as string;
+  if (part.type === 'reasoning') return `[Thinking] ${part.text}`;
+  if (String(part.type).startsWith('tool-') || part.type === 'dynamic-tool') {
+    const name = (part.toolName || part.type) as string;
+    const input = part.input ?? part.args;
+    const output = part.output ?? part.result;
+    const errorText = part.errorText as string | undefined;
+    const state = part.state as string | undefined;
+    let block = `[Tool: ${name}] (state: ${state || 'unknown'})\n`;
+    if (input) block += `  Input: ${JSON.stringify(input, null, 2)}\n`;
+    if (errorText) block += `  Error: ${errorText}\n`;
+    if (output !== undefined) block += `  Output: ${JSON.stringify(output, null, 2)}\n`;
+    return block;
+  }
+  return `[${part.type}] ${JSON.stringify(part)}`;
+}
+
+function buildChatLog(messages: { role: string; parts?: Record<string, unknown>[] }[]): string {
+  return messages.map((msg) => {
+    const role = msg.role === 'user' ? 'USER' : 'ASSISTANT';
+    const parts = (msg.parts || []).map(formatPartForLog).join('\n');
+    return `--- ${role} ---\n${parts}`;
+  }).join('\n\n');
+}
+
 export function AiChatPanel() {
   const { isOpen, setOpen, clear } = useAiChatStore();
   const chat = useAiChat();
   const { t } = useTranslations({ en, de });
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const { data: status } = useAiServiceAiControllerGetStatus(undefined, {
     enabled: isOpen,
     refetchInterval: 3000,
   });
 
-  const isBusy = chat.status === 'submitted' || chat.status === 'streaming';
+  const isStreaming = chat.status === 'streaming';
+  const isBusy = chat.status === 'submitted' || isStreaming;
 
   const handleSend = useCallback(
     (text: string) => {
@@ -28,12 +64,34 @@ export function AiChatPanel() {
     [chat],
   );
 
-  const handleClear = useCallback(() => {
+  const handleStop = useCallback(() => {
+    chat.stop();
+  }, [chat]);
+
+  const handleNewChat = useCallback(() => {
     chat.setMessages([]);
     clear();
   }, [chat, clear]);
 
+  const handleSuggestedPrompt = useCallback(
+    (key: string) => {
+      const text = t(`aiChat.suggestedPrompts.${key}`);
+      chat.sendMessage({ text });
+    },
+    [chat, t],
+  );
+
+  const handleCopyLog = useCallback(() => {
+    const log = buildChatLog(chat.messages as unknown as { role: string; parts?: Record<string, unknown>[] }[]);
+    navigator.clipboard.writeText(log).then(() => {
+      setCopied(true);
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    });
+  }, [chat.messages]);
+
   const notReady = status && (!status.ollamaConnected || !status.modelsReady);
+  const showSuggestions = chat.messages.length === 0 && !isBusy && !notReady;
 
   return (
     <Drawer
@@ -46,9 +104,16 @@ export function AiChatPanel() {
       <DrawerContent>
         <DrawerHeader className="flex items-center justify-between">
           <span>{t('aiChat.title')}</span>
-          <Button isIconOnly size="sm" variant="light" onPress={handleClear} aria-label={t('aiChat.clear')}>
-            <Trash2 size={16} />
-          </Button>
+          <div className="flex gap-1">
+            <Tooltip content={t('aiChat.copyChatLog')} delay={400}>
+              <Button isIconOnly size="sm" variant="light" onPress={handleCopyLog} aria-label={t('aiChat.copyChatLog')} isDisabled={chat.messages.length === 0}>
+                {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+              </Button>
+            </Tooltip>
+            <Button isIconOnly size="sm" variant="light" onPress={handleNewChat} aria-label={t('aiChat.newChat')}>
+              <MessageSquarePlus size={16} />
+            </Button>
+          </div>
         </DrawerHeader>
         <DrawerBody className="p-0">
           {notReady && (
@@ -72,6 +137,24 @@ export function AiChatPanel() {
                     <p>{t('aiChat.preparingModels')}</p>
                   </>
                 )}
+              </div>
+            </div>
+          )}
+          {showSuggestions && (
+            <div className="flex flex-col items-center gap-3 p-6">
+              <p className="text-sm text-default-400">{t('aiChat.emptyState')}</p>
+              <Divider className="my-2" />
+              <div className="flex flex-wrap gap-2 justify-center">
+                {SUGGESTED_PROMPT_KEYS.map((key) => (
+                  <Chip
+                    key={key}
+                    variant="bordered"
+                    className="cursor-pointer hover:bg-default-100"
+                    onClick={() => handleSuggestedPrompt(key)}
+                  >
+                    {t(`aiChat.suggestedPrompts.${key}`)}
+                  </Chip>
+                ))}
               </div>
             </div>
           )}
@@ -99,7 +182,9 @@ export function AiChatPanel() {
           )}
           <ChatInput
             onSend={handleSend}
+            onStop={handleStop}
             disabled={isBusy || !!notReady}
+            isStreaming={isStreaming}
           />
         </DrawerFooter>
       </DrawerContent>

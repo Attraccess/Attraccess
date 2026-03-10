@@ -3,7 +3,7 @@
     "title": "KI-Assistent",
     "inputPlaceholder": "Frag mich etwas über Attraccess...",
     "send": "Senden",
-    "clear": "Gespräch löschen",
+    "stop": "Generierung stoppen",
     "close": "Schließen",
     "toolCall": "Tool-Aufruf",
     "toolRunning": "Läuft...",
@@ -20,9 +20,16 @@
     "dismiss": "Schließen",
     "unavailable": "KI-Assistent ist nicht verfügbar",
     "emptyState": "Starte ein Gespräch mit dem KI-Assistenten",
-    "restoring": "Gespräch wird wiederhergestellt...",
     "downloadingModels": "KI-Modelle werden heruntergeladen...",
     "ollamaNotReachable": "Ollama ist nicht erreichbar. Bitte stellen Sie sicher, dass es läuft.",
-    "preparingModels": "KI-Modelle werden vorbereitet..."
+    "preparingModels": "KI-Modelle werden vorbereitet...",
+    "copyChatLog": "Chat-Protokoll kopieren (Debug)",
+    "newChat": "Neues Gespräch",
+    "suggestedPrompts": {
+      "showResources": "Verfügbare Ressourcen anzeigen",
+      "checkBilling": "Meinen Kontostand prüfen",
+      "howToUse": "Wie benutze ich eine Ressource?",
+      "myUsage": "Meine aktuelle Nutzung anzeigen"
+    }
   }
 }

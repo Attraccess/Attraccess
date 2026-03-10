@@ -252,8 +252,4 @@ export const ensureUseAnalyticsServiceGetBillingTransactionsInDateRangeData = (q
   end: string;
   start: string;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn({ end, start }), queryFn: () => AnalyticsService.getBillingTransactionsInDateRange({ end, start }) });
-export const ensureUseAiServiceAiControllerListConversationsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAiServiceAiControllerListConversationsKeyFn(), queryFn: () => AiService.aiControllerListConversations() });
-export const ensureUseAiServiceAiControllerGetConversationMessagesData = (queryClient: QueryClient, { uuid }: {
-  uuid: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAiServiceAiControllerGetConversationMessagesKeyFn({ uuid }), queryFn: () => AiService.aiControllerGetConversationMessages({ uuid }) });
 export const ensureUseAiServiceAiControllerGetStatusData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseAiServiceAiControllerGetStatusKeyFn(), queryFn: () => AiService.aiControllerGetStatus() });

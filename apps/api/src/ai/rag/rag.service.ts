@@ -15,10 +15,14 @@ interface SearchResult {
   score: number;
 }
 
+const RRF_K = 60;
+
 @Injectable()
 export class RagService implements OnModuleInit {
   private readonly logger = new Logger(RagService.name);
   private indexed = false;
+  private searchCache = new Map<string, { result: SearchResult[]; ts: number }>();
+  private readonly CACHE_TTL_MS = 30000;
 
   constructor(
     private readonly configService: ConfigService,
@@ -132,17 +136,21 @@ export class RagService implements OnModuleInit {
     if (!fs.existsSync(resolvedPath)) return [];
 
     const mdFiles = this.findMarkdownFiles(resolvedPath);
-    const queryLower = query.toLowerCase();
-    const results: { source: string; docsUrl: string; matches: string[] }[] = [];
+    const queryTerms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    const results: { source: string; docsUrl: string; matches: string[]; termHits: number }[] = [];
 
     for (const filePath of mdFiles) {
       const relativePath = path.relative(resolvedPath, filePath);
       const content = fs.readFileSync(filePath, 'utf-8');
       const lines = content.split('\n');
       const matchingContexts: string[] = [];
+      let termHits = 0;
 
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].toLowerCase().includes(queryLower)) {
+        const lineLower = lines[i].toLowerCase();
+        const matched = queryTerms.some((term) => lineLower.includes(term));
+        if (matched) {
+          termHits++;
           const start = Math.max(0, i - 3);
           const end = Math.min(lines.length, i + 4);
           matchingContexts.push(lines.slice(start, end).join('\n'));
@@ -155,16 +163,24 @@ export class RagService implements OnModuleInit {
           source: relativePath,
           docsUrl: `/docs/#/${docsUrlPath}`,
           matches: matchingContexts.slice(0, 3),
+          termHits,
         });
       }
 
-      if (results.length >= maxResults) break;
+      if (results.length >= maxResults * 2) break;
     }
 
-    return results;
+    results.sort((a, b) => b.termHits - a.termHits);
+    return results.slice(0, maxResults).map(({ termHits: _, ...rest }) => rest);
   }
 
   async search(query: string, topK = 5): Promise<SearchResult[]> {
+    const cacheKey = `${query}:${topK}`;
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL_MS) {
+      return cached.result;
+    }
+
     const queryEmbedding = await this.ollamaService.embed(query);
     const allEmbeddings = await this.embeddingRepo.find();
 
@@ -175,7 +191,82 @@ export class RagService implements OnModuleInit {
     }));
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, topK);
+    const result = scored.slice(0, topK);
+
+    this.searchCache.set(cacheKey, { result, ts: Date.now() });
+    this.pruneCache();
+
+    return result;
+  }
+
+  async hybridSearch(query: string, topK = 5): Promise<SearchResult[]> {
+    const [vectorResults, textResults] = await Promise.all([
+      this.search(query, topK * 2),
+      this.textSearchInternal(query, topK * 2),
+    ]);
+
+    const rrfScores = new Map<string, { score: number; source: string; content: string }>();
+
+    vectorResults.forEach((r, rank) => {
+      const key = `${r.source}:${r.content.slice(0, 50)}`;
+      const existing = rrfScores.get(key) || { score: 0, source: r.source, content: r.content };
+      existing.score += 1 / (RRF_K + rank + 1);
+      rrfScores.set(key, existing);
+    });
+
+    textResults.forEach((r, rank) => {
+      const key = `${r.source}:${r.content.slice(0, 50)}`;
+      const existing = rrfScores.get(key) || { score: 0, source: r.source, content: r.content };
+      existing.score += 1 / (RRF_K + rank + 1);
+      rrfScores.set(key, existing);
+    });
+
+    const merged = [...rrfScores.values()];
+    merged.sort((a, b) => b.score - a.score);
+    return merged.slice(0, topK);
+  }
+
+  private async textSearchInternal(query: string, maxResults: number): Promise<SearchResult[]> {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const docsPath = appConfig?.STATIC_DOCS_FILE_PATH;
+    if (!docsPath) return [];
+
+    const resolvedPath = path.resolve(docsPath);
+    if (!fs.existsSync(resolvedPath)) return [];
+
+    const mdFiles = this.findMarkdownFiles(resolvedPath);
+    const queryLower = query.toLowerCase();
+    const results: SearchResult[] = [];
+
+    for (const filePath of mdFiles) {
+      const relativePath = path.relative(resolvedPath, filePath);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(queryLower)) {
+          const start = Math.max(0, i - 3);
+          const end = Math.min(lines.length, i + 4);
+          results.push({
+            source: relativePath,
+            content: lines.slice(start, end).join('\n'),
+            score: 1,
+          });
+          if (results.length >= maxResults) return results;
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private pruneCache() {
+    const now = Date.now();
+    for (const [key, val] of this.searchCache) {
+      if (now - val.ts > this.CACHE_TTL_MS) {
+        this.searchCache.delete(key);
+      }
+    }
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

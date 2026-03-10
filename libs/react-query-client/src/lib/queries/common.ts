@@ -491,16 +491,6 @@ export const UseAnalyticsServiceGetBillingTransactionsInDateRangeKeyFn = ({ end,
   end: string;
   start: string;
 }, queryKey?: Array<unknown>) => [useAnalyticsServiceGetBillingTransactionsInDateRangeKey, ...(queryKey ?? [{ end, start }])];
-export type AiServiceAiControllerListConversationsDefaultResponse = Awaited<ReturnType<typeof AiService.aiControllerListConversations>>;
-export type AiServiceAiControllerListConversationsQueryResult<TData = AiServiceAiControllerListConversationsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAiServiceAiControllerListConversationsKey = "AiServiceAiControllerListConversations";
-export const UseAiServiceAiControllerListConversationsKeyFn = (queryKey?: Array<unknown>) => [useAiServiceAiControllerListConversationsKey, ...(queryKey ?? [])];
-export type AiServiceAiControllerGetConversationMessagesDefaultResponse = Awaited<ReturnType<typeof AiService.aiControllerGetConversationMessages>>;
-export type AiServiceAiControllerGetConversationMessagesQueryResult<TData = AiServiceAiControllerGetConversationMessagesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
-export const useAiServiceAiControllerGetConversationMessagesKey = "AiServiceAiControllerGetConversationMessages";
-export const UseAiServiceAiControllerGetConversationMessagesKeyFn = ({ uuid }: {
-  uuid: string;
-}, queryKey?: Array<unknown>) => [useAiServiceAiControllerGetConversationMessagesKey, ...(queryKey ?? [{ uuid }])];
 export type AiServiceAiControllerGetStatusDefaultResponse = Awaited<ReturnType<typeof AiService.aiControllerGetStatus>>;
 export type AiServiceAiControllerGetStatusQueryResult<TData = AiServiceAiControllerGetStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useAiServiceAiControllerGetStatusKey = "AiServiceAiControllerGetStatus";

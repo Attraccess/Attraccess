@@ -18,7 +18,7 @@ export type AiSettingsInternal = {
 const DEFAULTS: AiSettingsInternal = {
   enabled: false,
   ollamaBaseUrl: 'http://localhost:11434',
-  chatModel: 'llama3.2',
+  chatModel: 'qwen3:8b',
   embedModel: 'nomic-embed-text',
   maxContextChunks: 5,
 };

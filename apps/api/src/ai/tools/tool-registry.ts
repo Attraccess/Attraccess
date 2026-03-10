@@ -36,15 +36,15 @@ export class ToolRegistry {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchEndpoints'] = (tool as any)({
-      description: 'Search for available API endpoints by keyword or intent. Use this to discover what API operations are available before calling them. Returns matching endpoints with their method, path, parameters, and description.',
+      description: 'Search for API endpoints',
       parameters: z.object({
-        query: z.string().describe('Search query to find relevant API endpoints, e.g. "list resources", "billing", "create project"'),
+        query: z.string().describe('Keywords to find API endpoints'),
       }),
       execute: async (args: Record<string, unknown>) => {
         const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q']);
         this.logger.log(`Tool searchEndpoints: query="${query}" rawArgs=${JSON.stringify(args)}`);
         if (!query) {
-          return { error: 'Missing required parameter "query". Please provide a search query string.' };
+          return { error: '"query" is required. Provide a search string.' };
         }
         const result = this.handleSearchEndpoints(query);
         this.logger.log(`Tool searchEndpoints: found ${'endpoints' in result ? result.endpoints.length : 0} endpoints`);
@@ -54,22 +54,23 @@ export class ToolRegistry {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['callEndpoint'] = (tool as any)({
-      description: 'Call any API endpoint. First use searchEndpoints to find the right endpoint, then use this to execute it. Path parameters should be substituted directly in the path (e.g. /api/resources/5 not /api/resources/{id}).',
+      description: 'Call an API endpoint. Use searchEndpoints first to find the right one.',
       parameters: z.object({
         method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).describe('HTTP method'),
-        path: z.string().describe('API path with parameters already substituted, e.g. /api/resources/5'),
-        body: z.record(z.string(), z.unknown()).optional().describe('Request body for POST/PUT/PATCH requests'),
+        path: z.string().describe('API path with params substituted'),
+        body: z.record(z.string(), z.unknown()).optional().describe('Request body for POST/PUT/PATCH'),
         query: z.record(z.string(), z.string()).optional().describe('Query string parameters'),
       }),
       execute: async (args: Record<string, unknown>) => {
         const method = (args.method as string) || 'GET';
-        const path = (args.path as string) || '';
+        const path = this.extractStringArg(args, 'path', ['endpoint', 'url', 'route']) || '';
+        const body = (args.body || args.data || args.payload) as Record<string, unknown> | undefined;
         this.logger.log(`Tool callEndpoint: ${method} ${path} rawArgs=${JSON.stringify(args)}`);
         if (!path) {
-          return { success: false, error: 'Missing required parameter "path". Provide the API path to call.' };
+          return { success: false, error: 'Missing tool parameter "path". Use: callEndpoint({ method: "POST", path: "/api/projects", body: { name: "test" } })' };
         }
         const result = await this.handleCallEndpoint(
-          { method, path, body: args.body as Record<string, unknown>, query: args.query as Record<string, string> },
+          { method, path, body, query: args.query as Record<string, string> },
           sessionCookie,
         );
         this.logger.log(`Tool callEndpoint: ${method} ${path} -> ${result.success ? 'OK' : 'FAIL'} status=${result.status ?? 'N/A'}${result.error ? ` error="${result.error}"` : ''}`);
@@ -79,16 +80,16 @@ export class ToolRegistry {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchDocs'] = (tool as any)({
-      description: 'Full-text search through the Attraccess documentation markdown files. Use this to find specific terms or keywords in the docs. Returns matching text with surrounding context and file path.',
+      description: 'search in documentation.',
       parameters: z.object({
-        query: z.string().describe('Text to search for in the documentation'),
-        maxResults: z.number().optional().describe('Maximum number of results to return (default: 10)'),
+        query: z.string().describe('Text to search for'),
+        maxResults: z.number().optional().describe('Max results (default: 10)'),
       }),
       execute: async (args: Record<string, unknown>) => {
         const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q', 'text']);
         this.logger.log(`Tool searchDocs: query="${query}" rawArgs=${JSON.stringify(args)}`);
         if (!query) {
-          return { error: 'Missing required parameter "query". Please provide text to search for.' };
+          return { error: '"query" is required.' };
         }
         return this.ragService.textSearch(query, (args.maxResults as number) || undefined);
       },
@@ -96,19 +97,19 @@ export class ToolRegistry {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools['searchDocumentation'] = (tool as any)({
-      description: 'Semantic search through Attraccess documentation using embeddings. Use this to find documentation relevant to a topic or question by meaning, not just exact keywords. Returns the most relevant documentation chunks with their source file.',
+      description: 'Semantic search in documentation by meaning. Find relevant docs for a topic or question.',
       parameters: z.object({
-        query: z.string().describe('Natural language query describing what you want to find, e.g. "how to set up SSO" or "resource permissions"'),
-        maxResults: z.number().optional().describe('Maximum number of results to return (default: 5)'),
+        query: z.string().describe('Natural language query for doc search'),
+        maxResults: z.number().optional().describe('Max results (default: 5)'),
       }),
       execute: async (args: Record<string, unknown>) => {
         const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q', 'text']);
         this.logger.log(`Tool searchDocumentation: query="${query}" indexed=${this.ragService.isIndexed} rawArgs=${JSON.stringify(args)}`);
         if (!query) {
-          return { error: 'Missing required parameter "query". Please provide a search query.' };
+          return { error: '"query" is required.' };
         }
         if (!this.ragService.isIndexed) {
-          return { error: 'Documentation index not available. RAG indexing may still be in progress or Ollama is not reachable.' };
+          return { error: 'Doc index not ready. RAG indexing may still be in progress.' };
         }
         return this.ragService.search(query, (args.maxResults as number) || 5);
       },
@@ -129,19 +130,50 @@ export class ToolRegistry {
     return undefined;
   }
 
-  private handleSearchEndpoints(query: string): { endpoints: EndpointInfo[] } | { error: string } {
+  private handleSearchEndpoints(query: string): { endpoints: unknown[] } | { error: string } {
     if (!this.endpointIndex) {
-      return { error: 'OpenAPI spec not loaded yet. API endpoint search is not available.' };
+      return { error: 'OpenAPI spec not loaded yet.' };
     }
 
     const results = this.endpointIndex.search(query);
 
     if (results.length === 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { endpoints: [], error: `No endpoints found matching "${query}". Try different keywords.` } as any;
+      return { endpoints: [], error: `No match for "${query}". Try different keywords.` } as { endpoints: unknown[]; error: string };
     }
 
-    return { endpoints: results };
+    return { endpoints: results.map((ep) => this.compactEndpoint(ep)) };
+  }
+
+  private compactEndpoint(ep: EndpointInfo): unknown {
+    const params = ep.parameters
+      .filter((p) => p.in === 'path' || p.required)
+      .map((p) => `${p.name}${p.required ? '*' : ''}:${p.type}`)
+      .join(', ');
+
+    const optionalQuery = ep.parameters
+      .filter((p) => p.in === 'query' && !p.required)
+      .map((p) => p.name)
+      .join(', ');
+
+    const compact: Record<string, unknown> = {
+      m: ep.method,
+      p: ep.path,
+      d: ep.summary || ep.operationId,
+    };
+
+    if (params) compact.params = params;
+    if (optionalQuery) compact.q = optionalQuery;
+    if (ep.requestBodySummary) compact.body = this.compactBodySummary(ep.requestBodySummary);
+
+    return compact;
+  }
+
+  private compactBodySummary(summary: string): string {
+    return summary
+      .replace(/\n\s*/g, ' ')
+      .replace(/\s*—\s*[^,}]+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async handleCallEndpoint(

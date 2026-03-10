@@ -9,15 +9,22 @@
     },
     "chatModel": {
       "label": "Chat Model",
-      "description": "Ollama model used for chat conversations."
+      "description": "Ollama model for chat. Recommended: qwen3:8b (best tool calling). Alternatives: granite3.3-dense:8b, llama3.1:8b."
     },
     "embedModel": {
       "label": "Embedding Model",
-      "description": "Ollama model used for document embeddings (RAG)."
+      "description": "Ollama model for document embeddings (RAG). Default: nomic-embed-text."
     },
     "maxContextChunks": {
       "label": "Max Context Chunks",
       "description": "Maximum number of document chunks included as context."
+    },
+    "quantizationHelp": {
+      "title": "Model Quantization Guide",
+      "q8": "Q8_0 — Best quality (~8.5 GB RAM). Use if RAM allows.",
+      "q5": "Q5_K_M — Balanced (~5.5 GB RAM). Recommended for production.",
+      "q4": "Q4_K_M — Low memory (~4.5 GB RAM). Tool calling accuracy may decrease.",
+      "tip": "Example: Use \"qwen3:8b-q5_k_m\" for balanced quality/memory. Minimum Q5 recommended for tool calling."
     }
   },
   "actions": {

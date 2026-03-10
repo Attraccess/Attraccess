@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 import { createOllama } from 'ollama-ai-provider-v2';
@@ -12,8 +13,12 @@ import { SettingsService } from '../settings/settings.service';
 import { ResourcesService } from '../resources/resources.service';
 import { buildSystemPrompt, type ResourceInfo } from './prompts/system-prompt';
 
+const MAX_RECENT_MESSAGES = 20;
+const MAX_RESOURCE_CONTEXT = 5;
+const CONVERSATION_TTL_MS = 24 * 60 * 60 * 1000;
+
 @Injectable()
-export class AiService {
+export class AiService implements OnModuleInit {
   private readonly logger = new Logger(AiService.name);
 
   constructor(
@@ -27,6 +32,15 @@ export class AiService {
     @InjectRepository(AiConversationMessage)
     private readonly messageRepo: Repository<AiConversationMessage>,
   ) {}
+
+  async onModuleInit() {
+    await this.purgeStaleConversations();
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleConversationCleanup() {
+    await this.purgeStaleConversations();
+  }
 
   async chat(
     conversationId: string | undefined,
@@ -58,9 +72,9 @@ export class AiService {
     const ollamaProvider = createOllama({ baseURL: this.ollamaService.baseUrl + '/api' });
     const model = ollamaProvider.chat(this.ollamaService.modelName);
 
-    const modelMessages = await convertToModelMessages(messages);
+    const modelMessages = await this.prepareMessages(messages, dbConv.id);
 
-    this.logger.log(`Chat request: conv=${convId} user=${userId} messages=${messages.length} tools=${Object.keys(tools).join(',')}`);
+    this.logger.log(`Chat request: conv=${convId} user=${userId} messages=${modelMessages.length} tools=${Object.keys(tools).join(',')}`);
 
     const result = streamText({
       model,
@@ -68,6 +82,7 @@ export class AiService {
       messages: modelMessages,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: tools as any,
+      maxOutputTokens: 2048,
       stopWhen: stepCountIs(15),
       onFinish: async ({ text, steps, finishReason, usage }) => {
         const toolCalls = steps?.flatMap((s) => s.toolCalls || []) || [];
@@ -104,35 +119,58 @@ export class AiService {
     }
   }
 
-  async listConversations(userId: number): Promise<{ uuid: string; title: string | null; updatedAt: Date }[]> {
-    const conversations = await this.conversationRepo.find({
-      where: { userId },
-      order: { updatedAt: 'DESC' },
-      take: 50,
-    });
-    return conversations.map((c) => ({ uuid: c.uuid, title: c.title, updatedAt: c.updatedAt }));
+  async purgeStaleConversations(): Promise<number> {
+    const cutoff = new Date(Date.now() - CONVERSATION_TTL_MS);
+    const stale = await this.conversationRepo.find({ where: { updatedAt: LessThan(cutoff) } });
+    if (stale.length > 0) {
+      await this.conversationRepo.remove(stale);
+      this.logger.log(`Purged ${stale.length} stale conversations (older than 24h)`);
+    }
+    return stale.length;
   }
 
-  async getConversationMessages(
-    conversationId: string,
-    userId: number,
-  ): Promise<{ role: string; content: string; toolCalls?: unknown[]; createdAt: Date }[] | null> {
-    const dbConv = await this.conversationRepo.findOne({ where: { uuid: conversationId, userId } });
-    if (!dbConv) return null;
+  private async prepareMessages(messages: UIMessage[], _dbConvId: number) {
+    const modelMessages = await convertToModelMessages(messages);
 
-    const messages = await this.messageRepo.find({
-      where: { conversationId: dbConv.id },
-      order: { createdAt: 'ASC' },
-    });
+    if (modelMessages.length <= MAX_RECENT_MESSAGES) {
+      return modelMessages;
+    }
 
-    return messages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({
-        role: m.role,
-        content: m.content,
-        toolCalls: m.toolCalls || undefined,
-        createdAt: m.createdAt,
-      }));
+    const olderMessages = modelMessages.slice(0, modelMessages.length - MAX_RECENT_MESSAGES);
+    const recentMessages = modelMessages.slice(modelMessages.length - MAX_RECENT_MESSAGES);
+
+    const summary = this.summarizeOlderMessages(olderMessages);
+
+    const summaryMessage = {
+      role: 'user' as const,
+      content: [{ type: 'text' as const, text: `[Previous conversation summary: ${summary}]` }],
+    };
+
+    return [summaryMessage, ...recentMessages];
+  }
+
+  private summarizeOlderMessages(messages: Array<{ role: string; content: unknown }>): string {
+    const points: string[] = [];
+    for (const msg of messages) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        const textParts = Array.isArray(msg.content)
+          ? msg.content
+              .filter((p): p is { type: 'text'; text: string } => typeof p === 'object' && p !== null && 'type' in p && p.type === 'text')
+              .map((p) => p.text)
+          : [String(msg.content)];
+
+        const text = textParts.join(' ').trim();
+        if (text) {
+          const truncated = text.length > 100 ? text.slice(0, 100) + '...' : text;
+          points.push(`${msg.role}: ${truncated}`);
+        }
+      }
+    }
+
+    if (points.length > 10) {
+      return points.slice(0, 5).join(' | ') + ' | ... | ' + points.slice(-3).join(' | ');
+    }
+    return points.join(' | ');
   }
 
   private async fetchResourceContext(userId: number): Promise<{ resources: ResourceInfo[]; hasMore: boolean }> {
@@ -160,8 +198,7 @@ export class AiService {
         return a.name.localeCompare(b.name);
       });
 
-      const limit = 15;
-      return { resources: mapped.slice(0, limit), hasMore: mapped.length > limit };
+      return { resources: mapped.slice(0, MAX_RESOURCE_CONTEXT), hasMore: mapped.length > MAX_RESOURCE_CONTEXT };
     } catch (err) {
       this.logger.warn('Failed to fetch resource context for AI', err);
       return { resources: [], hasMore: false };
@@ -171,6 +208,7 @@ export class AiService {
   private async getOrCreateConversation(conversationId: string, userId: number): Promise<AiConversation> {
     let dbConv = await this.conversationRepo.findOne({ where: { uuid: conversationId, userId } });
     if (!dbConv) {
+      await this.conversationRepo.delete({ userId });
       dbConv = await this.conversationRepo.save({ uuid: conversationId, userId, title: null });
     }
     return dbConv;

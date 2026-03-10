@@ -10,7 +10,6 @@ import {
   HttpCode,
   Logger,
   UseGuards,
-  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -65,25 +64,6 @@ export class AiController {
         res.status(500).json({ error: message });
       }
     }
-  }
-
-  @Get('conversations')
-  @ApiOperation({ summary: 'List conversations for the current user' })
-  @ApiResponse({ status: 200, description: 'List of conversations' })
-  async listConversations(@Req() req: AuthenticatedRequest) {
-    return this.aiService.listConversations(req.user.id);
-  }
-
-  @Get('conversations/:uuid/messages')
-  @ApiOperation({ summary: 'Get messages for a conversation' })
-  @ApiResponse({ status: 200, description: 'Conversation messages' })
-  async getConversationMessages(
-    @Param('uuid') uuid: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const messages = await this.aiService.getConversationMessages(uuid, req.user.id);
-    if (!messages) throw new NotFoundException('Conversation not found');
-    return messages;
   }
 
   @Get('status')

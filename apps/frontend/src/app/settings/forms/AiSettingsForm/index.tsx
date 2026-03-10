@@ -6,7 +6,7 @@ import {
   useSettingsServiceUpdateSystemSettings,
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
-import { Button, Form, Input, Spinner, Switch } from '@heroui/react';
+import { Button, Card, CardBody, Form, Input, Spinner, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -109,7 +109,7 @@ export function AiSettingsForm() {
         description={t('inputs.chatModel.description')}
         value={chatModel}
         onValueChange={setChatModel}
-        placeholder="llama3.2"
+        placeholder="qwen3:8b"
       />
       <Input
         label={t('inputs.embedModel.label')}
@@ -126,6 +126,15 @@ export function AiSettingsForm() {
         onValueChange={setMaxContextChunks}
         min={1}
       />
+      <Card className="bg-default-50">
+        <CardBody className="text-xs text-default-600 gap-1">
+          <p className="font-semibold text-sm">{t('inputs.quantizationHelp.title')}</p>
+          <p>{t('inputs.quantizationHelp.q8')}</p>
+          <p>{t('inputs.quantizationHelp.q5')}</p>
+          <p>{t('inputs.quantizationHelp.q4')}</p>
+          <p className="mt-1 text-default-500 italic">{t('inputs.quantizationHelp.tip')}</p>
+        </CardBody>
+      </Card>
       <Button color="primary" onPress={handleSubmit} isLoading={isPending}>
         {t('actions.save')}
       </Button>
