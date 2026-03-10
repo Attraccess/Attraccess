@@ -9,6 +9,7 @@ async function main() {
   console.log('Bootstrapping');
 
   process.env.DISABLE_PLUGINS = 'true';
+  process.env.AI_ENABLED = 'true';
   const main = await import('./main.bootstrap');
   const { swaggerDocumentFactory } = await main.bootstrap();
 

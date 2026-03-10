@@ -49,6 +49,7 @@ export function ChartBlock({ data }: { data: ChartData }) {
 }
 
 export function isChartBlock(data: unknown): data is ChartData {
-  const t = (data as any)?.type;
-  return (t === 'bar-chart' || t === 'line-chart') && Array.isArray((data as any)?.data);
+  const d = data as Record<string, unknown>;
+  const t = d?.type;
+  return (t === 'bar-chart' || t === 'line-chart') && Array.isArray(d?.data);
 }

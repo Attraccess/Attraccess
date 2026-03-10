@@ -41,6 +41,7 @@ export class OllamaService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const aiConfig = this.configService.get<AiConfigType>('ai')!;
     this._baseUrl = aiConfig.ollamaBaseUrl;
     this.chatModel = aiConfig.chatModel;

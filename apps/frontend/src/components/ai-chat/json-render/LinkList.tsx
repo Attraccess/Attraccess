@@ -32,5 +32,6 @@ export function LinkList({ data }: { data: LinkListData }) {
 }
 
 export function isLinkList(data: unknown): data is LinkListData {
-  return (data as any)?.type === 'link-list' && Array.isArray((data as any)?.links);
+  const d = data as Record<string, unknown>;
+  return d?.type === 'link-list' && Array.isArray(d?.links);
 }
