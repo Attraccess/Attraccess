@@ -8,6 +8,20 @@ import { JsonRenderBlock } from './json-render/JsonRenderBlock';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
+const TRANSLATIONS = { en, de };
+const REMARK_PLUGINS = [remarkGfm];
+
+const MD_COMPONENTS = {
+  code({ className, children, ...props }: React.HTMLAttributes<HTMLElement> & { node?: unknown }) {
+    const match = /language-json-render/.exec(className || '');
+    if (match) {
+      const jsonStr = String(children).replace(/\n$/, '');
+      return <JsonRenderBlock jsonString={jsonStr} />;
+    }
+    return <code className={className} {...props}>{children}</code>;
+  },
+};
+
 interface ChatMessageProps {
   message: UIMessage;
 }
@@ -16,7 +30,7 @@ function ThinkingBlock({ content, isStreaming }: { content: string; isStreaming?
   const [isExpanded, setIsExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
-  const { t } = useTranslations({ en, de });
+  const { t } = useTranslations(TRANSLATIONS);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -84,7 +98,7 @@ function getToolState(part: Record<string, unknown>): { isRunning: boolean; isDo
 
 function ToolCallPart({ part }: { part: Record<string, unknown> }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { t } = useTranslations({ en, de });
+  const { t } = useTranslations(TRANSLATIONS);
 
   const toolName = getToolName(part);
   const isError = hasToolError(part);
@@ -135,19 +149,7 @@ function ToolCallPart({ part }: { part: Record<string, unknown> }) {
 function TextBlock({ text }: { text: string }) {
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          code({ className, children, ...props }) {
-            const match = /language-json-render/.exec(className || '');
-            if (match) {
-              const jsonStr = String(children).replace(/\n$/, '');
-              return <JsonRenderBlock jsonString={jsonStr} />;
-            }
-            return <code className={className} {...props}>{children}</code>;
-          },
-        }}
-      >
+      <Markdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>
         {text}
       </Markdown>
     </div>

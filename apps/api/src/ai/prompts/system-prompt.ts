@@ -2,7 +2,6 @@ export interface ResourceInfo {
   id: number;
   name: string;
   type: string;
-  userHasAccess: boolean;
   currentlyUsedBy?: { id: number; name: string };
   isUsedByCurrentUser: boolean;
 }
@@ -22,8 +21,8 @@ function buildResourceSection(resources?: { resources: ResourceInfo[]; hasMore: 
       : r.currentlyUsedBy
         ? `IN-USE:${r.currentlyUsedBy.name}`
         : 'available';
-    const access = r.userHasAccess ? 'access' : 'no-access';
-    return `${r.name}(${status},${access})`;
+
+    return `${r.name}(${status})`;
   });
 
   const moreNote = resources.hasMore ? ' [+more via API]' : '';

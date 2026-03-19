@@ -30,84 +30,86 @@ export class AiSettingsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  private async fetchRawSettings(): Promise<[string | null, string | null, string | null, string | null, string | null]> {
+    return Promise.all([
+      this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.enabled),
+      this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.ollamaBaseUrl),
+      this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.chatModel),
+      this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.embedModel),
+      this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.maxContextChunks),
+    ]);
+  }
+
   async getSettings(): Promise<AiSettingsDto> {
     const [enabledRaw, ollamaBaseUrl, chatModel, embedModel, maxContextChunksRaw] =
-      await Promise.all([
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.enabled),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.ollamaBaseUrl),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.chatModel),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.embedModel),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.maxContextChunks),
-      ]);
+      await this.fetchRawSettings();
 
     return {
-      enabled: this.parseBoolean(enabledRaw) ?? DEFAULTS.enabled,
+      enabled: parseBoolean(enabledRaw) ?? DEFAULTS.enabled,
       ollamaBaseUrl,
       chatModel,
       embedModel,
-      maxContextChunks: this.parseNumber(maxContextChunksRaw),
+      maxContextChunks: parseNumber(maxContextChunksRaw),
     };
   }
 
   async updateSettings(update: UpdateAiSettingsDto): Promise<void> {
+    const ops: Promise<void>[] = [];
+
     if (Object.prototype.hasOwnProperty.call(update, 'enabled')) {
-      await this.settingsStore.setPlainSetting(
+      ops.push(this.settingsStore.setPlainSetting(
         AI_PARENT,
         AI_KEYS.enabled,
         update.enabled === undefined ? null : String(update.enabled),
-      );
+      ));
     }
     if (Object.prototype.hasOwnProperty.call(update, 'ollamaBaseUrl')) {
-      await this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.ollamaBaseUrl, update.ollamaBaseUrl ?? null);
+      ops.push(this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.ollamaBaseUrl, update.ollamaBaseUrl ?? null));
     }
     if (Object.prototype.hasOwnProperty.call(update, 'chatModel')) {
-      await this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.chatModel, update.chatModel ?? null);
+      ops.push(this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.chatModel, update.chatModel ?? null));
     }
     if (Object.prototype.hasOwnProperty.call(update, 'embedModel')) {
-      await this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.embedModel, update.embedModel ?? null);
+      ops.push(this.settingsStore.setPlainSetting(AI_PARENT, AI_KEYS.embedModel, update.embedModel ?? null));
     }
     if (Object.prototype.hasOwnProperty.call(update, 'maxContextChunks')) {
       const val = update.maxContextChunks ?? null;
-      await this.settingsStore.setPlainSetting(
+      ops.push(this.settingsStore.setPlainSetting(
         AI_PARENT,
         AI_KEYS.maxContextChunks,
         val === null ? null : String(val),
-      );
+      ));
     }
+
+    await Promise.all(ops);
     this.eventEmitter.emit(AI_SETTINGS_UPDATED_EVENT);
   }
 
   async getConfiguration(): Promise<AiSettingsInternal> {
     const [enabledRaw, ollamaBaseUrl, chatModel, embedModel, maxContextChunksRaw] =
-      await Promise.all([
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.enabled),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.ollamaBaseUrl),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.chatModel),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.embedModel),
-        this.settingsStore.getPlainSetting(AI_PARENT, AI_KEYS.maxContextChunks),
-      ]);
+      await this.fetchRawSettings();
 
     return {
-      enabled: this.parseBoolean(enabledRaw) ?? DEFAULTS.enabled,
+      enabled: parseBoolean(enabledRaw) ?? DEFAULTS.enabled,
       ollamaBaseUrl: ollamaBaseUrl || DEFAULTS.ollamaBaseUrl,
       chatModel: chatModel || DEFAULTS.chatModel,
       embedModel: embedModel || DEFAULTS.embedModel,
-      maxContextChunks: this.parseNumber(maxContextChunksRaw) ?? DEFAULTS.maxContextChunks,
+      maxContextChunks: parseNumber(maxContextChunksRaw) ?? DEFAULTS.maxContextChunks,
     };
   }
+}
 
-  private parseBoolean(value: string | null): boolean | null {
-    if (value === null) return null;
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-    return null;
-  }
+function parseBoolean(value: string | null): boolean | null {
+  if (value === null) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  return null;
+}
 
-  private parseNumber(value: string | null): number | null {
-    if (!value) return null;
-    const parsed = Number(value);
-    if (Number.isNaN(parsed) || parsed <= 0) return null;
-    return parsed;
-  }
+function parseNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed) || parsed <= 0) return null;
+  return parsed;
 }

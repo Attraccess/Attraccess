@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { tool } from 'ai';
+import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 import { OpenAPIObject } from '@nestjs/swagger';
 import { AppConfigType } from '../../config/app.config';
@@ -31,29 +31,28 @@ export class ToolRegistry {
     return (await this.settingsService.getUrl()) || this.fallbackUrl;
   }
 
-  buildTools(sessionCookie: string): Record<string, unknown> {
-    const tools: Record<string, unknown> = {};
+  buildTools(sessionCookie: string): ToolSet {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI SDK's tool() overloads don't infer union return types
+    const defineTool = tool as (...args: unknown[]) => ToolSet[string];
+    const tools: ToolSet = {};
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools['searchEndpoints'] = (tool as any)({
+    tools['searchEndpoints'] = defineTool({
       description: 'Search for API endpoints',
       parameters: z.object({
         query: z.string().describe('Keywords to find API endpoints'),
       }),
-      execute: async (args: Record<string, unknown>) => {
-        const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q']);
-        this.logger.log(`Tool searchEndpoints: query="${query}" rawArgs=${JSON.stringify(args)}`);
-        if (!query) {
+      execute: async (args) => {
+        this.logger.log(`Tool searchEndpoints: query="${args.query}"`);
+        if (!args.query) {
           return { error: '"query" is required. Provide a search string.' };
         }
-        const result = this.handleSearchEndpoints(query);
+        const result = this.handleSearchEndpoints(args.query);
         this.logger.log(`Tool searchEndpoints: found ${'endpoints' in result ? result.endpoints.length : 0} endpoints`);
         return result;
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools['callEndpoint'] = (tool as any)({
+    tools['callEndpoint'] = defineTool({
       description: 'Call an API endpoint. Use searchEndpoints first to find the right one.',
       parameters: z.object({
         method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).describe('HTTP method'),
@@ -61,73 +60,55 @@ export class ToolRegistry {
         body: z.record(z.string(), z.unknown()).optional().describe('Request body for POST/PUT/PATCH'),
         query: z.record(z.string(), z.string()).optional().describe('Query string parameters'),
       }),
-      execute: async (args: Record<string, unknown>) => {
-        const method = (args.method as string) || 'GET';
-        const path = this.extractStringArg(args, 'path', ['endpoint', 'url', 'route']) || '';
-        const body = (args.body || args.data || args.payload) as Record<string, unknown> | undefined;
-        this.logger.log(`Tool callEndpoint: ${method} ${path} rawArgs=${JSON.stringify(args)}`);
-        if (!path) {
+      execute: async (args) => {
+        this.logger.log(`Tool callEndpoint: ${args.method} ${args.path}`);
+        if (!args.path) {
           return { success: false, error: 'Missing tool parameter "path". Use: callEndpoint({ method: "POST", path: "/api/projects", body: { name: "test" } })' };
         }
         const result = await this.handleCallEndpoint(
-          { method, path, body, query: args.query as Record<string, string> },
+          { method: args.method, path: args.path, body: args.body, query: args.query },
           sessionCookie,
         );
-        this.logger.log(`Tool callEndpoint: ${method} ${path} -> ${result.success ? 'OK' : 'FAIL'} status=${result.status ?? 'N/A'}${result.error ? ` error="${result.error}"` : ''}`);
+        this.logger.log(`Tool callEndpoint: ${args.method} ${args.path} -> ${result.success ? 'OK' : 'FAIL'} status=${result.status ?? 'N/A'}${result.error ? ` error="${result.error}"` : ''}`);
         return result;
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools['searchDocs'] = (tool as any)({
+    tools['searchDocs'] = defineTool({
       description: 'search in documentation.',
       parameters: z.object({
         query: z.string().describe('Text to search for'),
         maxResults: z.number().optional().describe('Max results (default: 10)'),
       }),
-      execute: async (args: Record<string, unknown>) => {
-        const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q', 'text']);
-        this.logger.log(`Tool searchDocs: query="${query}" rawArgs=${JSON.stringify(args)}`);
-        if (!query) {
+      execute: async (args) => {
+        this.logger.log(`Tool searchDocs: query="${args.query}"`);
+        if (!args.query) {
           return { error: '"query" is required.' };
         }
-        return this.ragService.textSearch(query, (args.maxResults as number) || undefined);
+        return this.ragService.textSearch(args.query, args.maxResults || undefined);
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools['searchDocumentation'] = (tool as any)({
+    tools['searchDocumentation'] = defineTool({
       description: 'Semantic search in documentation by meaning. Find relevant docs for a topic or question.',
       parameters: z.object({
         query: z.string().describe('Natural language query for doc search'),
         maxResults: z.number().optional().describe('Max results (default: 5)'),
       }),
-      execute: async (args: Record<string, unknown>) => {
-        const query = this.extractStringArg(args, 'query', ['keyword', 'search', 'q', 'text']);
-        this.logger.log(`Tool searchDocumentation: query="${query}" indexed=${this.ragService.isIndexed} rawArgs=${JSON.stringify(args)}`);
-        if (!query) {
+      execute: async (args) => {
+        this.logger.log(`Tool searchDocumentation: query="${args.query}" indexed=${this.ragService.isIndexed}`);
+        if (!args.query) {
           return { error: '"query" is required.' };
         }
         if (!this.ragService.isIndexed) {
           return { error: 'Doc index not ready. RAG indexing may still be in progress.' };
         }
-        return this.ragService.search(query, (args.maxResults as number) || 5);
+        return this.ragService.search(args.query, args.maxResults || 5);
       },
     });
 
     this.logger.debug(`Built ${Object.keys(tools).length} AI tools`);
     return tools;
-  }
-
-  private extractStringArg(args: Record<string, unknown>, primary: string, fallbacks: string[]): string | undefined {
-    if (typeof args[primary] === 'string' && args[primary]) return args[primary] as string;
-    for (const key of fallbacks) {
-      if (typeof args[key] === 'string' && args[key]) {
-        this.logger.warn(`Tool arg fixup: model sent "${key}" instead of "${primary}", accepting it`);
-        return args[key] as string;
-      }
-    }
-    return undefined;
   }
 
   private handleSearchEndpoints(query: string): { endpoints: unknown[] } | { error: string } {
@@ -198,7 +179,7 @@ export class ToolRegistry {
       }
 
       const res = await fetch(url, fetchOptions);
-      const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => res.text().catch(() => null));
 
       if (!res.ok) {
         return { success: false, status: res.status, error: `API returned ${res.status}: ${JSON.stringify(data)}` };

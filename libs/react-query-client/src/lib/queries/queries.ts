@@ -893,8 +893,4 @@ export const useAttractapServiceDeleteReader = <TData = Common.AttractapServiceD
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   readerId: number;
 }, TContext>({ mutationFn: ({ readerId }) => AttractapService.deleteReader({ readerId }) as unknown as Promise<TData>, ...options });
-export const useAiServiceAiControllerClearConversation = <TData = Common.AiServiceAiControllerClearConversationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  conversationId: string;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  conversationId: string;
-}, TContext>({ mutationFn: ({ conversationId }) => AiService.aiControllerClearConversation({ conversationId }) as unknown as Promise<TData>, ...options });
+export const useAiServiceAiControllerClearConversation = <TData = Common.AiServiceAiControllerClearConversationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => AiService.aiControllerClearConversation() as unknown as Promise<TData>, ...options });

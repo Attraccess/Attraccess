@@ -5,7 +5,7 @@ const AI_PARENT = 'ai';
 const DEFAULTS: [string, string][] = [
   ['enabled', 'false'],
   ['ollama_base_url', 'http://localhost:11434'],
-  ['chat_model', 'llama3.2'],
+  ['chat_model', 'qwen3:8b'],
   ['embed_model', 'nomic-embed-text'],
   ['max_context_chunks', '5'],
 ];

@@ -5153,13 +5153,9 @@ export type GetBillingTransactionsInDateRangeResponse = Array<BillingTransaction
 
 export type AiControllerChatResponse = unknown;
 
-export type AiControllerGetStatusResponse = AiStatusDto;
-
-export type AiControllerClearConversationData = {
-    conversationId: string;
-};
-
 export type AiControllerClearConversationResponse = void;
+
+export type AiControllerGetStatusResponse = AiStatusDto;
 
 export type $OpenApiTs = {
     '/api/info': {
@@ -8049,6 +8045,14 @@ export type $OpenApiTs = {
                 200: unknown;
             };
         };
+        delete: {
+            res: {
+                /**
+                 * Conversation cleared
+                 */
+                204: void;
+            };
+        };
     };
     '/api/ai/status': {
         get: {
@@ -8057,17 +8061,6 @@ export type $OpenApiTs = {
                  * AI status information
                  */
                 200: AiStatusDto;
-            };
-        };
-    };
-    '/api/ai/chat/{conversationId}': {
-        delete: {
-            req: AiControllerClearConversationData;
-            res: {
-                /**
-                 * Conversation cleared
-                 */
-                204: void;
             };
         };
     };

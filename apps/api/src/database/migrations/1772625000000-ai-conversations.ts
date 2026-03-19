@@ -7,12 +7,11 @@ export class AiConversations1772625000000 implements MigrationInterface {
     await queryRunner.query(
       `CREATE TABLE "ai_conversation" (
         "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-        "uuid" text NOT NULL,
         "userId" integer NOT NULL,
         "title" text,
         "createdAt" datetime NOT NULL DEFAULT (datetime('now')),
         "updatedAt" datetime NOT NULL DEFAULT (datetime('now')),
-        CONSTRAINT "UQ_ai_conversation_uuid" UNIQUE ("uuid"),
+        CONSTRAINT "UQ_ai_conversation_userId" UNIQUE ("userId"),
         CONSTRAINT "FK_ai_conversation_user" FOREIGN KEY ("userId") REFERENCES "user" ("id") ON DELETE CASCADE
       )`,
     );

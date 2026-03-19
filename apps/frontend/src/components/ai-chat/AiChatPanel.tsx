@@ -10,6 +10,8 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { useAiServiceAiControllerGetStatus } from '@attraccess/react-query-client';
 
+const TRANSLATIONS = { en, de };
+
 const SUGGESTED_PROMPT_KEYS = [
   'showResources',
   'checkBilling',
@@ -44,14 +46,16 @@ function buildChatLog(messages: { role: string; parts?: Record<string, unknown>[
 }
 
 export function AiChatPanel() {
-  const { isOpen, setOpen, clear } = useAiChatStore();
+  const { isOpen, setOpen } = useAiChatStore();
   const chat = useAiChat();
-  const { t } = useTranslations({ en, de });
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
+  const { t } = useTranslations(TRANSLATIONS);
   const [copied, setCopied] = useState(false);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { data: status } = useAiServiceAiControllerGetStatus(undefined, {
     enabled: isOpen,
-    refetchInterval: 3000,
+    refetchInterval: 10000,
   });
 
   const isStreaming = chat.status === 'streaming';
@@ -59,36 +63,35 @@ export function AiChatPanel() {
 
   const handleSend = useCallback(
     (text: string) => {
-      chat.sendMessage({ text });
+      chatRef.current.sendMessage({ text });
     },
-    [chat],
+    [],
   );
 
   const handleStop = useCallback(() => {
-    chat.stop();
-  }, [chat]);
+    chatRef.current.stop();
+  }, []);
 
   const handleNewChat = useCallback(() => {
-    chat.setMessages([]);
-    clear();
-  }, [chat, clear]);
+    chatRef.current.setMessages([]);
+  }, []);
 
   const handleSuggestedPrompt = useCallback(
     (key: string) => {
       const text = t(`aiChat.suggestedPrompts.${key}`);
-      chat.sendMessage({ text });
+      chatRef.current.sendMessage({ text });
     },
-    [chat, t],
+    [t],
   );
 
   const handleCopyLog = useCallback(() => {
-    const log = buildChatLog(chat.messages as unknown as { role: string; parts?: Record<string, unknown>[] }[]);
+    const log = buildChatLog(chatRef.current.messages as unknown as { role: string; parts?: Record<string, unknown>[] }[]);
     navigator.clipboard.writeText(log).then(() => {
       setCopied(true);
       clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     });
-  }, [chat.messages]);
+  }, []);
 
   const notReady = status && (!status.ollamaConnected || !status.modelsReady);
   const showSuggestions = chat.messages.length === 0 && !isBusy && !notReady;

@@ -14,7 +14,7 @@ export class DocEmbedding {
   @Column({ type: 'text', nullable: false })
   content!: string;
 
-  @Column({ type: 'simple-array', nullable: false })
+  @Column({ type: 'simple-json', nullable: false })
   embedding!: number[];
 
   @UpdateDateColumn()

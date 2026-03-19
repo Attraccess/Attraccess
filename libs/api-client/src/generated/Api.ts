@@ -4315,13 +4315,9 @@ export type GetBillingTransactionsInDateRangeData = BillingTransaction[];
 
 export type AiControllerChatData = any;
 
-export type AiControllerListConversationsData = any;
-
-export type AiControllerGetConversationMessagesData = any;
+export type AiControllerClearConversationData = any;
 
 export type AiControllerGetStatusData = AiStatusDto;
-
-export type AiControllerClearConversationData = any;
 
 export namespace System {
   /**
@@ -7855,33 +7851,16 @@ export namespace Ai {
   /**
    * No description
    * @tags AI
-   * @name AiControllerListConversations
-   * @summary List conversations for the current user
-   * @request GET:/api/ai/conversations
+   * @name AiControllerClearConversation
+   * @summary Clear the current user conversation
+   * @request DELETE:/api/ai/chat
    */
-  export namespace AiControllerListConversations {
+  export namespace AiControllerClearConversation {
     export type RequestParams = {};
     export type RequestQuery = {};
     export type RequestBody = never;
     export type RequestHeaders = {};
-    export type ResponseBody = AiControllerListConversationsData;
-  }
-
-  /**
-   * No description
-   * @tags AI
-   * @name AiControllerGetConversationMessages
-   * @summary Get messages for a conversation
-   * @request GET:/api/ai/conversations/{uuid}/messages
-   */
-  export namespace AiControllerGetConversationMessages {
-    export type RequestParams = {
-      uuid: string;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = AiControllerGetConversationMessagesData;
+    export type ResponseBody = AiControllerClearConversationData;
   }
 
   /**
@@ -7897,23 +7876,6 @@ export namespace Ai {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = AiControllerGetStatusData;
-  }
-
-  /**
-   * No description
-   * @tags AI
-   * @name AiControllerClearConversation
-   * @summary Clear a conversation
-   * @request DELETE:/api/ai/chat/{conversationId}
-   */
-  export namespace AiControllerClearConversation {
-    export type RequestParams = {
-      conversationId: string;
-    };
-    export type RequestQuery = {};
-    export type RequestBody = never;
-    export type RequestHeaders = {};
-    export type ResponseBody = AiControllerClearConversationData;
   }
 }
 
@@ -8163,7 +8125,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 0.0.16
+ * @version 1.0.0
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -11944,32 +11906,14 @@ export class Api<
      * No description
      *
      * @tags AI
-     * @name AiControllerListConversations
-     * @summary List conversations for the current user
-     * @request GET:/api/ai/conversations
+     * @name AiControllerClearConversation
+     * @summary Clear the current user conversation
+     * @request DELETE:/api/ai/chat
      */
-    aiControllerListConversations: (params: RequestParams = {}) =>
-      this.request<AiControllerListConversationsData, any>({
-        path: `/api/ai/conversations`,
-        method: "GET",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags AI
-     * @name AiControllerGetConversationMessages
-     * @summary Get messages for a conversation
-     * @request GET:/api/ai/conversations/{uuid}/messages
-     */
-    aiControllerGetConversationMessages: (
-      uuid: string,
-      params: RequestParams = {},
-    ) =>
-      this.request<AiControllerGetConversationMessagesData, any>({
-        path: `/api/ai/conversations/${uuid}/messages`,
-        method: "GET",
+    aiControllerClearConversation: (params: RequestParams = {}) =>
+      this.request<AiControllerClearConversationData, any>({
+        path: `/api/ai/chat`,
+        method: "DELETE",
         ...params,
       }),
 
@@ -11986,24 +11930,6 @@ export class Api<
         path: `/api/ai/status`,
         method: "GET",
         format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags AI
-     * @name AiControllerClearConversation
-     * @summary Clear a conversation
-     * @request DELETE:/api/ai/chat/{conversationId}
-     */
-    aiControllerClearConversation: (
-      conversationId: string,
-      params: RequestParams = {},
-    ) =>
-      this.request<AiControllerClearConversationData, any>({
-        path: `/api/ai/chat/${conversationId}`,
-        method: "DELETE",
         ...params,
       }),
   };

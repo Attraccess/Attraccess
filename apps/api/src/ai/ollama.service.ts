@@ -132,7 +132,10 @@ export class OllamaService implements OnModuleInit {
 
   async healthCheck(): Promise<boolean> {
     try {
-      await fetch(this._baseUrl);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      await fetch(this._baseUrl, { signal: controller.signal });
+      clearTimeout(timeout);
       return true;
     } catch {
       return false;
@@ -141,7 +144,12 @@ export class OllamaService implements OnModuleInit {
 
   async embed(text: string): Promise<number[]> {
     const { embeddings } = await this.client.embed({ model: this.embedModel, input: text });
-    return embeddings?.[0] ?? [];
+    const result = embeddings?.[0];
+    if (!result || result.length === 0) {
+      this.logger.warn(`Embedding returned empty vector for text: "${text.slice(0, 80)}..."`);
+      return [];
+    }
+    return result;
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {

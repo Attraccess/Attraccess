@@ -463,7 +463,6 @@ const seedDatabase = async (dataSource: DataSource) => {
   }));
 
   const aiConversation = await ensureEntity(aiConversationRepo, () => ({
-    uuid: `seed-conv-${seedTag}`,
     userId: primaryUser.id,
     title: 'Seed conversation',
   }));

@@ -5,6 +5,8 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
+const TRANSLATIONS = { en, de };
+
 interface ChatInputProps {
   onSend: (message: string) => void;
   onStop?: () => void;
@@ -14,7 +16,7 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, onStop, disabled, isStreaming }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const { t } = useTranslations({ en, de });
+  const { t } = useTranslations(TRANSLATIONS);
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();

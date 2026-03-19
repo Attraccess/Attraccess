@@ -9,15 +9,16 @@ interface InfoCardData {
   color?: 'primary' | 'success' | 'warning' | 'danger' | 'default';
 }
 
+const COLOR_MAP: Record<string, string> = {
+  primary: 'border-primary-200 bg-primary-50 dark:bg-primary-900/20',
+  success: 'border-success-200 bg-success-50 dark:bg-success-900/20',
+  warning: 'border-warning-200 bg-warning-50 dark:bg-warning-900/20',
+  danger: 'border-danger-200 bg-danger-50 dark:bg-danger-900/20',
+  default: 'border-default-200 bg-default-50',
+};
+
 export function InfoCard({ data }: { data: InfoCardData }) {
-  const colorMap: Record<string, string> = {
-    primary: 'border-primary-200 bg-primary-50 dark:bg-primary-900/20',
-    success: 'border-success-200 bg-success-50 dark:bg-success-900/20',
-    warning: 'border-warning-200 bg-warning-50 dark:bg-warning-900/20',
-    danger: 'border-danger-200 bg-danger-50 dark:bg-danger-900/20',
-    default: 'border-default-200 bg-default-50',
-  };
-  const className = colorMap[data.color || 'primary'] || colorMap['primary'];
+  const className = COLOR_MAP[data.color || 'primary'] || COLOR_MAP['primary'];
 
   return (
     <Card className={`my-2 border ${className}`} shadow="none" radius="lg">

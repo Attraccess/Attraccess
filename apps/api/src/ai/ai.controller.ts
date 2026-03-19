@@ -4,7 +4,6 @@ import {
   Get,
   Delete,
   Body,
-  Param,
   Req,
   Res,
   HttpCode,
@@ -39,7 +38,7 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to the AI assistant and receive a streaming response' })
   @ApiResponse({ status: 200, description: 'AI SDK data stream' })
   async chat(
-    @Body() body: { messages: UIMessage[]; id?: string },
+    @Body() body: { messages: UIMessage[] },
     @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
@@ -47,19 +46,17 @@ export class AiController {
     const userName = req.user?.username || req.user?.email;
 
     try {
-      const { conversationId, result } = await this.aiService.chat(
-        body.id,
+      const { result } = await this.aiService.chat(
         body.messages,
         req.user.id,
         userName,
         sessionCookie,
       );
 
-      res.setHeader('X-Conversation-Id', conversationId);
       result.pipeUIMessageStreamToResponse(res, { sendReasoning: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Chat endpoint error: user=${req.user.id} conv=${body.id ?? 'new'} error=${message}`, err instanceof Error ? err.stack : undefined);
+      this.logger.error(`Chat endpoint error: user=${req.user.id} error=${message}`, err instanceof Error ? err.stack : undefined);
       if (!res.headersSent) {
         res.status(500).json({ error: message });
       }
@@ -86,14 +83,13 @@ export class AiController {
     };
   }
 
-  @Delete('chat/:conversationId')
+  @Delete('chat')
   @HttpCode(204)
-  @ApiOperation({ summary: 'Clear a conversation' })
+  @ApiOperation({ summary: 'Clear the current user conversation' })
   @ApiResponse({ status: 204, description: 'Conversation cleared' })
   async clearConversation(
-    @Param('conversationId') conversationId: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    await this.aiService.clearConversation(conversationId, req.user.id);
+    await this.aiService.clearConversation(req.user.id);
   }
 }

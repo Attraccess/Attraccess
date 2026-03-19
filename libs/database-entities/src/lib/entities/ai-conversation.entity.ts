@@ -16,10 +16,7 @@ export class AiConversation {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'text', unique: true })
-  uuid!: string;
-
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', unique: true })
   userId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

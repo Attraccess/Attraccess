@@ -6,6 +6,8 @@ import { ChatMessage } from './ChatMessage';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
+const TRANSLATIONS = { en, de };
+
 interface ChatMessageListProps {
   messages: UIMessage[];
   isLoading: boolean;
@@ -13,11 +15,11 @@ interface ChatMessageListProps {
 
 export function ChatMessageList({ messages, isLoading }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { t } = useTranslations({ en, de });
+  const { t } = useTranslations(TRANSLATIONS);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages.length]);
 
   return (
     <ScrollShadow className="flex-1 overflow-y-auto p-3">
