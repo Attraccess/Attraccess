@@ -13,6 +13,43 @@ RgbGt911Driver::RgbGt911Driver(Logger &logger) : logger(logger) {}
 
 bool RgbGt911Driver::begin()
 {
+    // === TOUCH INIT FIRST (before display, matching Waveshare V4 demo) ===
+    // The GT911 is an I2C device independent of the display hardware.
+    // Waveshare's official demo initializes touch BEFORE gfx->begin().
+    // Initializing after gfx->begin() causes GT911 to stop reporting touches,
+    // likely because the ESP32 RGB LCD peripheral setup affects I2C bus state.
+    delay(100); // Allow GT911 to settle after power-on (matches Waveshare)
+
+    // RST and INT pins default to SENSOR_PIN_NONE (-1) in the GT911 constructor.
+    // RST is on the IO expander (not direct GPIO), INT left unmanaged.
+    // The library auto-detects the GT911 address via probeAddress().
+    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, 15, 7);
+    if (!touchFound)
+    {
+        logger.info("GT911 not found at 0x14, trying 0x5D...");
+        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7);
+    }
+    if (touchFound)
+    {
+        logger.info("Init GT911 Sensor success!");
+        touchInitialized = true;
+
+        touch.setHomeButtonCallback([](void *user_data)
+                                    {
+            auto *lg = static_cast<Logger *>(user_data);
+            if (lg)
+            {
+                lg->info("Home button pressed!");
+            } },
+                                    &logger);
+        touch.setMaxTouchPoint(1);
+    }
+    else
+    {
+        logger.error("GT911 not found — display will work without touch");
+    }
+
+    // === DISPLAY INIT SECOND ===
     bus = new Arduino_SWSPI(
         GFX_NOT_DEFINED /* DC */, 42 /* CS */,
         2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
@@ -32,40 +69,6 @@ bool RgbGt911Driver::begin()
     gfx->begin();
     screenWidth = gfx->width();
     screenHeight = gfx->height();
-
-#ifdef HAS_IO_EXPANDER_TCA9554
-    if (this->ioExpander)
-    {
-        logger.info("Resetting GT911 via IO expander (EXIO0)");
-        this->ioExpander->resetTouchPanel();
-    }
-#endif
-
-    touch.setPins(-1, 16);
-    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7);
-    if (!touchFound)
-    {
-        logger.info("GT911 not at 0x5D, trying 0x14");
-        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, 15, 7);
-    }
-    if (!touchFound)
-    {
-        logger.error("GT911 not found — display will work without touch");
-        initialized = true;
-        return true;
-    }
-    logger.info("Init GT911 Sensor success!");
-    touchInitialized = true;
-
-    touch.setHomeButtonCallback([](void *user_data)
-                                {
-        auto *lg = static_cast<Logger *>(user_data);
-        if (lg)
-        {
-            lg->info("Home button pressed!");
-        } },
-                                &logger);
-    touch.setMaxTouchPoint(1);
 
     initialized = true;
     return true;
@@ -93,10 +96,20 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
     }
 
     uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
+
+    // Debug: log touch state every 2 seconds
+    static uint32_t lastLog = 0;
+    if (millis() - lastLog > 2000) {
+        lastLog = millis();
+        logger.debugf("Touch poll: touched=%d", touched);
+    }
+
     if (touched <= 0)
     {
         return false;
     }
+
+    logger.debugf("Touch detected: touched=%d, x=%d, y=%d", touched, x[0], y[0]);
 
     int16_t touchX = x[0];
     int16_t touchY = y[0];

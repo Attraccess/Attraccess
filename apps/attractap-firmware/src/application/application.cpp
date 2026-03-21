@@ -49,10 +49,10 @@ void Application::setup()
     this->nfc.setup();
 
 #ifdef HAS_IO_EXPANDER_TCA9554
-    if (this->ioExpander.hasAddressConflict())
-    {
-        this->ioExpander.fullRefresh();
-    }
+    // Rewrite IO expander registers after display and NFC init.
+    // GT911 probing and I2C bus activity during init can corrupt
+    // the TCA9554 CONFIG/OUTPUT registers on V4 hardware.
+    this->ioExpander.fullRefresh();
 #endif
 
     this->api.setup();

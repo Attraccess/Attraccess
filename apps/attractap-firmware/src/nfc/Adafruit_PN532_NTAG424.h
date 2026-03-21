@@ -73,7 +73,9 @@
 #define PN532_SPI_DATAREAD (0x03)  ///< Data read
 #define PN532_SPI_READY (0x01)     ///< Ready
 
-#define PN532_I2C_ADDRESS (0x48 >> 1) ///< Default I2C address
+#ifndef PN532_I2C_ADDRESS
+#define PN532_I2C_ADDRESS (0x48 >> 1) ///< Default I2C address (0x24), override via build flag for address shifter
+#endif
 #define PN532_I2C_READBIT (0x01)      ///< Read bit
 #define PN532_I2C_BUSY (0x00)         ///< Busy
 #define PN532_I2C_READY (0x01)        ///< Ready

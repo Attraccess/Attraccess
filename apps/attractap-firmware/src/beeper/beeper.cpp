@@ -48,13 +48,6 @@ void Beeper::singleBeep()
         return;
     }
 
-#ifdef HAS_IO_EXPANDER_TCA9554
-    if (this->ioExpander && this->ioExpander->hasAddressConflict())
-    {
-        return;
-    }
-#endif
-
     this->logger.debug("BEEP");
 
 #ifdef HAS_IO_EXPANDER_TCA9554
