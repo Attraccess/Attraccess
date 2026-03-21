@@ -1,51 +1,30 @@
 #include "ioexpander.hpp"
 
-bool IOExpander::probeAddress(uint8_t addr)
-{
-    Wire.beginTransmission(addr);
-    return Wire.endTransmission() == 0;
-}
-
 void IOExpander::setup()
 {
-    if (probeAddress(IOEXPANDER_I2C_ADDR_V3))
-    {
-        i2cAddress = IOEXPANDER_I2C_ADDR_V3;
-        logger.infof("Found IO expander at 0x%02X (V3)", i2cAddress);
-    }
-    else if (probeAddress(IOEXPANDER_I2C_ADDR_V4))
-    {
-        i2cAddress = IOEXPANDER_I2C_ADDR_V4;
-        logger.infof("Found IO expander at 0x%02X (V4)", i2cAddress);
-    }
-    else
-    {
-        logger.error("IO expander not found at 0x20 or 0x24");
-        return;
-    }
+    i2cAddress = IOEXPANDER_I2C_ADDR;
+    delay(10); // Allow IO expander to complete power-on reset
+    logger.infof("Using IO expander at 0x%02X", i2cAddress);
 
-    uint8_t cfg = 0xFF;
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_TP_RST));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_BACKLIGHT));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_LCD_RST));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_BEEPER));
-    if (!writeRegister(TCA9554_REG_CONFIG, cfg))
-    {
-        logger.error("Failed to write CONFIG register");
-        return;
-    }
-    logger.infof("CONFIG set to 0x%02X", cfg);
+    // V4 IO expander at 0x24: only reg 0x02 (output) is reliably writable.
+    // Config register does not need explicit writes — pins default to outputs.
+    // The DFR1185 I2C address translator on the bus makes register reads
+    // unreliable, so we write without read-back verification.
 
+    // Set initial output: TP_RST released, backlight on, LCD out of reset, beeper off
     uint8_t out = 0x00;
     out |= (uint8_t(1 << IOEXP_BIT_TP_RST));
     out |= (uint8_t(1 << IOEXP_BIT_BACKLIGHT));
-    out &= ~(uint8_t(1 << IOEXP_BIT_BEEPER));
-    if (!writeRegister(TCA9554_REG_OUTPUT, out))
+    out |= (uint8_t(1 << IOEXP_BIT_LCD_RST));
+
+    if (!writeRegister(IOEXP_REG_OUTPUT, out))
     {
-        logger.error("Failed to write OUTPUT register");
-        return;
+        logger.error("Failed to write IO expander OUTPUT register");
     }
-    logger.infof("OUTPUT set to 0x%02X", out);
+    else
+    {
+        logger.infof("IO expander OUTPUT set to 0x%02X", out);
+    }
 
     outputState = out;
     initialized = true;
@@ -66,7 +45,7 @@ void IOExpander::setPin(uint8_t bit, bool high)
     {
         outputState &= ~(uint8_t(1 << bit));
     }
-    writeRegister(TCA9554_REG_OUTPUT, outputState);
+    writeRegister(IOEXP_REG_OUTPUT, outputState);
 }
 
 void IOExpander::resetTouchPanel()
@@ -103,7 +82,7 @@ void IOExpander::refreshOutput()
     {
         return;
     }
-    writeRegister(TCA9554_REG_OUTPUT, outputState);
+    writeRegister(IOEXP_REG_OUTPUT, outputState);
 }
 
 void IOExpander::fullRefresh()
@@ -112,19 +91,11 @@ void IOExpander::fullRefresh()
     {
         return;
     }
-    writeRegister(TCA9554_REG_OUTPUT, outputState);
-
-    uint8_t cfg = 0xFF;
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_TP_RST));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_BACKLIGHT));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_LCD_RST));
-    cfg &= ~(uint8_t(1 << IOEXP_BIT_BEEPER));
-    writeRegister(TCA9554_REG_CONFIG, cfg);
-}
-
-bool IOExpander::hasAddressConflict() const
-{
-    return i2cAddress == IOEXPANDER_I2C_ADDR_V4;
+    // Re-write output register after other I2C activity (GT911 probing, NFC init)
+    // which can corrupt IO expander state on V4 hardware due to the DFR1185
+    // I2C address translator sharing the bus.
+    // CONFIG register is not writable on the V4 IO expander — pins default to outputs.
+    writeRegister(IOEXP_REG_OUTPUT, outputState);
 }
 
 bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
