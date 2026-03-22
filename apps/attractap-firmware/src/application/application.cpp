@@ -32,27 +32,35 @@ void Application::setup()
     Network::setup();
 
 #ifdef HAS_IO_EXPANDER_TCA9554
+    this->logger.infof("[INIT] IO expander setup starting at t=%lu ms", millis());
     this->ioExpander.setup();
+    this->logger.infof("[INIT] IO expander setup done at t=%lu ms", millis());
     this->beeper.setup(&this->ioExpander);
 #else
     this->beeper.setup();
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
+    this->logger.infof("[INIT] Display setup starting at t=%lu ms", millis());
 #ifdef HAS_IO_EXPANDER_TCA9554
     Display::setup(&this->ioExpander);
 #else
     Display::setup();
 #endif
+    this->logger.infof("[INIT] Display setup done at t=%lu ms", millis());
 #endif
 
+    this->logger.infof("[INIT] NFC setup starting at t=%lu ms", millis());
     this->nfc.setup();
+    this->logger.infof("[INIT] NFC setup done at t=%lu ms", millis());
 
 #ifdef HAS_IO_EXPANDER_TCA9554
     // Rewrite IO expander registers after display and NFC init.
     // GT911 probing and I2C bus activity during init can corrupt
-    // the TCA9554 CONFIG/OUTPUT registers on V4 hardware.
+    // the IO expander CONFIG/OUTPUT registers on V4 hardware.
+    this->logger.infof("[INIT] IO expander fullRefresh starting at t=%lu ms", millis());
     this->ioExpander.fullRefresh();
+    this->logger.infof("[INIT] IO expander fullRefresh done at t=%lu ms", millis());
 #endif
 
     this->api.setup();

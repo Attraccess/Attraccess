@@ -13,6 +13,8 @@ RgbGt911Driver::RgbGt911Driver(Logger &logger) : logger(logger) {}
 
 bool RgbGt911Driver::begin()
 {
+    logger.infof("RgbGt911Driver::begin() starting at t=%lu ms", millis());
+
     // === TOUCH INIT FIRST (before display, matching Waveshare V4 demo) ===
     // The GT911 is an I2C device independent of the display hardware.
     // Waveshare's official demo initializes touch BEFORE gfx->begin().
@@ -20,18 +22,29 @@ bool RgbGt911Driver::begin()
     // likely because the ESP32 RGB LCD peripheral setup affects I2C bus state.
     delay(100); // Allow GT911 to settle after power-on (matches Waveshare)
 
-    // RST and INT pins default to SENSOR_PIN_NONE (-1) in the GT911 constructor.
-    // RST is on the IO expander (not direct GPIO), INT left unmanaged.
-    // The library auto-detects the GT911 address via probeAddress().
+#ifdef HAS_IO_EXPANDER_TCA9554
+    if (ioExpander) {
+        logger.info("Resetting touch panel via IO expander...");
+        ioExpander->resetTouchPanel();  // Pulse TP_RST: LOW 20ms → HIGH 50ms
+        logger.info("Touch panel reset complete");
+    } else {
+        logger.info("No IO expander — skipping touch panel reset");
+    }
+#endif
+
+    // RST is on the IO expander (not direct GPIO), INT is on GPIO 16.
+    touch.setPins(-1, 16);
+
+    logger.infof("Probing GT911 at 0x%02X (SDA=%d, SCL=%d)...", GT911_SLAVE_ADDRESS_H, 15, 7);
     bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, 15, 7);
     if (!touchFound)
     {
-        logger.info("GT911 not found at 0x14, trying 0x5D...");
+        logger.infof("GT911 not found at 0x%02X, trying 0x%02X...", GT911_SLAVE_ADDRESS_H, GT911_SLAVE_ADDRESS_L);
         touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7);
     }
     if (touchFound)
     {
-        logger.info("Init GT911 Sensor success!");
+        logger.infof("GT911 touch init SUCCESS at t=%lu ms", millis());
         touchInitialized = true;
 
         touch.setHomeButtonCallback([](void *user_data)
@@ -46,10 +59,12 @@ bool RgbGt911Driver::begin()
     }
     else
     {
-        logger.error("GT911 not found — display will work without touch");
+        logger.error("GT911 not found at either address — display will work without touch");
     }
 
     // === DISPLAY INIT SECOND ===
+    logger.infof("Initializing ST7701 RGB display at t=%lu ms...", millis());
+
     bus = new Arduino_SWSPI(
         GFX_NOT_DEFINED /* DC */, 42 /* CS */,
         2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
@@ -66,9 +81,13 @@ bool RgbGt911Driver::begin()
         480 /* width */, 480 /* height */, rgbpanel, 2 /* rotation */, true /* auto_flush */,
         bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
 
+    logger.info("Calling gfx->begin()...");
     gfx->begin();
     screenWidth = gfx->width();
     screenHeight = gfx->height();
+
+    logger.infof("Display init DONE at t=%lu ms: %dx%d, rotation=%d",
+                 millis(), screenWidth, screenHeight, gfx->getRotation());
 
     initialized = true;
     return true;
