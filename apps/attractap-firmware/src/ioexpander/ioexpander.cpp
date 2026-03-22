@@ -73,9 +73,6 @@ void IOExpander::setup()
 
     initialized = true;
     logger.info("IO expander initialized");
-
-    // Dump all registers for diagnostics
-    dumpRegisters();
 }
 
 void IOExpander::setPin(uint8_t bit, bool high)

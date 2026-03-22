@@ -362,27 +362,124 @@ The comment lists which bits are high but does not explain **what those bits are
 
 | # | File | Severity | Category | Issue |
 |---|------|----------|----------|-------|
-| 1 | `apps/api/project.json` | 🔴 Critical | Bug | `not_dependsOn` breaks firmware asset bundling |
-| 2 | `main.cpp` | 🔴 Critical | Debug leftover | `i2cBusScan()` runs unconditionally on every boot |
-| 3 | `application.cpp` | 🔴 Critical | Debug leftover | Boot-time `singleBeep()` hardware validation |
-| 4 | `platformio.ini` | 🔴 Critical | Config | `LOG_LEVEL=DEBUG` in production target |
+| 1 | `apps/api/project.json` | ✅ Fixed | Bug | `not_dependsOn` → `dependsOn` restored |
+| 2 | `main.cpp` | ✅ Fixed | Debug leftover | `i2cBusScan()` removed |
+| 3 | `application.cpp` | ✅ Fixed | Debug leftover | Boot-time `singleBeep()` removed |
+| 4 | `platformio.ini` | ✅ Fixed | Config | `attractap-touch-v2` changed to `LOG_LEVEL=INFO` / `LOGGER_LEVEL_NUM=3` |
 | 5 | `ioexpander.hpp` | 🟠 Major | Naming | `HAS_IO_EXPANDER_TCA9554` covers two different chips |
 | 6 | `ioexpander.cpp` | 🟠 Major | Bug | `setPin()` only controls port 0 of 16-bit expander |
 | 7 | `ioexpander.cpp` | 🟠 Major | SRP / Band-aid | CONFIG re-write duplicated inside `beeperOn/Off` |
-| 8 | `rgb_gt911_driver.cpp` | 🟠 Major | Debug leftover | Touch-poll debug log fires every 2 s |
+| 8 | `rgb_gt911_driver.cpp` | ✅ Fixed | Debug leftover | Touch-poll debug log removed |
 | 9 | `rgb_gt911_driver.cpp` | ✅ Fixed | Hardcoding | SDA/SCL pins now use `PIN_TOUCH_I2C_SDA`/`SCL`; `PIN_NFC_I2C_SDA`/`SCL` split added |
 | 10 | `ioexpander.cpp` | 🟠 Major | Design | Triple-write workaround blocks loop, misleading return |
 | 11 | `application.cpp` | 🟠 Major | Design | Silent periodic `fullRefresh()` hides I2C corruption |
 | 12 | `beeper.cpp` | 🟡 Minor | Style | Conditional `#include` not at top of file |
 | 13 | `beeper.hpp` / `display.hpp` | 🟡 Minor | Design | Asymmetric `setup()` API causes duplicate `#ifdef` at call sites |
-| 14 | `ioexpander.cpp` | 🟡 Minor | Debug leftover | `dumpRegisters()` called unconditionally in `setup()` |
+| 14 | `ioexpander.cpp` | ✅ Fixed | Debug leftover | `dumpRegisters()` removed from `setup()` |
 | 15 | `ioexpander.cpp` | 🟡 Minor | Readability | `#ifdef` inside format string args |
 | 16 | `ioexpander.cpp` | 🟡 Minor | Logging | Write failure logged at `INFO` not `WARN`/`ERROR` |
 | 17 | `rgb_gt911_driver.cpp` | 🟡 Minor | UX | No user-visible feedback when touch init fails |
 | 18 | `Adafruit_PN532_NTAG424.cpp` | 🟡 Minor | Bug | `uint8_t >= 0` guard is always true |
 | 19 | `rgb_gt911_driver.hpp` | 🟡 Minor | Bug | `ioExpander` member uninitialized in non-expander build |
 | 20 | `platformio.ini` | 🟡 Minor | Correctness | `TOUCH_DRIVER_FT6206` on ethernet target may be regression |
-| 21 | `application.cpp` | 🟡 Minor | Debug leftover | `[INIT]` timing logs throughout setup |
+| 21 | `application.cpp` | ✅ Fixed | Debug leftover | `[INIT]` timing logs removed |
 | 22 | `beeper.cpp` | 🟡 Minor | Unexplained change | Beep duration doubled 100→200 ms without comment |
 | 23 | `ioexpander.cpp` | 🟡 Minor | DRY | `fullRefresh()` duplicates `setup()` register sequence |
 | 24 | `ioexpander.hpp` | 🟡 Minor | Documentation | `IOEXP_PORT1_DEFAULT 0x3A` bits not explained |
+
+---
+
+## 🔬 Follow-up Investigation: Remove Defensive I2C Workarounds
+
+Several pieces of code exist solely to paper over what appeared to be an unreliable I2C bus during development. Now that the pin selection, address shifting (DFR1185), and init ordering are better understood, the root cause may already be fixed. These workarounds should be peeled back **one at a time**, verifying hardware behaviour after each removal.
+
+### Background
+
+The defensive code was introduced because the IO expander's CONFIG register (direction bits) appeared to revert to its power-on default (`0xFF` = all inputs) after GT911 or PN532 bus traffic, causing the beeper to stop working or get stuck on. The workarounds added to combat this:
+
+1. **`writeRegisterReliable()`** — triple-writes every register with 1 ms delays
+2. **`beeperOn()` / `beeperOff()`** — re-writes CONFIG register before every pin toggle
+3. **`fullRefresh()`** — re-writes all config + output registers every 10 s from the main loop
+4. **`fullRefresh()` after NFC init** — one-shot re-write at the end of `setup()`
+
+### Key hypothesis: `fullRefresh()` is overcorrecting for a problem that targeted writes would expose
+
+Every place `fullRefresh()` is called rewrites **all** config and output registers unconditionally. This means a transient write failure is silently swallowed — the next `fullRefresh()` just overwrites everything back to the expected state without ever indicating something went wrong. Importantly, it also means the code has never had to prove that individual `setPin()` / single-register writes actually work reliably on their own.
+
+The ideal end state is:
+- `setup()` writes CONFIG + initial OUTPUT once, verifies success
+- Every subsequent state change (backlight, beeper, LCD reset) is a **single targeted `writeRegister()` call** to the output register only — no CONFIG re-write, no full-port overwrite
+- If a single write fails, the failure is logged and visible
+
+`fullRefresh()` should not exist as a runtime mechanism at all; it belongs only in recovery paths that are explicitly triggered (e.g. after a detected bus reset event), not as a periodic background task.
+
+### Suggested Removal Order
+
+Work through these steps in order on real hardware. If everything still functions correctly (backlight on, touch works, NFC reads, beeper beeps on tap and is silent otherwise), proceed to the next step.
+
+#### Step 1 — Remove the one-shot `fullRefresh()` at the end of `setup()`
+
+```cpp
+// application.cpp — remove this block:
+this->ioExpander.fullRefresh();
+```
+
+**Rationale:** This was added because GT911 probing was suspected to corrupt the expander state during init. The new pin defines and corrected init order (touch reset via IO expander → touch init → display init) may have fixed the underlying cause. If the hardware comes up cleanly without this, the corruption during init is no longer happening.
+
+---
+
+#### Step 2 — Remove CONFIG re-writes from `beeperOn()` / `beeperOff()`
+
+```cpp
+// ioexpander.cpp — remove from both methods:
+#ifdef IO_EXPANDER_16BIT
+    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
+#endif
+```
+
+**Rationale:** If Step 1 passed, the CONFIG register is stable after init. Writing it on every beep is unnecessary. Removing it also makes `beeperOn/Off` single-responsibility again.
+
+---
+
+#### Step 3 — Replace the periodic `fullRefresh()` in `loop()` with a targeted output-only write, then remove it
+
+First, replace `fullRefresh(false)` with a call to `refreshOutput()` (output registers only, no CONFIG re-write):
+
+```cpp
+// application.cpp — change:
+this->ioExpander.fullRefresh(false);
+// to:
+this->ioExpander.refreshOutput();
+```
+
+Flash and observe: if the beeper or backlight state ever goes wrong between the 10 s intervals, that confirms the CONFIG register is still being corrupted at runtime and the problem is not fully solved yet. If everything stays correct, the CONFIG writes in `fullRefresh()` were not needed — then **remove the periodic call entirely**.
+
+**Rationale:** Isolating the CONFIG re-write from the output re-write tells you which one was actually doing the work. `fullRefresh()` was doing both unconditionally, which hid the real question: is it the config that gets corrupted, or the output state, or neither?
+
+---
+
+#### Step 4 — Downgrade `writeRegisterReliable()` to a single write
+
+Replace all `writeRegisterReliable()` calls with plain `writeRegister()` calls (or remove the `Reliable` wrapper entirely).
+
+**Rationale:** If CONFIG corruption is gone, every I2C write should succeed on the first attempt. The triple-write was masking transient failures; once those are gone it only adds 3 ms of blocking delay per write for no benefit.
+
+> If single writes start failing (check the `writeRegister FAILED` log), this points to a genuine remaining bus issue — investigate pull-up resistor values, bus capacitance, and `Wire.setTimeOut()` before reintroducing retries.
+
+---
+
+#### Step 5 (optional cleanup) — Remove or demote `dumpRegisters()` from `setup()`
+
+Once the above steps confirm stable operation, `dumpRegisters()` in `setup()` is no longer needed for diagnosis and can be removed or moved behind a `#ifdef DEBUG` guard.
+
+---
+
+### If Any Step Fails
+
+If removing a workaround causes the beeper to malfunction, log `writeRegister FAILED` errors, or produces other regressions, the root cause is still present. At that point, investigate:
+
+- **Pull-up resistors** on SDA/SCL — check values against the I2C bus capacitance for the number of devices on the bus
+- **`Wire.setTimeOut(50)`** — may be too short; try 100 ms or 200 ms
+- **I2C clock speed** — try `Wire.setClock(100000)` (100 kHz) instead of the default 400 kHz
+- **Bus sharing** — if GT911's `touch.begin()` re-configures the Wire bus speed or address, it could affect the IO expander; check the `TouchDrvGT911` library source
+- **Power sequencing** — verify the IO expander has fully completed its power-on reset before the first write (`delay(10)` in `setup()` may not be enough)
