@@ -7,14 +7,14 @@
 #include "../../../logger/logger.hpp"
 #include "../display_driver.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 class IOExpander;
 #endif
 
 class RgbGt911Driver : public IDisplayDriver
 {
 public:
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     RgbGt911Driver(Logger &logger, IOExpander *ioExpander = nullptr);
 #else
     explicit RgbGt911Driver(Logger &logger);
@@ -28,7 +28,7 @@ public:
 
 private:
     Logger &logger;
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;
 #endif
     Arduino_DataBus *bus = nullptr;

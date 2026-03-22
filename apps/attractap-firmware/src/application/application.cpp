@@ -31,24 +31,22 @@ void Application::setup()
     SerialCommandHandler::setup();
     Network::setup();
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     this->ioExpander.setup();
     this->beeper.setup(&this->ioExpander);
+#ifdef HAS_LVGL_DISPLAY
+    Display::setup(&this->ioExpander);
+#endif
 #else
     this->beeper.setup();
-#endif
-
 #ifdef HAS_LVGL_DISPLAY
-#ifdef HAS_IO_EXPANDER_TCA9554
-    Display::setup(&this->ioExpander);
-#else
     Display::setup();
 #endif
 #endif
 
     this->nfc.setup();
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     // Rewrite IO expander registers after display and NFC init.
     // GT911 probing and I2C bus activity during init can corrupt
     // the IO expander CONFIG/OUTPUT registers on V4 hardware.
@@ -414,7 +412,7 @@ void Application::loop()
 
     this->api.loop();
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     // Periodically re-write all IO expander registers to catch state drift
     // caused by I2C bus corruption from GT911/PN532 traffic.
     static unsigned long lastIoRefresh = 0;

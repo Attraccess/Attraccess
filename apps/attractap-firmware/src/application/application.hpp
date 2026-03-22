@@ -9,7 +9,7 @@
 #include "../utils.hpp"
 #include "../beeper/beeper.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
 #endif
 
@@ -44,7 +44,7 @@ public:
     void loop();
 
 private:
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     IOExpander ioExpander;
 #endif
     NFC nfc;

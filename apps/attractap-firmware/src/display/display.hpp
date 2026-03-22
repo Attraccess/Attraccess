@@ -19,14 +19,14 @@
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "driver/display_driver.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 class IOExpander;
 #endif
 
 class Display
 {
 public:
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     static void setup(IOExpander *ioExpander = nullptr);
 #else
     static void setup();
