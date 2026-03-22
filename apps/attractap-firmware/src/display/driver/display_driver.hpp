@@ -24,4 +24,8 @@ public:
 
     // Returns true when a touch is active and fills the point in display coordinates.
     virtual bool readTouch(TouchPoint &point) = 0;
+
+    // Returns true if a touch input device was successfully initialized.
+    // Drivers without a hardware-verified touch panel should override to return false.
+    virtual bool touchAvailable() const { return true; }
 };

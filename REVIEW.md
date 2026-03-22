@@ -72,21 +72,9 @@ Renamed to `HAS_IO_EXPANDER` across all files (`platformio.ini`, `application.hp
 
 ---
 
-### 6. `ioexpander.cpp` — `setPin()` is port-0 only but is the generic public API
+### 6. `ioexpander.cpp` — `setPin()` is port-0 only but is the generic public API ✅ Fixed
 
-```cpp
-void IOExpander::setPin(uint8_t bit, bool high)
-{
-    ...
-    outputState |= (uint8_t(1 << bit));   // only port 0
-    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
-    // outputState1 / IOEXP_REG_OUTPUT_1 never touched
-}
-```
-
-On the 16-bit expander (V4), port 1 state (`outputState1`) can only be written via `fullRefresh()`. Any caller that tries to control a port-1 pin via `setPin()` will silently manipulate the wrong register. Currently port 1 is only used for the defaults from the Waveshare demo, but this is a fragile assumption.
-
-**Action:** Either add a `port` parameter, or clearly document that `setPin()` is port-0 only and add an assertion/warning if `bit > 7`.
+On the 16-bit expander (V4), port 1 state (`outputState1`) can only be written via `fullRefresh()`. Documented the limitation with a header comment on `setPin()`. Added a `#ifdef IO_EXPANDER_16BIT` runtime guard that logs a warning and returns early if `bit > 7` is ever passed, preventing silent corruption of the port-0 output state.
 
 ---
 
@@ -250,15 +238,9 @@ An I2C write failure is logged at `INFO` level. This means it appears at all log
 
 ---
 
-### 17. `rgb_gt911_driver.cpp` — Touch init failure is non-fatal with no user feedback
+### 17. `rgb_gt911_driver.cpp` — Touch init failure is non-fatal with no user feedback ✅ Fixed
 
-```cpp
-logger.error("GT911 not found at either address — display will work without touch");
-```
-
-The device boots successfully without a working touchscreen. While this is more robust than the old hard-return-false, there is no visual indicator to the end user that touch is broken. The `initialized` flag is set to `true` regardless. If the display is present but touch is not, users will assume the device is broken rather than understanding touch specifically failed.
-
-**Action:** At minimum, show a warning screen or toast via LVGL if `touchInitialized == false`.
+Added `touchAvailable() const override { return touchInitialized; }` to `RgbGt911Driver` (base interface `IDisplayDriver` gets a default `touchAvailable()` returning `true`). `Display::setup()` checks the flag after `begin()` and calls `showErrorPopup("Touch Unavailable", ...)` via LVGL's top-layer overlay mechanism when touch hardware was not found. `Display::hasTouchInput()` is exposed as a public static for application code that needs to query touch availability at runtime.
 
 ---
 
@@ -293,11 +275,9 @@ If `HAS_IO_EXPANDER_TCA9554` is defined but the non-expander constructor is used
 
 ---
 
-### 20. `platformio.ini` — `TOUCH_DRIVER_FT6206=1` added to `attractap-touch-ethernet` without corresponding removal of legacy fallback
+### 20. `platformio.ini` — `TOUCH_DRIVER_FT6206=1` on `attractap-touch-ethernet` ✅ Documented
 
-The `attractap-touch-ethernet` env now has `TOUCH_DRIVER_FT6206=1`, which activates the new compile-time touch selection path in `qualia_ft_cst_driver.cpp`. The old `#else` fallback (try both FT6206 then CST8XX) remains in the source but is now dead code for this target. If the existing board actually needed CST8XX, this change is a silent regression.
-
-**Action:** Verify which touch controller the `attractap-touch-ethernet` hardware actually uses. If FT6206 is confirmed, the legacy `#else` fallback block should be cleaned up or removed.
+The Adafruit Qualia S3 RGB666 board uses a FocalTech FT6206 capacitive touch controller, so `TOUCH_DRIVER_FT6206=1` is correct and intentional. An explanatory comment has been added to `platformio.ini` to document this. The legacy try-both fallback in `qualia_ft_cst_driver.cpp` is now dead code for this target but is harmless and remains available for boards where the touch chip is not known at compile time.
 
 ---
 
@@ -356,7 +336,7 @@ The comment lists which bits are high but does not explain **what those bits are
 | 3 | `application.cpp` | ✅ Fixed | Debug leftover | Boot-time `singleBeep()` removed |
 | 4 | `platformio.ini` | ✅ Fixed | Config | `attractap-touch-v2` changed to `LOG_LEVEL=INFO` / `LOGGER_LEVEL_NUM=3` |
 | 5 | all firmware files | ✅ Fixed | Naming | `HAS_IO_EXPANDER_TCA9554` renamed to `HAS_IO_EXPANDER` everywhere |
-| 6 | `ioexpander.cpp` | 🟠 Major | Bug | `setPin()` only controls port 0 of 16-bit expander |
+| 6 | `ioexpander.cpp` / `ioexpander.hpp` | ✅ Fixed | Bug | `setPin()` documented as port-0 only; runtime `bit > 7` guard added |
 | 7 | `ioexpander.cpp` | 🟠 Major | SRP / Band-aid | CONFIG re-write duplicated inside `beeperOn/Off` |
 | 8 | `rgb_gt911_driver.cpp` | ✅ Fixed | Debug leftover | Touch-poll debug log removed |
 | 9 | `rgb_gt911_driver.cpp` | ✅ Fixed | Hardcoding | SDA/SCL pins now use `PIN_TOUCH_I2C_SDA`/`SCL`; `PIN_NFC_I2C_SDA`/`SCL` split added |
@@ -367,10 +347,10 @@ The comment lists which bits are high but does not explain **what those bits are
 | 14 | `ioexpander.cpp` | ✅ Fixed | Debug leftover | `dumpRegisters()` removed from `setup()` |
 | 15 | `ioexpander.cpp` | ✅ Fixed | Readability | `#ifdef` inside format string replaced with two separate `infof` calls |
 | 16 | `ioexpander.cpp` | ✅ Fixed | Logging | Write failure now logged at `warnf` |
-| 17 | `rgb_gt911_driver.cpp` | 🟡 Minor | UX | No user-visible feedback when touch init fails |
+| 17 | `display.cpp` / `display_driver.hpp` | ✅ Fixed | UX | `touchAvailable()` on driver interface; `Display::showErrorPopup()` shown on touch failure |
 | 18 | `Adafruit_PN532_NTAG424.cpp` | ✅ Fixed | Bug | `_reset >= 0` (always true for uint8_t) changed to `_reset != 0xFF` |
 | 19 | `rgb_gt911_driver.hpp` | ✅ Fixed | Bug | `ioExpander` member initialised to `nullptr` |
-| 20 | `platformio.ini` | 🟡 Minor | Correctness | `TOUCH_DRIVER_FT6206` on ethernet target may be regression |
+| 20 | `platformio.ini` | ✅ Fixed | Correctness | Confirmed FT6206 is correct for Qualia board; added comment to `platformio.ini` |
 | 21 | `application.cpp` | ✅ Fixed | Debug leftover | `[INIT]` timing logs removed |
 | 22 | `beeper.cpp` | ✅ Fixed | Unexplained change | Added comment: 200ms needed for passive buzzer on V4 (V3 used 100ms) |
 | 23 | `ioexpander.cpp` | 🟡 Minor | DRY | `fullRefresh()` duplicates `setup()` register sequence |

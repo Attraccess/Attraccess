@@ -51,6 +51,9 @@ public:
     static void setDeviceName(String deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
+    // Returns false if the display driver reported that touch hardware was not found at init.
+    static bool hasTouchInput();
+
     // Global error popup helpers
     static void showErrorPopup(const String &title, const String &message);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
