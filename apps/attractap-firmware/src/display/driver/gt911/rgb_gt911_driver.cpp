@@ -1,10 +1,10 @@
 #include "rgb_gt911_driver.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 #include "../../../ioexpander/ioexpander.hpp"
 #endif
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 RgbGt911Driver::RgbGt911Driver(Logger &logger, IOExpander *ioExpander)
     : logger(logger), ioExpander(ioExpander) {}
 #else
@@ -22,7 +22,7 @@ bool RgbGt911Driver::begin()
     // likely because the ESP32 RGB LCD peripheral setup affects I2C bus state.
     delay(100); // Allow GT911 to settle after power-on (matches Waveshare)
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     if (ioExpander) {
         logger.info("Resetting touch panel via IO expander...");
         ioExpander->resetTouchPanel();  // Pulse TP_RST: LOW 20ms → HIGH 50ms

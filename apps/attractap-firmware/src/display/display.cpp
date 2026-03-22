@@ -1,6 +1,6 @@
 #include "display.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
 #endif
 
@@ -119,7 +119,7 @@ uint32_t Display::tick_cb()
     return millis();
 }
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 void Display::setup(IOExpander *ioExpander)
 #else
 void Display::setup()
@@ -128,7 +128,7 @@ void Display::setup()
     Display::logger.info("Initializing");
 
 #if defined(DISPLAY_DRIVER_GT911)
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     Display::driver = new RgbGt911Driver(Display::logger, ioExpander);
 #else
     Display::driver = new RgbGt911Driver(Display::logger);

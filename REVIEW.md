@@ -60,15 +60,15 @@ The `attractap-touch-v2` target ships with `DEBUG` logging. Every `debugf` call 
 
 ## 🟠 Major Issues
 
-### 5. Macro name `HAS_IO_EXPANDER_TCA9554` is a lie
+### 5. Macro name `HAS_IO_EXPANDER_TCA9554` is a lie ✅ Fixed
 
 The macro named `HAS_IO_EXPANDER_TCA9554` now controls initialisation of **two** completely different chips:
 - V3: TCA9554 (8-bit, I2C address 0x20)
 - V4: XL9555 / PCA9555-compatible (16-bit, I2C address 0x24)
 
-The name implies a specific chip but the behaviour diverges dramatically inside `#ifdef IO_EXPANDER_16BIT` sub-guards. This is confusing for anyone reading the code: if `HAS_IO_EXPANDER_TCA9554` is defined but `IO_EXPANDER_16BIT` is also defined, you get the 16-bit code path while the outer flag claims TCA9554.
+The name implied a specific chip but the behaviour diverges dramatically inside `#ifdef IO_EXPANDER_16BIT` sub-guards.
 
-**Action:** Rename to `HAS_IO_EXPANDER`. Keep `IO_EXPANDER_16BIT` as the discriminator for chip variant. Update all call sites.
+Renamed to `HAS_IO_EXPANDER` across all files (`platformio.ini`, `application.hpp/cpp`, `beeper.hpp/cpp`, `display.hpp/cpp`, `rgb_gt911_driver.hpp/cpp`). `IO_EXPANDER_16BIT` remains as the chip-variant discriminator.
 
 ---
 
@@ -204,20 +204,9 @@ Conditional includes in `.cpp` files placed in the middle of the file (not at th
 
 ---
 
-### 13. `beeper.hpp` / `display.hpp` — Asymmetric `setup()` API via `#ifdef`
+### 13. `beeper.hpp` / `display.hpp` — Asymmetric `setup()` API via `#ifdef` ✅ Fixed
 
-Both classes conditionally expose a different `setup()` signature depending on compile flags:
-
-```cpp
-// beeper.hpp
-#ifdef HAS_IO_EXPANDER_TCA9554
-    void setup(IOExpander *expander);
-#else
-    void setup();
-#endif
-```
-
-This means callers must also `#ifdef` around every `setup()` call, which is what `application.cpp` does. This is the same conditional duplicated in two places. A cleaner pattern is a single `setup(IOExpander *expander = nullptr)` signature that is always available (the non-expander path simply ignores a null pointer), eliminating the conditional at call sites.
+`Beeper::setup()` now declares `setup(IOExpander *expander = nullptr)` (matching the existing `= nullptr` default already present on `Display::setup()`). In `application.cpp` the two previously separate `#ifdef HAS_IO_EXPANDER` blocks (one for beeper, one for display) are merged into a single outer block, eliminating the nested `#ifdef HAS_IO_EXPANDER` inside `#ifdef HAS_LVGL_DISPLAY`.
 
 ---
 
@@ -366,7 +355,7 @@ The comment lists which bits are high but does not explain **what those bits are
 | 2 | `main.cpp` | ✅ Fixed | Debug leftover | `i2cBusScan()` removed |
 | 3 | `application.cpp` | ✅ Fixed | Debug leftover | Boot-time `singleBeep()` removed |
 | 4 | `platformio.ini` | ✅ Fixed | Config | `attractap-touch-v2` changed to `LOG_LEVEL=INFO` / `LOGGER_LEVEL_NUM=3` |
-| 5 | `ioexpander.hpp` | 🟠 Major | Naming | `HAS_IO_EXPANDER_TCA9554` covers two different chips |
+| 5 | all firmware files | ✅ Fixed | Naming | `HAS_IO_EXPANDER_TCA9554` renamed to `HAS_IO_EXPANDER` everywhere |
 | 6 | `ioexpander.cpp` | 🟠 Major | Bug | `setPin()` only controls port 0 of 16-bit expander |
 | 7 | `ioexpander.cpp` | 🟠 Major | SRP / Band-aid | CONFIG re-write duplicated inside `beeperOn/Off` |
 | 8 | `rgb_gt911_driver.cpp` | ✅ Fixed | Debug leftover | Touch-poll debug log removed |
@@ -374,7 +363,7 @@ The comment lists which bits are high but does not explain **what those bits are
 | 10 | `ioexpander.cpp` | 🟠 Major | Design | Triple-write workaround blocks loop, misleading return |
 | 11 | `application.cpp` | 🟠 Major | Design | Silent periodic `fullRefresh()` hides I2C corruption |
 | 12 | `beeper.cpp` | ✅ Fixed | Style | Include already at top of file — no change needed |
-| 13 | `beeper.hpp` / `display.hpp` | 🟡 Minor | Design | Asymmetric `setup()` API causes duplicate `#ifdef` at call sites |
+| 13 | `beeper.hpp` / `application.cpp` | ✅ Fixed | Design | `Beeper::setup()` gets `= nullptr` default; `application.cpp` consolidated to one `#ifdef HAS_IO_EXPANDER` block |
 | 14 | `ioexpander.cpp` | ✅ Fixed | Debug leftover | `dumpRegisters()` removed from `setup()` |
 | 15 | `ioexpander.cpp` | ✅ Fixed | Readability | `#ifdef` inside format string replaced with two separate `infof` calls |
 | 16 | `ioexpander.cpp` | ✅ Fixed | Logging | Write failure now logged at `warnf` |

@@ -4,7 +4,7 @@
 #include "../settings/settings.hpp"
 #include "../logger/logger.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 class IOExpander;
 #endif
 
@@ -13,8 +13,8 @@ class Beeper
 public:
     Beeper() : logger("Beeper") {}
 
-#ifdef HAS_IO_EXPANDER_TCA9554
-    void setup(IOExpander *expander);
+#ifdef HAS_IO_EXPANDER
+    void setup(IOExpander *expander = nullptr);
 #else
     void setup();
 #endif
@@ -27,7 +27,7 @@ public:
 private:
     Logger logger;
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;
 #endif
 };

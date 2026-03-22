@@ -1,10 +1,10 @@
 #include "beeper.hpp"
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
 #endif
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
 void Beeper::setup(IOExpander *expander)
 {
     this->ioExpander = expander;
@@ -51,27 +51,27 @@ void Beeper::singleBeep()
 
     this->logger.debug("BEEP");
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     if (this->ioExpander)
     {
         this->ioExpander->beeperOn();
     }
 #endif
 
-#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER_TCA9554)
+#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
     digitalWrite(BEEPER_PIN, HIGH);
 #endif
 
     delay(200); // 200ms: passive buzzer on V4 hardware needs longer pulse to be audible (V3 used 100ms)
 
-#ifdef HAS_IO_EXPANDER_TCA9554
+#ifdef HAS_IO_EXPANDER
     if (this->ioExpander)
     {
         this->ioExpander->beeperOff();
     }
 #endif
 
-#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER_TCA9554)
+#if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
     digitalWrite(BEEPER_PIN, LOW);
 #endif
 }
