@@ -63,6 +63,8 @@ public:
     void beeperOff();
     void setDisplayBacklight(bool on);
     void resetTouchPanel();
+    // Set a single pin on port 0 (bits 0–7). On the 16-bit expander, port 1 pins
+    // (bits 8–15) cannot be set individually — use fullRefresh() or refreshOutput().
     void setPin(uint8_t bit, bool high);
     void refreshOutput();
     void fullRefresh(bool verbose = true);

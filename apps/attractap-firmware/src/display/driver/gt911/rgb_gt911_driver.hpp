@@ -25,6 +25,7 @@ public:
     uint32_t height() const override { return screenHeight; }
     void flush(const lv_area_t *area, uint8_t *px_map) override;
     bool readTouch(TouchPoint &point) override;
+    bool touchAvailable() const override { return touchInitialized; }
 
 private:
     Logger &logger;

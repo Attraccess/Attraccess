@@ -209,7 +209,19 @@ void Display::setup()
 
     Display::transitionToScreen(&Display::bootScreen);
 
+    if (!Display::driver->touchAvailable())
+    {
+        Display::logger.warn("Touch panel not detected — notifying user on screen");
+        Display::showErrorPopup("Touch Unavailable",
+                                "Touch panel not detected.\nCheck hardware and reboot.");
+    }
+
     Display::logger.info("Setup done");
+}
+
+bool Display::hasTouchInput()
+{
+    return Display::driver && Display::driver->touchAvailable();
 }
 
 void Display::loop()

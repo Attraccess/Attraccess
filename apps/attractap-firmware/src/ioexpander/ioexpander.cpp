@@ -82,6 +82,16 @@ void IOExpander::setPin(uint8_t bit, bool high)
         return;
     }
 
+#ifdef IO_EXPANDER_16BIT
+    // setPin() operates on port 0 (bits 0–7) only.
+    // Port 1 state is managed via fullRefresh() / refreshOutput().
+    if (bit > 7)
+    {
+        logger.warnf("setPin: bit=%d is out of range for port 0 (0–7) — port 1 pins cannot be set individually", bit);
+        return;
+    }
+#endif
+
     if (high)
     {
         outputState |= (uint8_t(1 << bit));
