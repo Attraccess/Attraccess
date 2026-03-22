@@ -373,19 +373,19 @@ The comment lists which bits are high but does not explain **what those bits are
 | 9 | `rgb_gt911_driver.cpp` | ✅ Fixed | Hardcoding | SDA/SCL pins now use `PIN_TOUCH_I2C_SDA`/`SCL`; `PIN_NFC_I2C_SDA`/`SCL` split added |
 | 10 | `ioexpander.cpp` | 🟠 Major | Design | Triple-write workaround blocks loop, misleading return |
 | 11 | `application.cpp` | 🟠 Major | Design | Silent periodic `fullRefresh()` hides I2C corruption |
-| 12 | `beeper.cpp` | 🟡 Minor | Style | Conditional `#include` not at top of file |
+| 12 | `beeper.cpp` | ✅ Fixed | Style | Include already at top of file — no change needed |
 | 13 | `beeper.hpp` / `display.hpp` | 🟡 Minor | Design | Asymmetric `setup()` API causes duplicate `#ifdef` at call sites |
 | 14 | `ioexpander.cpp` | ✅ Fixed | Debug leftover | `dumpRegisters()` removed from `setup()` |
-| 15 | `ioexpander.cpp` | 🟡 Minor | Readability | `#ifdef` inside format string args |
-| 16 | `ioexpander.cpp` | 🟡 Minor | Logging | Write failure logged at `INFO` not `WARN`/`ERROR` |
+| 15 | `ioexpander.cpp` | ✅ Fixed | Readability | `#ifdef` inside format string replaced with two separate `infof` calls |
+| 16 | `ioexpander.cpp` | ✅ Fixed | Logging | Write failure now logged at `warnf` |
 | 17 | `rgb_gt911_driver.cpp` | 🟡 Minor | UX | No user-visible feedback when touch init fails |
-| 18 | `Adafruit_PN532_NTAG424.cpp` | 🟡 Minor | Bug | `uint8_t >= 0` guard is always true |
-| 19 | `rgb_gt911_driver.hpp` | 🟡 Minor | Bug | `ioExpander` member uninitialized in non-expander build |
+| 18 | `Adafruit_PN532_NTAG424.cpp` | ✅ Fixed | Bug | `_reset >= 0` (always true for uint8_t) changed to `_reset != 0xFF` |
+| 19 | `rgb_gt911_driver.hpp` | ✅ Fixed | Bug | `ioExpander` member initialised to `nullptr` |
 | 20 | `platformio.ini` | 🟡 Minor | Correctness | `TOUCH_DRIVER_FT6206` on ethernet target may be regression |
 | 21 | `application.cpp` | ✅ Fixed | Debug leftover | `[INIT]` timing logs removed |
-| 22 | `beeper.cpp` | 🟡 Minor | Unexplained change | Beep duration doubled 100→200 ms without comment |
+| 22 | `beeper.cpp` | ✅ Fixed | Unexplained change | Added comment: 200ms needed for passive buzzer on V4 (V3 used 100ms) |
 | 23 | `ioexpander.cpp` | 🟡 Minor | DRY | `fullRefresh()` duplicates `setup()` register sequence |
-| 24 | `ioexpander.hpp` | 🟡 Minor | Documentation | `IOEXP_PORT1_DEFAULT 0x3A` bits not explained |
+| 24 | `ioexpander.hpp` | ✅ Fixed | Documentation | `IOEXP_PORT1_DEFAULT` now has per-bit comments with TODO to verify against schematic |
 
 ---
 

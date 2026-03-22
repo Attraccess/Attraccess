@@ -62,7 +62,7 @@ void Beeper::singleBeep()
     digitalWrite(BEEPER_PIN, HIGH);
 #endif
 
-    delay(200);
+    delay(200); // 200ms: passive buzzer on V4 hardware needs longer pulse to be audible (V3 used 100ms)
 
 #ifdef HAS_IO_EXPANDER_TCA9554
     if (this->ioExpander)

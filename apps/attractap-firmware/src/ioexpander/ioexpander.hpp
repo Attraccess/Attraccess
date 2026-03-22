@@ -33,8 +33,20 @@
 #define IOEXP_REG_CONFIG_1 0x07  // Configuration port 1 (1=input, 0=output)
 
 // Waveshare default output values (from official V4 demo code)
-#define IOEXP_PORT0_DEFAULT 0xBF  // All high EXCEPT bit 6 (beeper off)
-#define IOEXP_PORT1_DEFAULT 0x3A  // Binary 0011 1010 (bits 1,3,4,5 high)
+// Port 0 (0xBF = 1011 1111): all pins high except bit 6 (beeper off / active-low)
+#define IOEXP_PORT0_DEFAULT 0xBF
+
+// Port 1 (0x3A = 0011 1010): peripheral enable lines matching Waveshare V4 demo.
+// XIO8  (P1.0) = 0 — reserved / unused
+// XIO9  (P1.1) = 1 — RS485 DE/RE (transmit enable, idle-high)
+// XIO10 (P1.2) = 0 — reserved / unused
+// XIO11 (P1.3) = 1 — CAN standby released (active-low standby, so 1 = running)
+// XIO12 (P1.4) = 1 — IMU power / enable
+// XIO13 (P1.5) = 1 — RTC INTB released / SD card power enable
+// XIO14 (P1.6) = 0 — reserved / unused
+// XIO15 (P1.7) = 0 — reserved / unused
+// TODO: verify each assignment against the Waveshare ESP32-S3-Touch-LCD-4 V4 schematic
+#define IOEXP_PORT1_DEFAULT 0x3A
 #else
 // TCA9554 register map (V3 hardware)
 #define IOEXP_REG_INPUT    0x00

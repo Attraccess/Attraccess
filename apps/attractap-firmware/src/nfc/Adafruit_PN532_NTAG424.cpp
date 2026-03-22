@@ -113,7 +113,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t irq, uint8_t reset, TwoWire *theWire)
     : _irq(irq), _reset(reset)
 {
   pinMode(_irq, INPUT);
-  if (_reset >= 0)
+  if (_reset != 0xFF) // 0xFF (cast of -1) is the "no pin" sentinel
   {
     pinMode(_reset, OUTPUT);
   }
@@ -146,7 +146,7 @@ Adafruit_PN532::Adafruit_PN532(uint8_t ss, SPIClass *theSPI)
 Adafruit_PN532::Adafruit_PN532(uint8_t reset, HardwareSerial *theSer)
     : _reset(reset)
 {
-  if (_reset >= 0)
+  if (_reset != 0xFF) // 0xFF (cast of -1) is the "no pin" sentinel
   {
     pinMode(_reset, OUTPUT);
   }

@@ -172,16 +172,11 @@ void IOExpander::fullRefresh(bool verbose)
 
     if (verbose)
     {
-        logger.infof("fullRefresh done: port0=0x%02X"
 #ifdef IO_EXPANDER_16BIT
-                     " port1=0x%02X"
+        logger.infof("fullRefresh done: port0=0x%02X port1=0x%02X", outputState, outputState1);
+#else
+        logger.infof("fullRefresh done: port0=0x%02X", outputState);
 #endif
-                     , outputState
-#ifdef IO_EXPANDER_16BIT
-                     , outputState1
-#endif
-        );
-
         dumpRegisters();
     }
 }
@@ -254,7 +249,7 @@ bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
     uint8_t err = Wire.endTransmission();
     if (err != 0)
     {
-        logger.infof("writeRegister(0x%02X, 0x%02X) FAILED err=%d (0=ok,2=NACK addr,3=NACK data,5=timeout)",
+        logger.warnf("writeRegister(0x%02X, 0x%02X) FAILED err=%d (0=ok,2=NACK addr,3=NACK data,5=timeout)",
                      reg, value, err);
     }
     return err == 0;
