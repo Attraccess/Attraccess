@@ -35,12 +35,12 @@ bool RgbGt911Driver::begin()
     // RST is on the IO expander (not direct GPIO), INT is on GPIO 16.
     touch.setPins(-1, 16);
 
-    logger.infof("Probing GT911 at 0x%02X (SDA=%d, SCL=%d)...", GT911_SLAVE_ADDRESS_H, 15, 7);
-    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, 15, 7);
+    logger.infof("Probing GT911 at 0x%02X (SDA=%d, SCL=%d)...", GT911_SLAVE_ADDRESS_H, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
+    bool touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_H, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
     if (!touchFound)
     {
         logger.infof("GT911 not found at 0x%02X, trying 0x%02X...", GT911_SLAVE_ADDRESS_H, GT911_SLAVE_ADDRESS_L);
-        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, 15, 7);
+        touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
     }
     if (touchFound)
     {
