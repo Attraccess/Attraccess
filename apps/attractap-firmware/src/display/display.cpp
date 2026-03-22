@@ -41,6 +41,10 @@ std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
 lv_timer_t *Display::popupAutoCloseTimer = nullptr;
 
+// Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
+// to ensure LVGL is fully running before creating overlay objects.
+static bool s_touchWarningPending = false;
+
 #if LV_USE_LOG != 0
 /* Serial debugging */
 void Display::logFromLvgl(lv_log_level_t level, const char *buf)
@@ -211,9 +215,8 @@ void Display::setup()
 
     if (!Display::driver->touchAvailable())
     {
-        Display::logger.warn("Touch panel not detected — notifying user on screen");
-        Display::showErrorPopup("Touch Unavailable",
-                                "Touch panel not detected.\nCheck hardware and reboot.");
+        Display::logger.warn("Touch panel not detected — warning will be shown after first render");
+        s_touchWarningPending = true;
     }
 
     Display::logger.info("Setup done");
@@ -226,6 +229,13 @@ bool Display::hasTouchInput()
 
 void Display::loop()
 {
+    if (s_touchWarningPending)
+    {
+        s_touchWarningPending = false;
+        Display::showErrorPopup("Touch Unavailable",
+                                "Touch panel not detected.\nCheck hardware and reboot.");
+    }
+
     lv_timer_handler(); /* let the GUI do its work */
     if (Display::activeScreen)
     {

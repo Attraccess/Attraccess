@@ -42,6 +42,12 @@ bool RgbGt911Driver::begin()
         logger.infof("GT911 not found at 0x%02X, trying 0x%02X...", GT911_SLAVE_ADDRESS_H, GT911_SLAVE_ADDRESS_L);
         touchFound = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, PIN_TOUCH_I2C_SDA, PIN_TOUCH_I2C_SCL);
     }
+    // SensorCommon::begin() (called inside touch.begin()) re-invokes Wire.begin() on ESP32,
+    // which resets Wire.setTimeOut() back to the framework default (no timeout).
+    // Restore the 50 ms timeout so that subsequent I2C operations (IO expander fullRefresh,
+    // NFC) do not stall indefinitely on a busy or stuck bus.
+    Wire.setTimeOut(50);
+
     if (touchFound)
     {
         logger.infof("GT911 touch init SUCCESS at t=%lu ms", millis());
