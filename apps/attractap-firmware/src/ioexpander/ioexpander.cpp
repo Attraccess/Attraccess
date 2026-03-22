@@ -31,7 +31,7 @@ void IOExpander::setup()
     }
 
     // Step 2: Set output values matching Waveshare official demo
-    outputState = IOEXP_PORT0_DEFAULT; // 0xDF — all high except beeper
+    outputState = IOEXP_PORT0_DEFAULT; // 0xBF — all high except beeper
     if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
     {
         logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
@@ -118,7 +118,6 @@ void IOExpander::beeperOn()
 #ifdef IO_EXPANDER_16BIT
     // Re-write config register before beep — I2C bus traffic from GT911/NFC
     // can corrupt the IO expander config, reverting pins to inputs.
-    // This ensures bit 5 is actually an output when we try to drive it.
     writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
 #endif
     setPin(IOEXP_BIT_BEEPER, true);
