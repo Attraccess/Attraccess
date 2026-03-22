@@ -28,6 +28,27 @@ void logLoopStackUsage()
 }
 #endif
 
+void i2cBusScan()
+{
+    mainLogger.info("=== I2C Bus Scan ===");
+    int found = 0;
+    for (uint8_t addr = 0x01; addr <= 0x7E; addr++)
+    {
+        Wire.beginTransmission(addr);
+        uint8_t err = Wire.endTransmission();
+        if (err == 0)
+        {
+            mainLogger.infof("  I2C device found at 0x%02X", addr);
+            found++;
+        }
+        else if (err == 4)
+        {
+            mainLogger.infof("  I2C error at 0x%02X (err=4)", addr);
+        }
+    }
+    mainLogger.infof("=== I2C Scan complete: %d device(s) found ===", found);
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -40,13 +61,18 @@ void setup()
     mainLogger.info("Serial initialized");
 
 #if defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
+    mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_I2C_SDA, PIN_I2C_SCL);
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
 #else
+    mainLogger.info("I2C init: using default SDA/SCL pins");
     Wire.begin(SDA, SCL); // SDA, SCL
 #endif
 
     // Prevent potential I2C stalls on touch controller reads
     Wire.setTimeOut(50);
+
+    // Scan I2C bus to identify all connected devices
+    i2cBusScan();
 
     mainLogger.info("Attractap starting...");
     application.setup();
