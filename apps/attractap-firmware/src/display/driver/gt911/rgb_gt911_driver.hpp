@@ -29,7 +29,7 @@ public:
 private:
     Logger &logger;
 #ifdef HAS_IO_EXPANDER_TCA9554
-    IOExpander *ioExpander;
+    IOExpander *ioExpander = nullptr;
 #endif
     Arduino_DataBus *bus = nullptr;
     Arduino_ESP32RGBPanel *rgbpanel = nullptr;
