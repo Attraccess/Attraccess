@@ -60,9 +60,9 @@ void setup()
 
     mainLogger.info("Serial initialized");
 
-#if defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
-    mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_I2C_SDA, PIN_I2C_SCL);
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+#if defined(PIN_NFC_I2C_SDA) && defined(PIN_NFC_I2C_SCL)
+    mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
+    Wire.begin(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
 #else
     mainLogger.info("I2C init: using default SDA/SCL pins");
     Wire.begin(SDA, SCL); // SDA, SCL
