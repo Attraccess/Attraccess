@@ -7,11 +7,17 @@
 #define IOEXPANDER_I2C_ADDR (0x20)
 #endif
 
-// Port 0 pin assignments (shared by V3 and V4)
+// Port 0 pin assignments
 #define IOEXP_BIT_TP_RST (0)
 #define IOEXP_BIT_BACKLIGHT (1)
 #define IOEXP_BIT_LCD_RST (2)
+
+// Beeper pin: V3 (TCA9554) uses P0.5, V4 (XL9555) uses P0.6 (XIO6)
+#ifdef IO_EXPANDER_16BIT
+#define IOEXP_BIT_BEEPER (6)
+#else
 #define IOEXP_BIT_BEEPER (5)
+#endif
 
 #ifdef IO_EXPANDER_16BIT
 // XL9555 / PCA9555-compatible register map (V4 hardware)
@@ -27,7 +33,7 @@
 #define IOEXP_REG_CONFIG_1 0x07  // Configuration port 1 (1=input, 0=output)
 
 // Waveshare default output values (from official V4 demo code)
-#define IOEXP_PORT0_DEFAULT 0xFF  // All bits high
+#define IOEXP_PORT0_DEFAULT 0xBF  // All high EXCEPT bit 6 (beeper off)
 #define IOEXP_PORT1_DEFAULT 0x3A  // Binary 0011 1010 (bits 1,3,4,5 high)
 #else
 // TCA9554 register map (V3 hardware)
@@ -47,7 +53,7 @@ public:
     void resetTouchPanel();
     void setPin(uint8_t bit, bool high);
     void refreshOutput();
-    void fullRefresh();
+    void fullRefresh(bool verbose = true);
     void dumpRegisters();
 
 private:
@@ -60,5 +66,6 @@ private:
     bool initialized = false;
 
     bool writeRegister(uint8_t reg, uint8_t value);
+    bool writeRegisterReliable(uint8_t reg, uint8_t value);
     bool readRegister(uint8_t reg, uint8_t &value);
 };

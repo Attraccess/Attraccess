@@ -11,8 +11,8 @@ void IOExpander::setup()
     // Config registers default to 0xFF (ALL INPUTS).
     // We MUST write 0x00 to set pins as outputs before output writes take effect.
 
-    // Step 1: Configure all pins as outputs
-    if (!writeRegister(IOEXP_REG_CONFIG, 0x00))
+    // Step 1: Configure all pins as outputs (triple-write for reliability)
+    if (!writeRegisterReliable(IOEXP_REG_CONFIG, 0x00))
     {
         logger.error("Failed to write CONFIG port 0 (reg 0x06)");
     }
@@ -21,7 +21,7 @@ void IOExpander::setup()
         logger.info("CONFIG port 0 = 0x00 (all outputs)");
     }
 
-    if (!writeRegister(IOEXP_REG_CONFIG_1, 0x00))
+    if (!writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00))
     {
         logger.error("Failed to write CONFIG port 1 (reg 0x07)");
     }
@@ -31,8 +31,8 @@ void IOExpander::setup()
     }
 
     // Step 2: Set output values matching Waveshare official demo
-    outputState = IOEXP_PORT0_DEFAULT; // 0xFF — all high
-    if (!writeRegister(IOEXP_REG_OUTPUT, outputState))
+    outputState = IOEXP_PORT0_DEFAULT; // 0xDF — all high except beeper
+    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
     {
         logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
     }
@@ -42,7 +42,7 @@ void IOExpander::setup()
     }
 
     outputState1 = IOEXP_PORT1_DEFAULT; // 0x3A
-    if (!writeRegister(IOEXP_REG_OUTPUT_1, outputState1))
+    if (!writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1))
     {
         logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
     }
@@ -95,7 +95,7 @@ void IOExpander::setPin(uint8_t bit, bool high)
     }
 
     logger.debugf("setPin: bit=%d high=%d → outputState=0x%02X", bit, high, outputState);
-    writeRegister(IOEXP_REG_OUTPUT, outputState);
+    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
 }
 
 void IOExpander::resetTouchPanel()
@@ -115,11 +115,22 @@ void IOExpander::resetTouchPanel()
 
 void IOExpander::beeperOn()
 {
+#ifdef IO_EXPANDER_16BIT
+    // Re-write config register before beep — I2C bus traffic from GT911/NFC
+    // can corrupt the IO expander config, reverting pins to inputs.
+    // This ensures bit 5 is actually an output when we try to drive it.
+    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
+#endif
     setPin(IOEXP_BIT_BEEPER, true);
 }
 
 void IOExpander::beeperOff()
 {
+#ifdef IO_EXPANDER_16BIT
+    // Also re-write config register before turning off — if this write fails,
+    // the beeper stays stuck ON (explains "constant beeping" symptom).
+    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
+#endif
     setPin(IOEXP_BIT_BEEPER, false);
 }
 
@@ -134,43 +145,49 @@ void IOExpander::refreshOutput()
     {
         return;
     }
-    writeRegister(IOEXP_REG_OUTPUT, outputState);
+    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
 #ifdef IO_EXPANDER_16BIT
-    writeRegister(IOEXP_REG_OUTPUT_1, outputState1);
+    writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1);
 #endif
 }
 
-void IOExpander::fullRefresh()
+void IOExpander::fullRefresh(bool verbose)
 {
     if (!initialized)
     {
         return;
     }
 
-    logger.info("fullRefresh: re-writing all IO expander registers");
+    if (verbose)
+    {
+        logger.info("fullRefresh: re-writing all IO expander registers");
+    }
 
 #ifdef IO_EXPANDER_16BIT
     // Re-write config registers in case I2C bus corruption reset them to defaults
-    writeRegister(IOEXP_REG_CONFIG, 0x00);
-    writeRegister(IOEXP_REG_CONFIG_1, 0x00);
+    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
+    writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00);
     // Re-write both output ports
-    writeRegister(IOEXP_REG_OUTPUT, outputState);
-    writeRegister(IOEXP_REG_OUTPUT_1, outputState1);
+    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
+    writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1);
 #else
-    writeRegister(IOEXP_REG_OUTPUT, outputState);
+    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
 #endif
 
-    logger.infof("fullRefresh done: port0=0x%02X"
+    if (verbose)
+    {
+        logger.infof("fullRefresh done: port0=0x%02X"
 #ifdef IO_EXPANDER_16BIT
-                 " port1=0x%02X"
+                     " port1=0x%02X"
 #endif
-                 , outputState
+                     , outputState
 #ifdef IO_EXPANDER_16BIT
-                 , outputState1
+                     , outputState1
 #endif
-    );
+        );
 
-    dumpRegisters();
+        dumpRegisters();
+    }
 }
 
 void IOExpander::dumpRegisters()
@@ -215,6 +232,22 @@ void IOExpander::dumpRegisters()
 #endif
 
     logger.info("=== End Register Dump ===");
+}
+
+bool IOExpander::writeRegisterReliable(uint8_t reg, uint8_t value)
+{
+    // Write the same register 3 times with 1ms delays between writes.
+    // On a noisy I2C bus (shared with GT911 touch + PN532 NFC via DFR1185),
+    // individual writes can silently fail. Triple-write dramatically increases
+    // the probability that at least one write succeeds.
+    bool anyOk = false;
+    for (int attempt = 0; attempt < 3; attempt++)
+    {
+        if (writeRegister(reg, value))
+            anyOk = true;
+        delay(1);
+    }
+    return anyOk;
 }
 
 bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
