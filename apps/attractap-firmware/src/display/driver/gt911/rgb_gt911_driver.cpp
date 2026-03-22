@@ -116,13 +116,6 @@ bool RgbGt911Driver::readTouch(TouchPoint &point)
 
     uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
 
-    // Debug: log touch state every 2 seconds
-    static uint32_t lastLog = 0;
-    if (millis() - lastLog > 2000) {
-        lastLog = millis();
-        logger.debugf("Touch poll: touched=%d", touched);
-    }
-
     if (touched <= 0)
     {
         return false;
