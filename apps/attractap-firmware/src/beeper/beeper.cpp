@@ -1,5 +1,4 @@
 #include "beeper.hpp"
-#include <Wire.h>
 
 #ifdef HAS_IO_EXPANDER_TCA9554
 #include "../ioexpander/ioexpander.hpp"
@@ -50,11 +49,7 @@ void Beeper::singleBeep()
         return;
     }
 
-    this->logger.debug("BEEP (200ms)");
-
-    // Flush I2C bus to clear any stuck state from GT911/PN532 transactions
-    Wire.flush();
-    delay(1);
+    this->logger.debug("BEEP");
 
 #ifdef HAS_IO_EXPANDER_TCA9554
     if (this->ioExpander)
