@@ -61,6 +61,11 @@ void Application::setup()
     this->logger.infof("[INIT] IO expander fullRefresh starting at t=%lu ms", millis());
     this->ioExpander.fullRefresh();
     this->logger.infof("[INIT] IO expander fullRefresh done at t=%lu ms", millis());
+
+    // Hardware validation beep — confirms beeper works through normal code path
+    this->logger.info("[INIT] Testing beeper...");
+    this->beeper.singleBeep();
+    this->logger.info("[INIT] Beeper test done");
 #endif
 
     this->api.setup();
@@ -421,6 +426,17 @@ void Application::loop()
     nfc.loop();
 
     this->api.loop();
+
+#ifdef HAS_IO_EXPANDER_TCA9554
+    // Periodically re-write all IO expander registers to catch state drift
+    // caused by I2C bus corruption from GT911/PN532 traffic.
+    static unsigned long lastIoRefresh = 0;
+    if (millis() - lastIoRefresh > 10000)
+    {
+        lastIoRefresh = millis();
+        this->ioExpander.fullRefresh(false); // quiet — no register dump
+    }
+#endif
 
     this->processState();
 }

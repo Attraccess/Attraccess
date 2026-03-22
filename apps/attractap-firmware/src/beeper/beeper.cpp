@@ -1,4 +1,5 @@
 #include "beeper.hpp"
+#include <Wire.h>
 
 #ifdef HAS_IO_EXPANDER_TCA9554
 #include "../ioexpander/ioexpander.hpp"
@@ -45,10 +46,15 @@ void Beeper::singleBeep()
 {
     if (!Settings::getDeviceConfig().beeperEnabled)
     {
+        this->logger.debug("Beep skipped: beeperEnabled=false");
         return;
     }
 
-    this->logger.debug("BEEP");
+    this->logger.debug("BEEP (200ms)");
+
+    // Flush I2C bus to clear any stuck state from GT911/PN532 transactions
+    Wire.flush();
+    delay(1);
 
 #ifdef HAS_IO_EXPANDER_TCA9554
     if (this->ioExpander)
@@ -61,7 +67,7 @@ void Beeper::singleBeep()
     digitalWrite(BEEPER_PIN, HIGH);
 #endif
 
-    delay(100);
+    delay(200);
 
 #ifdef HAS_IO_EXPANDER_TCA9554
     if (this->ioExpander)
