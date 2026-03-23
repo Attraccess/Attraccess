@@ -15,7 +15,7 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Chip, Skeleton, Switch } from '@heroui/react';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal';
 import { EmptyState } from '../../components/emptyState';
@@ -27,8 +27,10 @@ import { useSearchParams } from 'react-router-dom';
 
 export function ProjectsListPage() {
   const page = 1;
+  const [includeArchived, setIncludeArchived] = useState(false);
   const { data: projects, isLoading } = useProjectsServiceFindManyProjects({
     page,
+    includeArchived,
   });
   const { data: invitations, isLoading: isLoadingInvitations } = useProjectInvitationsServiceListMyProjectInvitations();
   const { t, tExists } = useTranslations({
@@ -203,13 +205,18 @@ export function ProjectsListPage() {
         subtitle={t('subtitle')}
         icon={<FolderIcon />}
         actions={
-          <UpsertProjectModal>
-            {(onOpen) => (
-              <Button onPress={onOpen} startContent={<PlusIcon size="24" />} variant="light">
-                {t('actions.create')}
-              </Button>
-            )}
-          </UpsertProjectModal>
+          <div className="flex flex-wrap items-center gap-3">
+            <Switch isSelected={includeArchived} onValueChange={setIncludeArchived}>
+              {t('filters.includeArchived')}
+            </Switch>
+            <UpsertProjectModal>
+              {(onOpen) => (
+                <Button onPress={onOpen} startContent={<PlusIcon size="24" />} variant="light">
+                  {t('actions.create')}
+                </Button>
+              )}
+            </UpsertProjectModal>
+          </div>
         }
       />
 
@@ -233,7 +240,7 @@ export function ProjectsListPage() {
         )}
         {projects?.data?.length === 0 && !isLoading && <EmptyState />}
         {projects?.data?.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+          <ProjectCard key={project.id} project={project} archivedLabel={t('filters.archivedBadge')} />
         ))}
       </div>
     </div>

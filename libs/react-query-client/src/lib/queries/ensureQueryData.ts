@@ -187,10 +187,11 @@ export const ensureUseResourceFlowsServiceResourceFlowsControllerStreamEventsDat
 export const ensureUseResourceFlowsServiceGetButtonsData = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetButtonsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getButtons({ resourceId }) });
-export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { limit, page }: {
+export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { includeArchived, limit, page }: {
+  includeArchived?: boolean;
   limit?: number;
   page?: number;
-} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) });
 export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });

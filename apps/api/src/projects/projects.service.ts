@@ -38,14 +38,20 @@ export class ProjectsService {
   ) {}
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
-    const { page, limit: take } = query;
+    const { page, limit: take, includeArchived } = query;
     const skip = (page - 1) * take;
 
-    const projects = await this.projectRepository
+    const qb = this.projectRepository
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.owner', 'owner')
       .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('owner.id = :userId OR member.id IS NOT NULL', { userId })
+      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
+
+    if (includeArchived !== true) {
+      qb.andWhere('project.archivedAt IS NULL');
+    }
+
+    const projects = await qb
       .orderBy('project.name', 'ASC')
       .addOrderBy('project.createdAt', 'DESC')
       .skip(skip)
@@ -55,13 +61,19 @@ export class ProjectsService {
     return this.projectAccessService.addAccessMetadata(userId, projects);
   }
 
-  public async getTotalCount(userId: number): Promise<number> {
-    return await this.projectRepository
+  public async getTotalCount(userId: number, query: { includeArchived?: boolean } = {}): Promise<number> {
+    const includeArchived = query.includeArchived ?? false;
+    const qb = this.projectRepository
       .createQueryBuilder('project')
       .leftJoin('project.owner', 'owner')
       .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('owner.id = :userId OR member.id IS NOT NULL', { userId })
-      .getCount();
+      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
+
+    if (!includeArchived) {
+      qb.andWhere('project.archivedAt IS NULL');
+    }
+
+    return await qb.getCount();
   }
 
   public async findOneById(userId: number, id: number): Promise<Project> {
@@ -86,6 +98,18 @@ export class ProjectsService {
     }
 
     return project;
+  }
+
+  public async archiveOne(ownerUserId: number, id: number): Promise<Project> {
+    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    project.archivedAt = new Date();
+    return await this.projectRepository.save(project);
+  }
+
+  public async unarchiveOne(ownerUserId: number, id: number): Promise<Project> {
+    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    project.archivedAt = null;
+    return await this.projectRepository.save(project);
   }
 
   public async deleteOne(id: number): Promise<void> {

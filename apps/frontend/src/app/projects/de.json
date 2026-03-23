@@ -4,6 +4,10 @@
   "actions": {
     "create": "Projekt erstellen"
   },
+  "filters": {
+    "includeArchived": "Archivierte Projekte anzeigen",
+    "archivedBadge": "Archiviert"
+  },
   "invitations": {
     "title": "Projekteinladungen",
     "description": "Nimm Einladungen an oder lehne sie ab, um gemeinsam an Projekten zu arbeiten.",

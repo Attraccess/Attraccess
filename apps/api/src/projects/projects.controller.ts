@@ -62,7 +62,7 @@ export class ProjectsController {
     @Query() query: FindManyProjectsQueryDto,
   ): Promise<FindManyProjectsResponseDto> {
     const projects = await this.projectsService.findMany(req.user.id, query);
-    const total = await this.projectsService.getTotalCount(req.user.id);
+    const total = await this.projectsService.getTotalCount(req.user.id, query);
 
     let nextPage: number | undefined = query.page + 1;
     if (nextPage * query.limit >= total) {
@@ -96,6 +96,34 @@ export class ProjectsController {
   async deleteOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.projectAccessService.ensureOwner(req.user.id, id);
     await this.projectsService.deleteOne(id);
+  }
+
+  @Post(':id/archive')
+  @Auth()
+  @ApiOperation({ summary: 'Archive a project', operationId: 'archiveProject' })
+  @ApiResponse({ status: 200, description: 'The project was archived successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async archive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ProjectWithAccessDto> {
+    await this.projectsService.archiveOne(req.user.id, id);
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
+    return this.transformProject(projectWithAccess);
+  }
+
+  @Post(':id/unarchive')
+  @Auth()
+  @ApiOperation({ summary: 'Unarchive a project', operationId: 'unarchiveProject' })
+  @ApiResponse({ status: 200, description: 'The project was unarchived successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async unarchive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ProjectWithAccessDto> {
+    await this.projectsService.unarchiveOne(req.user.id, id);
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
+    return this.transformProject(projectWithAccess);
   }
 
   @Post()

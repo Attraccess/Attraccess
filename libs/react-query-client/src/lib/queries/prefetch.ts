@@ -187,10 +187,11 @@ export const prefetchUseResourceFlowsServiceResourceFlowsControllerStreamEvents 
 export const prefetchUseResourceFlowsServiceGetButtons = (queryClient: QueryClient, { resourceId }: {
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetButtonsKeyFn({ resourceId }), queryFn: () => ResourceFlowsService.getButtons({ resourceId }) });
-export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { limit, page }: {
+export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { includeArchived, limit, page }: {
+  includeArchived?: boolean;
   limit?: number;
   page?: number;
-} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit, page }), queryFn: () => ProjectsService.findManyProjects({ limit, page }) });
+} = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) });
 export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindOneProjectKeyFn({ id }), queryFn: () => ProjectsService.findOneProject({ id }) });

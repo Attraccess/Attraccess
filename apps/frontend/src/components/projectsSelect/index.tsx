@@ -12,12 +12,15 @@ interface Props {
   includeUnassignedOption?: boolean;
   unassignedLabel?: string;
   isDisabled?: boolean;
+  includeArchived?: boolean;
 }
 
 export function ProjectsSelect(props: Props) {
-  const { value, onValueChange, includeUnassignedOption, unassignedLabel, isDisabled, ...selectProps } = props;
+  const { value, onValueChange, includeUnassignedOption, unassignedLabel, isDisabled, includeArchived, ...selectProps } = props;
 
-  const { data: projects, isLoading } = useProjectsServiceFindManyProjects();
+  const { data: projects, isLoading } = useProjectsServiceFindManyProjects({
+    includeArchived,
+  });
   const resolvedValue = value ?? undefined;
   const projectItems = (projects?.data ?? []).map((project) => ({ key: project.id.toString(), label: project.name }));
   const items = includeUnassignedOption

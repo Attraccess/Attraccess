@@ -1,10 +1,11 @@
 {
+  "archivedBadge": "Archived",
   "actions": {
     "delete": {
       "label": "Delete Project",
       "success": {
         "title": "Project successfully deleted",
-        "description": "The project {name} was successfully deleted"
+        "description": "The project {{name}} was successfully deleted"
       }
     },
     "update": {
@@ -12,6 +13,20 @@
     },
     "members": {
       "label": "Team members"
+    },
+    "archive": {
+      "label": "Archive Project",
+      "success": {
+        "title": "Project archived",
+        "description": "The project {{name}} was successfully archived"
+      }
+    },
+    "unarchive": {
+      "label": "Unarchive Project",
+      "success": {
+        "title": "Project unarchived",
+        "description": "The project {{name}} was successfully unarchived"
+      }
     },
     "inviteMember": {
       "label": "Invite member"

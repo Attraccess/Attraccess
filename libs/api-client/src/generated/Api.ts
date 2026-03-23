@@ -1182,10 +1182,10 @@ export interface UpdateSmtpSettingsDto {
    */
   secure?: boolean;
   /**
-   * SMTP username.
+   * SMTP username. Omit or set to null for servers that do not require authentication.
    * @example "no-reply@example.com"
    */
-  user: string;
+  user?: string | null;
   /**
    * SMTP password.
    * @example "secret"
@@ -1503,6 +1503,11 @@ export interface Project {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * The date and time the project was archived
+   * @format date-time
+   */
+  archivedAt?: string | null;
   /** The ID of the user that owns the project */
   owner: User;
   /** The name of the project */
@@ -2915,6 +2920,11 @@ export interface ProjectWithAccessDto {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * The date and time the project was archived
+   * @format date-time
+   */
+  archivedAt?: string | null;
   /** The ID of the user that owns the project */
   owner: User;
   /** The name of the project */
@@ -4083,6 +4093,12 @@ export interface FindManyProjectsParams {
    * @example 10
    */
   limit?: number;
+  /**
+   * Include archived projects (already finished)
+   * @default false
+   * @example false
+   */
+  includeArchived?: boolean;
 }
 
 export type FindManyProjectsData = FindManyProjectsResponseDto;
@@ -4094,6 +4110,10 @@ export type FindOneProjectData = ProjectWithAccessDto;
 export type DeleteOneProjectData = any;
 
 export type UpdateProjectData = ProjectWithAccessDto;
+
+export type ArchiveProjectData = ProjectWithAccessDto;
+
+export type UnarchiveProjectData = ProjectWithAccessDto;
 
 export interface GetProjectUsageHistoryParams {
   /**
@@ -6976,6 +6996,12 @@ export namespace Projects {
        * @example 10
        */
       limit?: number;
+      /**
+       * Include archived projects (already finished)
+       * @default false
+       * @example false
+       */
+      includeArchived?: boolean;
     };
     export type RequestBody = never;
     export type RequestHeaders = {};
@@ -7050,6 +7076,42 @@ export namespace Projects {
     export type RequestBody = UpdateProjectDto;
     export type RequestHeaders = {};
     export type ResponseBody = UpdateProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name ArchiveProject
+   * @summary Archive a project
+   * @request POST:/api/projects/{id}/archive
+   * @secure
+   */
+  export namespace ArchiveProject {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ArchiveProjectData;
+  }
+
+  /**
+   * No description
+   * @tags Projects
+   * @name UnarchiveProject
+   * @summary Unarchive a project
+   * @request POST:/api/projects/{id}/unarchive
+   * @secure
+   */
+  export namespace UnarchiveProject {
+    export type RequestParams = {
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = UnarchiveProjectData;
   }
 
   /**
@@ -7996,7 +8058,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -11033,6 +11095,42 @@ export class Api<
         body: data,
         secure: true,
         type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name ArchiveProject
+     * @summary Archive a project
+     * @request POST:/api/projects/{id}/archive
+     * @secure
+     */
+    archiveProject: (id: number, params: RequestParams = {}) =>
+      this.request<ArchiveProjectData, void>({
+        path: `/api/projects/${id}/archive`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Projects
+     * @name UnarchiveProject
+     * @summary Unarchive a project
+     * @request POST:/api/projects/{id}/unarchive
+     * @secure
+     */
+    unarchiveProject: (id: number, params: RequestParams = {}) =>
+      this.request<UnarchiveProjectData, void>({
+        path: `/api/projects/${id}/unarchive`,
+        method: "POST",
+        secure: true,
         format: "json",
         ...params,
       }),

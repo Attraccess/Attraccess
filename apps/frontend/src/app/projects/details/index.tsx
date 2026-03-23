@@ -1,13 +1,16 @@
 import {
   ApiError,
+  useProjectsServiceArchiveProject,
   useProjectsServiceDeleteOneProject,
   useProjectsServiceFindManyProjectsKey,
   useProjectsServiceFindOneProject,
+  useProjectsServiceFindOneProjectKey,
+  useProjectsServiceUnarchiveProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Image, Button, Link } from '@heroui/react';
+import { Skeleton, Image, Button, Link, Chip } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
 import { PageHeader } from '../../../components/pageHeader';
-import { Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
+import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useCallback, useState } from 'react';
@@ -67,6 +70,52 @@ export function ProjectDetailsPage() {
     },
   });
 
+  const { mutate: archiveProject, isPending: isArchiving } = useProjectsServiceArchiveProject({
+    onSuccess: () => {
+      toast.success({
+        title: t('actions.archive.success.title'),
+        description: t('actions.archive.success.description', { name: project?.name ?? '' }),
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useProjectsServiceFindManyProjectsKey],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useProjectsServiceFindOneProjectKey],
+      });
+    },
+    onError: (error) => {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
+  const { mutate: unarchiveProject, isPending: isUnarchiving } = useProjectsServiceUnarchiveProject({
+    onSuccess: () => {
+      toast.success({
+        title: t('actions.unarchive.success.title'),
+        description: t('actions.unarchive.success.description', { name: project?.name ?? '' }),
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useProjectsServiceFindManyProjectsKey],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [useProjectsServiceFindOneProjectKey],
+      });
+    },
+    onError: (error) => {
+      toast.apiError({
+        error: error as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
   const onDeleteProject = useCallback(() => {
     deleteProject({ id: projectId });
   }, [deleteProject, projectId]);
@@ -74,7 +123,20 @@ export function ProjectDetailsPage() {
   return (
     <>
       <PageHeader
-        title={project?.name ?? <Skeleton className="w-full h-4" />}
+        title={
+          project ? (
+            <span className="flex items-center gap-2">
+              {project.name}
+              {project.archivedAt && (
+                <Chip size="sm" variant="flat" color="warning" startContent={<ArchiveIcon className="size-3" />}>
+                  {t('archivedBadge')}
+                </Chip>
+              )}
+            </span>
+          ) : (
+            <Skeleton className="w-full h-4" />
+          )
+        }
         subtitle={project?.description ?? <Skeleton className="w-full h-4" />}
         icon={
           project?.logo ? (
@@ -102,6 +164,27 @@ export function ProjectDetailsPage() {
                   </Button>
                 )}
               </UpsertProjectModal>
+              {project.archivedAt ? (
+                <Button
+                  onPress={() => unarchiveProject({ id: projectId })}
+                  startContent={<ArchiveRestoreIcon className="size-4" />}
+                  variant="light"
+                  color="warning"
+                  isLoading={isUnarchiving}
+                >
+                  {t('actions.unarchive.label')}
+                </Button>
+              ) : (
+                <Button
+                  onPress={() => archiveProject({ id: projectId })}
+                  startContent={<ArchiveIcon className="size-4" />}
+                  variant="light"
+                  color="warning"
+                  isLoading={isArchiving}
+                >
+                  {t('actions.archive.label')}
+                </Button>
+              )}
               <Button
                 onPress={() => setShowDeleteConfirmationModal(true)}
                 startContent={<Trash2Icon className="size-4" />}
