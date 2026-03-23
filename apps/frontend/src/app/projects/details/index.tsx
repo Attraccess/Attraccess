@@ -70,7 +70,7 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { mutate: archiveProject } = useProjectsServiceArchiveProject({
+  const { mutate: archiveProject, isPending: isArchiving } = useProjectsServiceArchiveProject({
     onSuccess: () => {
       toast.success({
         title: t('actions.archive.success.title'),
@@ -93,7 +93,7 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { mutate: unarchiveProject } = useProjectsServiceUnarchiveProject({
+  const { mutate: unarchiveProject, isPending: isUnarchiving } = useProjectsServiceUnarchiveProject({
     onSuccess: () => {
       toast.success({
         title: t('actions.unarchive.success.title'),
@@ -170,6 +170,7 @@ export function ProjectDetailsPage() {
                   startContent={<ArchiveRestoreIcon className="size-4" />}
                   variant="light"
                   color="warning"
+                  isLoading={isUnarchiving}
                 >
                   {t('actions.unarchive.label')}
                 </Button>
@@ -179,6 +180,7 @@ export function ProjectDetailsPage() {
                   startContent={<ArchiveIcon className="size-4" />}
                   variant="light"
                   color="warning"
+                  isLoading={isArchiving}
                 >
                   {t('actions.archive.label')}
                 </Button>
