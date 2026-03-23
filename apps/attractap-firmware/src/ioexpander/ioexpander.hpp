@@ -79,6 +79,10 @@ private:
 #endif
     bool initialized = false;
 
+    // Writes the direction config and current output state to the hardware.
+    // Called from setup() (initial write) and fullRefresh() (recovery re-write).
+    void writeDefaultState();
+
     bool writeRegister(uint8_t reg, uint8_t value);
     bool writeRegisterReliable(uint8_t reg, uint8_t value);
     bool readRegister(uint8_t reg, uint8_t &value);

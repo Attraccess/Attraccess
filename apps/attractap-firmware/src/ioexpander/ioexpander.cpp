@@ -9,67 +9,19 @@ void IOExpander::setup()
 #ifdef IO_EXPANDER_16BIT
     // V4 hardware: XL9555 / PCA9555-compatible 16-bit IO expander.
     // Config registers default to 0xFF (ALL INPUTS).
-    // We MUST write 0x00 to set pins as outputs before output writes take effect.
-
-    // Step 1: Configure all pins as outputs (triple-write for reliability)
-    if (!writeRegisterReliable(IOEXP_REG_CONFIG, 0x00))
-    {
-        logger.error("Failed to write CONFIG port 0 (reg 0x06)");
-    }
-    else
-    {
-        logger.info("CONFIG port 0 = 0x00 (all outputs)");
-    }
-
-    if (!writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00))
-    {
-        logger.error("Failed to write CONFIG port 1 (reg 0x07)");
-    }
-    else
-    {
-        logger.info("CONFIG port 1 = 0x00 (all outputs)");
-    }
-
-    // Step 2: Set output values matching Waveshare official demo
-    outputState = IOEXP_PORT0_DEFAULT; // 0xBF — all high except beeper
-    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
-    {
-        logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
-    }
-    else
-    {
-        logger.infof("OUTPUT port 0 = 0x%02X", outputState);
-    }
-
-    outputState1 = IOEXP_PORT1_DEFAULT; // 0x3A
-    if (!writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1))
-    {
-        logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
-    }
-    else
-    {
-        logger.infof("OUTPUT port 1 = 0x%02X", outputState1);
-    }
-
+    // Set output states to the Waveshare defaults then write all registers.
+    outputState  = IOEXP_PORT0_DEFAULT; // 0xBF — all high except beeper
+    outputState1 = IOEXP_PORT1_DEFAULT; // 0x3A — RS485/CAN/IMU/RTC enables
 #else
-    // V3 hardware: TCA9554 8-bit IO expander
-    // Set initial output: TP_RST released, backlight on, LCD out of reset, beeper off
-    uint8_t out = 0x00;
-    out |= (uint8_t(1 << IOEXP_BIT_TP_RST));
-    out |= (uint8_t(1 << IOEXP_BIT_BACKLIGHT));
-    out |= (uint8_t(1 << IOEXP_BIT_LCD_RST));
-
-    if (!writeRegister(IOEXP_REG_OUTPUT, out))
-    {
-        logger.error("Failed to write IO expander OUTPUT register");
-    }
-    else
-    {
-        logger.infof("IO expander OUTPUT set to 0x%02X", out);
-    }
-
-    outputState = out;
+    // V3 hardware: TCA9554 8-bit IO expander.
+    // TP_RST released, backlight on, LCD out of reset, beeper off.
+    outputState = 0x00;
+    outputState |= (uint8_t(1 << IOEXP_BIT_TP_RST));
+    outputState |= (uint8_t(1 << IOEXP_BIT_BACKLIGHT));
+    outputState |= (uint8_t(1 << IOEXP_BIT_LCD_RST));
 #endif
+
+    writeDefaultState();
 
     initialized = true;
     logger.info("IO expander initialized");
@@ -122,21 +74,11 @@ void IOExpander::resetTouchPanel()
 
 void IOExpander::beeperOn()
 {
-#ifdef IO_EXPANDER_16BIT
-    // Re-write config register before beep — I2C bus traffic from GT911/NFC
-    // can corrupt the IO expander config, reverting pins to inputs.
-    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
-#endif
     setPin(IOEXP_BIT_BEEPER, true);
 }
 
 void IOExpander::beeperOff()
 {
-#ifdef IO_EXPANDER_16BIT
-    // Also re-write config register before turning off — if this write fails,
-    // the beeper stays stuck ON (explains "constant beeping" symptom).
-    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
-#endif
     setPin(IOEXP_BIT_BEEPER, false);
 }
 
@@ -157,6 +99,28 @@ void IOExpander::refreshOutput()
 #endif
 }
 
+void IOExpander::writeDefaultState()
+{
+    // Writes direction config and current output state to hardware.
+    // Called from setup() on first init and from fullRefresh() as a recovery re-write.
+#ifdef IO_EXPANDER_16BIT
+    if (!writeRegisterReliable(IOEXP_REG_CONFIG, 0x00))
+        logger.error("Failed to write CONFIG port 0 (reg 0x06)");
+    if (!writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00))
+        logger.error("Failed to write CONFIG port 1 (reg 0x07)");
+    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
+        logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
+    if (!writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1))
+        logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
+    logger.infof("State written: port0=0x%02X port1=0x%02X", outputState, outputState1);
+#else
+    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
+        logger.error("Failed to write IO expander OUTPUT register");
+    else
+        logger.infof("IO expander OUTPUT set to 0x%02X", outputState);
+#endif
+}
+
 void IOExpander::fullRefresh(bool verbose)
 {
     if (!initialized)
@@ -169,24 +133,10 @@ void IOExpander::fullRefresh(bool verbose)
         logger.info("fullRefresh: re-writing all IO expander registers");
     }
 
-#ifdef IO_EXPANDER_16BIT
-    // Re-write config registers in case I2C bus corruption reset them to defaults
-    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
-    writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00);
-    // Re-write both output ports
-    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
-    writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1);
-#else
-    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
-#endif
+    writeDefaultState();
 
     if (verbose)
     {
-#ifdef IO_EXPANDER_16BIT
-        logger.infof("fullRefresh done: port0=0x%02X port1=0x%02X", outputState, outputState1);
-#else
-        logger.infof("fullRefresh done: port0=0x%02X", outputState);
-#endif
         dumpRegisters();
     }
 }
