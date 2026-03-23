@@ -64,10 +64,8 @@ public:
     void setDisplayBacklight(bool on);
     void resetTouchPanel();
     // Set a single pin on port 0 (bits 0–7). On the 16-bit expander, port 1 pins
-    // (bits 8–15) cannot be set individually — use fullRefresh() or refreshOutput().
+    // (bits 8–15) cannot be set individually — they are only written during setup().
     void setPin(uint8_t bit, bool high);
-    void refreshOutput();
-    void fullRefresh(bool verbose = true);
     void dumpRegisters();
 
 private:
@@ -80,10 +78,9 @@ private:
     bool initialized = false;
 
     // Writes the direction config and current output state to the hardware.
-    // Called from setup() (initial write) and fullRefresh() (recovery re-write).
+    // Called once from setup() during initialisation.
     void writeDefaultState();
 
     bool writeRegister(uint8_t reg, uint8_t value);
-    bool writeRegisterReliable(uint8_t reg, uint8_t value);
     bool readRegister(uint8_t reg, uint8_t &value);
 };

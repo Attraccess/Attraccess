@@ -335,11 +335,11 @@ The comment lists which bits are high but does not explain **what those bits are
 | 4 | `platformio.ini` | ✅ Fixed | Config | `attractap-touch-v2` changed to `LOG_LEVEL=INFO` / `LOGGER_LEVEL_NUM=3` |
 | 5 | all firmware files | ✅ Fixed | Naming | `HAS_IO_EXPANDER_TCA9554` renamed to `HAS_IO_EXPANDER` everywhere |
 | 6 | `ioexpander.cpp` / `ioexpander.hpp` | ✅ Fixed | Bug | `setPin()` documented as port-0 only; runtime `bit > 7` guard added |
-| 7 | `ioexpander.cpp` | ✅ Fixed | SRP / Band-aid | CONFIG re-writes removed from `beeperOn/Off`; needs hardware test |
+| 7 | `ioexpander.cpp` | ✅ Fixed | SRP / Band-aid | CONFIG re-writes removed from `beeperOn/Off`; hardware confirmed stable |
 | 8 | `rgb_gt911_driver.cpp` | ✅ Fixed | Debug leftover | Touch-poll debug log removed |
 | 9 | `rgb_gt911_driver.cpp` | ✅ Fixed | Hardcoding | SDA/SCL pins now use `PIN_TOUCH_I2C_SDA`/`SCL`; `PIN_NFC_I2C_SDA`/`SCL` split added |
-| 10 | `ioexpander.cpp` | 🟠 Major | Design | Triple-write workaround blocks loop, misleading return |
-| 11 | `application.cpp` | 🟠 Major | Design | Silent periodic `fullRefresh()` hides I2C corruption |
+| 10 | `ioexpander.cpp` | ✅ Fixed | Design | `writeRegisterReliable()` removed; all writes use plain `writeRegister()`; hardware confirmed stable |
+| 11 | `application.cpp` | ✅ Fixed | Design | Periodic IO refresh removed entirely — bus proven stable without it |
 | 12 | `beeper.cpp` | ✅ Fixed | Style | Include already at top of file — no change needed |
 | 13 | `beeper.hpp` / `application.cpp` | ✅ Fixed | Design | `Beeper::setup()` gets `= nullptr` default; `application.cpp` consolidated to one `#ifdef HAS_IO_EXPANDER` block |
 | 14 | `ioexpander.cpp` | ✅ Fixed | Debug leftover | `dumpRegisters()` removed from `setup()` |
@@ -400,30 +400,15 @@ Removed from both methods. Flash and verify: beeper beeps on a successful NFC sc
 
 ---
 
-#### Step 3 — Replace the periodic `fullRefresh()` in `loop()` with a targeted output-only write, then remove it
+#### Step 3 — Replace the periodic `fullRefresh()` in `loop()` with a targeted output-only write, then remove it ✅ Done
 
-First, replace `fullRefresh(false)` with a call to `refreshOutput()` (output registers only, no CONFIG re-write):
-
-```cpp
-// application.cpp — change:
-this->ioExpander.fullRefresh(false);
-// to:
-this->ioExpander.refreshOutput();
-```
-
-Flash and observe: if the beeper or backlight state ever goes wrong between the 10 s intervals, that confirms the CONFIG register is still being corrupted at runtime and the problem is not fully solved yet. If everything stays correct, the CONFIG writes in `fullRefresh()` were not needed — then **remove the periodic call entirely**.
-
-**Rationale:** Isolating the CONFIG re-write from the output re-write tells you which one was actually doing the work. `fullRefresh()` was doing both unconditionally, which hid the real question: is it the config that gets corrupted, or the output state, or neither?
+Swapped to `refreshOutput()`, tested stable, then removed the periodic call entirely from `application.cpp`. The I2C bus proved stable with no periodic re-writes of any kind.
 
 ---
 
-#### Step 4 — Downgrade `writeRegisterReliable()` to a single write
+#### Step 4 — Downgrade `writeRegisterReliable()` to a single write ✅ Done — hardware confirmed
 
-Replace all `writeRegisterReliable()` calls with plain `writeRegister()` calls (or remove the `Reliable` wrapper entirely).
-
-**Rationale:** If CONFIG corruption is gone, every I2C write should succeed on the first attempt. The triple-write was masking transient failures; once those are gone it only adds 3 ms of blocking delay per write for no benefit.
-
-> If single writes start failing (check the `writeRegister FAILED` log), this points to a genuine remaining bus issue — investigate pull-up resistor values, bus capacitance, and `Wire.setTimeOut()` before reintroducing retries.
+`writeRegisterReliable()` removed entirely. All I2C writes are now plain single `writeRegister()` calls. Hardware tested: backlight on, beeper correct, NFC reads working, no `writeRegister FAILED` in the log. I2C bus fully stable without any defensive workarounds.
 
 ---
 
