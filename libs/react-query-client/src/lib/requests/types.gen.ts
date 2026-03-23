@@ -1416,7 +1416,7 @@ export type Project = {
     /**
      * The date and time the project was archived
      */
-    archivedAt?: string;
+    archivedAt?: string | null;
     /**
      * The ID of the user that owns the project
      */
@@ -2971,7 +2971,7 @@ export type ProjectWithAccessDto = {
     /**
      * The date and time the project was archived
      */
-    archivedAt?: string;
+    archivedAt?: string | null;
     /**
      * The ID of the user that owns the project
      */
@@ -4778,6 +4778,10 @@ export type GetButtonsResponse = Array<ResourceFlowNode>;
 
 export type FindManyProjectsData = {
     /**
+     * Include archived projects (already finished)
+     */
+    includeArchived?: boolean;
+    /**
      * The number of items per page to retrieve
      */
     limit?: number;
@@ -4785,10 +4789,6 @@ export type FindManyProjectsData = {
      * The page number to retrieve
      */
     page?: number;
-    /**
-     * Include archived projects (already finished)
-     */
-    includeArchived?: boolean;
 };
 
 export type FindManyProjectsResponse = FindManyProjectsResponseDto;
@@ -4817,6 +4817,18 @@ export type UpdateProjectData = {
 };
 
 export type UpdateProjectResponse = ProjectWithAccessDto;
+
+export type ArchiveProjectData = {
+    id: number;
+};
+
+export type ArchiveProjectResponse = ProjectWithAccessDto;
+
+export type UnarchiveProjectData = {
+    id: number;
+};
+
+export type UnarchiveProjectResponse = ProjectWithAccessDto;
 
 export type GetProjectUsageHistoryData = {
     /**
@@ -7490,6 +7502,36 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * The project was updated successfully.
+                 */
+                200: ProjectWithAccessDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/archive': {
+        post: {
+            req: ArchiveProjectData;
+            res: {
+                /**
+                 * The project was archived successfully.
+                 */
+                200: ProjectWithAccessDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/projects/{id}/unarchive': {
+        post: {
+            req: UnarchiveProjectData;
+            res: {
+                /**
+                 * The project was unarchived successfully.
                  */
                 200: ProjectWithAccessDto;
                 /**

@@ -604,6 +604,16 @@ export const useProjectsServiceCreateProject = <TData = Common.ProjectsServiceCr
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   formData: CreateProjectDto;
 }, TContext>({ mutationFn: ({ formData }) => ProjectsService.createProject({ formData }) as unknown as Promise<TData>, ...options });
+export const useProjectsServiceArchiveProject = <TData = Common.ProjectsServiceArchiveProjectMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+}, TContext>({ mutationFn: ({ id }) => ProjectsService.archiveProject({ id }) as unknown as Promise<TData>, ...options });
+export const useProjectsServiceUnarchiveProject = <TData = Common.ProjectsServiceUnarchiveProjectMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  id: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  id: number;
+}, TContext>({ mutationFn: ({ id }) => ProjectsService.unarchiveProject({ id }) as unknown as Promise<TData>, ...options });
 export const useProjectsServiceCreateProjectInvitation = <TData = Common.ProjectsServiceCreateProjectInvitationMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
   id: number;
   requestBody: CreateProjectInvitationDto;

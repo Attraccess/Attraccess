@@ -18,7 +18,7 @@ export function ProjectCard(props: Props) {
           className="w-full object-cover h-[240px] hover:object-contain transition-all duration-300"
           radius="lg"
           shadow="sm"
-          src={filenameToUrl(project.logo)}
+          src={filenameToUrl(project.logo) || '/project-no-thumbnail.svg'}
           width="100%"
         />
       </CardBody>

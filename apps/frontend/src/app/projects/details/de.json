@@ -1,10 +1,11 @@
 {
+  "archivedBadge": "Archiviert",
   "actions": {
     "delete": {
       "label": "Projekt löschen",
       "success": {
         "title": "Projekt erfolgreich gelöscht",
-        "description": "Das Projekt {name} wurde erfolgreich gelöscht"
+        "description": "Das Projekt {{name}} wurde erfolgreich gelöscht"
       }
     },
     "update": {
@@ -12,6 +13,20 @@
     },
     "members": {
       "label": "Mitglieder"
+    },
+    "archive": {
+      "label": "Projekt archivieren",
+      "success": {
+        "title": "Projekt archiviert",
+        "description": "Das Projekt {{name}} wurde erfolgreich archiviert"
+      }
+    },
+    "unarchive": {
+      "label": "Projekt wiederherstellen",
+      "success": {
+        "title": "Projekt wiederhergestellt",
+        "description": "Das Projekt {{name}} wurde erfolgreich wiederhergestellt"
+      }
     },
     "inviteMember": {
       "label": "Mitglied einladen"

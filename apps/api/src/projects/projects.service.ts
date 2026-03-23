@@ -45,9 +45,9 @@ export class ProjectsService {
       .createQueryBuilder('project')
       .leftJoinAndSelect('project.owner', 'owner')
       .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('owner.id = :userId OR member.id IS NOT NULL', { userId });
+      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
 
-    if (!includeArchived) {
+    if (includeArchived !== true) {
       qb.andWhere('project.archivedAt IS NULL');
     }
 
@@ -67,7 +67,7 @@ export class ProjectsService {
       .createQueryBuilder('project')
       .leftJoin('project.owner', 'owner')
       .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('owner.id = :userId OR member.id IS NOT NULL', { userId });
+      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
 
     if (!includeArchived) {
       qb.andWhere('project.archivedAt IS NULL');
@@ -98,6 +98,18 @@ export class ProjectsService {
     }
 
     return project;
+  }
+
+  public async archiveOne(ownerUserId: number, id: number): Promise<Project> {
+    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    project.archivedAt = new Date();
+    return await this.projectRepository.save(project);
+  }
+
+  public async unarchiveOne(ownerUserId: number, id: number): Promise<Project> {
+    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    project.archivedAt = null;
+    return await this.projectRepository.save(project);
   }
 
   public async deleteOne(id: number): Promise<void> {

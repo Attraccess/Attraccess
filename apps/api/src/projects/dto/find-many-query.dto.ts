@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsPositive, IsInt, IsNumber, Min, Max, IsBoolean } from 'class-validator';
+import { IsOptional, IsPositive, IsInt, IsNumber, Min, Max } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ToBoolean } from '../../common/request-transformers';
 
@@ -41,7 +41,6 @@ export class FindManyProjectsQueryDto {
     default: false,
   })
   @IsOptional()
-  @IsBoolean()
   @ToBoolean()
   @Type(() => Boolean)
   includeArchived?: boolean = false;

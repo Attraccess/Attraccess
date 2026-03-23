@@ -2124,7 +2124,8 @@ export const $Project = {
         archivedAt: {
             format: 'date-time',
             type: 'string',
-            description: 'The date and time the project was archived'
+            description: 'The date and time the project was archived',
+            nullable: true
         },
         owner: {
             description: 'The ID of the user that owns the project',
@@ -4588,7 +4589,8 @@ export const $ProjectWithAccessDto = {
         archivedAt: {
             format: 'date-time',
             type: 'string',
-            description: 'The date and time the project was archived'
+            description: 'The date and time the project was archived',
+            nullable: true
         },
         owner: {
             description: 'The ID of the user that owns the project',

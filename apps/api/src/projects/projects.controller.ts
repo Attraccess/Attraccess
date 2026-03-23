@@ -98,6 +98,34 @@ export class ProjectsController {
     await this.projectsService.deleteOne(id);
   }
 
+  @Post(':id/archive')
+  @Auth()
+  @ApiOperation({ summary: 'Archive a project', operationId: 'archiveProject' })
+  @ApiResponse({ status: 200, description: 'The project was archived successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async archive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ProjectWithAccessDto> {
+    await this.projectsService.archiveOne(req.user.id, id);
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
+    return this.transformProject(projectWithAccess);
+  }
+
+  @Post(':id/unarchive')
+  @Auth()
+  @ApiOperation({ summary: 'Unarchive a project', operationId: 'unarchiveProject' })
+  @ApiResponse({ status: 200, description: 'The project was unarchived successfully.', type: ProjectWithAccessDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  async unarchive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ProjectWithAccessDto> {
+    await this.projectsService.unarchiveOne(req.user.id, id);
+    const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
+    return this.transformProject(projectWithAccess);
+  }
+
   @Post()
   @Auth()
   @ApiOperation({ summary: 'Create a project', operationId: 'createProject' })

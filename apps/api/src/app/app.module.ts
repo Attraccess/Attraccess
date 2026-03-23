@@ -101,7 +101,7 @@ import { SettingsService } from '../settings/settings.service';
         return [
           {
             rootPath: resolvedFrontendPath,
-            exclude: ['/api/{*path}', '/docs/{*path}'],
+            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}'],
           },
         ];
       },
