@@ -9,6 +9,5 @@ script = "pnpm install"
 name = "Run"
 icon = "run"
 command = '''
-pnpm install
 pnpm nx run-many -t serve --projects=api,frontend
 '''
