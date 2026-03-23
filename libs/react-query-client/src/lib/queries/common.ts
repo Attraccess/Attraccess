@@ -369,10 +369,11 @@ export const UseResourceFlowsServiceGetButtonsKeyFn = ({ resourceId }: {
 export type ProjectsServiceFindManyProjectsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findManyProjects>>;
 export type ProjectsServiceFindManyProjectsQueryResult<TData = ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectsServiceFindManyProjectsKey = "ProjectsServiceFindManyProjects";
-export const UseProjectsServiceFindManyProjectsKeyFn = ({ limit, page }: {
+export const UseProjectsServiceFindManyProjectsKeyFn = ({ includeArchived, limit, page }: {
+  includeArchived?: boolean;
   limit?: number;
   page?: number;
-} = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ limit, page }])];
+} = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ includeArchived, limit, page }])];
 export type ProjectsServiceFindOneProjectDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findOneProject>>;
 export type ProjectsServiceFindOneProjectQueryResult<TData = ProjectsServiceFindOneProjectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectsServiceFindOneProjectKey = "ProjectsServiceFindOneProject";

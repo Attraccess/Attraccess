@@ -62,7 +62,7 @@ export class ProjectsController {
     @Query() query: FindManyProjectsQueryDto,
   ): Promise<FindManyProjectsResponseDto> {
     const projects = await this.projectsService.findMany(req.user.id, query);
-    const total = await this.projectsService.getTotalCount(req.user.id);
+    const total = await this.projectsService.getTotalCount(req.user.id, query);
 
     let nextPage: number | undefined = query.page + 1;
     if (nextPage * query.limit >= total) {

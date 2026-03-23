@@ -1414,6 +1414,10 @@ export type Project = {
      */
     updatedAt: string;
     /**
+     * The date and time the project was archived
+     */
+    archivedAt?: string;
+    /**
      * The ID of the user that owns the project
      */
     owner: User;
@@ -2964,6 +2968,10 @@ export type ProjectWithAccessDto = {
      * The date and time the NFC card was last updated
      */
     updatedAt: string;
+    /**
+     * The date and time the project was archived
+     */
+    archivedAt?: string;
     /**
      * The ID of the user that owns the project
      */
@@ -4777,6 +4785,10 @@ export type FindManyProjectsData = {
      * The page number to retrieve
      */
     page?: number;
+    /**
+     * Include archived projects (already finished)
+     */
+    includeArchived?: boolean;
 };
 
 export type FindManyProjectsResponse = FindManyProjectsResponseDto;

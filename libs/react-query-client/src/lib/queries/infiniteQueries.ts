@@ -69,10 +69,11 @@ export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = Infin
     nextPage: string;
   }).nextPage, ...options
 });
-export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<Common.ProjectsServiceFindManyProjectsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit }: {
+export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<Common.ProjectsServiceFindManyProjectsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeArchived, limit }: {
+  includeArchived?: boolean;
   limit?: number;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+  queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ includeArchived, limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });

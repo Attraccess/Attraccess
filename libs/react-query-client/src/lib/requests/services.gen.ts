@@ -3067,6 +3067,7 @@ export class ProjectsService {
      * @param data The data for the request.
      * @param data.page The page number to retrieve
      * @param data.limit The number of items per page to retrieve
+     * @param data.includeArchived Include archived projects (already finished)
      * @returns FindManyProjectsResponseDto The list of projects.
      * @throws ApiError
      */
@@ -3076,7 +3077,8 @@ export class ProjectsService {
             url: '/api/projects',
             query: {
                 page: data.page,
-                limit: data.limit
+                limit: data.limit,
+                includeArchived: data.includeArchived
             },
             errors: {
                 401: 'Unauthorized'

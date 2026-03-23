@@ -4,6 +4,10 @@
   "actions": {
     "create": "Create Project"
   },
+  "filters": {
+    "includeArchived": "Show archived projects",
+    "archivedBadge": "Archived"
+  },
   "invitations": {
     "title": "Project invitations",
     "description": "Accept or decline invitations to collaborate on shared projects.",

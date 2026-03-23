@@ -16,6 +16,7 @@ type MockQueryBuilder = {
   leftJoinAndSelect: jest.Mock;
   leftJoin: jest.Mock;
   where: jest.Mock;
+  andWhere: jest.Mock;
   orderBy: jest.Mock;
   addOrderBy: jest.Mock;
   skip: jest.Mock;
@@ -28,6 +29,7 @@ const createMockQueryBuilder = (): MockQueryBuilder => ({
   leftJoinAndSelect: jest.fn().mockReturnThis(),
   leftJoin: jest.fn().mockReturnThis(),
   where: jest.fn().mockReturnThis(),
+  andWhere: jest.fn().mockReturnThis(),
   orderBy: jest.fn().mockReturnThis(),
   addOrderBy: jest.fn().mockReturnThis(),
   skip: jest.fn().mockReturnThis(),
@@ -103,6 +105,7 @@ describe('ProjectsService', () => {
       expect(projectRepository.createQueryBuilder).toHaveBeenCalledWith('project');
       expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('project.owner', 'owner');
       expect(qb.leftJoin).toHaveBeenCalledWith('project.members', 'member', 'member.userId = :userId', { userId: 5 });
+      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
       expect(qb.skip).toHaveBeenCalledWith(10);
       expect(qb.take).toHaveBeenCalledWith(10);
       expect(projectAccessService.addAccessMetadata).toHaveBeenCalledWith(5, [{ id: 1 }]);
@@ -121,6 +124,7 @@ describe('ProjectsService', () => {
       expect(projectRepository.createQueryBuilder).toHaveBeenCalledWith('project');
       expect(qb.leftJoin).toHaveBeenCalledWith('project.owner', 'owner');
       expect(qb.leftJoin).toHaveBeenCalledWith('project.members', 'member', 'member.userId = :userId', { userId: 3 });
+      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
       expect(total).toBe(7);
     });
   });

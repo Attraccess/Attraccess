@@ -2121,6 +2121,11 @@ export const $Project = {
             type: 'string',
             description: 'The date and time the NFC card was last updated'
         },
+        archivedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the project was archived'
+        },
         owner: {
             description: 'The ID of the user that owns the project',
             allOf: [
@@ -4579,6 +4584,11 @@ export const $ProjectWithAccessDto = {
             format: 'date-time',
             type: 'string',
             description: 'The date and time the NFC card was last updated'
+        },
+        archivedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'The date and time the project was archived'
         },
         owner: {
             description: 'The ID of the user that owns the project',

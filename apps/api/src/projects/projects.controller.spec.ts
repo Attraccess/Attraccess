@@ -76,7 +76,7 @@ describe('ProjectsController', () => {
       const result = await controller.findMany(req as AuthenticatedRequest, query);
 
       expect(projectsService.findMany).toHaveBeenCalledWith(1, query);
-      expect(projectsService.getTotalCount).toHaveBeenCalledWith(1);
+      expect(projectsService.getTotalCount).toHaveBeenCalledWith(1, query);
       expect(result.total).toBe(42);
       expect(result.page).toBe(2);
       expect(result.limit).toBe(5);

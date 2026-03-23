@@ -20,6 +20,17 @@ export class Project {
   @ApiProperty({ description: 'The date and time the NFC card was last updated' })
   updatedAt!: Date;
 
+  @Column({
+    type: 'datetime',
+    nullable: true,
+  })
+  @ApiProperty({
+    description: 'The date and time the project was archived',
+    required: false,
+    nullable: true,
+  })
+  archivedAt!: Date | null;
+
   @ManyToOne(() => User, (user) => user.ownedProjects)
   @JoinColumn({ name: 'userId' })
   @ApiProperty({ description: 'The ID of the user that owns the project', type: () => User })

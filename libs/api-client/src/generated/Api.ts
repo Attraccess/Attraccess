@@ -1503,6 +1503,11 @@ export interface Project {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * The date and time the project was archived
+   * @format date-time
+   */
+  archivedAt?: string;
   /** The ID of the user that owns the project */
   owner: User;
   /** The name of the project */
@@ -2915,6 +2920,11 @@ export interface ProjectWithAccessDto {
    * @format date-time
    */
   updatedAt: string;
+  /**
+   * The date and time the project was archived
+   * @format date-time
+   */
+  archivedAt?: string;
   /** The ID of the user that owns the project */
   owner: User;
   /** The name of the project */
@@ -4083,6 +4093,11 @@ export interface FindManyProjectsParams {
    * @example 10
    */
   limit?: number;
+  /**
+   * Include archived projects (already finished)
+   * @example false
+   */
+  includeArchived?: boolean;
 }
 
 export type FindManyProjectsData = FindManyProjectsResponseDto;
