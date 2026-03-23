@@ -1,3 +1,36 @@
+## 1.4.0 (2026-01-31)
+
+### 🚀 Features
+
+- **ATT-184:** SSO SAML support v2 ([#354](https://github.com/Attraccess/Attraccess/pull/354))
+- SSO integration enrichment ([#422](https://github.com/Attraccess/Attraccess/pull/422))
+- SSO username conversion ([#425](https://github.com/Attraccess/Attraccess/pull/425))
+- **ATT-241:** upgrade SSO users from v1.2 requires linking via password ([#438](https://github.com/Attraccess/Attraccess/pull/438))
+- 2FA requirement and setup ([#420](https://github.com/Attraccess/Attraccess/pull/420))
+- account 2FA security ([#408](https://github.com/Attraccess/Attraccess/pull/408))
+- **ATT-169:** project tracking — change project of a usage session after it finished ([#411](https://github.com/Attraccess/Attraccess/pull/411))
+- **ATT-202:** Attractap Lite ([#394](https://github.com/Attraccess/Attraccess/pull/394))
+- **ATT-138:** NFC reader ethernet support ([#392](https://github.com/Attraccess/Attraccess/pull/392))
+- NFC reader wifi dropdown ([#413](https://github.com/Attraccess/Attraccess/pull/413))
+- user email change ([#414](https://github.com/Attraccess/Attraccess/pull/414))
+- metadata per resource ([#409](https://github.com/Attraccess/Attraccess/pull/409))
+- **ATT-32:** delete user ([#404](https://github.com/Attraccess/Attraccess/pull/404))
+
+### 🩹 Fixes
+
+- Dockerfile user security ([#416](https://github.com/Attraccess/Attraccess/pull/416))
+
+### 🔧 Maintenance
+
+- **ATT-205:** restructured and flattened the main navigation system ([#391](https://github.com/Attraccess/Attraccess/pull/391))
+- optimised the beeping patterns of Attractap to be more intuitive ([#398](https://github.com/Attraccess/Attraccess/pull/398))
+- higher contrast UI improvements ([#397](https://github.com/Attraccess/Attraccess/pull/397))
+- pin GitHub Actions to commit SHAs ([#417](https://github.com/Attraccess/Attraccess/pull/417))
+- migration rollback test ([#410](https://github.com/Attraccess/Attraccess/pull/410))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
 ## 1.3.0 (2025-12-21)
 
 ### 🚀 Features
