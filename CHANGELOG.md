@@ -1,3 +1,81 @@
+## 1.5.0 (2026-03-09)
+
+### 🚀 Features
+
+- **ATT-254:** propagate flow errors to Attractap on door actions ([#484](https://github.com/Attraccess/Attraccess/pull/484))
+- **ATT-246:** test SMTP email settings before saving ([#483](https://github.com/Attraccess/Attraccess/pull/483))
+- **ATT-250:** OIDC/SSO use state parameter instead of redirect ([#469](https://github.com/Attraccess/Attraccess/pull/469))
+- ContextPlus integration ([#474](https://github.com/Attraccess/Attraccess/pull/474))
+- enhance SSO provider setup ([#457](https://github.com/Attraccess/Attraccess/pull/457))
+- **ATT-48:** resource maintenance schedules ([#464](https://github.com/Attraccess/Attraccess/pull/464))
+- sensitive data encryption ([#448](https://github.com/Attraccess/Attraccess/pull/448))
+- flows import/export ([#442](https://github.com/Attraccess/Attraccess/pull/442))
+- fixed id/guid for docker user in non-system range ([#458](https://github.com/Attraccess/Attraccess/pull/458))
+- mapped SSO permissions disable ([#444](https://github.com/Attraccess/Attraccess/pull/444))
+- settings database migration ([#445](https://github.com/Attraccess/Attraccess/pull/445))
+- React compiler migration ([#446](https://github.com/Attraccess/Attraccess/pull/446))
+- upgrade notes in docs ([#439](https://github.com/Attraccess/Attraccess/pull/439))
+
+### 🩹 Fixes
+
+- close mobile sidebar on route navigation ([#479](https://github.com/Attraccess/Attraccess/pull/479))
+- stop logging raw email verification token ([#480](https://github.com/Attraccess/Attraccess/pull/480))
+- add pointer cursor to collapsible sidebar nav items ([03ecab2](https://github.com/Attraccess/Attraccess/commit/03ecab2))
+- move GitHub corner to top-left to avoid overlap with toggles ([91febd2](https://github.com/Attraccess/Attraccess/commit/91febd2))
+- remove background-attachment fixed to prevent scroll stutter ([c5a0e35](https://github.com/Attraccess/Attraccess/commit/c5a0e35))
+- match docs theme to app styling with proper dark/light mode contrast ([5f548bd](https://github.com/Attraccess/Attraccess/commit/5f548bd))
+- resolve i18n routing bug causing 404 by doubled language prefix ([085bdaa](https://github.com/Attraccess/Attraccess/commit/085bdaa))
+- user invite popup state ([#440](https://github.com/Attraccess/Attraccess/pull/440))
+
+### 📖 Documentation
+
+- add v2 documentation with docsify ([#476](https://github.com/Attraccess/Attraccess/pull/476))
+- add mobile responsive design for documentation site ([#477](https://github.com/Attraccess/Attraccess/pull/477))
+
+### 🔧 Maintenance
+
+- split and parallelize GitHub Actions pipelines ([#482](https://github.com/Attraccess/Attraccess/pull/482))
+- run pnpm precommit and enforce clean tree ([#450](https://github.com/Attraccess/Attraccess/pull/450))
+- update API client, OpenAPI config, README, and add dev setup scripts ([#468](https://github.com/Attraccess/Attraccess/pull/468))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
+## 1.4.0 (2026-01-31)
+
+### 🚀 Features
+
+- **ATT-184:** SSO SAML support v2 ([#354](https://github.com/Attraccess/Attraccess/pull/354))
+- SSO integration enrichment ([#422](https://github.com/Attraccess/Attraccess/pull/422))
+- SSO username conversion ([#425](https://github.com/Attraccess/Attraccess/pull/425))
+- **ATT-241:** upgrade SSO users from v1.2 requires linking via password ([#438](https://github.com/Attraccess/Attraccess/pull/438))
+- 2FA requirement and setup ([#420](https://github.com/Attraccess/Attraccess/pull/420))
+- account 2FA security ([#408](https://github.com/Attraccess/Attraccess/pull/408))
+- **ATT-169:** project tracking — change project of a usage session after it finished ([#411](https://github.com/Attraccess/Attraccess/pull/411))
+- **ATT-202:** Attractap Lite ([#394](https://github.com/Attraccess/Attraccess/pull/394))
+- **ATT-138:** NFC reader ethernet support ([#392](https://github.com/Attraccess/Attraccess/pull/392))
+- NFC reader wifi dropdown ([#413](https://github.com/Attraccess/Attraccess/pull/413))
+- user email change ([#414](https://github.com/Attraccess/Attraccess/pull/414))
+- metadata per resource ([#409](https://github.com/Attraccess/Attraccess/pull/409))
+- **ATT-32:** delete user ([#404](https://github.com/Attraccess/Attraccess/pull/404))
+
+### 🩹 Fixes
+
+- Dockerfile user security ([#416](https://github.com/Attraccess/Attraccess/pull/416))
+
+### 🔧 Maintenance
+
+- **ATT-205:** restructured and flattened the main navigation system ([#391](https://github.com/Attraccess/Attraccess/pull/391))
+- optimised the beeping patterns of Attractap to be more intuitive ([#398](https://github.com/Attraccess/Attraccess/pull/398))
+- higher contrast UI improvements ([#397](https://github.com/Attraccess/Attraccess/pull/397))
+- pin GitHub Actions to commit SHAs ([#417](https://github.com/Attraccess/Attraccess/pull/417))
+- migration rollback test ([#410](https://github.com/Attraccess/Attraccess/pull/410))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.3.0 (2025-12-21)
 
 ### 🚀 Features

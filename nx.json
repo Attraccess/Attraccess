@@ -192,7 +192,6 @@
       "commitMessage": "chore(release): {version} [skip ci]"
     },
     "version": {
-      "preVersionCommand": "pnpm nx run-many -t build",
       "conventionalCommits": true
     },
     "changelog": {

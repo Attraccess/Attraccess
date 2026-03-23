@@ -1,0 +1,49 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      specifier:
+        description: 'Version: "major", "minor", "patch", or exact like "2.0.0"'
+        required: true
+        type: string
+      dry-run:
+        description: 'Preview changes without creating a release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Configure npm auth
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
+
+      - name: Run NX Release (dry run)
+        if: inputs.dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: pnpm nx release ${{ inputs.specifier }} --dry-run --yes
+
+      - name: Run NX Release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: pnpm nx release ${{ inputs.specifier }} --yes
