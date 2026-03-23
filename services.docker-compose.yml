@@ -1,6 +1,6 @@
 services:
   mailpit:
-    image: axllent/mailpit:v1.28.3
+    image: axllent/mailpit:v1.29.4
     ports:
       - '8025:8025'
       - '1025:1025'
@@ -17,7 +17,7 @@ services:
       - bunkerm:/bunkerm/data # persistent data storage
 
   webhook-site:
-    image: tarampampam/webhook-tester:2.2.5
+    image: tarampampam/webhook-tester:2.2.6
     environment:
       - STORAGE_DRIVER=fs
       - FS_STORAGE_DIR=/storage
@@ -27,7 +27,7 @@ services:
       - webhook-site:/storage
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.5.1
+    image: quay.io/keycloak/keycloak:26.5.6
     command: start-dev
     environment:
       - KEYCLOAK_ADMIN=admin
@@ -44,7 +44,7 @@ services:
       retries: 3
 
   authentik-postgresql:
-    image: docker.io/library/postgres:16.11-alpine
+    image: docker.io/library/postgres:16.13-alpine
     restart: unless-stopped
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -d authentik -U authentik']
@@ -60,7 +60,7 @@ services:
       POSTGRES_DB: authentik
 
   authentik-redis:
-    image: docker.io/library/redis:8.4.0-alpine
+    image: docker.io/library/redis:8.0.6-alpine
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
@@ -125,7 +125,7 @@ services:
         condition: service_healthy
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.7.2
+    image: ghcr.io/koenkk/zigbee2mqtt:2.9.1
     restart: unless-stopped
     expose:
       - '8080'
