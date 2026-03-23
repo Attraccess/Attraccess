@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   proxy:
-    image: 'jc21/nginx-proxy-manager:latest'
+    image: 'jc21/nginx-proxy-manager:2.14.0'
     restart: unless-stopped
     ports:
       - '80:80' # HTTP
@@ -34,7 +34,7 @@ services:
       - .env.docker-compose
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.29.4
     restart: unless-stopped
     expose:
       - '8025'
@@ -43,7 +43,7 @@ services:
       - .env.docker-compose
 
   webhook-site:
-    image: tarampampam/webhook-tester:latest
+    image: tarampampam/webhook-tester:2.2.6
     restart: unless-stopped
     expose:
       - '80'
@@ -56,7 +56,7 @@ services:
       - .env.docker-compose
 
   rabbitmq:
-    image: rabbitmq:4-management
+    image: rabbitmq:4.2.5-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -82,7 +82,7 @@ services:
       interval: 30s
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt
+    image: ghcr.io/koenkk/zigbee2mqtt:2.9.1
     restart: unless-stopped
     expose:
       - '8080'
@@ -111,7 +111,7 @@ services:
       - .env.docker-compose
 
   duplicati:
-    image: duplicati/duplicati:latest
+    image: duplicati/duplicati:2.2.0.3-stable
     expose:
       - '8200'
     volumes:
