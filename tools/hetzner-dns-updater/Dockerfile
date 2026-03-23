@@ -5,7 +5,7 @@ RUN addgroup -S appuser && adduser -S -G appuser -h /app appuser
 
 WORKDIR /app
 
-# Copy script only (no dependencies needed beyond Node 20+ which has fetch)
+# Copy script only (no dependencies needed beyond Node 24+ which has fetch)
 COPY update-hetzner.js /usr/local/bin/update-hetzner.js
 
 RUN chown appuser:appuser /usr/local/bin/update-hetzner.js
