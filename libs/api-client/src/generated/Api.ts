@@ -1182,10 +1182,10 @@ export interface UpdateSmtpSettingsDto {
    */
   secure?: boolean;
   /**
-   * SMTP username.
+   * SMTP username. Omit or set to null for servers that do not require authentication.
    * @example "no-reply@example.com"
    */
-  user: string;
+  user?: string | null;
   /**
    * SMTP password.
    * @example "secret"
@@ -7996,7 +7996,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 0.0.16
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
