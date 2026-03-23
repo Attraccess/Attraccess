@@ -405,18 +405,6 @@ void Application::loop()
 
     this->api.loop();
 
-#ifdef HAS_IO_EXPANDER
-    // Periodically re-write all IO expander registers to catch state drift
-    // Periodically re-write output registers only (no CONFIG re-write) to verify
-    // the output state is holding without needing full direction-register recovery.
-    static unsigned long lastIoRefresh = 0;
-    if (millis() - lastIoRefresh > 10000)
-    {
-        lastIoRefresh = millis();
-        this->ioExpander.refreshOutput();
-    }
-#endif
-
     this->processState();
 }
 
@@ -483,6 +471,12 @@ void Application::processState()
         this->resetSessionOnDisconnect();
 #endif
         if (this->state == APPLICATION_STATE_INIT)
+        {
+            return;
+        }
+
+        // User intentionally opened settings from the init screen — don't force back to init.
+        if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
             return;
         }

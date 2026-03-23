@@ -54,7 +54,7 @@ void IOExpander::setPin(uint8_t bit, bool high)
     }
 
     logger.debugf("setPin: bit=%d high=%d → outputState=0x%02X", bit, high, outputState);
-    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
+    writeRegister(IOEXP_REG_OUTPUT, outputState);
 }
 
 void IOExpander::resetTouchPanel()
@@ -87,59 +87,28 @@ void IOExpander::setDisplayBacklight(bool on)
     setPin(IOEXP_BIT_BACKLIGHT, on);
 }
 
-void IOExpander::refreshOutput()
-{
-    if (!initialized)
-    {
-        return;
-    }
-    writeRegisterReliable(IOEXP_REG_OUTPUT, outputState);
-#ifdef IO_EXPANDER_16BIT
-    writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1);
-#endif
-}
-
 void IOExpander::writeDefaultState()
 {
     // Writes direction config and current output state to hardware.
     // Called from setup() on first init and from fullRefresh() as a recovery re-write.
 #ifdef IO_EXPANDER_16BIT
-    if (!writeRegisterReliable(IOEXP_REG_CONFIG, 0x00))
+    if (!writeRegister(IOEXP_REG_CONFIG, 0x00))
         logger.error("Failed to write CONFIG port 0 (reg 0x06)");
-    if (!writeRegisterReliable(IOEXP_REG_CONFIG_1, 0x00))
+    if (!writeRegister(IOEXP_REG_CONFIG_1, 0x00))
         logger.error("Failed to write CONFIG port 1 (reg 0x07)");
-    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
+    if (!writeRegister(IOEXP_REG_OUTPUT, outputState))
         logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
-    if (!writeRegisterReliable(IOEXP_REG_OUTPUT_1, outputState1))
+    if (!writeRegister(IOEXP_REG_OUTPUT_1, outputState1))
         logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
     logger.infof("State written: port0=0x%02X port1=0x%02X", outputState, outputState1);
 #else
-    if (!writeRegisterReliable(IOEXP_REG_OUTPUT, outputState))
+    if (!writeRegister(IOEXP_REG_OUTPUT, outputState))
         logger.error("Failed to write IO expander OUTPUT register");
     else
         logger.infof("IO expander OUTPUT set to 0x%02X", outputState);
 #endif
 }
 
-void IOExpander::fullRefresh(bool verbose)
-{
-    if (!initialized)
-    {
-        return;
-    }
-
-    if (verbose)
-    {
-        logger.info("fullRefresh: re-writing all IO expander registers");
-    }
-
-    writeDefaultState();
-
-    if (verbose)
-    {
-        dumpRegisters();
-    }
-}
 
 void IOExpander::dumpRegisters()
 {
@@ -183,22 +152,6 @@ void IOExpander::dumpRegisters()
 #endif
 
     logger.info("=== End Register Dump ===");
-}
-
-bool IOExpander::writeRegisterReliable(uint8_t reg, uint8_t value)
-{
-    // Write the same register 3 times with 1ms delays between writes.
-    // On a noisy I2C bus (shared with GT911 touch + PN532 NFC via DFR1185),
-    // individual writes can silently fail. Triple-write dramatically increases
-    // the probability that at least one write succeeds.
-    bool anyOk = false;
-    for (int attempt = 0; attempt < 3; attempt++)
-    {
-        if (writeRegister(reg, value))
-            anyOk = true;
-        delay(1);
-    }
-    return anyOk;
 }
 
 bool IOExpander::writeRegister(uint8_t reg, uint8_t value)
