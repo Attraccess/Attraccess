@@ -307,11 +307,9 @@ No comment explains why the duration was doubled. This could be a tuning decisio
 
 ---
 
-### 23. DRY: `fullRefresh()` duplicates the initialisation sequence from `setup()`
+### 23. DRY: `fullRefresh()` duplicates the initialisation sequence from `setup()` ✅ Fixed
 
-The V4 path in `setup()` writes CONFIG registers and initial OUTPUT values. `fullRefresh()` does the exact same CONFIG + OUTPUT writes. The logic is not shared — it is duplicated. If the default port values or register addresses change, they must be updated in two places.
-
-**Action:** Extract a private `writeDefaultState()` helper and call it from both `setup()` and `fullRefresh()`.
+Extracted a private `writeDefaultState()` helper that writes the CONFIG direction registers and current output state to hardware. `setup()` now sets `outputState`/`outputState1` to defaults and calls it; `fullRefresh()` calls it with the live output state. Error logging is consolidated in `writeDefaultState()` rather than duplicated in both callers.
 
 ---
 
@@ -337,7 +335,7 @@ The comment lists which bits are high but does not explain **what those bits are
 | 4 | `platformio.ini` | ✅ Fixed | Config | `attractap-touch-v2` changed to `LOG_LEVEL=INFO` / `LOGGER_LEVEL_NUM=3` |
 | 5 | all firmware files | ✅ Fixed | Naming | `HAS_IO_EXPANDER_TCA9554` renamed to `HAS_IO_EXPANDER` everywhere |
 | 6 | `ioexpander.cpp` / `ioexpander.hpp` | ✅ Fixed | Bug | `setPin()` documented as port-0 only; runtime `bit > 7` guard added |
-| 7 | `ioexpander.cpp` | 🟠 Major | SRP / Band-aid | CONFIG re-write duplicated inside `beeperOn/Off` |
+| 7 | `ioexpander.cpp` | ✅ Fixed | SRP / Band-aid | CONFIG re-writes removed from `beeperOn/Off`; needs hardware test |
 | 8 | `rgb_gt911_driver.cpp` | ✅ Fixed | Debug leftover | Touch-poll debug log removed |
 | 9 | `rgb_gt911_driver.cpp` | ✅ Fixed | Hardcoding | SDA/SCL pins now use `PIN_TOUCH_I2C_SDA`/`SCL`; `PIN_NFC_I2C_SDA`/`SCL` split added |
 | 10 | `ioexpander.cpp` | 🟠 Major | Design | Triple-write workaround blocks loop, misleading return |
@@ -353,7 +351,7 @@ The comment lists which bits are high but does not explain **what those bits are
 | 20 | `platformio.ini` | ✅ Fixed | Correctness | Confirmed FT6206 is correct for Qualia board; added comment to `platformio.ini` |
 | 21 | `application.cpp` | ✅ Fixed | Debug leftover | `[INIT]` timing logs removed |
 | 22 | `beeper.cpp` | ✅ Fixed | Unexplained change | Added comment: 200ms needed for passive buzzer on V4 (V3 used 100ms) |
-| 23 | `ioexpander.cpp` | 🟡 Minor | DRY | `fullRefresh()` duplicates `setup()` register sequence |
+| 23 | `ioexpander.cpp` | ✅ Fixed | DRY | `writeDefaultState()` extracted; called from both `setup()` and `fullRefresh()` |
 | 24 | `ioexpander.hpp` | ✅ Fixed | Documentation | `IOEXP_PORT1_DEFAULT` now has per-bit comments with TODO to verify against schematic |
 
 ---
@@ -386,25 +384,17 @@ The ideal end state is:
 
 Work through these steps in order on real hardware. If everything still functions correctly (backlight on, touch works, NFC reads, beeper beeps on tap and is silent otherwise), proceed to the next step.
 
-#### Step 1 — Remove the one-shot `fullRefresh()` at the end of `setup()`
+#### Step 1 — Remove the one-shot `fullRefresh()` at the end of `setup()` ✅ Done — needs hardware test
 
-```cpp
-// application.cpp — remove this block:
-this->ioExpander.fullRefresh();
-```
+Removed from `application.cpp`. Flash and verify: backlight on, touch works, NFC reads on first scan after boot. If yes, proceed to Step 2.
 
 **Rationale:** This was added because GT911 probing was suspected to corrupt the expander state during init. The new pin defines and corrected init order (touch reset via IO expander → touch init → display init) may have fixed the underlying cause. If the hardware comes up cleanly without this, the corruption during init is no longer happening.
 
 ---
 
-#### Step 2 — Remove CONFIG re-writes from `beeperOn()` / `beeperOff()`
+#### Step 2 — Remove CONFIG re-writes from `beeperOn()` / `beeperOff()` ✅ Done — needs hardware test
 
-```cpp
-// ioexpander.cpp — remove from both methods:
-#ifdef IO_EXPANDER_16BIT
-    writeRegisterReliable(IOEXP_REG_CONFIG, 0x00);
-#endif
-```
+Removed from both methods. Flash and verify: beeper beeps on a successful NFC scan, doesn't get stuck on or go silent after repeated scans. If yes, proceed to Step 3.
 
 **Rationale:** If Step 1 passed, the CONFIG register is stable after init. Writing it on every beep is unnecessary. Removing it also makes `beeperOn/Off` single-responsibility again.
 

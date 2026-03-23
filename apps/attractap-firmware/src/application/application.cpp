@@ -46,13 +46,6 @@ void Application::setup()
 
     this->nfc.setup();
 
-#ifdef HAS_IO_EXPANDER
-    // Rewrite IO expander registers after display and NFC init.
-    // GT911 probing and I2C bus activity during init can corrupt
-    // the IO expander CONFIG/OUTPUT registers on V4 hardware.
-    this->ioExpander.fullRefresh();
-#endif
-
     this->api.setup();
 
 #ifdef HAS_LVGL_DISPLAY
@@ -414,12 +407,13 @@ void Application::loop()
 
 #ifdef HAS_IO_EXPANDER
     // Periodically re-write all IO expander registers to catch state drift
-    // caused by I2C bus corruption from GT911/PN532 traffic.
+    // Periodically re-write output registers only (no CONFIG re-write) to verify
+    // the output state is holding without needing full direction-register recovery.
     static unsigned long lastIoRefresh = 0;
     if (millis() - lastIoRefresh > 10000)
     {
         lastIoRefresh = millis();
-        this->ioExpander.fullRefresh(false); // quiet — no register dump
+        this->ioExpander.refreshOutput();
     }
 #endif
 
