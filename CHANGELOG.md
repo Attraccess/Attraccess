@@ -1,3 +1,13 @@
+## 1.5.1 (2026-03-25)
+
+### 🩹 Fixes
+
+- allow SSO re-linking when provider issuer URL changes (ATT-259) ([f0250c2](https://github.com/Attraccess/Attraccess/commit/f0250c2))
+
+### ❤️ Thank You
+
+- Jan Jaap
+
 ## 1.5.0 (2026-03-09)
 
 ### 🚀 Features

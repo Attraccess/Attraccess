@@ -162,6 +162,16 @@ export class AuthService {
     return count > 0;
   }
 
+  async findSSOAuthenticationDetail(userId: number): Promise<AuthenticationDetail | null> {
+    return this.authenticationDetailRepository.findOne({
+      where: { userId, type: AuthenticationType.SSO },
+    });
+  }
+
+  async updateSSOSubject(detailId: number, ssoSubject: string): Promise<void> {
+    await this.authenticationDetailRepository.update(detailId, { ssoSubject });
+  }
+
   async removeLocalPasswordAuthentication(userId: number): Promise<void> {
     const detail = await this.authenticationDetailRepository.findOne({
       where: { userId, type: AuthenticationType.LOCAL_PASSWORD },
