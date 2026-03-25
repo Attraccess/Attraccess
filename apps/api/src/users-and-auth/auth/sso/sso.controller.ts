@@ -94,8 +94,8 @@ export class SSOController {
       throw new UnauthorizedException();
     }
 
-    const hasSSO = await this.authService.userHasSSOAuthentication(user.id);
-    if (hasSSO) {
+    const existingSSODetail = await this.authService.findSSOAuthenticationDetail(user.id);
+    if (existingSSODetail && existingSSODetail.providerId !== linkPayload.providerId) {
       throw new BadRequestException('SSO_ALREADY_LINKED');
     }
 
@@ -124,17 +124,23 @@ export class SSOController {
       throw new BadRequestException('SSO_SUBJECT_ALREADY_LINKED');
     }
 
-    await this.authService.addAuthenticationDetails(user.id, {
-      type: AuthenticationType.SSO,
-      details: {
-        providerType: linkPayload.providerType,
-        providerId: linkPayload.providerId,
-        subject: linkPayload.ssoSubject,
-      },
-    });
+    if (existingSSODetail) {
+      await this.authService.updateSSOSubject(existingSSODetail.id, linkPayload.ssoSubject);
+    } else {
+      await this.authService.addAuthenticationDetails(user.id, {
+        type: AuthenticationType.SSO,
+        details: {
+          providerType: linkPayload.providerType,
+          providerId: linkPayload.providerId,
+          subject: linkPayload.ssoSubject,
+        },
+      });
+    }
 
     // Remove local password to enforce SSO-only after linking
-    await this.authService.removeAuthenticationDetails(localAuth.id);
+    if (localAuth) {
+      await this.authService.removeAuthenticationDetails(localAuth.id);
+    }
     await this.usersService.updateOne(user.id, { externalIdentifier: null });
 
     return { OK: true };

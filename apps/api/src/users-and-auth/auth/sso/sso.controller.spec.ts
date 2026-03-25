@@ -83,6 +83,8 @@ describe('SsoController', () => {
           provide: AuthService,
           useValue: {
             userHasSSOAuthentication: jest.fn(),
+            findSSOAuthenticationDetail: jest.fn(),
+            updateSSOSubject: jest.fn(),
             validateAuthenticationDetails: jest.fn(),
             findUserIdBySSO: jest.fn(),
             addAuthenticationDetails: jest.fn(),
@@ -263,77 +265,222 @@ describe('SsoController', () => {
     };
 
     function setupLinkMocks({
-      hasSSO = false,
+      existingSSODetail = null as AuthenticationDetail | null,
       passwordOk = true,
       ssoSubjectExistsForOtherUser = false,
       hasLocalPassword = true,
+      userExists = true,
+      payload = linkPayload,
     } = {}) {
       const authService = module.get<AuthService>(AuthService);
       const usersService = module.get<UsersService>(UsersService);
 
-      (linkTokenService.verify as jest.Mock).mockResolvedValue(linkPayload);
-      (authService.userHasSSOAuthentication as jest.Mock | undefined)?.mockResolvedValue(hasSSO);
-      (authService.validateAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(passwordOk);
-      (authService.findUserIdBySSO as jest.Mock | undefined)?.mockResolvedValue(
+      (linkTokenService.verify as jest.Mock).mockResolvedValue(payload);
+      (authService.findSSOAuthenticationDetail as jest.Mock).mockResolvedValue(existingSSODetail);
+      (authService.updateSSOSubject as jest.Mock).mockResolvedValue(undefined);
+      (authService.validateAuthenticationDetails as jest.Mock).mockResolvedValue(passwordOk);
+      (authService.findUserIdBySSO as jest.Mock).mockResolvedValue(
         ssoSubjectExistsForOtherUser ? 999 : null,
       );
-      (authService.addAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(undefined);
-      (authService.removeAuthenticationDetails as jest.Mock | undefined)?.mockResolvedValue(undefined);
-      (usersService.updateOne as jest.Mock | undefined)?.mockResolvedValue(undefined);
+      (authService.addAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
+      (authService.removeAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
+      (usersService.updateOne as jest.Mock).mockResolvedValue(undefined);
 
-      const user = {
-        ...baseUser,
-        authenticationDetails: hasLocalPassword ? baseUser.authenticationDetails : [],
-      };
-      (usersService.findOne as jest.Mock | undefined)?.mockResolvedValue(user);
+      const user = userExists
+        ? {
+            ...baseUser,
+            authenticationDetails: hasLocalPassword ? baseUser.authenticationDetails : [],
+          }
+        : null;
+      (usersService.findOne as jest.Mock).mockResolvedValue(user);
 
       return { authService, usersService };
     }
 
-    it('links when password is valid, no prior SSO, and removes local password', async () => {
-      const { authService, usersService } = setupLinkMocks();
+    describe('fresh linking (no prior SSO)', () => {
+      it('links when password is valid and removes local password', async () => {
+        const { authService, usersService } = setupLinkMocks();
 
-      const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
 
-      expect(result).toEqual({ OK: true });
-      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(baseUser.id, {
-        type: AuthenticationType.SSO,
-        details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'sub-123' },
+        expect(result).toEqual({ OK: true });
+        expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(baseUser.id, {
+          type: AuthenticationType.SSO,
+          details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'sub-123' },
+        });
+        expect(authService.updateSSOSubject).not.toHaveBeenCalled();
+        expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
+        expect(usersService.updateOne).toHaveBeenCalledWith(baseUser.id, { externalIdentifier: null });
       });
-      expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
-      expect(usersService.updateOne).toHaveBeenCalledWith(baseUser.id, { externalIdentifier: null });
+
+      it('verifies link token', async () => {
+        setupLinkMocks();
+
+        await controller.linkUserToExternalAccount({ linkToken: 'my-token', password: 'secret' });
+
+        expect(linkTokenService.verify).toHaveBeenCalledWith('my-token');
+      });
+
+      it('looks up user by email from link payload', async () => {
+        const { usersService } = setupLinkMocks();
+
+        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+
+        expect(usersService.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
+      });
     });
 
-    it('rejects when user already has SSO binding', async () => {
-      setupLinkMocks({ hasSSO: true });
+    describe('re-linking (same provider, changed subject)', () => {
+      const existingSSODetailSameProvider: AuthenticationDetail = {
+        id: 20,
+        userId: 42,
+        type: AuthenticationType.SSO,
+        providerType: SSOProviderType.OIDC,
+        providerId: 1,
+        ssoSubject: 'old-sub-from-test-idp',
+      } as AuthenticationDetail;
 
-      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-        BadRequestException,
-      );
+      it('updates ssoSubject when re-linking to the same provider', async () => {
+        const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
+
+        const result = await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+
+        expect(result).toEqual({ OK: true });
+        expect(authService.updateSSOSubject).toHaveBeenCalledWith(20, 'sub-123');
+        expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
+      });
+
+      it('still validates password before updating subject', async () => {
+        const { authService } = setupLinkMocks({
+          existingSSODetail: existingSSODetailSameProvider,
+          passwordOk: false,
+        });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }),
+        ).rejects.toThrow(UnauthorizedException);
+
+        expect(authService.updateSSOSubject).not.toHaveBeenCalled();
+      });
+
+      it('removes local password after re-linking', async () => {
+        const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
+
+        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+
+        expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
+      });
+
+      it('clears externalIdentifier after re-linking', async () => {
+        const { usersService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
+
+        await controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+
+        expect(usersService.updateOne).toHaveBeenCalledWith(42, { externalIdentifier: null });
+      });
+
+      it('rejects re-linking if new subject is already bound to another user', async () => {
+        const { authService } = setupLinkMocks({
+          existingSSODetail: existingSSODetailSameProvider,
+          ssoSubjectExistsForOtherUser: true,
+        });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(authService.updateSSOSubject).not.toHaveBeenCalled();
+      });
     });
 
-    it('rejects when no local password is present', async () => {
-      setupLinkMocks({ hasLocalPassword: false });
+    describe('cross-provider rejection', () => {
+      const existingSSODetailDifferentProvider: AuthenticationDetail = {
+        id: 30,
+        userId: 42,
+        type: AuthenticationType.SSO,
+        providerType: SSOProviderType.SAML,
+        providerId: 2,
+        ssoSubject: 'saml-sub-456',
+      } as AuthenticationDetail;
 
-      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-        BadRequestException,
-      );
+      it('rejects linking when user is already linked to a different provider', async () => {
+        const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
+        expect(authService.updateSSOSubject).not.toHaveBeenCalled();
+      });
+
+      it('throws SSO_ALREADY_LINKED error message for cross-provider linking', async () => {
+        setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('SSO_ALREADY_LINKED');
+      });
+
+      it('does not validate password when rejecting cross-provider link', async () => {
+        const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
+      });
     });
 
-    it('rejects when password verification fails', async () => {
-      setupLinkMocks({ passwordOk: false });
+    describe('error conditions', () => {
+      it('throws UnauthorizedException when user not found by email', async () => {
+        setupLinkMocks({ userExists: false });
 
-      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(UnauthorizedException);
+      });
 
-    it('rejects when SSO subject is already linked to another user', async () => {
-      setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
+      it('rejects when no local password is present', async () => {
+        setupLinkMocks({ hasLocalPassword: false });
 
-      await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
-        BadRequestException,
-      );
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws PASSWORD_REQUIRED when no local password exists', async () => {
+        setupLinkMocks({ hasLocalPassword: false });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('PASSWORD_REQUIRED');
+      });
+
+      it('rejects when password verification fails', async () => {
+        setupLinkMocks({ passwordOk: false });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(UnauthorizedException);
+      });
+
+      it('rejects when SSO subject is already linked to another user', async () => {
+        setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws SSO_SUBJECT_ALREADY_LINKED for subject collision', async () => {
+        setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
+
+        await expect(
+          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+        ).rejects.toThrow('SSO_SUBJECT_ALREADY_LINKED');
+      });
     });
   });
 

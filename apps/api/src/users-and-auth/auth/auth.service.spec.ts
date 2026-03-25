@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, UpdateResult } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
@@ -37,6 +37,8 @@ describe('AuthService', () => {
           provide: AuthenticationDetailRepository,
           useValue: {
             findOne: jest.fn(),
+            count: jest.fn(),
+            update: jest.fn(),
           },
         },
 
@@ -162,5 +164,63 @@ describe('AuthService', () => {
     });
 
     expect(isAuthenticated).toBeNull();
+  });
+
+  describe('findSSOAuthenticationDetail', () => {
+    it('returns the SSO detail when one exists for the user', async () => {
+      const ssoDetail = {
+        id: 5,
+        userId: 1,
+        type: AuthenticationType.SSO,
+        providerType: SSOProviderType.OIDC,
+        providerId: 10,
+        ssoSubject: 'sub-abc',
+      } as AuthenticationDetail;
+
+      jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue(ssoDetail);
+
+      const result = await authService.findSSOAuthenticationDetail(1);
+
+      expect(result).toEqual(ssoDetail);
+      expect(authenticationDetailRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: 1, type: AuthenticationType.SSO },
+      });
+    });
+
+    it('returns null when no SSO detail exists for the user', async () => {
+      jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue(null);
+
+      const result = await authService.findSSOAuthenticationDetail(99);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('updateSSOSubject', () => {
+    it('updates the ssoSubject on the given detail row', async () => {
+      jest.spyOn(authenticationDetailRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
+
+      await authService.updateSSOSubject(5, 'new-sub-xyz');
+
+      expect(authenticationDetailRepository.update).toHaveBeenCalledWith(5, { ssoSubject: 'new-sub-xyz' });
+    });
+  });
+
+  describe('userHasSSOAuthentication', () => {
+    it('returns true when user has an SSO authentication detail', async () => {
+      (authenticationDetailRepository.count as jest.Mock).mockResolvedValue(1);
+
+      const result = await authService.userHasSSOAuthentication(1);
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when user has no SSO authentication detail', async () => {
+      (authenticationDetailRepository.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await authService.userHasSSOAuthentication(1);
+
+      expect(result).toBe(false);
+    });
   });
 });
