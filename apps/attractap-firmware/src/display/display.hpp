@@ -19,10 +19,18 @@
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "driver/display_driver.hpp"
 
+#ifdef HAS_IO_EXPANDER
+class IOExpander;
+#endif
+
 class Display
 {
 public:
+#ifdef HAS_IO_EXPANDER
+    static void setup(IOExpander *ioExpander = nullptr);
+#else
     static void setup();
+#endif
     static void loop();
 
     static void transitionToScreen(IScreen *screen);
@@ -42,6 +50,9 @@ public:
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(String deviceName);
     static void logFromLvgl(lv_log_level_t level, const char *buf);
+
+    // Returns false if the display driver reported that touch hardware was not found at init.
+    static bool hasTouchInput();
 
     // Global error popup helpers
     static void showErrorPopup(const String &title, const String &message);

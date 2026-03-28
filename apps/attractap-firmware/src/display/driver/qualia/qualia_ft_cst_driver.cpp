@@ -39,7 +39,33 @@ bool QualiaFtCstDriver::begin()
     expander->pinMode(PCA_TFT_BACKLIGHT, OUTPUT);
     expander->digitalWrite(PCA_TFT_BACKLIGHT, HIGH);
 
-    // Touch init: try FT6206 first, then CST8XX
+    // Touch init: selected at compile time via TOUCH_DRIVER_FT6206 or TOUCH_DRIVER_CST8XX
+#if defined(TOUCH_DRIVER_FT6206)
+    if (focalTouch.begin(0, &Wire, I2C_TOUCH_ADDR))
+    {
+        logger.info("FocalTouch touchscreen found");
+        touchOK = true;
+        isFocalTouch = true;
+    }
+    else
+    {
+        logger.warnf("FT6206 not found at 0x%02X", I2C_TOUCH_ADDR);
+        touchOK = false;
+    }
+#elif defined(TOUCH_DRIVER_CST8XX)
+    if (cstTouch.begin(&Wire, I2C_TOUCH_ADDR))
+    {
+        logger.info("CST8XX touchscreen found");
+        touchOK = true;
+        isFocalTouch = false;
+    }
+    else
+    {
+        logger.warnf("CST8XX not found at 0x%02X", I2C_TOUCH_ADDR);
+        touchOK = false;
+    }
+#else
+    // Fallback: try both (legacy behavior)
     if (focalTouch.begin(0, &Wire, I2C_TOUCH_ADDR))
     {
         logger.info("FocalTouch touchscreen found");
@@ -58,6 +84,7 @@ bool QualiaFtCstDriver::begin()
         touchOK = false;
         isFocalTouch = false;
     }
+#endif
 
     screenWidth = gfx->width();
     screenHeight = gfx->height();

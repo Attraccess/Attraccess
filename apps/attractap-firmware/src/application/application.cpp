@@ -30,13 +30,22 @@ void Application::setup()
     Settings::setup();
     SerialCommandHandler::setup();
     Network::setup();
-    this->beeper.setup();
 
+#ifdef HAS_IO_EXPANDER
+    this->ioExpander.setup();
+    this->beeper.setup(&this->ioExpander);
+#ifdef HAS_LVGL_DISPLAY
+    Display::setup(&this->ioExpander);
+#endif
+#else
+    this->beeper.setup();
 #ifdef HAS_LVGL_DISPLAY
     Display::setup();
 #endif
+#endif
 
     this->nfc.setup();
+
     this->api.setup();
 
 #ifdef HAS_LVGL_DISPLAY
@@ -393,6 +402,7 @@ void Application::loop()
 #endif
 
     nfc.loop();
+
     this->api.loop();
 
     this->processState();
@@ -405,10 +415,9 @@ void Application::processState()
 
     if (!connectionIsConfigured)
     {
-        this->logger.debug("Connection is not configured, showing connection configuration screen");
         if (this->state != APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
-            this->logger.debug("Connection is not configured, showing connection configuration screen");
+            this->logger.debug("Connection not configured, showing config screen");
             this->state = APPLICATION_STATE_CONFIGURATION_REQUIRED;
 
 #ifdef HAS_LVGL_DISPLAY
@@ -422,7 +431,7 @@ void Application::processState()
 
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
-        this->api.enableConnectionAttempts();
+        return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
@@ -462,6 +471,12 @@ void Application::processState()
         this->resetSessionOnDisconnect();
 #endif
         if (this->state == APPLICATION_STATE_INIT)
+        {
+            return;
+        }
+
+        // User intentionally opened settings from the init screen — don't force back to init.
+        if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
         {
             return;
         }
@@ -799,6 +814,10 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
 
     Settings::setDevicePin(cfg.devicePin);
     Settings::setBeeperEnabled(cfg.beeperEnabled);
+
+    this->state = APPLICATION_STATE_INIT;
+    this->api.enableConnectionAttempts();
+    Display::transitionToScreen(&Display::initScreen);
 };
 
 void Application::handleResourceListUpdate(const API::ResourceList &resourceList)

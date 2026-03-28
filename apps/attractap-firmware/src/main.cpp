@@ -39,9 +39,42 @@ void setup()
 
     mainLogger.info("Serial initialized");
 
-#if defined(PIN_I2C_SDA) && defined(PIN_I2C_SCL)
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+// Bit-bang 9 SCL clock pulses to release any I2C slave stuck mid-transaction.
+    // This handles the common case where a firmware flash (or a crash) resets the ESP32
+    // (I2C master) without power-cycling I2C slaves; the slaves may still be holding SDA
+    // low waiting for more clock edges or an ACK that never arrives.
+    // After 9 pulses a STOP condition is generated, then Wire.begin() takes over normally.
+    auto recoverI2CBus = [](int sda, int scl)
+    {
+        pinMode(scl, OUTPUT);
+        pinMode(sda, INPUT_PULLUP); // sense SDA without driving it
+        for (int i = 0; i < 9; i++)
+        {
+            digitalWrite(scl, LOW);
+            delayMicroseconds(10);
+            digitalWrite(scl, HIGH);
+            delayMicroseconds(10);
+            if (digitalRead(sda))
+                break; // slave released SDA — bus is free
+        }
+        // STOP condition: SDA LOW → SCL HIGH → SDA HIGH
+        pinMode(sda, OUTPUT);
+        digitalWrite(sda, LOW);
+        delayMicroseconds(10);
+        digitalWrite(scl, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(sda, HIGH);
+        delayMicroseconds(10);
+        // Pins will be reclaimed by Wire.begin() immediately after
+    };
+
+#if defined(PIN_NFC_I2C_SDA) && defined(PIN_NFC_I2C_SCL)
+    mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
+    recoverI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
+    Wire.begin(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
 #else
+    mainLogger.info("I2C init: using default SDA/SCL pins");
+    recoverI2CBus(SDA, SCL);
     Wire.begin(SDA, SCL); // SDA, SCL
 #endif
 

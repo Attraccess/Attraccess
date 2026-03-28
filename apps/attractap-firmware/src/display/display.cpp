@@ -1,5 +1,9 @@
 #include "display.hpp"
 
+#ifdef HAS_IO_EXPANDER
+#include "../ioexpander/ioexpander.hpp"
+#endif
+
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
 #endif
@@ -36,6 +40,10 @@ FirmwareUpdateScreen Display::firmwareUpdateScreen;
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::activePopup = nullptr;
 lv_timer_t *Display::popupAutoCloseTimer = nullptr;
+
+// Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
+// to ensure LVGL is fully running before creating overlay objects.
+static bool s_touchWarningPending = false;
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -115,12 +123,20 @@ uint32_t Display::tick_cb()
     return millis();
 }
 
+#ifdef HAS_IO_EXPANDER
+void Display::setup(IOExpander *ioExpander)
+#else
 void Display::setup()
+#endif
 {
     Display::logger.info("Initializing");
 
 #if defined(DISPLAY_DRIVER_GT911)
+#ifdef HAS_IO_EXPANDER
+    Display::driver = new RgbGt911Driver(Display::logger, ioExpander);
+#else
     Display::driver = new RgbGt911Driver(Display::logger);
+#endif
 #elif defined(DISPLAY_DRIVER_QUALIA)
     Display::driver = new QualiaFtCstDriver(Display::logger);
 #else
@@ -197,11 +213,29 @@ void Display::setup()
 
     Display::transitionToScreen(&Display::bootScreen);
 
+    if (!Display::driver->touchAvailable())
+    {
+        Display::logger.warn("Touch panel not detected — warning will be shown after first render");
+        s_touchWarningPending = true;
+    }
+
     Display::logger.info("Setup done");
+}
+
+bool Display::hasTouchInput()
+{
+    return Display::driver && Display::driver->touchAvailable();
 }
 
 void Display::loop()
 {
+    if (s_touchWarningPending)
+    {
+        s_touchWarningPending = false;
+        Display::showErrorPopup("Touch Unavailable",
+                                "Touch panel not detected.\nCheck hardware and reboot.");
+    }
+
     lv_timer_handler(); /* let the GUI do its work */
     if (Display::activeScreen)
     {
