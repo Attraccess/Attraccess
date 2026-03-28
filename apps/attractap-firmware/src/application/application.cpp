@@ -431,7 +431,7 @@ void Application::processState()
 
     if (this->state == APPLICATION_STATE_CONFIGURATION_REQUIRED)
     {
-        this->api.enableConnectionAttempts();
+        return;
     }
 
 #ifdef HAS_LVGL_DISPLAY
@@ -814,6 +814,10 @@ void Application::handleConnectionConfigurationSave(const ConnectionConfiguratio
 
     Settings::setDevicePin(cfg.devicePin);
     Settings::setBeeperEnabled(cfg.beeperEnabled);
+
+    this->state = APPLICATION_STATE_INIT;
+    this->api.enableConnectionAttempts();
+    Display::transitionToScreen(&Display::initScreen);
 };
 
 void Application::handleResourceListUpdate(const API::ResourceList &resourceList)
