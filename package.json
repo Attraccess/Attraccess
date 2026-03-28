@@ -88,7 +88,7 @@
     "mqtt": "^5.12.1",
     "nanoid": "^3.3.11",
     "new-github-issue-url": "^1.1.0",
-    "nodemailer": "^7.0.11",
+    "nodemailer": "^8.0.0",
     "otplib": "^13.1.1",
     "parcel": "^2.14.4",
     "passport": "^0.7.0",
