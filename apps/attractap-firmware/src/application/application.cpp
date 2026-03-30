@@ -46,17 +46,15 @@ void Application::setup() {
 #endif
 #else
   this->beeper.setup();
+#ifdef HAS_LVGL_DISPLAY
+  Display::setup();
+#endif
 #endif
 
 #ifdef HAS_WS2812_LED
   this->led.setup();
   xTaskCreate(Application::ledTask, "LedTask", 2048, this,
               tskIDLE_PRIORITY, nullptr);
-#endif
-
-#ifdef HAS_LVGL_DISPLAY
-  Display::setup();
-#endif
 #endif
 
   this->nfc.setup();
@@ -418,6 +416,8 @@ void Application::setup() {
 
 #ifdef HAS_LVGL_DISPLAY
   this->bootTime = millis();
+#else
+  this->state = APPLICATION_STATE_INIT;
 #endif
 }
 
@@ -634,6 +634,11 @@ void Application::processState() {
     Display::transitionToScreen(&Display::firmwareUpdateScreen);
 #endif
     this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+#ifdef HAS_WS2812_LED
+    this->updateLedState();
+    this->led.loop();
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+#endif
     return;
   }
 

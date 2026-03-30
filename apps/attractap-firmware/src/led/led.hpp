@@ -52,6 +52,7 @@ private:
     uint32_t _triggerStartMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
+    bool _firmwarePatternSet = false;
     Adafruit_NeoPixel _strip;
 
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;

@@ -22,6 +22,7 @@ void LedController::setState(LedState state)
         return;
     }
     _state = state;
+    _firmwarePatternSet = false;
 }
 
 void LedController::triggerSuccess()
@@ -121,6 +122,19 @@ void LedController::loop()
 
     if (_state == LED_STATE_FIRMWARE_UPDATE)
     {
+        if (!_firmwarePatternSet)
+        {
+            uint16_t n = _strip.numPixels();
+            for (uint16_t i = 0; i < n; i++)
+            {
+                if (i % 2 == 0)
+                    _strip.setPixelColor(i, _strip.Color(0, 0, 255));
+                else
+                    _strip.setPixelColor(i, _strip.Color(255, 255, 255));
+            }
+            _strip.show();
+            _firmwarePatternSet = true;
+        }
         return;
     }
 
@@ -158,70 +172,79 @@ uint16_t LedController::wrapIndex(int16_t i) const
 
 void LedController::runCircularAnimation()
 {
-    const uint16_t n = 24;
+    const uint16_t n = _strip.numPixels();
 
     switch (_state)
     {
     case LED_STATE_CONFIG_REQUIRED:
     {
-        uint16_t pos = _phase % n;
-        uint32_t c = _strip.Color(255, 165, 0);
+        uint8_t subPhase = (_phase / 12) % 2;
+        uint16_t third = n / 3;
+        uint16_t sixth = n / 6;
         setAll(0);
-        _strip.setPixelColor(pos, c);
+        if (subPhase == 0)
+        {
+            uint32_t c = _strip.Color(255, 0, 0);
+            for (uint8_t i = 0; i < 3; i++)
+                _strip.setPixelColor(i * third, c);
+        }
+        else
+        {
+            uint32_t c = _strip.Color(255, 165, 0);
+            for (uint8_t i = 0; i < 3; i++)
+                _strip.setPixelColor(sixth + i * third, c);
+        }
         break;
     }
 
     case LED_STATE_INIT:
     {
-        uint16_t start = _phase % n;
+        uint16_t head = _phase % n;
         uint32_t c = _strip.Color(0, 0, 255);
         setAll(0);
-        for (uint8_t i = 0; i < 6; i++)
+        const uint8_t tailLen = 8;
+        const uint8_t tailBrightness[] = {255, 180, 100, 50, 25, 10, 4, 1};
+        for (uint8_t i = 0; i < tailLen; i++)
         {
-            uint16_t idx = wrapIndex(start + i);
-            uint8_t falloff = 255 - (i * 42);
-            _strip.setPixelColor(idx, dim(c, falloff));
+            uint16_t idx = wrapIndex(head - i);
+            _strip.setPixelColor(idx, dim(c, tailBrightness[i]));
         }
         break;
     }
 
     case LED_STATE_WAIT_FOR_CARD:
     {
-        uint16_t arcLen = 4 + ((_phase / 4) % 5);
-        uint16_t start = (_phase / 2) % n;
+        uint16_t p = _phase % 60;
+        uint8_t b = (p < 30)
+            ? (26 + (uint8_t)(51 * p / 30))
+            : (77 - (uint8_t)(51 * (p - 30) / 30));
         uint32_t c = _strip.Color(0, 255, 0);
-        setAll(0);
-        for (uint8_t i = 0; i < arcLen; i++)
-        {
-            uint16_t idx = wrapIndex(start + i);
-            uint8_t falloff = (i == 0 || i == arcLen - 1) ? 128 : 255;
-            _strip.setPixelColor(idx, dim(c, falloff));
-        }
+        setAll(dim(c, b));
         break;
     }
 
     case LED_STATE_AUTHENTICATE_CARD:
     {
-        uint16_t pos = (_phase * 2) % n;
+        uint16_t head = (_phase * 2) % n;
         uint32_t c = _strip.Color(100, 200, 255);
         setAll(0);
-        _strip.setPixelColor(pos, c);
+        const uint8_t tailLen = 6;
+        const uint8_t tailBrightness[] = {255, 180, 100, 50, 20, 8};
+        for (uint8_t i = 0; i < tailLen; i++)
+        {
+            uint16_t idx = wrapIndex(head - i);
+            _strip.setPixelColor(idx, dim(c, tailBrightness[i]));
+        }
         break;
     }
 
     case LED_STATE_NO_RESOURCES:
     {
         uint8_t flashPhase = (_phase / 10) % 2;
-        setAll(0);
         if (flashPhase == 0)
-        {
-            uint32_t c = _strip.Color(255, 165, 0);
-            for (uint8_t i = 0; i < 12; i++)
-            {
-                _strip.setPixelColor(i, c);
-                _strip.setPixelColor(wrapIndex(i + 12), c);
-            }
-        }
+            setAll(_strip.Color(255, 165, 0));
+        else
+            setAll(0);
         break;
     }
 
