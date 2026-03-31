@@ -1,6 +1,7 @@
 #ifdef HAS_WS2812_LED
 
 #include "led.hpp"
+#include "../settings/settings.hpp"
 
 #ifndef PIN_WS2812_DATA
 #define PIN_WS2812_DATA 38
@@ -11,8 +12,16 @@
 
 void LedController::setup()
 {
+    _globalBrightness = Settings::getLedBrightness();
     _strip.begin();
+    _strip.setBrightness(_globalBrightness);
     _strip.show();
+}
+
+void LedController::setBrightness(uint8_t brightness)
+{
+    _globalBrightness = brightness;
+    _strip.setBrightness(_globalBrightness);
 }
 
 void LedController::setState(LedState state)

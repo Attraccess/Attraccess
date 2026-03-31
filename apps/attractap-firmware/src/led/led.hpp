@@ -23,6 +23,7 @@ public:
     void loop();
 
     void setState(LedState state);
+    void setBrightness(uint8_t brightness);
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
@@ -53,6 +54,7 @@ private:
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
     bool _firmwarePatternSet = false;
+    uint8_t _globalBrightness = 255;
     Adafruit_NeoPixel _strip;
 
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;

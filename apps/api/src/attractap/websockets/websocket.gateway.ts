@@ -196,13 +196,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       if (lastError) {
         this.logger.error(
-          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`,
+          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
         );
-        try {
-          client.close();
-        } catch {
-          // ignore error
-        }
         return;
       }
     };
@@ -657,6 +652,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
       readerName: reader.name,
+      ledBrightness: reader.ledBrightness,
       resources: resourcesWithFlowButtons.map((resource) => ({
         id: resource.id,
         name: resource.name,

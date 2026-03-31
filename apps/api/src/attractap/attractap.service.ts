@@ -152,7 +152,7 @@ export class AttractapService {
 
   public async updateReader(
     id: number,
-    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion },
+    updateData: { name?: string; connectedResourceIds?: number[]; firmware?: AttractapFirmwareVersion; ledBrightness?: number },
     emitEvent = true,
   ): Promise<Attractap> {
     const reader = await this.findReaderById(id);
@@ -163,6 +163,10 @@ export class AttractapService {
 
     if (updateData.name) {
       reader.name = updateData.name;
+    }
+
+    if (updateData.ledBrightness !== undefined) {
+      reader.ledBrightness = updateData.ledBrightness;
     }
 
     if (updateData.firmware) {

@@ -598,6 +598,12 @@ void API::sendFirmwareInfo()
 #else
         false;
 #endif
+    event["data"]["payload"]["capabilities"]["hasLeds"] =
+#ifdef HAS_WS2812_LED
+        true;
+#else
+        false;
+#endif
 
     char json[JSON_OUTBUF_SMALL];
     size_t n = serializeJson(event, json, sizeof(json));
@@ -645,6 +651,16 @@ void API::onResourceList(JsonObject data)
         if (this->deviceNameCallback != nullptr)
         {
             this->deviceNameCallback(readerName);
+        }
+    }
+
+    if (data["payload"]["ledBrightness"].is<int>())
+    {
+        uint8_t brightness = (uint8_t)data["payload"]["ledBrightness"].as<int>();
+        Settings::setLedBrightness(brightness);
+        if (this->ledBrightnessChangedCallback != nullptr)
+        {
+            this->ledBrightnessChangedCallback(brightness);
         }
     }
 
@@ -993,6 +1009,11 @@ void API::onEnrollNewCard(JsonObject data)
 void API::onDeviceName(std::function<void(String)> callback)
 {
     this->deviceNameCallback = callback;
+}
+
+void API::setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback)
+{
+    this->ledBrightnessChangedCallback = callback;
 }
 
 void API::disableConnectionAttempts()

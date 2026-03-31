@@ -82,6 +82,11 @@ void Application::setup() {
 #endif
       });
 
+#ifdef HAS_WS2812_LED
+  this->api.setLedBrightnessChangedCallback(
+      [this](uint8_t brightness) { this->led.setBrightness(brightness); });
+#endif
+
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
         if (response.error.length() > 0) {
