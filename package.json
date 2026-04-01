@@ -9,7 +9,7 @@
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts",
-    "sbom:generate": "npx @cyclonedx/cyclonedx-npm --output-file bom.json --output-format json"
+    "sbom:generate": "npx @cyclonedx/cdxgen -o bom.json --format json"
   },
   "private": true,
   "dependencies": {
