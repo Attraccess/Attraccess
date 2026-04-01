@@ -1,0 +1,44 @@
+name: DependencyTrack SBOM
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup
+
+      - name: Determine project version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+            echo "VERSION=nightly-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate CycloneDX SBOM
+        run: pnpm sbom:generate
+
+      - name: Upload SBOM to DependencyTrack
+        run: |
+          curl -sf -X PUT \
+            "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
+            -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
+            -F "autoCreate=true" \
+            -F "projectName=Attraccess" \
+            -F "projectVersion=${{ steps.version.outputs.VERSION }}" \
+            -F "bom=@bom.json"
