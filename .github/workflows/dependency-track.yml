@@ -35,10 +35,9 @@ jobs:
 
       - name: Upload SBOM to DependencyTrack
         run: |
-          curl -sS --fail-with-body -X POST \
+          BOM_BASE64=$(base64 -w 0 bom.json)
+          curl -sS --fail-with-body -X PUT \
             "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
+            -H "Content-Type: application/json" \
             -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
-            -F "autoCreate=true" \
-            -F "projectName=Attraccess" \
-            -F "projectVersion=${{ steps.version.outputs.VERSION }}" \
-            -F "bom=@bom.json"
+            -d "{\"projectName\":\"Attraccess\",\"projectVersion\":\"${{ steps.version.outputs.VERSION }}\",\"autoCreate\":true,\"bom\":\"${BOM_BASE64}\"}"
