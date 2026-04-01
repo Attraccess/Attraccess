@@ -9,7 +9,7 @@
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts",
-    "sbom:generate": "npx @cyclonedx/cdxgen -o bom.json --format json"
+    "sbom:generate": "cdxgen -o bom.json --format json"
   },
   "private": true,
   "dependencies": {
@@ -133,6 +133,7 @@
   "devDependencies": {
     "@babel/core": "^7.27.1",
     "@babel/preset-react": "^7.28.5",
+    "@cyclonedx/cdxgen": "^12.1.4",
     "@nx/esbuild": "22.0.2",
     "@nx/eslint": "21.1.2",
     "@nx/eslint-plugin": "21.1.2",
