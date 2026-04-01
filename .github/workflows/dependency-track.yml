@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload SBOM to DependencyTrack
         run: |
-          curl -sf -X PUT \
+          curl -sS --fail-with-body -X POST \
             "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
             -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
             -F "autoCreate=true" \
