@@ -31,14 +31,13 @@ jobs:
           fi
 
       - name: Generate CycloneDX SBOM
-        run: npx @cyclonedx/cyclonedx-npm --output-file bom.json --output-format json
+        run: pnpm sbom:generate
 
       - name: Upload SBOM to DependencyTrack
         run: |
           curl -sf -X PUT \
             "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
             -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
-            -H "Content-Type: multipart/form-data" \
             -F "autoCreate=true" \
             -F "projectName=Attraccess" \
             -F "projectVersion=${{ steps.version.outputs.VERSION }}" \
