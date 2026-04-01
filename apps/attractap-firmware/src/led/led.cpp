@@ -223,12 +223,19 @@ void LedController::runCircularAnimation()
 
     case LED_STATE_WAIT_FOR_CARD:
     {
-        uint16_t p = _phase % 60;
-        uint8_t b = (p < 30)
-            ? (26 + (uint8_t)(51 * p / 30))
-            : (77 - (uint8_t)(51 * (p - 30) / 30));
+        uint16_t p = _phase % IDLE_BREATH_CYCLE;
+        uint8_t b = (p < IDLE_BREATH_HALF)
+            ? (IDLE_BRIGHTNESS_MIN + (uint8_t)(IDLE_BRIGHTNESS_RANGE * p / IDLE_BREATH_HALF))
+            : (IDLE_BRIGHTNESS_MAX - (uint8_t)(IDLE_BRIGHTNESS_RANGE * (p - IDLE_BREATH_HALF) / IDLE_BREATH_HALF));
+        uint8_t bInv = IDLE_BRIGHTNESS_MIN + IDLE_BRIGHTNESS_MAX - b;
         uint32_t c = _strip.Color(0, 255, 0);
-        setAll(dim(c, b));
+        uint16_t pieceSize = n / IDLE_SEGMENT_COUNT;
+        for (uint16_t i = 0; i < n; i++)
+        {
+            uint8_t piece = (pieceSize > 0) ? (i / pieceSize) : 0;
+            if (piece >= IDLE_SEGMENT_COUNT) piece = IDLE_SEGMENT_COUNT - 1;
+            _strip.setPixelColor(i, dim(c, (piece % 2 == 0) ? b : bInv));
+        }
         break;
     }
 

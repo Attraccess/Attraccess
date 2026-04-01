@@ -60,6 +60,13 @@ private:
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;
     static constexpr uint32_t TRIGGER_DURATION_MS = 400;
     static constexpr uint32_t TRIGGER_ERROR_FLASH_MS = 100;
+
+    static constexpr uint8_t IDLE_BRIGHTNESS_MIN = 8;
+    static constexpr uint8_t IDLE_BRIGHTNESS_MAX = 38;
+    static constexpr uint8_t IDLE_BRIGHTNESS_RANGE = IDLE_BRIGHTNESS_MAX - IDLE_BRIGHTNESS_MIN;
+    static constexpr uint16_t IDLE_BREATH_CYCLE = 60;
+    static constexpr uint16_t IDLE_BREATH_HALF = IDLE_BREATH_CYCLE / 2;
+    static constexpr uint8_t IDLE_SEGMENT_COUNT = 6;
 };
 
 #endif
