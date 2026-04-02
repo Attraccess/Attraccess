@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate SBOM
-        run: pnpm dlx @cyclonedx/cdxgen -o bom.json .
+        run: pnpm exec cdxgen -o bom.json .
 
       - name: Determine project version
         id: version
