@@ -656,11 +656,16 @@ void API::onResourceList(JsonObject data)
 
     if (data["payload"]["ledBrightness"].is<int>())
     {
-        uint8_t brightness = (uint8_t)data["payload"]["ledBrightness"].as<int>();
-        Settings::setLedBrightness(brightness);
-        if (this->ledBrightnessChangedCallback != nullptr)
-        {
-            this->ledBrightnessChangedCallback(brightness);
+        int rawBrightness = data["payload"]["ledBrightness"].as<int>();
+        if (rawBrightness < 0) rawBrightness = 0;
+        if (rawBrightness > 255) rawBrightness = 255;
+        uint8_t brightness = (uint8_t)rawBrightness;
+        if (brightness != Settings::getLedBrightness()) {
+            Settings::setLedBrightness(brightness);
+            if (this->ledBrightnessChangedCallback != nullptr)
+            {
+                this->ledBrightnessChangedCallback(brightness);
+            }
         }
     }
 

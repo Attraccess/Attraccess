@@ -440,7 +440,7 @@ void Application::loop() {
   this->processState();
 
 #ifdef ESP_PLATFORM
-  vTaskDelay(1 / portTICK_PERIOD_MS);
+  vTaskDelay(pdMS_TO_TICKS(1));
 #endif
 }
 
@@ -641,8 +641,6 @@ void Application::processState() {
     this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
 #ifdef HAS_WS2812_LED
     this->updateLedState();
-    this->led.loop();
-    vTaskDelay(500 / portTICK_PERIOD_MS);
 #endif
     return;
   }
