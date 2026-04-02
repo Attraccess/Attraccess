@@ -5,6 +5,8 @@ import { SettingsService } from './settings.service';
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
+import { MetricsSettingsDto } from './dto/metrics-settings.dto';
+import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -37,6 +39,25 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'First-time setup status and steps completed.', type: FirstTimeSetupStatusDto })
   async getFirstTimeSetupStatus(): Promise<FirstTimeSetupStatusDto> {
     return this.settingsService.getFirstTimeSetupStatus();
+  }
+
+  @Get('metrics')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
+  @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
+  async getMetricsSettings(): Promise<MetricsSettingsDto> {
+    const { configured } = await this.settingsService.getMetricsApiKey();
+    return { apiKeyConfigured: configured };
+  }
+
+  @Patch('metrics')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
+  @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
+  async updateMetricsSettings(@Body() body: UpdateMetricsSettingsDto): Promise<MetricsSettingsDto> {
+    await this.settingsService.setMetricsApiKey(body.apiKey || null);
+    const { configured } = await this.settingsService.getMetricsApiKey();
+    return { apiKeyConfigured: configured };
   }
 
   @Post('first-time-setup')

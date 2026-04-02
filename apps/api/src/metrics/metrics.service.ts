@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, IsNull } from 'typeorm';
+import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage } from '@attraccess/database-entities';
 import {
   Registry,
   collectDefaultMetrics,
@@ -8,7 +11,8 @@ import {
 } from 'prom-client';
 
 @Injectable()
-export class MetricsService {
+export class MetricsService implements OnModuleInit {
+  private readonly logger = new Logger(MetricsService.name);
   public readonly registry: Registry;
 
   public readonly httpRequestDuration: Histogram;
@@ -49,7 +53,20 @@ export class MetricsService {
 
   public readonly websocketConnectionsActive: Gauge;
 
-  constructor() {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Resource)
+    private readonly resourceRepository: Repository<Resource>,
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
+    @InjectRepository(ResourceGroup)
+    private readonly resourceGroupRepository: Repository<ResourceGroup>,
+    @InjectRepository(MqttServer)
+    private readonly mqttServerRepository: Repository<MqttServer>,
+    @InjectRepository(ResourceUsage)
+    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+  ) {
     this.registry = new Registry();
     collectDefaultMetrics({ register: this.registry });
 
@@ -226,6 +243,29 @@ export class MetricsService {
       help: 'Number of active WebSocket connections',
       registers: [this.registry],
     });
+  }
+
+  async onModuleInit(): Promise<void> {
+    this.logger.log('Initializing gauge metrics from database...');
+    const [users, resources, projects, groups, mqttServers, activeSessions] = await Promise.all([
+      this.userRepository.count(),
+      this.resourceRepository.count(),
+      this.projectRepository.count(),
+      this.resourceGroupRepository.count(),
+      this.mqttServerRepository.count(),
+      this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+    ]);
+
+    this.usersTotal.set(users);
+    this.resourcesTotal.set(resources);
+    this.projectsTotal.set(projects);
+    this.resourceGroupsTotal.set(groups);
+    this.mqttServersTotal.set(mqttServers);
+    this.resourceUsageSessionsActive.set(activeSessions);
+
+    this.logger.log(
+      `Gauge metrics initialized: users=${users}, resources=${resources}, projects=${projects}, groups=${groups}, mqttServers=${mqttServers}, activeSessions=${activeSessions}`,
+    );
   }
 
   async getMetrics(): Promise<string> {
