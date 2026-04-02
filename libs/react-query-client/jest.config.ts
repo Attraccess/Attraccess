@@ -1,5 +1,5 @@
 module.exports = {
-  displayName: 'api-client',
+  displayName: 'react-query-client',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   passWithNoTests: true,
