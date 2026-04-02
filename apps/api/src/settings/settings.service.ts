@@ -10,7 +10,7 @@ import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
-import { APP_KEYS, APP_PARENT } from './constants';
+import { APP_KEYS, APP_PARENT, METRICS_KEYS, METRICS_PARENT } from './constants';
 import { SettingsStoreService } from './settings-store.service';
 import {
   FirstTimeSetupStatusDto,
@@ -123,5 +123,13 @@ export class SettingsService {
 
   buildSmtpTransportOptions(config: SmtpSettingsInternal): SMTPTransport.Options {
     return this.smtpSettingsService.buildTransportOptions(config);
+  }
+
+  async getMetricsApiKey(): Promise<{ value: string | null; configured: boolean }> {
+    return this.settingsStore.getSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey);
+  }
+
+  async setMetricsApiKey(apiKey: string | null): Promise<void> {
+    await this.settingsStore.setSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey, apiKey);
   }
 }
