@@ -5323,6 +5323,13 @@ export const $UpdateReaderDto = {
             items: {
                 type: 'number'
             }
+        },
+        ledBrightness: {
+            type: 'number',
+            description: 'Global LED brightness for the reader (0-255)',
+            example: 255,
+            minimum: 0,
+            maximum: 255
         }
     },
     required: ['name', 'connectedResourceIds']
@@ -5348,9 +5355,15 @@ export const $AttractapCapabilities = {
             description: 'Whether the reader can enroll new cards',
             example: true,
             default: true
+        },
+        hasLeds: {
+            type: 'boolean',
+            description: 'Whether the reader has addressable LEDs',
+            example: false,
+            default: false
         }
     },
-    required: ['resourceSelection', 'resourceActionSelection', 'cardEnrollment']
+    required: ['resourceSelection', 'resourceActionSelection', 'cardEnrollment', 'hasLeds']
 } as const;
 
 export const $AttractapFirmwareVersion = {
@@ -5414,6 +5427,14 @@ export const $Attractap = {
             type: 'string',
             description: 'The first time the reader connected to the server'
         },
+        ledBrightness: {
+            type: 'number',
+            description: 'Global LED brightness for the reader (0-255)',
+            example: 255,
+            default: 255,
+            minimum: 0,
+            maximum: 255
+        },
         firmware: {
             description: 'The firmware of the reader',
             allOf: [
@@ -5423,7 +5444,7 @@ export const $Attractap = {
             ]
         }
     },
-    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'firmware']
+    required: ['id', 'name', 'resources', 'lastConnection', 'firstConnection', 'ledBrightness', 'firmware']
 } as const;
 
 export const $UpdateReaderResponseDto = {

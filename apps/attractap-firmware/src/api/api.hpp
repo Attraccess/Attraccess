@@ -204,6 +204,7 @@ public:
     void requestBillingTopup(uint32_t amountCents);
 
     void onDeviceName(std::function<void(String)> callback);
+    void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
     void enableConnectionAttempts();
@@ -237,6 +238,7 @@ private:
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
 
     std::function<void(String)> deviceNameCallback;
+    std::function<void(uint8_t)> ledBrightnessChangedCallback;
 
     uint32_t lastRequestedProjectsOfUserPage = -1;
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;

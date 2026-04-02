@@ -59,6 +59,7 @@
   - [Setup](attractap/setup.md)
   - [NFC Cards](attractap/nfc-cards.md)
   - [Firmware Updates](attractap/firmware-updates.md)
+  - [LED Guide (Lite)](attractap/led-guide.md)
 
 - **MQTT & IoT**
   - [Overview](mqtt/overview.md)

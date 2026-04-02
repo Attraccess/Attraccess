@@ -3397,6 +3397,10 @@ export type UpdateReaderDto = {
      * The IDs of the resources that the reader has access to
      */
     connectedResourceIds: Array<(number)>;
+    /**
+     * Global LED brightness for the reader (0-255)
+     */
+    ledBrightness?: number;
 };
 
 export type AttractapCapabilities = {
@@ -3412,6 +3416,10 @@ export type AttractapCapabilities = {
      * Whether the reader can enroll new cards
      */
     cardEnrollment: boolean;
+    /**
+     * Whether the reader has addressable LEDs
+     */
+    hasLeds: boolean;
 };
 
 export type AttractapFirmwareVersion = {
@@ -3454,6 +3462,10 @@ export type Attractap = {
      * The first time the reader connected to the server
      */
     firstConnection: string;
+    /**
+     * Global LED brightness for the reader (0-255)
+     */
+    ledBrightness: number;
     /**
      * The firmware of the reader
      */

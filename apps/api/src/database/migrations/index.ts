@@ -102,3 +102,5 @@ export * from './1770485229439-maintenance-schedules';
 export * from './1772616264344-RemoveFrontendUrlSetting';
 export * from './1772617000000-add-cookie-same-site-setting';
 export * from './1772618000000-remove-cookie-same-site-setting';
+export * from './1774980294900-attractap-led-capability';
+export * from './1774980482357-add-saml-provider-type-and-invitation-index';

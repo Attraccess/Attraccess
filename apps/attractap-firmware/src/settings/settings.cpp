@@ -18,6 +18,7 @@ void Settings::setup()
 
     _deviceConfig.passCode = preferences.getString("device.passCode", "0000");
     _deviceConfig.beeperEnabled = preferences.getBool("device.beeper", true);
+    _deviceConfig.ledBrightness = preferences.getUChar("device.ledBrt", 255);
 
     _networkConfig.ssid = preferences.getString("wifi.ssid", "");
     _networkConfig.password = preferences.getString("wifi.pass", "");
@@ -59,6 +60,21 @@ void Settings::setBeeperEnabled(bool beeperEnabled)
     preferences.putBool("device.beeper", beeperEnabled);
     preferences.end();
     logger.info("Device beeper enabled set.");
+}
+
+uint8_t Settings::getLedBrightness()
+{
+    return _deviceConfig.ledBrightness;
+}
+
+void Settings::setLedBrightness(uint8_t brightness)
+{
+    logger.info("Saving LED brightness...");
+    _deviceConfig.ledBrightness = brightness;
+    preferences.begin("settings", false);
+    preferences.putUChar("device.ledBrt", brightness);
+    preferences.end();
+    logger.info("LED brightness set.");
 }
 
 NetworkConfig Settings::getNetworkConfig()

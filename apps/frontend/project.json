@@ -20,10 +20,10 @@
     "copy-dependency-list": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{workspaceRoot}/package.json", "{projectRoot}/extract-dependencies.js"],
+      "inputs": ["{workspaceRoot}/package.json", "{projectRoot}/extract-dependencies.cjs"],
       "outputs": ["{projectRoot}/public/dependencies.json"],
       "options": {
-        "command": "node apps/frontend/extract-dependencies.js"
+        "command": "node apps/frontend/extract-dependencies.cjs"
       }
     },
     "lint": {

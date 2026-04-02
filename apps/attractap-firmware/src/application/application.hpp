@@ -13,6 +13,10 @@
 #include "../ioexpander/ioexpander.hpp"
 #endif
 
+#ifdef HAS_WS2812_LED
+#include "../led/led.hpp"
+#endif
+
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
 #else
@@ -52,6 +56,11 @@ private:
     API api;
     Beeper beeper;
 
+#ifdef HAS_WS2812_LED
+    LedController led;
+    void updateLedState();
+#endif
+
     enum ExternalStates_t
     {
         EXTERNAL_STATE_NONE,
@@ -89,6 +98,10 @@ private:
 
     static void
     networkTask(void *parameter);
+
+#ifdef HAS_WS2812_LED
+    static void ledTask(void *parameter);
+#endif
 
     void processState();
 

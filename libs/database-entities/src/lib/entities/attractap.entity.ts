@@ -40,6 +40,18 @@ class AttractapCapabilities {
     default: true,
   })
   cardEnrollment!: boolean;
+
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @ApiProperty({
+    description: 'Whether the reader has addressable LEDs',
+    example: false,
+    default: false,
+  })
+  hasLeds!: boolean;
 }
 
 export class AttractapFirmwareVersion {
@@ -107,6 +119,20 @@ export class Attractap {
   })
   @ApiProperty({ description: 'The first time the reader connected to the server' })
   firstConnection!: Date;
+
+  @Column({
+    type: 'integer',
+    nullable: false,
+    default: 255,
+  })
+  @ApiProperty({
+    description: 'Global LED brightness for the reader (0-255)',
+    example: 255,
+    default: 255,
+    minimum: 0,
+    maximum: 255,
+  })
+  ledBrightness!: number;
 
   @Column(() => AttractapFirmwareVersion, { prefix: 'firmware' })
   @ApiProperty({ description: 'The firmware of the reader', type: () => AttractapFirmwareVersion })

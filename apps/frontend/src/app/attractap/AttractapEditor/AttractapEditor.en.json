@@ -9,5 +9,6 @@
   "save": "Save Changes",
   "errorUpdatingReader": "Error updating reader",
   "readerUpdated": "Reader updated",
-  "readerUpdatedDescription": "Reader updated successfully"
+  "readerUpdatedDescription": "Reader updated successfully",
+  "ledBrightness": "LED Brightness"
 }

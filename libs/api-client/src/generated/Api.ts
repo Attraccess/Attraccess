@@ -3347,6 +3347,13 @@ export interface UpdateReaderDto {
   name: string;
   /** The IDs of the resources that the reader has access to */
   connectedResourceIds: number[];
+  /**
+   * Global LED brightness for the reader (0-255)
+   * @min 0
+   * @max 255
+   * @example 255
+   */
+  ledBrightness?: number;
 }
 
 export interface AttractapCapabilities {
@@ -3368,6 +3375,12 @@ export interface AttractapCapabilities {
    * @example true
    */
   cardEnrollment: boolean;
+  /**
+   * Whether the reader has addressable LEDs
+   * @default false
+   * @example false
+   */
+  hasLeds: boolean;
 }
 
 export interface AttractapFirmwareVersion {
@@ -3407,6 +3420,14 @@ export interface Attractap {
    * @format date-time
    */
   firstConnection: string;
+  /**
+   * Global LED brightness for the reader (0-255)
+   * @min 0
+   * @max 255
+   * @default 255
+   * @example 255
+   */
+  ledBrightness: number;
   /** The firmware of the reader */
   firmware: AttractapFirmwareVersion;
 }
