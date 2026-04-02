@@ -18,28 +18,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup
+      - name: Setup PNPM
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file bom.json --output-format json
 
       - name: Determine project version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "PROJECT_VERSION=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
           else
-            SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-            echo "VERSION=nightly-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "PROJECT_VERSION=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Generate CycloneDX SBOM
-        run: pnpm sbom:generate
-
-      - name: Upload SBOM to DependencyTrack
-        run: |
-          jq -n --arg bom "$(base64 -w 0 bom.json)" \
-            --arg version "${{ steps.version.outputs.VERSION }}" \
-            '{projectName:"Attraccess",projectVersion:$version,autoCreate:true,bom:$bom}' > payload.json
-          curl -sS --fail-with-body -X PUT \
-            "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
-            -H "Content-Type: application/json" \
-            -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
-            -d @payload.json
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
+        with:
+          serverHostname: ${{ vars.DEPENDENCYTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
+          projectName: ${{ github.event.repository.name }}
+          projectVersion: ${{ steps.version.outputs.PROJECT_VERSION }}
+          bomFilename: bom.json
+          autoCreate: 'true'
