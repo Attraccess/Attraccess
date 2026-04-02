@@ -30,9 +30,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Upload SBOM to DependencyTrack
-        uses: Quobis/action-owasp-dependecy-track-check@main
+      - name: Generate SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file bom.json --output-format json
+
+      - name: Determine project version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "PROJECT_VERSION=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "PROJECT_VERSION=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
         with:
-          url: ${{ vars.DEPENDENCYTRACK_API_URL }}
-          key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
-          language: nodejs
+          serverHostname: ${{ vars.DEPENDENCYTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
+          projectName: ${{ github.event.repository.name }}
+          projectVersion: ${{ steps.version.outputs.PROJECT_VERSION }}
+          bomFilename: bom.json
+          autoCreate: 'true'
