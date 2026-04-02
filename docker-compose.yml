@@ -110,6 +110,21 @@ services:
     env_file:
       - .env.docker-compose
 
+  dns-server:
+    build:
+      context: ./tools/dns-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '53:53/udp'
+      - '53:53/tcp'
+    expose:
+      - '5380'
+    volumes:
+      - dns-server-data:/data
+    env_file:
+      - .env.docker-compose
+
   duplicati:
     image: duplicati/duplicati:2.2.0.3-stable
     expose:
@@ -123,6 +138,7 @@ services:
       - webhook-site:/external-storage/webhook-site
       - rabbitmq_data:/external-storage/rabbitmq
       - zigbee2mqtt:/external-storage/zigbee2mqtt
+      - dns-server-data:/external-storage/dns-server
     env_file:
       - .env.docker-compose
 
@@ -134,3 +150,4 @@ volumes:
   rabbitmq_data:
   zigbee2mqtt:
   duplicati:
+  dns-server-data:
