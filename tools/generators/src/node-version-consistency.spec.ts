@@ -101,6 +101,27 @@ describe('Node.js version consistency', () => {
     });
   });
 
+  describe('dns-server Dockerfile', () => {
+    let dockerfileContent: string;
+
+    beforeAll(() => {
+      dockerfileContent = readFile('tools/dns-server/Dockerfile');
+    });
+
+    it('should use a FROM image with the same Node.js version as .nvmrc', () => {
+      const match = dockerfileContent.match(/FROM\s+node:(\S+)/);
+      expect(match).not.toBeNull();
+      expect(match![1]).toContain(nvmrcVersion);
+    });
+
+    it('should not reference an older Node.js major version', () => {
+      const olderMajorRefs = dockerfileContent.match(
+        /node:(18|20|22)\.\d+\.\d+/gi
+      );
+      expect(olderMajorRefs).toBeNull();
+    });
+  });
+
   describe('package.json engines', () => {
     let engines: { node?: string; pnpm?: string };
 
@@ -205,6 +226,7 @@ describe('Node.js version consistency', () => {
     const filesToCheck = [
       'Dockerfile',
       'tools/hetzner-dns-updater/Dockerfile',
+      'tools/dns-server/Dockerfile',
       '.github/actions/setup/action.yml',
       '.github/workflows/pull-requests.yml',
       '.github/workflows/release.yml',
@@ -232,6 +254,13 @@ describe('Node.js version consistency', () => {
 
     it('hetzner Dockerfile FROM version matches .nvmrc exactly', () => {
       const dockerfile = readFile('tools/hetzner-dns-updater/Dockerfile');
+      const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
+      expect(match).not.toBeNull();
+      expect(match![1]).toBe(nvmrcVersion);
+    });
+
+    it('dns-server Dockerfile FROM version matches .nvmrc exactly', () => {
+      const dockerfile = readFile('tools/dns-server/Dockerfile');
       const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
       expect(match).not.toBeNull();
       expect(match![1]).toBe(nvmrcVersion);
