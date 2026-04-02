@@ -12,6 +12,7 @@ import { MjmlService } from '../email-template/mjml.service';
 import { createTransport } from 'nodemailer';
 import { SettingsService } from '../settings/settings.service';
 import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
+import { MetricsService } from '../metrics/metrics.service';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -102,10 +103,15 @@ describe('EmailService', () => {
       }),
     };
 
+    const metricsService = {
+      emailSentTotal: { inc: jest.fn() },
+    };
+
     const service = new EmailService(
       settingsService as unknown as SettingsService,
       emailTemplateService as unknown as EmailTemplateService,
       mjmlService as unknown as MjmlService,
+      metricsService as unknown as MetricsService,
     );
 
     return { service, sendMail, close, settingsService, emailTemplateService, mjmlService };

@@ -10,6 +10,18 @@ import { ResourceImageService } from './resourceImage.service';
 import { LicenseService } from '../license/license.service';
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MetricsService } from '../metrics/metrics.service';
+
+const mockMetricsService = {
+  resourcesTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  resourceUsageSessionsActive: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  resourceUsageSessionsTotal: { inc: jest.fn() },
+  resourceUsageDurationSeconds: { observe: jest.fn() },
+  resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  resourceIntroductionsTotal: { inc: jest.fn() },
+  resourceMaintenanceTotal: { inc: jest.fn() },
+  resourceMaintenanceOverdue: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+};
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
@@ -66,6 +78,10 @@ describe('ResourcesService', () => {
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

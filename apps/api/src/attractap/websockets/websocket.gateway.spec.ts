@@ -14,6 +14,13 @@ import { ResourceFlowsExecutorService } from '../../resources/flows/resource-flo
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './websocket.types';
+import { MetricsService } from '../../metrics/metrics.service';
+
+const mockMetricsService = {
+  websocketConnectionsActive: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  attractapNfcTapsTotal: { inc: jest.fn() },
+};
 
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
   return {
@@ -65,6 +72,7 @@ describe('AttractapGateway', () => {
         { provide: ResourceFlowsExecutorService, useValue: {} },
         { provide: ProjectsService, useValue: {} },
         { provide: ResourceFormsService, useValue: {} },
+        { provide: MetricsService, useValue: mockMetricsService },
       ],
     }).compile();
 

@@ -11,6 +11,11 @@ import { UpdateProjectDto } from './dto/update.dto';
 import { ProjectAccessService } from './project-access.service';
 import { EmailService } from '../email/email.service';
 import { NotFoundException } from '@nestjs/common';
+import { MetricsService } from '../metrics/metrics.service';
+
+const mockMetricsService = {
+  projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+};
 
 type MockQueryBuilder = {
   leftJoinAndSelect: jest.Mock;
@@ -83,6 +88,7 @@ describe('ProjectsService', () => {
         { provide: FileStorageService, useValue: fileStorageService },
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
+        { provide: MetricsService, useValue: mockMetricsService },
       ],
     }).compile();
 

@@ -23,6 +23,12 @@ import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { EmailService } from '../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MetricsService } from '../metrics/metrics.service';
+
+const mockMetricsService = {
+  billingTransactionsTotal: { inc: jest.fn() },
+  billingTransactionAmount: { observe: jest.fn() },
+};
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -96,6 +102,10 @@ describe('BillingService', () => {
         {
           provide: EmailService,
           useValue: { sendBillingTransactionEmail: jest.fn(), sendResourceUsageBillingSummaryEmail: jest.fn() },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();
