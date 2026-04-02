@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   displayName: 'plugins-backend-sdk',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',

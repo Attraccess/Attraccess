@@ -34,3 +34,5 @@ bom.json
 .autopilot.json
 .mcp_data/
 .claude/worktrees/
+.claude/worktrees
+.claude/settings.local.json

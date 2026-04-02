@@ -16,7 +16,7 @@ describe('forms.validation', () => {
     });
 
     it('validates numeric option ordering', () => {
-      expect(() => parseFieldOptions(FormFieldType.NUMBER, { min: '10', max: '5' })).toThrowError(
+      expect(() => parseFieldOptions(FormFieldType.NUMBER, { min: '10', max: '5' })).toThrow(
         new BadRequestException('Number field min option cannot be greater than max.'),
       );
     });
@@ -41,7 +41,7 @@ describe('forms.validation', () => {
     });
 
     it('requires select values to match configured options', () => {
-      expect(() => parseFieldValue(FormFieldType.SELECT, 'X', ['A', 'B'])).toThrowError(
+      expect(() => parseFieldValue(FormFieldType.SELECT, 'X', ['A', 'B'])).toThrow(
         new BadRequestException('Select field values must match one of the available options.'),
       );
       expect(parseFieldValue(FormFieldType.SELECT, 'A', ['A', 'B'])).toBe('A');

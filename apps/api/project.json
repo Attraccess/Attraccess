@@ -3,17 +3,12 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/api/src",
   "projectType": "application",
-  "implicitDependencies": [
-    "plugins-backend-sdk",
-    "plugins-frontend-sdk"
-  ],
   "tags": [],
+  "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
   "targets": {
     "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "attractap-firmware:build"
-      ],
+      "dependsOn": ["attractap-firmware:build"],
       "cache": false,
       "options": {
         "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
@@ -22,57 +17,37 @@
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": [
-        "copy-attractap-firmware-into-assets"
-      ],
+      "dependsOn": ["copy-attractap-firmware-into-assets"],
       "inputs": [
         "production",
         "^production",
         {
-          "externalDependencies": [
-            "webpack-cli"
-          ]
+          "externalDependencies": ["webpack-cli"]
         }
       ],
-      "outputs": [
-        "{workspaceRoot}/dist/apps/api"
-      ],
+      "outputs": ["{workspaceRoot}/dist/apps/api"],
       "options": {
         "cwd": "apps/api",
         "command": "webpack-cli build",
-        "args": [
-          "node-env=production"
-        ],
-        "tsPlugins": [
-          "@nestjs/swagger/plugin"
-        ]
+        "args": ["node-env=production"],
+        "tsPlugins": ["@nestjs/swagger/plugin"]
       },
       "configurations": {
         "development": {
-          "args": [
-            "node-env=development"
-          ]
+          "args": ["node-env=development"]
         }
       }
     },
     "swagger-build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "swagger"
-      ],
-      "outputs": [
-        "{workspaceRoot}/dist/apps/{projectName}-swagger"
-      ],
+      "dependsOn": ["^build"],
+      "inputs": ["swagger"],
+      "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger"],
       "options": {
         "command": "webpack-cli build",
         "config": "apps/api/webpack.config.swagger.js",
-        "args": [
-          "node-env=production"
-        ],
+        "args": ["node-env=production"],
         "output-path": "dist/apps/api-swagger"
       }
     },
@@ -96,13 +71,9 @@
     },
     "export-swagger": {
       "executor": "nx:run-commands",
-      "dependsOn": [
-        "swagger-build"
-      ],
+      "dependsOn": ["swagger-build"],
       "cache": true,
-      "outputs": [
-        "{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"
-      ],
+      "outputs": ["{workspaceRoot}/dist/apps/{projectName}-swagger/swagger.json"],
       "options": {
         "command": "LICENSE_KEY=\"I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md\" AUTH_SESSION_SECRET=super-secret ATTRACCESS_URL=http://localhost:3000 SMTP_SERVICE=SMTP SMTP_HOST=not-a-host SMTP_PORT=1234 SMTP_FROM=mail@attraccess.org node dist/apps/api-swagger/main.js"
       }
@@ -115,38 +86,24 @@
         "^production",
         "{workspaceRoot}/jest.preset.js",
         {
-          "externalDependencies": [
-            "jest"
-          ]
+          "externalDependencies": ["jest"]
         }
       ],
-      "outputs": [
-        "{workspaceRoot}/coverage/apps/api"
-      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/api"],
       "options": {
         "jestConfig": "apps/api/jest.config.ts",
-        "testMatch": [
-          "**/*.spec.ts",
-          "!**/*.e2e.spec.ts"
-        ],
+        "testMatch": ["**/*.spec.ts", "!**/*.e2e.spec.ts"],
         "passWithNoTests": true
       }
     },
     "e2e": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "inputs": [
-        "testing",
-        "^production"
-      ],
-      "outputs": [
-        "{workspaceRoot}/coverage/apps/api-e2e"
-      ],
+      "inputs": ["testing", "^production"],
+      "outputs": ["{workspaceRoot}/coverage/apps/api-e2e"],
       "options": {
         "jestConfig": "apps/api/jest.config.ts",
-        "testMatch": [
-          "**/*.e2e.spec.ts"
-        ],
+        "testMatch": ["**/*.e2e.spec.ts"],
         "passWithNoTests": true
       }
     },
@@ -159,12 +116,8 @@
     "build-migration-datasource": {
       "executor": "@nx/webpack:webpack",
       "cache": true,
-      "inputs": [
-        "typeorm"
-      ],
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "inputs": ["typeorm"],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/apps/migrations",
         "main": "apps/api/src/database/datasource.ts",
@@ -175,12 +128,8 @@
     "migration-generate": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        "build-migration-datasource"
-      ],
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "dependsOn": ["build-migration-datasource"],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
         "commands": [
@@ -191,33 +140,21 @@
     "migrations-run": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        "build-migration-datasource"
-      ],
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "dependsOn": ["build-migration-datasource"],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": [
-          "typeorm -d dist/apps/migrations/main.js migration:run"
-        ]
+        "commands": ["typeorm -d dist/apps/migrations/main.js migration:run"]
       }
     },
     "migration-revert": {
       "executor": "nx:run-commands",
       "cache": false,
-      "dependsOn": [
-        "build-migration-datasource"
-      ],
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "dependsOn": ["build-migration-datasource"],
+      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": [
-          "typeorm -d dist/apps/migrations/main.js migration:revert"
-        ]
+        "commands": ["typeorm -d dist/apps/migrations/main.js migration:revert"]
       }
     },
     "lint": {
@@ -230,14 +167,10 @@
         "{projectRoot}/eslint.config.cjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         {
-          "externalDependencies": [
-            "eslint"
-          ]
+          "externalDependencies": ["eslint"]
         }
       ],
-      "outputs": [
-        "{options.outputFile}"
-      ],
+      "outputs": ["{options.outputFile}"],
       "options": {
         "cwd": "apps/api",
         "command": "eslint .",
