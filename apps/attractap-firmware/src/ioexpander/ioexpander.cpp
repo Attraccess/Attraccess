@@ -102,6 +102,8 @@ void IOExpander::writeDefaultState()
         logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
     logger.infof("State written: port0=0x%02X port1=0x%02X", outputState, outputState1);
 #else
+    if (!writeRegister(IOEXP_REG_CONFIG, 0x00))
+        logger.error("Failed to write IO expander CONFIG register");
     if (!writeRegister(IOEXP_REG_OUTPUT, outputState))
         logger.error("Failed to write IO expander OUTPUT register");
     else

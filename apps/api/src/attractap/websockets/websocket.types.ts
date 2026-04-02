@@ -79,6 +79,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       path: string;
       size: number;
       fd?: number;
+      lastLoggedPct?: number;
     } | null;
   };
 }

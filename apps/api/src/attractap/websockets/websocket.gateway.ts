@@ -196,13 +196,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       if (lastError) {
         this.logger.error(
-          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Closing connection.`,
+          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
         );
-        try {
-          client.close();
-        } catch {
-          // ignore error
-        }
         return;
       }
     };
@@ -300,7 +295,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         clearTimeout(awaiter.timeoutId);
       });
 
-      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== client.id);
+      // Only remove the awaiters we just resolved, not all awaiters for this client.
+      // Previously we removed all client awaiters, which could prematurely clear
+      // awaiters for other in-flight messages (e.g. ACK_RESOURCE_LIST clearing
+      // READER_FIRMWARE_UPDATE_REQUIRED awaiter before its ACK arrived).
+      const resolvedIds = new Set(matchingAwaiters.map((a) => a.id));
+      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => !resolvedIds.has(awaiter.id));
     });
   }
 
@@ -475,6 +475,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       if (bytesRead > 0) {
         socket.sendBinaryData(buffer.subarray(0, bytesRead));
+        const progressPct = Math.round(((offset + bytesRead) / total) * 100);
+        const pctBucket = Math.floor(progressPct / 10) * 10;
+        const lastLogged = socket.state.ota.lastLoggedPct ?? -1;
+        if (pctBucket > lastLogged) {
+          socket.state.ota.lastLoggedPct = pctBucket;
+          this.logger.log(
+            `Attractap firmware update progress: ${pctBucket}% (reader ${socket.readerId ?? 'unknown'})`,
+          );
+        }
       }
     } catch (err) {
       this.logger.error(`handleFirmwareChunkRequest error: ${(err as Error).message}`);
@@ -643,6 +652,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
       readerName: reader.name,
+      ledBrightness: reader.ledBrightness,
       resources: resourcesWithFlowButtons.map((resource) => ({
         id: resource.id,
         name: resource.name,
@@ -653,11 +663,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         introducers: resource.introducers.map((introducer) => introducer.user.username),
         activeUsageSession: resource.activeUsageSession
           ? {
-              user: {
-                username: resource.activeUsageSession.user.username,
-              },
-              startTime: resource.activeUsageSession.startTime.toISOString(),
-            }
+            user: {
+              username: resource.activeUsageSession.user.username,
+            },
+            startTime: resource.activeUsageSession.startTime.toISOString(),
+          }
           : null,
         flowButtons: resource.flowButtons,
       })),
@@ -906,7 +916,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return false;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const lastAuthenticatedUserId = socket.state.lastAuthenticatedUserId;
+    if (lastAuthenticatedUserId == null) {
+      await socket.sendMessage(new AttractapEvent(eventType, { error: 'USER_NOT_AUTHENTICATED' }));
+      return false;
+    }
+
+    const user = await this.usersService.findOne({ id: lastAuthenticatedUserId });
     if (!user) {
       await socket.sendMessage(new AttractapEvent(eventType, { error: 'USER_NOT_FOUND' }));
       return false;

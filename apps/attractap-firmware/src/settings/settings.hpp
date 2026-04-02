@@ -8,6 +8,7 @@ struct DeviceConfig
 {
     String passCode = "0000";
     bool beeperEnabled = true;
+    uint8_t ledBrightness = 255;
 };
 
 struct NetworkConfig
@@ -37,6 +38,8 @@ public:
     static DeviceConfig getDeviceConfig();
     static void setDevicePin(String passCode);
     static void setBeeperEnabled(bool beeperEnabled);
+    static uint8_t getLedBrightness();
+    static void setLedBrightness(uint8_t brightness);
 
     static NetworkConfig getNetworkConfig();
     static void saveNetworkConfig(String ssid, String password);
