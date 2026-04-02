@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   displayName: 'generators',
   preset: '../../jest.preset.js',
   transform: {
