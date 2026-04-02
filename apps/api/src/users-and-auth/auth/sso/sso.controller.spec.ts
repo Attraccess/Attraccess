@@ -18,6 +18,11 @@ import { LicenseService } from '../../../license/license.service';
 import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
+import { MetricsService } from '../../../metrics/metrics.service';
+
+const mockMetricsService = {
+  authSsoLoginTotal: { inc: jest.fn() },
+};
 
 describe('SsoController', () => {
   let controller: SSOController;
@@ -164,6 +169,10 @@ describe('SsoController', () => {
         {
           provide: OidcCookieStateStore,
           useValue: {},
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
         SSOOIDCGuard,
       ],

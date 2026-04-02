@@ -8,6 +8,11 @@ import { EmailService } from '../../email/email.service';
 import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
+
+const mockMetricsService = {
+  authLoginTotal: { inc: jest.fn() },
+};
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -59,6 +64,10 @@ describe('AuthService', () => {
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

@@ -5,6 +5,12 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenance, Resource, ResourceIntroducer } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MetricsService } from '../../metrics/metrics.service';
+
+const mockMetricsService = {
+  resourceMaintenanceTotal: { inc: jest.fn() },
+  resourceMaintenanceOverdue: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+};
 
 // Mock the database entities to avoid import issues
 const mockResource = {
@@ -66,6 +72,10 @@ describe('MaintenanceService', () => {
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

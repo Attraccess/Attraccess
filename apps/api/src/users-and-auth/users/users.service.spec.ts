@@ -9,6 +9,12 @@ import { LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
+
+const mockMetricsService = {
+  usersRegisteredTotal: { inc: jest.fn() },
+  usersTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+};
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -71,6 +77,10 @@ describe('UsersService', () => {
           useValue: {
             count: jest.fn(),
           },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();
