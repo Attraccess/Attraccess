@@ -18,29 +18,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup
+      - name: Setup PNPM
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
 
-      - name: Determine project version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
-            echo "VERSION=nightly-${SHORT_SHA}" >> $GITHUB_OUTPUT
-          fi
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
 
-      - name: Generate CycloneDX SBOM
-        run: pnpm sbom:generate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Upload SBOM to DependencyTrack
-        run: |
-          base64 -w 0 bom.json > bom.b64
-          echo -n '{"projectName":"Attraccess","projectVersion":"${{ steps.version.outputs.VERSION }}","autoCreate":false,"bom":"' > payload.json
-          cat bom.b64 >> payload.json
-          echo -n '"}' >> payload.json
-          curl -sS --fail-with-body -X PUT \
-            "${{ vars.DEPENDENCYTRACK_API_URL }}/api/v1/bom" \
-            -H "Content-Type: application/json" \
-            -H "X-Api-Key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}" \
-            -d @payload.json
+        uses: Quobis/action-owasp-dependecy-track-check@main
+        with:
+          url: ${{ vars.DEPENDENCYTRACK_API_URL }}
+          key: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
+          language: nodejs
