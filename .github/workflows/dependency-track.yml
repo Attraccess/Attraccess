@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate SBOM
-        run: npx --yes @cyclonedx/cyclonedx-npm --output-file bom.json --output-format json
+        run: pnpm sbom --sbom-format cyclonedx --sbom-type dependencies > bom.json
 
       - name: Determine project version
         id: version
