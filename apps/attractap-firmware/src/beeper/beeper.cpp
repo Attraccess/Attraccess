@@ -22,16 +22,16 @@ void Beeper::setup()
 void Beeper::errorBeep()
 {
     this->singleBeep();
-    delay(100);
+    delay(200);
     this->singleBeep();
-    delay(100);
+    delay(200);
     this->singleBeep();
 }
 
 void Beeper::indicateBeep()
 {
     this->singleBeep();
-    delay(100);
+    delay(200);
     this->singleBeep();
 }
 
@@ -62,7 +62,7 @@ void Beeper::singleBeep()
     digitalWrite(BEEPER_PIN, HIGH);
 #endif
 
-    delay(200);
+    delay(100);
 
 #ifdef HAS_IO_EXPANDER
     if (this->ioExpander)

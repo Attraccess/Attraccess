@@ -7,5 +7,6 @@ firmware_output/*
 /data/
 # Generated certificate files
 src/certs/
-
+.cache/
 platformio_temp.ini
+compile_commands.json

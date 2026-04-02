@@ -220,13 +220,19 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
 
     this->logger.info("Starting OTA firmware update");
 
+    // Set inProgress immediately to suppress heartbeats and avoid WebSocket send contention.
+    // processIncomingMessage runs in the WebSocket task; the main loop runs in a different task.
+    // Without this, sendHeartbeat could run concurrently and fail (esp_websocket_client_send_text
+    // returns -1 when called from multiple tasks or during heavy receive processing).
+    this->ota.inProgress = true;
+
     this->ota.totalSize = firmwareMeta["totalSize"].is<uint32_t>() ? firmwareMeta["totalSize"].as<uint32_t>() : 0;
     this->ota.bytesWritten = 0;
-    this->ota.inProgress = false;
 
     if (this->ota.totalSize == 0)
     {
         this->logger.error("Invalid firmware meta (totalSize)");
+        this->ota.inProgress = false;
         return;
     }
 
@@ -234,15 +240,16 @@ void API::startFirmwareUpdate(JsonObject firmwareMeta)
     if (!this->ota.updatePartition)
     {
         this->logger.error("OTA: no update partition found");
+        this->ota.inProgress = false;
         return;
     }
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)
     {
         this->logger.error((String("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
+        this->ota.inProgress = false;
         return;
     }
-    this->ota.inProgress = true;
     this->ota.lastReportedPercent = -1;
 
     String availableVersion = firmwareMeta["version"].as<String>();
@@ -591,6 +598,12 @@ void API::sendFirmwareInfo()
 #else
         false;
 #endif
+    event["data"]["payload"]["capabilities"]["hasLeds"] =
+#ifdef HAS_WS2812_LED
+        true;
+#else
+        false;
+#endif
 
     char json[JSON_OUTBUF_SMALL];
     size_t n = serializeJson(event, json, sizeof(json));
@@ -638,6 +651,21 @@ void API::onResourceList(JsonObject data)
         if (this->deviceNameCallback != nullptr)
         {
             this->deviceNameCallback(readerName);
+        }
+    }
+
+    if (data["payload"]["ledBrightness"].is<int>())
+    {
+        int rawBrightness = data["payload"]["ledBrightness"].as<int>();
+        if (rawBrightness < 0) rawBrightness = 0;
+        if (rawBrightness > 255) rawBrightness = 255;
+        uint8_t brightness = (uint8_t)rawBrightness;
+        if (brightness != Settings::getLedBrightness()) {
+            Settings::setLedBrightness(brightness);
+            if (this->ledBrightnessChangedCallback != nullptr)
+            {
+                this->ledBrightnessChangedCallback(brightness);
+            }
         }
     }
 
@@ -986,6 +1014,11 @@ void API::onEnrollNewCard(JsonObject data)
 void API::onDeviceName(std::function<void(String)> callback)
 {
     this->deviceNameCallback = callback;
+}
+
+void API::setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback)
+{
+    this->ledBrightnessChangedCallback = callback;
 }
 
 void API::disableConnectionAttempts()

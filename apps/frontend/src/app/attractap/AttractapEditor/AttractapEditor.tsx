@@ -1,7 +1,7 @@
 import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
-import { Button, Form, ModalBody, Modal, ModalContent, ModalHeader, ModalFooter, Divider } from '@heroui/react';
+import { Button, Form, ModalBody, Modal, ModalContent, ModalHeader, ModalFooter, Divider, Slider } from '@heroui/react';
 import { Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,6 +34,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const toast = useToastMessage();
 
   const [name, setName] = useState('');
+  const [ledBrightness, setLedBrightness] = useState<number>(255);
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const updateReaderMutation = useAttractapServiceUpdateReader({
     onSuccess: () => {
@@ -55,6 +56,7 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   useEffect(() => {
     setName(reader?.name ?? '');
+    setLedBrightness(reader?.ledBrightness ?? 255);
     setConnectedResourceIds(reader?.resources.map((r) => r.id) ?? []);
   }, [reader]);
 
@@ -68,9 +70,10 @@ export function AttractapEditor(props: Readonly<Props>) {
       requestBody: {
         name,
         connectedResourceIds,
+        ledBrightness,
       },
     });
-  }, [name, connectedResourceIds, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, ledBrightness, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -102,6 +105,18 @@ export function AttractapEditor(props: Readonly<Props>) {
                   className="w-full"
                   data-cy="attractap-editor-name-input"
                 />
+                {reader?.firmware.capabilities.hasLeds && (
+                  <Slider
+                    label={t('ledBrightness')}
+                    step={1}
+                    minValue={0}
+                    maxValue={255}
+                    value={ledBrightness}
+                    onChange={(val) => setLedBrightness(val as number)}
+                    className="w-full"
+                    data-cy="attractap-editor-led-brightness-slider"
+                  />
+                )}
                 <Divider className="my-6" />
                 <ResourceSelector
                   selection={connectedResourceIds}
