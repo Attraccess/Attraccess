@@ -1,0 +1,52 @@
+{
+  "loading": "Metriken-Einstellungen werden geladen...",
+  "description": "Erstelle einen API-Schlüssel, um authentifizierten Zugriff auf den Prometheus-Metriken-Endpunkt zu ermöglichen.",
+  "endpointLabel": "Metriken-Endpunkt",
+  "endpointCopied": {
+    "title": "Kopiert",
+    "description": "Endpunkt-URL in die Zwischenablage kopiert."
+  },
+  "generateButton": "API-Schlüssel generieren",
+  "rerollButton": "API-Schlüssel neu generieren",
+  "removeButton": "API-Schlüssel entfernen",
+  "keyGenerated": {
+    "title": "API-Schlüssel generiert",
+    "description": "Kopiere diesen Schlüssel jetzt. Er wird nicht erneut angezeigt."
+  },
+  "keyRemoved": {
+    "title": "API-Schlüssel entfernt",
+    "description": "Der Metriken-Endpunkt ist jetzt deaktiviert."
+  },
+  "warning": "Dieser Schlüssel wird nur einmal angezeigt. Wenn du ihn verlierst, musst du ihn neu generieren.",
+  "apiKeyLabel": "API-Schlüssel",
+  "copyButton": "Kopieren",
+  "copied": {
+    "title": "Kopiert",
+    "description": "API-Schlüssel in die Zwischenablage kopiert."
+  },
+  "copyFailed": {
+    "title": "Kopieren fehlgeschlagen",
+    "description": "Konnte nicht in die Zwischenablage kopieren."
+  },
+  "confirmReroll": {
+    "title": "API-Schlüssel neu generieren?",
+    "description": "Der aktuelle Schlüssel wird ungültig. Alle Systeme, die den alten Schlüssel verwenden, verlieren den Zugriff auf den Metriken-Endpunkt.",
+    "confirm": "Neu generieren",
+    "cancel": "Abbrechen"
+  },
+  "confirmRemove": {
+    "title": "API-Schlüssel entfernen?",
+    "description": "Der Metriken-Endpunkt wird deaktiviert. Prometheus-Scraper erhalten keine Daten mehr.",
+    "confirm": "Entfernen",
+    "cancel": "Abbrechen"
+  },
+  "setupGuide": {
+    "title": "Prometheus-Konfiguration",
+    "description": "Füge den folgenden Scrape-Job zu deiner prometheus.yml hinzu:",
+    "bearerNote": "Ersetze <YOUR_API_KEY> durch den oben generierten API-Schlüssel.",
+    "queryParamNote": "Alternativ kann der Schlüssel als Query-Parameter übergeben werden:",
+    "grafanaTitle": "Grafana-Einrichtung",
+    "grafanaDescription": "Füge in Grafana eine Prometheus-Datenquelle hinzu, die auf deinen Prometheus-Server zeigt (z. B. http://prometheus:9090). Die Metriken sind automatisch verfügbar, sobald Prometheus den obigen Endpunkt abfragt."
+  },
+  "doneButton": "Fertig"
+}

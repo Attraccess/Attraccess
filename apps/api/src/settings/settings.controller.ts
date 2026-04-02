@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from './settings.service';
@@ -6,7 +6,7 @@ import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { MetricsSettingsDto } from './dto/metrics-settings.dto';
-import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
+import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
 
 @ApiTags('Settings')
 @Controller('settings')
@@ -50,14 +50,22 @@ export class SettingsController {
     return { apiKeyConfigured: configured };
   }
 
-  @Patch('metrics')
+  @Post('metrics/generate-api-key')
   @Auth('canManageSystemConfiguration')
-  @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
-  @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
-  async updateMetricsSettings(@Body() body: UpdateMetricsSettingsDto): Promise<MetricsSettingsDto> {
-    await this.settingsService.setMetricsApiKey(body.apiKey || null);
-    const { configured } = await this.settingsService.getMetricsApiKey();
-    return { apiKeyConfigured: configured };
+  @ApiOperation({ summary: 'Generate a new metrics API key', operationId: 'generateMetricsApiKey' })
+  @ApiResponse({ status: 201, description: 'Metrics API key generated.', type: GenerateMetricsApiKeyResponseDto })
+  async generateMetricsApiKey(): Promise<GenerateMetricsApiKeyResponseDto> {
+    const { apiKey } = await this.settingsService.generateMetricsApiKey();
+    return { apiKeyConfigured: true, apiKey };
+  }
+
+  @Delete('metrics/api-key')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Remove the metrics API key', operationId: 'deleteMetricsApiKey' })
+  @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
+  async deleteMetricsApiKey(): Promise<MetricsSettingsDto> {
+    await this.settingsService.setMetricsApiKey(null);
+    return { apiKeyConfigured: false };
   }
 
   @Post('first-time-setup')

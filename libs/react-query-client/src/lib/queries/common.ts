@@ -129,6 +129,10 @@ export type SettingsServiceGetFirstTimeSetupStatusDefaultResponse = Awaited<Retu
 export type SettingsServiceGetFirstTimeSetupStatusQueryResult<TData = SettingsServiceGetFirstTimeSetupStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSettingsServiceGetFirstTimeSetupStatusKey = "SettingsServiceGetFirstTimeSetupStatus";
 export const UseSettingsServiceGetFirstTimeSetupStatusKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetFirstTimeSetupStatusKey, ...(queryKey ?? [])];
+export type SettingsServiceGetMetricsSettingsDefaultResponse = Awaited<ReturnType<typeof SettingsService.getMetricsSettings>>;
+export type SettingsServiceGetMetricsSettingsQueryResult<TData = SettingsServiceGetMetricsSettingsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSettingsServiceGetMetricsSettingsKey = "SettingsServiceGetMetricsSettings";
+export const UseSettingsServiceGetMetricsSettingsKeyFn = (queryKey?: Array<unknown>) => [useSettingsServiceGetMetricsSettingsKey, ...(queryKey ?? [])];
 export type LicenseServiceGetLicenseInformationDefaultResponse = Awaited<ReturnType<typeof LicenseService.getLicenseInformation>>;
 export type LicenseServiceGetLicenseInformationQueryResult<TData = LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useLicenseServiceGetLicenseInformationKey = "LicenseServiceGetLicenseInformation";
@@ -522,6 +526,7 @@ export type TwoFactorAuthenticationServiceDisableTwoFactorMutationResult = Await
 export type TwoFactorAuthenticationServiceSetTwoFactorPolicyMutationResult = Awaited<ReturnType<typeof TwoFactorAuthenticationService.setTwoFactorPolicy>>;
 export type EmailTemplatesServiceEmailTemplateControllerPreviewMjmlMutationResult = Awaited<ReturnType<typeof EmailTemplatesService.emailTemplateControllerPreviewMjml>>;
 export type SettingsServiceApplyFirstTimeSetupSettingsMutationResult = Awaited<ReturnType<typeof SettingsService.applyFirstTimeSetupSettings>>;
+export type SettingsServiceGenerateMetricsApiKeyMutationResult = Awaited<ReturnType<typeof SettingsService.generateMetricsApiKey>>;
 export type ResourcesServiceCreateOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.createOneResource>>;
 export type ResourcesServiceResourceGroupsCreateOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsCreateOne>>;
 export type ResourcesServiceResourceGroupsAddResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsAddResource>>;
@@ -583,6 +588,7 @@ export type AttractapServiceToggleCardActiveMutationResult = Awaited<ReturnType<
 export type UsersServiceDeleteUserMutationResult = Awaited<ReturnType<typeof UsersService.deleteUser>>;
 export type AuthenticationServiceEndSessionMutationResult = Awaited<ReturnType<typeof AuthenticationService.endSession>>;
 export type AuthenticationServiceDeleteOneSsoProviderMutationResult = Awaited<ReturnType<typeof AuthenticationService.deleteOneSsoProvider>>;
+export type SettingsServiceDeleteMetricsApiKeyMutationResult = Awaited<ReturnType<typeof SettingsService.deleteMetricsApiKey>>;
 export type ResourcesServiceDeleteOneResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.deleteOneResource>>;
 export type ResourcesServiceResourceGroupsRemoveResourceMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsRemoveResource>>;
 export type ResourcesServiceResourceGroupsDeleteOneMutationResult = Awaited<ReturnType<typeof ResourcesService.resourceGroupsDeleteOne>>;

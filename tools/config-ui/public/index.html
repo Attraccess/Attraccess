@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attraccess Config</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 1rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    h2 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #555; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .status-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+    .status-bar.running { background: #e8f5e9; color: #2e7d32; }
+    .status-bar.stopped { background: #ffebee; color: #c62828; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .status-bar.running .status-dot { background: #4caf50; }
+    .status-bar.stopped .status-dot { background: #f44336; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+    th { color: #888; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+    .actions { display: flex; gap: 0.25rem; }
+    button { cursor: pointer; border: none; border-radius: 4px; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+    .btn-primary { background: #1976d2; color: #fff; }
+    .btn-primary:hover { background: #1565c0; }
+    .btn-danger { background: #d32f2f; color: #fff; }
+    .btn-danger:hover { background: #c62828; }
+    .btn-secondary { background: #e0e0e0; color: #333; }
+    .btn-secondary:hover { background: #bdbdbd; }
+    input[type="text"] { border: 1px solid #ccc; border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.9rem; width: 100%; }
+    .add-form { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; padding-top: 0.2rem; }
+    .add-form .field { flex: 1; min-width: 150px; }
+    .add-form label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.2rem; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .settings-grid label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.2rem; }
+    .settings-grid.full { grid-template-columns: 1fr; }
+    .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+    .checkbox-row input { width: auto; }
+    .edit-input { border: 1px solid #1976d2; border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 100%; }
+    .empty-state { text-align: center; color: #999; padding: 2rem; }
+    .desc { font-size: 0.8rem; color: #888; margin-bottom: 0.75rem; line-height: 1.4; }
+    .field-hint { font-size: 0.75rem; color: #aaa; margin-top: 0.15rem; }
+    .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid #e0e0e0; }
+    .tab { padding: 0.6rem 1.2rem; cursor: pointer; font-size: 0.95rem; font-weight: 500; color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; background: none; border-radius: 0; }
+    .tab:hover { color: #555; }
+    .tab.active { color: #1976d2; border-bottom-color: #1976d2; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .config-preview { background: #263238; color: #e0e0e0; border-radius: 6px; padding: 0.75rem 1rem; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 0.8rem; white-space: pre; overflow-x: auto; line-height: 1.5; margin-top: 0.5rem; }
+    .api-key-field { position: relative; }
+    .api-key-field input { padding-right: 3rem; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; }
+    .masked-key { font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; color: #888; }
+    .success-msg { background: #e8f5e9; color: #2e7d32; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.75rem; }
+    @media (max-width: 600px) {
+      .add-form { flex-direction: column; }
+      .settings-grid { grid-template-columns: 1fr; }
+      table { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Attraccess Config</h1>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('dns')" data-testid="tab-dns">DNS Server</button>
+      <button class="tab" onclick="switchTab('prometheus')" data-testid="tab-prometheus">Prometheus</button>
+    </div>
+
+    <!-- ==================== DNS Tab ==================== -->
+    <div id="tab-dns" class="tab-content active">
+      <div id="dns-status" class="status-bar stopped">
+        <div class="status-dot"></div>
+        <span id="dns-status-text">Checking...</span>
+      </div>
+
+      <div class="card">
+        <h2>DNS Records</h2>
+        <p class="desc">Map hostnames to IP addresses on your local network. Changes take effect immediately.</p>
+        <div class="add-form" style="margin-bottom: 1rem;">
+          <div class="field">
+            <label for="new-hostname">Hostname</label>
+            <input type="text" id="new-hostname" placeholder="e.g. myapp.local" data-testid="input-hostname">
+            <div class="field-hint">The domain name to resolve</div>
+          </div>
+          <div class="field">
+            <label for="new-ip">IP Address</label>
+            <input type="text" id="new-ip" placeholder="e.g. 192.168.1.10" data-testid="input-ip">
+            <div class="field-hint">The IPv4 address this hostname should point to</div>
+          </div>
+          <button class="btn-primary" onclick="addDnsRecord()" data-testid="btn-add-record" style="margin-top: 1.15rem;">Add Record</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Hostname</th><th>IP Address</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="dns-records-table"></tbody>
+        </table>
+        <div id="dns-empty-state" class="empty-state" style="display:none;">No DNS records configured.</div>
+      </div>
+
+      <div class="card">
+        <h2>DNS Settings</h2>
+        <p class="desc">Configure upstream DNS servers. Saving restarts dnsmasq.</p>
+        <div class="settings-grid">
+          <div>
+            <label for="dns-upstream1">Upstream DNS 1</label>
+            <input type="text" id="dns-upstream1" placeholder="1.1.1.1" data-testid="input-upstream1">
+          </div>
+          <div>
+            <label for="dns-upstream2">Upstream DNS 2</label>
+            <input type="text" id="dns-upstream2" placeholder="8.8.8.8" data-testid="input-upstream2">
+          </div>
+        </div>
+        <div class="settings-grid full" style="margin-top: 0.75rem;">
+          <div>
+            <label for="dns-localDomain">Local Domain</label>
+            <input type="text" id="dns-localDomain" placeholder="e.g. home.local" data-testid="input-local-domain">
+            <div class="field-hint">Optional. Queries for this domain are never forwarded upstream.</div>
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="dns-logQueries" data-testid="input-log-queries">
+          <label for="dns-logQueries" style="font-size: 0.9rem; color: #333;">Enable query logging</label>
+        </div>
+        <div style="margin-top: 0.75rem;">
+          <button class="btn-primary" onclick="saveDnsSettings()" data-testid="btn-save-dns-settings">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Prometheus Tab ==================== -->
+    <div id="tab-prometheus" class="tab-content">
+      <div id="prom-status" class="status-bar stopped">
+        <div class="status-dot"></div>
+        <span id="prom-status-text">Checking...</span>
+      </div>
+
+      <div class="card">
+        <h2>Prometheus Settings</h2>
+        <p class="desc">Configure how Prometheus scrapes the Attraccess metrics endpoint. Changes write a new prometheus.yml and reload the process.</p>
+
+        <div class="settings-grid">
+          <div>
+            <label for="prom-scrapeInterval">Scrape Interval</label>
+            <input type="text" id="prom-scrapeInterval" placeholder="10s" data-testid="input-scrape-interval">
+            <div class="field-hint">How often Prometheus scrapes Attraccess (e.g. 10s, 30s, 1m)</div>
+          </div>
+          <div>
+            <label for="prom-evaluationInterval">Evaluation Interval</label>
+            <input type="text" id="prom-evaluationInterval" placeholder="15s" data-testid="input-eval-interval">
+            <div class="field-hint">How often Prometheus evaluates rules</div>
+          </div>
+        </div>
+
+        <div class="settings-grid" style="margin-top: 0.75rem;">
+          <div>
+            <label for="prom-attraccessTarget">Attraccess Target</label>
+            <input type="text" id="prom-attraccessTarget" placeholder="attraccess:3000" data-testid="input-attraccess-target">
+            <div class="field-hint">host:port of the Attraccess instance (as seen from Prometheus)</div>
+          </div>
+          <div>
+            <label for="prom-retentionTime">Retention Time</label>
+            <input type="text" id="prom-retentionTime" placeholder="30d" data-testid="input-retention-time">
+            <div class="field-hint">How long to keep data (used in Prometheus CLI args)</div>
+          </div>
+        </div>
+
+        <div class="settings-grid full" style="margin-top: 0.75rem;">
+          <div>
+            <label for="prom-metricsApiKey">Metrics API Key</label>
+            <input type="text" id="prom-metricsApiKey" placeholder="Paste the API key from Attraccess Settings > Metrics" data-testid="input-metrics-api-key">
+            <div class="field-hint">The bearer token used to authenticate with /api/metrics. Generate this in Attraccess Settings &gt; Metrics.</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.75rem;">
+          <button class="btn-primary" onclick="savePromSettings()" data-testid="btn-save-prom-settings">Save &amp; Reload</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Generated Config</h2>
+        <p class="desc">The current prometheus.yml that will be used by Prometheus. Updated automatically when you save settings above.</p>
+        <div id="prom-config-preview" class="config-preview">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var API = '';
+
+    function request(method, url, body) {
+      var opts = { method: method, headers: {} };
+      if (body) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      return fetch(API + url, opts).then(function(r) { return r.json(); });
+    }
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    /* ---- Tab switching ---- */
+    function switchTab(id) {
+      document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      document.querySelector('[onclick="switchTab(\'' + id + '\')"]').classList.add('active');
+      document.getElementById('tab-' + id).classList.add('active');
+    }
+
+    /* ==================== DNS ==================== */
+    function renderDnsRecords(records) {
+      var tbody = document.getElementById('dns-records-table');
+      var empty = document.getElementById('dns-empty-state');
+      if (!records.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      tbody.innerHTML = records.map(function(r) {
+        return '<tr data-id="' + escapeHtml(r.id) + '">'
+          + '<td><span class="cell-text">' + escapeHtml(r.hostname) + '</span>'
+          + '<input class="edit-input edit-hostname" style="display:none" value="' + escapeHtml(r.hostname) + '"></td>'
+          + '<td><span class="cell-text">' + escapeHtml(r.ip) + '</span>'
+          + '<input class="edit-input edit-ip" style="display:none" value="' + escapeHtml(r.ip) + '"></td>'
+          + '<td class="actions">'
+          + '<button class="btn-secondary btn-edit" onclick="startDnsEdit(this)" data-testid="btn-edit-record">Edit</button>'
+          + '<button class="btn-primary btn-save" style="display:none" onclick="saveDnsEdit(this)" data-testid="btn-save-record">Save</button>'
+          + '<button class="btn-secondary btn-cancel" style="display:none" onclick="loadDnsRecords()" data-testid="btn-cancel-edit">Cancel</button>'
+          + '<button class="btn-danger btn-delete" onclick="deleteDnsRecord(\'' + escapeHtml(r.id) + '\')" data-testid="btn-delete-record">Delete</button>'
+          + '</td></tr>';
+      }).join('');
+    }
+
+    function loadDnsRecords() {
+      request('GET', '/api/modules/dnsmasq/records').then(renderDnsRecords);
+    }
+
+    function addDnsRecord() {
+      var hostname = document.getElementById('new-hostname').value.trim();
+      var ip = document.getElementById('new-ip').value.trim();
+      if (!hostname || !ip) return;
+      request('POST', '/api/modules/dnsmasq/records', { hostname: hostname, ip: ip }).then(function() {
+        document.getElementById('new-hostname').value = '';
+        document.getElementById('new-ip').value = '';
+        loadDnsRecords();
+      });
+    }
+
+    function deleteDnsRecord(id) {
+      if (!confirm('Delete this DNS record?')) return;
+      request('DELETE', '/api/modules/dnsmasq/records/' + id).then(loadDnsRecords);
+    }
+
+    function startDnsEdit(btn) {
+      var row = btn.closest('tr');
+      row.querySelectorAll('.cell-text').forEach(function(el) { el.style.display = 'none'; });
+      row.querySelectorAll('.edit-input').forEach(function(el) { el.style.display = 'block'; });
+      row.querySelector('.btn-edit').style.display = 'none';
+      row.querySelector('.btn-save').style.display = '';
+      row.querySelector('.btn-cancel').style.display = '';
+    }
+
+    function saveDnsEdit(btn) {
+      var row = btn.closest('tr');
+      var id = row.getAttribute('data-id');
+      var hostname = row.querySelector('.edit-hostname').value.trim();
+      var ip = row.querySelector('.edit-ip').value.trim();
+      if (!hostname || !ip) return;
+      request('PUT', '/api/modules/dnsmasq/records/' + id, { hostname: hostname, ip: ip }).then(loadDnsRecords);
+    }
+
+    function loadDnsSettings() {
+      request('GET', '/api/modules/dnsmasq/settings').then(function(s) {
+        document.getElementById('dns-upstream1').value = s.upstream1 || '';
+        document.getElementById('dns-upstream2').value = s.upstream2 || '';
+        document.getElementById('dns-localDomain').value = s.localDomain || '';
+        document.getElementById('dns-logQueries').checked = !!s.logQueries;
+      });
+    }
+
+    function saveDnsSettings() {
+      var data = {
+        upstream1: document.getElementById('dns-upstream1').value.trim(),
+        upstream2: document.getElementById('dns-upstream2').value.trim(),
+        localDomain: document.getElementById('dns-localDomain').value.trim(),
+        logQueries: document.getElementById('dns-logQueries').checked
+      };
+      request('PUT', '/api/modules/dnsmasq/settings', data).then(loadDnsSettings);
+    }
+
+    function checkDnsStatus() {
+      request('GET', '/api/modules/dnsmasq/status').then(function(s) {
+        var el = document.getElementById('dns-status');
+        var text = document.getElementById('dns-status-text');
+        if (s.running) {
+          el.className = 'status-bar running';
+          text.textContent = 'dnsmasq running (PID ' + s.pid + ')';
+        } else {
+          el.className = 'status-bar stopped';
+          text.textContent = 'dnsmasq not running';
+        }
+      }).catch(function() {
+        document.getElementById('dns-status').className = 'status-bar stopped';
+        document.getElementById('dns-status-text').textContent = 'Connection error';
+      });
+    }
+
+    /* ==================== Prometheus ==================== */
+    function loadPromSettings() {
+      request('GET', '/api/modules/prometheus/settings').then(function(s) {
+        document.getElementById('prom-scrapeInterval').value = s.scrapeInterval || '';
+        document.getElementById('prom-evaluationInterval').value = s.evaluationInterval || '';
+        document.getElementById('prom-attraccessTarget').value = s.attraccessTarget || '';
+        document.getElementById('prom-retentionTime').value = s.retentionTime || '';
+        document.getElementById('prom-metricsApiKey').value = s.metricsApiKey || '';
+      });
+    }
+
+    function savePromSettings() {
+      var data = {
+        scrapeInterval: document.getElementById('prom-scrapeInterval').value.trim(),
+        evaluationInterval: document.getElementById('prom-evaluationInterval').value.trim(),
+        attraccessTarget: document.getElementById('prom-attraccessTarget').value.trim(),
+        retentionTime: document.getElementById('prom-retentionTime').value.trim(),
+        metricsApiKey: document.getElementById('prom-metricsApiKey').value.trim()
+      };
+      request('PUT', '/api/modules/prometheus/settings', data).then(function() {
+        loadPromSettings();
+        loadPromConfig();
+      });
+    }
+
+    function loadPromConfig() {
+      request('GET', '/api/modules/prometheus/config').then(function(data) {
+        document.getElementById('prom-config-preview').textContent = data.config || 'No config file found.';
+      }).catch(function() {
+        document.getElementById('prom-config-preview').textContent = 'Failed to load config.';
+      });
+    }
+
+    function checkPromStatus() {
+      request('GET', '/api/modules/prometheus/status').then(function(s) {
+        var el = document.getElementById('prom-status');
+        var text = document.getElementById('prom-status-text');
+        if (s.running) {
+          el.className = 'status-bar running';
+          text.textContent = 'prometheus running (' + (s.url || '') + ')';
+        } else {
+          el.className = 'status-bar stopped';
+          text.textContent = 'prometheus not reachable';
+        }
+      }).catch(function() {
+        document.getElementById('prom-status').className = 'status-bar stopped';
+        document.getElementById('prom-status-text').textContent = 'Connection error';
+      });
+    }
+
+    /* ==================== Init ==================== */
+    loadDnsRecords();
+    loadDnsSettings();
+    checkDnsStatus();
+    loadPromSettings();
+    loadPromConfig();
+    checkPromStatus();
+    setInterval(function() { checkDnsStatus(); checkPromStatus(); }, 10000);
+  </script>
+</body>
+</html>
