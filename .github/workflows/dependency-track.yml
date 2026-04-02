@@ -50,4 +50,4 @@ jobs:
           projectName: ${{ github.event.repository.name }}
           projectVersion: ${{ steps.version.outputs.PROJECT_VERSION }}
           bomFilename: bom.json
-          autoCreate: 'false'
+          autoCreate: 'true'
