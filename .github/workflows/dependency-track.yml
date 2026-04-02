@@ -36,7 +36,7 @@ jobs:
       - name: Upload SBOM to DependencyTrack
         run: |
           base64 -w 0 bom.json > bom.b64
-          echo -n '{"projectName":"Attraccess","projectVersion":"${{ steps.version.outputs.VERSION }}","autoCreate":true,"bom":"' > payload.json
+          echo -n '{"projectName":"Attraccess","projectVersion":"${{ steps.version.outputs.VERSION }}","autoCreate":false,"bom":"' > payload.json
           cat bom.b64 >> payload.json
           echo -n '"}' >> payload.json
           curl -sS --fail-with-body -X PUT \
