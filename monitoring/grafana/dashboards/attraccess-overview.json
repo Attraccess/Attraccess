@@ -1,0 +1,396 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"attraccess\"}[5m])) by (route)",
+          "legendFormat": "{{ route }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Request Latency (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Error Rate (4xx + 5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"attraccess\", status_code=~\"4..\"}[5m]))",
+          "legendFormat": "4xx",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{job=\"attraccess\", status_code=~\"5..\"}[5m]))",
+          "legendFormat": "5xx",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Authentication",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_auth_login_total{job=\"attraccess\", status=\"success\"}[5m]))",
+          "legendFormat": "Successful Logins/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(attraccess_auth_login_total{job=\"attraccess\", status=\"fail\"}[5m]))",
+          "legendFormat": "Failed Logins/s",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(attraccess_auth_sso_login_total{job=\"attraccess\"}[5m])) by (provider_type)",
+          "legendFormat": "SSO {{ provider_type }}/s",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_users_total{job=\"attraccess\"}",
+          "legendFormat": "Total Users",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Resources",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_resources_total{job=\"attraccess\"}",
+          "legendFormat": "Total Resources",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Active Usage Sessions",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_resource_usage_sessions_active{job=\"attraccess\"}",
+          "legendFormat": "Active Sessions",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Connected Devices",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_attractap_devices_connected{job=\"attraccess\"}",
+          "legendFormat": "Devices Online",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Resource Usage Sessions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_resource_usage_sessions_total{job=\"attraccess\", action=\"start\"}[5m]))",
+          "legendFormat": "Sessions Started/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(attraccess_resource_usage_sessions_total{job=\"attraccess\", action=\"end\"}[5m]))",
+          "legendFormat": "Sessions Ended/s",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Resource Usage Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(attraccess_resource_usage_duration_seconds_bucket{job=\"attraccess\"}[30m])) by (le))",
+          "legendFormat": "p50 Duration",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(attraccess_resource_usage_duration_seconds_bucket{job=\"attraccess\"}[30m])) by (le))",
+          "legendFormat": "p95 Duration",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Billing Transactions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_billing_transactions_total{job=\"attraccess\"}[5m])) by (status)",
+          "legendFormat": "{{ status }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "NFC Tap Events",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_attractap_nfc_taps_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "NFC Taps/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Emails Sent",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_email_sent_total{job=\"attraccess\"}[5m])) by (status)",
+          "legendFormat": "{{ status }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "System Overview",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_projects_total{job=\"attraccess\"}",
+          "legendFormat": "Projects",
+          "refId": "A"
+        },
+        {
+          "expr": "attraccess_resource_groups_total{job=\"attraccess\"}",
+          "legendFormat": "Resource Groups",
+          "refId": "B"
+        },
+        {
+          "expr": "attraccess_mqtt_servers_total{job=\"attraccess\"}",
+          "legendFormat": "MQTT Servers",
+          "refId": "C"
+        },
+        {
+          "expr": "attraccess_resource_maintenance_overdue{job=\"attraccess\"}",
+          "legendFormat": "Overdue Maintenance",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "title": "Maintenance Events",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_resource_maintenance_total{job=\"attraccess\"}[5m])) by (type)",
+          "legendFormat": "{{ type }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "User Registrations",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_users_registered_total{job=\"attraccess\"}[1h]))",
+          "legendFormat": "Registrations/hr",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Resource Introductions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_resource_introductions_total{job=\"attraccess\"}[1h]))",
+          "legendFormat": "Introductions/hr",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["attraccess"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Attraccess Overview",
+  "uid": "attraccess-overview",
+  "version": 1
+}

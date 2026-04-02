@@ -11,6 +11,7 @@ import { ResourceNotFoundException } from '../exceptions/resource.notFound.excep
 import { LicenseError, LicenseService } from '../license/license.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceChangedEvent } from './events/resource-changed.event';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class ResourcesService {
@@ -23,6 +24,7 @@ export class ResourcesService {
     private readonly licenseService: LicenseService,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async createResource(dto: CreateResourceDto, image?: FileUpload): Promise<Resource> {
@@ -67,6 +69,7 @@ export class ResourcesService {
     }
 
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(resource.id));
+    this.metricsService.resourcesTotal.inc();
 
     return resource;
   }
@@ -143,6 +146,7 @@ export class ResourcesService {
     }
 
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
+    this.metricsService.resourcesTotal.dec();
   }
 
   async listResources(options?: {

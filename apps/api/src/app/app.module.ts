@@ -25,6 +25,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { SettingsService } from '../settings/settings.service';
         ];
       },
     }),
+    MetricsModule,
     PluginModule.forRoot(),
     AttractapModule,
     AnalyticsModule,

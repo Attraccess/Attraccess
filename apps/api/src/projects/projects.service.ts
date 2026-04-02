@@ -18,6 +18,7 @@ import { FileUpload } from '../common/types/file-upload.types';
 import { ProjectAccessService } from './project-access.service';
 import { ProjectWithAccessDto } from './dto/project-access.dto';
 import { EmailService } from '../email/email.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class ProjectsService {
@@ -35,6 +36,7 @@ export class ProjectsService {
     private readonly fileStorageService: FileStorageService,
     private readonly projectAccessService: ProjectAccessService,
     private readonly emailService: EmailService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
@@ -97,6 +99,7 @@ export class ProjectsService {
       await this.setLogo(project, data.logo);
     }
 
+    this.metricsService.projectsTotal.inc();
     return project;
   }
 
@@ -115,6 +118,7 @@ export class ProjectsService {
   public async deleteOne(id: number): Promise<void> {
     await this.resourceUsageRepository.update({ projectId: id }, { projectId: null });
     await this.projectRepository.delete(id);
+    this.metricsService.projectsTotal.dec();
   }
 
   public async updateOne(ownerUserId: number, id: number, data: UpdateProjectDto): Promise<Project> {

@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
@@ -59,6 +60,7 @@ export class AuthService {
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
     private usersService: UsersService,
     private readonly tokenHashService: TokenHashService,
+    private readonly metricsService: MetricsService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -207,9 +209,11 @@ export class AuthService {
     const isValid = await this.validateAuthenticationDetails(user.id, options);
     if (!isValid) {
       this.logger.debug(`Invalid authentication for user ID: ${user.id}`);
+      this.metricsService.authLoginTotal.inc({ method: options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso', status: 'fail' });
       return null;
     }
 
+    this.metricsService.authLoginTotal.inc({ method: options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso', status: 'success' });
     return user;
   }
 

@@ -27,6 +27,7 @@ import { RefundAmountHigherThanTransactionAmountException } from './errors/refun
 import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class BillingService {
@@ -46,6 +47,7 @@ export class BillingService {
     private readonly emailService: EmailService,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -173,6 +175,10 @@ export class BillingService {
     });
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    this.metricsService.billingTransactionsTotal.inc({ status: transaction.status });
+    if (amount) {
+      this.metricsService.billingTransactionAmount.observe(Math.abs(amount));
+    }
 
     return transaction;
   }

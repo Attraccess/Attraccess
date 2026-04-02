@@ -15,6 +15,7 @@ import * as Handlebars from 'handlebars';
 import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class EmailService {
@@ -24,6 +25,7 @@ export class EmailService {
     private readonly settingsService: SettingsService,
     private readonly emailTemplateService: EmailTemplateService,
     private readonly mjmlService: MjmlService,
+    private readonly metricsService: MetricsService,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -67,8 +69,10 @@ export class EmailService {
       if (typeof transporter.close === 'function') {
         transporter.close();
       }
+      this.metricsService.emailSentTotal.inc({ status: 'success' });
       this.logger.debug(`Email sent successfully to: ${user.email}`);
     } catch (error) {
+      this.metricsService.emailSentTotal.inc({ status: 'fail' });
       this.logger.error(`Failed to send email to: ${user.email}`, error.stack);
       throw error;
     }
