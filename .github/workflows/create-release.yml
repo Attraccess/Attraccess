@@ -36,6 +36,9 @@ jobs:
       - name: Configure npm auth
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
 
+      - name: Build publishable libraries
+        run: pnpm nx run-many -t build -p plugins-frontend-sdk plugins-frontend-ui plugins-backend-sdk react-query-client env
+
       - name: Run NX Release (dry run)
         if: inputs.dry-run
         env:
