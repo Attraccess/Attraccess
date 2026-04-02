@@ -110,17 +110,36 @@ services:
     env_file:
       - .env.docker-compose
 
+  config-ui:
+    build:
+      context: ./tools/config-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '53:53/udp'
+      - '53:53/tcp'
+    expose:
+      - '5380'
+    volumes:
+      - config-ui-data:/data
+      - prometheus-config:/etc/prometheus
+    env_file:
+      - .env.docker-compose
+
   prometheus:
     image: prom/prometheus:v3.4.0
     restart: unless-stopped
     expose:
       - '9090'
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-config:/etc/prometheus:ro
       - prometheus-data:/prometheus
+    depends_on:
+      - config-ui
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
 
   grafana:
     image: grafana/grafana:11.6.0
@@ -151,6 +170,7 @@ services:
       - zigbee2mqtt:/external-storage/zigbee2mqtt
       - prometheus-data:/external-storage/prometheus
       - grafana-data:/external-storage/grafana
+      - config-ui-data:/external-storage/config-ui
     env_file:
       - .env.docker-compose
 
@@ -161,6 +181,8 @@ volumes:
   webhook-site:
   rabbitmq_data:
   zigbee2mqtt:
+  config-ui-data:
+  prometheus-config:
   prometheus-data:
   grafana-data:
   duplicati:

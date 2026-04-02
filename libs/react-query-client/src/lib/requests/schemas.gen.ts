@@ -1650,6 +1650,32 @@ export const $FirstTimeSetupStatusDto = {
     required: ['available', 'stepsCompleted']
 } as const;
 
+export const $MetricsSettingsDto = {
+    type: 'object',
+    properties: {
+        apiKeyConfigured: {
+            type: 'boolean',
+            description: 'Whether a metrics API key is configured'
+        }
+    },
+    required: ['apiKeyConfigured']
+} as const;
+
+export const $GenerateMetricsApiKeyResponseDto = {
+    type: 'object',
+    properties: {
+        apiKeyConfigured: {
+            type: 'boolean',
+            description: 'Whether a metrics API key is configured'
+        },
+        apiKey: {
+            type: 'string',
+            description: 'The generated API key (shown only once)'
+        }
+    },
+    required: ['apiKeyConfigured', 'apiKey']
+} as const;
+
 export const $LicenseDataDto = {
     type: 'object',
     properties: {

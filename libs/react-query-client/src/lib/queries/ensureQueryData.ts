@@ -64,6 +64,7 @@ export const ensureUseEmailTemplatesServiceEmailTemplateControllerFindOneData = 
 }) => queryClient.ensureQueryData({ queryKey: Common.UseEmailTemplatesServiceEmailTemplateControllerFindOneKeyFn({ type }), queryFn: () => EmailTemplatesService.emailTemplateControllerFindOne({ type }) });
 export const ensureUseSettingsServiceGetSystemSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetSystemSettingsKeyFn(), queryFn: () => SettingsService.getSystemSettings() });
 export const ensureUseSettingsServiceGetFirstTimeSetupStatusData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetFirstTimeSetupStatusKeyFn(), queryFn: () => SettingsService.getFirstTimeSetupStatus() });
+export const ensureUseSettingsServiceGetMetricsSettingsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSettingsServiceGetMetricsSettingsKeyFn(), queryFn: () => SettingsService.getMetricsSettings() });
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 export const ensureUseResourcesServiceGetAllResourcesData = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
   groupId?: number;

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
+import { randomBytes } from 'crypto';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { AppSettingsDto } from './dto/app-settings.dto';
 import { SmtpSettingsDto } from './dto/smtp-settings.dto';
@@ -131,5 +132,11 @@ export class SettingsService {
 
   async setMetricsApiKey(apiKey: string | null): Promise<void> {
     await this.settingsStore.setSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey, apiKey);
+  }
+
+  async generateMetricsApiKey(): Promise<{ apiKey: string }> {
+    const apiKey = randomBytes(32).toString('base64url');
+    await this.settingsStore.setSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey, apiKey);
+    return { apiKey };
   }
 }

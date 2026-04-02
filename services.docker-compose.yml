@@ -132,16 +132,29 @@ services:
     volumes:
       - zigbee2mqtt:/app/data
 
+  config-ui:
+    build:
+      context: ./tools/config-ui
+      dockerfile: Dockerfile
+    ports:
+      - '5380:5380'
+    volumes:
+      - config-ui-data:/data
+      - prometheus-config:/etc/prometheus
+
   prometheus:
     image: prom/prometheus:v3.4.0
     ports:
       - '9090:9090'
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-config:/etc/prometheus:ro
       - prometheus-data:/prometheus
+    depends_on:
+      - config-ui
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
 
   grafana:
     image: grafana/grafana:11.6.0
@@ -174,6 +187,10 @@ volumes:
   webhook-site:
     driver: local
   zigbee2mqtt:
+    driver: local
+  config-ui-data:
+    driver: local
+  prometheus-config:
     driver: local
   prometheus-data:
     driver: local

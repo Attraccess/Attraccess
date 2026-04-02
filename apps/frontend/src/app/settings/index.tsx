@@ -5,6 +5,7 @@ import en from './en.json';
 import de from './de.json';
 import { AppSettingsCard } from './cards/AppSettingsCard';
 import { SmtpSettingsCard } from './cards/SmtpSettingsCard';
+import { MetricsSettingsCard } from './cards/MetricsSettingsCard';
 
 export function SystemSettingsPage() {
   const { t } = useTranslations({ en, de });
@@ -15,6 +16,7 @@ export function SystemSettingsPage() {
       <div className="flex flex-row flex-wrap gap-4">
         <AppSettingsCard variant="standalone" />
         <SmtpSettingsCard variant="standalone" />
+        <MetricsSettingsCard />
       </div>
     </div>
   );

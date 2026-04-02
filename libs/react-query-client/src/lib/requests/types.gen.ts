@@ -1066,6 +1066,24 @@ export type FirstTimeSetupStatusDto = {
     stepsCompleted: FirstTimeSetupStepsDto;
 };
 
+export type MetricsSettingsDto = {
+    /**
+     * Whether a metrics API key is configured
+     */
+    apiKeyConfigured: boolean;
+};
+
+export type GenerateMetricsApiKeyResponseDto = {
+    /**
+     * Whether a metrics API key is configured
+     */
+    apiKeyConfigured: boolean;
+    /**
+     * The generated API key (shown only once)
+     */
+    apiKey: string;
+};
+
 export type LicenseDataDto = {
     /**
      * Whether the license is valid
@@ -4104,6 +4122,12 @@ export type ApplyFirstTimeSetupSettingsData = {
 
 export type ApplyFirstTimeSetupSettingsResponse = SystemSettingsDto;
 
+export type GetMetricsSettingsResponse = MetricsSettingsDto;
+
+export type GenerateMetricsApiKeyResponse = GenerateMetricsApiKeyResponseDto;
+
+export type DeleteMetricsApiKeyResponse = MetricsSettingsDto;
+
 export type GetLicenseInformationResponse = LicenseDataDto;
 
 export type CreateOneResourceData = {
@@ -6111,6 +6135,48 @@ export type $OpenApiTs = {
                  * First-time setup is not available.
                  */
                 403: unknown;
+            };
+        };
+    };
+    '/api/settings/metrics': {
+        get: {
+            res: {
+                /**
+                 * Current metrics settings.
+                 */
+                200: MetricsSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/metrics/generate-api-key': {
+        post: {
+            res: {
+                /**
+                 * Metrics API key generated.
+                 */
+                201: GenerateMetricsApiKeyResponseDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/settings/metrics/api-key': {
+        delete: {
+            res: {
+                /**
+                 * Metrics API key removed.
+                 */
+                200: MetricsSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
