@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugins-backend-sdk",
-  "version": "0.0.16",
+  "version": "1.5.1",
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",

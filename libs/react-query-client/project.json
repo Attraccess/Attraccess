@@ -3,13 +3,6 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/react-query-client/src",
   "projectType": "library",
-  "release": {
-    "version": {
-      "currentVersionResolver": "git-tag",
-      "preserveLocalDependencyProtocols": false,
-      "manifestRootsToUpdate": ["dist/{projectRoot}"]
-    }
-  },
   "tags": [],
   "// targets": "to see all targets run: nx show project react-query-client --web",
   "targets": {
