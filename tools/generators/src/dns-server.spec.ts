@@ -342,6 +342,20 @@ describe('dns-server', () => {
       expect(content).toContain('base64');
     });
 
+    it('should use timing-safe comparison for auth credentials', () => {
+      expect(content).toContain('timingSafeEqual');
+    });
+
+    // --- Request body limits ---
+
+    it('should enforce a maximum body size limit', () => {
+      expect(content).toContain('MAX_BODY_SIZE');
+    });
+
+    it('should reject bodies exceeding the size limit', () => {
+      expect(content).toContain('body too large');
+    });
+
     // --- Environment variables ---
 
     it('should reference DNS_UPSTREAM_1 env var', () => {
@@ -909,9 +923,20 @@ describe('dns-server', () => {
       expect(server).toMatch(/catch|error/i);
     });
 
-    it('auth should use constant-time-safe comparison pattern', () => {
+    it('auth should use crypto.timingSafeEqual for constant-time comparison', () => {
       const server = readFile('tools/dns-server/server.js');
-      expect(server).toContain('Basic');
+      expect(server).toContain('crypto.timingSafeEqual');
+    });
+
+    it('server.js should enforce maximum request body size', () => {
+      const server = readFile('tools/dns-server/server.js');
+      expect(server).toContain('MAX_BODY_SIZE');
+      expect(server).toContain('body too large');
+    });
+
+    it('Dockerfile should document why root is required', () => {
+      const dockerfile = readFile('tools/dns-server/Dockerfile');
+      expect(dockerfile).toMatch(/root.*required|privileged.*port/i);
     });
   });
 

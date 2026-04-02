@@ -136,6 +136,16 @@ function getDnsmasqStatus() {
   }
 }
 
+function timingSafeEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 function checkAuth(req) {
   const password = process.env.DNS_ADMIN_PASSWORD || '';
   if (!password) return true;
@@ -146,7 +156,7 @@ function checkAuth(req) {
 
   const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
   const [user, pass] = decoded.split(':');
-  return user === username && pass === password;
+  return timingSafeEqual(user, username) && timingSafeEqual(pass, password);
 }
 
 function sendJson(res, statusCode, data) {
@@ -166,10 +176,21 @@ function send401(res) {
   res.end('Unauthorized');
 }
 
+const MAX_BODY_SIZE = 64 * 1024;
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('body too large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')));
@@ -205,7 +226,7 @@ function restartDnsmasq(records, settings) {
   startDnsmasq();
 }
 
-function applyAndReload(records, settings) {
+function applyAndReload(records) {
   saveRecords(records);
   writeHostsAndReload(records);
 }
@@ -238,7 +259,7 @@ async function handleRequest(req, res) {
     const records = loadRecords();
     const newRecord = { id: crypto.randomUUID(), hostname: body.hostname, ip: body.ip };
     records.push(newRecord);
-    applyAndReload(records, loadSettings());
+    applyAndReload(records);
     return sendJson(res, 201, newRecord);
   }
 
@@ -250,7 +271,7 @@ async function handleRequest(req, res) {
     if (idx === -1) return sendJson(res, 404, { error: 'record not found' });
     if (body.hostname) records[idx].hostname = body.hostname;
     if (body.ip) records[idx].ip = body.ip;
-    applyAndReload(records, loadSettings());
+    applyAndReload(records);
     return sendJson(res, 200, records[idx]);
   }
 
@@ -260,7 +281,7 @@ async function handleRequest(req, res) {
     const before = records.length;
     records = records.filter((r) => r.id !== id);
     if (records.length === before) return sendJson(res, 404, { error: 'record not found' });
-    applyAndReload(records, loadSettings());
+    applyAndReload(records);
     return sendJson(res, 200, { deleted: true });
   }
 
