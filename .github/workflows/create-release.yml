@@ -33,9 +33,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
-
       - name: Build publishable libraries
         run: pnpm nx run-many -t build,lint,typecheck
 
@@ -43,10 +40,12 @@ jobs:
         if: inputs.dry-run
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm nx release ${{ inputs.specifier }} --dry-run --yes
 
       - name: Run NX Release
         if: ${{ !inputs.dry-run }}
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm nx release ${{ inputs.specifier }} --yes
