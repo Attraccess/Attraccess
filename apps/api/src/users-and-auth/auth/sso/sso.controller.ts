@@ -42,6 +42,7 @@ import { timingSafeEqual } from 'crypto';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
 import { resolvePermissionsFromRoles } from './permission-mapping';
+import { MetricsService } from '../../../metrics/metrics.service';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 export class SSOController {
@@ -55,6 +56,7 @@ export class SSOController {
     private readonly cookieConfigService: CookieConfigService,
     private readonly linkTokenService: SSOLinkTokenService,
     private readonly settingsService: SettingsService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Get('providers')
@@ -637,6 +639,7 @@ export class SSOController {
       request as unknown as Record<string, unknown>,
       redirectToQuery,
     );
+    this.metricsService.authSsoLoginTotal.inc({ provider_type: 'oidc' });
     return this.finalizeLogin(request, response, redirectTo);
   }
 
@@ -689,6 +692,7 @@ export class SSOController {
   ): Promise<CreateSessionResponse | void> {
     const defaultRedirect = await this.settingsService.getUrl();
     const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
+    this.metricsService.authSsoLoginTotal.inc({ provider_type: 'saml' });
     return this.finalizeLogin(request, response, target);
   }
 

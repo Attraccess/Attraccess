@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { EncryptionService } from '../../encryption/encryption.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class MqttServerService {
@@ -11,6 +12,7 @@ export class MqttServerService {
     @InjectRepository(MqttServer)
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly encryptionService: EncryptionService,
+    private readonly metricsService: MetricsService,
   ) { }
 
   /**
@@ -46,7 +48,9 @@ export class MqttServerService {
       ...createMqttServerDto,
       password: createMqttServerDto.password ? this.encryptionService.encrypt(createMqttServerDto.password) : null,
     });
-    return this.mqttServerRepository.save(newServer);
+    const saved = await this.mqttServerRepository.save(newServer);
+    this.metricsService.mqttServersTotal.inc();
+    return saved;
   }
 
   /**
@@ -68,6 +72,7 @@ export class MqttServerService {
   async remove(id: number): Promise<void> {
     const server = await this.findOne(id);
     await this.mqttServerRepository.remove(server);
+    this.metricsService.mqttServersTotal.dec();
   }
 
   /**

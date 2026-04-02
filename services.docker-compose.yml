@@ -132,6 +132,30 @@ services:
     volumes:
       - zigbee2mqtt:/app/data
 
+  prometheus:
+    image: prom/prometheus:v3.4.0
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    ports:
+      - '3001:3001'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=attraccess
+      - GF_SERVER_HTTP_PORT=3001
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
 volumes:
   authentik-database:
     driver: local
@@ -150,4 +174,8 @@ volumes:
   webhook-site:
     driver: local
   zigbee2mqtt:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local

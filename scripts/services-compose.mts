@@ -26,6 +26,7 @@ const SETS: Record<string, string[]> = {
   'webhook-site': ['webhook-site'],
   bunkerm: ['bunkerm'],
   zigbee2mqtt: ['zigbee2mqtt'],
+  monitoring: ['prometheus', 'grafana'],
 };
 
 const DEFAULT_SETS = ['mailpit'];
