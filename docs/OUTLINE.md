@@ -81,6 +81,12 @@ Mark pages with [x] when completed.
 - [x] `plugins/installing-plugins.md` — Installing and managing plugins
 - [x] `plugins/developing-plugins.md` — Developing custom plugins
 
+### Monitoring & Metrics (Administrators)
+- [x] `monitoring/overview.md` — Monitoring feature overview
+- [x] `monitoring/setup.md` — Enabling metrics and generating API keys
+- [x] `monitoring/prometheus-grafana.md` — Prometheus & Grafana configuration with Docker Compose
+- [x] `monitoring/metrics-reference.md` — Complete list of all exposed metrics
+
 ### System Settings (Administrators)
 - [x] `settings/overview.md` — System settings reference
 - [x] `settings/security.md` — Security settings (cookies, sessions)
