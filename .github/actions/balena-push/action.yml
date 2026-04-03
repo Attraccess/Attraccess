@@ -1,0 +1,52 @@
+name: 'Balena Push'
+description: 'Set version in balena.yml, install balena-cli, login, and push to fleet'
+
+inputs:
+  version:
+    description: 'Version to write into balena.yml (replaces {{VERSION_TO_BE_REPLACED}})'
+    required: true
+  balena-token:
+    description: 'Balena API token'
+    required: true
+  balena-fleet:
+    description: 'Balena fleet name'
+    required: true
+  draft:
+    description: 'Push as draft release'
+    required: false
+    default: 'false'
+  note:
+    description: 'Optional release note (auto-generated if empty)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Get short SHA
+      id: vars
+      run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Set balena.yml version
+      run: |
+        sed -i "s/{{VERSION_TO_BE_REPLACED}}/${{ inputs.version }}/" balena.yml
+        cat balena.yml
+      shell: bash
+
+    - name: Install balena-cli
+      run: |
+        BALENA_CLI_VERSION=v24.0.3
+        wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
+      shell: bash
+
+    - name: Balena login and push
+      run: |
+        set -euo pipefail
+        balena/bin/balena login --token "${{ inputs.balena-token }}"
+        DRAFT_FLAG=""
+        if [ "${{ inputs.draft }}" = "true" ]; then DRAFT_FLAG="--draft"; fi
+        NOTE="${{ inputs.note }}"
+        if [ -z "$NOTE" ]; then NOTE="${{ inputs.version }} @ ${{ steps.vars.outputs.SHORT_SHA }}"; fi
+        balena/bin/balena push "${{ inputs.balena-fleet }}" $DRAFT_FLAG --note "$NOTE"
+      shell: bash
