@@ -12,7 +12,7 @@
       "title": "HTTP Request Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
@@ -22,7 +22,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{job=\"attraccess\"}[5m])) by (route)",
+          "expr": "sum(rate(attraccess_http_requests_total{job=\"attraccess\"}[5m])) by (route)",
           "legendFormat": "{{ route }}",
           "refId": "A"
         }
@@ -32,7 +32,7 @@
       "title": "HTTP Request Latency (p95)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -42,17 +42,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(attraccess_http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(attraccess_http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(attraccess_http_request_duration_seconds_bucket{job=\"attraccess\"}[5m])) by (le))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -62,7 +62,7 @@
       "title": "HTTP Error Rate (4xx + 5xx)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
@@ -72,12 +72,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{job=\"attraccess\", status_code=~\"4..\"}[5m]))",
+          "expr": "sum(rate(attraccess_http_requests_total{job=\"attraccess\", status_code=~\"4..\"}[5m]))",
           "legendFormat": "4xx",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(http_requests_total{job=\"attraccess\", status_code=~\"5..\"}[5m]))",
+          "expr": "sum(rate(attraccess_http_requests_total{job=\"attraccess\", status_code=~\"5..\"}[5m]))",
           "legendFormat": "5xx",
           "refId": "B"
         }
@@ -87,7 +87,7 @@
       "title": "Authentication",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -117,7 +117,7 @@
       "title": "Users",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": []
@@ -134,7 +134,7 @@
       "title": "Resources",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": []
@@ -151,7 +151,7 @@
       "title": "Active Usage Sessions",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": []
@@ -168,7 +168,7 @@
       "title": "Connected Devices",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": []
@@ -185,7 +185,7 @@
       "title": "Resource Usage Sessions",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -210,7 +210,7 @@
       "title": "Resource Usage Duration",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -235,7 +235,7 @@
       "title": "Billing Transactions",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -255,7 +255,7 @@
       "title": "NFC Tap Events",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -275,7 +275,7 @@
       "title": "Emails Sent",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -295,7 +295,7 @@
       "title": "System Overview",
       "type": "stat",
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
         "overrides": []
@@ -327,7 +327,7 @@
       "title": "Maintenance Events",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -347,7 +347,7 @@
       "title": "User Registrations",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -367,7 +367,7 @@
       "title": "Resource Introductions",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",

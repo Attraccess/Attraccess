@@ -17,9 +17,9 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './we
 import { MetricsService } from '../../metrics/metrics.service';
 
 const mockMetricsService = {
-  websocketConnectionsActive: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
   attractapNfcTapsTotal: { inc: jest.fn() },
+  attractapFirmwareUpdatesTotal: { inc: jest.fn() },
 };
 
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {

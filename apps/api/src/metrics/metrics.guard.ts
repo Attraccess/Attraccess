@@ -1,11 +1,15 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { SettingsService } from '../settings/settings.service';
+import { TokenHashService } from '../encryption/token-hash.service';
 import { timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class MetricsGuard implements CanActivate {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly tokenHashService: TokenHashService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const { value: apiKey, configured } = await this.settingsService.getMetricsApiKey();
@@ -18,7 +22,7 @@ export class MetricsGuard implements CanActivate {
     const providedKey = this.extractApiKey(request);
 
     if (!providedKey) {
-      throw new UnauthorizedException('Missing metrics API key. Provide via Authorization: Bearer <key> header or api_key query parameter.');
+      throw new UnauthorizedException('Missing metrics API key. Provide via Authorization: Bearer <key> header.');
     }
 
     if (!this.secureCompare(providedKey, apiKey)) {
@@ -34,20 +38,12 @@ export class MetricsGuard implements CanActivate {
       return authHeader.slice(7);
     }
 
-    const queryKey = request.query['api_key'];
-    if (typeof queryKey === 'string' && queryKey.length > 0) {
-      return queryKey;
-    }
-
     return null;
   }
 
   private secureCompare(a: string, b: string): boolean {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) {
-      return false;
-    }
-    return timingSafeEqual(bufA, bufB);
+    const hashA = Buffer.from(this.tokenHashService.hashToken(a), 'base64url');
+    const hashB = Buffer.from(this.tokenHashService.hashToken(b), 'base64url');
+    return timingSafeEqual(hashA, hashB);
   }
 }

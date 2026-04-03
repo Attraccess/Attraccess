@@ -1,6 +1,12 @@
+# NOTE: When using the config-ui service, this file is dynamically generated
+# and overwritten on startup. Manual edits here will be lost unless config-ui
+# is not in use.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+rule_files:
+  - '/etc/prometheus/alerts.yml'
 
 scrape_configs:
   - job_name: 'attraccess'

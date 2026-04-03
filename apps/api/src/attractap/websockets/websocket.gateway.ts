@@ -228,7 +228,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
 
     this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
-    this.metricsService.websocketConnectionsActive.set(this.websocketService.sockets.size);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
 
     await this.clientWasActive(client as unknown as AuthenticatedWebSocket);
@@ -333,7 +332,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     }
     this.websocketService.sockets.delete(socket.id);
-    this.metricsService.websocketConnectionsActive.set(this.websocketService.sockets.size);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }
 
@@ -541,6 +539,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
             },
           }),
         );
+        this.metricsService.attractapFirmwareUpdatesTotal.inc();
       } catch (err) {
         this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
       }

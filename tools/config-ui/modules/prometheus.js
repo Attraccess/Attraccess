@@ -42,22 +42,29 @@ function saveSettings(settings) {
   saveJson(SETTINGS_FILE, settings);
 }
 
+function sanitizeYamlValue(value) {
+  return String(value).replace(/['\n\r\\]/g, '');
+}
+
 function generatePrometheusConfig(settings) {
   const lines = [
     'global:',
-    `  scrape_interval: ${settings.evaluationInterval || '15s'}`,
-    `  evaluation_interval: ${settings.evaluationInterval || '15s'}`,
+    `  scrape_interval: ${sanitizeYamlValue(settings.scrapeInterval || '15s')}`,
+    `  evaluation_interval: ${sanitizeYamlValue(settings.evaluationInterval || '15s')}`,
+    '',
+    'rule_files:',
+    "  - '/etc/prometheus/alerts.yml'",
     '',
     'scrape_configs:',
     "  - job_name: 'attraccess'",
     "    metrics_path: '/api/metrics'",
     '    static_configs:',
-    `      - targets: ['${settings.attraccessTarget || 'attraccess:3000'}']`,
-    `    scrape_interval: ${settings.scrapeInterval || '10s'}`,
+    `      - targets: ['${sanitizeYamlValue(settings.attraccessTarget || 'attraccess:3000')}']`,
+    `    scrape_interval: ${sanitizeYamlValue(settings.scrapeInterval || '10s')}`,
   ];
 
   if (settings.metricsApiKey) {
-    lines.push(`    bearer_token: '${settings.metricsApiKey}'`);
+    lines.push(`    bearer_token: '${sanitizeYamlValue(settings.metricsApiKey)}'`);
   }
 
   return lines.join('\n') + '\n';

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage } from '@attraccess/database-entities';
+import { Repository, IsNull, MoreThan } from 'typeorm';
+import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
 import {
   Registry,
   collectDefaultMetrics,
@@ -51,8 +51,6 @@ export class MetricsService implements OnModuleInit {
 
   public readonly pluginsLoaded: Gauge;
 
-  public readonly websocketConnectionsActive: Gauge;
-
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -66,12 +64,14 @@ export class MetricsService implements OnModuleInit {
     private readonly mqttServerRepository: Repository<MqttServer>,
     @InjectRepository(ResourceUsage)
     private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @InjectRepository(Session)
+    private readonly sessionRepository: Repository<Session>,
   ) {
     this.registry = new Registry();
     collectDefaultMetrics({ register: this.registry });
 
     this.httpRequestDuration = new Histogram({
-      name: 'http_request_duration_seconds',
+      name: 'attraccess_http_request_duration_seconds',
       help: 'Duration of HTTP requests in seconds',
       labelNames: ['method', 'route', 'status_code'],
       buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
@@ -79,7 +79,7 @@ export class MetricsService implements OnModuleInit {
     });
 
     this.httpRequestsTotal = new Counter({
-      name: 'http_requests_total',
+      name: 'attraccess_http_requests_total',
       help: 'Total number of HTTP requests',
       labelNames: ['method', 'route', 'status_code'],
       registers: [this.registry],
@@ -202,7 +202,7 @@ export class MetricsService implements OnModuleInit {
 
     this.billingTransactionAmount = new Histogram({
       name: 'attraccess_billing_transaction_amount',
-      help: 'Billing transaction amounts',
+      help: 'Billing transaction amounts in base currency units',
       buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000],
       registers: [this.registry],
     });
@@ -238,22 +238,18 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
-    this.websocketConnectionsActive = new Gauge({
-      name: 'attraccess_websocket_connections_active',
-      help: 'Number of active WebSocket connections',
-      registers: [this.registry],
-    });
   }
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Initializing gauge metrics from database...');
-    const [users, resources, projects, groups, mqttServers, activeSessions] = await Promise.all([
+    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions] = await Promise.all([
       this.userRepository.count(),
       this.resourceRepository.count(),
       this.projectRepository.count(),
       this.resourceGroupRepository.count(),
       this.mqttServerRepository.count(),
       this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+      this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
     ]);
 
     this.usersTotal.set(users);
@@ -261,10 +257,18 @@ export class MetricsService implements OnModuleInit {
     this.projectsTotal.set(projects);
     this.resourceGroupsTotal.set(groups);
     this.mqttServersTotal.set(mqttServers);
-    this.resourceUsageSessionsActive.set(activeSessions);
+    this.resourceUsageSessionsActive.set(activeUsageSessions);
+    this.authActiveSessions.set(activeAuthSessions);
+
+    try {
+      const { PluginService } = await import('../plugin-system/plugin.service');
+      this.pluginsLoaded.set(PluginService.getPlugins().length);
+    } catch {
+      this.pluginsLoaded.set(0);
+    }
 
     this.logger.log(
-      `Gauge metrics initialized: users=${users}, resources=${resources}, projects=${projects}, groups=${groups}, mqttServers=${mqttServers}, activeSessions=${activeSessions}`,
+      `Gauge metrics initialized: users=${users}, resources=${resources}, projects=${projects}, groups=${groups}, mqttServers=${mqttServers}, activeUsageSessions=${activeUsageSessions}, activeAuthSessions=${activeAuthSessions}`,
     );
   }
 

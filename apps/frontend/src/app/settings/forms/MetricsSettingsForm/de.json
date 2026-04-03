@@ -44,7 +44,6 @@
     "title": "Prometheus-Konfiguration",
     "description": "Füge den folgenden Scrape-Job zu deiner prometheus.yml hinzu:",
     "bearerNote": "Ersetze <YOUR_API_KEY> durch den oben generierten API-Schlüssel.",
-    "queryParamNote": "Alternativ kann der Schlüssel als Query-Parameter übergeben werden:",
     "grafanaTitle": "Grafana-Einrichtung",
     "grafanaDescription": "Füge in Grafana eine Prometheus-Datenquelle hinzu, die auf deinen Prometheus-Server zeigt (z. B. http://prometheus:9090). Die Metriken sind automatisch verfügbar, sobald Prometheus den obigen Endpunkt abfragt."
   },

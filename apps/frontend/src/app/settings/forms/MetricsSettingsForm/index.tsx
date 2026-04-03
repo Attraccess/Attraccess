@@ -111,8 +111,6 @@ export function MetricsSettingsForm() {
     bearer_token: '<YOUR_API_KEY>'`;
   }, []);
 
-  const queryParamExample = useMemo(() => `${metricsEndpointUrl}?api_key=<YOUR_API_KEY>`, [metricsEndpointUrl]);
-
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-default-500">
@@ -152,9 +150,6 @@ export function MetricsSettingsForm() {
       <p className="text-sm text-default-500">{t('setupGuide.description')}</p>
       <CodeBlock>{prometheusSnippet}</CodeBlock>
       <p className="text-xs text-default-400">{t('setupGuide.bearerNote')}</p>
-
-      <p className="text-sm text-default-500">{t('setupGuide.queryParamNote')}</p>
-      <CodeBlock>{queryParamExample}</CodeBlock>
 
       <Divider />
       <h4 className="text-sm font-semibold">{t('setupGuide.grafanaTitle')}</h4>

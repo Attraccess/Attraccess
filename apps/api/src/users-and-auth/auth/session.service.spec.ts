@@ -10,6 +10,7 @@ import { Repository, LessThan, MoreThan } from 'typeorm';
 import { SessionService, SessionMetadata } from './session.service';
 import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -55,6 +56,12 @@ describe('SessionService', () => {
           provide: TokenHashService,
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
+          },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            authActiveSessions: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
           },
         },
       ],

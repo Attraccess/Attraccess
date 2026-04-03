@@ -7,6 +7,7 @@ import { MqttClient } from 'mqtt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent } from './mqtt-message.event';
 import { EncryptionService } from '../encryption/encryption.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
@@ -20,6 +21,7 @@ export class MqttClientService implements OnModuleDestroy {
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly eventEmitter: EventEmitter2,
     private readonly encryptionService: EncryptionService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async onModuleDestroy() {
@@ -103,6 +105,7 @@ export class MqttClientService implements OnModuleDestroy {
 
       client.on('connect', () => {
         this.logger.log(`Connected to MQTT server ${server.name} (${url})`);
+        this.updateHealthyServerCount();
         // Re-subscribe to all known topics for this server on each successful connect
         const topics = this.subscriptions.get(serverId);
         if (topics && topics.size > 0) {
@@ -120,6 +123,7 @@ export class MqttClientService implements OnModuleDestroy {
 
       client.on('error', (error) => {
         this.logger.error(`MQTT connection error for server ${server.name} (${url}): ${error.message}`);
+        this.updateHealthyServerCount();
       });
 
       client.on('reconnect', () => {
@@ -132,6 +136,7 @@ export class MqttClientService implements OnModuleDestroy {
 
       client.on('offline', () => {
         this.logger.log(`MQTT client for server ${server.name} is offline`);
+        this.updateHealthyServerCount();
       });
 
       // Reject after 10 seconds if connection hasn't been established
@@ -150,6 +155,11 @@ export class MqttClientService implements OnModuleDestroy {
         clearTimeout(timeout);
       });
     });
+  }
+
+  private updateHealthyServerCount(): void {
+    const healthyCount = Array.from(this.clients.values()).filter((c) => c.connected).length;
+    this.metricsService.mqttServersHealthy.set(healthyCount);
   }
 
   private async resolveServerPassword(server: MqttServer): Promise<string | null> {

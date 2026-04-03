@@ -136,6 +136,7 @@ services:
       - '9090'
     volumes:
       - prometheus-config:/etc/prometheus:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     depends_on:
       - config-ui

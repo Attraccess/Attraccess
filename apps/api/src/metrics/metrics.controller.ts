@@ -1,4 +1,5 @@
-import { Controller, Get, Header, UseGuards } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { MetricsService } from './metrics.service';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { MetricsGuard } from './metrics.guard';
@@ -10,8 +11,9 @@ export class MetricsController {
   constructor(private readonly metricsService: MetricsService) {}
 
   @Get()
-  @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
-  async getMetrics(): Promise<string> {
-    return this.metricsService.getMetrics();
+  async getMetrics(@Res() res: Response): Promise<void> {
+    const metrics = await this.metricsService.getMetrics();
+    res.set('Content-Type', this.metricsService.getContentType());
+    res.end(metrics);
   }
 }

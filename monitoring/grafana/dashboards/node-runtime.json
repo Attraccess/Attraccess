@@ -12,7 +12,7 @@
       "title": "CPU Usage",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
@@ -37,7 +37,7 @@
       "title": "Memory Usage",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -72,7 +72,7 @@
       "title": "Event Loop Lag",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -97,7 +97,7 @@
       "title": "Active Handles & Requests",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -122,7 +122,7 @@
       "title": "GC Duration",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -142,7 +142,7 @@
       "title": "Heap Space Usage",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
@@ -162,7 +162,7 @@
       "title": "Process Open File Descriptors",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -187,7 +187,7 @@
       "title": "Process Uptime",
       "type": "stat",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "" },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "s" },
         "overrides": []
