@@ -108,7 +108,7 @@ let dnsmasqProcess = null;
 
 function startDnsmasq() {
   if (dnsmasqProcess) return;
-  dnsmasqProcess = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d'], {
+  dnsmasqProcess = spawn('dnsmasq', ['--no-daemon', '--conf-dir=/etc/dnsmasq.d/,*.conf'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   dnsmasqProcess.stdout.on('data', (data) => log(`dnsmasq: ${data.toString().trim()}`));
