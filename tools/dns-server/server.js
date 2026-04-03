@@ -13,6 +13,7 @@ const DNSMASQ_CONF_DIR = '/etc/dnsmasq.d';
 const DNSMASQ_CONF_FILE = path.join(DNSMASQ_CONF_DIR, 'records.conf');
 const DNSMASQ_HOSTS_FILE = path.join(DNSMASQ_CONF_DIR, 'custom-hosts');
 const ADMIN_PORT = Number(process.env.DNS_ADMIN_PORT) || 5380;
+const LISTEN_ADDRESS = process.env.DNS_LISTEN_ADDRESS || '';
 const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
 
 function log(message) {
@@ -64,6 +65,10 @@ function saveSettings(settings) {
 
 function generateDnsmasqConfig(settings) {
   const lines = ['no-resolv', 'user=root'];
+  if (LISTEN_ADDRESS) {
+    lines.push(`listen-address=${LISTEN_ADDRESS}`);
+    lines.push('bind-interfaces');
+  }
   lines.push(`server=${settings.upstream1 || '1.1.1.1'}`);
   lines.push(`server=${settings.upstream2 || '8.8.8.8'}`);
   lines.push(`addn-hosts=${DNSMASQ_HOSTS_FILE}`);
@@ -322,7 +327,7 @@ function main() {
     });
   });
 
-  server.listen(ADMIN_PORT, '0.0.0.0', () => {
+  server.listen(ADMIN_PORT, LISTEN_ADDRESS || '0.0.0.0', () => {
     log(`admin UI listening on port ${ADMIN_PORT}`);
   });
 

@@ -115,11 +115,7 @@ services:
       context: ./tools/dns-server
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - '53:53/udp'
-      - '53:53/tcp'
-    expose:
-      - '5380'
+    network_mode: host
     volumes:
       - dns-server-data:/data
     env_file:
