@@ -36,28 +36,10 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
-      - name: Get short SHA
-        id: vars
-        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
-
-      - name: Set balena.yml version
-        run: |
-          sed -i "s/{{VERSION_TO_BE_REPLACED}}/${{ inputs.version }}/" balena.yml
-          cat balena.yml
-
-      - name: Install balena-cli
-        run: |
-          BALENA_CLI_VERSION=v24.03
-          wget -qO- "https://github.com/balena-io/balena-cli/releases/download/${BALENA_CLI_VERSION}/balena-cli-${BALENA_CLI_VERSION}-linux-x64-standalone.tar.gz" | tar -xzf -
-
-      - name: Balena login and push
-        env:
-          BALENA_TOKEN: ${{ secrets.BALENA_TOKEN }}
-          BALENA_FLEET: ${{ secrets.BALENA_FLEET }}
-        run: |
-          set -euo pipefail
-          balena/bin/balena login --token "$BALENA_TOKEN"
-          DRAFT_FLAG=$([ "${{ inputs.draft }}" = "true" ] && echo "--draft" )
-          NOTE_INPUT="${{ inputs.note }}"
-          if [ -z "$NOTE_INPUT" ]; then NOTE_INPUT="Manual @ ${{ steps.vars.outputs.SHORT_SHA }}"; fi
-          balena/bin/balena push "$BALENA_FLEET" $DRAFT_FLAG --note "$NOTE_INPUT"
+      - uses: ./.github/actions/balena-push
+        with:
+          version: ${{ inputs.version }}
+          balena-token: ${{ secrets.BALENA_TOKEN }}
+          balena-fleet: ${{ secrets.BALENA_FLEET }}
+          draft: ${{ inputs.draft }}
+          note: ${{ inputs.note }}
