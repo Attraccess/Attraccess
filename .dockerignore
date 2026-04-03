@@ -64,7 +64,6 @@ tmp
 .env.*
 .gitignore
 .gitmodules
-balena.yml
 CODEOWNERS
 docker-compose.yml
 Dockerfile
