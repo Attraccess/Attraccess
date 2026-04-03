@@ -76,6 +76,12 @@
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
 
+- **Monitoring & Metrics**
+  - [Overview](monitoring/overview.md)
+  - [Setup](monitoring/setup.md)
+  - [Prometheus & Grafana](monitoring/prometheus-grafana.md)
+  - [Metrics Reference](monitoring/metrics-reference.md)
+
 - **System Settings**
   - [Overview](settings/overview.md)
   - [Security](settings/security.md)
