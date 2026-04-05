@@ -65,6 +65,9 @@ services:
       - '5672' # RabbitMQ AMQP
       - '1883' # MQTT
       - '15675' # MQTT WebSocket
+    ports:
+      - '115675:15675'
+      - '11883:1883'
     environment:
       RABBITMQ_HOST: '%'
       RABBITMQ_DEFAULT_USER: attraccess
