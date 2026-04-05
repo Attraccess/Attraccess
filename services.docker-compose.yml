@@ -5,16 +5,26 @@ services:
       - '8025:8025'
       - '1025:1025'
 
-  bunkerm:
-    image: bunkeriot/bunkerm:v1.2.0
+  rabbitmq:
+    image: rabbitmq:4.2.5-management
+    hostname: rabbitmq
     restart: unless-stopped
+    command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
     ports:
-      - '1883:1883' # MQTT broker port
-      - '9001:9001' # WebSocket port (if needed)
-      - '2000:2000' # Web UI
-      - '1900:1900' # Internal admin API
+      - '5672:5672' # AMQP
+      - '15672:15672' # Management UI
+      - '1883:1883' # MQTT
+      - '15675:15675' # MQTT WebSocket
+    environment:
+      RABBITMQ_DEFAULT_USER: attraccess
+      RABBITMQ_DEFAULT_PASS: password
     volumes:
-      - bunkerm:/bunkerm/data # persistent data storage
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      retries: 3
+      timeout: 5s
+      interval: 30s
 
   webhook-site:
     image: tarampampam/webhook-tester:2.2.6
@@ -137,7 +147,7 @@ volumes:
     driver: local
   authentik-redis:
     driver: local
-  bunkerm:
+  rabbitmq_data:
     driver: local
   authentik-media:
     driver: local

@@ -24,7 +24,7 @@ const SETS: Record<string, string[]> = {
   ],
   keycloak: ['keycloak'],
   'webhook-site': ['webhook-site'],
-  bunkerm: ['bunkerm'],
+  rabbitmq: ['rabbitmq'],
   zigbee2mqtt: ['zigbee2mqtt'],
 };
 
