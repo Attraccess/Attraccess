@@ -5,7 +5,7 @@ runs:
   using: 'composite'
   steps:
     - name: Setup PNPM
-      uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      uses: pnpm/action-setup@6e7bdbda5fe05107efc88b23b7ed00aa05f84ca0
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
