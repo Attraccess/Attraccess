@@ -63,7 +63,7 @@ function saveSettings(settings) {
   saveJson(SETTINGS_FILE, settings);
 }
 
-function generateDnsmasqConfig(settings) {
+function generateDnsmasqConfig(settings, records) {
   const lines = ['no-resolv', 'user=root'];
   if (LISTEN_ADDRESS) {
     lines.push(`listen-address=${LISTEN_ADDRESS}`);
@@ -82,12 +82,19 @@ function generateDnsmasqConfig(settings) {
     lines.push('log-queries');
   }
 
+  (records || [])
+    .filter((r) => r.hostname && r.ip && r.hostname.startsWith('*.'))
+    .forEach((r) => {
+      const domain = r.hostname.slice(2);
+      lines.push(`address=/${domain}/${r.ip}`);
+    });
+
   return lines.join('\n') + '\n';
 }
 
 function generateHostsFile(records) {
   return records
-    .filter((r) => r.hostname && r.ip)
+    .filter((r) => r.hostname && r.ip && !r.hostname.startsWith('*.'))
     .map((r) => `${r.ip} ${r.hostname}`)
     .join('\n') + '\n';
 }
@@ -95,7 +102,7 @@ function generateHostsFile(records) {
 function writeDnsmasqConfig(records, settings) {
   try {
     fs.mkdirSync(DNSMASQ_CONF_DIR, { recursive: true });
-    fs.writeFileSync(DNSMASQ_CONF_FILE, generateDnsmasqConfig(settings), 'utf-8');
+    fs.writeFileSync(DNSMASQ_CONF_FILE, generateDnsmasqConfig(settings, records), 'utf-8');
     fs.writeFileSync(DNSMASQ_HOSTS_FILE, generateHostsFile(records), 'utf-8');
     return true;
   } catch (err) {
