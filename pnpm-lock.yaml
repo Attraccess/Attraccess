@@ -150,7 +150,7 @@ importers:
         version: 1.13.5
       balena-sdk:
         specifier: ^22.4.1
-        version: 22.4.1(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
+        version: 22.4.9(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -1864,8 +1864,8 @@ packages:
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.2 || ^10.0.0 || ^11.0.0
 
-  '@balena/abstract-sql-compiler@11.2.3':
-    resolution: {integrity: sha512-E7Acbr6Wnf/uU3ZIoxCqlsrLonHpVbElgQH1iEmSSKoaTbpj5gduVQAlMdwJ0Pe9R6pszwHgzcQEGYvtZYBQVg==}
+  '@balena/abstract-sql-compiler@11.3.18':
+    resolution: {integrity: sha512-f7AhBvSLBZrT/bchecsD2avWgXhnaBrWKli6F1oCy/VFHR/XK+EYbb/uqbHo3jxiIsCzD2lZs5VKEVAPOb/7Tw==}
     engines: {node: '>=20.14.0', npm: '>=10.7.0'}
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.2 || ^10.0.0 || ^11.0.0
@@ -1876,21 +1876,21 @@ packages:
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
 
-  '@balena/abstract-sql-to-typescript@6.1.2':
-    resolution: {integrity: sha512-YKYzmeUUwpUbvO5nDzkswRy36P8eAV8z66CSDih5gK/qkyvkDAoL+05TYYMwPOdJmUui5sdchWO4XF7kQmQivQ==}
+  '@balena/abstract-sql-to-typescript@6.1.19':
+    resolution: {integrity: sha512-NwKZ6uNviQM43OZTGdxO49/OBnVLguqGTRmz1pCjUbFLxjc83NbqhvvXZC8rAyzZ7Oup7RFHlMIgSPlRoWYrDw==}
     engines: {node: '>=20.14.0', npm: '>=10.7.0'}
     peerDependencies:
       '@balena/sbvr-types': ^7.1.0 || ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
 
-  '@balena/es-version@1.0.3':
-    resolution: {integrity: sha512-ER6xtNwBSytZ1E1TmEzcE19mHpfJH8NPItxgGeJZjMYE4k5VHlBorl4UwZkAmsiW4vhy7LgJ+RGvHU15rB1L7g==}
+  '@balena/es-version@1.0.4':
+    resolution: {integrity: sha512-9OVgZXksV0i7gklYhWKslEbvkuoDU98fd3bOXuuc+hjPKW5ogqdL42rEm+pKUezdQJ6kWEHjDCkRZ/VjBBEQAw==}
 
-  '@balena/odata-parser@4.2.10':
-    resolution: {integrity: sha512-8tCS0+Kn87c/yfdSBtjOYFzpBT1prN4AeQ2/hFWt1TRhIVhNrQkVTmfHqIeAHHzJixbVUgdn8+3TSBnv+GKsxg==}
+  '@balena/odata-parser@4.2.28':
+    resolution: {integrity: sha512-qVgAKM2rB7FM0hO1yijwIZzJvIaGPRM1jhtslBClzUCUMqv+6z0p2wkg0bxE/3WCsUI4W/wCfU6EretEfnWBOg==}
     engines: {node: '>=16.13.0', npm: '>=8.1.0'}
 
-  '@balena/odata-to-abstract-sql@10.0.4':
-    resolution: {integrity: sha512-E7Jy1cNqO38mkvjzZmEnydonTxrrZ3us3J1+LdCktmXE+pVtFs0FYptEYQZ5zo6DQcRfSIJwwErVYIaUqNdI4w==}
+  '@balena/odata-to-abstract-sql@10.0.22':
+    resolution: {integrity: sha512-b6IFuWYrynMPkauW+If/gDj5X50/K/i/4JofNZRFx5qOo0PLkoOWTxaxq6QwtyOsPY0hu0XpkNBEGDhrbCTgwg==}
     engines: {node: '>=20.14.0', npm: '>=10.7.0'}
 
   '@balena/odata-to-abstract-sql@8.0.2':
@@ -6445,8 +6445,8 @@ packages:
   '@types/lodash@4.17.16':
     resolution: {integrity: sha512-HX7Em5NYQAXKW+1T+FiuG27NGwzJfCX3s1GjOa7ujxZa52kjJLOr4FUxT+giF6Tgxv1e+/czV/iTtBw27WTU9g==}
 
-  '@types/lodash@4.17.20':
-    resolution: {integrity: sha512-H3MHACvFUEiujabxhaI/ImO6gUrd8oOurg7LQtS7mbwIXA/cUqWrvBsaeJ23aZEPk1TAYkurjfMbSELfoCXlGA==}
+  '@types/lodash@4.17.24':
+    resolution: {integrity: sha512-gIW7lQLZbue7lRSWEFql49QJJWThrTFFeIMJdp3eH4tKoxm1OvEPg02rm4wCCSHS0cL3/Fizimb35b7k8atwsQ==}
 
   '@types/luxon@3.7.1':
     resolution: {integrity: sha512-H3iskjFIAn5SlJU7OuxUmTEpebK6TKB8rxZShDslBMZJ5u9S//KM1sbdAisiSrqwLQncVjnpi2OK2J51h+4lsg==}
@@ -6478,8 +6478,8 @@ packages:
   '@types/node-forge@1.3.11':
     resolution: {integrity: sha512-FQx220y22OKNTqaByeBGqHWYz4cl94tpcxeFdvBo3wjG6XPBuZ0BNgNZRV5J5TFmmcsJ4IzsLkmGRiQbnYsBEQ==}
 
-  '@types/node@10.17.60':
-    resolution: {integrity: sha512-F0KIgDJfy2nA3zMLmWGKxcH2ZVEtCZXHHdOQs2gSaQ27+lNeEfGxzkIw90aXswATX7AZ33tahPbzy6KAfUreVw==}
+  '@types/node@14.18.63':
+    resolution: {integrity: sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ==}
 
   '@types/node@20.19.9':
     resolution: {integrity: sha512-cuVNgarYWZqxRJDQHEB58GEONhOK79QVR/qYx4S7kcUObQvUwvFnYxJuuHUKm2aieN9X3yZB4LZsuYNU1Qphsw==}
@@ -6587,10 +6587,6 @@ packages:
 
   '@types/use-sync-external-store@0.0.6':
     resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
-
-  '@types/uuid@11.0.0':
-    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
-    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/uuid@9.0.8':
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
@@ -7641,8 +7637,8 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
-  balena-auth@6.0.1:
-    resolution: {integrity: sha512-llJEg0kB0ZltdaXVfnq5efZ9gLl0vOirzPdTOHQ8PK/iZdPJBt2RlXjUKGkUb/0SQ/pHET0aIj1nu81vjIe/ZQ==}
+  balena-auth@6.1.0:
+    resolution: {integrity: sha512-vhrZmFKRqaIrqiykd69R0QciU2Y56Tby73AoEXbqlw+HZgeur19oFAZtK7fIiCphE/yAgSVwJB6YnFs79L2t7g==}
     engines: {node: '>=18.0.0', npm: '>=6.0.0'}
 
   balena-errors@4.9.0:
@@ -7653,20 +7649,20 @@ packages:
     resolution: {integrity: sha512-7TEBrnDXWZ+zXOjzbUdftJNO+kBQiAmtxTofDA5tyLh0WMukHJPMTRE/WPCxBIqDvQPpqi22L5sfJidjZYjctw==}
     engines: {node: '>=18.0'}
 
-  balena-register-device@9.0.12:
-    resolution: {integrity: sha512-4gQwwEUiD0f/pfr+C7Pptfwnjpy1O+HJUmeVj/4NymbFuWmWhT0HLvHBHZXmKndi7aZNFG855ZyqhVEcjP1TWA==}
+  balena-register-device@9.0.32:
+    resolution: {integrity: sha512-5v/eZewlgw2VDFh+Orp3NOsFjseIOG0vMiQNBzhtI4ZzzihxFYpiatjTgs8SYvuQ2OA/VsiJeHS1A6YztwyX/A==}
     engines: {node: '>=18.0.0', npm: '>=6.0.0'}
     peerDependencies:
       balena-request: ^13.3.1 || ^14.0.0
 
-  balena-request@14.1.5:
-    resolution: {integrity: sha512-pPcRMK5mnyRKqUBNSQHLqk32iXUQAtutyMDlpyFTp0FjS8kGT6dJNh7TFPN93kJpA3R5Vopfn4lFlt69nZGzFA==}
+  balena-request@14.2.0:
+    resolution: {integrity: sha512-gb4FyAXbyr2skG7goMSoN/OmZdBu40sD/bKgpiaxNfolqGTIpeEe1TYl2uQegi89DsC1fivbsE1ihgft6UkfYQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       balena-auth: ^6.0.1
 
-  balena-sdk@22.4.1:
-    resolution: {integrity: sha512-8ZHexbJg/U+okHmXs0D9seFg3RGu04inZyNPgjwQB03hTQhxVQkc1Zfa2v5NiwlyuiMBpfVhM5YLcaGWJiMNHw==}
+  balena-sdk@22.4.9:
+    resolution: {integrity: sha512-+N4iIpEyTvcmb8HUFU+2sjT+s3Nhnj8wXmtwNwRIvJfn+GBXRA5ZlRzEFrOUbg9DUq+wEBiQU9WFLPctQ9Thzg==}
     engines: {node: ^20.12.0 || >= 22.0.0}
 
   balena-semver@3.0.10:
@@ -7676,8 +7672,8 @@ packages:
   balena-settings-client@5.0.3:
     resolution: {integrity: sha512-CXa/the16fcfDsotKLnK7tiaxbHkB9QCgL1MmQT54VmNVYhRpSV0n338FgPNp2kq88gQg7hLKgFuG1rPdyji5g==}
 
-  balena-settings-storage@8.1.0:
-    resolution: {integrity: sha512-zqOhJ8pU0ZB84V0ddJE0lKjV8QzT2nF3mRAi3AmpQ0v/DlMUjfxWipdl5CXGQNkD04Ji9pa8E5zXgB+dha+4JA==}
+  balena-settings-storage@8.2.0:
+    resolution: {integrity: sha512-2llVgUffyq08sXoDGbNm7gDM4nh9UdSBzWVq3DTZyo+crPv1BBkSUwFLN0EEj0EV0uOaWm2Ei15QI2eD92GehQ==}
     engines: {node: '>=14.0'}
 
   barcode-detector@3.0.3:
@@ -13223,8 +13219,8 @@ packages:
     resolution: {integrity: sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g==}
     engines: {node: '>=6'}
 
-  pinejs-client-core@8.4.1:
-    resolution: {integrity: sha512-E6/VfvYcX9s8mX90fJgcFthXUBQgncmx++rrdbEoKG4xeCdFfNAYR0AcrmSGeOSz/Tq6so+3RsRJp8Q0ecaD6g==}
+  pinejs-client-core@8.5.18:
+    resolution: {integrity: sha512-sV6e5Y6MOa7xJM9JjlKH076YKxKsSlMSMBd2JPDTSGIIqDMwc3DIeaCKtqBcWlA/OpNRW6RH1kaYXg+FvVHltg==}
     engines: {node: '>=10.0.0', npm: '>=6.0.0'}
 
   pinkie-promise@2.0.1:
@@ -13725,9 +13721,6 @@ packages:
   punycode.js@2.3.1:
     resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
     engines: {node: '>=6'}
-
-  punycode@1.4.1:
-    resolution: {integrity: sha512-jmYNElW7yvO7TV33CjSmvSiE2yco3bV2czu/OzDKdMNVZQWfxCblURLhf+47syQRBntjfLdd/H0egrzIG+oaFQ==}
 
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
@@ -15511,8 +15504,8 @@ packages:
   typed-assert@1.0.9:
     resolution: {integrity: sha512-KNNZtayBCtmnNmbo5mG47p1XsCyrx6iVqomjcZnec/1Y5GGARaxPs6r49RnSPeUP3YjNYiU9sQHAtY4BBvnZwg==}
 
-  typed-error@3.2.2:
-    resolution: {integrity: sha512-Z48LU67/qJ+vyA7lh3ozELqpTp3pvQoY5RtLi5wQ/UGSrEidBhlVSqhjr8B3iqbGpjqAoJYrtSYXWMDtidWGkA==}
+  typed-error@3.2.3:
+    resolution: {integrity: sha512-xmXIbAyEOYeRg11jY3AzjyB9clkxVfzBlHs3JgD3N6vPMMVBX+xNtQft4pKb1oM9lASdTISA+pOj1EejFr2SgQ==}
     engines: {node: '>=6.0.0', npm: '>=3.0.0'}
 
   typedarray-to-buffer@3.1.5:
@@ -15752,10 +15745,6 @@ packages:
 
   url-parse@1.5.10:
     resolution: {integrity: sha512-WypcfiRhfeUP9vvF0j6rw0J3hrWrw6iZv3+22h6iRMJ/8z1Tj6XfLP4DsUix5MhMPnXpiHDoKyoZ/bdCkwBCiQ==}
-
-  url@0.11.4:
-    resolution: {integrity: sha512-oCwdVC7mTuWiPyjLUz/COz5TLk6wgp0RCsN+wHZ2Ekneac9w8uuV0njcbbie2ME+Vs+d6duwmYuR3HgQXs1fOg==}
-    engines: {node: '>= 0.4'}
 
   use-composed-ref@1.4.0:
     resolution: {integrity: sha512-djviaxuOOh7wkj0paeO1Q/4wMZ8Zrnag5H6yBvzN7AKKe8beOaED9SF5/ByLqsku8NP4zQqsvM2u3ew/tJK8/w==}
@@ -18419,7 +18408,7 @@ snapshots:
     dependencies:
       '@balena/sbvr-types': 11.1.4
 
-  '@balena/abstract-sql-compiler@11.2.3(@balena/sbvr-types@11.1.4)':
+  '@balena/abstract-sql-compiler@11.3.18(@balena/sbvr-types@11.1.4)':
     dependencies:
       '@balena/sbvr-types': 11.1.4
 
@@ -18431,26 +18420,26 @@ snapshots:
       '@types/node': 20.19.9
       common-tags: 1.8.2
 
-  '@balena/abstract-sql-to-typescript@6.1.2(@balena/sbvr-types@11.1.4)':
+  '@balena/abstract-sql-to-typescript@6.1.19(@balena/sbvr-types@11.1.4)':
     dependencies:
-      '@balena/abstract-sql-compiler': 11.2.3(@balena/sbvr-types@11.1.4)
-      '@balena/odata-to-abstract-sql': 10.0.4(@balena/sbvr-types@11.1.4)
+      '@balena/abstract-sql-compiler': 11.3.18(@balena/sbvr-types@11.1.4)
+      '@balena/odata-to-abstract-sql': 10.0.22(@balena/sbvr-types@11.1.4)
       '@balena/sbvr-types': 11.1.4
       '@types/node': 20.19.9
       common-tags: 1.8.2
 
-  '@balena/es-version@1.0.3': {}
+  '@balena/es-version@1.0.4': {}
 
-  '@balena/odata-parser@4.2.10': {}
+  '@balena/odata-parser@4.2.28': {}
 
-  '@balena/odata-to-abstract-sql@10.0.4(@balena/sbvr-types@11.1.4)':
+  '@balena/odata-to-abstract-sql@10.0.22(@balena/sbvr-types@11.1.4)':
     dependencies:
-      '@balena/abstract-sql-compiler': 11.2.3(@balena/sbvr-types@11.1.4)
-      '@balena/odata-parser': 4.2.10
-      '@types/lodash': 4.17.20
+      '@balena/abstract-sql-compiler': 11.3.18(@balena/sbvr-types@11.1.4)
+      '@balena/odata-parser': 4.2.28
+      '@types/lodash': 4.17.24
       '@types/memoizee': 0.4.12
       '@types/string-hash': 1.1.3
-      lodash: 4.17.21
+      lodash: 4.18.1
       memoizee: 0.4.17
       string-hash: 1.1.3
     transitivePeerDependencies:
@@ -18459,11 +18448,11 @@ snapshots:
   '@balena/odata-to-abstract-sql@8.0.2(@balena/sbvr-types@11.1.4)':
     dependencies:
       '@balena/abstract-sql-compiler': 10.6.3(@balena/sbvr-types@11.1.4)
-      '@balena/odata-parser': 4.2.10
-      '@types/lodash': 4.17.20
+      '@balena/odata-parser': 4.2.28
+      '@types/lodash': 4.17.24
       '@types/memoizee': 0.4.12
       '@types/string-hash': 1.1.3
-      lodash: 4.17.21
+      lodash: 4.18.1
       memoizee: 0.4.17
       string-hash: 1.1.3
     transitivePeerDependencies:
@@ -24559,7 +24548,7 @@ snapshots:
 
   '@types/lodash@4.17.16': {}
 
-  '@types/lodash@4.17.20': {}
+  '@types/lodash@4.17.24': {}
 
   '@types/luxon@3.7.1': {}
 
@@ -24589,7 +24578,7 @@ snapshots:
     dependencies:
       '@types/node': 20.19.9
 
-  '@types/node@10.17.60': {}
+  '@types/node@14.18.63': {}
 
   '@types/node@20.19.9':
     dependencies:
@@ -24712,10 +24701,6 @@ snapshots:
   '@types/unist@3.0.3': {}
 
   '@types/use-sync-external-store@0.0.6': {}
-
-  '@types/uuid@11.0.0':
-    dependencies:
-      uuid: 9.0.1
 
   '@types/uuid@9.0.8': {}
 
@@ -26083,35 +26068,34 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  balena-auth@6.0.1:
+  balena-auth@6.1.0:
     dependencies:
       balena-errors: 4.9.0
-      balena-settings-storage: 8.1.0
+      balena-settings-storage: 8.2.0
       jwt-decode: 3.1.2
       tslib: 2.8.1
 
   balena-errors@4.9.0:
     dependencies:
       tslib: 2.8.1
-      typed-error: 3.2.2
+      typed-error: 3.2.3
 
   balena-hup-action-utils@6.2.10:
     dependencies:
       balena-semver: 3.0.10
       tslib: 2.8.1
-      typed-error: 3.2.2
+      typed-error: 3.2.3
 
-  balena-register-device@9.0.12(balena-request@14.1.5(balena-auth@6.0.1)(encoding@0.1.13)):
+  balena-register-device@9.0.32(balena-request@14.2.0(balena-auth@6.1.0)(encoding@0.1.13)):
     dependencies:
-      '@types/uuid': 11.0.0
-      balena-request: 14.1.5(balena-auth@6.0.1)(encoding@0.1.13)
+      balena-request: 14.2.0(balena-auth@6.1.0)(encoding@0.1.13)
       tslib: 2.8.1
-      typed-error: 3.2.2
-      uuid: 11.1.0
+      typed-error: 3.2.3
+      uuid: 13.0.0
 
-  balena-request@14.1.5(balena-auth@6.0.1)(encoding@0.1.13):
+  balena-request@14.2.0(balena-auth@6.1.0)(encoding@0.1.13):
     dependencies:
-      balena-auth: 6.0.1
+      balena-auth: 6.1.0
       balena-errors: 4.9.0
       fetch-readablestream: 0.2.0
       form-data-encoder: 4.1.0
@@ -26120,32 +26104,31 @@ snapshots:
       progress-stream: 2.0.0
       qs: 6.15.0
       tslib: 2.8.1
-      url: 0.11.4
     transitivePeerDependencies:
       - encoding
 
-  balena-sdk@22.4.1(@balena/sbvr-types@11.1.4)(encoding@0.1.13):
+  balena-sdk@22.4.9(@balena/sbvr-types@11.1.4)(encoding@0.1.13):
     dependencies:
       '@balena/abstract-sql-to-typescript': 5.1.5(@balena/sbvr-types@11.1.4)
-      '@balena/es-version': 1.0.3
+      '@balena/es-version': 1.0.4
       '@types/json-schema': 7.0.15
       '@types/node': 20.19.9
       abortcontroller-polyfill: 1.7.8
-      balena-auth: 6.0.1
+      balena-auth: 6.1.0
       balena-errors: 4.9.0
       balena-hup-action-utils: 6.2.10
-      balena-register-device: 9.0.12(balena-request@14.1.5(balena-auth@6.0.1)(encoding@0.1.13))
-      balena-request: 14.1.5(balena-auth@6.0.1)(encoding@0.1.13)
+      balena-register-device: 9.0.32(balena-request@14.2.0(balena-auth@6.1.0)(encoding@0.1.13))
+      balena-request: 14.2.0(balena-auth@6.1.0)(encoding@0.1.13)
       balena-semver: 3.0.10
       balena-settings-client: 5.0.3
       date-fns: 3.6.0
       handlebars: 4.7.9
-      lodash: 4.17.21
+      lodash: 4.18.1
       memoizee: 0.4.17
       mime: 3.0.0
       ndjson: 2.0.0
       p-throttle: 4.1.1
-      pinejs-client-core: 8.4.1(@balena/sbvr-types@11.1.4)
+      pinejs-client-core: 8.5.18(@balena/sbvr-types@11.1.4)
       tslib: 2.8.1
     transitivePeerDependencies:
       - '@balena/sbvr-types'
@@ -26153,9 +26136,9 @@ snapshots:
 
   balena-semver@3.0.10:
     dependencies:
-      '@types/lodash': 4.17.20
+      '@types/lodash': 4.17.24
       '@types/semver': 7.7.1
-      lodash: 4.17.21
+      lodash: 4.18.1
       semver: 7.7.4
 
   balena-settings-client@5.0.3:
@@ -26163,15 +26146,15 @@ snapshots:
       '@resin.io/types-hidepath': 1.0.1
       '@resin.io/types-home-or-tmp': 3.0.0
       '@types/js-yaml': 3.11.1
-      '@types/lodash': 4.17.16
+      '@types/lodash': 4.17.24
       hidepath: 1.0.1
       home-or-tmp: 2.0.0
       js-yaml: 3.14.2
-      lodash: 4.17.21
+      lodash: 4.18.1
 
-  balena-settings-storage@8.1.0:
+  balena-settings-storage@8.2.0:
     dependencies:
-      '@types/node': 10.17.60
+      '@types/node': 14.18.63
       balena-errors: 4.9.0
       tslib: 2.8.1
 
@@ -33317,9 +33300,9 @@ snapshots:
   pify@4.0.1:
     optional: true
 
-  pinejs-client-core@8.4.1(@balena/sbvr-types@11.1.4):
+  pinejs-client-core@8.5.18(@balena/sbvr-types@11.1.4):
     dependencies:
-      '@balena/abstract-sql-to-typescript': 6.1.2(@balena/sbvr-types@11.1.4)
+      '@balena/abstract-sql-to-typescript': 6.1.19(@balena/sbvr-types@11.1.4)
     transitivePeerDependencies:
       - '@balena/sbvr-types'
 
@@ -33890,8 +33873,6 @@ snapshots:
 
   punycode.js@2.3.1:
     optional: true
-
-  punycode@1.4.1: {}
 
   punycode@2.3.1: {}
 
@@ -35956,7 +35937,7 @@ snapshots:
 
   typed-assert@1.0.9: {}
 
-  typed-error@3.2.2: {}
+  typed-error@3.2.3: {}
 
   typedarray-to-buffer@3.1.5:
     dependencies:
@@ -36210,11 +36191,6 @@ snapshots:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
-
-  url@0.11.4:
-    dependencies:
-      punycode: 1.4.1
-      qs: 6.15.0
 
   use-composed-ref@1.4.0(@types/react@19.2.10)(react@19.2.4):
     dependencies:
