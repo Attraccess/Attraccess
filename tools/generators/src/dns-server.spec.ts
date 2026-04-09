@@ -683,19 +683,19 @@ describe('dns-server', () => {
       expect(dnsSection).toContain('restart: unless-stopped');
     });
 
-    it('should map port 53 UDP for DNS', () => {
+    it('should expose port 53 UDP for DNS', () => {
       const dnsSection = extractServiceBlock(content, 'dns-server');
-      expect(dnsSection).toMatch(/['"]53:53\/udp['"]/);
+      expect(dnsSection).toContain('53/udp');
     });
 
-    it('should map port 53 TCP for DNS', () => {
+    it('should expose port 53 TCP for DNS', () => {
       const dnsSection = extractServiceBlock(content, 'dns-server');
-      expect(dnsSection).toMatch(/['"]53:53\/tcp['"]/);
+      expect(dnsSection).toContain('53/tcp');
     });
 
     it('should expose port 5380 for admin UI', () => {
       const dnsSection = extractServiceBlock(content, 'dns-server');
-      expect(dnsSection).toMatch(/['"]5380['"]/);
+      expect(dnsSection).toContain('5380');
     });
 
     it('should use env_file referencing .env.docker-compose', () => {
@@ -708,9 +708,9 @@ describe('dns-server', () => {
       expect(dnsSection).toMatch(/dns-server-data:\/data/);
     });
 
-    it('should NOT use network_mode: host', () => {
+    it('should use network_mode: host', () => {
       const dnsSection = extractServiceBlock(content, 'dns-server');
-      expect(dnsSection).not.toContain('network_mode');
+      expect(dnsSection).toContain('network_mode: host');
     });
 
     it('should define dns-server-data in the volumes section', () => {
