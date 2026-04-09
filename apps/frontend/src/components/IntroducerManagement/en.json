@@ -1,4 +1,5 @@
 {
   "title": "Introducers",
-  "subtitle": "Manage users who can grant introductions to this group"
+  "subtitle": "Manage users who can grant introductions to this group",
+  "addToSelectionButtonLabel": "Add"
 }

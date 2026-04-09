@@ -4,9 +4,7 @@
     "ariaLabel": "Maintenance schedules",
     "columns": {
       "name": "Name",
-      "triggerType": "Trigger",
       "configSummary": "Config",
-      "enabled": "Enabled",
       "actions": "Actions"
     }
   },

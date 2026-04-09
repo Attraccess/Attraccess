@@ -9,8 +9,6 @@
       "start": "Start",
       "end": "End",
       "reason": "Reason",
-      "createdBy": "Created by",
-      "completedBy": "Completed by",
       "completedAt": "Completed at"
     }
   },

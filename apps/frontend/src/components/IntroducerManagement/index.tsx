@@ -42,6 +42,7 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
             removeWrapper: true,
             shadow: 'none',
           }}
+          addToSelectionButtonLabel={t('addToSelectionButtonLabel')}
           actions={[
             {
               key: 'revoke',

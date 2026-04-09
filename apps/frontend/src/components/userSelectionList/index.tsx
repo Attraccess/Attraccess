@@ -38,6 +38,7 @@ interface Props<TUser> {
   selectedUsers?: TUser[];
   selectedUserIsLoading?: boolean;
   onAddToSelection: (user: User) => void;
+  addToSelectionButtonLabel?: string;
   addToSelectionIsLoading?: boolean;
   actions?: Action<TUser>[] | ((user: TUser) => Action<TUser>[]);
   tableProps?: Omit<TableProps, 'bottomContent' | 'children'>;
@@ -55,6 +56,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     tableProps,
     additionalColumns,
     rowClassName,
+    addToSelectionButtonLabel,
   } = props;
 
   const { t } = useTranslations({
@@ -111,9 +113,11 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
               onPress={onAddUser}
               color="primary"
               isLoading={addToSelectionIsLoading}
-              isIconOnly
+              isIconOnly={addToSelectionButtonLabel ? false : true}
               startContent={<PlusIcon className="w-4 h-4" />}
-            />
+            >
+              {addToSelectionButtonLabel}
+            </Button>
           )
         }
       />

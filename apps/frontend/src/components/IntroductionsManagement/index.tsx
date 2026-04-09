@@ -137,6 +137,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
             removeWrapper: true,
             shadow: 'none',
           }}
+          addToSelectionButtonLabel={t('actions.grant')}
           actions={Actions}
         />
 

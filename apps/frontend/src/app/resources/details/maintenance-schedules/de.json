@@ -4,9 +4,7 @@
     "ariaLabel": "Wartungspläne",
     "columns": {
       "name": "Name",
-      "triggerType": "Auslöser",
       "configSummary": "Konfiguration",
-      "enabled": "Aktiv",
       "actions": "Aktionen"
     }
   },

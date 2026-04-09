@@ -130,10 +130,8 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
         <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
-            <TableColumn>{t('table.columns.triggerType')}</TableColumn>
-            <TableColumn>{t('table.columns.configSummary')}</TableColumn>
-            <TableColumn>{t('table.columns.enabled')}</TableColumn>
-            <TableColumn align="end">{t('table.columns.actions')}</TableColumn>
+            <TableColumn width="0">{t('table.columns.configSummary')}</TableColumn>
+            <TableColumn width="0" >{t('table.columns.actions')}</TableColumn>
           </TableHeader>
           <TableBody<ResourceMaintenanceSchedule>
             items={schedules}
@@ -143,17 +141,9 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
             {(schedule) => (
               <TableRow key={schedule.id}>
                 <TableCell>{schedule.name ?? '—'}</TableCell>
-                <TableCell>{t(`triggerType.${schedule.triggerType}`)}</TableCell>
-                <TableCell>{configSummary(schedule, t)}</TableCell>
-                <TableCell>
-                  <Switch
-                    isSelected={schedule.enabled}
-                    onValueChange={(enabled) => handleEnabledChange(schedule, enabled)}
-                    isDisabled={isUpdating}
-                    aria-label={schedule.enabled ? 'Disable' : 'Enable'}
-                  />
-                </TableCell>
-                <TableCell align="right">
+                <TableCell style={{ whiteSpace: 'nowrap' }}>{configSummary(schedule, t)}</TableCell>
+                <TableCell style={{ whiteSpace: 'nowrap' }} className='flex flex-row'>
+
                   <MaintenanceScheduleUpsertModal resourceId={resourceId} scheduleId={schedule.id}>
                     {(open: () => void) => (
                       <Button
@@ -177,6 +167,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
                       />
                     )}
                   </ScheduleDeleteModal>
+
                 </TableCell>
               </TableRow>
             )}

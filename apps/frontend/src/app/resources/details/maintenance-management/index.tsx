@@ -107,13 +107,11 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
       <CardBody>
         <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
-            <TableColumn>{t('table.columns.start')}</TableColumn>
-            <TableColumn>{t('table.columns.end')}</TableColumn>
+            <TableColumn width="0">{t('table.columns.start')}</TableColumn>
+            <TableColumn width="0">{t('table.columns.end')}</TableColumn>
+            <TableColumn width="0">{t('table.columns.completedAt')}</TableColumn>
             <TableColumn>{t('table.columns.reason')}</TableColumn>
-            <TableColumn>{t('table.columns.createdBy')}</TableColumn>
-            <TableColumn>{t('table.columns.completedBy')}</TableColumn>
-            <TableColumn>{t('table.columns.completedAt')}</TableColumn>
-            <TableColumn>
+            <TableColumn width="0">
               <CogIcon />
             </TableColumn>
           </TableHeader>
@@ -125,27 +123,21 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
                   maintenance.isPast && 'line-through',
                 )}
               >
-                <TableCell>
+                <TableCell style={{ whiteSpace: 'nowrap' }}>
                   <DateTimeDisplay date={maintenance.startTime} />
                 </TableCell>
-                <TableCell>
+                <TableCell style={{ whiteSpace: 'nowrap' }}>
                   <DateTimeDisplay date={maintenance.endTime} />
                 </TableCell>
-                <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
-                  <MaintenanceReasonDisplay reason={maintenance.reason} />
-                </TableCell>
-                <TableCell title={(maintenance.createdByUser as { username?: string } | undefined)?.username ?? ''}>
-                  {(maintenance.createdByUser as { username?: string } | undefined)?.username ?? '—'}
-                </TableCell>
-                <TableCell title={(maintenance.completedByUser as { username?: string } | undefined)?.username ?? ''}>
-                  {(maintenance.completedByUser as { username?: string } | undefined)?.username ?? '—'}
-                </TableCell>
-                <TableCell>
+                <TableCell style={{ whiteSpace: 'nowrap' }}>
                   {maintenance.completedAt ? (
                     <DateTimeDisplay date={maintenance.completedAt} />
                   ) : (
                     '—'
                   )}
+                </TableCell>
+                <TableCell className="overflow-hidden text-ellipsis" title={formatReason(maintenance.reason)}>
+                  <MaintenanceReasonDisplay reason={maintenance.reason} />
                 </TableCell>
                 <TableCell align="right">
                   {maintenance.isActive && (
