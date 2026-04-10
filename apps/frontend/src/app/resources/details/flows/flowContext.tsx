@@ -21,14 +21,9 @@ import { AttraccessNode } from './node';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
+import { buildClipboardData, parseClipboardData, buildPastedElements } from './flowClipboard';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
-
-interface AttraccessClipboardData {
-  type: 'attraccess-flow-nodes';
-  nodes: Node[];
-  edges: Edge[];
-}
 
 interface FlowContextType {
   nodes: Node[];
@@ -147,54 +142,17 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   }, [nodeSchemas, tNodeTranslations]);
 
   const copySelectedNodes = useCallback(async () => {
-    const selectedNodes = nodes.filter((n) => n.selected);
-    if (selectedNodes.length === 0) return;
-
-    const selectedIds = new Set(selectedNodes.map((n) => n.id));
-    const selectedEdges = edges.filter(
-      (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
-    );
-
-    const clipboardData: AttraccessClipboardData = {
-      type: 'attraccess-flow-nodes',
-      nodes: selectedNodes,
-      edges: selectedEdges,
-    };
-
+    const clipboardData = buildClipboardData(nodes, edges);
+    if (!clipboardData) return;
     await navigator.clipboard.writeText(JSON.stringify(clipboardData));
   }, [nodes, edges]);
 
   const pasteNodes = useCallback(async () => {
-    let clipboardData: AttraccessClipboardData;
-    try {
-      const text = await navigator.clipboard.readText();
-      const parsed = JSON.parse(text);
-      if (parsed?.type !== 'attraccess-flow-nodes') return;
-      clipboardData = parsed;
-    } catch {
-      return;
-    }
+    const text = await navigator.clipboard.readText().catch(() => '');
+    const clipboardData = parseClipboardData(text);
+    if (!clipboardData) return;
 
-    const idMap = new Map<string, string>();
-    clipboardData.nodes.forEach((n) => idMap.set(n.id, nanoid()));
-
-    const PASTE_OFFSET = 50;
-    const newNodes: Node[] = clipboardData.nodes.map((n) => ({
-      ...n,
-      id: idMap.get(n.id)!,
-      position: { x: n.position.x + PASTE_OFFSET, y: n.position.y + PASTE_OFFSET },
-      selected: true,
-    }));
-
-    const newEdges: Edge[] = clipboardData.edges
-      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
-      .map((e) => ({
-        ...e,
-        id: nanoid(),
-        source: idMap.get(e.source)!,
-        target: idMap.get(e.target)!,
-      }));
-
+    const { nodes: newNodes, edges: newEdges } = buildPastedElements(clipboardData, nanoid);
     setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
     setEdges((prev) => [...prev, ...newEdges]);
   }, [setNodes, setEdges]);

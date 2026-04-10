@@ -345,6 +345,7 @@ function FlowsPageInner() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           selectionOnDrag
+          panOnDrag={[1, 2]}
           selectionMode={SelectionMode.Partial}
           deleteKeyCode={['Backspace', 'Delete']}
           multiSelectionKeyCode="Shift"
