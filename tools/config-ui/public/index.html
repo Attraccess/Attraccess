@@ -160,11 +160,6 @@
             <input type="text" id="prom-attraccessTarget" placeholder="attraccess:3000" data-testid="input-attraccess-target">
             <div class="field-hint">host:port of the Attraccess instance (as seen from Prometheus)</div>
           </div>
-          <div>
-            <label for="prom-retentionTime">Retention Time</label>
-            <input type="text" id="prom-retentionTime" placeholder="30d" data-testid="input-retention-time">
-            <div class="field-hint">How long to keep data (used in Prometheus CLI args)</div>
-          </div>
         </div>
 
         <div class="settings-grid full" style="margin-top: 0.75rem;">
@@ -319,7 +314,6 @@
         document.getElementById('prom-scrapeInterval').value = s.scrapeInterval || '';
         document.getElementById('prom-evaluationInterval').value = s.evaluationInterval || '';
         document.getElementById('prom-attraccessTarget').value = s.attraccessTarget || '';
-        document.getElementById('prom-retentionTime').value = s.retentionTime || '';
         document.getElementById('prom-metricsApiKey').value = s.metricsApiKey || '';
       });
     }
@@ -329,7 +323,6 @@
         scrapeInterval: document.getElementById('prom-scrapeInterval').value.trim(),
         evaluationInterval: document.getElementById('prom-evaluationInterval').value.trim(),
         attraccessTarget: document.getElementById('prom-attraccessTarget').value.trim(),
-        retentionTime: document.getElementById('prom-retentionTime').value.trim(),
         metricsApiKey: document.getElementById('prom-metricsApiKey').value.trim()
       };
       request('PUT', '/api/modules/prometheus/settings', data).then(function() {

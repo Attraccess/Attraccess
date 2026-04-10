@@ -79,9 +79,8 @@ Replace `<your-metrics-api-key>` with the API key you generated in the [setup gu
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `scrape_interval` | `10s` | How often Prometheus scrapes the Attraccess metrics endpoint |
+| `scrape_interval` | `10s` | Recommended job-level scrape interval for the Attraccess job in the example config (global `scrape_interval` remains `15s` unless overridden) |
 | `evaluation_interval` | `15s` | How often Prometheus evaluates recording and alerting rules |
-| `storage.tsdb.retention.time` | `30d` | How long metrics data is retained |
 
 > [!TIP]
 > A 10-second scrape interval provides good granularity for most dashboards. Increase it to 30s or 60s if you want to reduce resource usage.

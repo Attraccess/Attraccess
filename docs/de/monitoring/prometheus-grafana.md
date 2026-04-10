@@ -79,9 +79,8 @@ Ersetzen Sie `<Ihr-Metriken-API-Schlüssel>` durch den API-Schlüssel, den Sie i
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|--------------|
-| `scrape_interval` | `10s` | Wie oft Prometheus den Attraccess-Metriken-Endpunkt abfragt |
+| `scrape_interval` | `10s` | Empfohlenes Job-Level-Scrape-Intervall für den Attraccess-Job in der Beispielkonfiguration (globales `scrape_interval` bleibt `15s`, sofern nicht überschrieben) |
 | `evaluation_interval` | `15s` | Wie oft Prometheus Aufzeichnungs- und Alarmregeln auswertet |
-| `storage.tsdb.retention.time` | `30d` | Wie lange Metrikdaten aufbewahrt werden |
 
 > [!TIP]
 > Ein 10-Sekunden-Scrape-Intervall bietet gute Granularität für die meisten Dashboards. Erhöhen Sie es auf 30s oder 60s, wenn Sie den Ressourcenverbrauch reduzieren möchten.

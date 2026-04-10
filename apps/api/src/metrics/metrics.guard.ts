@@ -22,7 +22,7 @@ export class MetricsGuard implements CanActivate {
     const providedKey = this.extractApiKey(request);
 
     if (!providedKey) {
-      throw new UnauthorizedException('Missing metrics API key. Provide via Authorization: Bearer <key> header.');
+      throw new UnauthorizedException('Missing metrics API key. Provide via Authorization: Bearer <key> header or ?api_key=<key> query parameter.');
     }
 
     if (!this.secureCompare(providedKey, apiKey)) {
@@ -38,12 +38,20 @@ export class MetricsGuard implements CanActivate {
       return authHeader.slice(7);
     }
 
+    const queryKey = request.query?.['api_key'];
+    if (typeof queryKey === 'string' && queryKey.length > 0) {
+      return queryKey;
+    }
+
     return null;
   }
 
   private secureCompare(a: string, b: string): boolean {
-    const hashA = Buffer.from(this.tokenHashService.hashToken(a), 'base64url');
-    const hashB = Buffer.from(this.tokenHashService.hashToken(b), 'base64url');
+    const hashA = Buffer.from(this.tokenHashService.hashToken(a), 'utf8');
+    const hashB = Buffer.from(this.tokenHashService.hashToken(b), 'utf8');
+    if (hashA.length !== hashB.length) {
+      return timingSafeEqual(hashA, hashA) && false;
+    }
     return timingSafeEqual(hashA, hashB);
   }
 }

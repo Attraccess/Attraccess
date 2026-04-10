@@ -30,7 +30,6 @@ function loadSettings() {
   const defaults = {
     scrapeInterval: process.env.PROMETHEUS_SCRAPE_INTERVAL || '10s',
     evaluationInterval: process.env.PROMETHEUS_EVALUATION_INTERVAL || '15s',
-    retentionTime: process.env.PROMETHEUS_RETENTION_TIME || '30d',
     attraccessTarget: process.env.PROMETHEUS_ATTRACCESS_TARGET || 'attraccess:3000',
     metricsApiKey: process.env.PROMETHEUS_METRICS_API_KEY || '',
   };
@@ -165,7 +164,6 @@ const prometheusModule = {
       const settings = loadSettings();
       if (body.scrapeInterval !== undefined) settings.scrapeInterval = body.scrapeInterval;
       if (body.evaluationInterval !== undefined) settings.evaluationInterval = body.evaluationInterval;
-      if (body.retentionTime !== undefined) settings.retentionTime = body.retentionTime;
       if (body.attraccessTarget !== undefined) settings.attraccessTarget = body.attraccessTarget;
       if (body.metricsApiKey !== undefined) settings.metricsApiKey = body.metricsApiKey;
       saveSettings(settings);
