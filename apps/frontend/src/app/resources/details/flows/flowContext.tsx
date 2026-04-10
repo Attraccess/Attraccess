@@ -13,6 +13,7 @@ import {
   NodeTypes,
   NodeProps,
 } from '@xyflow/react';
+import { nanoid } from 'nanoid';
 import { ResourceFlowLog, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from './liveLogs';
@@ -22,6 +23,12 @@ import nodesDeTranslations from './node/de.json';
 import nodesEnTranslations from './node/en.json';
 
 export type LiveLogReceiver = (log: ResourceFlowLog) => void;
+
+interface AttraccessClipboardData {
+  type: 'attraccess-flow-nodes';
+  nodes: Node[];
+  edges: Edge[];
+}
 
 interface FlowContextType {
   nodes: Node[];
@@ -42,6 +49,8 @@ interface FlowContextType {
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;
+  copySelectedNodes: () => Promise<void>;
+  pasteNodes: () => Promise<void>;
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -137,6 +146,59 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     return types;
   }, [nodeSchemas, tNodeTranslations]);
 
+  const copySelectedNodes = useCallback(async () => {
+    const selectedNodes = nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+
+    const selectedIds = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdges = edges.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
+    );
+
+    const clipboardData: AttraccessClipboardData = {
+      type: 'attraccess-flow-nodes',
+      nodes: selectedNodes,
+      edges: selectedEdges,
+    };
+
+    await navigator.clipboard.writeText(JSON.stringify(clipboardData));
+  }, [nodes, edges]);
+
+  const pasteNodes = useCallback(async () => {
+    let clipboardData: AttraccessClipboardData;
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsed = JSON.parse(text);
+      if (parsed?.type !== 'attraccess-flow-nodes') return;
+      clipboardData = parsed;
+    } catch {
+      return;
+    }
+
+    const idMap = new Map<string, string>();
+    clipboardData.nodes.forEach((n) => idMap.set(n.id, nanoid()));
+
+    const PASTE_OFFSET = 50;
+    const newNodes: Node[] = clipboardData.nodes.map((n) => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      position: { x: n.position.x + PASTE_OFFSET, y: n.position.y + PASTE_OFFSET },
+      selected: true,
+    }));
+
+    const newEdges: Edge[] = clipboardData.edges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => ({
+        ...e,
+        id: nanoid(),
+        source: idMap.get(e.source)!,
+        target: idMap.get(e.target)!,
+      }));
+
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
+    setEdges((prev) => [...prev, ...newEdges]);
+  }, [setNodes, setEdges]);
+
   const value: FlowContextType = useMemo(
     () => ({
       nodes,
@@ -157,6 +219,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      copySelectedNodes,
+      pasteNodes,
     }),
     [
       nodes,
@@ -177,6 +241,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
+      copySelectedNodes,
+      pasteNodes,
     ],
   );
 

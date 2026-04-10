@@ -1,7 +1,7 @@
 import { PageHeader } from '../../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow } from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ApiError,
@@ -153,6 +153,8 @@ function FlowsPageInner() {
     addLiveLogReceiver,
     removeLiveLogReceiver,
     flowNodeTypes,
+    copySelectedNodes,
+    pasteNodes,
   } = useFlowContext();
 
   const { handleExport, handleImportClick } = useFlowImportExport({
@@ -296,6 +298,22 @@ function FlowsPageInner() {
     };
   }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key === 'c') {
+        copySelectedNodes();
+      } else if (isMod && e.key === 'v') {
+        pasteNodes();
+      } else if (isMod && e.key === 'a') {
+        e.preventDefault();
+        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [copySelectedNodes, pasteNodes, setNodes]);
+
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
       ...edge,
@@ -326,6 +344,10 @@ function FlowsPageInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          selectionOnDrag
+          selectionMode={SelectionMode.Partial}
+          deleteKeyCode={['Backspace', 'Delete']}
+          multiSelectionKeyCode="Shift"
           colorMode={theme === 'dark' ? 'dark' : 'light'}
           fitView
           defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
