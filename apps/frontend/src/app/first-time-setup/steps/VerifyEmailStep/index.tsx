@@ -23,16 +23,14 @@ export function VerifyEmailStep() {
   const toast = useToastMessage();
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [showCorrection, setShowCorrection] = useState(false);
+  const [view, setView] = useState<'initial' | 'correcting' | 'corrected'>('initial');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [corrected, setCorrected] = useState(false);
 
   const { mutate: correctEmail, isPending } = useUsersServiceCorrectSetupEmail({
     onSuccess: () => {
-      setCorrected(true);
-      setShowCorrection(false);
+      setView('corrected');
       setUsername('');
       setPassword('');
       setNewEmail('');
@@ -67,13 +65,13 @@ export function VerifyEmailStep() {
         </div>
       </div>
 
-      {corrected ? (
+      {view === 'corrected' ? (
         <Alert color="success" variant="flat" description={t('correction.success')} />
       ) : (
         <Alert color="primary" variant="flat" description={t('message')} />
       )}
 
-      {!showCorrection && (
+      {view !== 'correcting' && (
         <>
           <Button color="primary" onPress={() => navigate('/', { replace: true })}>
             {t('actions.goToLogin')}
@@ -81,7 +79,7 @@ export function VerifyEmailStep() {
           <Link
             as="button"
             className="text-sm cursor-pointer self-center"
-            onPress={() => setShowCorrection(true)}
+            onPress={() => setView('correcting')}
             data-testid="wrong-email-link"
           >
             <PencilIcon className="h-3.5 w-3.5 mr-1 inline" />
@@ -90,7 +88,7 @@ export function VerifyEmailStep() {
         </>
       )}
 
-      {showCorrection && (
+      {view === 'correcting' && (
         <div className="flex flex-col gap-4 rounded-lg border border-default-200 p-4">
           <div>
             <h4 className="font-semibold text-default-700">{t('correction.title')}</h4>
@@ -141,7 +139,7 @@ export function VerifyEmailStep() {
             </Button>
             <Button
               variant="flat"
-              onPress={() => setShowCorrection(false)}
+              onPress={() => setView('initial')}
             >
               {t('actions.hideCorrection')}
             </Button>
