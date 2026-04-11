@@ -302,6 +302,18 @@ export const $VerifyEmailDto = {
     required: ['token', 'email']
 } as const;
 
+export const $ResendVerificationEmailDto = {
+    type: 'object',
+    properties: {
+        email: {
+            type: 'string',
+            description: 'The email address to resend the verification email to',
+            example: 'john.doe@example.com'
+        }
+    },
+    required: ['email']
+} as const;
+
 export const $AcceptInvitationDto = {
     type: 'object',
     properties: {

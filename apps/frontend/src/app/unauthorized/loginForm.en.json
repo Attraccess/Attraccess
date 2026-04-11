@@ -13,5 +13,12 @@
   "signingIn": "Signing in...",
   "accordion": {
     "title": "Sign in with email and password"
+  },
+  "resendVerification": {
+    "prompt": "Didn't receive the verification email or link expired? Enter your email to get a new one.",
+    "emailLabel": "Email address",
+    "button": "Resend verification email",
+    "successTitle": "Email sent!",
+    "successMessage": "If an account with that email exists and is not yet verified, a new verification link has been sent."
   }
 }

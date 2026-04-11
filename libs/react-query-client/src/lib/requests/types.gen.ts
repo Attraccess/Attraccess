@@ -182,6 +182,13 @@ export type VerifyEmailDto = {
     email: string;
 };
 
+export type ResendVerificationEmailDto = {
+    /**
+     * The email address to resend the verification email to
+     */
+    email: string;
+};
+
 export type AcceptInvitationDto = {
     /**
      * The token to accept the invitation
@@ -3747,6 +3754,14 @@ export type VerifyEmailResponse = {
     message?: string;
 };
 
+export type ResendVerificationEmailData = {
+    requestBody: ResendVerificationEmailDto;
+};
+
+export type ResendVerificationEmailResponse = {
+    message?: string;
+};
+
 export type AcceptInvitationData = {
     requestBody: AcceptInvitationDto;
 };
@@ -5408,6 +5423,23 @@ export type $OpenApiTs = {
                 };
                 /**
                  * Invalid token or email.
+                 */
+                400: unknown;
+            };
+        };
+    };
+    '/api/users/resend-verification-email': {
+        post: {
+            req: ResendVerificationEmailData;
+            res: {
+                /**
+                 * If the email exists and is not yet verified, a new verification email will be sent.
+                 */
+                200: {
+                    message?: string;
+                };
+                /**
+                 * Invalid input data.
                  */
                 400: unknown;
             };
