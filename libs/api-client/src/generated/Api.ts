@@ -373,6 +373,14 @@ export interface VerifyEmailDto {
   email: string;
 }
 
+export interface ResendVerificationEmailDto {
+  /**
+   * The email address to resend the verification email to
+   * @example "john.doe@example.com"
+   */
+  email: string;
+}
+
 export interface AcceptInvitationDto {
   /**
    * The token to accept the invitation
@@ -4047,6 +4055,11 @@ export interface VerifyEmailData {
   message?: string;
 }
 
+export interface ResendVerificationEmailData {
+  /** @example "OK" */
+  message?: string;
+}
+
 export type AcceptInvitationData = User;
 
 export type RequestPasswordResetData = any;
@@ -5548,6 +5561,21 @@ export namespace Users {
     export type RequestBody = VerifyEmailDto;
     export type RequestHeaders = {};
     export type ResponseBody = VerifyEmailData;
+  }
+
+  /**
+   * No description
+   * @tags Users
+   * @name ResendVerificationEmail
+   * @summary Resend the email verification link
+   * @request POST:/api/users/resend-verification-email
+   */
+  export namespace ResendVerificationEmail {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ResendVerificationEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = ResendVerificationEmailData;
   }
 
   /**
@@ -9758,6 +9786,27 @@ export class Api<
     verifyEmail: (data: VerifyEmailDto, params: RequestParams = {}) =>
       this.request<VerifyEmailData, void>({
         path: `/api/users/verify-email`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Users
+     * @name ResendVerificationEmail
+     * @summary Resend the email verification link
+     * @request POST:/api/users/resend-verification-email
+     */
+    resendVerificationEmail: (
+      data: ResendVerificationEmailDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResendVerificationEmailData, void>({
+        path: `/api/users/resend-verification-email`,
         method: "POST",
         body: data,
         type: ContentType.Json,

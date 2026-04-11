@@ -13,5 +13,12 @@
   "signingIn": "Anmelden...",
   "accordion": {
     "title": "Anmelden mit E-Mail und Passwort"
+  },
+  "resendVerification": {
+    "prompt": "Verifizierungs-E-Mail nicht erhalten oder Link abgelaufen? Gib deine E-Mail ein, um einen neuen zu erhalten.",
+    "emailLabel": "E-Mail-Adresse",
+    "button": "Verifizierungsmail erneut senden",
+    "successTitle": "E-Mail gesendet!",
+    "successMessage": "Wenn ein Konto mit dieser E-Mail existiert und noch nicht verifiziert ist, wurde ein neuer Verifizierungslink gesendet."
   }
 }

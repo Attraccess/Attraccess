@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '../../components/button';
@@ -8,7 +8,11 @@ import { PasswordInput } from '../../components/PasswordInput';
 import { useLogin } from '../../hooks/useAuth';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
-import { ApiError, useUsersServiceIsLocalSignupEnabled } from '@attraccess/react-query-client';
+import {
+  ApiError,
+  useUsersServiceIsLocalSignupEnabled,
+  useUsersServiceResendVerificationEmail,
+} from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
@@ -84,6 +88,21 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
   const { onForgotPassword, t, tExists } = props;
 
   const { mutate: login, isPending, error } = useLogin();
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const isEmailNotVerified = useMemo(() => {
+    if (!error) return false;
+    const apiError = error as ApiError;
+    const body = apiError?.body as Record<string, unknown> | undefined;
+    return body?.message === 'UserEmailNotVerifiedException';
+  }, [error]);
+
+  const resendVerification = useUsersServiceResendVerificationEmail({
+    onSuccess: () => {
+      setResendSuccess(true);
+    },
+  });
 
   const { errorTitle, errorDescription } = useMemo(() => {
     if (!error) {
@@ -120,6 +139,8 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       if (typeof username !== 'string' || typeof password !== 'string') {
         return;
       }
+
+      setResendSuccess(false);
 
       login({
         username,
@@ -179,6 +200,38 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
             <AlertDescription>{errorDescription}</AlertDescription>
           </AlertContent>
         </Alert>
+      )}
+
+      {isEmailNotVerified && !resendSuccess && (
+        <div className="space-y-2" data-testid="resend-verification-section">
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
+          <Input
+            type="email"
+            label={t('resendVerification.emailLabel')}
+            value={resendEmail}
+            onValueChange={setResendEmail}
+            data-testid="resend-email-input"
+          />
+          <Button
+            fullWidth
+            color="secondary"
+            onPress={() => resendVerification.mutate({ requestBody: { email: resendEmail } })}
+            isLoading={resendVerification.isPending}
+            isDisabled={!resendEmail || resendVerification.isPending}
+            data-testid="resend-verification-button"
+          >
+            {t('resendVerification.button')}
+          </Button>
+        </div>
+      )}
+
+      {resendSuccess && (
+        <Alert
+          color="success"
+          title={t('resendVerification.successTitle')}
+          description={t('resendVerification.successMessage')}
+          data-testid="resend-success-alert"
+        />
       )}
     </form>
   );

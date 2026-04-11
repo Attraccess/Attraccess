@@ -26,6 +26,7 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
+import { ResendVerificationEmailDto } from './dtos/resendVerificationEmail.dto';
 import {
   AuthenticationDetail,
   User,
@@ -621,6 +622,43 @@ export class UsersController {
     await this.authService.verifyEmail(body.email, body.token);
     this.logger.debug(`Email verified successfully for: ${body.email}`);
     return { message: 'Email verified successfully' };
+  }
+
+  @Post('resend-verification-email')
+  @ApiOperation({ summary: 'Resend the email verification link', operationId: 'resendVerificationEmail' })
+  @ApiResponse({
+    status: 200,
+    description: 'If the email exists and is not yet verified, a new verification email will be sent.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'OK' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input data.',
+  })
+  async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {
+    this.logger.debug(`Resend verification email requested for: ${body.email}`);
+
+    const user = await this.usersService.findOne({ email: body.email });
+    if (!user || user.isEmailVerified) {
+      this.logger.debug(`No unverified user found for: ${body.email}`);
+      return { message: 'OK' };
+    }
+
+    try {
+      const verificationToken = await this.authService.generateEmailVerificationToken(user);
+      await this.emailService.sendVerificationEmail(user, verificationToken);
+      this.logger.debug(`Verification email resent to: ${body.email}`);
+    } catch (e) {
+      this.logger.error(`Error resending verification email for: ${body.email}`, e.stack);
+      throw this.mapEmailSendError(e);
+    }
+
+    return { message: 'OK' };
   }
 
   @Post('accept-invitation')
