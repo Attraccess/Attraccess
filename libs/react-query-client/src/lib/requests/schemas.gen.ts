@@ -136,6 +136,28 @@ export const $User = {
     required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
 } as const;
 
+export const $CorrectSetupEmailDto = {
+    type: 'object',
+    properties: {
+        username: {
+            type: 'string',
+            description: 'The admin username',
+            example: 'admin'
+        },
+        password: {
+            type: 'string',
+            description: 'The admin password',
+            example: 'password123'
+        },
+        newEmail: {
+            type: 'string',
+            description: 'The corrected email address',
+            example: 'correct@example.com'
+        }
+    },
+    required: ['username', 'password', 'newEmail']
+} as const;
+
 export const $InviteUserDto = {
     type: 'object',
     properties: {

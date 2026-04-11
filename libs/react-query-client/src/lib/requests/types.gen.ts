@@ -92,6 +92,21 @@ export type User = {
     billingFactor: number;
 };
 
+export type CorrectSetupEmailDto = {
+    /**
+     * The admin username
+     */
+    username: string;
+    /**
+     * The admin password
+     */
+    password: string;
+    /**
+     * The corrected email address
+     */
+    newEmail: string;
+};
+
 export type InviteUserDto = {
     /**
      * The username for the new user
@@ -3717,6 +3732,14 @@ export type FindManyData = {
 
 export type FindManyResponse = PaginatedUsersResponseDto;
 
+export type CorrectSetupEmailData = {
+    requestBody: CorrectSetupEmailDto;
+};
+
+export type CorrectSetupEmailResponse = {
+    message?: string;
+};
+
 export type InviteUserData = {
     requestBody: InviteUserDto;
 };
@@ -5331,6 +5354,27 @@ export type $OpenApiTs = {
                 401: unknown;
                 /**
                  * Forbidden - User does not have permission to manage users.
+                 */
+                403: unknown;
+            };
+        };
+    };
+    '/api/users/correct-setup-email': {
+        post: {
+            req: CorrectSetupEmailData;
+            res: {
+                /**
+                 * Email corrected and new verification email sent.
+                 */
+                200: {
+                    message?: string;
+                };
+                /**
+                 * Invalid username or password.
+                 */
+                401: unknown;
+                /**
+                 * First-time setup is already complete.
                  */
                 403: unknown;
             };

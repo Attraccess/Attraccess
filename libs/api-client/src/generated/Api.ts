@@ -278,6 +278,24 @@ export interface User {
   billingFactor: number;
 }
 
+export interface CorrectSetupEmailDto {
+  /**
+   * The admin username
+   * @example "admin"
+   */
+  username: string;
+  /**
+   * The admin password
+   * @example "password123"
+   */
+  password: string;
+  /**
+   * The corrected email address
+   * @example "correct@example.com"
+   */
+  newEmail: string;
+}
+
 export interface InviteUserDto {
   /**
    * The username for the new user
@@ -3586,6 +3604,11 @@ export interface FindManyParams {
 
 export type FindManyData = PaginatedUsersResponseDto;
 
+export interface CorrectSetupEmailData {
+  /** @example "Email updated and verification email sent" */
+  message?: string;
+}
+
 export type InviteUserData = User;
 
 export type InviteUsersFromCsvData = User[];
@@ -4398,6 +4421,21 @@ export namespace Users {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = FindManyData;
+  }
+
+  /**
+   * @description Allows correcting the admin email when first-time setup is incomplete (admin created but email not verified). Requires the admin username and password for security. This is an unauthenticated endpoint.
+   * @tags Users
+   * @name CorrectSetupEmail
+   * @summary Correct admin email during first-time setup
+   * @request POST:/api/users/correct-setup-email
+   */
+  export namespace CorrectSetupEmail {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CorrectSetupEmailDto;
+    export type RequestHeaders = {};
+    export type ResponseBody = CorrectSetupEmailData;
   }
 
   /**
@@ -8212,6 +8250,27 @@ export class Api<
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Allows correcting the admin email when first-time setup is incomplete (admin created but email not verified). Requires the admin username and password for security. This is an unauthenticated endpoint.
+     *
+     * @tags Users
+     * @name CorrectSetupEmail
+     * @summary Correct admin email during first-time setup
+     * @request POST:/api/users/correct-setup-email
+     */
+    correctSetupEmail: (
+      data: CorrectSetupEmailDto,
+      params: RequestParams = {},
+    ) =>
+      this.request<CorrectSetupEmailData, void>({
+        path: `/api/users/correct-setup-email`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

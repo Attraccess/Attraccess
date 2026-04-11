@@ -3,6 +3,18 @@
   "subtitle": "Überprüfe deine E-Mails zur Verifizierung.",
   "message": "Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte öffne sie und klicke auf den Link, um dein Konto zu bestätigen. Anschließend kannst du dich anmelden und die Anwendung nutzen.",
   "actions": {
-    "goToLogin": "Zur Anmeldung"
+    "goToLogin": "Zur Anmeldung",
+    "wrongEmail": "Falsche E-Mail eingegeben?",
+    "hideCorrection": "Abbrechen"
+  },
+  "correction": {
+    "title": "E-Mail korrigieren",
+    "subtitle": "Gib deine Admin-Anmeldedaten und die korrekte E-Mail-Adresse ein.",
+    "username": "Admin-Benutzername",
+    "password": "Admin-Passwort",
+    "newEmail": "Korrekte E-Mail-Adresse",
+    "submit": "E-Mail aktualisieren & Bestätigung erneut senden",
+    "submitting": "Aktualisiere...",
+    "success": "E-Mail aktualisiert! Eine neue Bestätigungs-E-Mail wurde gesendet."
   }
 }
