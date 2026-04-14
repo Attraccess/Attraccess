@@ -18,7 +18,9 @@ import {
   ServiceUnavailableException,
   Delete,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthService } from '../auth/auth.service';
@@ -436,6 +438,8 @@ export class UsersController {
   }
 
   @Post('correct-setup-email')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({
     summary: 'Correct admin email during first-time setup',
     operationId: 'correctSetupEmail',

@@ -14,6 +14,7 @@ import { FileUpload } from '../../common/types/file-upload.types';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { CorrectSetupEmailDto } from './dtos/correctSetupEmail.dto';
 import { ForbiddenException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -29,6 +30,7 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [UsersController],
       providers: [
         {

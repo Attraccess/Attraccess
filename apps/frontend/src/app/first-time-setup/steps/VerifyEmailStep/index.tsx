@@ -49,7 +49,11 @@ export function VerifyEmailStep() {
   const handleCorrectSubmit = useCallback(() => {
     if (!formRef.current?.checkValidity() || !username || !password || !newEmail) return;
     correctEmail({
-      requestBody: { username, password, newEmail },
+      requestBody: {
+        username: username.trim(),
+        password,
+        newEmail: newEmail.trim(),
+      },
     });
   }, [correctEmail, username, password, newEmail]);
 
