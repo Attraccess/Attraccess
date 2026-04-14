@@ -192,7 +192,7 @@ importers:
         version: 1.18.1
       fetch-event-stream:
         specifier: ^0.1.5
-        version: 0.1.5
+        version: 0.1.6
       framer-motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -9994,8 +9994,8 @@ packages:
       picomatch:
         optional: true
 
-  fetch-event-stream@0.1.5:
-    resolution: {integrity: sha512-V1PWovkspxQfssq/NnxoEyQo1DV+MRK/laPuPblIZmSjMN8P5u46OhlFQznSr9p/t0Sp8Uc6SbM3yCMfr0KU8g==}
+  fetch-event-stream@0.1.6:
+    resolution: {integrity: sha512-GREtJ5HNikdU2AXtZ6E/5bk+aslMU6ie5mPG6H9nvsdDkkHQ6m5lHwmmmDTOBexok9hApQ7EprsXCdmz9ZC68w==}
 
   fetch-readablestream@0.2.0:
     resolution: {integrity: sha512-qu4mXWf4wus4idBIN/kVH+XSer8IZ9CwHP+Pd7DL7TuKNC1hP7ykon4kkBjwJF3EMX2WsFp4hH7gU7CyL7ucXw==}
@@ -29474,7 +29474,7 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.3
 
-  fetch-event-stream@0.1.5: {}
+  fetch-event-stream@0.1.6: {}
 
   fetch-readablestream@0.2.0: {}
 
