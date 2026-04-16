@@ -36,7 +36,7 @@ importers:
         version: 5.0.1(react-hook-form@7.56.4(react@19.2.5))
       '@icons-pack/react-simple-icons':
         specifier: ^13.1.0
-        version: 13.1.0(react@19.2.5)
+        version: 13.13.0(react@19.2.5)
       '@internationalized/date':
         specifier: ^3.12.0
         version: 3.12.0
@@ -3319,8 +3319,9 @@ packages:
   '@iarna/toml@2.2.5':
     resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
 
-  '@icons-pack/react-simple-icons@13.1.0':
-    resolution: {integrity: sha512-BrBHWxWM1X2pCdFmQfYnwkfwwm9Ta5NMdvSNe/ns2e9rhVK863rRAF6AhDjsvUIDKXSkRG1HfXZiSX/Uij0kxg==}
+  '@icons-pack/react-simple-icons@13.13.0':
+    resolution: {integrity: sha512-B5HhQMIpcSH4z8IZ8HFhD59CboHceKYMpPC9kAwGyKntvPdyJJv26DLu4Z1wAjcCLyrJhf11tMhiQGom9Rxb9g==}
+    engines: {node: '>=24', pnpm: '>=10'}
     peerDependencies:
       react: ^16.13 || ^17 || ^18 || ^19
 
@@ -19851,7 +19852,7 @@ snapshots:
 
   '@iarna/toml@2.2.5': {}
 
-  '@icons-pack/react-simple-icons@13.1.0(react@19.2.5)':
+  '@icons-pack/react-simple-icons@13.13.0(react@19.2.5)':
     dependencies:
       react: 19.2.5
 
