@@ -147,7 +147,10 @@ services:
       context: ./tools/config-ui
       dockerfile: Dockerfile
     ports:
-      - '5380:5380'
+      - '127.0.0.1:5380:5380'
+    environment:
+      CONFIG_UI_USERNAME: ${CONFIG_UI_USERNAME:-admin}
+      CONFIG_UI_PASSWORD: ${CONFIG_UI_PASSWORD:-attraccess}
     volumes:
       - config-ui-data:/data
       - prometheus-config:/etc/prometheus

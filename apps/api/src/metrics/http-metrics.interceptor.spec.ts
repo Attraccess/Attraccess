@@ -119,4 +119,26 @@ describe('HttpMetricsInterceptor', () => {
       },
     });
   });
+
+  it('labels unmatched routes with a constant to avoid cardinality explosion', (done) => {
+    const request = { method: 'GET', path: '/foo/' + Math.random(), route: undefined };
+    const response = { statusCode: 404 };
+    const context = {
+      getType: () => 'http',
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => response,
+      }),
+    } as unknown as ExecutionContext;
+    const next = { handle: () => of(null) } as CallHandler;
+
+    interceptor.intercept(context, next).subscribe({
+      complete: () => {
+        expect(metricsService.httpRequestsTotal.inc).toHaveBeenCalledWith(
+          expect.objectContaining({ route: 'unmatched' }),
+        );
+        done();
+      },
+    });
+  });
 });

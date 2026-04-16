@@ -97,44 +97,14 @@ describe('MetricsGuard', () => {
     });
   });
 
-  describe('query parameter auth', () => {
-    it('accepts api_key query parameter as fallback when no Bearer header', async () => {
+  describe('query parameter auth is rejected (secrets must not appear in URLs)', () => {
+    it('rejects api_key query parameter even when value is correct', async () => {
       settingsService.getMetricsApiKey.mockResolvedValue({ value: 'test-key', configured: true });
       const context = {
         switchToHttp: () => ({
           getRequest: () => ({
             headers: {},
             query: { api_key: 'test-key' },
-          }),
-        }),
-      } as unknown as ExecutionContext;
-
-      const result = await guard.canActivate(context);
-      expect(result).toBe(true);
-    });
-
-    it('prefers Bearer header over query parameter', async () => {
-      settingsService.getMetricsApiKey.mockResolvedValue({ value: 'header-key', configured: true });
-      const context = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: { authorization: 'Bearer header-key' },
-            query: { api_key: 'query-key' },
-          }),
-        }),
-      } as unknown as ExecutionContext;
-
-      const result = await guard.canActivate(context);
-      expect(result).toBe(true);
-    });
-
-    it('rejects empty api_key query parameter', async () => {
-      settingsService.getMetricsApiKey.mockResolvedValue({ value: 'test-key', configured: true });
-      const context = {
-        switchToHttp: () => ({
-          getRequest: () => ({
-            headers: {},
-            query: { api_key: '' },
           }),
         }),
       } as unknown as ExecutionContext;

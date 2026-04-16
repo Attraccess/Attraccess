@@ -139,14 +139,21 @@ export class SessionService {
     }
 
     const hashed = this.tokenHashService.hashToken(token);
-    let result = await this.sessionRepository.delete({ token: hashed });
-    if (!result.affected) {
-      result = await this.sessionRepository.delete({ token });
+    const now = new Date();
+    const existing = await this.sessionRepository.findOne({
+      where: [{ token: hashed }, { token }],
+      select: ['id', 'expiresAt'],
+    });
+    if (!existing) {
+      return;
     }
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
+    const wasActive = existing.expiresAt > now;
+    await this.sessionRepository.delete({ id: existing.id });
+    if (wasActive) {
+      this.metricsService.authActiveSessions.dec();
     }
+    this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
   }
 
   /**
@@ -154,12 +161,16 @@ export class SessionService {
    * @param userId The ID of the user whose sessions should be revoked
    */
   async revokeAllUserSessions(userId: number): Promise<void> {
+    const activeBefore = await this.sessionRepository.count({
+      where: { userId, expiresAt: MoreThan(new Date()) },
+    });
     const result = await this.sessionRepository.delete({ userId });
 
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked ${result.affected} sessions for user ${userId}`);
-      const activeCount = await this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } });
-      this.metricsService.authActiveSessions.set(activeCount);
+      if (activeBefore > 0) {
+        this.metricsService.authActiveSessions.dec(activeBefore);
+      }
     }
   }
 

@@ -9,6 +9,7 @@ import {
   Gauge,
   Histogram,
 } from 'prom-client';
+import { PluginService } from '../plugin-system/plugin.service';
 
 @Injectable()
 export class MetricsService implements OnModuleInit {
@@ -261,9 +262,9 @@ export class MetricsService implements OnModuleInit {
     this.authActiveSessions.set(activeAuthSessions);
 
     try {
-      const { PluginService } = await import('../plugin-system/plugin.service');
       this.pluginsLoaded.set(PluginService.getPlugins().length);
-    } catch {
+    } catch (err) {
+      this.logger.warn(`Could not enumerate plugins for metric: ${(err as Error).message}`);
       this.pluginsLoaded.set(0);
     }
 

@@ -165,7 +165,10 @@
         <div class="settings-grid full" style="margin-top: 0.75rem;">
           <div>
             <label for="prom-metricsApiKey">Metrics API Key</label>
-            <input type="text" id="prom-metricsApiKey" placeholder="Paste the API key from Attraccess Settings > Metrics" data-testid="input-metrics-api-key">
+            <div class="api-key-field">
+              <input type="password" id="prom-metricsApiKey" placeholder="Paste the API key from Attraccess Settings > Metrics" data-testid="input-metrics-api-key" autocomplete="off">
+              <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility()" data-testid="btn-toggle-api-key" style="margin-top: 0.4rem;">Show</button>
+            </div>
             <div class="field-hint">The bearer token used to authenticate with /api/metrics. Generate this in Attraccess Settings &gt; Metrics.</div>
           </div>
         </div>
@@ -331,12 +334,28 @@
       });
     }
 
+    function maskBearerToken(config) {
+      return config.replace(/(bearer_token:\s*)(['"])[^'"]+(['"])/g, '$1$2<hidden>$3');
+    }
+
     function loadPromConfig() {
       request('GET', '/api/modules/prometheus/config').then(function(data) {
-        document.getElementById('prom-config-preview').textContent = data.config || 'No config file found.';
+        document.getElementById('prom-config-preview').textContent = data.config ? maskBearerToken(data.config) : 'No config file found.';
       }).catch(function() {
         document.getElementById('prom-config-preview').textContent = 'Failed to load config.';
       });
+    }
+
+    function toggleApiKeyVisibility() {
+      var input = document.getElementById('prom-metricsApiKey');
+      var btn = document.querySelector('[data-testid="btn-toggle-api-key"]');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+      }
     }
 
     function checkPromStatus() {

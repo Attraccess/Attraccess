@@ -24,7 +24,7 @@ function timingSafeEqual(a, b) {
 
 function checkAuth(req) {
   const password = process.env.CONFIG_UI_PASSWORD || '';
-  if (!password) return true;
+  if (!password) return false;
 
   const username = process.env.CONFIG_UI_USERNAME || 'admin';
   const authHeader = req.headers['authorization'] || '';
@@ -149,6 +149,11 @@ async function handleRequest(req, res) {
 }
 
 function main() {
+  if (!process.env.CONFIG_UI_PASSWORD) {
+    log('refusing to start: CONFIG_UI_PASSWORD is not set');
+    process.exit(1);
+  }
+
   const dnsmasqModule = require('./modules/dnsmasq');
   const prometheusModule = require('./modules/prometheus');
 

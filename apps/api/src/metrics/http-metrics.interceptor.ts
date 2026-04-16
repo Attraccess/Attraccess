@@ -16,7 +16,7 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     const request = httpCtx.getRequest<Request>();
     const startTime = process.hrtime.bigint();
 
-    const route = request.route?.path || request.path || 'unknown';
+    const route = request.route?.path || 'unmatched';
     const method = request.method;
 
     return next.handle().pipe(

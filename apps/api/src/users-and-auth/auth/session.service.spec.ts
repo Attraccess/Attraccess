@@ -304,32 +304,39 @@ describe('SessionService', () => {
   });
 
   describe('revokeSession', () => {
-    it('should revoke existing session', async () => {
+    it('should revoke existing active session and delete by id', async () => {
+      const futureSession = { id: 42, expiresAt: new Date(Date.now() + 60 * 60 * 1000) } as Session;
+      sessionRepository.findOne.mockResolvedValue(futureSession);
       sessionRepository.delete.mockResolvedValue({ affected: 1, raw: {} });
 
       await service.revokeSession('token-to-revoke');
 
-      expect(sessionRepository.delete).toHaveBeenCalledWith({ token: 'hashed:token-to-revoke' });
+      expect(sessionRepository.findOne).toHaveBeenCalledWith({
+        where: [{ token: 'hashed:token-to-revoke' }, { token: 'token-to-revoke' }],
+        select: ['id', 'expiresAt'],
+      });
+      expect(sessionRepository.delete).toHaveBeenCalledWith({ id: 42 });
     });
 
     it('should handle non-existent session gracefully', async () => {
-      sessionRepository.delete.mockResolvedValue({ affected: 0, raw: {} });
+      sessionRepository.findOne.mockResolvedValue(null);
 
       await service.revokeSession('non-existent-token');
 
-      expect(sessionRepository.delete).toHaveBeenNthCalledWith(1, { token: 'hashed:non-existent-token' });
-      expect(sessionRepository.delete).toHaveBeenNthCalledWith(2, { token: 'non-existent-token' });
+      expect(sessionRepository.delete).not.toHaveBeenCalled();
     });
 
     it('should handle empty token gracefully', async () => {
       await service.revokeSession('');
 
+      expect(sessionRepository.findOne).not.toHaveBeenCalled();
       expect(sessionRepository.delete).not.toHaveBeenCalled();
     });
   });
 
   describe('revokeAllUserSessions', () => {
     it('should revoke all sessions for a user', async () => {
+      sessionRepository.count.mockResolvedValue(2);
       sessionRepository.delete.mockResolvedValue({ affected: 3, raw: {} });
 
       await service.revokeAllUserSessions(1);
@@ -338,6 +345,7 @@ describe('SessionService', () => {
     });
 
     it('should handle user with no sessions', async () => {
+      sessionRepository.count.mockResolvedValue(0);
       sessionRepository.delete.mockResolvedValue({ affected: 0, raw: {} });
 
       await service.revokeAllUserSessions(999);

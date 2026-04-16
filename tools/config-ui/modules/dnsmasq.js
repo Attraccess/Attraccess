@@ -17,6 +17,20 @@ function log(message) {
   console.log(`[dnsmasq] ${message}`);
 }
 
+const HOSTNAME_PATTERN = /^(\*\.)?(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const IPV4_PATTERN = /^(25[0-5]|2[0-4]\d|[01]?\d?\d)(\.(25[0-5]|2[0-4]\d|[01]?\d?\d)){3}$/;
+const IPV6_PATTERN = /^[0-9a-fA-F:]+$/;
+
+function isValidHostname(value) {
+  return typeof value === 'string' && HOSTNAME_PATTERN.test(value);
+}
+
+function isValidIp(value) {
+  if (typeof value !== 'string') return false;
+  if (IPV4_PATTERN.test(value)) return true;
+  return IPV6_PATTERN.test(value) && value.includes(':');
+}
+
 function getEnvBoolean(name, defaultValue = false) {
   const raw = process.env[name];
   if (raw == null) return defaultValue;
@@ -213,6 +227,10 @@ const dnsmasqModule = {
         helpers.sendJson(res, 400, { error: 'hostname and ip required' });
         return true;
       }
+      if (!isValidHostname(body.hostname) || !isValidIp(body.ip)) {
+        helpers.sendJson(res, 400, { error: 'invalid hostname or ip' });
+        return true;
+      }
       const records = loadRecords();
       const newRecord = { id: crypto.randomUUID(), hostname: body.hostname, ip: body.ip };
       records.push(newRecord);
@@ -228,6 +246,14 @@ const dnsmasqModule = {
       const idx = records.findIndex((r) => r.id === id);
       if (idx === -1) {
         helpers.sendJson(res, 404, { error: 'record not found' });
+        return true;
+      }
+      if (body.hostname !== undefined && !isValidHostname(body.hostname)) {
+        helpers.sendJson(res, 400, { error: 'invalid hostname' });
+        return true;
+      }
+      if (body.ip !== undefined && !isValidIp(body.ip)) {
+        helpers.sendJson(res, 400, { error: 'invalid ip' });
         return true;
       }
       if (body.hostname) records[idx].hostname = body.hostname;
