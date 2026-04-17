@@ -1,4 +1,4 @@
-FROM node:24.13.0-alpine
+FROM node:24.15.0-alpine
 
 # Create unprivileged user for runtime
 RUN addgroup -S appuser && adduser -S -G appuser -h /app appuser
