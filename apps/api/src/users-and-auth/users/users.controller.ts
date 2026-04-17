@@ -17,10 +17,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
   Delete,
-  UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
-import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthService } from '../auth/auth.service';
@@ -47,7 +44,6 @@ import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
-import { CorrectSetupEmailDto } from './dtos/correctSetupEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -382,8 +378,16 @@ export class UsersController {
     status: 400,
     description: 'Invalid input data.',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).',
+  })
   async createOne(@Body() body: CreateUserDto): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
+
+    if (body.overwriteFirstTimeAdmin) {
+      await this.ensureFirstTimeSetupIncompleteAndDeleteAdmin();
+    }
 
     const signupDomainWhitelist = await this.getLocalSignupDomainWhitelist();
 
@@ -437,66 +441,20 @@ export class UsersController {
     return user;
   }
 
-  @Post('correct-setup-email')
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({
-    summary: 'Correct admin email during first-time setup',
-    operationId: 'correctSetupEmail',
-    description:
-      'Allows correcting the admin email when first-time setup is incomplete (admin created but email not verified). Requires the admin username and password for security. This is an unauthenticated endpoint.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Email corrected and new verification email sent.',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Email updated and verification email sent' },
-      },
-    },
-  })
-  @ApiResponse({ status: 403, description: 'First-time setup is already complete.' })
-  @ApiResponse({ status: 401, description: 'Invalid username or password.' })
-  async correctSetupEmail(@Body() body: CorrectSetupEmailDto) {
-    this.logger.debug(`Correcting setup email for username: ${body.username}`);
-
-    const admin = await this.usersService.findOne({ username: body.username });
-    if (!admin) {
-      throw new UnauthorizedException('Invalid username or password');
-    }
-
-    if (admin.isEmailVerified) {
-      throw new ForbiddenException('First-time setup is already complete');
-    }
-
+  private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {
     const totalUsers = await this.usersService.countUsers();
     if (totalUsers !== 1) {
       throw new ForbiddenException('First-time setup is already complete');
     }
 
-    const isValid = await this.authService.validateAuthenticationDetails(admin.id, {
-      type: AuthenticationType.LOCAL_PASSWORD,
-      details: { password: body.password },
-    });
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid username or password');
+    const { data: firstPage } = await this.usersService.findMany({ page: 1, limit: 1 });
+    const existingAdmin = firstPage[0];
+    if (!existingAdmin || existingAdmin.isEmailVerified) {
+      throw new ForbiddenException('First-time setup is already complete');
     }
 
-    const trimmedEmail = body.newEmail.trim();
-    if (admin.email.trim() === trimmedEmail) {
-      const token = await this.authService.generateEmailVerificationToken(admin);
-      try {
-        await this.emailService.sendVerificationEmail(admin, token);
-      } catch (e) {
-        this.mapEmailSendError(e);
-      }
-    } else {
-      await this.usersService.changeEmail(admin.id, trimmedEmail, admin);
-    }
-
-    this.logger.debug(`Setup email corrected for user ID: ${admin.id}`);
-    return { message: 'Email updated and verification email sent' };
+    this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
+    await this.usersService.deleteOne(existingAdmin.id);
   }
 
   @Post('/invite')

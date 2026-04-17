@@ -4,17 +4,6 @@
   "message": "We've sent a verification email to your inbox. Please open it and click the link to verify your account. Then you can log in and start using the application.",
   "actions": {
     "goToLogin": "Go to login",
-    "wrongEmail": "Entered the wrong email?",
-    "hideCorrection": "Cancel"
-  },
-  "correction": {
-    "title": "Correct your email",
-    "subtitle": "Enter your admin credentials and the correct email address.",
-    "username": "Admin username",
-    "password": "Admin password",
-    "newEmail": "Correct email address",
-    "submit": "Update email & resend verification",
-    "submitting": "Updating...",
-    "success": "Email updated! A new verification email has been sent."
+    "wrongDetails": "Entered something wrong? Correct your admin details."
   }
 }

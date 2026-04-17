@@ -24,6 +24,10 @@ export type CreateUserDto = {
      * The authentication strategy to use
      */
     strategy: AuthenticationType;
+    /**
+     * When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.
+     */
+    overwriteFirstTimeAdmin?: boolean;
 };
 
 export type SystemPermissions = {
@@ -90,21 +94,6 @@ export type User = {
      * The percentage rate the user to actually pay for activities that cost credits
      */
     billingFactor: number;
-};
-
-export type CorrectSetupEmailDto = {
-    /**
-     * The admin username
-     */
-    username: string;
-    /**
-     * The admin password
-     */
-    password: string;
-    /**
-     * The corrected email address
-     */
-    newEmail: string;
 };
 
 export type InviteUserDto = {
@@ -1068,6 +1057,10 @@ export type FirstTimeSetupStepsDto = {
      * Whether at least one admin user has been created.
      */
     admin: boolean;
+    /**
+     * Whether the first admin user has verified their email. False during the unverified-admin limbo state.
+     */
+    adminEmailVerified: boolean;
 };
 
 export type FirstTimeSetupStatusDto = {
@@ -3732,14 +3725,6 @@ export type FindManyData = {
 
 export type FindManyResponse = PaginatedUsersResponseDto;
 
-export type CorrectSetupEmailData = {
-    requestBody: CorrectSetupEmailDto;
-};
-
-export type CorrectSetupEmailResponse = {
-    message?: string;
-};
-
 export type InviteUserData = {
     requestBody: InviteUserDto;
 };
@@ -5339,6 +5324,10 @@ export type $OpenApiTs = {
                  * Invalid input data.
                  */
                 400: unknown;
+                /**
+                 * First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).
+                 */
+                403: unknown;
             };
         };
         get: {
@@ -5354,27 +5343,6 @@ export type $OpenApiTs = {
                 401: unknown;
                 /**
                  * Forbidden - User does not have permission to manage users.
-                 */
-                403: unknown;
-            };
-        };
-    };
-    '/api/users/correct-setup-email': {
-        post: {
-            req: CorrectSetupEmailData;
-            res: {
-                /**
-                 * Email corrected and new verification email sent.
-                 */
-                200: {
-                    message?: string;
-                };
-                /**
-                 * Invalid username or password.
-                 */
-                401: unknown;
-                /**
-                 * First-time setup is already complete.
                  */
                 403: unknown;
             };

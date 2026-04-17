@@ -33,11 +33,14 @@ export class SettingsService {
   }
 
   async getFirstTimeSetupStatus(): Promise<FirstTimeSetupStatusDto> {
-    const [app, smtp, userCount] = await Promise.all([
+    const [app, smtp, userCount, verifiedAdminCount] = await Promise.all([
       this.getAppSettings(),
       this.smtpSettingsService.getSettings(),
       this.userRepository.count(),
+      this.userRepository.count({ where: { isEmailVerified: true } }),
     ]);
+
+    const adminEmailVerified = userCount > 0 && verifiedAdminCount > 0;
 
     const stepsCompleted: FirstTimeSetupStepsDto = {
       app:
@@ -48,10 +51,11 @@ export class SettingsService {
         !!smtp.user?.trim() &&
         !!smtp.from?.trim(),
       admin: userCount > 0,
+      adminEmailVerified,
     };
 
     return {
-      available: userCount === 0,
+      available: userCount === 0 || (userCount === 1 && !adminEmailVerified),
       stepsCompleted,
     };
   }

@@ -39,12 +39,13 @@ export function FirstTimeSetupPage() {
     const serverApp = s?.app ?? false;
     const smtpDone = s?.smtp ?? false;
     const adminDone = s?.admin ?? false;
+    const adminEmailVerified = !!s?.adminEmailVerified;
     return [
       localCompleted.url || serverApp,
       smtpDone,
       localCompleted.license || serverApp,
       adminDone,
-      adminDone,
+      adminEmailVerified,
     ] as const;
   }, [setupStatus?.stepsCompleted, localCompleted]);
 
@@ -77,6 +78,8 @@ export function FirstTimeSetupPage() {
     setCurrentStep('step-4');
   }, []);
   const goToStep5 = useCallback(() => setCurrentStep('step-5'), []);
+  const adminEmailVerified = !!setupStatus?.stepsCompleted?.adminEmailVerified;
+  const isAdminStepOverwrite = stepCompleted[3] && !adminEmailVerified;
 
   const currentStepIndex = WIZARD_STEPS.indexOf(currentStep);
 
@@ -175,7 +178,7 @@ export function FirstTimeSetupPage() {
             </span>
           }
         >
-          <CreateAdminStep onSuccess={goToStep5} />
+          <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
         </AccordionItem>
         <AccordionItem
           key="step-5"
@@ -189,7 +192,7 @@ export function FirstTimeSetupPage() {
             </span>
           }
         >
-          <VerifyEmailStep />
+          <VerifyEmailStep onCorrectAdminDetails={goToStep3} />
         </AccordionItem>
       </Accordion>
     </div>

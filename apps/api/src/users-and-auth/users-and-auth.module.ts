@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { PassportModule } from '@nestjs/passport';
 
 // Services and Controllers
@@ -58,7 +57,6 @@ import { SettingsService } from '../settings/settings.service';
       Setting,
     ]),
     PassportModule,
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     EmailModule,
     EncryptionModule,
     LicenseModule,

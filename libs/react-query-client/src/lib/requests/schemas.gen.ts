@@ -32,6 +32,11 @@ export const $CreateUserDto = {
                     '$ref': '#/components/schemas/AuthenticationType'
                 }
             ]
+        },
+        overwriteFirstTimeAdmin: {
+            type: 'boolean',
+            description: 'When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.',
+            example: false
         }
     },
     required: ['username', 'email', 'password', 'strategy']
@@ -134,28 +139,6 @@ export const $User = {
         }
     },
     required: ['id', 'username', 'isEmailVerified', 'systemPermissions', 'createdAt', 'updatedAt', 'creditBalance', 'billingFactor']
-} as const;
-
-export const $CorrectSetupEmailDto = {
-    type: 'object',
-    properties: {
-        username: {
-            type: 'string',
-            description: 'The admin username',
-            example: 'admin'
-        },
-        password: {
-            type: 'string',
-            description: 'The admin password',
-            example: 'password123'
-        },
-        newEmail: {
-            type: 'string',
-            description: 'The corrected email address',
-            example: 'correct@example.com'
-        }
-    },
-    required: ['username', 'password', 'newEmail']
 } as const;
 
 export const $InviteUserDto = {
@@ -1647,9 +1630,14 @@ export const $FirstTimeSetupStepsDto = {
             type: 'boolean',
             description: 'Whether at least one admin user has been created.',
             example: false
+        },
+        adminEmailVerified: {
+            type: 'boolean',
+            description: 'Whether the first admin user has verified their email. False during the unverified-admin limbo state.',
+            example: false
         }
     },
-    required: ['app', 'smtp', 'admin']
+    required: ['app', 'smtp', 'admin', 'adminEmailVerified']
 } as const;
 
 export const $FirstTimeSetupStatusDto = {
