@@ -33,7 +33,7 @@ importers:
         version: 2.1.10(react@19.2.5)
       '@hookform/resolvers':
         specifier: ^5.0.1
-        version: 5.0.1(react-hook-form@7.56.4(react@19.2.5))
+        version: 5.2.2(react-hook-form@7.56.4(react@19.2.5))
       '@icons-pack/react-simple-icons':
         specifier: ^13.1.0
         version: 13.13.0(react@19.2.5)
@@ -3252,8 +3252,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@hookform/resolvers@5.0.1':
-    resolution: {integrity: sha512-u/+Jp83luQNx9AdyW2fIPGY6Y7NG68eN2ZW8FOJYL+M0i4s49+refdJdOp/A9n9HFQtQs3HIDHQvX3ZET2o7YA==}
+  '@hookform/resolvers@5.2.2':
+    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
       react-hook-form: ^7.55.0
 
@@ -19635,7 +19635,7 @@ snapshots:
     dependencies:
       hono: 4.12.9
 
-  '@hookform/resolvers@5.0.1(react-hook-form@7.56.4(react@19.2.5))':
+  '@hookform/resolvers@5.2.2(react-hook-form@7.56.4(react@19.2.5))':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.56.4(react@19.2.5)
