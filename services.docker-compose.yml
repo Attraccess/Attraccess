@@ -1,6 +1,6 @@
 services:
   mailpit:
-    image: axllent/mailpit:v1.29.4
+    image: axllent/mailpit:v1.29.7
     ports:
       - '8025:8025'
       - '1025:1025'
@@ -27,7 +27,7 @@ services:
       interval: 30s
 
   webhook-site:
-    image: tarampampam/webhook-tester:2.2.6
+    image: tarampampam/webhook-tester:2.3.0
     environment:
       - STORAGE_DRIVER=fs
       - FS_STORAGE_DIR=/storage
@@ -37,7 +37,7 @@ services:
       - webhook-site:/storage
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.5.6
+    image: quay.io/keycloak/keycloak:26.6.1
     command: start-dev
     environment:
       - KEYCLOAK_ADMIN=admin
@@ -70,7 +70,7 @@ services:
       POSTGRES_DB: authentik
 
   authentik-redis:
-    image: docker.io/library/redis:8.0.6-alpine
+    image: docker.io/library/redis:8.6.2-alpine
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
@@ -83,7 +83,7 @@ services:
       - authentik-redis:/data
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:2025.6.4
+    image: ghcr.io/goauthentik/server:2025.12.4
     restart: unless-stopped
     command: server
     environment:
@@ -106,7 +106,7 @@ services:
         condition: service_healthy
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2025.6.4
+    image: ghcr.io/goauthentik/server:2025.12.4
     restart: unless-stopped
     command: worker
     environment:
@@ -135,7 +135,7 @@ services:
         condition: service_healthy
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.9.1
+    image: ghcr.io/koenkk/zigbee2mqtt:2.9.2
     restart: unless-stopped
     expose:
       - '8080'

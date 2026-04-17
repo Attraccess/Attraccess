@@ -1,4 +1,4 @@
-FROM node:24.13.0-alpine
+FROM node:24.15.0-alpine
 
 # Install dnsmasq DNS server (no dependencies needed beyond Node 24+ which has fetch)
 # Root is required: dnsmasq binds to privileged port 53
