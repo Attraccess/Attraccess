@@ -9,7 +9,8 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'prometheus-settings.json');
 const PROMETHEUS_CONFIG_PATH = process.env.PROMETHEUS_CONFIG_PATH || '/etc/prometheus/prometheus.yml';
 const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
-const SECRET_FILE_MODE = 0o600;
+const PRIVATE_FILE_MODE = 0o600;
+const SHARED_FILE_MODE = 0o644;
 
 function log(message) {
   console.log(`[prometheus] ${message}`);
@@ -25,9 +26,9 @@ function loadJson(filePath, fallback) {
 
 function saveJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: SECRET_FILE_MODE });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: PRIVATE_FILE_MODE });
   try {
-    fs.chmodSync(filePath, SECRET_FILE_MODE);
+    fs.chmodSync(filePath, PRIVATE_FILE_MODE);
   } catch {
     // best-effort: tmpfs/volume may not support chmod
   }
@@ -102,10 +103,10 @@ function writePrometheusConfig(settings, apiKey) {
     fs.writeFileSync(
       PROMETHEUS_CONFIG_PATH,
       generatePrometheusConfig(settings, apiKey),
-      { encoding: 'utf-8', mode: SECRET_FILE_MODE },
+      { encoding: 'utf-8', mode: SHARED_FILE_MODE },
     );
     try {
-      fs.chmodSync(PROMETHEUS_CONFIG_PATH, SECRET_FILE_MODE);
+      fs.chmodSync(PROMETHEUS_CONFIG_PATH, SHARED_FILE_MODE);
     } catch {
       // best-effort
     }

@@ -150,7 +150,8 @@ services:
       - '127.0.0.1:5380:5380'
     environment:
       CONFIG_UI_USERNAME: ${CONFIG_UI_USERNAME:-admin}
-      CONFIG_UI_PASSWORD: ${CONFIG_UI_PASSWORD:-attraccess}
+      CONFIG_UI_PASSWORD: ${CONFIG_UI_PASSWORD:-attraccess-dev-only-password}
+      CONFIG_UI_ALLOW_WEAK_PASSWORD: ${CONFIG_UI_ALLOW_WEAK_PASSWORD:-true}
     volumes:
       - config-ui-data:/data
       - prometheus-config:/etc/prometheus

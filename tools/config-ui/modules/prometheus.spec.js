@@ -225,7 +225,7 @@ describe('secret persistence policy', () => {
     expect(chmods[settingsPath]).toBe(0o600);
   });
 
-  it('prometheus.yml is written with mode 0o600 when a bearer is present', async () => {
+  it('prometheus.yml is world-readable (0o644) so the prometheus sidecar (UID nobody) can read it', async () => {
     const { mod, writes, chmods, restore } = loadModuleWithEnv({ PROMETHEUS_METRICS_API_KEY: 'abc' });
     try {
       mod.init();
@@ -234,8 +234,8 @@ describe('secret persistence policy', () => {
     }
 
     const ymlPath = Object.keys(writes).find((p) => p.endsWith('prometheus.yml'));
-    expect(writes[ymlPath].opts).toMatchObject({ mode: 0o600 });
-    expect(chmods[ymlPath]).toBe(0o600);
+    expect(writes[ymlPath].opts).toMatchObject({ mode: 0o644 });
+    expect(chmods[ymlPath]).toBe(0o644);
   });
 
   it('GET /settings exposes apiKeyConfigured boolean rather than the raw key', async () => {
