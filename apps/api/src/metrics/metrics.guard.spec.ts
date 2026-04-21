@@ -127,5 +127,17 @@ describe('MetricsGuard', () => {
       await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
       expect(hashCalls).toHaveLength(2);
     });
+
+    it('does not throw when a hasher returns different-length digests (robustness)', async () => {
+      settingsService.getMetricsApiKey.mockResolvedValue({ value: 'stored', configured: true });
+      const context = createContext({ authorization: 'Bearer provided' });
+
+      tokenHashService.hashToken.mockImplementation((token: string) =>
+        token === 'stored' ? 'hashed:stored' : 'hashed:provided:long',
+      );
+
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
+      await expect(guard.canActivate(context)).rejects.toThrow(/Invalid metrics API key/);
+    });
   });
 });

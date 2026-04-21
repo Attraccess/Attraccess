@@ -148,9 +148,30 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { error: 'not found' });
 }
 
+const WEAK_PASSWORDS = new Set([
+  'admin',
+  'attraccess',
+  'change-me',
+  'change-me-before-deploying',
+  'changeme',
+  'password',
+  'root',
+]);
+
+function isWeakPassword(value) {
+  if (typeof value !== 'string' || value.length === 0) return true;
+  if (value.length < 12) return true;
+  return WEAK_PASSWORDS.has(value.toLowerCase());
+}
+
 function main() {
   if (!process.env.CONFIG_UI_PASSWORD) {
     log('refusing to start: CONFIG_UI_PASSWORD is not set');
+    process.exit(1);
+  }
+  if (isWeakPassword(process.env.CONFIG_UI_PASSWORD) && process.env.CONFIG_UI_ALLOW_WEAK_PASSWORD !== 'true') {
+    log('refusing to start: CONFIG_UI_PASSWORD is too short or a well-known default.');
+    log('Set a password of at least 12 characters, or explicitly set CONFIG_UI_ALLOW_WEAK_PASSWORD=true to override (not recommended outside ephemeral dev).');
     process.exit(1);
   }
 

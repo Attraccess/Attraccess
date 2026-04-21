@@ -9,6 +9,8 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'prometheus-settings.json');
 const PROMETHEUS_CONFIG_PATH = process.env.PROMETHEUS_CONFIG_PATH || '/etc/prometheus/prometheus.yml';
 const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
+const SECRET_FILE_MODE = 0o600;
+
 function log(message) {
   console.log(`[prometheus] ${message}`);
 }
@@ -23,29 +25,54 @@ function loadJson(filePath, fallback) {
 
 function saveJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: SECRET_FILE_MODE });
+  try {
+    fs.chmodSync(filePath, SECRET_FILE_MODE);
+  } catch {
+    // best-effort: tmpfs/volume may not support chmod
+  }
 }
 
-function loadSettings() {
-  const defaults = {
+function loadNonSecretDefaults() {
+  return {
     scrapeInterval: process.env.PROMETHEUS_SCRAPE_INTERVAL || '10s',
     evaluationInterval: process.env.PROMETHEUS_EVALUATION_INTERVAL || '15s',
     attraccessTarget: process.env.PROMETHEUS_ATTRACCESS_TARGET || 'attraccess:3000',
-    metricsApiKey: process.env.PROMETHEUS_METRICS_API_KEY || '',
   };
+}
+
+function loadSettings() {
   const stored = loadJson(SETTINGS_FILE, null);
-  return stored || defaults;
+  return stored || loadNonSecretDefaults();
 }
 
 function saveSettings(settings) {
-  saveJson(SETTINGS_FILE, settings);
+  const { scrapeInterval, evaluationInterval, attraccessTarget } = settings;
+  saveJson(SETTINGS_FILE, { scrapeInterval, evaluationInterval, attraccessTarget });
 }
 
 function sanitizeYamlValue(value) {
   return String(value).replace(/['\n\r\\]/g, '');
 }
 
-function generatePrometheusConfig(settings) {
+function readApiKeyFromConfig() {
+  try {
+    const content = fs.readFileSync(PROMETHEUS_CONFIG_PATH, 'utf-8');
+    const match = content.match(/bearer_token:\s*'([^']*)'/);
+    return match ? match[1] : '';
+  } catch {
+    return '';
+  }
+}
+
+function resolveApiKey(bodyValue) {
+  if (typeof bodyValue === 'string' && bodyValue.length > 0) return bodyValue;
+  const envKey = process.env.PROMETHEUS_METRICS_API_KEY;
+  if (typeof envKey === 'string' && envKey.length > 0) return envKey;
+  return readApiKeyFromConfig();
+}
+
+function generatePrometheusConfig(settings, apiKey) {
   const lines = [
     'global:',
     `  scrape_interval: ${sanitizeYamlValue(settings.scrapeInterval || '15s')}`,
@@ -62,17 +89,26 @@ function generatePrometheusConfig(settings) {
     `    scrape_interval: ${sanitizeYamlValue(settings.scrapeInterval || '10s')}`,
   ];
 
-  if (settings.metricsApiKey) {
-    lines.push(`    bearer_token: '${sanitizeYamlValue(settings.metricsApiKey)}'`);
+  if (apiKey) {
+    lines.push(`    bearer_token: '${sanitizeYamlValue(apiKey)}'`);
   }
 
   return lines.join('\n') + '\n';
 }
 
-function writePrometheusConfig(settings) {
+function writePrometheusConfig(settings, apiKey) {
   try {
     fs.mkdirSync(path.dirname(PROMETHEUS_CONFIG_PATH), { recursive: true });
-    fs.writeFileSync(PROMETHEUS_CONFIG_PATH, generatePrometheusConfig(settings), 'utf-8');
+    fs.writeFileSync(
+      PROMETHEUS_CONFIG_PATH,
+      generatePrometheusConfig(settings, apiKey),
+      { encoding: 'utf-8', mode: SECRET_FILE_MODE },
+    );
+    try {
+      fs.chmodSync(PROMETHEUS_CONFIG_PATH, SECRET_FILE_MODE);
+    } catch {
+      // best-effort
+    }
     log('wrote prometheus.yml');
     return true;
   } catch (err) {
@@ -134,13 +170,23 @@ function getCurrentConfig() {
   }
 }
 
+function publicSettings(settings) {
+  return {
+    scrapeInterval: settings.scrapeInterval,
+    evaluationInterval: settings.evaluationInterval,
+    attraccessTarget: settings.attraccessTarget,
+    apiKeyConfigured: Boolean(readApiKeyFromConfig()),
+  };
+}
+
 const prometheusModule = {
   id: 'prometheus',
   label: 'Prometheus',
 
   init() {
     const settings = loadSettings();
-    writePrometheusConfig(settings);
+    const apiKey = resolveApiKey();
+    writePrometheusConfig(settings, apiKey);
     log('initialized');
   },
 
@@ -154,8 +200,7 @@ const prometheusModule = {
     }
 
     if (method === 'GET' && subPath === '/settings') {
-      const settings = loadSettings();
-      helpers.sendJson(res, 200, settings);
+      helpers.sendJson(res, 200, publicSettings(loadSettings()));
       return true;
     }
 
@@ -165,11 +210,19 @@ const prometheusModule = {
       if (body.scrapeInterval !== undefined) settings.scrapeInterval = body.scrapeInterval;
       if (body.evaluationInterval !== undefined) settings.evaluationInterval = body.evaluationInterval;
       if (body.attraccessTarget !== undefined) settings.attraccessTarget = body.attraccessTarget;
-      if (body.metricsApiKey !== undefined) settings.metricsApiKey = body.metricsApiKey;
       saveSettings(settings);
-      writePrometheusConfig(settings);
+      const apiKey = resolveApiKey(body.metricsApiKey);
+      writePrometheusConfig(settings, apiKey);
       reloadPrometheus();
-      helpers.sendJson(res, 200, settings);
+      helpers.sendJson(res, 200, publicSettings(settings));
+      return true;
+    }
+
+    if (method === 'DELETE' && subPath === '/api-key') {
+      const settings = loadSettings();
+      writePrometheusConfig(settings, '');
+      reloadPrometheus();
+      helpers.sendJson(res, 200, publicSettings(settings));
       return true;
     }
 

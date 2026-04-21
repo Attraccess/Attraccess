@@ -166,15 +166,16 @@
           <div>
             <label for="prom-metricsApiKey">Metrics API Key</label>
             <div class="api-key-field">
-              <input type="password" id="prom-metricsApiKey" placeholder="Paste the API key from Attraccess Settings > Metrics" data-testid="input-metrics-api-key" autocomplete="off">
+              <input type="password" id="prom-metricsApiKey" placeholder="Paste to set or rotate — leave empty to keep the existing key" data-testid="input-metrics-api-key" autocomplete="off">
               <button type="button" class="btn-secondary" onclick="toggleApiKeyVisibility()" data-testid="btn-toggle-api-key" style="margin-top: 0.4rem;">Show</button>
             </div>
-            <div class="field-hint">The bearer token used to authenticate with /api/metrics. Generate this in Attraccess Settings &gt; Metrics.</div>
+            <div class="field-hint" id="prom-metricsApiKey-status">The bearer token used to authenticate with /api/metrics. The current key is never sent back to the browser.</div>
           </div>
         </div>
 
-        <div style="margin-top: 0.75rem;">
+        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
           <button class="btn-primary" onclick="savePromSettings()" data-testid="btn-save-prom-settings">Save &amp; Reload</button>
+          <button class="btn-danger" onclick="clearPromApiKey()" data-testid="btn-clear-prom-api-key">Remove API Key</button>
         </div>
       </div>
 
@@ -317,18 +318,31 @@
         document.getElementById('prom-scrapeInterval').value = s.scrapeInterval || '';
         document.getElementById('prom-evaluationInterval').value = s.evaluationInterval || '';
         document.getElementById('prom-attraccessTarget').value = s.attraccessTarget || '';
-        document.getElementById('prom-metricsApiKey').value = s.metricsApiKey || '';
+        document.getElementById('prom-metricsApiKey').value = '';
+        var statusEl = document.getElementById('prom-metricsApiKey-status');
+        statusEl.textContent = s.apiKeyConfigured
+          ? 'An API key is currently configured. Paste a new one here to rotate it, or leave this empty to keep it.'
+          : 'No API key configured. Generate one in Attraccess Settings > Metrics and paste it here.';
       });
     }
 
     function savePromSettings() {
+      var keyInput = document.getElementById('prom-metricsApiKey').value.trim();
       var data = {
         scrapeInterval: document.getElementById('prom-scrapeInterval').value.trim(),
         evaluationInterval: document.getElementById('prom-evaluationInterval').value.trim(),
-        attraccessTarget: document.getElementById('prom-attraccessTarget').value.trim(),
-        metricsApiKey: document.getElementById('prom-metricsApiKey').value.trim()
+        attraccessTarget: document.getElementById('prom-attraccessTarget').value.trim()
       };
+      if (keyInput.length > 0) data.metricsApiKey = keyInput;
       request('PUT', '/api/modules/prometheus/settings', data).then(function() {
+        loadPromSettings();
+        loadPromConfig();
+      });
+    }
+
+    function clearPromApiKey() {
+      if (!confirm('Remove the configured metrics API key? Prometheus will stop authenticating to /api/metrics until a new key is set.')) return;
+      request('DELETE', '/api/modules/prometheus/api-key').then(function() {
         loadPromSettings();
         loadPromConfig();
       });

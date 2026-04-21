@@ -44,6 +44,10 @@ export class MetricsGuard implements CanActivate {
   private secureCompare(a: string, b: string): boolean {
     const hashA = Buffer.from(this.tokenHashService.hashToken(a), 'utf8');
     const hashB = Buffer.from(this.tokenHashService.hashToken(b), 'utf8');
+    if (hashA.length !== hashB.length) {
+      timingSafeEqual(hashA, hashA);
+      return false;
+    }
     return timingSafeEqual(hashA, hashB);
   }
 }
