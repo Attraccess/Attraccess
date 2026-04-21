@@ -1,4 +1,4 @@
-FROM node:24.13.0-alpine
+FROM node:24.15.0-alpine
 
 RUN apk add --no-cache dnsmasq procps
 
