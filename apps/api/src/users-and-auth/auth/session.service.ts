@@ -5,6 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Session, User } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 export interface SessionMetadata {
   userAgent?: string;
@@ -22,6 +23,7 @@ export class SessionService {
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
     private readonly tokenHashService: TokenHashService,
+    private readonly metricsService: MetricsService,
   ) { }
 
   /**
@@ -50,6 +52,7 @@ export class SessionService {
     });
 
     await this.sessionRepository.save(session);
+    this.metricsService.authActiveSessions.inc();
 
     this.logger.log(`Created session for user ${user.id} (${user.username}), expires at ${expiresAt.toISOString()}`);
 
@@ -136,14 +139,21 @@ export class SessionService {
     }
 
     const hashed = this.tokenHashService.hashToken(token);
-    let result = await this.sessionRepository.delete({ token: hashed });
-    if (!result.affected) {
-      result = await this.sessionRepository.delete({ token });
+    const now = new Date();
+    const existing = await this.sessionRepository.findOne({
+      where: [{ token: hashed }, { token }],
+      select: ['id', 'expiresAt'],
+    });
+    if (!existing) {
+      return;
     }
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
+    const wasActive = existing.expiresAt > now;
+    await this.sessionRepository.delete({ id: existing.id });
+    if (wasActive) {
+      this.metricsService.authActiveSessions.dec();
     }
+    this.logger.log(`Revoked session with token: ${token.substring(0, 8)}...`);
   }
 
   /**
@@ -151,10 +161,16 @@ export class SessionService {
    * @param userId The ID of the user whose sessions should be revoked
    */
   async revokeAllUserSessions(userId: number): Promise<void> {
+    const activeBefore = await this.sessionRepository.count({
+      where: { userId, expiresAt: MoreThan(new Date()) },
+    });
     const result = await this.sessionRepository.delete({ userId });
 
     if (result.affected && result.affected > 0) {
       this.logger.log(`Revoked ${result.affected} sessions for user ${userId}`);
+      if (activeBefore > 0) {
+        this.metricsService.authActiveSessions.dec(activeBefore);
+      }
     }
   }
 
@@ -171,6 +187,8 @@ export class SessionService {
 
     if (result.affected && result.affected > 0) {
       this.logger.log(`Cleaned up ${result.affected} expired sessions`);
+      const activeCount = await this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } });
+      this.metricsService.authActiveSessions.set(activeCount);
     }
   }
 

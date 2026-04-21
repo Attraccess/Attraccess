@@ -8,6 +8,7 @@ import { ResourceGroupNotFoundException } from './errors/groupNotFound.error';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroductionChangedEvent } from './introductions/events/resource-group-introduction-changed.event';
+import { MetricsService } from '../../metrics/metrics.service';
 
 interface GetOneSearchOptions {
   id: number;
@@ -22,6 +23,7 @@ export class ResourceGroupsService {
     private readonly resourceRepository: Repository<Resource>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
@@ -34,6 +36,7 @@ export class ResourceGroupsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
     );
+    this.metricsService.resourceGroupsTotal.inc();
     return savedResourceGroup;
   }
 
@@ -124,6 +127,7 @@ export class ResourceGroupsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(groupId),
     );
+    this.metricsService.resourceGroupsTotal.dec();
   }
 
   public async getGroupsOfResource(

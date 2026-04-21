@@ -31,6 +31,13 @@ import { ResourceInUseError } from './errors/resource-in-use.error';
 import { ResourceFlowsExecutorService } from '../flows/resource-flows-executor.service';
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
+import { MetricsService } from '../../metrics/metrics.service';
+
+const mockMetricsService = {
+  resourceUsageSessionsTotal: { inc: jest.fn() },
+  resourceUsageSessionsActive: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  resourceUsageDurationSeconds: { observe: jest.fn() },
+};
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -208,6 +215,10 @@ describe('ResourceUsageService', () => {
         {
           provide: ResourceFormsService,
           useValue: mockResourceFormsService,
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
         },
       ],
     }).compile();

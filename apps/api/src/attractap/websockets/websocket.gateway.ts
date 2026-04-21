@@ -35,6 +35,7 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../resources/forms/dto/form-submission-request.dto';
 import { ResourceUsageFormRequestPayload } from './websocket.types';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -82,6 +83,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(ResourceFormsService)
   private resourceFormsService: ResourceFormsService;
+
+  @Inject(MetricsService)
+  private metricsService: MetricsService;
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -224,6 +228,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
 
     this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
+    this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
 
     await this.clientWasActive(client as unknown as AuthenticatedWebSocket);
 
@@ -327,6 +332,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
     }
     this.websocketService.sockets.delete(socket.id);
+    this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }
 
   private async clientWasActive(socket: AuthenticatedWebSocket) {
@@ -533,6 +539,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
             },
           }),
         );
+        this.metricsService.attractapFirmwareUpdatesTotal.inc();
       } catch (err) {
         this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
       }
@@ -840,6 +847,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   private async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    this.metricsService.attractapNfcTapsTotal.inc();
     const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
 
     if (!uid || typeof uid !== 'string') {

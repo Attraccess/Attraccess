@@ -30,6 +30,7 @@ import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeF
 import { addDays } from 'date-fns';
 import { nanoid } from 'nanoid';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -94,6 +95,7 @@ export class UsersService {
     private emailService: EmailService,
     private dataSource: DataSource,
     private readonly tokenHashService: TokenHashService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   public validateUsernameOrThrow(username: string): void {
@@ -283,12 +285,15 @@ export class UsersService {
     this.logger.debug('Saving new user to database');
     const savedUser = await this.userRepository.save(user);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
+    this.metricsService.usersRegisteredTotal.inc();
+    this.metricsService.usersTotal.inc();
     return savedUser;
   }
 
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
     await this.anonymizeAndSoftDelete(id);
+    this.metricsService.usersTotal.dec();
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 

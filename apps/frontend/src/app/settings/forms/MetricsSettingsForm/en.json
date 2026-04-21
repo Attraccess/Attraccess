@@ -1,0 +1,51 @@
+{
+  "loading": "Loading metrics settings...",
+  "description": "Generate an API key to enable authenticated access to the Prometheus metrics endpoint.",
+  "endpointLabel": "Metrics Endpoint",
+  "endpointCopied": {
+    "title": "Copied",
+    "description": "Endpoint URL copied to clipboard."
+  },
+  "generateButton": "Generate API Key",
+  "rerollButton": "Regenerate API Key",
+  "removeButton": "Remove API Key",
+  "keyGenerated": {
+    "title": "API Key Generated",
+    "description": "Copy this key now. It will not be shown again."
+  },
+  "keyRemoved": {
+    "title": "API Key Removed",
+    "description": "The metrics endpoint is now disabled."
+  },
+  "warning": "This key will only be shown once. If you lose it, you must regenerate.",
+  "apiKeyLabel": "API Key",
+  "copyButton": "Copy",
+  "copied": {
+    "title": "Copied",
+    "description": "API key copied to clipboard."
+  },
+  "copyFailed": {
+    "title": "Copy failed",
+    "description": "Could not copy to clipboard."
+  },
+  "confirmReroll": {
+    "title": "Regenerate API Key?",
+    "description": "This will invalidate the current key. Any systems using the old key will lose access to the metrics endpoint.",
+    "confirm": "Regenerate",
+    "cancel": "Cancel"
+  },
+  "confirmRemove": {
+    "title": "Remove API Key?",
+    "description": "This will disable the metrics endpoint. Prometheus scrapers will stop receiving data.",
+    "confirm": "Remove",
+    "cancel": "Cancel"
+  },
+  "setupGuide": {
+    "title": "Prometheus Configuration",
+    "description": "Add the following scrape job to your prometheus.yml:",
+    "bearerNote": "Replace <YOUR_API_KEY> with the generated API key above.",
+    "grafanaTitle": "Grafana Setup",
+    "grafanaDescription": "In Grafana, add a Prometheus data source pointing to your Prometheus server (e.g. http://prometheus:9090). The metrics will be available automatically once Prometheus is scraping the endpoint above."
+  },
+  "doneButton": "Done"
+}

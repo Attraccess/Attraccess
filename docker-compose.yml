@@ -113,20 +113,51 @@ services:
     env_file:
       - .env.docker-compose
 
-  dns-server:
+  config-ui:
     build:
-      context: ./tools/dns-server
+      context: ./tools/config-ui
       dockerfile: Dockerfile
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - '53:53/udp'
+      - '53:53/tcp'
     expose:
-      - 5380 # admin UI
-      - 53/udp # DNS
-      - 53/tcp # DNS
+      - '5380'
     volumes:
-      - dns-server-data:/data
+      - config-ui-data:/data
+      - prometheus-config:/etc/prometheus
     env_file:
       - .env.docker-compose
+
+  prometheus:
+    image: prom/prometheus:v3.4.0
+    restart: unless-stopped
+    expose:
+      - '9090'
+    volumes:
+      - prometheus-config:/etc/prometheus:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - config-ui
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    restart: unless-stopped
+    expose:
+      - '3001'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
+      - GF_SERVER_HTTP_PORT=3001
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
 
   duplicati:
     image: duplicati/duplicati:2.3.0.0-stable
@@ -141,7 +172,9 @@ services:
       - webhook-site:/external-storage/webhook-site
       - rabbitmq_data:/external-storage/rabbitmq
       - zigbee2mqtt:/external-storage/zigbee2mqtt
-      - dns-server-data:/external-storage/dns-server
+      - prometheus-data:/external-storage/prometheus
+      - grafana-data:/external-storage/grafana
+      - config-ui-data:/external-storage/config-ui
     env_file:
       - .env.docker-compose
 
@@ -152,5 +185,8 @@ volumes:
   webhook-site:
   rabbitmq_data:
   zigbee2mqtt:
+  config-ui-data:
+  prometheus-config:
+  prometheus-data:
+  grafana-data:
   duplicati:
-  dns-server-data:

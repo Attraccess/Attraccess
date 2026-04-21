@@ -5,6 +5,7 @@ import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attrac
 import { TwoFactorPolicy } from './two-factor.dto';
 import { SettingsService } from '../../settings/settings.service';
 import { EncryptionService } from '../../encryption/encryption.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class TwoFactorService {
@@ -20,6 +21,7 @@ export class TwoFactorService {
     private readonly settingRepository: Repository<Setting>,
     private readonly settingsService: SettingsService,
     private readonly encryptionService: EncryptionService,
+    private readonly metricsService: MetricsService,
   ) {
   }
 
@@ -113,6 +115,7 @@ export class TwoFactorService {
       await this.authenticationDetailRepository.save(detail);
     }
 
+    this.metricsService.auth2faUsageTotal.inc({ action: 'setup' });
     return { secret, otpauthUrl };
   }
 
@@ -132,6 +135,7 @@ export class TwoFactorService {
 
     detail.totpEnabledAt = new Date();
     await this.authenticationDetailRepository.save(detail);
+    this.metricsService.auth2faUsageTotal.inc({ action: 'enable' });
   }
 
   async disable(user: User, code: string): Promise<void> {
@@ -146,6 +150,7 @@ export class TwoFactorService {
     }
 
     await this.authenticationDetailRepository.delete(detail.id);
+    this.metricsService.auth2faUsageTotal.inc({ action: 'disable' });
   }
 
   async assertTwoFactorForLogin(user: User, code: string | undefined): Promise<void> {

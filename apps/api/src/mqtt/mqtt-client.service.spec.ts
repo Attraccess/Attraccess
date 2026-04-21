@@ -7,6 +7,7 @@ import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EncryptionService } from '../encryption/encryption.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 // Interface to access private members for testing
 interface MqttClientServicePrivate {
@@ -96,6 +97,12 @@ describe('MqttClientService', () => {
             isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
             encrypt: jest.fn((value: string) => `enc:${value}`),
             decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
+          },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            mqttServersHealthy: { set: jest.fn() },
           },
         },
       ],

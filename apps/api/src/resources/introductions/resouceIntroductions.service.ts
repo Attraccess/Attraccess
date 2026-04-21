@@ -9,6 +9,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -21,6 +22,7 @@ export class ResourceIntroductionsService {
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   private async getIntroductionOfUser(
@@ -167,6 +169,7 @@ export class ResourceIntroductionsService {
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(resourceId, userId, IntroductionHistoryAction.GRANT, data);
+    this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
   }

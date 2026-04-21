@@ -7,6 +7,12 @@ export const APP_KEYS = {
   licenseKey: 'license_key',
 } as const;
 
+export const METRICS_PARENT = 'metrics';
+
+export const METRICS_KEYS = {
+  apiKey: 'api_key',
+} as const;
+
 export const SMTP_KEYS = {
   service: 'service',
   host: 'host',

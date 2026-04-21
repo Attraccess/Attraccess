@@ -28,6 +28,7 @@ import { ResourceInUseError } from './errors/resource-in-use.error';
 import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../forms/forms.service';
 import { ResourceFormAction } from '@attraccess/database-entities';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class ResourceUsageService {
@@ -71,6 +72,7 @@ export class ResourceUsageService {
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     private readonly projectsService: ProjectsService,
     private readonly resourceFormsService: ResourceFormsService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   public async canControllResource(
@@ -398,6 +400,9 @@ export class ResourceUsageService {
       this.logger.error(`Failed to emit usage events after startSession commit`, (error as Error).stack);
     }
 
+    this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
+    this.metricsService.resourceUsageSessionsActive.inc();
+
     return newSession;
   }
 
@@ -503,6 +508,13 @@ export class ResourceUsageService {
       }
     } catch (error) {
       this.logger.error(`Failed to emit usage event after endSession commit`, (error as Error).stack);
+    }
+
+    this.metricsService.resourceUsageSessionsTotal.inc({ action: 'end' });
+    this.metricsService.resourceUsageSessionsActive.dec();
+    if (updatedUsage?.startTime && updatedUsage?.endTime) {
+      const durationSeconds = (updatedUsage.endTime.getTime() - updatedUsage.startTime.getTime()) / 1000;
+      this.metricsService.resourceUsageDurationSeconds.observe(durationSeconds);
     }
 
     return updatedUsage;

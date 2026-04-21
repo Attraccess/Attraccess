@@ -7,6 +7,7 @@ import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class ResourceMaintenanceService {
@@ -21,6 +22,7 @@ export class ResourceMaintenanceService {
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) { }
 
   /**
@@ -65,6 +67,7 @@ export class ResourceMaintenanceService {
       ResourceMaintenanceChangedEvent.EVENT_NAME,
       new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
     );
+    this.metricsService.resourceMaintenanceTotal.inc({ type: 'manual' });
     return savedMaintenance;
   }
 
@@ -106,6 +109,7 @@ export class ResourceMaintenanceService {
       ResourceMaintenanceChangedEvent.EVENT_NAME,
       new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
     );
+    this.metricsService.resourceMaintenanceTotal.inc({ type: 'scheduled' });
     return savedMaintenance;
   }
 

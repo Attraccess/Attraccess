@@ -1,0 +1,276 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
+const ROOT = path.resolve(__dirname, '..', '..', '..');
+
+function readFile(relativePath: string): string {
+  return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').trim();
+}
+
+function fileExists(relativePath: string): boolean {
+  return fs.existsSync(path.join(ROOT, relativePath));
+}
+
+function extractServiceBlock(compose: string, serviceName: string): string {
+  const lines = compose.split('\n');
+  const start = lines.findIndex((l) => new RegExp(`^\\s{2}${serviceName}:\\s*$`).test(l));
+  if (start === -1) return '';
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\s{2}\S/.test(lines[i]) || /^\S/.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
+}
+
+describe('config-ui', () => {
+  describe('Dockerfile', () => {
+    let content: string;
+
+    beforeAll(() => {
+      content = readFile('tools/config-ui/Dockerfile');
+    });
+
+    it('should exist', () => {
+      expect(fileExists('tools/config-ui/Dockerfile')).toBe(true);
+    });
+
+    it('should use a node alpine base image', () => {
+      expect(content).toMatch(/FROM\s+node:\S+-alpine/);
+    });
+
+    it('should install dnsmasq via apk --no-cache', () => {
+      expect(content).toMatch(/apk\s+add\s+--no-cache\b[^\n]*\bdnsmasq\b/);
+    });
+
+    it('should COPY entrypoint.sh and make it executable', () => {
+      expect(content).toMatch(/COPY\s+entrypoint\.sh\b/);
+      expect(content).toMatch(/chmod\s+\+x\s+.*entrypoint\.sh/);
+    });
+
+    it('should COPY server.js, modules/, and public/index.html', () => {
+      expect(content).toMatch(/COPY\s+server\.js\b/);
+      expect(content).toMatch(/COPY\s+modules\//);
+      expect(content).toMatch(/COPY\s+public\/index\.html\b/);
+    });
+
+    it('should EXPOSE DNS ports 53/udp and 53/tcp', () => {
+      expect(content).toMatch(/EXPOSE\s+53\/udp/);
+      expect(content).toMatch(/EXPOSE\s+53\/tcp/);
+    });
+
+    it('should EXPOSE admin UI port 5380', () => {
+      expect(content).toMatch(/EXPOSE\s+5380/);
+    });
+
+    it('should create /data and /etc/dnsmasq.d and /etc/prometheus', () => {
+      expect(content).toMatch(/mkdir[^\n]*\/data\b/);
+      expect(content).toMatch(/mkdir[^\n]*\/etc\/dnsmasq\.d\b/);
+      expect(content).toMatch(/mkdir[^\n]*\/etc\/prometheus\b/);
+    });
+
+    it('should set ENTRYPOINT to entrypoint.sh', () => {
+      expect(content).toMatch(/ENTRYPOINT\s+\[.*entrypoint\.sh.*\]/);
+    });
+  });
+
+  describe('docker-compose.yml', () => {
+    let content: string;
+
+    beforeAll(() => {
+      content = readFile('docker-compose.yml');
+    });
+
+    it('should define a config-ui service', () => {
+      expect(content).toMatch(/^\s{2}config-ui:/m);
+    });
+
+    it('should build config-ui from ./tools/config-ui', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('context: ./tools/config-ui');
+      expect(section).toContain('dockerfile: Dockerfile');
+    });
+
+    it('should use restart: unless-stopped', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('restart: unless-stopped');
+    });
+
+    it('should publish DNS ports 53 UDP and TCP', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('53:53/udp');
+      expect(section).toContain('53:53/tcp');
+    });
+
+    it('should expose admin UI port 5380', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toMatch(/expose:[\s\S]*?5380/);
+    });
+
+    it('should mount config-ui-data:/data', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toMatch(/config-ui-data:\/data/);
+    });
+
+    it('should share prometheus-config with prometheus', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('prometheus-config:/etc/prometheus');
+    });
+
+    it('should load .env.docker-compose', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('.env.docker-compose');
+    });
+
+    it('should declare config-ui-data and prometheus-config volumes', () => {
+      const volumesSection = content.slice(content.lastIndexOf('\nvolumes:'));
+      expect(volumesSection).toContain('config-ui-data:');
+      expect(volumesSection).toContain('prometheus-config:');
+    });
+
+    it('should include config-ui-data in duplicati backup volumes', () => {
+      const duplicatiSection = extractServiceBlock(content, 'duplicati');
+      expect(duplicatiSection).toContain('config-ui-data:/external-storage/config-ui');
+    });
+
+    it('should define a prometheus service that depends_on config-ui', () => {
+      const section = extractServiceBlock(content, 'prometheus');
+      expect(section).toMatch(/depends_on:[\s\S]*?-\s*config-ui/);
+      expect(section).toContain('prometheus-config:/etc/prometheus:ro');
+    });
+
+    it('should define a grafana service mounting monitoring/grafana provisioning', () => {
+      const section = extractServiceBlock(content, 'grafana');
+      expect(section).toContain('./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro');
+      expect(section).toContain('./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro');
+    });
+  });
+
+  describe('services.docker-compose.yml', () => {
+    let content: string;
+
+    beforeAll(() => {
+      content = readFile('services.docker-compose.yml');
+    });
+
+    it('should define a config-ui service bound to 127.0.0.1:5380', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('127.0.0.1:5380:5380');
+    });
+
+    it('should require CONFIG_UI_USERNAME and CONFIG_UI_PASSWORD env vars', () => {
+      const section = extractServiceBlock(content, 'config-ui');
+      expect(section).toContain('CONFIG_UI_USERNAME');
+      expect(section).toContain('CONFIG_UI_PASSWORD');
+    });
+  });
+
+  describe('cross-file consistency', () => {
+    it('all DNS_* env vars from .env.docker-compose are consumed by dnsmasq module', () => {
+      const envContent = readFile('.env.docker-compose');
+      const dnsmasqModule = readFile('tools/config-ui/modules/dnsmasq.js');
+
+      const dnsVars = envContent
+        .split('\n')
+        .filter((l) => /^DNS_[A-Z_]+=/.test(l))
+        .map((l) => l.split('=')[0]);
+
+      expect(dnsVars.length).toBeGreaterThan(0);
+      dnsVars.forEach((varName) => {
+        expect(dnsmasqModule).toContain(varName);
+      });
+    });
+
+    it('CONFIG_UI_PASSWORD is required by server.js (refuses to start when empty)', () => {
+      const server = readFile('tools/config-ui/server.js');
+      expect(server).toContain('CONFIG_UI_PASSWORD');
+      expect(server).toMatch(/refus.*start|process\.exit\(1\)/i);
+    });
+
+    it('admin UI port in docker-compose matches server.js default', () => {
+      const compose = readFile('docker-compose.yml');
+      const server = readFile('tools/config-ui/server.js');
+      const composeSection = extractServiceBlock(compose, 'config-ui');
+      expect(composeSection).toContain('5380');
+      expect(server).toContain('5380');
+    });
+
+    it('data volume path is consistent between docker-compose and dnsmasq module', () => {
+      const compose = readFile('docker-compose.yml');
+      const dnsmasqModule = readFile('tools/config-ui/modules/dnsmasq.js');
+      expect(compose).toContain('config-ui-data:/data');
+      expect(dnsmasqModule).toContain("'/data'");
+    });
+  });
+
+  describe('security', () => {
+    it('server.js uses crypto.timingSafeEqual for basic-auth comparison', () => {
+      const server = readFile('tools/config-ui/server.js');
+      expect(server).toContain('crypto.timingSafeEqual');
+    });
+
+    it('server.js enforces a maximum request body size', () => {
+      const server = readFile('tools/config-ui/server.js');
+      expect(server).toContain('MAX_BODY_SIZE');
+      expect(server).toContain('body too large');
+    });
+
+    it('admin UI escapes user-provided content to prevent XSS', () => {
+      const html = readFile('tools/config-ui/public/index.html');
+      expect(html).toMatch(/escapeHtml|textContent|innerText/);
+    });
+
+    it('prometheus module sanitizes YAML values', () => {
+      const mod = readFile('tools/config-ui/modules/prometheus.js');
+      expect(mod).toContain('sanitizeYamlValue');
+    });
+
+    it('dnsmasq module validates hostnames and ips before writing config', () => {
+      const mod = readFile('tools/config-ui/modules/dnsmasq.js');
+      expect(mod).toContain('isValidHostname');
+      expect(mod).toContain('isValidIp');
+    });
+  });
+
+  describe('file structure', () => {
+    it('tools/config-ui/ directory should exist', () => {
+      const dirPath = path.join(ROOT, 'tools/config-ui');
+      expect(fs.existsSync(dirPath)).toBe(true);
+      expect(fs.statSync(dirPath).isDirectory()).toBe(true);
+    });
+
+    it('should contain the expected top-level files', () => {
+      [
+        'Dockerfile',
+        'entrypoint.sh',
+        'server.js',
+        'public/index.html',
+        'modules/dnsmasq.js',
+        'modules/prometheus.js',
+      ].forEach((f) => {
+        expect(fileExists(`tools/config-ui/${f}`)).toBe(true);
+      });
+    });
+
+    it('should not contain a package.json or node_modules', () => {
+      expect(fileExists('tools/config-ui/package.json')).toBe(false);
+      expect(fileExists('tools/config-ui/package-lock.json')).toBe(false);
+      expect(fileExists('tools/config-ui/node_modules')).toBe(false);
+    });
+  });
+
+  describe('orphaned dns-server tool has been removed', () => {
+    it('tools/dns-server/ directory should no longer exist', () => {
+      expect(fileExists('tools/dns-server')).toBe(false);
+    });
+
+    it('docker-compose.yml should not reference the removed dns-server service', () => {
+      const compose = readFile('docker-compose.yml');
+      expect(compose).not.toMatch(/^\s{2}dns-server:\s*$/m);
+      expect(compose).not.toContain('dns-server-data');
+      expect(compose).not.toContain('./tools/dns-server');
+    });
+  });
+});

@@ -9,6 +9,7 @@ import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AttractapFirmwareVersion } from '@attraccess/database-entities';
 import { EncryptionService } from '../encryption/encryption.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class AttractapService {
@@ -26,6 +27,7 @@ export class AttractapService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly encryptionService: EncryptionService,
+    private readonly metricsService: MetricsService,
   ) { }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
