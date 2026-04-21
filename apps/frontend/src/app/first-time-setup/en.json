@@ -5,6 +5,7 @@
   "steps": {
     "app": "Application settings",
     "smtp": "Email (SMTP)",
+    "license": "License",
     "admin": "Create admin user",
     "verify": "You're all set"
   }

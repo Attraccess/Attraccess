@@ -1,0 +1,10 @@
+{
+  "button": "Community-/Non-Profit-Lizenz verwenden",
+  "modal": {
+    "title": "Community-/Non-Profit-Nutzung bestätigen",
+    "question": "Bist du ein privater Nutzer oder eine gemeinnützige Organisation und stimmst du den Bedingungen der <link>Prosperity Public License</link> zu?",
+    "commercialNotice": "Kommerzielle Nutzung über die 30-tägige Testphase hinaus erfordert einen kostenpflichtigen Lizenzschlüssel.",
+    "cancel": "Abbrechen",
+    "confirm": "Ja, ich erfülle die Bedingungen"
+  }
+}

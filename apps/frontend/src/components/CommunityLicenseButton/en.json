@@ -1,0 +1,10 @@
+{
+  "button": "Use community / non-profit license",
+  "modal": {
+    "title": "Confirm community / non-profit use",
+    "question": "Are you a private user or non-profit organization and do you agree to the <link>Prosperity Public License</link> terms?",
+    "commercialNotice": "Commercial use beyond the 30-day trial requires a paid license key.",
+    "cancel": "Cancel",
+    "confirm": "Yes, I qualify"
+  }
+}

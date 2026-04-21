@@ -5,6 +5,7 @@
   "steps": {
     "app": "Anwendungseinstellungen",
     "smtp": "E-Mail (SMTP)",
+    "license": "Lizenz",
     "admin": "Admin-Benutzer anlegen",
     "verify": "Fertig"
   }

@@ -1,0 +1,18 @@
+{
+  "title": "Lizenz",
+  "subtitle": "Aktiviere Attraccess mit einem Lizenzschlüssel.",
+  "intro": "Wenn du ein privater Nutzer oder eine gemeinnützige Organisation bist, klicke auf die Schaltfläche unten, um die kostenlose Community-Lizenz zu nutzen. Kommerzielle Nutzer fügen ihren bezahlten Lizenzschlüssel ein.",
+  "inputs": {
+    "licenseKey": {
+      "label": "Lizenzschlüssel",
+      "description": "Füge deinen kommerziellen Lizenzschlüssel ein oder nutze die Community-Schaltfläche oben."
+    }
+  },
+  "actions": {
+    "save": "Lizenz speichern"
+  },
+  "success": {
+    "title": "Lizenz gespeichert",
+    "description": "Dein Lizenzschlüssel wurde übernommen."
+  }
+}

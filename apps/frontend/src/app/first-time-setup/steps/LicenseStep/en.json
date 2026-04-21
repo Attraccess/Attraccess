@@ -1,0 +1,18 @@
+{
+  "title": "License",
+  "subtitle": "Activate Attraccess with a license key.",
+  "intro": "If you are a private user or non-profit organization, click the button below to use the free community license. Commercial users should paste their paid license key.",
+  "inputs": {
+    "licenseKey": {
+      "label": "License Key",
+      "description": "Paste your commercial license key, or use the community button above."
+    }
+  },
+  "actions": {
+    "save": "Save license"
+  },
+  "success": {
+    "title": "License saved",
+    "description": "Your license key has been applied."
+  }
+}
