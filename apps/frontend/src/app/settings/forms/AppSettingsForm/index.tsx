@@ -11,6 +11,7 @@ import {
 import { Button, Form, Input, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
+import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
@@ -132,14 +133,18 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         value={publicInternetUrl}
         onValueChange={setPublicInternetUrl}
       />
-      <PasswordInput
-        label={t('inputs.licenseKey.label')}
-        description={t('inputs.licenseKey.description')}
-        value={licenseKey}
-        onValueChange={setLicenseKey}
-        autoComplete="off"
-        isRequired={endpoint === 'first-time-setup'}
-      />
+      {variant === 'standalone' && (
+        <>
+          <PasswordInput
+            label={t('inputs.licenseKey.label')}
+            description={t('inputs.licenseKey.description')}
+            value={licenseKey}
+            onValueChange={setLicenseKey}
+            autoComplete="off"
+          />
+          <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />
+        </>
+      )}
       <Button
         color="primary"
         onPress={handleSubmit}

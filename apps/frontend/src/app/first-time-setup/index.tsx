@@ -7,12 +7,13 @@ import { PageHeader } from '../../components/pageHeader';
 import { AppSettingsForm } from '../settings/forms/AppSettingsForm';
 import { SmtpSettingsForm } from '../settings/forms/SmtpSettingsForm';
 import { CreateAdminStep } from './steps/CreateAdminStep';
+import { LicenseStep } from './steps/LicenseStep';
 import { VerifyEmailStep } from './steps/VerifyEmailStep';
 import en from './en.json';
 import de from './de.json';
 import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
 
-const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4'] as const;
+const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'] as const;
 type WizardStepKey = (typeof WIZARD_STEPS)[number];
 
 function isWizardStepKey(key: string): key is WizardStepKey {
@@ -25,6 +26,7 @@ export function FirstTimeSetupPage() {
   const [currentStep, setCurrentStep] = useState<WizardStepKey>(WIZARD_STEPS[0]);
   const hasInitializedStep = useRef(false);
   const hasSeenSetupAvailable = useRef(false);
+  const [localCompleted, setLocalCompleted] = useState({ url: false, license: false });
 
   const { data: setupStatus, isLoading: isCheckingSetup } = useSettingsServiceGetFirstTimeSetupStatus();
 
@@ -34,24 +36,29 @@ export function FirstTimeSetupPage() {
 
   const stepCompleted = useMemo(() => {
     const s = setupStatus?.stepsCompleted;
-    if (!s) return [false, false, false, false] as const;
-    return [s.app, s.smtp, s.admin, s.admin] as const;
-  }, [setupStatus?.stepsCompleted]);
+    const serverApp = s?.app ?? false;
+    const smtpDone = s?.smtp ?? false;
+    const adminDone = s?.admin ?? false;
+    return [
+      localCompleted.url || serverApp,
+      smtpDone,
+      localCompleted.license || serverApp,
+      adminDone,
+      adminDone,
+    ] as const;
+  }, [setupStatus?.stepsCompleted, localCompleted]);
 
   const firstIncompleteIndex = useMemo(() => {
     const i = stepCompleted.findIndex((done) => !done);
     return i >= 0 ? i : WIZARD_STEPS.length - 1;
   }, [stepCompleted]);
 
-  // Only redirect when user landed on this page with setup already complete (e.g. bookmarked).
-  // Do not redirect when they just completed the admin step – let them see the final step.
   useEffect(() => {
     if (!isCheckingSetup && setupStatus && !setupStatus.available && !hasSeenSetupAvailable.current) {
       navigate('/', { replace: true });
     }
   }, [isCheckingSetup, navigate, setupStatus]);
 
-  // Set current step to first incomplete step once when status has loaded (only once).
   useEffect(() => {
     if (isCheckingSetup || setupStatus === undefined || hasInitializedStep.current) {
       return;
@@ -60,9 +67,16 @@ export function FirstTimeSetupPage() {
     setCurrentStep(WIZARD_STEPS[firstIncompleteIndex]);
   }, [isCheckingSetup, firstIncompleteIndex, setupStatus]);
 
-  const goToStep2 = useCallback(() => setCurrentStep('step-2'), []);
+  const goToStep2 = useCallback(() => {
+    setLocalCompleted((prev) => ({ ...prev, url: true }));
+    setCurrentStep('step-2');
+  }, []);
   const goToStep3 = useCallback(() => setCurrentStep('step-3'), []);
-  const goToStep4 = useCallback(() => setCurrentStep('step-4'), []);
+  const goToStep4 = useCallback(() => {
+    setLocalCompleted((prev) => ({ ...prev, license: true }));
+    setCurrentStep('step-4');
+  }, []);
+  const goToStep5 = useCallback(() => setCurrentStep('step-5'), []);
 
   const currentStepIndex = WIZARD_STEPS.indexOf(currentStep);
 
@@ -137,24 +151,38 @@ export function FirstTimeSetupPage() {
         </AccordionItem>
         <AccordionItem
           key="step-3"
-          aria-label={t('steps.admin')}
+          aria-label={t('steps.license')}
           title={
             <span className="flex items-center gap-2">
               {stepCompleted[2] && (
+                <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
+              )}
+              {t('steps.license')}
+            </span>
+          }
+        >
+          <LicenseStep onSuccess={goToStep4} />
+        </AccordionItem>
+        <AccordionItem
+          key="step-4"
+          aria-label={t('steps.admin')}
+          title={
+            <span className="flex items-center gap-2">
+              {stepCompleted[3] && (
                 <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
               )}
               {t('steps.admin')}
             </span>
           }
         >
-          <CreateAdminStep onSuccess={goToStep4} />
+          <CreateAdminStep onSuccess={goToStep5} />
         </AccordionItem>
         <AccordionItem
-          key="step-4"
+          key="step-5"
           aria-label={t('steps.verify')}
           title={
             <span className="flex items-center gap-2">
-              {stepCompleted[3] && (
+              {stepCompleted[4] && (
                 <CheckCircle2Icon className="size-5 shrink-0 text-success" aria-hidden />
               )}
               {t('steps.verify')}
