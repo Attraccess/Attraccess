@@ -7,6 +7,16 @@ export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemS
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceInfoKey = "SystemServiceInfo";
 export const UseSystemServiceInfoKeyFn = (queryKey?: Array<unknown>) => [useSystemServiceInfoKey, ...(queryKey ?? [])];
+export type SystemServiceGetCurrentVersionDefaultResponse = Awaited<ReturnType<typeof SystemService.getCurrentVersion>>;
+export type SystemServiceGetCurrentVersionQueryResult<TData = SystemServiceGetCurrentVersionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemServiceGetCurrentVersionKey = "SystemServiceGetCurrentVersion";
+export const UseSystemServiceGetCurrentVersionKeyFn = (queryKey?: Array<unknown>) => [useSystemServiceGetCurrentVersionKey, ...(queryKey ?? [])];
+export type SystemServiceGetUpdateStatusDefaultResponse = Awaited<ReturnType<typeof SystemService.getUpdateStatus>>;
+export type SystemServiceGetUpdateStatusQueryResult<TData = SystemServiceGetUpdateStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useSystemServiceGetUpdateStatusKey = "SystemServiceGetUpdateStatus";
+export const UseSystemServiceGetUpdateStatusKeyFn = ({ refresh }: {
+  refresh: string;
+}, queryKey?: Array<unknown>) => [useSystemServiceGetUpdateStatusKey, ...(queryKey ?? [{ refresh }])];
 export type UsersServiceGetLocalSignupDomainWhitelistDefaultResponse = Awaited<ReturnType<typeof UsersService.getLocalSignupDomainWhitelist>>;
 export type UsersServiceGetLocalSignupDomainWhitelistQueryResult<TData = UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceGetLocalSignupDomainWhitelistKey = "UsersServiceGetLocalSignupDomainWhitelist";

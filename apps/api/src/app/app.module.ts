@@ -26,6 +26,7 @@ import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsModule } from '../metrics/metrics.module';
+import { VersionModule } from '../version/version.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { MetricsModule } from '../metrics/metrics.module';
       },
     }),
     MetricsModule,
+    VersionModule,
     PluginModule.forRoot(),
     AttractapModule,
     AnalyticsModule,

@@ -5,6 +5,10 @@ import { AccessControlService, AnalyticsService, AttractapService, Authenticatio
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 export const prefetchUseSystemServiceInfo = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
+export const prefetchUseSystemServiceGetCurrentVersion = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceGetCurrentVersionKeyFn(), queryFn: () => SystemService.getCurrentVersion() });
+export const prefetchUseSystemServiceGetUpdateStatus = (queryClient: QueryClient, { refresh }: {
+  refresh: string;
+}) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }), queryFn: () => SystemService.getUpdateStatus({ refresh }) });
 export const prefetchUseUsersServiceGetLocalSignupDomainWhitelist = (queryClient: QueryClient) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
   ids?: number[];

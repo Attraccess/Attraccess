@@ -1,0 +1,10 @@
+{
+  "title": "Eine neue Attraccess-Version ist verfügbar",
+  "versionSummary": "Aktuell installiert {{current}} · Neuste Version {{latest}}",
+  "viewReleaseNotes": "Release Notes anzeigen",
+  "howToUpdate": "Update-Anleitung",
+  "dismissThisVersion": "Für diese Version ausblenden",
+  "releaseNotesModalTitle": "Release Notes für {{version}}",
+  "releaseNotesFallback": "Keine Release Notes verfügbar.",
+  "close": "Schließen"
+}

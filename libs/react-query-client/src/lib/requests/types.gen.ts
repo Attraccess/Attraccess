@@ -3298,6 +3298,63 @@ export type UpdateFormDto = {
     fields: Array<UpdateFormFieldDto>;
 };
 
+export type VersionInfoDto = {
+    /**
+     * The currently running Attraccess version (semver, without a leading "v")
+     */
+    version: string;
+};
+
+export type ReleaseDto = {
+    /**
+     * Release version (semver, without a leading "v")
+     */
+    version: string;
+    /**
+     * Release tag name as published on GitHub
+     */
+    tagName: string;
+    /**
+     * Human-readable release title
+     */
+    name: string;
+    /**
+     * Release notes body as Markdown
+     */
+    body: string;
+    /**
+     * URL of the GitHub release page
+     */
+    htmlUrl: string;
+    /**
+     * ISO-8601 timestamp when the release was published
+     */
+    publishedAt: string;
+};
+
+export type UpdateStatusDto = {
+    /**
+     * The currently running Attraccess version
+     */
+    currentVersion: string;
+    /**
+     * The highest version available on GitHub, or null when the check failed
+     */
+    latestVersion?: string | null;
+    /**
+     * True when the latest release on GitHub is strictly newer than the running version
+     */
+    isUpdateAvailable: boolean;
+    /**
+     * True when the update check succeeded. False means the GitHub API call failed (network, rate limit, etc.)
+     */
+    checkSucceeded: boolean;
+    /**
+     * The latest release details. Null when the check failed or no release exists.
+     */
+    latestRelease?: (ReleaseDto) | null;
+};
+
 export type PluginMainFrontend = {
     /**
      * The directory of the plugins frontend files
@@ -3613,6 +3670,14 @@ export type InfoResponse = {
 export type RebootHostResponse = unknown;
 
 export type ShutdownHostResponse = unknown;
+
+export type GetCurrentVersionResponse = VersionInfoDto;
+
+export type GetUpdateStatusData = {
+    refresh: string;
+};
+
+export type GetUpdateStatusResponse = UpdateStatusDto;
 
 export type GetLocalSignupDomainWhitelistResponse = Array<(string)>;
 
@@ -5142,6 +5207,8 @@ export type $OpenApiTs = {
                  */
                 200: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -5160,11 +5227,44 @@ export type $OpenApiTs = {
                  */
                 200: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
                 /**
                  * Forbidden - User does not have permission to shutdown the host
+                 */
+                403: unknown;
+            };
+        };
+    };
+    '/api/version': {
+        get: {
+            res: {
+                /**
+                 * The currently running version.
+                 */
+                200: VersionInfoDto;
+            };
+        };
+    };
+    '/api/version/updates': {
+        get: {
+            req: GetUpdateStatusData;
+            res: {
+                /**
+                 * Update availability status.
+                 */
+                200: UpdateStatusDto;
+                /**
+                 * Unauthorized - User is not authenticated
+                 *
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Forbidden - User does not have permission to check for updates
                  */
                 403: unknown;
             };
@@ -5351,6 +5451,8 @@ export type $OpenApiTs = {
                  */
                 200: User;
                 /**
+                 * User is not authenticated.
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -5656,6 +5758,8 @@ export type $OpenApiTs = {
                     [key: string]: unknown;
                 };
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6188,6 +6292,8 @@ export type $OpenApiTs = {
                  */
                 200: LicenseDataDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6216,6 +6322,8 @@ export type $OpenApiTs = {
                  */
                 200: PaginatedResourceResponseDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6241,6 +6349,8 @@ export type $OpenApiTs = {
                  */
                 200: Resource;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6396,6 +6506,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6419,6 +6531,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6442,6 +6556,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6469,6 +6585,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6492,6 +6610,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6515,6 +6635,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6538,6 +6660,8 @@ export type $OpenApiTs = {
                  */
                 400: unknown;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -6557,6 +6681,8 @@ export type $OpenApiTs = {
                  */
                 200: GetActiveUsageSessionDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7529,6 +7655,8 @@ export type $OpenApiTs = {
                  */
                 200: FindManyProjectsResponseDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7542,6 +7670,8 @@ export type $OpenApiTs = {
                  */
                 201: ProjectWithAccessDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7557,6 +7687,8 @@ export type $OpenApiTs = {
                  */
                 200: ProjectWithAccessDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7570,6 +7702,8 @@ export type $OpenApiTs = {
                  */
                 204: void;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7583,6 +7717,8 @@ export type $OpenApiTs = {
                  */
                 200: ProjectWithAccessDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7598,6 +7734,8 @@ export type $OpenApiTs = {
                  */
                 200: ProjectWithAccessDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
@@ -7613,6 +7751,8 @@ export type $OpenApiTs = {
                  */
                 200: ProjectWithAccessDto;
                 /**
+                 * Unauthorized - User is not authenticated
+                 *
                  * Unauthorized
                  */
                 401: unknown;
