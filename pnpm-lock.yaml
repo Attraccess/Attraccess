@@ -304,6 +304,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      semver:
+        specifier: ^7.7.1
+        version: 7.7.4
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -488,6 +491,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      '@types/semver':
+        specifier: ^7.7.1
+        version: 7.7.1
       '@types/spark-md5':
         specifier: ^3.0.5
         version: 3.0.5
@@ -14479,11 +14485,6 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.7.2:
-    resolution: {integrity: sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.7.4:
     resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
     engines: {node: '>=10'}
@@ -20449,7 +20450,7 @@ snapshots:
       react-scan: 0.0.31
       rrweb: 2.0.0-alpha.4
       rrweb-player: 1.0.0-alpha.4
-      semver: 7.7.2
+      semver: 7.7.4
       socket.io: 4.8.1
       socket.io-client: 4.8.1
       tmp: 0.2.5
@@ -34130,7 +34131,7 @@ snapshots:
   react-pluggable@0.4.3(react@19.2.5):
     dependencies:
       react: 19.2.5
-      semver: 7.6.3
+      semver: 7.7.4
 
   react-qrcode-logo@3.0.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
@@ -34802,8 +34803,6 @@ snapshots:
   semver@7.6.3: {}
 
   semver@7.7.1: {}
-
-  semver@7.7.2: {}
 
   semver@7.7.4: {}
 

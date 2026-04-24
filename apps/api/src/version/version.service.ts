@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import * as semver from 'semver';
 import { AppConfigType } from '../config/app.config';
 import { ReleaseDto } from './dto/release.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { VersionInfoDto } from './dto/version-info.dto';
-import { compareSemver, isNewerSemver, normalizeSemver, parseSemver } from './semver.util';
 
 export interface GithubReleaseApiResponse {
   tag_name: string;
@@ -46,7 +46,7 @@ export class VersionService {
   getCurrentVersion(): VersionInfoDto {
     const appConfig = this.configService.get<AppConfigType>('app');
     const raw = appConfig?.VERSION ?? '0.0.0-dev';
-    const normalized = normalizeSemver(raw) ?? raw;
+    const normalized = semver.valid(semver.clean(raw)) ?? raw;
     return { version: normalized };
   }
 
@@ -89,8 +89,11 @@ export class VersionService {
       return value;
     }
 
-    const latestVersion = normalizeSemver(latestRelease.tag_name);
-    const isUpdateAvailable = latestVersion ? isNewerSemver(latestVersion, currentVersion) : false;
+    const latestVersion = semver.valid(semver.clean(latestRelease.tag_name));
+    const isUpdateAvailable =
+      latestVersion !== null && semver.valid(currentVersion) !== null
+        ? semver.gt(latestVersion, currentVersion)
+        : false;
 
     const releaseDto: ReleaseDto = {
       version: latestVersion ?? latestRelease.tag_name,
@@ -119,18 +122,18 @@ export class VersionService {
   private pickLatestRelease(releases: GithubReleaseApiResponse[]): GithubReleaseApiResponse | null {
     const stable = releases
       .filter((release) => !release.draft && !release.prerelease)
-      .filter((release) => parseSemver(release.tag_name) !== null);
+      .filter((release) => semver.valid(semver.clean(release.tag_name)) !== null);
 
     if (stable.length === 0) {
       return null;
     }
 
     return stable.reduce((highest, candidate) => {
-      const highestNormalized = normalizeSemver(highest.tag_name);
-      const candidateNormalized = normalizeSemver(candidate.tag_name);
+      const highestNormalized = semver.valid(semver.clean(highest.tag_name));
+      const candidateNormalized = semver.valid(semver.clean(candidate.tag_name));
       if (!candidateNormalized) return highest;
       if (!highestNormalized) return candidate;
-      return compareSemver(candidateNormalized, highestNormalized) > 0 ? candidate : highest;
+      return semver.gt(candidateNormalized, highestNormalized) ? candidate : highest;
     });
   }
 }
