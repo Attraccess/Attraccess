@@ -52,14 +52,19 @@ describe('VersionService', () => {
       expect(service.getCurrentVersion()).toEqual({ version: '1.2.3' });
     });
 
-    it('falls back to 1.0.0 when config is missing', () => {
+    it('falls back to 0.0.0-dev when config is missing', () => {
       configService.get.mockReturnValue(undefined);
-      expect(service.getCurrentVersion()).toEqual({ version: '1.0.0' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev' });
     });
 
     it('keeps the raw value when the configured version is not semver-shaped', () => {
       configService.get.mockReturnValue({ VERSION: 'canary' });
       expect(service.getCurrentVersion()).toEqual({ version: 'canary' });
+    });
+
+    it('normalizes the 0.0.0-dev placeholder into a comparable semver', () => {
+      configService.get.mockReturnValue({ VERSION: '0.0.0-dev' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.0-dev' });
     });
   });
 
@@ -88,6 +93,17 @@ describe('VersionService', () => {
 
       expect(result.isUpdateAvailable).toBe(false);
       expect(result.latestVersion).toBe('1.0.0');
+    });
+
+    it('reports an available update for the 0.0.0-dev placeholder (unreleased dev build)', async () => {
+      configService.get.mockReturnValue({ VERSION: '0.0.0-dev' });
+      httpGet.mockResolvedValue({ data: [buildRelease({ tag_name: 'v1.5.2' })] });
+
+      const result = await service.getUpdateStatus();
+
+      expect(result.currentVersion).toBe('0.0.0-dev');
+      expect(result.latestVersion).toBe('1.5.2');
+      expect(result.isUpdateAvailable).toBe(true);
     });
 
     it('reports no update when the running version is newer than the highest release', async () => {

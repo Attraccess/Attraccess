@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/source",
-  "version": "0.0.16",
+  "version": "1.5.2",
   "license": "MIT",
   "scripts": {
     "serve": "nx run-many -t serve --projects=api,frontend --outputStyle=stream",

@@ -45,7 +45,7 @@ export class VersionService {
 
   getCurrentVersion(): VersionInfoDto {
     const appConfig = this.configService.get<AppConfigType>('app');
-    const raw = appConfig?.VERSION ?? '1.0.0';
+    const raw = appConfig?.VERSION ?? '0.0.0-dev';
     const normalized = normalizeSemver(raw) ?? raw;
     return { version: normalized };
   }
