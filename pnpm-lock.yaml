@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@internationalized/date': 3.12.1
+
 patchedDependencies:
   typeorm@0.3.28:
     hash: awxlykwbpei6nnl5vfaztyyefy
@@ -38,8 +41,8 @@ importers:
         specifier: ^13.1.0
         version: 13.13.0(react@19.2.5)
       '@internationalized/date':
-        specifier: ^3.12.0
-        version: 3.12.0
+        specifier: 3.12.1
+        version: 3.12.1
       '@khmyznikov/pwa-install':
         specifier: ^0.5.5
         version: 0.5.5(@lit/react@1.0.7(@types/react@19.2.14))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)
@@ -3437,8 +3440,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@internationalized/date@3.12.0':
-    resolution: {integrity: sha512-/PyIMzK29jtXaGU23qTvNZxvBXRtKbNnGDFD+PY6CZw/Y8Ex8pFUzkuCJCG9aOqmShjqhS9mPqP6Dk5onQY8rQ==}
+  '@internationalized/date@3.12.1':
+    resolution: {integrity: sha512-6IedsVWXyq4P9Tj+TxuU8WGWM70hYLl12nbYU8jkikVpa6WXapFazPUcHUMDMoWftIDE2ILDkFFte6W2nFCkRQ==}
 
   '@internationalized/message@3.1.8':
     resolution: {integrity: sha512-Rwk3j/TlYZhn3HQ6PyXUV0XP9Uv42jqZGNegt0BXlxjE6G3+LwHjbQZAGHhCnCPdaA6Tvd3ma/7QzLlLkJxAWA==}
@@ -18946,7 +18949,7 @@ snapshots:
       '@heroui/system': 2.4.28(@heroui/theme@2.4.26(tailwindcss@4.1.18))(framer-motion@12.38.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@heroui/theme': 2.4.26(tailwindcss@4.1.18)
       '@heroui/use-aria-button': 2.2.22(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-aria/calendar': 3.9.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/focus': 3.21.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/i18n': 3.12.16(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -19024,7 +19027,7 @@ snapshots:
       '@heroui/shared-utils': 2.1.12
       '@heroui/system': 2.4.28(@heroui/theme@2.4.26(tailwindcss@4.1.18))(framer-motion@12.38.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@heroui/theme': 2.4.26(tailwindcss@4.1.18)
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-aria/datepicker': 3.16.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/i18n': 3.12.16(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-stately/datepicker': 3.16.1(react@19.2.5)
@@ -19046,7 +19049,7 @@ snapshots:
       '@heroui/shared-utils': 2.1.12
       '@heroui/system': 2.4.28(@heroui/theme@2.4.26(tailwindcss@4.1.18))(framer-motion@12.38.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@heroui/theme': 2.4.26(tailwindcss@4.1.18)
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-aria/datepicker': 3.16.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/i18n': 3.12.16(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-stately/datepicker': 3.16.1(react@19.2.5)
@@ -19966,7 +19969,7 @@ snapshots:
   '@img/sharp-win32-x64@0.34.5':
     optional: true
 
-  '@internationalized/date@3.12.0':
+  '@internationalized/date@3.12.1':
     dependencies:
       '@swc/helpers': 0.5.20
 
@@ -22587,7 +22590,7 @@ snapshots:
 
   '@react-aria/calendar@3.9.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-aria/i18n': 3.12.16(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/interactions': 3.27.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@react-aria/live-announcer': 3.4.4
@@ -22640,7 +22643,7 @@ snapshots:
 
   '@react-aria/datepicker@3.16.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@internationalized/number': 3.6.5
       '@internationalized/string': 3.2.7
       '@react-aria/focus': 3.21.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -22712,7 +22715,7 @@ snapshots:
 
   '@react-aria/i18n@3.12.16(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@internationalized/message': 3.1.8
       '@internationalized/number': 3.6.5
       '@internationalized/string': 3.2.7
@@ -23022,7 +23025,7 @@ snapshots:
 
   '@react-stately/calendar@3.9.3(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-stately/utils': 3.11.0(react@19.2.5)
       '@react-types/calendar': 3.8.3(react@19.2.5)
       '@react-types/shared': 3.33.1(react@19.2.5)
@@ -23064,7 +23067,7 @@ snapshots:
 
   '@react-stately/datepicker@3.16.1(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@internationalized/number': 3.6.5
       '@internationalized/string': 3.2.7
       '@react-stately/form': 3.2.4(react@19.2.5)
@@ -23233,7 +23236,7 @@ snapshots:
 
   '@react-types/calendar@3.8.3(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-types/shared': 3.33.1(react@19.2.5)
       react: 19.2.5
 
@@ -23249,7 +23252,7 @@ snapshots:
 
   '@react-types/datepicker@3.13.5(react@19.2.5)':
     dependencies:
-      '@internationalized/date': 3.12.0
+      '@internationalized/date': 3.12.1
       '@react-types/calendar': 3.8.3(react@19.2.5)
       '@react-types/overlays': 3.9.4(react@19.2.5)
       '@react-types/shared': 3.33.1(react@19.2.5)
