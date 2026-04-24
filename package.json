@@ -230,6 +230,9 @@
   "pnpm": {
     "patchedDependencies": {
       "typeorm@0.3.28": "patches/typeorm@0.3.28.patch"
+    },
+    "overrides": {
+      "@internationalized/date": "3.12.1"
     }
   }
 }

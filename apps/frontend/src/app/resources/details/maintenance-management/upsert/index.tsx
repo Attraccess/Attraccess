@@ -18,7 +18,7 @@ import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { parseAbsolute, type DateValue, toZoned } from '@internationalized/date';
+import { parseAbsolute, type DateValue, type ZonedDateTime, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
 import {
   useResourceMaintenancesServiceCreateMaintenance,
@@ -48,8 +48,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
   const now = useNow();
 
   const timezoneOfBrowser = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const [startTime, setStartTime] = useState<DateValue | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
-  const [endTime, setEndTime] = useState<DateValue | null>(null);
+  const [startTime, setStartTime] = useState<ZonedDateTime | null>(parseAbsolute(now.toISOString(), timezoneOfBrowser));
+  const [endTime, setEndTime] = useState<ZonedDateTime | null>(null);
   const [reason, setReason] = useState<string>('');
   const [hasEndDate, setHasEndDate] = useState(false);
 
