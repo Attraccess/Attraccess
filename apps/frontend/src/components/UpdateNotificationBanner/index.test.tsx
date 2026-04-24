@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestWrapper } from '../../test-utils/wrappers';
-import type { UpdateStatus } from '../../api/version';
+import type { UpdateStatusDto } from '@attraccess/react-query-client';
 import { DISMISSED_VERSION_STORAGE_KEY } from './storage';
 import { UpdateNotificationBanner } from './index';
 
@@ -56,23 +56,21 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }));
 
-let updateStatusValue: UpdateStatus | undefined;
+let updateStatusValue: UpdateStatusDto | undefined;
 
-vi.mock('../../api/version', async () => {
-  const types = await vi.importActual<typeof import('../../api/version/types')>(
-    '../../api/version/types',
-  );
-  return {
-    ...types,
-    useUpdateStatus: (options?: { enabled?: boolean }) => ({
-      data: options?.enabled === false ? undefined : updateStatusValue,
-      isLoading: false,
-      error: null,
-    }),
-  };
-});
+vi.mock('@attraccess/react-query-client', () => ({
+  useSystemServiceGetUpdateStatus: (
+    _params: unknown,
+    _queryKey: unknown,
+    options?: { enabled?: boolean },
+  ) => ({
+    data: options?.enabled === false ? undefined : updateStatusValue,
+    isLoading: false,
+    error: null,
+  }),
+}));
 
-function buildStatus(overrides: Partial<UpdateStatus> = {}): UpdateStatus {
+function buildStatus(overrides: Partial<UpdateStatusDto> = {}): UpdateStatusDto {
   return {
     currentVersion: '0.0.16',
     latestVersion: '0.1.2',

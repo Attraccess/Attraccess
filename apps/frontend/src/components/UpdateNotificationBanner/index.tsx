@@ -11,20 +11,27 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
-import { useUpdateStatus } from '../../api/version';
 import { readDismissedVersion, writeDismissedVersion } from './storage';
 import en from './en.json';
 import de from './de.json';
 
 export const UPDATE_DOCS_PATH = '/docs/#/en/installation/updating';
+export const UPDATE_STATUS_STALE_MS = 60 * 60 * 1000;
 
 export function UpdateNotificationBanner() {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canSeeBanner = hasPermission('canManageSystemConfiguration');
 
-  const { data: updateStatus } = useUpdateStatus({ enabled: canSeeBanner });
+  const { data: updateStatus } = useSystemServiceGetUpdateStatus({}, undefined, {
+    enabled: canSeeBanner,
+    staleTime: UPDATE_STATUS_STALE_MS,
+    refetchInterval: UPDATE_STATUS_STALE_MS,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
 
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(() => readDismissedVersion());
   const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);

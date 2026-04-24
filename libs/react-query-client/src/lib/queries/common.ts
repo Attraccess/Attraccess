@@ -15,8 +15,8 @@ export type SystemServiceGetUpdateStatusDefaultResponse = Awaited<ReturnType<typ
 export type SystemServiceGetUpdateStatusQueryResult<TData = SystemServiceGetUpdateStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceGetUpdateStatusKey = "SystemServiceGetUpdateStatus";
 export const UseSystemServiceGetUpdateStatusKeyFn = ({ refresh }: {
-  refresh: string;
-}, queryKey?: Array<unknown>) => [useSystemServiceGetUpdateStatusKey, ...(queryKey ?? [{ refresh }])];
+  refresh?: string;
+} = {}, queryKey?: Array<unknown>) => [useSystemServiceGetUpdateStatusKey, ...(queryKey ?? [{ refresh }])];
 export type UsersServiceGetLocalSignupDomainWhitelistDefaultResponse = Awaited<ReturnType<typeof UsersService.getLocalSignupDomainWhitelist>>;
 export type UsersServiceGetLocalSignupDomainWhitelistQueryResult<TData = UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceGetLocalSignupDomainWhitelistKey = "UsersServiceGetLocalSignupDomainWhitelist";

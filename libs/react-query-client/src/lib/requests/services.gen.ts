@@ -70,11 +70,11 @@ Unauthorized`,
      * Check whether a newer Attraccess release is available on GitHub
      * Compares the currently running version against the highest stable GitHub release. Results are cached for one hour to avoid hitting the GitHub API rate limit.
      * @param data The data for the request.
-     * @param data.refresh
+     * @param data.refresh Set to "true" or "1" to bypass the 1-hour server-side cache and re-query GitHub immediately.
      * @returns UpdateStatusDto Update availability status.
      * @throws ApiError
      */
-    public static getUpdateStatus(data: GetUpdateStatusData): CancelablePromise<GetUpdateStatusResponse> {
+    public static getUpdateStatus(data: GetUpdateStatusData = {}): CancelablePromise<GetUpdateStatusResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/version/updates',

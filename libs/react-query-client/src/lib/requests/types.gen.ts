@@ -3674,7 +3674,10 @@ export type ShutdownHostResponse = unknown;
 export type GetCurrentVersionResponse = VersionInfoDto;
 
 export type GetUpdateStatusData = {
-    refresh: string;
+    /**
+     * Set to "true" or "1" to bypass the 1-hour server-side cache and re-query GitHub immediately.
+     */
+    refresh?: string;
 };
 
 export type GetUpdateStatusResponse = UpdateStatusDto;

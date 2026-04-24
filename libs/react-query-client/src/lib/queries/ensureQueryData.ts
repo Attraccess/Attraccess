@@ -7,8 +7,8 @@ import * as Common from "./common";
 export const ensureUseSystemServiceInfoData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceInfoKeyFn(), queryFn: () => SystemService.info() });
 export const ensureUseSystemServiceGetCurrentVersionData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceGetCurrentVersionKeyFn(), queryFn: () => SystemService.getCurrentVersion() });
 export const ensureUseSystemServiceGetUpdateStatusData = (queryClient: QueryClient, { refresh }: {
-  refresh: string;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }), queryFn: () => SystemService.getUpdateStatus({ refresh }) });
+  refresh?: string;
+} = {}) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }), queryFn: () => SystemService.getUpdateStatus({ refresh }) });
 export const ensureUseUsersServiceGetLocalSignupDomainWhitelistData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetLocalSignupDomainWhitelistKeyFn(), queryFn: () => UsersService.getLocalSignupDomainWhitelist() });
 export const ensureUseUsersServiceFindManyData = (queryClient: QueryClient, { ids, limit, page, search }: {
   ids?: number[];
