@@ -370,7 +370,7 @@ importers:
         version: 7.28.5(@babel/core@7.29.0)
       '@cyclonedx/cdxgen':
         specifier: ^12.1.5
-        version: 12.2.0
+        version: 12.2.1
       '@nx/esbuild':
         specifier: 22.6.5
         version: 22.6.5(@babel/traverse@7.29.0)(@swc-node/register@1.11.1(@emnapi/core@1.8.1)(@emnapi/runtime@1.9.2)(@swc/core@1.15.8(@swc/helpers@0.5.20))(@swc/types@0.1.26)(typescript@5.8.3))(@swc/core@1.15.8(@swc/helpers@0.5.20))(esbuild@0.28.0)(nx@22.6.5(@swc-node/register@1.11.1(@emnapi/core@1.8.1)(@emnapi/runtime@1.9.2)(@swc/core@1.15.8(@swc/helpers@0.5.20))(@swc/types@0.1.26)(typescript@5.8.3))(@swc/core@1.15.8(@swc/helpers@0.5.20)))(verdaccio@6.1.2(encoding@0.1.13)(typanion@3.14.0))
@@ -1832,6 +1832,9 @@ packages:
   '@bufbuild/protobuf@2.11.0':
     resolution: {integrity: sha512-sBXGT13cpmPR5BMgHE6UEEfEaShh5Ror6rfN3yEK5si7QVrtZg8LEPQb0VVhiLRUslD2yLnXtnRzG035J/mZXQ==}
 
+  '@bufbuild/protobuf@2.12.0':
+    resolution: {integrity: sha512-B/XlCaFIP8LOwzo+bz5uFzATYokcwCKQcghqnlfwSmM5eX/qTkvDBnDPs+gXtX/RyjxJ4DRikECcPJbyALA8FA==}
+
   '@cdxgen/cdxgen-plugins-bin-darwin-amd64@2.0.3':
     resolution: {integrity: sha512-yMpl0X/JhQNL/BZZlSOYzJK8Yi2k4rpzJVxTeww0VmN5jr2JgJNeH0qQJOCDjLjGl9uAmy7yBIwXk4JcIhqBpw==}
     cpu: [x64]
@@ -2005,8 +2008,8 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@cyclonedx/cdxgen@12.2.0':
-    resolution: {integrity: sha512-8j1oGGKSSnECvg3+GseweNaiEuMlDNPRBERGEeJL530FjG0VghFgd2SVJMpDwbs2rLrxhwKB9HvZiSeE34volw==}
+  '@cyclonedx/cdxgen@12.2.1':
+    resolution: {integrity: sha512-Omk8tVH29a4S50yDyX45IjmbvwkNk57CezIQi00+vUobNB8A1KWlHoAGKsvDGKW/3lofBBBcuCB7GXvL1zPT3A==}
     engines: {node: ^20 || ^22 || ^24 || ^25, pnpm: '>=10'}
     hasBin: true
 
@@ -7287,6 +7290,9 @@ packages:
   ajv@6.14.0:
     resolution: {integrity: sha512-IWrosm/yrn43eiKqkfkHis7QioDleaXQHdDVPKg0FSwwd/DuvyX79TZnFOnYpB7dcsFAMmtFztZuXPDvSePkFw==}
 
+  ajv@6.15.0:
+    resolution: {integrity: sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==}
+
   ajv@8.12.0:
     resolution: {integrity: sha512-sRu1kpcO9yLtYxBKvqfTeh9KzZEwO3STyX1HT+4CaDzC6HpTGYhIhPIzj9XuKU7KYDwnaeh5hcOwjy1QuJzBPA==}
 
@@ -7472,10 +7478,6 @@ packages:
   ast-types@0.16.1:
     resolution: {integrity: sha512-6t10qk83GOG8p0vKmaCr8eiilZwO171AvbROMtvvNiwrTly62t+7XkA8RdIIVbpMhCASAsxgAzdRSwh6nw/5Dg==}
     engines: {node: '>=4'}
-
-  astral-regex@2.0.0:
-    resolution: {integrity: sha512-Z7tMw1ytTXt5jqMcOP+OQteU1VuNK9Y02uuJtKQ1Sv69jXQKKg5cibLwGJow8yzZP+eAc18EmLGPal0bp36rvQ==}
-    engines: {node: '>=8'}
 
   async-function@1.0.0:
     resolution: {integrity: sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==}
@@ -11806,9 +11808,6 @@ packages:
   lodash.sortby@4.7.0:
     resolution: {integrity: sha512-HDWXG8isMntAyRF5vZ7xKuEvOhT4AhlRt/3czTSjvGUxjYCBVRQY48ViDHyfYz9VIoBkW4TMGQNapx+l3RUwdA==}
 
-  lodash.truncate@4.4.2:
-    resolution: {integrity: sha512-jttmRe7bRse52OsWIMDLaXxWqRAmtIUccAQ3garviCqJjafXOfNMO0yMfNpdD6zbGaTU0P5Nz7e7gAT6cKmJRw==}
-
   lodash.uniq@4.5.0:
     resolution: {integrity: sha512-xfBaXQd9ryd9dlSDvnvI0lvxfLJlYAZzXomUYzLKtUeOQvOP5piqAWuGtrhWeqaXK9hhoM/iyJc5AV+XfsX3HQ==}
 
@@ -14724,10 +14723,6 @@ packages:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
     engines: {node: '>=8'}
 
-  slice-ansi@4.0.0:
-    resolution: {integrity: sha512-qMCMfhY040cVHT43K9BFygqYbUPFZKHOg7K73mtTWJRb8pyP3fzf4Ixd5SzdEJQ6MRUg/WBnOLxghZtKKurENQ==}
-    engines: {node: '>=10'}
-
   slice-ansi@8.0.0:
     resolution: {integrity: sha512-stxByr12oeeOyY2BlviTNQlYV5xOj47GirPr4yA1hE9JCtxfQN0+tVbkxwCtYDQWhEKWFHsEK48ORg5jrouCAg==}
     engines: {node: '>=20'}
@@ -15169,10 +15164,6 @@ packages:
   synckit@0.11.11:
     resolution: {integrity: sha512-MeQTA1r0litLUf0Rp/iisCaL8761lKAZHaimlbGK4j0HysC4PLfqygQj9srcs0m2RdtDYnF8UuYyKpbjHYp7Jw==}
     engines: {node: ^14.18.0 || >=16.0.0}
-
-  table@6.9.0:
-    resolution: {integrity: sha512-9kY+CygyYM6j02t5YFHbNz2FN5QmYGv9zAjVp4lCDjlCw7amdckXlEt/bjMhUIfj4ThGRE4gCUH5+yGnNuPo5A==}
-    engines: {node: '>=10.0.0'}
 
   tagged-tag@1.0.0:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
@@ -18192,7 +18183,10 @@ snapshots:
 
   '@borewit/text-codec@0.2.2': {}
 
-  '@bufbuild/protobuf@2.11.0': {}
+  '@bufbuild/protobuf@2.11.0':
+    optional: true
+
+  '@bufbuild/protobuf@2.12.0': {}
 
   '@cdxgen/cdxgen-plugins-bin-darwin-amd64@2.0.3':
     optional: true
@@ -18320,7 +18314,7 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@cyclonedx/cdxgen@12.2.0':
+  '@cyclonedx/cdxgen@12.2.1':
     dependencies:
       '@babel/parser': 7.29.2
       '@babel/traverse': 7.29.0
@@ -18350,7 +18344,6 @@ snapshots:
       read-package-json-fast: 5.0.0
       semver: 7.7.4
       ssri: 13.0.1
-      table: 6.9.0
       tar: 7.5.13
       treeverse: 3.0.0
       uuid: 13.0.0
@@ -25277,9 +25270,9 @@ snapshots:
     optionalDependencies:
       ajv: 8.18.0
 
-  ajv-keywords@3.5.2(ajv@6.14.0):
+  ajv-keywords@3.5.2(ajv@6.15.0):
     dependencies:
-      ajv: 6.14.0
+      ajv: 6.15.0
 
   ajv-keywords@5.1.0(ajv@8.18.0):
     dependencies:
@@ -25287,6 +25280,13 @@ snapshots:
       fast-deep-equal: 3.1.3
 
   ajv@6.14.0:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-json-stable-stringify: 2.1.0
+      json-schema-traverse: 0.4.1
+      uri-js: 4.4.1
+
+  ajv@6.15.0:
     dependencies:
       fast-deep-equal: 3.1.3
       fast-json-stable-stringify: 2.1.0
@@ -25498,8 +25498,6 @@ snapshots:
   ast-types@0.16.1:
     dependencies:
       tslib: 2.8.1
-
-  astral-regex@2.0.0: {}
 
   async-function@1.0.0: {}
 
@@ -30989,8 +30987,6 @@ snapshots:
 
   lodash.sortby@4.7.0: {}
 
-  lodash.truncate@4.4.2: {}
-
   lodash.uniq@4.5.0: {}
 
   lodash@4.17.21: {}
@@ -34795,7 +34791,7 @@ snapshots:
 
   sass-embedded@1.89.0:
     dependencies:
-      '@bufbuild/protobuf': 2.11.0
+      '@bufbuild/protobuf': 2.12.0
       buffer-builder: 0.2.0
       colorjs.io: 0.5.2
       immutable: 5.1.5
@@ -34861,8 +34857,8 @@ snapshots:
   schema-utils@3.3.0:
     dependencies:
       '@types/json-schema': 7.0.15
-      ajv: 6.14.0
-      ajv-keywords: 3.5.2(ajv@6.14.0)
+      ajv: 6.15.0
+      ajv-keywords: 3.5.2(ajv@6.15.0)
 
   schema-utils@4.3.3:
     dependencies:
@@ -35156,12 +35152,6 @@ snapshots:
   sisteransi@1.0.5: {}
 
   slash@3.0.0: {}
-
-  slice-ansi@4.0.0:
-    dependencies:
-      ansi-styles: 4.3.0
-      astral-regex: 2.0.0
-      is-fullwidth-code-point: 3.0.0
 
   slice-ansi@8.0.0:
     dependencies:
@@ -35738,14 +35728,6 @@ snapshots:
   synckit@0.11.11:
     dependencies:
       '@pkgr/core': 0.2.9
-
-  table@6.9.0:
-    dependencies:
-      ajv: 8.18.0
-      lodash.truncate: 4.4.2
-      slice-ansi: 4.0.0
-      string-width: 4.2.3
-      strip-ansi: 6.0.1
 
   tagged-tag@1.0.0: {}
 
@@ -36394,7 +36376,7 @@ snapshots:
       pupa: 2.1.1
       registry-auth-token: 5.1.0
       registry-url: 5.1.0
-      semver: 7.7.4
+      semver: 7.7.2
       semver-diff: 3.1.1
       xdg-basedir: 4.0.0
     transitivePeerDependencies:
