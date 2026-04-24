@@ -58,7 +58,7 @@ import {
   CsvInviteRowErrorDto,
   CsvInviteUploadDto,
 } from './dtos/csvInvite.dto';
-import { parse as parseCsv, type Info as CsvInfo } from 'csv-parse';
+import { parse as parseCsv } from 'csv-parse';
 import { Readable } from 'stream';
 import { plainToInstance } from 'class-transformer';
 import { validate, isEmail } from 'class-validator';
@@ -175,16 +175,6 @@ export class UsersController {
       trim: true,
     });
 
-    const normalizeColumns = (columns: CsvInfo['columns'] | undefined): string[] | null => {
-      if (!columns || typeof columns === 'boolean') {
-        return null;
-      }
-
-      return columns
-        .map((column) => (typeof column === 'string' ? column : (column?.name ?? '')))
-        .filter((value) => value !== '');
-    };
-
     let header: string[] | null = null;
     const candidates: Array<{
       username: string;
@@ -203,7 +193,7 @@ export class UsersController {
 
     try {
       for await (const record of inputStream.pipe(parser)) {
-        header = header ?? normalizeColumns(parser.info?.columns) ?? Object.keys(record ?? {});
+        header = header ?? Object.keys(record ?? {});
 
         dataRowIndex += 1;
         const rowNumber = dataRowIndex;
@@ -303,7 +293,6 @@ export class UsersController {
       throw new BadRequestException('Invalid CSV file');
     }
 
-    header = header ?? normalizeColumns(parser.info?.columns);
     if (!header || header.every((value) => `${value}`.trim() === '')) {
       throw new BadRequestException('MISSING_HEADER_ROW');
     }
