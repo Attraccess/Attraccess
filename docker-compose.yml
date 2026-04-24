@@ -56,7 +56,7 @@ services:
       - .env.docker-compose
 
   rabbitmq:
-    image: rabbitmq:4.2.5-management
+    image: rabbitmq:4.3.0-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -130,7 +130,7 @@ services:
       - .env.docker-compose
 
   prometheus:
-    image: prom/prometheus:v3.4.0
+    image: prom/prometheus:v3.11.2
     restart: unless-stopped
     expose:
       - '9090'
@@ -146,7 +146,7 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:11.6.0
+    image: grafana/grafana:11.6.14
     restart: unless-stopped
     expose:
       - '3001'
@@ -160,7 +160,7 @@ services:
       - grafana-data:/var/lib/grafana
 
   duplicati:
-    image: duplicati/duplicati:2.3.0.0-stable
+    image: duplicati/duplicati:2.3.0.1-stable
     expose:
       - '8200'
     volumes:
