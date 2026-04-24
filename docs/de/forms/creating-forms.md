@@ -36,6 +36,19 @@ Nach dem Erstellen eines Formulars fügen Sie Felder hinzu, um festzulegen, welc
 
 <!-- TODO: Screenshot der Feldkonfiguration -->
 
+### Pflicht-Boolean-Felder (Zustimmung / Akzeptanz)
+
+Wenn ein **Boolean**-Feld als **Pflichtfeld** markiert ist, muss der Benutzer es explizit auf **Ja** (aktiviert) setzen, um das Formular abzusenden. Wird es auf **Nein** belassen, wird das Absenden mit einem Validierungsfehler blockiert.
+
+Nutzen Sie dieses Muster, um Benutzer dazu zu zwingen, etwas aktiv zu bestätigen, bevor sie fortfahren können -- zum Beispiel:
+
+- Akzeptieren der AGB
+- Bestätigung, dass Sicherheitshinweise gelesen wurden
+- Bestätigung einer abgeschlossenen Sicherheits-Checkliste
+
+> [!NOTE]
+> Die Beschriftung eines Boolean-Feldes wird durch den **Namen** des Feldes bestimmt. Eine separate Checkbox-Beschriftung kann nicht gesetzt werden -- der Feldname ist das, was der Benutzer neben der Checkbox sieht.
+
 ### Auswahlfelder konfigurieren
 
 Wenn Sie **Auswahl** als Feldtyp wählen, müssen Sie die verfügbaren Optionen definieren:

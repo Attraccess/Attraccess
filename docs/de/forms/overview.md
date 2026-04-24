@@ -31,8 +31,11 @@ Formulare unterstützen die folgenden Feldtypen:
 |-----|-------------|---------|
 | **Text** | Freitexteingabe | Materialname, Anmerkungen |
 | **Zahl** | Numerische Eingabe | Dauer, Gewicht, Menge |
-| **Boolean** | Checkbox (Ja/Nein) | "Arbeitsplatz aufgeräumt?", "Sicherheitscheck durchgeführt?" |
+| **Boolean** | Checkbox (Ja/Nein) | "Arbeitsplatz aufgeräumt?", "Sicherheitscheck durchgeführt?", "Ich akzeptiere die AGB" |
 | **Auswahl** | Dropdown mit vordefinierten Optionen | Materialtyp, Projektauswahl |
+
+> [!TIP]
+> Ein **Boolean**-Feld, das als **Pflichtfeld** markiert ist, muss auf **Ja** (aktiviert) gesetzt werden, bevor das Formular abgesendet werden kann. Dies eignet sich ideal dazu, Benutzer zum Akzeptieren der AGB oder zur Bestätigung von Sicherheitshinweisen zu zwingen. Details siehe [Formulare erstellen](forms/creating-forms.md).
 
 ## Formulareinreichungen
 
