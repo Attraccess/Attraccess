@@ -3913,11 +3913,6 @@ export const $SumUpReaderStatus = {
     enum: ['unknown', 'processing', 'paired', 'expired']
 } as const;
 
-export const $SumUpReaderModel = {
-    type: 'string',
-    enum: ['solo', 'virtual-solo']
-} as const;
-
 export const $SumUpReaderDevice = {
     type: 'object',
     properties: {
@@ -3926,12 +3921,9 @@ export const $SumUpReaderDevice = {
             example: '1234567890'
         },
         model: {
+            type: 'string',
             example: 'solo',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumUpReaderModel'
-                }
-            ]
+            enum: ['solo', 'virtual-solo']
         }
     },
     required: ['identifier', 'model']
@@ -4009,18 +4001,6 @@ export const $SumupTopUpDto = {
     required: ['amount', 'readerId']
 } as const;
 
-export const $SumupTransactionEventType = {
-    type: 'string',
-    enum: ['solo.transaction.updated'],
-    description: 'The type of the transaction'
-} as const;
-
-export const $SumupTransactionStatus = {
-    type: 'string',
-    enum: ['successful', 'failed'],
-    description: 'The status of the transaction'
-} as const;
-
 export const $Payload = {
     type: 'object',
     properties: {
@@ -4035,13 +4015,10 @@ export const $Payload = {
             example: 'MPMGEBZF'
         },
         status: {
+            type: 'string',
             description: 'The status of the transaction',
             example: 'successful',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumupTransactionStatus'
-                }
-            ]
+            enum: ['successful', 'failed']
         },
         transaction_id: {
             type: 'string',
@@ -4061,13 +4038,10 @@ export const $SumupTransactionCallbackDto = {
             example: '1234567890'
         },
         event_type: {
+            type: 'string',
             description: 'The type of the transaction',
             example: 'solo.transaction.updated',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumupTransactionEventType'
-                }
-            ]
+            enum: ['solo.transaction.updated']
         },
         payload: {
             description: 'The payload of the transaction',

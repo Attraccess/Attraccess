@@ -2605,15 +2605,15 @@ export enum SumUpReaderStatus {
     EXPIRED = 'expired'
 }
 
-export enum SumUpReaderModel {
+export type SumUpReaderDevice = {
+    identifier: string;
+    model: 'solo' | 'virtual-solo';
+};
+
+export enum model {
     SOLO = 'solo',
     VIRTUAL_SOLO = 'virtual-solo'
 }
-
-export type SumUpReaderDevice = {
-    identifier: string;
-    model: SumUpReaderModel;
-};
 
 export type SumUpReaderDto = {
     id: string;
@@ -2637,21 +2637,6 @@ export type SumupTopUpDto = {
     readerId: string;
 };
 
-/**
- * The type of the transaction
- */
-export enum SumupTransactionEventType {
-    SOLO_TRANSACTION_UPDATED = 'solo.transaction.updated'
-}
-
-/**
- * The status of the transaction
- */
-export enum SumupTransactionStatus {
-    SUCCESSFUL = 'successful',
-    FAILED = 'failed'
-}
-
 export type Payload = {
     /**
      * The ID of the transaction
@@ -2664,12 +2649,20 @@ export type Payload = {
     /**
      * The status of the transaction
      */
-    status: SumupTransactionStatus;
+    status: 'successful' | 'failed';
     /**
      * The ID of the transaction
      */
     transaction_id: string;
 };
+
+/**
+ * The status of the transaction
+ */
+export enum status {
+    SUCCESSFUL = 'successful',
+    FAILED = 'failed'
+}
 
 export type SumupTransactionCallbackDto = {
     /**
@@ -2679,7 +2672,7 @@ export type SumupTransactionCallbackDto = {
     /**
      * The type of the transaction
      */
-    event_type: SumupTransactionEventType;
+    event_type: 'solo.transaction.updated';
     /**
      * The payload of the transaction
      */
@@ -2689,6 +2682,13 @@ export type SumupTransactionCallbackDto = {
      */
     timestamp: string;
 };
+
+/**
+ * The type of the transaction
+ */
+export enum event_type {
+    SOLO_TRANSACTION_UPDATED = 'solo.transaction.updated'
+}
 
 export type RefundTransactionDto = {
     amount: number;
