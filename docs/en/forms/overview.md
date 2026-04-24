@@ -31,8 +31,11 @@ Forms support the following field types:
 |------|-------------|---------|
 | **Text** | Free-text input | Material name, notes |
 | **Number** | Numeric input | Duration, weight, quantity |
-| **Boolean** | Checkbox (yes/no) | "Workspace cleaned?", "Safety check done?" |
+| **Boolean** | Checkbox (yes/no) | "Workspace cleaned?", "Safety check done?", "I accept the terms" |
 | **Select** | Dropdown with predefined options | Material type, project selection |
+
+> [!TIP]
+> A **Boolean** field marked as **Required** must be set to **Yes** (checked) before the form can be submitted. This is ideal for forcing users to accept terms and conditions or confirm safety instructions. See [Creating Forms](forms/creating-forms.md) for details.
 
 ## Form Submissions
 

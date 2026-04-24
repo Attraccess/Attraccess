@@ -36,6 +36,19 @@ After creating a form, add fields to define what data to collect:
 
 <!-- TODO: Screenshot of field configuration -->
 
+### Required Boolean Fields (Consent / Acceptance)
+
+When a **Boolean** field is marked as **Required**, the user must explicitly set it to **Yes** (checked) to submit the form. Leaving it at **No** will block submission with a validation error.
+
+Use this pattern to force users to actively acknowledge something before proceeding -- for example:
+
+- Accepting terms and conditions (AGB)
+- Confirming safety instructions have been read
+- Confirming a safety checklist has been completed
+
+> [!NOTE]
+> The label of a Boolean field is determined by the field's **Name**. You cannot set a separate custom label for the checkbox itself -- the field name is what the user sees next to the checkbox.
+
 ### Configuring Select Fields
 
 When you choose **Select** as the field type, you need to define the available options:
