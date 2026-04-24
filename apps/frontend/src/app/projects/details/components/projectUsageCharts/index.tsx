@@ -46,8 +46,8 @@ const BAR_COLORS = {
   sessions: { base: '#0ea5e9', active: '#38bdf8' },
   minutes: { base: '#10b981', active: '#34d399' },
 };
-type ChartTooltipProps = TooltipContentProps<number, string>;
-type ChartTooltipPayload = TooltipPayload<number, string>;
+type ChartTooltipProps = TooltipContentProps;
+type ChartTooltipPayload = TooltipPayload;
 
 export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
