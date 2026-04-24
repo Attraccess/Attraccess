@@ -4,8 +4,13 @@ import { LogLevel } from '@nestjs/common';
 
 const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
 
-export function resolveAppVersion(env: NodeJS.ProcessEnv = process.env): string {
-  const candidates = [env.ATTRACCESS_VERSION, env.npm_package_version];
+export const BUILD_TIME_VERSION: string | undefined = process.env.ATTRACCESS_VERSION;
+
+export function resolveAppVersion(
+  env: NodeJS.ProcessEnv = process.env,
+  buildTimeVersion: string | undefined = BUILD_TIME_VERSION,
+): string {
+  const candidates = [buildTimeVersion, env.ATTRACCESS_VERSION, env.npm_package_version];
   for (const candidate of candidates) {
     if (typeof candidate !== 'string') continue;
     const trimmed = candidate.trim();
