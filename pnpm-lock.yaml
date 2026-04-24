@@ -171,7 +171,7 @@ importers:
         version: 6.5.1
       csv-parse:
         specifier: ^6.1.0
-        version: 6.1.0
+        version: 6.2.1
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -8668,9 +8668,6 @@ packages:
 
   csv-generate@4.5.1:
     resolution: {integrity: sha512-nWVtFBfyK+YX1fHtKkMqzULc6sH5ise6baD64SmYTq3GEDSErVZ5xzyMa0hNP/a9PGJTTTyQTU69xpjcuCx2IA==}
-
-  csv-parse@6.1.0:
-    resolution: {integrity: sha512-CEE+jwpgLn+MmtCpVcPtiCZpVtB6Z2OKPTr34pycYYoL7sxdOkXDdQ4lRiw6ioC0q6BLqhc6cKweCVvral8yhw==}
 
   csv-parse@6.2.1:
     resolution: {integrity: sha512-LRLMV+UCyfMokp8Wb411duBf1gaBKJfOfBWU9eHMJ+b+cJYZsNu3AFmjJf3+yPGd59Exz1TsMjaSFyxnYB9+IQ==}
@@ -27005,8 +27002,6 @@ snapshots:
   csstype@3.2.3: {}
 
   csv-generate@4.5.1: {}
-
-  csv-parse@6.1.0: {}
 
   csv-parse@6.2.1: {}
 
