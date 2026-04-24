@@ -6,7 +6,7 @@ services:
       - '1025:1025'
 
   rabbitmq:
-    image: rabbitmq:4.2.5-management
+    image: rabbitmq:4.3.0-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -157,7 +157,7 @@ services:
       - prometheus-config:/etc/prometheus
 
   prometheus:
-    image: prom/prometheus:v3.4.0
+    image: prom/prometheus:v3.11.2
     ports:
       - '9090:9090'
     volumes:
@@ -171,7 +171,7 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:11.6.0
+    image: grafana/grafana:11.6.14
     ports:
       - '3001:3001'
     environment:
