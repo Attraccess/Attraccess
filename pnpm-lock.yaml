@@ -321,7 +321,7 @@ importers:
         version: 5.1.7
       swagger-typescript-api:
         specifier: ^13.1.3
-        version: 13.6.11(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5)
+        version: 13.7.1(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5)
       tailwind-merge:
         specifier: ^3.2.0
         version: 3.5.0
@@ -15235,8 +15235,8 @@ packages:
   swagger-schema-official@2.0.0-bab6bed:
     resolution: {integrity: sha512-rCC0NWGKr/IJhtRuPq/t37qvZHI/mH4I4sxflVM+qgVe5Z2uOCivzWaVbuioJaB61kvm5UvB7b49E+oBY0M8jA==}
 
-  swagger-typescript-api@13.6.11:
-    resolution: {integrity: sha512-nzG2f677ERh8RgZfbTxiYharNepHUBIVFL9tHVnl/vcTFbSL5c4HWI3u567Jpx+BpN4YX0NfMadflHxL6y6NFA==}
+  swagger-typescript-api@13.7.1:
+    resolution: {integrity: sha512-CuRxMWjD6QqzDPQO9snTYLyN0FER3BK0PRDifCfgZlfqqOxwoet+9t3Q12zR8s2Vs8XEvKsaRKoMLedfMDUa/A==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -20594,7 +20594,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.5
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -35912,7 +35912,7 @@ snapshots:
 
   swagger-schema-official@2.0.0-bab6bed: {}
 
-  swagger-typescript-api@13.6.11(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5):
+  swagger-typescript-api@13.7.1(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
       '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.13)
