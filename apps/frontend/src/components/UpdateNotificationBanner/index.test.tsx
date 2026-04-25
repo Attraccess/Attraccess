@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestWrapper } from '../../test-utils/wrappers';
 import type { UpdateStatusDto } from '@attraccess/react-query-client';
 import { DISMISSED_VERSION_STORAGE_KEY } from './storage';
-import { UpdateNotificationBanner } from './index';
+import { UpdateNotificationBanner, buildUpdateDocsPath } from './index';
+
+let mockLanguage: 'en' | 'de' = 'en';
 
 vi.mock('@attraccess/plugins-frontend-ui', () => {
   const translations: Record<string, string> = {
@@ -32,7 +34,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => {
 
   const tExists = (key: string) => Boolean(translations[key]);
 
-  return { useTranslations: () => ({ t, tExists, language: 'en', setLanguage: vi.fn() }) };
+  return { useTranslations: () => ({ t, tExists, language: mockLanguage, setLanguage: vi.fn() }) };
 });
 
 vi.mock('react-markdown', () => ({
@@ -93,6 +95,7 @@ describe('UpdateNotificationBanner', () => {
     localStorage.clear();
     hasPermissionMock = vi.fn((permission: string) => permission === 'canManageSystemConfiguration');
     updateStatusValue = undefined;
+    mockLanguage = 'en';
   });
 
   afterEach(() => {
@@ -174,7 +177,7 @@ describe('UpdateNotificationBanner', () => {
     expect(localStorage.getItem(DISMISSED_VERSION_STORAGE_KEY)).toBe('0.1.2');
   });
 
-  it('renders the "How to update" button as a link to the updating docs', () => {
+  it('renders the "How to update" button as a link to the English updating docs when UI is English', () => {
     updateStatusValue = buildStatus();
 
     render(<UpdateNotificationBanner />, { wrapper: TestWrapper });
@@ -184,6 +187,16 @@ describe('UpdateNotificationBanner', () => {
     expect(howToUpdate).toHaveAttribute('href', '/docs/#/en/installation/updating');
     expect(howToUpdate).toHaveAttribute('target', '_blank');
     expect(howToUpdate?.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('routes the "How to update" link to the German docs when UI language is German', () => {
+    mockLanguage = 'de';
+    updateStatusValue = buildStatus();
+
+    render(<UpdateNotificationBanner />, { wrapper: TestWrapper });
+
+    const howToUpdate = screen.getByText('How to update').closest('a');
+    expect(howToUpdate).toHaveAttribute('href', '/docs/#/de/installation/updating');
   });
 
   it('opens a modal with the release notes when "View release notes" is clicked', async () => {
@@ -235,5 +248,31 @@ describe('UpdateNotificationBanner', () => {
       'https://github.com/Attraccess/Attraccess/releases/tag/v0.1.2',
     );
     expect(tagLink).toHaveAttribute('target', '_blank');
+  });
+});
+
+describe('buildUpdateDocsPath', () => {
+  it('returns the EN path for "en"', () => {
+    expect(buildUpdateDocsPath('en')).toBe('/docs/#/en/installation/updating');
+  });
+
+  it('returns the DE path for "de"', () => {
+    expect(buildUpdateDocsPath('de')).toBe('/docs/#/de/installation/updating');
+  });
+
+  it('lower-cases the language tag before matching', () => {
+    expect(buildUpdateDocsPath('DE')).toBe('/docs/#/de/installation/updating');
+  });
+
+  it('falls back to EN for an unsupported language', () => {
+    expect(buildUpdateDocsPath('fr')).toBe('/docs/#/en/installation/updating');
+  });
+
+  it('falls back to EN for undefined', () => {
+    expect(buildUpdateDocsPath(undefined)).toBe('/docs/#/en/installation/updating');
+  });
+
+  it('falls back to EN for an empty string', () => {
+    expect(buildUpdateDocsPath('')).toBe('/docs/#/en/installation/updating');
   });
 });

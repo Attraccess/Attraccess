@@ -12,23 +12,31 @@ import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
+import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { readDismissedVersion, writeDismissedVersion } from './storage';
 import en from './en.json';
 import de from './de.json';
 
-export const UPDATE_DOCS_PATH = '/docs/#/en/installation/updating';
-export const UPDATE_STATUS_STALE_MS = 60 * 60 * 1000;
+const SUPPORTED_DOC_LANGUAGES = new Set(['en', 'de']);
+const DEFAULT_DOC_LANGUAGE = 'en';
+
+export function buildUpdateDocsPath(language: string | undefined): string {
+  const normalized = language?.toLowerCase() ?? '';
+  const lang = SUPPORTED_DOC_LANGUAGES.has(normalized) ? normalized : DEFAULT_DOC_LANGUAGE;
+  return `/docs/#/${lang}/installation/updating`;
+}
 
 export function UpdateNotificationBanner() {
-  const { t } = useTranslations({ en, de });
+  const { t, language } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canSeeBanner = hasPermission('canManageSystemConfiguration');
+  const updateDocsPath = buildUpdateDocsPath(language);
 
   const { data: updateStatus } = useSystemServiceGetUpdateStatus({}, undefined, {
     enabled: canSeeBanner,
-    staleTime: UPDATE_STATUS_STALE_MS,
-    refetchInterval: UPDATE_STATUS_STALE_MS,
+    staleTime: UPDATE_CHECK_CACHE_TTL_MS,
+    refetchInterval: UPDATE_CHECK_CACHE_TTL_MS,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -88,7 +96,7 @@ export function UpdateNotificationBanner() {
               color="primary"
               endContent={<ExternalLink size={14} />}
               as="a"
-              href={UPDATE_DOCS_PATH}
+              href={updateDocsPath}
               target="_blank"
               rel="noopener noreferrer"
             >

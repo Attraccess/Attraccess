@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import * as semver from 'semver';
+import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { AppConfigType } from '../config/app.config';
 import { ReleaseDto } from './dto/release.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -18,7 +19,6 @@ export interface GithubReleaseApiResponse {
 }
 
 export const GITHUB_RELEASES_URL = 'https://api.github.com/repos/Attraccess/Attraccess/releases';
-export const UPDATE_CHECK_CACHE_TTL_MS = 60 * 60 * 1000;
 export const GITHUB_REQUEST_TIMEOUT_MS = 10 * 1000;
 
 interface CacheEntry {
