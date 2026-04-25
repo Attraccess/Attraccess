@@ -44,8 +44,8 @@ importers:
         specifier: 3.12.1
         version: 3.12.1
       '@khmyznikov/pwa-install':
-        specifier: ^0.5.5
-        version: 0.5.5(@lit/react@1.0.7(@types/react@19.2.14))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)
+        specifier: ^0.6.0
+        version: 0.6.3(@lit/react@1.0.7(@types/react@19.2.14))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)
       '@licenso/client':
         specifier: ^1.2.0
         version: 1.2.0
@@ -3693,13 +3693,13 @@ packages:
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
 
-  '@khmyznikov/pwa-install@0.5.5':
-    resolution: {integrity: sha512-yVOJd5Y0cr+fA37FZ+76zLRv9vuB0l1mBbxb78Z0EH7isHAfzwkWv+DI31AnP8SAwP9oe5yZf9dIhakxfkWVYg==}
+  '@khmyznikov/pwa-install@0.6.3':
+    resolution: {integrity: sha512-1GoPVcltXCZgXa7kovAYqodSWNmUW26RaNoF6KbSGfEZ6r6OLwHrUm/+vYFlDUBaIgYHo5Xi301bN4mG51KZRA==}
     peerDependencies:
-      '@lit/react': ^1.0.7
+      '@lit/react': ^1.0.8
       '@types/dom-chromium-installation-events': ^101.0.4
       '@types/web-app-manifest': ^1.0.9
-      lit: ^3.3.0
+      lit: ^3.3.1
 
   '@kwsites/file-exists@1.1.1':
     resolution: {integrity: sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw==}
@@ -20539,7 +20539,7 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@khmyznikov/pwa-install@0.5.5(@lit/react@1.0.7(@types/react@19.2.14))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)':
+  '@khmyznikov/pwa-install@0.6.3(@lit/react@1.0.7(@types/react@19.2.14))(@types/dom-chromium-installation-events@101.0.4)(@types/web-app-manifest@1.0.9)(lit@3.3.0)':
     dependencies:
       '@lit/react': 1.0.7(@types/react@19.2.14)
       '@types/dom-chromium-installation-events': 101.0.4
