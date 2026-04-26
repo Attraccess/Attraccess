@@ -188,13 +188,33 @@
     }
   },
   "release": {
-    "git": {
-      "commitMessage": "chore(release): {version} [skip ci]"
-    },
+    "projects": [
+      "api",
+      "frontend",
+      "api-client",
+      "database-entities",
+      "env",
+      "plugins-backend-sdk",
+      "plugins-frontend-sdk",
+      "plugins-frontend-ui",
+      "react-query-client",
+      "@attraccess/source"
+    ],
+    "projectsRelationship": "fixed",
     "version": {
-      "conventionalCommits": true
+      "conventionalCommits": true,
+      "fallbackCurrentVersionResolver": "disk",
+      "git": {
+        "commit": true,
+        "tag": true,
+        "commitMessage": "chore(release): {version} [skip ci]"
+      }
     },
     "changelog": {
+      "git": {
+        "commit": false,
+        "tag": false
+      },
       "workspaceChangelog": {
         "createRelease": "github"
       }

@@ -1,0 +1,10 @@
+{
+  "title": "A new Attraccess release is available",
+  "versionSummary": "Running {{current}} · Latest {{latest}}",
+  "viewReleaseNotes": "View release notes",
+  "howToUpdate": "How to update",
+  "dismissThisVersion": "Dismiss for this version",
+  "releaseNotesModalTitle": "Release notes for {{version}}",
+  "releaseNotesFallback": "No release notes provided.",
+  "close": "Close"
+}

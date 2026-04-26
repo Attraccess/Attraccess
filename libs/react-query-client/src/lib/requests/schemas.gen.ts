@@ -3045,6 +3045,7 @@ export const $GetActiveUsageSessionDto = {
         usage: {
             description: 'The active usage session or null if none exists',
             nullable: true,
+            type: 'object',
             allOf: [
                 {
                     '$ref': '#/components/schemas/ResourceUsage'
@@ -3912,11 +3913,6 @@ export const $SumUpReaderStatus = {
     enum: ['unknown', 'processing', 'paired', 'expired']
 } as const;
 
-export const $SumUpReaderModel = {
-    type: 'string',
-    enum: ['solo', 'virtual-solo']
-} as const;
-
 export const $SumUpReaderDevice = {
     type: 'object',
     properties: {
@@ -3925,12 +3921,9 @@ export const $SumUpReaderDevice = {
             example: '1234567890'
         },
         model: {
+            type: 'string',
             example: 'solo',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumUpReaderModel'
-                }
-            ]
+            enum: ['solo', 'virtual-solo']
         }
     },
     required: ['identifier', 'model']
@@ -4008,18 +4001,6 @@ export const $SumupTopUpDto = {
     required: ['amount', 'readerId']
 } as const;
 
-export const $SumupTransactionEventType = {
-    type: 'string',
-    enum: ['solo.transaction.updated'],
-    description: 'The type of the transaction'
-} as const;
-
-export const $SumupTransactionStatus = {
-    type: 'string',
-    enum: ['successful', 'failed'],
-    description: 'The status of the transaction'
-} as const;
-
 export const $Payload = {
     type: 'object',
     properties: {
@@ -4034,13 +4015,10 @@ export const $Payload = {
             example: 'MPMGEBZF'
         },
         status: {
+            type: 'string',
             description: 'The status of the transaction',
             example: 'successful',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumupTransactionStatus'
-                }
-            ]
+            enum: ['successful', 'failed']
         },
         transaction_id: {
             type: 'string',
@@ -4060,13 +4038,10 @@ export const $SumupTransactionCallbackDto = {
             example: '1234567890'
         },
         event_type: {
+            type: 'string',
             description: 'The type of the transaction',
             example: 'solo.transaction.updated',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/SumupTransactionEventType'
-                }
-            ]
+            enum: ['solo.transaction.updated']
         },
         payload: {
             description: 'The payload of the transaction',
@@ -5148,6 +5123,94 @@ export const $UpdateFormDto = {
         }
     },
     required: ['name', 'isRequiredOnResourceUsageStart', 'isRequiredOnResourceUsageTakeOver', 'isRequiredOnResourceUsageEnd', 'fields']
+} as const;
+
+export const $VersionInfoDto = {
+    type: 'object',
+    properties: {
+        version: {
+            type: 'string',
+            description: 'The currently running Attraccess version (semver, without a leading "v")',
+            example: '0.0.16'
+        }
+    },
+    required: ['version']
+} as const;
+
+export const $ReleaseDto = {
+    type: 'object',
+    properties: {
+        version: {
+            type: 'string',
+            description: 'Release version (semver, without a leading "v")',
+            example: '0.1.2'
+        },
+        tagName: {
+            type: 'string',
+            description: 'Release tag name as published on GitHub',
+            example: 'v0.1.2'
+        },
+        name: {
+            type: 'string',
+            description: 'Human-readable release title',
+            example: 'v0.1.2 – Bug fixes'
+        },
+        body: {
+            type: 'string',
+            description: 'Release notes body as Markdown',
+            example: `## Changes
+- Fixed X`
+        },
+        htmlUrl: {
+            type: 'string',
+            description: 'URL of the GitHub release page',
+            example: 'https://github.com/Attraccess/Attraccess/releases/tag/v0.1.2'
+        },
+        publishedAt: {
+            type: 'string',
+            description: 'ISO-8601 timestamp when the release was published',
+            example: '2026-04-20T12:34:56Z'
+        }
+    },
+    required: ['version', 'tagName', 'name', 'body', 'htmlUrl', 'publishedAt']
+} as const;
+
+export const $UpdateStatusDto = {
+    type: 'object',
+    properties: {
+        currentVersion: {
+            type: 'string',
+            description: 'The currently running Attraccess version',
+            example: '0.0.16'
+        },
+        latestVersion: {
+            type: 'string',
+            description: 'The highest version available on GitHub, or null when the check failed',
+            example: '0.1.2',
+            nullable: true
+        },
+        isUpdateAvailable: {
+            type: 'boolean',
+            description: 'True when the latest release on GitHub is strictly newer than the running version',
+            example: true
+        },
+        checkSucceeded: {
+            type: 'boolean',
+            description: 'True when the update check succeeded. False means the GitHub API call failed (network, rate limit, etc.)',
+            example: true
+        },
+        latestRelease: {
+            description: 'The latest release details. Null when the check failed or no release exists.',
+            nullable: true,
+            type: 'object',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ReleaseDto'
+                }
+            ]
+        }
+    },
+    required: ['currentVersion', 'isUpdateAvailable', 'checkSucceeded']
 } as const;
 
 export const $PluginMainFrontend = {

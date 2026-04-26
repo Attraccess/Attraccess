@@ -2,6 +2,25 @@ import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import { LogLevel } from '@nestjs/common';
 
+const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
+
+export const BUILD_TIME_VERSION: string | undefined = process.env.ATTRACCESS_VERSION;
+
+export function resolveAppVersion(
+  env: NodeJS.ProcessEnv = process.env,
+  buildTimeVersion: string | undefined = BUILD_TIME_VERSION,
+): string {
+  const candidates = [buildTimeVersion, env.ATTRACCESS_VERSION, env.npm_package_version];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (trimmed.length === 0) continue;
+    if (PLACEHOLDER_VERSIONS.has(trimmed)) continue;
+    return trimmed;
+  }
+  return '0.0.0-dev';
+}
+
 const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -22,7 +41,7 @@ const AppEnvSchema = z
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
-    VERSION: z.string().default(process.env.npm_package_version || '1.0.0'),
+    VERSION: z.string().default(resolveAppVersion()),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
     PLUGIN_DIR: z.string().optional(),

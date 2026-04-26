@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
+import { UpdateNotificationBanner } from '../../components/UpdateNotificationBanner';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -78,6 +79,9 @@ export function Layout({ children, noLayout }: LayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <Header toggleSidebar={toggleSidebar} />
+
+        {/* Update notification banner (admins only) */}
+        <UpdateNotificationBanner />
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-4">{children}</main>
