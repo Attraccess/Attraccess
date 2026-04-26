@@ -45,6 +45,7 @@ interface FlowContextType {
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;
   copySelectedNodes: () => Promise<void>;
+  cutSelectedNodes: () => Promise<void>;
   pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
 }
 
@@ -147,6 +148,19 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     await navigator.clipboard.writeText(JSON.stringify(clipboardData));
   }, [nodes, edges]);
 
+  const cutSelectedNodes = useCallback(async () => {
+    const clipboardData = buildClipboardData(nodes, edges);
+    if (!clipboardData) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(clipboardData));
+    } catch {
+      return;
+    }
+    const removedIds = new Set(clipboardData.nodes.map((n) => n.id));
+    setNodes((prev) => prev.filter((n) => !removedIds.has(n.id)));
+    setEdges((prev) => prev.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target)));
+  }, [nodes, edges, setNodes, setEdges]);
+
   const pasteNodes = useCallback(
     async (targetFlowPosition?: { x: number; y: number }) => {
       const text = await navigator.clipboard.readText().catch(() => '');
@@ -181,6 +195,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       removeLiveLogReceiver,
       flowNodeTypes,
       copySelectedNodes,
+      cutSelectedNodes,
       pasteNodes,
     }),
     [
@@ -203,6 +218,7 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       removeLiveLogReceiver,
       flowNodeTypes,
       copySelectedNodes,
+      cutSelectedNodes,
       pasteNodes,
     ],
   );

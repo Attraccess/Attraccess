@@ -155,6 +155,7 @@ function FlowsPageInner() {
     removeLiveLogReceiver,
     flowNodeTypes,
     copySelectedNodes,
+    cutSelectedNodes,
     pasteNodes,
   } = useFlowContext();
 
@@ -308,6 +309,8 @@ function FlowsPageInner() {
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && e.key === 'c') {
         copySelectedNodes();
+      } else if (isMod && e.key === 'x') {
+        cutSelectedNodes();
       } else if (isMod && e.key === 'v') {
         const targetFlowPosition = mousePosRef.current ? screenToFlowPosition(mousePosRef.current) : undefined;
         pasteNodes(targetFlowPosition);
@@ -318,7 +321,7 @@ function FlowsPageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [copySelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
+  }, [copySelectedNodes, cutSelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
 
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
