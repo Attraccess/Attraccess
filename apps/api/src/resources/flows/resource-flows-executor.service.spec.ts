@@ -17,6 +17,7 @@ import { FlowConfigType } from './flow.config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
+import { ResourceHealthService } from '../health/resource-health.service';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -48,6 +49,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
+  let resourceHealthService: ResourceHealthService;
 
   // Dynamic stores per test
   let nodesById: Record<string, ResourceFlowNode>;
@@ -122,6 +124,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     eventEmitter = new EventEmitter2();
 
+    resourceHealthService = {
+      reportHealth: jest.fn(async () => undefined),
+      isResourceUnhealthy: jest.fn(async () => false),
+      listForResource: jest.fn(async () => []),
+      getSummary: jest.fn(async () => ({ resourceId: 1, isHealthy: true, entries: [], unhealthyEntries: [] })),
+    } as unknown as ResourceHealthService;
+
     const billingItemRepoMock = {
       manager: {
         findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
@@ -141,6 +150,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       resourceUsageService,
       billingItemRepoMock,
       eventEmitter,
+      resourceHealthService,
     );
   });
 
@@ -500,6 +510,285 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(updatedActivity).toBeInstanceOf(Date);
     expect(updatedActivity.getTime()).toBeGreaterThan(tenMinutesAgo.getTime());
   });
+
+  describe('health nodes', () => {
+    it('reports healthy when heartbeat output node fires and stores last seen timestamp', async () => {
+      const resourceId = 11;
+      const inputNode = createNode({ id: 'in-hb', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const heartbeatNode = createNode({
+        id: 'heartbeat-1',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        resourceId,
+        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[heartbeatNode.id] = heartbeatNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: heartbeatNode.id }];
+      edgesBySourceAndHandle[`${heartbeatNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId,
+          identifier: 'Shelly',
+          status: 'healthy',
+          source: 'heartbeat',
+        }),
+      );
+
+      const lastSeen = service.getHeartbeatLastSeen(resourceId, 'Shelly');
+      expect(lastSeen).toBeInstanceOf(Date);
+    });
+
+    it('SET node sets unhealthy from static config with templated reason', async () => {
+      const resourceId = 12;
+      const inputNode = createNode({ id: 'in-set-1', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-1',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: 'Internal', status: 'unhealthy', reason: 'temp={{temp}}' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, { temp: 91 });
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId,
+          identifier: 'Internal',
+          status: 'unhealthy',
+          reason: 'temp=91',
+          source: 'manual',
+        }),
+      );
+    });
+
+    it('SET node sets healthy from static config and clears reason', async () => {
+      const resourceId = 13;
+      const inputNode = createNode({ id: 'in-set-h', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-h',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: '', status: 'healthy', reason: '' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId,
+          identifier: '',
+          status: 'healthy',
+          reason: null,
+          source: 'manual',
+        }),
+      );
+    });
+
+    it('SET node payload health.status overrides static status and switches source to payload', async () => {
+      const resourceId = 14;
+      const inputNode = createNode({ id: 'in-set-ovs', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-ovs',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: 'Shelly', status: 'healthy', reason: 'fallback' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+        health: { status: 'unhealthy', reason: 'lost wifi' },
+      });
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId,
+          identifier: 'Shelly',
+          status: 'unhealthy',
+          reason: 'lost wifi',
+          source: 'payload',
+        }),
+      );
+    });
+
+    it('SET node payload health.identifier overrides static identifier', async () => {
+      const resourceId = 15;
+      const inputNode = createNode({ id: 'in-set-id', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-id',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: 'StaticId', status: 'unhealthy', reason: 'static reason' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+        health: { identifier: 'PayloadId' },
+      });
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identifier: 'PayloadId',
+          status: 'unhealthy',
+        }),
+      );
+    });
+
+    it('SET node uses static reason when payload reason absent', async () => {
+      const resourceId = 16;
+      const inputNode = createNode({ id: 'in-set-sr', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-sr',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: '', status: 'unhealthy', reason: 'static fallback' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {});
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'unhealthy',
+          reason: 'static fallback',
+          source: 'manual',
+        }),
+      );
+    });
+
+    it('SET node throws on invalid payload status', async () => {
+      const resourceId = 17;
+      const inputNode = createNode({ id: 'in-set-bad', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId });
+      const setNode = createNode({
+        id: 'set-bad',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+        resourceId,
+        data: { identifier: '', status: 'healthy', reason: '' },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await expect(
+        service.runFlow(resourceId, ResourceFlowNodeType.INPUT_BUTTON, {
+          health: { status: 'maybe' },
+        }),
+      ).rejects.toThrow(/expected "healthy" or "unhealthy"/);
+    });
+
+    it('triggers heartbeat unhealthy report when timeout elapsed', async () => {
+      const resourceId = 18;
+      const heartbeatNode = createNode({
+        id: 'hb-timeout',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        resourceId,
+        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+      });
+
+      (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+
+      const heartbeatLastSeen = (service as unknown as { heartbeatLastSeen: Map<string, Date> }).heartbeatLastSeen;
+      heartbeatLastSeen.set(`${resourceId}::Shelly`, new Date(Date.now() - 5 * 60 * 1000));
+
+      await service.checkHealthHeartbeats();
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resourceId,
+          identifier: 'Shelly',
+          status: 'unhealthy',
+          reason: 'no signal',
+          source: 'heartbeat',
+        }),
+      );
+    });
+
+    it('does not trigger heartbeat unhealthy when within timeout', async () => {
+      const resourceId = 19;
+      const heartbeatNode = createNode({
+        id: 'hb-fresh',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        resourceId,
+        data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
+      });
+
+      (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+
+      const heartbeatLastSeen = (service as unknown as { heartbeatLastSeen: Map<string, Date> }).heartbeatLastSeen;
+      heartbeatLastSeen.set(`${resourceId}::`, new Date(Date.now() - 10 * 1000));
+
+      await service.checkHealthHeartbeats();
+
+      expect(resourceHealthService.reportHealth).not.toHaveBeenCalled();
+    });
+
+    it('initialises last-seen on first heartbeat tick when not previously set', async () => {
+      const resourceId = 20;
+      const heartbeatNode = createNode({
+        id: 'hb-firsttick',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        resourceId,
+        data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
+      });
+
+      (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+
+      await service.checkHealthHeartbeats();
+
+      expect(resourceHealthService.reportHealth).not.toHaveBeenCalled();
+      expect(service.getHeartbeatLastSeen(resourceId, '')).toBeInstanceOf(Date);
+    });
+
+    it('uses default reason when unhealthyReason is blank on heartbeat timeout', async () => {
+      const resourceId = 21;
+      const heartbeatNode = createNode({
+        id: 'hb-default-reason',
+        type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
+        resourceId,
+        data: { identifier: '', timeoutSeconds: 30, unhealthyReason: '' },
+      });
+
+      (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+
+      const heartbeatLastSeen = (service as unknown as { heartbeatLastSeen: Map<string, Date> }).heartbeatLastSeen;
+      heartbeatLastSeen.set(`${resourceId}::`, new Date(Date.now() - 5 * 60 * 1000));
+
+      await service.checkHealthHeartbeats();
+
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'Heartbeat timed out',
+        }),
+      );
+    });
+  });
 });
 
 describe('ResourceFlowsExecutorService MQTT', () => {
@@ -512,6 +801,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
+  let resourceHealthService: ResourceHealthService;
 
   let nodesById: Record<string, ResourceFlowNode>;
   let initialNodes: ResourceFlowNode[];
@@ -579,6 +869,13 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     } as unknown as ResourceUsageService;
     eventEmitter = new EventEmitter2();
 
+    resourceHealthService = {
+      reportHealth: jest.fn(async () => undefined),
+      isResourceUnhealthy: jest.fn(async () => false),
+      listForResource: jest.fn(async () => []),
+      getSummary: jest.fn(async () => ({ resourceId: 1, isHealthy: true, entries: [], unhealthyEntries: [] })),
+    } as unknown as ResourceHealthService;
+
     const billingItemRepoMock = {
       manager: {
         findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
@@ -598,6 +895,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       resourceUsageService,
       billingItemRepoMock,
       eventEmitter,
+      resourceHealthService,
     );
   });
 

@@ -14,6 +14,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Resource } from '@attraccess/database-entities';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
+import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
 import { ApiTags } from '@nestjs/swagger';
 
 interface MessageEvent {
@@ -132,5 +133,23 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     subject.next({ data: eventData });
 
     this.logger.debug(`Emitted ${ResourceUsageEvent.EVENT_NAME} event for resource ${resource.id}`);
+  }
+
+  @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
+  handleResourceHealthChanged(event: ResourceHealthChangedEvent) {
+    if (!this.resourceSubjects.has(event.resourceId)) {
+      return;
+    }
+    const subject = this.resourceSubjects.get(event.resourceId);
+    subject.next({
+      data: {
+        eventType: ResourceHealthChangedEvent.EVENT_NAME,
+        resourceId: event.resourceId,
+        identifier: event.identifier,
+        status: event.status,
+        reason: event.reason,
+        previousStatus: event.previousStatus,
+      },
+    });
   }
 }

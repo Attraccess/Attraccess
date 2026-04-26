@@ -23,6 +23,8 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSetNodeDataSchema,
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
@@ -422,6 +424,22 @@ export class ResourceFlowsService {
           schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema);
           schema.inputs = ['input'];
           schema.supportedByResource = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+          schema.configSchema = z.toJSONSchema(ResourceHealthHeartbeatNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+          schema.configSchema = z.toJSONSchema(ResourceHealthSetNodeDataSchema);
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
+          schema.supportedByResource = true;
+          schema.isOutput = true;
           break;
 
         default: {

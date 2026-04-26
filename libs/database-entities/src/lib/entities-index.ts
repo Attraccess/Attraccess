@@ -37,7 +37,15 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSetNodeDataSchema,
+  HealthStateOptionEnum,
 } from './entities/resourceFlowNode';
+import {
+  ResourceHealthState,
+  ResourceHealthStatus,
+  ResourceHealthSource,
+} from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
@@ -128,6 +136,12 @@ export {
   ResourceFormAction,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSetNodeDataSchema,
+  HealthStateOptionEnum,
+  ResourceHealthState,
+  ResourceHealthStatus,
+  ResourceHealthSource,
 };
 
 // Export the entities object
@@ -166,4 +180,5 @@ export const entities = {
   Form,
   FormField,
   FormSubmission,
+  ResourceHealthState,
 };

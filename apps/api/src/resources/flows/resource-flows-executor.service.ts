@@ -32,6 +32,11 @@ import {
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSetNodeDataSchema,
+  ResourceHealthSource,
+  ResourceHealthStatus,
+  HealthStateOptionEnum,
 } from '@attraccess/database-entities';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
@@ -50,6 +55,7 @@ import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FlowExecutionError } from './errors/flow-execution.error';
+import { ResourceHealthService } from '../health/resource-health.service';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -106,6 +112,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   private keepAliveInterval: NodeJS.Timeout;
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
+  private readonly heartbeatLastSeen: Map<string, Date> = new Map();
 
   public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
 
@@ -125,6 +132,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     @InjectRepository(BillingTransactionItem)
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly resourceHealthService: ResourceHealthService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -552,6 +560,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           };
           break;
 
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+          responseOfNode = await this.processHeartbeatNode(node, input);
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+          responseOfNode = await this.processHealthSetNode(node, input);
+          break;
+
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
           responseOfNode = await this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
           break;
@@ -926,6 +942,141 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   public trackResourceActivity(resourceId: number) {
     this.resourceActivity.set(resourceId, new Date());
+  }
+
+  private heartbeatKey(resourceId: number, identifier: string): string {
+    return `${resourceId}::${identifier}`;
+  }
+
+  public getHeartbeatLastSeen(resourceId: number, identifier: string): Date | undefined {
+    return this.heartbeatLastSeen.get(this.heartbeatKey(resourceId, identifier));
+  }
+
+  private async processHeartbeatNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
+    if (!parsed.success) {
+      this.logger.warn(`Heartbeat node ${node.id} has invalid data: ${parsed.error.message}`);
+      return { payload: input };
+    }
+    const normalizedIdentifier = (parsed.data.identifier ?? '').trim();
+    const now = new Date();
+
+    this.heartbeatLastSeen.set(this.heartbeatKey(node.resourceId, normalizedIdentifier), now);
+
+    await this.resourceHealthService.reportHealth({
+      resourceId: node.resourceId,
+      identifier: normalizedIdentifier,
+      status: ResourceHealthStatus.HEALTHY,
+      reason: null,
+      source: ResourceHealthSource.HEARTBEAT,
+      reportedAt: now,
+    });
+
+    return { payload: input };
+  }
+
+  private async processHealthSetNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const parsed = ResourceHealthSetNodeDataSchema.safeParse(node.data ?? {});
+    if (!parsed.success) {
+      throw new FlowExecutionError(`Invalid health-set node data: ${parsed.error.message}`);
+    }
+
+    const identifierFromPayload = get(input, 'health.identifier') as unknown;
+    const identifierOverride =
+      typeof identifierFromPayload === 'string' && identifierFromPayload.length > 0 ? identifierFromPayload : null;
+    const identifier = identifierOverride ?? this.compileTemplate(parsed.data.identifier ?? '', input);
+
+    const statusFromPayload = get(input, 'health.status') as unknown;
+    const statusOverride =
+      typeof statusFromPayload === 'string' && statusFromPayload.length > 0 ? statusFromPayload : null;
+    const statusCandidate = statusOverride ?? parsed.data.status;
+    const statusEnum = HealthStateOptionEnum.safeParse(statusCandidate);
+    if (!statusEnum.success) {
+      throw new FlowExecutionError(
+        `Invalid health-set status "${String(statusCandidate)}"; expected "healthy" or "unhealthy"`,
+      );
+    }
+    const status =
+      statusEnum.data === 'healthy' ? ResourceHealthStatus.HEALTHY : ResourceHealthStatus.UNHEALTHY;
+
+    const reasonFromPayload = get(input, 'health.reason') as unknown;
+    const reasonOverride =
+      typeof reasonFromPayload === 'string' && reasonFromPayload.length > 0 ? reasonFromPayload : null;
+    const reasonCandidate = reasonOverride ?? this.compileTemplate(parsed.data.reason ?? '', input);
+
+    await this.resourceHealthService.reportHealth({
+      resourceId: node.resourceId,
+      identifier,
+      status,
+      reason: status === ResourceHealthStatus.UNHEALTHY ? reasonCandidate : null,
+      source: statusOverride !== null ? ResourceHealthSource.PAYLOAD : ResourceHealthSource.MANUAL,
+    });
+
+    return { payload: input };
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  public async checkHealthHeartbeats() {
+    const heartbeatNodes = await this.flowNodeRepository.find({
+      where: { type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT },
+    });
+
+    const validKeys = new Set<string>();
+    for (const node of heartbeatNodes) {
+      const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
+      if (!parsed.success) {
+        continue;
+      }
+      validKeys.add(this.heartbeatKey(node.resourceId, (parsed.data.identifier ?? '').trim()));
+    }
+
+    for (const key of this.heartbeatLastSeen.keys()) {
+      if (!validKeys.has(key)) {
+        this.heartbeatLastSeen.delete(key);
+      }
+    }
+
+    if (heartbeatNodes.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+
+    await Promise.all(
+      heartbeatNodes.map(async (node) => {
+        const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
+        if (!parsed.success) {
+          this.logger.warn(`Skipping heartbeat node ${node.id} with invalid data: ${parsed.error.message}`);
+          return;
+        }
+
+        const identifier = (parsed.data.identifier ?? '').trim();
+        const timeoutMs = parsed.data.timeoutSeconds * 1000;
+        const lastSeen = this.heartbeatLastSeen.get(this.heartbeatKey(node.resourceId, identifier));
+
+        if (!lastSeen) {
+          this.heartbeatLastSeen.set(this.heartbeatKey(node.resourceId, identifier), now);
+          return;
+        }
+
+        const elapsed = now.getTime() - lastSeen.getTime();
+        if (elapsed < timeoutMs) {
+          return;
+        }
+
+        const reasonTemplate = (parsed.data.unhealthyReason ?? '').trim();
+        const reason = reasonTemplate.length > 0 ? reasonTemplate : 'Heartbeat timed out';
+
+        await this.resourceHealthService.reportHealth({
+          resourceId: node.resourceId,
+          identifier,
+          status: ResourceHealthStatus.UNHEALTHY,
+          reason,
+          source: ResourceHealthSource.HEARTBEAT,
+          reportedAt: now,
+        });
+      }),
+    );
   }
 
   private async processActivityTrackActivityNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {

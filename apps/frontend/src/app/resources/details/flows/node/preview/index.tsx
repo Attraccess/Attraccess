@@ -141,6 +141,30 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
         return [];
 
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+        return [
+          {
+            label: t('nodes.output.resource.health.heartbeat.preview.identifier'),
+            value: (nodeData?.data.identifier as string) || '-',
+          },
+          {
+            label: t('nodes.output.resource.health.heartbeat.preview.timeoutSeconds'),
+            value: String(nodeData?.data.timeoutSeconds ?? ''),
+          },
+        ];
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+        return [
+          {
+            label: t('nodes.output.resource.health.set.preview.identifier'),
+            value: (nodeData?.data.identifier as string) || '-',
+          },
+          {
+            label: t('nodes.output.resource.health.set.preview.status'),
+            value: (nodeData?.data.status as string) ?? '',
+          },
+        ];
+
       default: {
         const exhaustiveCheck: never = schema.type;
         throw new Error(`Unknown node type: ${exhaustiveCheck}`);

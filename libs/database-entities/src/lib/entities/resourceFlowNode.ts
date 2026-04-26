@@ -24,6 +24,8 @@ export enum ResourceFlowNodeType {
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
   PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
   PROCESSING_ERROR = 'processing.error',
+  OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
+  OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set',
 }
 
 // Zod schemas for node data validation
@@ -139,6 +141,42 @@ export const ResourceUsageEndSessionNodeDataSchema = z
   })
   .optional();
 
+export const HealthStateOptionEnum = z.enum(['healthy', 'unhealthy']);
+
+export const ResourceHealthHeartbeatNodeDataSchema = z.object({
+  identifier: z.string().optional().default('').meta({
+    helpText:
+      'Optional label identifying which subsystem reports this heartbeat (e.g. "Shelly"). Leave empty for the resource default.',
+  }),
+  timeoutSeconds: z
+    .number()
+    .int()
+    .positive()
+    .describe('If no heartbeat is received within this many seconds, the resource is marked unhealthy'),
+  unhealthyReason: z.string().optional().default('').meta({
+    helpText: 'Reason recorded when the heartbeat times out (e.g. "no heartbeat received")',
+  }),
+});
+
+export const ResourceHealthSetNodeDataSchema = z.object({
+  identifier: z.string().optional().default('').meta({
+    overrideWithInput: 'health.identifier',
+    helpText:
+      'Optional label identifying which subsystem this state refers to (e.g. "Shelly"). Overridable via payload path "health.identifier".',
+  }),
+  status: HealthStateOptionEnum.meta({
+    overrideWithInput: 'health.status',
+    helpText:
+      'Static status for this node. Overridable via payload path "health.status" (must be "healthy" or "unhealthy").',
+  }),
+  reason: z.string().optional().default('').meta({
+    overrideWithInput: 'health.reason',
+    helpText:
+      'Optional reason shown to users when unhealthy. Templates allowed. Overridable via payload path "health.reason".',
+    stringVariant: 'multiline',
+  }),
+});
+
 // Helper function to get the appropriate schema for a node type
 export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
   switch (nodeType) {
@@ -189,6 +227,12 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
       return ResourceActivityTrackActivityNodeDataSchema;
 
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+      return ResourceHealthHeartbeatNodeDataSchema;
+
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+      return ResourceHealthSetNodeDataSchema;
+
     default: {
       const exhaustiveCheck: never = nodeType;
       throw new Error(`Unknown node type: ${exhaustiveCheck}`);
@@ -222,8 +266,7 @@ export class ResourceFlowNode {
   id!: string;
 
   @Column({
-    type: 'simple-enum',
-    enum: ResourceFlowNodeType,
+    type: 'varchar',
   })
   @ApiProperty({
     description: 'The type of the node',

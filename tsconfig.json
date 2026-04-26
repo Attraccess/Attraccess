@@ -12,5 +12,11 @@
     "experimentalDecorators": true,
     "sourceMap": true,
     "ignoreDeprecations": "6.0"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "types": ["node", "jest"]
+    }
   }
 }

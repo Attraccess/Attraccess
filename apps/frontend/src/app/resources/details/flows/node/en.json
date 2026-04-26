@@ -388,6 +388,44 @@
               "output": "Output"
             }
           }
+        },
+        "health": {
+          "heartbeat": {
+            "title": "Health heartbeat",
+            "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "preview": {
+              "identifier": "Identifier",
+              "timeoutSeconds": "Timeout (s)"
+            },
+            "config": {
+              "identifier": { "label": "Identifier (optional)" },
+              "timeoutSeconds": { "label": "Timeout (seconds)" },
+              "unhealthyReason": { "label": "Reason on timeout (optional)" }
+            }
+          },
+          "set": {
+            "title": "Set health state",
+            "description": "Sets the resource health state. Static config values can be overridden by payload fields (health.identifier, health.status, health.reason).",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" },
+            "preview": {
+              "identifier": "Identifier",
+              "status": "Status"
+            },
+            "config": {
+              "identifier": { "label": "Identifier (optional)" },
+              "status": {
+                "label": "Status",
+                "enum": {
+                  "healthy": "Healthy",
+                  "unhealthy": "Unhealthy"
+                }
+              },
+              "reason": { "label": "Reason (optional, templates allowed)" }
+            }
+          }
         }
       }
     }

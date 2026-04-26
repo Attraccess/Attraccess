@@ -4090,7 +4090,7 @@ export const $RefundTransactionDto = {
 
 export const $ResourceFlowNodeType = {
     type: 'string',
-    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error'],
+    enum: ['input.button', 'input.resource.usage.started', 'input.resource.usage.stopped', 'input.resource.usage.takeover', 'input.resource.door.unlocked', 'input.resource.door.locked', 'input.resource.door.unlatched', 'input.mqtt.message.received', 'input.resource.activity.no-activity', 'output.http.sendRequest', 'output.mqtt.sendMessage', 'output.resource.billing.calculation.set-additional-items', 'output.resource.usage.end-session', 'output.resource.activity.track-activity', 'processing.wait', 'processing.if', 'processing.set-payload', 'processing.mqtt.waitForMessage', 'processing.error', 'output.resource.health.heartbeat', 'output.resource.health.set'],
     description: 'The name of the node type'
 } as const;
 
@@ -4554,6 +4554,93 @@ export const $ResourceFlowNode = {
         }
     },
     required: ['id', 'type', 'position', 'data', 'resourceId']
+} as const;
+
+export const $ResourceHealthStatus = {
+    type: 'string',
+    enum: ['healthy', 'unhealthy']
+} as const;
+
+export const $ResourceHealthSource = {
+    type: 'string',
+    enum: ['payload', 'heartbeat', 'manual']
+} as const;
+
+export const $ResourceHealthStateDto = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The health record id',
+            example: 1
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The resource ID this state belongs to',
+            example: 1
+        },
+        identifier: {
+            type: 'string',
+            description: 'Identifier for the source reporting health (empty for the resource default).',
+            example: 'Shelly'
+        },
+        status: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceHealthStatus'
+                }
+            ]
+        },
+        reason: {
+            type: 'string',
+            nullable: true,
+            example: 'not connected'
+        },
+        source: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceHealthSource'
+                }
+            ]
+        },
+        lastReportedAt: {
+            type: 'string',
+            description: 'When the state was last reported',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'resourceId', 'identifier', 'status', 'source', 'lastReportedAt']
+} as const;
+
+export const $ResourceHealthSummaryDto = {
+    type: 'object',
+    properties: {
+        resourceId: {
+            type: 'number',
+            description: 'The resource ID',
+            example: 1
+        },
+        isHealthy: {
+            type: 'boolean',
+            description: 'Whether the resource is currently considered healthy',
+            example: true
+        },
+        entries: {
+            description: 'Individual health state entries (one per identifier). Empty if no entries exist yet.',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceHealthStateDto'
+            }
+        },
+        unhealthyEntries: {
+            description: 'Subset of entries that are unhealthy (convenience for clients showing warnings).',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceHealthStateDto'
+            }
+        }
+    },
+    required: ['resourceId', 'isHealthy', 'entries', 'unhealthyEntries']
 } as const;
 
 export const $ProjectAccessInfoDto = {
