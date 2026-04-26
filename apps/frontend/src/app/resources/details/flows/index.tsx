@@ -300,6 +300,10 @@ function FlowsPageInner() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || target?.closest('input, textarea, select, [contenteditable="true"]')) {
+        return;
+      }
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && e.key === 'c') {
         copySelectedNodes();
