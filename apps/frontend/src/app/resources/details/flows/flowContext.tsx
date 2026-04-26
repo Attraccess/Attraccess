@@ -45,7 +45,7 @@ interface FlowContextType {
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;
   copySelectedNodes: () => Promise<void>;
-  pasteNodes: () => Promise<void>;
+  pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -147,15 +147,18 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     await navigator.clipboard.writeText(JSON.stringify(clipboardData));
   }, [nodes, edges]);
 
-  const pasteNodes = useCallback(async () => {
-    const text = await navigator.clipboard.readText().catch(() => '');
-    const clipboardData = parseClipboardData(text);
-    if (!clipboardData) return;
+  const pasteNodes = useCallback(
+    async (targetFlowPosition?: { x: number; y: number }) => {
+      const text = await navigator.clipboard.readText().catch(() => '');
+      const clipboardData = parseClipboardData(text);
+      if (!clipboardData) return;
 
-    const { nodes: newNodes, edges: newEdges } = buildPastedElements(clipboardData, nanoid);
-    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
-    setEdges((prev) => [...prev, ...newEdges]);
-  }, [setNodes, setEdges]);
+      const { nodes: newNodes, edges: newEdges } = buildPastedElements(clipboardData, nanoid, 50, targetFlowPosition);
+      setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
+      setEdges((prev) => [...prev, ...newEdges]);
+    },
+    [setNodes, setEdges],
+  );
 
   const value: FlowContextType = useMemo(
     () => ({

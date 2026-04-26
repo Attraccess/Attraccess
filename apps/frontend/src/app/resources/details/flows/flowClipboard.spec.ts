@@ -218,3 +218,82 @@ describe('buildPastedElements', () => {
     expect(result.nodes[0].type).toBe('mqtt-publish');
   });
 });
+
+describe('buildPastedElements with targetPosition', () => {
+  let idCounter: number;
+  const generateId = () => `new-${++idCounter}`;
+
+  beforeEach(() => {
+    idCounter = 0;
+  });
+
+  it('places single-node centroid at the target position', () => {
+    const data: FlowClipboardData = {
+      type: CLIPBOARD_TYPE,
+      nodes: [makeNode('a', { position: { x: 100, y: 200 } })],
+      edges: [],
+    };
+    const result = buildPastedElements(data, generateId, 50, { x: 500, y: 600 });
+    expect(result.nodes[0].position).toEqual({ x: 500, y: 600 });
+  });
+
+  it('places multi-node group centroid at the target position', () => {
+    const data: FlowClipboardData = {
+      type: CLIPBOARD_TYPE,
+      nodes: [
+        makeNode('a', { position: { x: 100, y: 200 } }),
+        makeNode('b', { position: { x: 300, y: 400 } }),
+      ],
+      edges: [],
+    };
+    const result = buildPastedElements(data, generateId, 50, { x: 500, y: 500 });
+    expect(result.nodes[0].position).toEqual({ x: 400, y: 400 });
+    expect(result.nodes[1].position).toEqual({ x: 600, y: 600 });
+  });
+
+  it('preserves relative spacing between nodes', () => {
+    const data: FlowClipboardData = {
+      type: CLIPBOARD_TYPE,
+      nodes: [
+        makeNode('a', { position: { x: 0, y: 0 } }),
+        makeNode('b', { position: { x: 200, y: 100 } }),
+        makeNode('c', { position: { x: 50, y: 300 } }),
+      ],
+      edges: [],
+    };
+    const result = buildPastedElements(data, generateId, 50, { x: 1000, y: 1000 });
+    const dx = result.nodes[1].position.x - result.nodes[0].position.x;
+    const dy = result.nodes[1].position.y - result.nodes[0].position.y;
+    expect(dx).toBe(200);
+    expect(dy).toBe(100);
+    const dx2 = result.nodes[2].position.x - result.nodes[0].position.x;
+    const dy2 = result.nodes[2].position.y - result.nodes[0].position.y;
+    expect(dx2).toBe(50);
+    expect(dy2).toBe(300);
+  });
+
+  it('still remaps edges when target position is provided', () => {
+    const data: FlowClipboardData = {
+      type: CLIPBOARD_TYPE,
+      nodes: [
+        makeNode('a', { position: { x: 100, y: 100 } }),
+        makeNode('b', { position: { x: 300, y: 300 } }),
+      ],
+      edges: [makeEdge('e1', 'a', 'b')],
+    };
+    const result = buildPastedElements(data, generateId, 50, { x: 0, y: 0 });
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].source).toBe('new-1');
+    expect(result.edges[0].target).toBe('new-2');
+  });
+
+  it('falls back to legacy offset when target position is omitted', () => {
+    const data: FlowClipboardData = {
+      type: CLIPBOARD_TYPE,
+      nodes: [makeNode('a', { position: { x: 100, y: 200 } })],
+      edges: [],
+    };
+    const result = buildPastedElements(data, generateId, 50);
+    expect(result.nodes[0].position).toEqual({ x: 150, y: 250 });
+  });
+});

@@ -44,14 +44,26 @@ export function buildPastedElements(
   clipboardData: FlowClipboardData,
   generateId: () => string,
   offset = 50,
+  targetPosition?: { x: number; y: number },
 ): PasteResult {
   const idMap = new Map<string, string>();
   clipboardData.nodes.forEach((n) => idMap.set(n.id, generateId()));
 
+  let dx = offset;
+  let dy = offset;
+  if (targetPosition && clipboardData.nodes.length > 0) {
+    const xs = clipboardData.nodes.map((n) => n.position.x);
+    const ys = clipboardData.nodes.map((n) => n.position.y);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    dx = targetPosition.x - centerX;
+    dy = targetPosition.y - centerY;
+  }
+
   const nodes: Node[] = clipboardData.nodes.map(({ measured, dragging, ...n }) => ({
     ...n,
     id: idMap.get(n.id) ?? generateId(),
-    position: { x: n.position.x + offset, y: n.position.y + offset },
+    position: { x: n.position.x + dx, y: n.position.y + dy },
     selected: true,
   }));
 

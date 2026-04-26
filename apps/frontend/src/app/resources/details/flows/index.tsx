@@ -13,7 +13,7 @@ import {
   useResourceFlowsServiceSaveResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
@@ -140,7 +140,8 @@ function FlowsPageInner() {
     },
   });
 
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const {
     nodes,
     edges,
@@ -308,7 +309,8 @@ function FlowsPageInner() {
       if (isMod && e.key === 'c') {
         copySelectedNodes();
       } else if (isMod && e.key === 'v') {
-        pasteNodes();
+        const targetFlowPosition = mousePosRef.current ? screenToFlowPosition(mousePosRef.current) : undefined;
+        pasteNodes(targetFlowPosition);
       } else if (isMod && e.key === 'a') {
         e.preventDefault();
         setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
@@ -316,7 +318,7 @@ function FlowsPageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [copySelectedNodes, pasteNodes, setNodes]);
+  }, [copySelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
 
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
@@ -341,7 +343,12 @@ function FlowsPageInner() {
         backTo={`/resources/${resourceId}`}
       />
 
-      <div className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div
+        className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
+        onMouseMove={(e) => {
+          mousePosRef.current = { x: e.clientX, y: e.clientY };
+        }}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edgesWithCorrectType}
