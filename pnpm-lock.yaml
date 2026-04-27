@@ -236,8 +236,8 @@ importers:
         specifier: ^5.12.1
         version: 5.15.1
       nanoid:
-        specifier: ^3.3.11
-        version: 3.3.11
+        specifier: ^5.1.9
+        version: 5.1.9
       new-github-issue-url:
         specifier: ^1.1.0
         version: 1.1.0
@@ -12441,11 +12441,6 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nanoid@5.1.5:
-    resolution: {integrity: sha512-Ir/+ZpE9fDsNH0hQ3C68uyThDXzYcim2EqcZ8zn8Chtt1iylPT9xXJB0kPCnqzgcEGikO9RxSrh63MsmVCU7Fw==}
-    engines: {node: ^18 || >=20}
-    hasBin: true
-
   nanoid@5.1.9:
     resolution: {integrity: sha512-ZUvP7KeBLe3OZ1ypw6dI/TzYJuvHP77IM4Ry73waSQTLn8/g8rpdjfyVAh7t1/+FjBtG4lCP42MEbDxOsRpBMw==}
     engines: {node: ^18 || >=20}
@@ -20290,7 +20285,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.5
+      nanoid: 5.1.9
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -20309,7 +20304,7 @@ snapshots:
       faster-babel-types: 0.1.0(@babel/types@7.26.0)
       hono: 4.12.14
       isomorphic-fetch: 3.0.0(encoding@0.1.13)
-      nanoid: 5.1.5
+      nanoid: 5.1.9
       ohash: 1.1.4
       pako: 2.1.0
       pathe: 1.1.2
@@ -32151,8 +32146,6 @@ snapshots:
       thunky: 1.1.0
 
   nanoid@3.3.11: {}
-
-  nanoid@5.1.5: {}
 
   nanoid@5.1.9: {}
 
