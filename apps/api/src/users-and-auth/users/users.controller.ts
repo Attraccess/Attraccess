@@ -378,8 +378,16 @@ export class UsersController {
     status: 400,
     description: 'Invalid input data.',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).',
+  })
   async createOne(@Body() body: CreateUserDto): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
+
+    if (body.overwriteFirstTimeAdmin) {
+      await this.ensureFirstTimeSetupIncompleteAndDeleteAdmin();
+    }
 
     const signupDomainWhitelist = await this.getLocalSignupDomainWhitelist();
 
@@ -431,6 +439,22 @@ export class UsersController {
 
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
     return user;
+  }
+
+  private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {
+    const totalUsers = await this.usersService.countUsers();
+    if (totalUsers !== 1) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    const { data: firstPage } = await this.usersService.findMany({ page: 1, limit: 1 });
+    const existingAdmin = firstPage[0];
+    if (!existingAdmin || existingAdmin.isEmailVerified) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
+    await this.usersService.deleteOne(existingAdmin.id);
   }
 
   @Post('/invite')

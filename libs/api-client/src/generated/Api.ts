@@ -42,22 +42,6 @@ export enum ResourceFlowNodeType {
   ProcessingError = "processing.error",
 }
 
-/** The status of the transaction */
-export enum SumupTransactionStatus {
-  Successful = "successful",
-  Failed = "failed",
-}
-
-/** The type of the transaction */
-export enum SumupTransactionEventType {
-  SoloTransactionUpdated = "solo.transaction.updated",
-}
-
-export enum SumUpReaderModel {
-  Solo = "solo",
-  VirtualSolo = "virtual-solo",
-}
-
 export enum SumUpReaderStatus {
   Unknown = "unknown",
   Processing = "processing",
@@ -201,6 +185,11 @@ export interface CreateUserDto {
    * @example "local_password"
    */
   strategy: AuthenticationType;
+  /**
+   * When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.
+   * @example false
+   */
+  overwriteFirstTimeAdmin?: boolean;
 }
 
 export interface SystemPermissions {
@@ -1221,6 +1210,11 @@ export interface FirstTimeSetupStepsDto {
    * @example false
    */
   admin: boolean;
+  /**
+   * Whether the first admin user has verified their email. False during the unverified-admin limbo state.
+   * @example false
+   */
+  adminEmailVerified: boolean;
 }
 
 export interface FirstTimeSetupStatusDto {
@@ -1231,6 +1225,18 @@ export interface FirstTimeSetupStatusDto {
   available: boolean;
   /** Which wizard steps are already completed. Used to open the first incomplete step. */
   stepsCompleted: FirstTimeSetupStepsDto;
+}
+
+export interface MetricsSettingsDto {
+  /** Whether a metrics API key is configured */
+  apiKeyConfigured: boolean;
+}
+
+export interface GenerateMetricsApiKeyResponseDto {
+  /** Whether a metrics API key is configured */
+  apiKeyConfigured: boolean;
+  /** The generated API key (shown only once) */
+  apiKey: string;
 }
 
 export interface LicenseDataDto {
@@ -2565,7 +2571,7 @@ export interface SumUpReaderDevice {
   /** @example "1234567890" */
   identifier: string;
   /** @example "solo" */
-  model: SumUpReaderModel;
+  model: "solo" | "virtual-solo";
 }
 
 export interface SumUpReaderDto {
@@ -2622,7 +2628,7 @@ export interface Payload {
    * The status of the transaction
    * @example "successful"
    */
-  status: SumupTransactionStatus;
+  status: "successful" | "failed";
   /**
    * The ID of the transaction
    * @example "8f0973dc-60df-4a8c-80ee-a06103c1d10e"
@@ -2640,7 +2646,7 @@ export interface SumupTransactionCallbackDto {
    * The type of the transaction
    * @example "solo.transaction.updated"
    */
-  event_type: SumupTransactionEventType;
+  event_type: "solo.transaction.updated";
   /**
    * The payload of the transaction
    * @example {"client_transaction_id":"1234567890","merchant_code":"MPMGEBZF","status":"successful","transaction_id":"8f0973dc-60df-4a8c-80ee-a06103c1d10e"}
@@ -3212,6 +3218,73 @@ export interface UpdateFormDto {
   fields: UpdateFormFieldDto[];
 }
 
+export interface VersionInfoDto {
+  /**
+   * The currently running Attraccess version (semver, without a leading "v")
+   * @example "0.0.16"
+   */
+  version: string;
+}
+
+export interface ReleaseDto {
+  /**
+   * Release version (semver, without a leading "v")
+   * @example "0.1.2"
+   */
+  version: string;
+  /**
+   * Release tag name as published on GitHub
+   * @example "v0.1.2"
+   */
+  tagName: string;
+  /**
+   * Human-readable release title
+   * @example "v0.1.2 – Bug fixes"
+   */
+  name: string;
+  /**
+   * Release notes body as Markdown
+   * @example "## Changes
+   * - Fixed X"
+   */
+  body: string;
+  /**
+   * URL of the GitHub release page
+   * @example "https://github.com/Attraccess/Attraccess/releases/tag/v0.1.2"
+   */
+  htmlUrl: string;
+  /**
+   * ISO-8601 timestamp when the release was published
+   * @example "2026-04-20T12:34:56Z"
+   */
+  publishedAt: string;
+}
+
+export interface UpdateStatusDto {
+  /**
+   * The currently running Attraccess version
+   * @example "0.0.16"
+   */
+  currentVersion: string;
+  /**
+   * The highest version available on GitHub, or null when the check failed
+   * @example "0.1.2"
+   */
+  latestVersion?: string | null;
+  /**
+   * True when the latest release on GitHub is strictly newer than the running version
+   * @example true
+   */
+  isUpdateAvailable: boolean;
+  /**
+   * True when the update check succeeded. False means the GitHub API call failed (network, rate limit, etc.)
+   * @example true
+   */
+  checkSucceeded: boolean;
+  /** The latest release details. Null when the check failed or no release exists. */
+  latestRelease?: ReleaseDto | null;
+}
+
 export interface PluginMainFrontend {
   /**
    * The directory of the plugins frontend files
@@ -3603,6 +3676,10 @@ export type AcceptInvitationData = User;
 
 export type RequestPasswordResetData = any;
 
+export interface ChangePasswordViaResetTokenParams {
+  userId: number;
+}
+
 export type ChangePasswordViaResetTokenData = any;
 
 export type GetCurrentData = User;
@@ -3615,13 +3692,29 @@ export type ChangeMyUsernameData = User;
 
 export type ChangeMyEmailData = User;
 
+export interface GetOneUserByIdParams {
+  id: number;
+}
+
 export type GetOneUserByIdData = User;
 
 export type GetOneUserByIdError = UserNotFoundException;
 
+export interface DeleteUserParams {
+  id: number;
+}
+
 export type DeleteUserData = any;
 
+export interface UpdatePermissionsParams {
+  id: number;
+}
+
 export type UpdatePermissionsData = User;
+
+export interface GetPermissionsParams {
+  id: number;
+}
 
 export type GetPermissionsData = SystemPermissions;
 
@@ -3638,14 +3731,30 @@ export interface GetAllWithPermissionParams {
 
 export type GetAllWithPermissionData = PaginatedUsersResponseDto;
 
+export interface SetUserPasswordParams {
+  id: number;
+}
+
 export interface SetUserPasswordData {
   /** @example "Password updated successfully" */
   message?: string;
 }
 
+export interface ChangeUserUsernameParams {
+  id: number;
+}
+
 export type ChangeUserUsernameData = User;
 
+export interface ChangeUserEmailParams {
+  id: number;
+}
+
 export type ChangeUserEmailData = User;
+
+export interface ChangeUserBillingFactorParams {
+  id: number;
+}
 
 export type ChangeUserBillingFactorData = User;
 
@@ -3687,9 +3796,24 @@ export interface LinkUserToExternalAccountData {
   OK?: boolean;
 }
 
+export interface GetOneSsoProviderByIdParams {
+  /** The ID of the SSO provider */
+  id: number;
+}
+
 export type GetOneSsoProviderByIdData = SSOProvider;
 
+export interface UpdateOneSsoProviderParams {
+  /** The ID of the SSO provider */
+  id: number;
+}
+
 export type UpdateOneSsoProviderData = SSOProvider;
+
+export interface DeleteOneSsoProviderParams {
+  /** The ID of the SSO provider */
+  id: number;
+}
 
 export type DeleteOneSsoProviderData = any;
 
@@ -3711,24 +3835,54 @@ export interface DiscoverKeycloakOidcParams {
 
 export type DiscoverKeycloakOidcData = any;
 
+export interface SsoOidcLogoutParams {
+  /** The ID of the SSO provider */
+  providerId: string;
+}
+
 export interface SsoOidcLogoutData {
   OK?: boolean;
+}
+
+export interface SsoSamlLogoutParams {
+  /** The ID of the SSO provider */
+  providerId: string;
 }
 
 export interface SsoSamlLogoutData {
   OK?: boolean;
 }
 
+export interface SsoOidcDeleteUserParams {
+  /** The ID of the SSO provider */
+  providerId: string;
+}
+
 export interface SsoOidcDeleteUserData {
   OK?: boolean;
+}
+
+export interface SsoSamlDeleteUserParams {
+  /** The ID of the SSO provider */
+  providerId: string;
 }
 
 export interface SsoSamlDeleteUserData {
   OK?: boolean;
 }
 
+export interface SsoOidcUpdatePermissionsParams {
+  /** The ID of the SSO provider */
+  providerId: string;
+}
+
 export interface SsoOidcUpdatePermissionsData {
   OK?: boolean;
+}
+
+export interface SsoSamlUpdatePermissionsParams {
+  /** The ID of the SSO provider */
+  providerId: string;
 }
 
 export interface SsoSamlUpdatePermissionsData {
@@ -3778,7 +3932,17 @@ export type EmailTemplateControllerPreviewMjmlData = PreviewMjmlResponseDto;
 
 export type EmailTemplateControllerFindAllData = EmailTemplate[];
 
+export interface EmailTemplateControllerFindOneParams {
+  /** Template type/type */
+  type: EmailTemplateType;
+}
+
 export type EmailTemplateControllerFindOneData = EmailTemplate;
+
+export interface EmailTemplateControllerUpdateParams {
+  /** Template type/type */
+  type: EmailTemplateType;
+}
 
 export type EmailTemplateControllerUpdateData = EmailTemplate;
 
@@ -3789,6 +3953,12 @@ export type UpdateSystemSettingsData = SystemSettingsDto;
 export type GetFirstTimeSetupStatusData = FirstTimeSetupStatusDto;
 
 export type ApplyFirstTimeSetupSettingsData = SystemSettingsDto;
+
+export type GetMetricsSettingsData = MetricsSettingsDto;
+
+export type GenerateMetricsApiKeyData = GenerateMetricsApiKeyResponseDto;
+
+export type DeleteMetricsApiKeyData = MetricsSettingsDto;
 
 export type GetLicenseInformationData = LicenseDataDto;
 
@@ -3823,9 +3993,21 @@ export type GetAllResourcesData = PaginatedResourceResponseDto;
 
 export type GetAllResourcesInUseData = Resource[];
 
+export interface GetOneResourceByIdParams {
+  id: number;
+}
+
 export type GetOneResourceByIdData = Resource;
 
+export interface UpdateOneResourceParams {
+  id: number;
+}
+
 export type UpdateOneResourceData = Resource;
+
+export interface DeleteOneResourceParams {
+  id: number;
+}
 
 export type DeleteOneResourceData = any;
 
@@ -3833,11 +4015,27 @@ export type MqttServersGetAllData = MqttServer[];
 
 export type MqttServersCreateOneData = MqttServer;
 
+export interface MqttServersGetOneByIdParams {
+  id: number;
+}
+
 export type MqttServersGetOneByIdData = MqttServer;
+
+export interface MqttServersUpdateOneParams {
+  id: number;
+}
 
 export type MqttServersUpdateOneData = MqttServer;
 
+export interface MqttServersDeleteOneParams {
+  id: number;
+}
+
 export type MqttServersDeleteOneData = any;
+
+export interface SseControllerStreamEventsParams {
+  resourceId: number;
+}
 
 export type SseControllerStreamEventsData = any;
 
@@ -3845,45 +4043,151 @@ export type ResourceGroupsCreateOneData = ResourceGroup;
 
 export type ResourceGroupsGetManyData = ResourceGroup[];
 
+export interface ResourceGroupsGetOneParams {
+  /** The ID of the resource group */
+  id: number;
+}
+
 export type ResourceGroupsGetOneData = ResourceGroup;
+
+export interface ResourceGroupsUpdateOneParams {
+  /** The ID of the resource group */
+  id: number;
+}
 
 export type ResourceGroupsUpdateOneData = ResourceGroup;
 
+export interface ResourceGroupsAddResourceParams {
+  /** The ID of the resource group */
+  groupId: number;
+  /** The ID of the resource */
+  resourceId: number;
+}
+
 export type ResourceGroupsAddResourceData = any;
+
+export interface ResourceGroupsRemoveResourceParams {
+  /** The ID of the resource group */
+  groupId: number;
+  /** The ID of the resource */
+  resourceId: number;
+}
 
 export type ResourceGroupsRemoveResourceData = any;
 
+export interface ResourceGroupsDeleteOneParams {
+  /** The ID of the resource group */
+  groupId: number;
+}
+
 export type ResourceGroupsDeleteOneData = any;
 
+export interface ResourceGroupIntroductionsGetManyParams {
+  /** The ID of the resource group */
+  groupId: number;
+}
+
 export type ResourceGroupIntroductionsGetManyData = ResourceIntroduction[];
+
+export interface ResourceGroupIntroductionsGetHistoryParams {
+  /** The ID of the resource group */
+  groupId: number;
+  /** The ID of the user */
+  userId: number;
+}
 
 export type ResourceGroupIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
 
+export interface ResourceGroupIntroductionsGrantParams {
+  /** The ID of the resource group */
+  groupId: number;
+  /** The ID of the user */
+  userId: number;
+}
+
 export type ResourceGroupIntroductionsGrantData =
   ResourceIntroductionHistoryItem;
+
+export interface ResourceGroupIntroductionsRevokeParams {
+  /** The ID of the resource group */
+  groupId: number;
+  /** The ID of the user */
+  userId: number;
+}
 
 export type ResourceGroupIntroductionsRevokeData =
   ResourceIntroductionHistoryItem;
 
+export interface ResourceGroupIntroducersGetManyParams {
+  /** The ID of the resource group */
+  groupId: number;
+}
+
 export type ResourceGroupIntroducersGetManyData = ResourceIntroducer[];
+
+export interface ResourceGroupIntroducersIsIntroducerParams {
+  /** The ID of the user */
+  userId: number;
+  /** The ID of the resource group */
+  groupId: number;
+}
 
 export type ResourceGroupIntroducersIsIntroducerData =
   IsResourceGroupIntroducerResponseDto;
 
+export interface ResourceGroupIntroducersGrantParams {
+  /** The ID of the user */
+  userId: number;
+  /** The ID of the resource group */
+  groupId: number;
+}
+
 export type ResourceGroupIntroducersGrantData = any;
+
+export interface ResourceGroupIntroducersRevokeParams {
+  /** The ID of the user */
+  userId: number;
+  /** The ID of the resource group */
+  groupId: number;
+}
 
 export type ResourceGroupIntroducersRevokeData = any;
 
+export interface ResourceUsageStartSessionParams {
+  resourceId: number;
+}
+
 export type ResourceUsageStartSessionData = ResourceUsage;
+
+export interface ResourceUsageEndSessionParams {
+  resourceId: number;
+}
 
 export type ResourceUsageEndSessionData = ResourceUsage;
 
+export interface ResourceUsageUpdateSessionProjectParams {
+  resourceId: number;
+  usageId: number;
+}
+
 export type ResourceUsageUpdateSessionProjectData = ResourceUsage;
+
+export interface LockDoorParams {
+  resourceId: number;
+}
 
 export type LockDoorData = ResourceUsage;
 
+export interface UnlockDoorParams {
+  resourceId: number;
+}
+
 export type UnlockDoorData = ResourceUsage;
+
+export interface UnlatchDoorParams {
+  resourceId: number;
+}
 
 export type UnlatchDoorData = ResourceUsage;
 
@@ -3908,7 +4212,15 @@ export interface ResourceUsageGetHistoryParams {
 
 export type ResourceUsageGetHistoryData = GetResourceHistoryResponseDto;
 
+export interface ResourceUsageGetActiveSessionParams {
+  resourceId: number;
+}
+
 export type ResourceUsageGetActiveSessionData = GetActiveUsageSessionDto;
+
+export interface ResourceUsageCanControlParams {
+  resourceId: number;
+}
 
 export type ResourceUsageCanControlData = CanControlResponseDto;
 
@@ -3921,22 +4233,67 @@ export interface ResourceIntroducersIsIntroducerParams {
 export type ResourceIntroducersIsIntroducerData =
   IsResourceIntroducerResponseDto;
 
+export interface ResourceIntroducersGetManyParams {
+  resourceId: number;
+}
+
 export type ResourceIntroducersGetManyData = ResourceIntroducer[];
+
+export interface ResourceIntroducersGrantParams {
+  resourceId: number;
+  userId: number;
+}
 
 export type ResourceIntroducersGrantData = ResourceIntroducer;
 
+export interface ResourceIntroducersRevokeParams {
+  resourceId: number;
+  userId: number;
+}
+
 export type ResourceIntroducersRevokeData = any;
+
+export interface ResourceIntroductionsGetManyParams {
+  resourceId: number;
+}
 
 export type ResourceIntroductionsGetManyData = ResourceIntroduction[];
 
+export interface ResourceIntroductionsGrantParams {
+  resourceId: number;
+  userId: number;
+}
+
 export type ResourceIntroductionsGrantData = ResourceIntroductionHistoryItem;
 
+export interface ResourceIntroductionsRevokeParams {
+  resourceId: number;
+  userId: number;
+}
+
 export type ResourceIntroductionsRevokeData = ResourceIntroductionHistoryItem;
+
+export interface ResourceIntroductionsGetHistoryParams {
+  /** The ID of the resource */
+  resourceId: number;
+  /** The ID of the user */
+  userId: number;
+}
 
 export type ResourceIntroductionsGetHistoryData =
   ResourceIntroductionHistoryItem[];
 
+export interface CanManageMaintenanceParams {
+  /** The ID of the resource */
+  resourceId: number;
+}
+
 export type CanManageMaintenanceData = CanManageMaintenanceResponseDto;
+
+export interface CreateMaintenanceParams {
+  /** The ID of the resource */
+  resourceId: number;
+}
 
 export type CreateMaintenanceData = ResourceMaintenance;
 
@@ -3977,19 +4334,68 @@ export interface FindMaintenancesParams {
 
 export type FindMaintenancesData = PaginatedMaintenanceResponse;
 
+export interface GetMaintenanceParams {
+  /** The ID of the resource */
+  resourceId: number;
+  /** The ID of the maintenance */
+  maintenanceId: number;
+}
+
 export type GetMaintenanceData = ResourceMaintenance;
+
+export interface FinishMaintenanceParams {
+  /** The ID of the resource */
+  resourceId: number;
+  /** The ID of the maintenance */
+  maintenanceId: number;
+}
 
 export type FinishMaintenanceData = ResourceMaintenance;
 
+export interface FindMaintenanceSchedulesParams {
+  /** Resource ID */
+  resourceId: number;
+}
+
 export type FindMaintenanceSchedulesData = ResourceMaintenanceSchedule[];
+
+export interface CreateMaintenanceScheduleParams {
+  /** Resource ID */
+  resourceId: number;
+}
 
 export type CreateMaintenanceScheduleData = ResourceMaintenanceSchedule;
 
+export interface GetMaintenanceScheduleParams {
+  /** Resource ID */
+  resourceId: number;
+  /** Schedule ID */
+  scheduleId: number;
+}
+
 export type GetMaintenanceScheduleData = ResourceMaintenanceSchedule;
+
+export interface UpdateMaintenanceScheduleParams {
+  /** Resource ID */
+  resourceId: number;
+  /** Schedule ID */
+  scheduleId: number;
+}
 
 export type UpdateMaintenanceScheduleData = ResourceMaintenanceSchedule;
 
+export interface DeleteMaintenanceScheduleParams {
+  /** Resource ID */
+  resourceId: number;
+  /** Schedule ID */
+  scheduleId: number;
+}
+
 export type DeleteMaintenanceScheduleData = any;
+
+export interface GetBillingBalanceParams {
+  userId: number;
+}
 
 export type GetBillingBalanceData = BalanceDto;
 
@@ -4009,12 +4415,29 @@ export interface GetBillingTransactionsParams {
 
 export type GetBillingTransactionsData = TransactionsDto;
 
+export interface CreateManualTransactionParams {
+  userId: number;
+}
+
 export type CreateManualTransactionData = number;
+
+export interface GetBillingTransactionParams {
+  transactionId: number;
+  userId: string;
+}
 
 export type GetBillingTransactionData = BillingTransaction;
 
+export interface GetResourceBillingConfigurationParams {
+  resourceId: number;
+}
+
 export type GetResourceBillingConfigurationData =
   ResourceBillingConfigurationDto;
+
+export interface UpdateResourceBillingConfigurationParams {
+  resourceId: number;
+}
 
 export type UpdateResourceBillingConfigurationData =
   ResourceBillingConfiguration;
@@ -4031,13 +4454,33 @@ export type GetSumUpReadersData = SumUpReaderDto[];
 
 export type PairSumUpReaderData = SumUpReaderDto;
 
+export interface RemoveSumUpReaderParams {
+  readerId: string;
+}
+
 export type TopUpWithSumUpReaderData = BillingTransaction;
 
 export type SumUpTopUpCallbackData = any;
 
+export interface RefundTransactionParams {
+  transactionId: number;
+}
+
 export type RefundTransactionData = BillingTransaction;
 
+export interface GetNodeSchemasParams {
+  resourceId: number;
+}
+
 export type GetNodeSchemasData = ResourceFlowNodeSchemaDto[];
+
+export interface GetResourceFlowParams {
+  /**
+   * The ID of the resource to get the flow for
+   * @example 1
+   */
+  resourceId: number;
+}
 
 export type GetResourceFlowData = ResourceFlowResponseDto;
 
@@ -4047,6 +4490,14 @@ export type GetResourceFlowError = {
   /** @example 404 */
   statusCode?: number;
 };
+
+export interface SaveResourceFlowParams {
+  /**
+   * The ID of the resource to save the flow for
+   * @example 1
+   */
+  resourceId: number;
+}
 
 export type SaveResourceFlowData = ResourceFlowResponseDto;
 
@@ -4094,11 +4545,32 @@ export type GetResourceFlowLogsError = {
   statusCode?: number;
 };
 
+export interface ResourceFlowsControllerStreamEventsParams {
+  resourceId: number;
+}
+
 export type ResourceFlowsControllerStreamEventsData = any;
+
+export interface PressButtonParams {
+  resourceId: number;
+  /**
+   * The ID of the button to press
+   * @example "lsHVcGBwIbOGxez5fBM68"
+   */
+  buttonId: string;
+}
 
 export interface PressButtonData {
   /** @example "OK" */
   message?: string;
+}
+
+export interface GetButtonsParams {
+  /**
+   * The ID of the resource to get buttons for
+   * @example 1
+   */
+  resourceId: number;
 }
 
 export type GetButtonsData = ResourceFlowNode[];
@@ -4126,13 +4598,33 @@ export type FindManyProjectsData = FindManyProjectsResponseDto;
 
 export type CreateProjectData = ProjectWithAccessDto;
 
+export interface FindOneProjectParams {
+  id: number;
+}
+
 export type FindOneProjectData = ProjectWithAccessDto;
+
+export interface DeleteOneProjectParams {
+  id: number;
+}
 
 export type DeleteOneProjectData = any;
 
+export interface UpdateProjectParams {
+  id: number;
+}
+
 export type UpdateProjectData = ProjectWithAccessDto;
 
+export interface ArchiveProjectParams {
+  id: number;
+}
+
 export type ArchiveProjectData = ProjectWithAccessDto;
+
+export interface UnarchiveProjectParams {
+  id: number;
+}
 
 export type UnarchiveProjectData = ProjectWithAccessDto;
 
@@ -4178,25 +4670,68 @@ export interface GetProjectUsageStatsParams {
 
 export type GetProjectUsageStatsData = ProjectUsageStatsDto;
 
+export interface ListProjectMembersParams {
+  id: number;
+}
+
 export type ListProjectMembersData = ProjectMembersResponseDto;
+
+export interface RemoveProjectMemberParams {
+  id: number;
+  memberId: number;
+}
 
 export type RemoveProjectMemberData = any;
 
+export interface ListProjectInvitationsParams {
+  id: number;
+}
+
 export type ListProjectInvitationsData = ProjectInvitation[];
+
+export interface CreateProjectInvitationParams {
+  id: number;
+}
 
 export type CreateProjectInvitationData = ProjectInvitation;
 
+export interface ResendProjectInvitationParams {
+  id: number;
+  invitationId: number;
+}
+
 export type ResendProjectInvitationData = ProjectInvitation;
+
+export interface CancelProjectInvitationParams {
+  id: number;
+  invitationId: number;
+}
 
 export type CancelProjectInvitationData = ProjectInvitation;
 
 export type ListMyProjectInvitationsData = ProjectInvitation[];
 
+export interface AcceptProjectInvitationParams {
+  invitationId: number;
+}
+
 export type AcceptProjectInvitationData = ProjectInvitation;
+
+export interface DeclineProjectInvitationParams {
+  invitationId: number;
+}
 
 export type DeclineProjectInvitationData = ProjectInvitation;
 
+export interface ResourceFormsListParams {
+  resourceId: number;
+}
+
 export type ResourceFormsListData = FormResponseDto[];
+
+export interface ResourceFormsCreateParams {
+  resourceId: number;
+}
 
 export type ResourceFormsCreateData = FormResponseDto;
 
@@ -4208,15 +4743,48 @@ export interface ResourceFormsGetRequirementsParams {
 
 export type ResourceFormsGetRequirementsData = FormResponseDto[];
 
+export interface ResourceFormsGetOneParams {
+  resourceId: number;
+  formId: number;
+}
+
 export type ResourceFormsGetOneData = FormResponseDto;
+
+export interface ResourceFormsUpdateParams {
+  resourceId: number;
+  formId: number;
+}
 
 export type ResourceFormsUpdateData = FormResponseDto;
 
+export interface ResourceFormsDeleteParams {
+  resourceId: number;
+  formId: number;
+}
+
 export type ResourceFormsDeleteData = any;
+
+export type GetCurrentVersionData = VersionInfoDto;
+
+export interface GetUpdateStatusParams {
+  /** Set to "true" or "1" to bypass the 1-hour server-side cache and re-query GitHub immediately. */
+  refresh?: string;
+}
+
+export type GetUpdateStatusData = UpdateStatusDto;
 
 export type GetPluginsData = LoadedPluginManifest[];
 
+export interface GetFrontendPluginFileParams {
+  pluginName: string;
+  filePath: string;
+}
+
 export type GetFrontendPluginFileData = string;
+
+export interface DeletePluginParams {
+  pluginId: string;
+}
 
 export type DeletePluginData = any;
 
@@ -4224,9 +4792,33 @@ export type EnrollNfcCardData = EnrollNfcCardResponseDto;
 
 export type ResetNfcCardData = ResetNfcCardResponseDto;
 
+export interface UpdateReaderParams {
+  /**
+   * The ID of the reader to update
+   * @example 1
+   */
+  readerId: number;
+}
+
 export type UpdateReaderData = UpdateReaderResponseDto;
 
+export interface GetReaderByIdParams {
+  /**
+   * The ID of the reader to get
+   * @example 1
+   */
+  readerId: number;
+}
+
 export type GetReaderByIdData = Attractap;
+
+export interface DeleteReaderParams {
+  /**
+   * The ID of the reader to delete
+   * @example 1
+   */
+  readerId: number;
+}
 
 export type DeleteReaderData = any;
 
@@ -4236,11 +4828,26 @@ export type GetAppKeyByUidData = AppKeyResponseDto;
 
 export type GetAllCardsData = NFCCard[];
 
+export interface ToggleCardActiveParams {
+  id: number;
+}
+
 export type ToggleCardActiveData = NFCCard;
 
 export type GetFirmwaresData = AttractapFirmware[];
 
+export interface DownloadFirmwareBinaryParams {
+  firmwareName: string;
+  variantName: string;
+}
+
 export type DownloadFirmwareBinaryData = string;
+
+export interface GetFirmwareBinaryParams {
+  firmwareName: string;
+  variantName: string;
+  filename: string;
+}
 
 export type GetFirmwareBinaryData = string;
 
@@ -4324,6 +4931,40 @@ export namespace System {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ShutdownHostData;
+  }
+
+  /**
+   * No description
+   * @tags System
+   * @name GetCurrentVersion
+   * @summary Return the currently running Attraccess version
+   * @request GET:/api/version
+   */
+  export namespace GetCurrentVersion {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetCurrentVersionData;
+  }
+
+  /**
+   * @description Compares the currently running version against the highest stable GitHub release. Results are cached for one hour to avoid hitting the GitHub API rate limit.
+   * @tags System
+   * @name GetUpdateStatus
+   * @summary Check whether a newer Attraccess release is available on GitHub
+   * @request GET:/api/version/updates
+   * @secure
+   */
+  export namespace GetUpdateStatus {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** Set to "true" or "1" to bypass the 1-hour server-side cache and re-query GitHub immediately. */
+      refresh?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetUpdateStatusData;
   }
 }
 
@@ -5424,6 +6065,54 @@ export namespace Settings {
     export type RequestBody = UpdateSystemSettingsDto;
     export type RequestHeaders = {};
     export type ResponseBody = ApplyFirstTimeSetupSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GetMetricsSettings
+   * @summary Get metrics settings
+   * @request GET:/api/settings/metrics
+   * @secure
+   */
+  export namespace GetMetricsSettings {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GetMetricsSettingsData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name GenerateMetricsApiKey
+   * @summary Generate a new metrics API key
+   * @request POST:/api/settings/metrics/generate-api-key
+   * @secure
+   */
+  export namespace GenerateMetricsApiKey {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = GenerateMetricsApiKeyData;
+  }
+
+  /**
+   * No description
+   * @tags Settings
+   * @name DeleteMetricsApiKey
+   * @summary Remove the metrics API key
+   * @request DELETE:/api/settings/metrics/api-key
+   * @secure
+   */
+  export namespace DeleteMetricsApiKey {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteMetricsApiKeyData;
   }
 }
 
@@ -7879,6 +8568,7 @@ type CancelToken = Symbol | string | number;
 
 export enum ContentType {
   Json = "application/json",
+  JsonApi = "application/vnd.api+json",
   FormData = "multipart/form-data",
   UrlEncoded = "application/x-www-form-urlencoded",
   Text = "text/plain",
@@ -7945,12 +8635,20 @@ export class HttpClient<SecurityDataType = unknown> {
       input !== null && (typeof input === "object" || typeof input === "string")
         ? JSON.stringify(input)
         : input,
+    [ContentType.JsonApi]: (input: any) =>
+      input !== null && (typeof input === "object" || typeof input === "string")
+        ? JSON.stringify(input)
+        : input,
     [ContentType.Text]: (input: any) =>
       input !== null && typeof input !== "string"
         ? JSON.stringify(input)
         : input,
-    [ContentType.FormData]: (input: any) =>
-      Object.keys(input || {}).reduce((formData, key) => {
+    [ContentType.FormData]: (input: any) => {
+      if (input instanceof FormData) {
+        return input;
+      }
+
+      return Object.keys(input || {}).reduce((formData, key) => {
         const property = input[key];
         formData.append(
           key,
@@ -7961,7 +8659,8 @@ export class HttpClient<SecurityDataType = unknown> {
               : `${property}`,
         );
         return formData;
-      }, new FormData()),
+      }, new FormData());
+    },
     [ContentType.UrlEncoded]: (input: any) => this.toQueryString(input),
   };
 
@@ -8047,13 +8746,14 @@ export class HttpClient<SecurityDataType = unknown> {
             : payloadFormatter(body),
       },
     ).then(async (response) => {
-      const r = response.clone() as HttpResponse<T, E>;
+      const r = response as HttpResponse<T, E>;
       r.data = null as unknown as T;
       r.error = null as unknown as E;
 
+      const responseToParse = responseFormat ? response.clone() : response;
       const data = !responseFormat
         ? r
-        : await response[responseFormat]()
+        : await responseToParse[responseFormat]()
             .then((data) => {
               if (r.ok) {
                 r.data = data;
@@ -8079,7 +8779,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title Attraccess API
- * @version 1.0.0
+ * @version 1.5.2
  * @contact
  *
  * The Attraccess API used to manage machine and tool access in a Makerspace or FabLab
@@ -8135,6 +8835,44 @@ export class Api<
         path: `/api/balena/device/shutdown`,
         method: "POST",
         secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags System
+     * @name GetCurrentVersion
+     * @summary Return the currently running Attraccess version
+     * @request GET:/api/version
+     */
+    getCurrentVersion: (params: RequestParams = {}) =>
+      this.request<GetCurrentVersionData, any>({
+        path: `/api/version`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Compares the currently running version against the highest stable GitHub release. Results are cached for one hour to avoid hitting the GitHub API rate limit.
+     *
+     * @tags System
+     * @name GetUpdateStatus
+     * @summary Check whether a newer Attraccess release is available on GitHub
+     * @request GET:/api/version/updates
+     * @secure
+     */
+    getUpdateStatus: (
+      query: GetUpdateStatusParams,
+      params: RequestParams = {},
+    ) =>
+      this.request<GetUpdateStatusData, void>({
+        path: `/api/version/updates`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
         ...params,
       }),
   };
@@ -8340,7 +9078,7 @@ export class Api<
      * @request POST:/api/users/{userId}/change-password-by-token
      */
     changePasswordViaResetToken: (
-      userId: number,
+      { userId }: ChangePasswordViaResetTokenParams,
       data: ChangePasswordDto,
       params: RequestParams = {},
     ) =>
@@ -8456,7 +9194,10 @@ export class Api<
      * @request GET:/api/users/{id}
      * @secure
      */
-    getOneUserById: (id: number, params: RequestParams = {}) =>
+    getOneUserById: (
+      { id }: GetOneUserByIdParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetOneUserByIdData, GetOneUserByIdError>({
         path: `/api/users/${id}`,
         method: "GET",
@@ -8474,7 +9215,7 @@ export class Api<
      * @request DELETE:/api/users/{id}
      * @secure
      */
-    deleteUser: (id: number, params: RequestParams = {}) =>
+    deleteUser: ({ id }: DeleteUserParams, params: RequestParams = {}) =>
       this.request<DeleteUserData, void>({
         path: `/api/users/${id}`,
         method: "DELETE",
@@ -8492,7 +9233,7 @@ export class Api<
      * @secure
      */
     updatePermissions: (
-      id: number,
+      { id }: UpdatePermissionsParams,
       data: UpdateUserPermissionsDto,
       params: RequestParams = {},
     ) =>
@@ -8515,7 +9256,10 @@ export class Api<
      * @request GET:/api/users/{id}/permissions
      * @secure
      */
-    getPermissions: (id: number, params: RequestParams = {}) =>
+    getPermissions: (
+      { id }: GetPermissionsParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetPermissionsData, void>({
         path: `/api/users/${id}/permissions`,
         method: "GET",
@@ -8579,7 +9323,7 @@ export class Api<
      * @secure
      */
     setUserPassword: (
-      id: number,
+      { id }: SetUserPasswordParams,
       data: SetUserPasswordDto,
       params: RequestParams = {},
     ) =>
@@ -8603,7 +9347,7 @@ export class Api<
      * @secure
      */
     changeUserUsername: (
-      id: number,
+      { id }: ChangeUserUsernameParams,
       data: ChangeUsernameDto,
       params: RequestParams = {},
     ) =>
@@ -8627,7 +9371,7 @@ export class Api<
      * @secure
      */
     changeUserEmail: (
-      id: number,
+      { id }: ChangeUserEmailParams,
       data: ChangeEmailDto,
       params: RequestParams = {},
     ) =>
@@ -8651,7 +9395,7 @@ export class Api<
      * @secure
      */
     changeUserBillingFactor: (
-      id: number,
+      { id }: ChangeUserBillingFactorParams,
       data: ChangeBillingFactorDto,
       params: RequestParams = {},
     ) =>
@@ -8790,7 +9534,10 @@ export class Api<
      * @request GET:/api/auth/sso/providers/{id}
      * @secure
      */
-    getOneSsoProviderById: (id: number, params: RequestParams = {}) =>
+    getOneSsoProviderById: (
+      { id }: GetOneSsoProviderByIdParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetOneSsoProviderByIdData, void>({
         path: `/api/auth/sso/providers/${id}`,
         method: "GET",
@@ -8809,7 +9556,7 @@ export class Api<
      * @secure
      */
     updateOneSsoProvider: (
-      id: number,
+      { id }: UpdateOneSsoProviderParams,
       data: UpdateSSOProviderDto,
       params: RequestParams = {},
     ) =>
@@ -8832,7 +9579,10 @@ export class Api<
      * @request DELETE:/api/auth/sso/providers/{id}
      * @secure
      */
-    deleteOneSsoProvider: (id: number, params: RequestParams = {}) =>
+    deleteOneSsoProvider: (
+      { id }: DeleteOneSsoProviderParams,
+      params: RequestParams = {},
+    ) =>
       this.request<DeleteOneSsoProviderData, void>({
         path: `/api/auth/sso/providers/${id}`,
         method: "DELETE",
@@ -8891,7 +9641,7 @@ export class Api<
      * @request POST:/api/auth/sso/OIDC/{providerId}/logout
      */
     ssoOidcLogout: (
-      providerId: string,
+      { providerId }: SsoOidcLogoutParams,
       data: SSOProvisioningUserDto,
       params: RequestParams = {},
     ) =>
@@ -8913,7 +9663,7 @@ export class Api<
      * @request POST:/api/auth/sso/SAML/{providerId}/logout
      */
     ssoSamlLogout: (
-      providerId: string,
+      { providerId }: SsoSamlLogoutParams,
       data: SSOProvisioningUserDto,
       params: RequestParams = {},
     ) =>
@@ -8935,7 +9685,7 @@ export class Api<
      * @request POST:/api/auth/sso/OIDC/{providerId}/users/delete
      */
     ssoOidcDeleteUser: (
-      providerId: string,
+      { providerId }: SsoOidcDeleteUserParams,
       data: SSOProvisioningUserDto,
       params: RequestParams = {},
     ) =>
@@ -8957,7 +9707,7 @@ export class Api<
      * @request POST:/api/auth/sso/SAML/{providerId}/users/delete
      */
     ssoSamlDeleteUser: (
-      providerId: string,
+      { providerId }: SsoSamlDeleteUserParams,
       data: SSOProvisioningUserDto,
       params: RequestParams = {},
     ) =>
@@ -8979,7 +9729,7 @@ export class Api<
      * @request POST:/api/auth/sso/OIDC/{providerId}/users/permissions
      */
     ssoOidcUpdatePermissions: (
-      providerId: string,
+      { providerId }: SsoOidcUpdatePermissionsParams,
       data: SSOProvisioningPermissionsDto,
       params: RequestParams = {},
     ) =>
@@ -9001,7 +9751,7 @@ export class Api<
      * @request POST:/api/auth/sso/SAML/{providerId}/users/permissions
      */
     ssoSamlUpdatePermissions: (
-      providerId: string,
+      { providerId }: SsoSamlUpdatePermissionsParams,
       data: SSOProvisioningPermissionsDto,
       params: RequestParams = {},
     ) =>
@@ -9261,7 +10011,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerFindOne: (
-      type: EmailTemplateType,
+      { type }: EmailTemplateControllerFindOneParams,
       params: RequestParams = {},
     ) =>
       this.request<EmailTemplateControllerFindOneData, void>({
@@ -9282,7 +10032,7 @@ export class Api<
      * @secure
      */
     emailTemplateControllerUpdate: (
-      type: EmailTemplateType,
+      { type }: EmailTemplateControllerUpdateParams,
       data: UpdateEmailTemplateDto,
       params: RequestParams = {},
     ) =>
@@ -9374,6 +10124,60 @@ export class Api<
         format: "json",
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GetMetricsSettings
+     * @summary Get metrics settings
+     * @request GET:/api/settings/metrics
+     * @secure
+     */
+    getMetricsSettings: (params: RequestParams = {}) =>
+      this.request<GetMetricsSettingsData, void>({
+        path: `/api/settings/metrics`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name GenerateMetricsApiKey
+     * @summary Generate a new metrics API key
+     * @request POST:/api/settings/metrics/generate-api-key
+     * @secure
+     */
+    generateMetricsApiKey: (params: RequestParams = {}) =>
+      this.request<GenerateMetricsApiKeyData, void>({
+        path: `/api/settings/metrics/generate-api-key`,
+        method: "POST",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Settings
+     * @name DeleteMetricsApiKey
+     * @summary Remove the metrics API key
+     * @request DELETE:/api/settings/metrics/api-key
+     * @secure
+     */
+    deleteMetricsApiKey: (params: RequestParams = {}) =>
+      this.request<DeleteMetricsApiKeyData, void>({
+        path: `/api/settings/metrics/api-key`,
+        method: "DELETE",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
   };
   license = {
     /**
@@ -9462,7 +10266,10 @@ export class Api<
      * @request GET:/api/resources/{id}
      * @secure
      */
-    getOneResourceById: (id: number, params: RequestParams = {}) =>
+    getOneResourceById: (
+      { id }: GetOneResourceByIdParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetOneResourceByIdData, void>({
         path: `/api/resources/${id}`,
         method: "GET",
@@ -9481,7 +10288,7 @@ export class Api<
      * @secure
      */
     updateOneResource: (
-      id: number,
+      { id }: UpdateOneResourceParams,
       data: UpdateResourceDto,
       params: RequestParams = {},
     ) =>
@@ -9504,7 +10311,10 @@ export class Api<
      * @request DELETE:/api/resources/{id}
      * @secure
      */
-    deleteOneResource: (id: number, params: RequestParams = {}) =>
+    deleteOneResource: (
+      { id }: DeleteOneResourceParams,
+      params: RequestParams = {},
+    ) =>
       this.request<DeleteOneResourceData, void>({
         path: `/api/resources/${id}`,
         method: "DELETE",
@@ -9520,7 +10330,7 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/events
      */
     sseControllerStreamEvents: (
-      resourceId: number,
+      { resourceId }: SseControllerStreamEventsParams,
       params: RequestParams = {},
     ) =>
       this.request<SseControllerStreamEventsData, any>({
@@ -9576,7 +10386,10 @@ export class Api<
      * @summary Get a resource group by ID
      * @request GET:/api/resource-groups/{id}
      */
-    resourceGroupsGetOne: (id: number, params: RequestParams = {}) =>
+    resourceGroupsGetOne: (
+      { id }: ResourceGroupsGetOneParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ResourceGroupsGetOneData, void>({
         path: `/api/resource-groups/${id}`,
         method: "GET",
@@ -9594,7 +10407,7 @@ export class Api<
      * @secure
      */
     resourceGroupsUpdateOne: (
-      id: number,
+      { id }: ResourceGroupsUpdateOneParams,
       data: UpdateResourceGroupDto,
       params: RequestParams = {},
     ) =>
@@ -9618,8 +10431,7 @@ export class Api<
      * @secure
      */
     resourceGroupsAddResource: (
-      groupId: number,
-      resourceId: number,
+      { groupId, resourceId }: ResourceGroupsAddResourceParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupsAddResourceData, void>({
@@ -9639,8 +10451,7 @@ export class Api<
      * @secure
      */
     resourceGroupsRemoveResource: (
-      groupId: number,
-      resourceId: number,
+      { groupId, resourceId }: ResourceGroupsRemoveResourceParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupsRemoveResourceData, void>({
@@ -9659,7 +10470,10 @@ export class Api<
      * @request DELETE:/api/resource-groups/{groupId}
      * @secure
      */
-    resourceGroupsDeleteOne: (groupId: number, params: RequestParams = {}) =>
+    resourceGroupsDeleteOne: (
+      { groupId }: ResourceGroupsDeleteOneParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ResourceGroupsDeleteOneData, void>({
         path: `/api/resource-groups/${groupId}`,
         method: "DELETE",
@@ -9677,7 +10491,7 @@ export class Api<
      * @secure
      */
     resourceUsageStartSession: (
-      resourceId: number,
+      { resourceId }: ResourceUsageStartSessionParams,
       data: StartUsageSessionDto,
       params: RequestParams = {},
     ) =>
@@ -9701,7 +10515,7 @@ export class Api<
      * @secure
      */
     resourceUsageEndSession: (
-      resourceId: number,
+      { resourceId }: ResourceUsageEndSessionParams,
       data: EndUsageSessionDto,
       params: RequestParams = {},
     ) =>
@@ -9725,8 +10539,7 @@ export class Api<
      * @secure
      */
     resourceUsageUpdateSessionProject: (
-      resourceId: number,
-      usageId: number,
+      { resourceId, usageId }: ResourceUsageUpdateSessionProjectParams,
       data: UpdateUsageSessionProjectDto,
       params: RequestParams = {},
     ) =>
@@ -9749,7 +10562,7 @@ export class Api<
      * @request POST:/api/resources/{resourceId}/usage/lock
      * @secure
      */
-    lockDoor: (resourceId: number, params: RequestParams = {}) =>
+    lockDoor: ({ resourceId }: LockDoorParams, params: RequestParams = {}) =>
       this.request<LockDoorData, void>({
         path: `/api/resources/${resourceId}/usage/lock`,
         method: "POST",
@@ -9767,7 +10580,10 @@ export class Api<
      * @request POST:/api/resources/{resourceId}/usage/unlock
      * @secure
      */
-    unlockDoor: (resourceId: number, params: RequestParams = {}) =>
+    unlockDoor: (
+      { resourceId }: UnlockDoorParams,
+      params: RequestParams = {},
+    ) =>
       this.request<UnlockDoorData, void>({
         path: `/api/resources/${resourceId}/usage/unlock`,
         method: "POST",
@@ -9785,7 +10601,10 @@ export class Api<
      * @request POST:/api/resources/{resourceId}/usage/unlatch
      * @secure
      */
-    unlatchDoor: (resourceId: number, params: RequestParams = {}) =>
+    unlatchDoor: (
+      { resourceId }: UnlatchDoorParams,
+      params: RequestParams = {},
+    ) =>
       this.request<UnlatchDoorData, void>({
         path: `/api/resources/${resourceId}/usage/unlatch`,
         method: "POST",
@@ -9826,7 +10645,7 @@ export class Api<
      * @secure
      */
     resourceUsageGetActiveSession: (
-      resourceId: number,
+      { resourceId }: ResourceUsageGetActiveSessionParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceUsageGetActiveSessionData, void>({
@@ -9846,7 +10665,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/usage/can-control
      * @secure
      */
-    resourceUsageCanControl: (resourceId: number, params: RequestParams = {}) =>
+    resourceUsageCanControl: (
+      { resourceId }: ResourceUsageCanControlParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ResourceUsageCanControlData, void>({
         path: `/api/resources/${resourceId}/usage/can-control`,
         method: "GET",
@@ -9906,7 +10728,10 @@ export class Api<
      * @request GET:/api/mqtt/servers/{id}
      * @secure
      */
-    mqttServersGetOneById: (id: number, params: RequestParams = {}) =>
+    mqttServersGetOneById: (
+      { id }: MqttServersGetOneByIdParams,
+      params: RequestParams = {},
+    ) =>
       this.request<MqttServersGetOneByIdData, void>({
         path: `/api/mqtt/servers/${id}`,
         method: "GET",
@@ -9925,7 +10750,7 @@ export class Api<
      * @secure
      */
     mqttServersUpdateOne: (
-      id: number,
+      { id }: MqttServersUpdateOneParams,
       data: UpdateMqttServerDto,
       params: RequestParams = {},
     ) =>
@@ -9948,7 +10773,10 @@ export class Api<
      * @request DELETE:/api/mqtt/servers/{id}
      * @secure
      */
-    mqttServersDeleteOne: (id: number, params: RequestParams = {}) =>
+    mqttServersDeleteOne: (
+      { id }: MqttServersDeleteOneParams,
+      params: RequestParams = {},
+    ) =>
       this.request<MqttServersDeleteOneData, void>({
         path: `/api/mqtt/servers/${id}`,
         method: "DELETE",
@@ -9967,7 +10795,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroductionsGetMany: (
-      groupId: number,
+      { groupId }: ResourceGroupIntroductionsGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroductionsGetManyData, void>({
@@ -9988,8 +10816,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroductionsGetHistory: (
-      groupId: number,
-      userId: number,
+      { groupId, userId }: ResourceGroupIntroductionsGetHistoryParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroductionsGetHistoryData, void>({
@@ -10010,8 +10837,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroductionsGrant: (
-      groupId: number,
-      userId: number,
+      { groupId, userId }: ResourceGroupIntroductionsGrantParams,
       data: UpdateResourceGroupIntroductionDto,
       params: RequestParams = {},
     ) =>
@@ -10035,8 +10861,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroductionsRevoke: (
-      groupId: number,
-      userId: number,
+      { groupId, userId }: ResourceGroupIntroductionsRevokeParams,
       data: UpdateResourceGroupIntroductionDto,
       params: RequestParams = {},
     ) =>
@@ -10059,7 +10884,7 @@ export class Api<
      * @request GET:/api/resource-groups/{groupId}/introducers
      */
     resourceGroupIntroducersGetMany: (
-      groupId: number,
+      { groupId }: ResourceGroupIntroducersGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersGetManyData, void>({
@@ -10078,8 +10903,7 @@ export class Api<
      * @request GET:/api/resource-groups/{groupId}/introducers/{userId}/is-introducer
      */
     resourceGroupIntroducersIsIntroducer: (
-      userId: number,
-      groupId: number,
+      { userId, groupId }: ResourceGroupIntroducersIsIntroducerParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersIsIntroducerData, any>({
@@ -10099,8 +10923,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroducersGrant: (
-      userId: number,
-      groupId: number,
+      { userId, groupId }: ResourceGroupIntroducersGrantParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersGrantData, void>({
@@ -10120,8 +10943,7 @@ export class Api<
      * @secure
      */
     resourceGroupIntroducersRevoke: (
-      userId: number,
-      groupId: number,
+      { userId, groupId }: ResourceGroupIntroducersRevokeParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceGroupIntroducersRevokeData, void>({
@@ -10160,7 +10982,7 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introducers
      */
     resourceIntroducersGetMany: (
-      resourceId: number,
+      { resourceId }: ResourceIntroducersGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGetManyData, any>({
@@ -10180,8 +11002,7 @@ export class Api<
      * @secure
      */
     resourceIntroducersGrant: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId }: ResourceIntroducersGrantParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersGrantData, void>({
@@ -10202,8 +11023,7 @@ export class Api<
      * @secure
      */
     resourceIntroducersRevoke: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId }: ResourceIntroducersRevokeParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroducersRevokeData, void>({
@@ -10222,7 +11042,7 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/introductions
      */
     resourceIntroductionsGetMany: (
-      resourceId: number,
+      { resourceId }: ResourceIntroductionsGetManyParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroductionsGetManyData, any>({
@@ -10242,8 +11062,7 @@ export class Api<
      * @secure
      */
     resourceIntroductionsGrant: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId }: ResourceIntroductionsGrantParams,
       data: UpdateResourceIntroductionDto,
       params: RequestParams = {},
     ) =>
@@ -10267,8 +11086,7 @@ export class Api<
      * @secure
      */
     resourceIntroductionsRevoke: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId }: ResourceIntroductionsRevokeParams,
       data: UpdateResourceIntroductionDto,
       params: RequestParams = {},
     ) =>
@@ -10292,8 +11110,7 @@ export class Api<
      * @secure
      */
     resourceIntroductionsGetHistory: (
-      resourceId: number,
-      userId: number,
+      { resourceId, userId }: ResourceIntroductionsGetHistoryParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceIntroductionsGetHistoryData, void>({
@@ -10314,7 +11131,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/maintenances/can-manage
      * @secure
      */
-    canManageMaintenance: (resourceId: number, params: RequestParams = {}) =>
+    canManageMaintenance: (
+      { resourceId }: CanManageMaintenanceParams,
+      params: RequestParams = {},
+    ) =>
       this.request<CanManageMaintenanceData, void>({
         path: `/api/resources/${resourceId}/maintenances/can-manage`,
         method: "GET",
@@ -10333,7 +11153,7 @@ export class Api<
      * @secure
      */
     createMaintenance: (
-      resourceId: number,
+      { resourceId }: CreateMaintenanceParams,
       data: CreateMaintenanceDto,
       params: RequestParams = {},
     ) =>
@@ -10379,8 +11199,7 @@ export class Api<
      * @secure
      */
     getMaintenance: (
-      resourceId: number,
-      maintenanceId: number,
+      { resourceId, maintenanceId }: GetMaintenanceParams,
       params: RequestParams = {},
     ) =>
       this.request<GetMaintenanceData, void>({
@@ -10401,8 +11220,7 @@ export class Api<
      * @secure
      */
     finishMaintenance: (
-      resourceId: number,
-      maintenanceId: number,
+      { resourceId, maintenanceId }: FinishMaintenanceParams,
       data: FinishMaintenanceDto,
       params: RequestParams = {},
     ) =>
@@ -10427,7 +11245,7 @@ export class Api<
      * @secure
      */
     findMaintenanceSchedules: (
-      resourceId: number,
+      { resourceId }: FindMaintenanceSchedulesParams,
       params: RequestParams = {},
     ) =>
       this.request<FindMaintenanceSchedulesData, void>({
@@ -10448,7 +11266,7 @@ export class Api<
      * @secure
      */
     createMaintenanceSchedule: (
-      resourceId: number,
+      { resourceId }: CreateMaintenanceScheduleParams,
       data: CreateMaintenanceScheduleDto,
       params: RequestParams = {},
     ) =>
@@ -10472,8 +11290,7 @@ export class Api<
      * @secure
      */
     getMaintenanceSchedule: (
-      resourceId: number,
-      scheduleId: number,
+      { resourceId, scheduleId }: GetMaintenanceScheduleParams,
       params: RequestParams = {},
     ) =>
       this.request<GetMaintenanceScheduleData, void>({
@@ -10494,8 +11311,7 @@ export class Api<
      * @secure
      */
     updateMaintenanceSchedule: (
-      resourceId: number,
-      scheduleId: number,
+      { resourceId, scheduleId }: UpdateMaintenanceScheduleParams,
       data: UpdateMaintenanceScheduleDto,
       params: RequestParams = {},
     ) =>
@@ -10519,8 +11335,7 @@ export class Api<
      * @secure
      */
     deleteMaintenanceSchedule: (
-      resourceId: number,
-      scheduleId: number,
+      { resourceId, scheduleId }: DeleteMaintenanceScheduleParams,
       params: RequestParams = {},
     ) =>
       this.request<DeleteMaintenanceScheduleData, void>({
@@ -10540,7 +11355,10 @@ export class Api<
      * @request GET:/api/users/{userId}/billing/balance
      * @secure
      */
-    getBillingBalance: (userId: number, params: RequestParams = {}) =>
+    getBillingBalance: (
+      { userId }: GetBillingBalanceParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetBillingBalanceData, void>({
         path: `/api/users/${userId}/billing/balance`,
         method: "GET",
@@ -10581,7 +11399,7 @@ export class Api<
      * @secure
      */
     createManualTransaction: (
-      userId: number,
+      { userId }: CreateManualTransactionParams,
       data: ModifyBalanceDto,
       params: RequestParams = {},
     ) =>
@@ -10605,8 +11423,7 @@ export class Api<
      * @secure
      */
     getBillingTransaction: (
-      transactionId: number,
-      userId: string,
+      { transactionId, userId }: GetBillingTransactionParams,
       params: RequestParams = {},
     ) =>
       this.request<GetBillingTransactionData, void>({
@@ -10627,7 +11444,7 @@ export class Api<
      * @secure
      */
     getResourceBillingConfiguration: (
-      resourceId: number,
+      { resourceId }: GetResourceBillingConfigurationParams,
       params: RequestParams = {},
     ) =>
       this.request<GetResourceBillingConfigurationData, void>({
@@ -10648,7 +11465,7 @@ export class Api<
      * @secure
      */
     updateResourceBillingConfiguration: (
-      resourceId: number,
+      { resourceId }: UpdateResourceBillingConfigurationParams,
       data: UpdateResourceBillingConfigurationDto,
       params: RequestParams = {},
     ) =>
@@ -10788,7 +11605,10 @@ export class Api<
      * @request DELETE:/api/billing/sumup/readers/{readerId}
      * @secure
      */
-    removeSumUpReader: (readerId: string, params: RequestParams = {}) =>
+    removeSumUpReader: (
+      { readerId }: RemoveSumUpReaderParams,
+      params: RequestParams = {},
+    ) =>
       this.request<any, void>({
         path: `/api/billing/sumup/readers/${readerId}`,
         method: "DELETE",
@@ -10862,7 +11682,7 @@ export class Api<
      * @secure
      */
     refundTransaction: (
-      transactionId: number,
+      { transactionId }: RefundTransactionParams,
       data: RefundTransactionDto,
       params: RequestParams = {},
     ) =>
@@ -10886,7 +11706,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/flow/node-schemas
      * @secure
      */
-    getNodeSchemas: (resourceId: number, params: RequestParams = {}) =>
+    getNodeSchemas: (
+      { resourceId }: GetNodeSchemasParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetNodeSchemasData, void>({
         path: `/api/resources/${resourceId}/flow/node-schemas`,
         method: "GET",
@@ -10904,7 +11727,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/flow
      * @secure
      */
-    getResourceFlow: (resourceId: number, params: RequestParams = {}) =>
+    getResourceFlow: (
+      { resourceId }: GetResourceFlowParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetResourceFlowData, GetResourceFlowError>({
         path: `/api/resources/${resourceId}/flow`,
         method: "GET",
@@ -10923,7 +11749,7 @@ export class Api<
      * @secure
      */
     saveResourceFlow: (
-      resourceId: number,
+      { resourceId }: SaveResourceFlowParams,
       data: ResourceFlowSaveDto,
       params: RequestParams = {},
     ) =>
@@ -10968,7 +11794,7 @@ export class Api<
      * @secure
      */
     resourceFlowsControllerStreamEvents: (
-      resourceId: number,
+      { resourceId }: ResourceFlowsControllerStreamEventsParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceFlowsControllerStreamEventsData, void>({
@@ -10988,8 +11814,7 @@ export class Api<
      * @secure
      */
     pressButton: (
-      resourceId: number,
-      buttonId: string,
+      { resourceId, buttonId }: PressButtonParams,
       params: RequestParams = {},
     ) =>
       this.request<PressButtonData, void>({
@@ -11009,7 +11834,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/flow/buttons
      * @secure
      */
-    getButtons: (resourceId: number, params: RequestParams = {}) =>
+    getButtons: (
+      { resourceId }: GetButtonsParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetButtonsData, void>({
         path: `/api/resources/${resourceId}/flow/buttons`,
         method: "GET",
@@ -11070,7 +11898,10 @@ export class Api<
      * @request GET:/api/projects/{id}
      * @secure
      */
-    findOneProject: (id: number, params: RequestParams = {}) =>
+    findOneProject: (
+      { id }: FindOneProjectParams,
+      params: RequestParams = {},
+    ) =>
       this.request<FindOneProjectData, void>({
         path: `/api/projects/${id}`,
         method: "GET",
@@ -11088,7 +11919,10 @@ export class Api<
      * @request DELETE:/api/projects/{id}
      * @secure
      */
-    deleteOneProject: (id: number, params: RequestParams = {}) =>
+    deleteOneProject: (
+      { id }: DeleteOneProjectParams,
+      params: RequestParams = {},
+    ) =>
       this.request<DeleteOneProjectData, void>({
         path: `/api/projects/${id}`,
         method: "DELETE",
@@ -11106,7 +11940,7 @@ export class Api<
      * @secure
      */
     updateProject: (
-      id: number,
+      { id }: UpdateProjectParams,
       data: UpdateProjectDto,
       params: RequestParams = {},
     ) =>
@@ -11129,7 +11963,10 @@ export class Api<
      * @request POST:/api/projects/{id}/archive
      * @secure
      */
-    archiveProject: (id: number, params: RequestParams = {}) =>
+    archiveProject: (
+      { id }: ArchiveProjectParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ArchiveProjectData, void>({
         path: `/api/projects/${id}/archive`,
         method: "POST",
@@ -11147,7 +11984,10 @@ export class Api<
      * @request POST:/api/projects/{id}/unarchive
      * @secure
      */
-    unarchiveProject: (id: number, params: RequestParams = {}) =>
+    unarchiveProject: (
+      { id }: UnarchiveProjectParams,
+      params: RequestParams = {},
+    ) =>
       this.request<UnarchiveProjectData, void>({
         path: `/api/projects/${id}/unarchive`,
         method: "POST",
@@ -11209,7 +12049,10 @@ export class Api<
      * @request GET:/api/projects/{id}/members
      * @secure
      */
-    listProjectMembers: (id: number, params: RequestParams = {}) =>
+    listProjectMembers: (
+      { id }: ListProjectMembersParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ListProjectMembersData, void>({
         path: `/api/projects/${id}/members`,
         method: "GET",
@@ -11228,8 +12071,7 @@ export class Api<
      * @secure
      */
     removeProjectMember: (
-      id: number,
-      memberId: number,
+      { id, memberId }: RemoveProjectMemberParams,
       params: RequestParams = {},
     ) =>
       this.request<RemoveProjectMemberData, void>({
@@ -11248,7 +12090,10 @@ export class Api<
      * @request GET:/api/projects/{id}/invitations
      * @secure
      */
-    listProjectInvitations: (id: number, params: RequestParams = {}) =>
+    listProjectInvitations: (
+      { id }: ListProjectInvitationsParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ListProjectInvitationsData, void>({
         path: `/api/projects/${id}/invitations`,
         method: "GET",
@@ -11267,7 +12112,7 @@ export class Api<
      * @secure
      */
     createProjectInvitation: (
-      id: number,
+      { id }: CreateProjectInvitationParams,
       data: CreateProjectInvitationDto,
       params: RequestParams = {},
     ) =>
@@ -11291,8 +12136,7 @@ export class Api<
      * @secure
      */
     resendProjectInvitation: (
-      id: number,
-      invitationId: number,
+      { id, invitationId }: ResendProjectInvitationParams,
       params: RequestParams = {},
     ) =>
       this.request<ResendProjectInvitationData, void>({
@@ -11313,8 +12157,7 @@ export class Api<
      * @secure
      */
     cancelProjectInvitation: (
-      id: number,
-      invitationId: number,
+      { id, invitationId }: CancelProjectInvitationParams,
       params: RequestParams = {},
     ) =>
       this.request<CancelProjectInvitationData, void>({
@@ -11354,7 +12197,7 @@ export class Api<
      * @secure
      */
     acceptProjectInvitation: (
-      invitationId: number,
+      { invitationId }: AcceptProjectInvitationParams,
       params: RequestParams = {},
     ) =>
       this.request<AcceptProjectInvitationData, void>({
@@ -11375,7 +12218,7 @@ export class Api<
      * @secure
      */
     declineProjectInvitation: (
-      invitationId: number,
+      { invitationId }: DeclineProjectInvitationParams,
       params: RequestParams = {},
     ) =>
       this.request<DeclineProjectInvitationData, void>({
@@ -11396,7 +12239,10 @@ export class Api<
      * @request GET:/api/resources/{resourceId}/forms
      * @secure
      */
-    resourceFormsList: (resourceId: number, params: RequestParams = {}) =>
+    resourceFormsList: (
+      { resourceId }: ResourceFormsListParams,
+      params: RequestParams = {},
+    ) =>
       this.request<ResourceFormsListData, void>({
         path: `/api/resources/${resourceId}/forms`,
         method: "GET",
@@ -11415,7 +12261,7 @@ export class Api<
      * @secure
      */
     resourceFormsCreate: (
-      resourceId: number,
+      { resourceId }: ResourceFormsCreateParams,
       data: CreateFormDto,
       params: RequestParams = {},
     ) =>
@@ -11461,8 +12307,7 @@ export class Api<
      * @secure
      */
     resourceFormsGetOne: (
-      resourceId: number,
-      formId: number,
+      { resourceId, formId }: ResourceFormsGetOneParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceFormsGetOneData, void>({
@@ -11483,8 +12328,7 @@ export class Api<
      * @secure
      */
     resourceFormsUpdate: (
-      resourceId: number,
-      formId: number,
+      { resourceId, formId }: ResourceFormsUpdateParams,
       data: UpdateFormDto,
       params: RequestParams = {},
     ) =>
@@ -11508,8 +12352,7 @@ export class Api<
      * @secure
      */
     resourceFormsDelete: (
-      resourceId: number,
-      formId: number,
+      { resourceId, formId }: ResourceFormsDeleteParams,
       params: RequestParams = {},
     ) =>
       this.request<ResourceFormsDeleteData, void>({
@@ -11564,8 +12407,7 @@ export class Api<
      * @request GET:/api/plugins/{pluginName}/frontend/module-federation/{filePath}
      */
     getFrontendPluginFile: (
-      pluginName: string,
-      filePath: string,
+      { pluginName, filePath }: GetFrontendPluginFileParams,
       params: RequestParams = {},
     ) =>
       this.request<GetFrontendPluginFileData, any>({
@@ -11584,7 +12426,10 @@ export class Api<
      * @request DELETE:/api/plugins/{pluginId}
      * @secure
      */
-    deletePlugin: (pluginId: string, params: RequestParams = {}) =>
+    deletePlugin: (
+      { pluginId }: DeletePluginParams,
+      params: RequestParams = {},
+    ) =>
       this.request<DeletePluginData, void>({
         path: `/api/plugins/${pluginId}`,
         method: "DELETE",
@@ -11643,7 +12488,7 @@ export class Api<
      * @secure
      */
     updateReader: (
-      readerId: number,
+      { readerId }: UpdateReaderParams,
       data: UpdateReaderDto,
       params: RequestParams = {},
     ) =>
@@ -11666,7 +12511,10 @@ export class Api<
      * @request GET:/api/attractap/readers/{readerId}
      * @secure
      */
-    getReaderById: (readerId: number, params: RequestParams = {}) =>
+    getReaderById: (
+      { readerId }: GetReaderByIdParams,
+      params: RequestParams = {},
+    ) =>
       this.request<GetReaderByIdData, void>({
         path: `/api/attractap/readers/${readerId}`,
         method: "GET",
@@ -11684,7 +12532,10 @@ export class Api<
      * @request DELETE:/api/attractap/readers/{readerId}
      * @secure
      */
-    deleteReader: (readerId: number, params: RequestParams = {}) =>
+    deleteReader: (
+      { readerId }: DeleteReaderParams,
+      params: RequestParams = {},
+    ) =>
       this.request<DeleteReaderData, void>({
         path: `/api/attractap/readers/${readerId}`,
         method: "DELETE",
@@ -11758,7 +12609,7 @@ export class Api<
      * @secure
      */
     toggleCardActive: (
-      id: number,
+      { id }: ToggleCardActiveParams,
       data: NfcCardSetActiveStateDto,
       params: RequestParams = {},
     ) =>
@@ -11799,8 +12650,7 @@ export class Api<
      * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}
      */
     downloadFirmwareBinary: (
-      firmwareName: string,
-      variantName: string,
+      { firmwareName, variantName }: DownloadFirmwareBinaryParams,
       params: RequestParams = {},
     ) =>
       this.request<DownloadFirmwareBinaryData, any>({
@@ -11819,9 +12669,7 @@ export class Api<
      * @request GET:/api/attractap/firmwares/{firmwareName}/variants/{variantName}/{filename}
      */
     getFirmwareBinary: (
-      firmwareName: string,
-      variantName: string,
-      filename: string,
+      { firmwareName, variantName, filename }: GetFirmwareBinaryParams,
       params: RequestParams = {},
     ) =>
       this.request<GetFirmwareBinaryData, any>({

@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthenticationType } from '@attraccess/database-entities';
 
@@ -33,4 +33,14 @@ export class CreateUserDto {
   })
   @IsIn([AuthenticationType.LOCAL_PASSWORD])
   strategy: AuthenticationType.LOCAL_PASSWORD;
+
+  @ApiProperty({
+    description:
+      'When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  overwriteFirstTimeAdmin?: boolean;
 }

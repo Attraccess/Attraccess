@@ -18,6 +18,12 @@ export class FirstTimeSetupStepsDto {
     example: false,
   })
   admin!: boolean;
+
+  @ApiProperty({
+    description: 'Whether the first admin user has verified their email. False during the unverified-admin limbo state.',
+    example: false,
+  })
+  adminEmailVerified!: boolean;
 }
 
 export class FirstTimeSetupStatusDto {

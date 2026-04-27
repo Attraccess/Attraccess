@@ -32,6 +32,11 @@ export const $CreateUserDto = {
                     '$ref': '#/components/schemas/AuthenticationType'
                 }
             ]
+        },
+        overwriteFirstTimeAdmin: {
+            type: 'boolean',
+            description: 'When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.',
+            example: false
         }
     },
     required: ['username', 'email', 'password', 'strategy']
@@ -1625,9 +1630,14 @@ export const $FirstTimeSetupStepsDto = {
             type: 'boolean',
             description: 'Whether at least one admin user has been created.',
             example: false
+        },
+        adminEmailVerified: {
+            type: 'boolean',
+            description: 'Whether the first admin user has verified their email. False during the unverified-admin limbo state.',
+            example: false
         }
     },
-    required: ['app', 'smtp', 'admin']
+    required: ['app', 'smtp', 'admin', 'adminEmailVerified']
 } as const;
 
 export const $FirstTimeSetupStatusDto = {

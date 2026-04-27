@@ -12,6 +12,7 @@ import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.e
 import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -33,9 +34,12 @@ describe('UsersController', () => {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
+            findMany: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
             updateOne: jest.fn(),
+            countUsers: jest.fn(),
+            changeEmail: jest.fn(),
             cleanupUsername: jest.fn((value: string) => value),
             validateUsernameOrThrow: jest.fn(),
           },
@@ -644,6 +648,139 @@ describe('UsersController', () => {
         expect(result).toHaveLength(2);
         expect(usersService.updateOne).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+
+  describe('createOneUser with overwriteFirstTimeAdmin', () => {
+    const unverifiedAdmin = {
+      id: 1,
+      username: 'admin',
+      email: 'wrong@example.com',
+      isEmailVerified: false,
+      emailVerificationToken: 'token',
+      emailVerificationTokenExpiresAt: new Date(),
+      passwordResetToken: null,
+      passwordResetTokenExpiresAt: null,
+      systemPermissions: {
+        canManageResources: true,
+        canManageSystemConfiguration: true,
+        canManageUsers: true,
+        canManageBilling: true,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      resourceIntroductions: [],
+      resourceUsages: [],
+      authenticationDetails: [],
+      resourceIntroducerPermissions: [],
+    } as User;
+
+    const newAdmin = { ...unverifiedAdmin, id: 2, email: 'correct@example.com' } as User;
+
+    const dto: CreateUserDto & { overwriteFirstTimeAdmin: true } = {
+      username: 'admin',
+      email: 'correct@example.com',
+      password: 'password123',
+      strategy: AuthenticationType.LOCAL_PASSWORD,
+      overwriteFirstTimeAdmin: true,
+    };
+
+    beforeEach(() => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+    });
+
+    it('deletes the existing unverified admin and creates a fresh one', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
+      jest
+        .spyOn(usersService, 'findMany')
+        .mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+      jest.spyOn(usersService, 'deleteOne').mockResolvedValue(undefined);
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({
+        id: 1,
+        userId: newAdmin.id,
+        type: AuthenticationType.LOCAL_PASSWORD,
+        password: 'hashed',
+        user: {} as User,
+      });
+
+      const result = await controller.createOne(dto);
+
+      expect(usersService.deleteOne).toHaveBeenCalledWith(unverifiedAdmin.id);
+      expect(usersService.createOne).toHaveBeenCalled();
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(newAdmin, 'verification-token');
+      expect(result).toEqual(newAdmin);
+    });
+
+    it('throws ForbiddenException when total users is not exactly 1', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(2);
+
+      await expect(controller.createOne(dto)).rejects.toThrow(ForbiddenException);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.createOne).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when no users exist', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(0);
+
+      await expect(controller.createOne(dto)).rejects.toThrow(ForbiddenException);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.createOne).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the single existing user has a verified email', async () => {
+      const verified = { ...unverifiedAdmin, isEmailVerified: true } as User;
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
+      jest
+        .spyOn(usersService, 'findMany')
+        .mockResolvedValue({ data: [verified], total: 1, page: 1, limit: 1 });
+
+      await expect(controller.createOne(dto)).rejects.toThrow(ForbiddenException);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.createOne).not.toHaveBeenCalled();
+    });
+
+    it('checks the first-time-setup invariant BEFORE touching credentials (no user enumeration)', async () => {
+      const callOrder: string[] = [];
+      jest.spyOn(usersService, 'countUsers').mockImplementation(async () => {
+        callOrder.push('countUsers');
+        return 2;
+      });
+      const findOneSpy = jest.spyOn(usersService, 'findOne').mockImplementation(async () => {
+        callOrder.push('findOne');
+        return unverifiedAdmin;
+      });
+
+      await expect(controller.createOne(dto)).rejects.toThrow(ForbiddenException);
+
+      expect(callOrder[0]).toBe('countUsers');
+      expect(findOneSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores the overwrite flag when not set (normal create flow)', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(5);
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({
+        id: 1,
+        userId: newAdmin.id,
+        type: AuthenticationType.LOCAL_PASSWORD,
+        password: 'hashed',
+        user: {} as User,
+      });
+
+      const regularDto: CreateUserDto = {
+        username: 'someone',
+        email: 'someone@example.com',
+        password: 'password123',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      };
+
+      await controller.createOne(regularDto);
+
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.countUsers).not.toHaveBeenCalled();
     });
   });
 });

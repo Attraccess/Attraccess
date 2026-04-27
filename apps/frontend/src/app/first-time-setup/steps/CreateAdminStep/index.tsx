@@ -21,9 +21,10 @@ import de from './de.json';
 
 export type CreateAdminStepProps = {
   onSuccess?: () => void;
+  isOverwrite?: boolean;
 };
 
-export function CreateAdminStep({ onSuccess }: CreateAdminStepProps) {
+export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -108,9 +109,10 @@ export function CreateAdminStep({ onSuccess }: CreateAdminStepProps) {
         email: trimmedEmail,
         password,
         strategy: AuthenticationType.LOCAL_PASSWORD,
+        ...(isOverwrite ? { overwriteFirstTimeAdmin: true } : {}),
       },
     });
-  }, [canSubmit, createUser, password, trimmedEmail, trimmedUsername]);
+  }, [canSubmit, createUser, isOverwrite, password, trimmedEmail, trimmedUsername]);
 
   return (
     <div className="flex flex-col gap-4">

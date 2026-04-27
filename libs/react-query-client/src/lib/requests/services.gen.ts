@@ -142,7 +142,8 @@ export class UsersService {
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
-                400: 'Invalid input data.'
+                400: 'Invalid input data.',
+                403: 'First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).'
             }
         });
     }

@@ -24,6 +24,10 @@ export type CreateUserDto = {
      * The authentication strategy to use
      */
     strategy: AuthenticationType;
+    /**
+     * When true, replaces the existing first-time-setup admin if setup is incomplete (exactly one user exists with an unverified email). Ignored otherwise.
+     */
+    overwriteFirstTimeAdmin?: boolean;
 };
 
 export type SystemPermissions = {
@@ -1053,6 +1057,10 @@ export type FirstTimeSetupStepsDto = {
      * Whether at least one admin user has been created.
      */
     admin: boolean;
+    /**
+     * Whether the first admin user has verified their email. False during the unverified-admin limbo state.
+     */
+    adminEmailVerified: boolean;
 };
 
 export type FirstTimeSetupStatusDto = {
@@ -5316,6 +5324,10 @@ export type $OpenApiTs = {
                  * Invalid input data.
                  */
                 400: unknown;
+                /**
+                 * First-time setup is already complete (only relevant when overwriteFirstTimeAdmin is true).
+                 */
+                403: unknown;
             };
         };
         get: {
