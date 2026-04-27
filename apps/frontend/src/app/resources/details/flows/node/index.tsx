@@ -89,17 +89,20 @@ export function AttraccessNode(props: Props) {
     onClose: userDoesNotWantToDelete,
   } = useDisclosure();
 
+  const isSelected = props.node?.selected ?? false;
+
   const cardClasses = useMemo(() => {
     const baseClasses = 'bg-gray-100 dark:bg-gray-800 w-64 overflow-visible';
 
     return cn(baseClasses, {
-      'border-2 border-gray-500': processingState === ProcessingState.IDLE,
+      'border-2 border-gray-500': processingState === ProcessingState.IDLE && !isSelected,
+      'border-2 border-primary-500 ring-2 ring-primary-300 dark:ring-primary-700': isSelected && processingState === ProcessingState.IDLE,
       'animate-pulse border-2 border-blue-500': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
       'opacity-60 grayscale border-dashed': !schema.supportedByResource,
     });
-  }, [processingState, schema]);
+  }, [processingState, schema, isSelected]);
 
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.inputs.map((inputName, index) => {

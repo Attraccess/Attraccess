@@ -1,7 +1,7 @@
 import { PageHeader } from '../../../../components/pageHeader';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow } from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   ApiError,
@@ -13,7 +13,7 @@ import {
   useResourceFlowsServiceSaveResourceFlow,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@heroui/use-theme';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
@@ -140,7 +140,8 @@ function FlowsPageInner() {
     },
   });
 
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   const {
     nodes,
     edges,
@@ -153,6 +154,9 @@ function FlowsPageInner() {
     addLiveLogReceiver,
     removeLiveLogReceiver,
     flowNodeTypes,
+    copySelectedNodes,
+    cutSelectedNodes,
+    pasteNodes,
   } = useFlowContext();
 
   const { handleExport, handleImportClick } = useFlowImportExport({
@@ -296,6 +300,29 @@ function FlowsPageInner() {
     };
   }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || target?.closest('input, textarea, select, [contenteditable="true"]')) {
+        return;
+      }
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key === 'c') {
+        copySelectedNodes();
+      } else if (isMod && e.key === 'x') {
+        cutSelectedNodes();
+      } else if (isMod && e.key === 'v') {
+        const targetFlowPosition = mousePosRef.current ? screenToFlowPosition(mousePosRef.current) : undefined;
+        pasteNodes(targetFlowPosition);
+      } else if (isMod && e.key === 'a') {
+        e.preventDefault();
+        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [copySelectedNodes, cutSelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
+
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
       ...edge,
@@ -319,13 +346,23 @@ function FlowsPageInner() {
         backTo={`/resources/${resourceId}`}
       />
 
-      <div className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div
+        className="w-full h-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800"
+        onMouseMove={(e) => {
+          mousePosRef.current = { x: e.clientX, y: e.clientY };
+        }}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edgesWithCorrectType}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          selectionOnDrag
+          panOnDrag={[1, 2]}
+          selectionMode={SelectionMode.Partial}
+          deleteKeyCode={['Backspace', 'Delete']}
+          multiSelectionKeyCode="Shift"
           colorMode={theme === 'dark' ? 'dark' : 'light'}
           fitView
           defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
