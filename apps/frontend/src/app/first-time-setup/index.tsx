@@ -192,7 +192,7 @@ export function FirstTimeSetupPage() {
             </span>
           }
         >
-          <VerifyEmailStep onCorrectAdminDetails={goToStep3} />
+          <VerifyEmailStep onCorrectAdminDetails={goToStep4} />
         </AccordionItem>
       </Accordion>
     </div>
