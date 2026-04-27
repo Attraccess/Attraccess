@@ -185,8 +185,8 @@ importers:
         specifier: ^4.4.4
         version: 4.4.4(encoding@0.1.13)
       esptool-js:
-        specifier: ^0.5.6
-        version: 0.5.6
+        specifier: ^0.6.0
+        version: 0.6.0
       express:
         specifier: 4.22.1
         version: 4.22.1
@@ -9514,8 +9514,8 @@ packages:
     engines: {node: '>=4'}
     hasBin: true
 
-  esptool-js@0.5.6:
-    resolution: {integrity: sha512-5xkKxWNUuXyqdg4oS6rFVhGDr0yPNVF6qTHEMpZj26/0DeymfBlM2bT5RQdpEDatx211gDVe7op/9gKyMVbL9g==}
+  esptool-js@0.6.0:
+    resolution: {integrity: sha512-ZyuSBXvmS+4DRKM6GrDHfCscnq3YSNlRfM+Zw0DoS7uC3SdkyC262s/ji4MjDYVmMH8SE2BiYx3/dZ1J23Xiew==}
 
   esquery@1.6.0:
     resolution: {integrity: sha512-ca9pw9fomFcKPvFLXhBKUK90ZvGibiGOvRJNbjljY7s7uq/5YO4BOzcYtJqExdx99rF6aAcnRxHmcUHcz6sQsg==}
@@ -20290,7 +20290,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.5
+      nanoid: 5.1.9
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -27951,7 +27951,7 @@ snapshots:
 
   esprima@4.0.1: {}
 
-  esptool-js@0.5.6:
+  esptool-js@0.6.0:
     dependencies:
       atob-lite: 2.0.0
       pako: 2.1.0
