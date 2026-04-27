@@ -116,8 +116,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.3(rollup@4.60.2)
       '@sumup/sdk':
-        specifier: ^0.0.4
-        version: 0.0.4
+        specifier: ^0.1.0
+        version: 0.1.5
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.19(tailwindcss@4.2.4)
@@ -5962,8 +5962,8 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
-  '@sumup/sdk@0.0.4':
-    resolution: {integrity: sha512-nH3VzeMCbVdFHGSMAR9CO+316SMBwjJEJUT0HzbVzOVqTtrnlPbb4w3LIROpuk+IRSATXY5IHtXi9kHE67PfVQ==}
+  '@sumup/sdk@0.1.5':
+    resolution: {integrity: sha512-3Hf1evVt5/3PnCKnfkCStzlB5taFdjtFritATsZaDZLIniRHWopk/Jk9fjkk/lWblYbYHwK6OJjNq0gTMpcf8g==}
     engines: {node: '>=18'}
 
   '@surma/rollup-plugin-off-main-thread@2.2.3':
@@ -20290,7 +20290,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.5
+      nanoid: 5.1.9
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -23616,7 +23616,7 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
-  '@sumup/sdk@0.0.4': {}
+  '@sumup/sdk@0.1.5': {}
 
   '@surma/rollup-plugin-off-main-thread@2.2.3':
     dependencies:
