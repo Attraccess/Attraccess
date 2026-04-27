@@ -167,7 +167,7 @@
     "@types/lodash-es": "^4.17.12",
     "@types/mjml": "^4.7.4",
     "@types/node": "20.19.39",
-    "@types/nodemailer": "^7.0.3",
+    "@types/nodemailer": "^8.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/passport-openidconnect": "^0.1.3",
