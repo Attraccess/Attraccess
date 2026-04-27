@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginForm } from './loginForm';
@@ -10,6 +10,7 @@ const loginMock = vi.fn();
 const resendMutateMock = vi.fn();
 let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
+let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => {
@@ -62,8 +63,12 @@ vi.mock('@attraccess/react-query-client', () => ({
     data: { value: true },
     isLoading: false,
   }),
-  useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void }) => {
+  useUsersServiceResendVerificationEmail: (options: {
+    onSuccess?: () => void;
+    onError?: (error: unknown) => void;
+  }) => {
     resendOnSuccess = options?.onSuccess;
+    resendOnError = options?.onError;
     return { mutate: resendMutateMock, isPending: false };
   },
 }));
@@ -93,6 +98,7 @@ describe('LoginForm – resend verification email', () => {
     resendMutateMock.mockReset();
     loginError = null;
     resendOnSuccess = undefined;
+    resendOnError = undefined;
   });
 
   it('does not show resend section when there is no login error', () => {
@@ -151,6 +157,58 @@ describe('LoginForm – resend verification email', () => {
     expect(screen.getByTestId('resend-verification-button')).toBeDisabled();
   });
 
+  it('resend button is disabled when email format is invalid', async () => {
+    const user = userEvent.setup();
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+
+    renderLogin();
+
+    const input = screen.getByLabelText('Email address');
+    await user.type(input, 'not-an-email');
+
+    expect(screen.getByTestId('resend-verification-button')).toBeDisabled();
+  });
+
+  it('trims surrounding whitespace before submitting the resend request', async () => {
+    const user = userEvent.setup();
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+
+    renderLogin();
+
+    const input = screen.getByLabelText('Email address');
+    await user.type(input, '  test@example.com  ');
+    await user.click(screen.getByTestId('resend-verification-button'));
+
+    expect(resendMutateMock).toHaveBeenCalledWith({
+      requestBody: { email: 'test@example.com' },
+    });
+  });
+
+  it('renders the resend error alert when the mutation fails', async () => {
+    const user = userEvent.setup();
+    const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
+    apiError.body = { message: 'UserEmailNotVerifiedException' };
+    loginError = apiError;
+
+    renderLogin();
+
+    const input = screen.getByLabelText('Email address');
+    await user.type(input, 'test@example.com');
+    await user.click(screen.getByTestId('resend-verification-button'));
+
+    const mutationError = new Error('boom') as Error & { body: Record<string, unknown> };
+    mutationError.body = { message: 'GenericException' };
+    act(() => resendOnError?.(mutationError));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resend-error-alert')).toBeInTheDocument();
+    });
+  });
+
   it('shows success alert after resend succeeds and hides the resend form', async () => {
     const user = userEvent.setup();
     const apiError = new Error('Forbidden') as Error & { body: Record<string, unknown> };
@@ -162,7 +220,7 @@ describe('LoginForm – resend verification email', () => {
     const input = screen.getByLabelText('Email address');
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
-    resendOnSuccess?.();
+    act(() => resendOnSuccess?.());
 
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();

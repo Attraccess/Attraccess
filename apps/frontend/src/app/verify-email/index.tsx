@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isValidEmail } from '../../utils/email';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
@@ -149,9 +150,15 @@ export function VerifyEmail() {
                 <Button
                   fullWidth
                   color="secondary"
-                  onPress={() => resendVerification.mutate({ requestBody: { email: resendEmail } })}
+                  onPress={() => {
+                    const trimmed = resendEmail.trim();
+                    if (!isValidEmail(trimmed)) {
+                      return;
+                    }
+                    resendVerification.mutate({ requestBody: { email: trimmed } });
+                  }}
                   isLoading={resendVerification.isPending}
-                  isDisabled={!resendEmail || resendVerification.isPending}
+                  isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
                   data-testid="resend-verification-button"
                 >
                   {t('resend.button')}
