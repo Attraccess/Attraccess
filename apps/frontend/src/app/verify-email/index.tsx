@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isValidEmail } from '../../utils/email';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Input, Label, TextField } from '@heroui/react';
 import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { isValidEmail } from '../../utils/email';
 import en from './en.json';
 import de from './de.json';
 import {

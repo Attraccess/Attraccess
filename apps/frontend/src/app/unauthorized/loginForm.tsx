@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { isValidEmail } from '../../utils/email';
 import { ArrowRight, LogInIcon } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '../../components/button';
@@ -90,6 +91,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
   const { mutate: login, isPending, error } = useLogin();
   const [resendEmail, setResendEmail] = useState('');
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [resendError, setResendError] = useState<{ title: string; description: string } | null>(null);
 
   const isEmailNotVerified = useMemo(() => {
     if (!error) return false;
@@ -98,9 +100,30 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
     return body?.message === 'UserEmailNotVerifiedException';
   }, [error]);
 
+  useEffect(() => {
+    setResendSuccess(false);
+    setResendError(null);
+    setResendEmail('');
+  }, [error]);
+
   const resendVerification = useUsersServiceResendVerificationEmail({
     onSuccess: () => {
+      setResendError(null);
       setResendSuccess(true);
+    },
+    onError: (mutationError) => {
+      setResendSuccess(false);
+      const { key } = getTranslationKeyForApiError({
+        error: mutationError as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+        fallbackKey: 'generic',
+      });
+      setResendError({
+        title: t(key + '.title', { error: mutationError }),
+        description: t(key + '.description', { error: mutationError }),
+      });
     },
   });
 
@@ -141,6 +164,7 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       }
 
       setResendSuccess(false);
+      setResendError(null);
 
       login({
         username,
@@ -209,15 +233,32 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
             type="email"
             label={t('resendVerification.emailLabel')}
             value={resendEmail}
-            onValueChange={setResendEmail}
+            onValueChange={(value) => {
+              setResendEmail(value);
+              setResendError(null);
+            }}
             data-testid="resend-email-input"
           />
+          {resendError && (
+            <Alert
+              color="danger"
+              title={resendError.title}
+              description={resendError.description}
+              data-testid="resend-error-alert"
+            />
+          )}
           <Button
             fullWidth
             color="secondary"
-            onPress={() => resendVerification.mutate({ requestBody: { email: resendEmail } })}
+            onPress={() => {
+              const trimmed = resendEmail.trim();
+              if (!isValidEmail(trimmed)) {
+                return;
+              }
+              resendVerification.mutate({ requestBody: { email: trimmed } });
+            }}
             isLoading={resendVerification.isPending}
-            isDisabled={!resendEmail || resendVerification.isPending}
+            isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
             data-testid="resend-verification-button"
           >
             {t('resendVerification.button')}

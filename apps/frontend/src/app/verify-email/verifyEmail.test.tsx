@@ -183,6 +183,33 @@ describe('VerifyEmail', () => {
     });
   });
 
+  it('disables resend button when email format is invalid', async () => {
+    renderWithRoute('/verify-email?email=not-an-email&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('resend-verification-button')).toBeDisabled();
+  });
+
+  it('trims surrounding whitespace before submitting the resend request', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email?email=%20%20spaced%40example.com%20%20&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('resend-verification-button'));
+
+    expect(resendMutateMock).toHaveBeenCalledWith({
+      requestBody: { email: 'spaced@example.com' },
+    });
+  });
+
   it('hides resend form and shows success alert after resend succeeds (replaces form)', async () => {
     const user = userEvent.setup();
     renderWithRoute('/verify-email?email=test%40example.com&token=bad');
