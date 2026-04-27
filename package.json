@@ -166,7 +166,7 @@
     "@types/jest": "30.0.0",
     "@types/lodash-es": "^4.17.12",
     "@types/mjml": "^4.7.4",
-    "@types/node": "20.19.39",
+    "@types/node": "25.6.0",
     "@types/nodemailer": "^8.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
