@@ -1,14 +1,23 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { SumUp } from '@sumup/sdk';
+// DTO for SumUp Merchant API response with Swagger documentation
+// FEATURE: Billing SumUp integration DTO layer
 
-export class SumUpMerchantProfile implements SumUp.Merchant.MerchantProfile {
-  @ApiProperty({ type: String, example: '1234567890' })
-  merchant_code?: string;
-  @ApiProperty({ type: String, example: 'Attraccess' })
-  company_name?: string;
+import { ApiProperty } from '@nestjs/swagger';
+
+export class SumUpCompanyDto {
+  @ApiProperty({ type: String, example: 'Attraccess GmbH', required: false })
+  name?: string;
 }
 
-export class SumUpMerchantDto implements SumUp.Merchant.MerchantAccount {
-  @ApiProperty({ type: SumUpMerchantProfile, required: false })
-  merchant_profile?: SumUpMerchantProfile;
+export class SumUpMerchantDto {
+  @ApiProperty({ type: String, example: '1234567890' })
+  merchant_code: string;
+
+  @ApiProperty({ type: String, example: 'EUR' })
+  default_currency: string;
+
+  @ApiProperty({ type: String, example: 'en-US' })
+  default_locale: string;
+
+  @ApiProperty({ type: SumUpCompanyDto, required: false })
+  company?: SumUpCompanyDto;
 }

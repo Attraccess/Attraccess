@@ -1,3 +1,6 @@
+// Tests for SumUpService billing integration with mocked SDK
+// FEATURE: Billing SumUp integration
+
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -9,8 +12,8 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
 import { SettingsService } from '../settings/settings.service';
 
-// Mock @sumup/sdk
-const mockMerchantGet = jest.fn();
+const mockSumUpGet = jest.fn();
+const mockMerchantsGet = jest.fn();
 const mockReadersList = jest.fn();
 const mockReadersCreate = jest.fn();
 const mockReadersDelete = jest.fn();
@@ -20,11 +23,12 @@ const mockTransactionsGet = jest.fn();
 jest.mock('@sumup/sdk', () => {
   return {
     SumUp: jest.fn().mockImplementation(() => ({
-      merchant: { get: mockMerchantGet },
+      get: mockSumUpGet,
+      merchants: { get: mockMerchantsGet },
       readers: {
         list: mockReadersList,
         create: mockReadersCreate,
-        deleteReader: mockReadersDelete,
+        delete: mockReadersDelete,
         createCheckout: mockReadersCreateCheckout,
       },
       transactions: { get: mockTransactionsGet },
@@ -77,7 +81,8 @@ describe('SumUpService', () => {
 
   const resetAllMocks = () => {
     jest.clearAllMocks();
-    mockMerchantGet.mockReset();
+    mockSumUpGet.mockReset();
+    mockMerchantsGet.mockReset();
     mockReadersList.mockReset();
     mockReadersCreate.mockReset();
     mockReadersDelete.mockReset();
@@ -122,30 +127,32 @@ describe('SumUpService', () => {
   });
 
   describe('setApiKey', () => {
-    it('stores encrypted API key via update when existing', async () => {
-      mockMerchantGet.mockResolvedValue({});
+    it('stores encrypted API key and merchant code via update when existing', async () => {
+      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
       settingRepository.findOneBy.mockResolvedValue({ id: 1, value: 'enc' });
       encryptionService.encrypt.mockReturnValue('encrypted');
 
       await service.setApiKey('token');
 
       expect(settingRepository.update).toHaveBeenCalledWith(1, { value: 'encrypted' });
+      expect(settingRepository.update).toHaveBeenCalledWith(1, { value: 'M123' });
       expect(settingRepository.insert).not.toHaveBeenCalled();
     });
 
-    it('stores encrypted API key via insert when missing', async () => {
-      mockMerchantGet.mockResolvedValue({});
+    it('stores encrypted API key and merchant code via insert when missing', async () => {
+      mockSumUpGet.mockResolvedValue({ merchant_code: 'M123' });
       settingRepository.findOneBy.mockResolvedValue(null);
       encryptionService.encrypt.mockReturnValue('encrypted');
 
       await service.setApiKey('token');
 
       expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'apiKey', value: 'encrypted' });
+      expect(settingRepository.insert).toHaveBeenCalledWith({ parent: 'sumup', key: 'merchantCode', value: 'M123' });
       expect(settingRepository.update).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException on invalid API key', async () => {
-      mockMerchantGet.mockRejectedValue(new Error('invalid'));
+      mockSumUpGet.mockRejectedValue(new Error('invalid'));
 
       await expect(service.setApiKey('bad')).rejects.toBeInstanceOf(BadRequestException);
       expect(settingRepository.insert).not.toHaveBeenCalled();
@@ -177,20 +184,26 @@ describe('SumUpService', () => {
     });
   });
 
+  const merchantCode = 'M123';
+
   const withApiKey = () => {
-    settingRepository.findOneBy.mockResolvedValue({ value: 'enc' });
+    settingRepository.findOneBy.mockImplementation(({ key }: { key: string }) => {
+      if (key === 'apiKey') return Promise.resolve({ value: 'enc' });
+      if (key === 'merchantCode') return Promise.resolve({ value: merchantCode });
+      return Promise.resolve(null);
+    });
     encryptionService.decrypt.mockReturnValue('token');
   };
 
-  const merchantCode = 'M123';
-  const mockMerchant = { merchant_profile: { merchant_code: merchantCode } };
+  const mockMerchant = { merchant_code: merchantCode, default_currency: 'EUR', default_locale: 'en-US' };
 
   describe('getMerchant', () => {
     it('returns merchant from SDK', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
+      mockMerchantsGet.mockResolvedValue(mockMerchant);
 
       const merchant = await service.getMerchant();
+      expect(mockMerchantsGet).toHaveBeenCalledWith(merchantCode);
       expect(merchant).toEqual(mockMerchant);
     });
   });
@@ -198,7 +211,6 @@ describe('SumUpService', () => {
   describe('getReaders', () => {
     it('lists readers for merchant', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       mockReadersList.mockResolvedValue({ items: [{ id: 'r1' }, { id: 'r2' }] });
 
       const readers = await service.getReaders();
@@ -210,7 +222,6 @@ describe('SumUpService', () => {
   describe('pairReader', () => {
     it('creates reader with uppercase pairing code', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       mockReadersCreate.mockResolvedValue({ id: 'rid' });
 
       const res = await service.pairReader('ab12', 'My Reader');
@@ -220,7 +231,6 @@ describe('SumUpService', () => {
 
     it('wraps SDK error into BadRequestException with message preference', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err: any = new Error('fallback');
       err.error = { message: 'Specific' };
@@ -233,7 +243,6 @@ describe('SumUpService', () => {
   describe('removeReader', () => {
     it('swallows unexpected non-json response error', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       mockReadersDelete.mockRejectedValue(new Error('SumUpError: Unexpected non-json response'));
 
       await expect(service.removeReader('rid')).resolves.toBeUndefined();
@@ -241,7 +250,6 @@ describe('SumUpService', () => {
 
     it('rethrows other errors', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       mockReadersDelete.mockRejectedValue(new Error('Some other error'));
 
       await expect(service.removeReader('rid')).rejects.toBeInstanceOf(Error);
@@ -257,7 +265,6 @@ describe('SumUpService', () => {
 
     it('creates checkout, saves transaction, and notifies', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
       mockReadersCreateCheckout.mockResolvedValue({ data: { client_transaction_id: 'tx123' } });
       billingTransactionRepository.save.mockImplementation(async (t: BillingTransaction) => ({ id: 1, ...t }));
@@ -285,7 +292,6 @@ describe('SumUpService', () => {
 
     it('maps reader not found error', async () => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
       billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err: any = new Error('not found');
@@ -327,7 +333,6 @@ describe('SumUpService', () => {
 
     beforeEach(() => {
       withApiKey();
-      mockMerchantGet.mockResolvedValue(mockMerchant);
     });
 
     it('throws when transaction not found', async () => {
