@@ -3961,7 +3961,7 @@ export const $SumUpReaderDto = {
         device: {
             '$ref': '#/components/schemas/SumUpReaderDevice'
         },
-        meta: {
+        metadata: {
             type: 'object',
             example: {},
             additionalProperties: true

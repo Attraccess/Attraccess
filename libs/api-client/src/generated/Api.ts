@@ -2583,7 +2583,7 @@ export interface SumUpReaderDto {
   status: SumUpReaderStatus;
   device: SumUpReaderDevice;
   /** @example {} */
-  meta?: Record<string, any>;
+  metadata?: Record<string, any>;
   /**
    * @format date-time
    * @example "2021-01-01T00:00:00.000Z"
