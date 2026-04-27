@@ -103,7 +103,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Post image URL comment to PR
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
