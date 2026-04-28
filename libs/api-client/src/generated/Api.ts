@@ -1135,11 +1135,36 @@ export interface SmtpSettingsDto {
   passConfigured: boolean;
 }
 
+export interface RateLimitSettingsDto {
+  /** @example 60 */
+  ipLoginWindowSeconds: number;
+  /** @example 10 */
+  ipLoginMaxRequests: number;
+  /** @example 900 */
+  ipEmailTriggerWindowSeconds: number;
+  /** @example 5 */
+  ipEmailTriggerMaxRequests: number;
+  /** @example 900 */
+  ipTokenActionWindowSeconds: number;
+  /** @example 20 */
+  ipTokenActionMaxRequests: number;
+  /** @example 60 */
+  accountVerifyResendCooldownSeconds: number;
+  /** @example 60 */
+  accountPasswordResetCooldownSeconds: number;
+  /** @example 10 */
+  accountLoginMaxFailures: number;
+  /** @example 900 */
+  accountLoginLockSeconds: number;
+}
+
 export interface SystemSettingsDto {
   /** Application settings */
   app: AppSettingsDto;
   /** SMTP settings */
   smtp: SmtpSettingsDto;
+  /** Rate-limit settings */
+  rateLimit: RateLimitSettingsDto;
 }
 
 export interface UpdateAppSettingsDto {
@@ -1195,11 +1220,26 @@ export interface UpdateSmtpSettingsDto {
   from: string;
 }
 
+export interface UpdateRateLimitSettingsDto {
+  ipLoginWindowSeconds?: number;
+  ipLoginMaxRequests?: number;
+  ipEmailTriggerWindowSeconds?: number;
+  ipEmailTriggerMaxRequests?: number;
+  ipTokenActionWindowSeconds?: number;
+  ipTokenActionMaxRequests?: number;
+  accountVerifyResendCooldownSeconds?: number;
+  accountPasswordResetCooldownSeconds?: number;
+  accountLoginMaxFailures?: number;
+  accountLoginLockSeconds?: number;
+}
+
 export interface UpdateSystemSettingsDto {
   /** Application settings update */
   app?: UpdateAppSettingsDto;
   /** SMTP settings update */
   smtp?: UpdateSmtpSettingsDto;
+  /** Rate-limit settings update */
+  rateLimit?: UpdateRateLimitSettingsDto;
 }
 
 export interface FirstTimeSetupStepsDto {

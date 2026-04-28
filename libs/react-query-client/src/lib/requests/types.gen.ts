@@ -983,6 +983,19 @@ export type SmtpSettingsDto = {
     passConfigured: boolean;
 };
 
+export type RateLimitSettingsDto = {
+    ipLoginWindowSeconds: number;
+    ipLoginMaxRequests: number;
+    ipEmailTriggerWindowSeconds: number;
+    ipEmailTriggerMaxRequests: number;
+    ipTokenActionWindowSeconds: number;
+    ipTokenActionMaxRequests: number;
+    accountVerifyResendCooldownSeconds: number;
+    accountPasswordResetCooldownSeconds: number;
+    accountLoginMaxFailures: number;
+    accountLoginLockSeconds: number;
+};
+
 export type SystemSettingsDto = {
     /**
      * Application settings
@@ -992,6 +1005,10 @@ export type SystemSettingsDto = {
      * SMTP settings
      */
     smtp: SmtpSettingsDto;
+    /**
+     * Rate-limit settings
+     */
+    rateLimit: RateLimitSettingsDto;
 };
 
 export type UpdateAppSettingsDto = {
@@ -1040,6 +1057,19 @@ export type UpdateSmtpSettingsDto = {
     from: string;
 };
 
+export type UpdateRateLimitSettingsDto = {
+    ipLoginWindowSeconds?: number;
+    ipLoginMaxRequests?: number;
+    ipEmailTriggerWindowSeconds?: number;
+    ipEmailTriggerMaxRequests?: number;
+    ipTokenActionWindowSeconds?: number;
+    ipTokenActionMaxRequests?: number;
+    accountVerifyResendCooldownSeconds?: number;
+    accountPasswordResetCooldownSeconds?: number;
+    accountLoginMaxFailures?: number;
+    accountLoginLockSeconds?: number;
+};
+
 export type UpdateSystemSettingsDto = {
     /**
      * Application settings update
@@ -1049,6 +1079,10 @@ export type UpdateSystemSettingsDto = {
      * SMTP settings update
      */
     smtp?: UpdateSmtpSettingsDto;
+    /**
+     * Rate-limit settings update
+     */
+    rateLimit?: UpdateRateLimitSettingsDto;
 };
 
 export type FirstTimeSetupStepsDto = {

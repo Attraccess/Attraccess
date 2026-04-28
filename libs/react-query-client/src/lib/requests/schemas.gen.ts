@@ -1513,6 +1513,53 @@ export const $SmtpSettingsDto = {
     required: ['service', 'host', 'port', 'secure', 'user', 'from', 'passConfigured']
 } as const;
 
+export const $RateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        ipLoginWindowSeconds: {
+            type: 'number',
+            example: 60
+        },
+        ipLoginMaxRequests: {
+            type: 'number',
+            example: 10
+        },
+        ipEmailTriggerWindowSeconds: {
+            type: 'number',
+            example: 900
+        },
+        ipEmailTriggerMaxRequests: {
+            type: 'number',
+            example: 5
+        },
+        ipTokenActionWindowSeconds: {
+            type: 'number',
+            example: 900
+        },
+        ipTokenActionMaxRequests: {
+            type: 'number',
+            example: 20
+        },
+        accountVerifyResendCooldownSeconds: {
+            type: 'number',
+            example: 60
+        },
+        accountPasswordResetCooldownSeconds: {
+            type: 'number',
+            example: 60
+        },
+        accountLoginMaxFailures: {
+            type: 'number',
+            example: 10
+        },
+        accountLoginLockSeconds: {
+            type: 'number',
+            example: 900
+        }
+    },
+    required: ['ipLoginWindowSeconds', 'ipLoginMaxRequests', 'ipEmailTriggerWindowSeconds', 'ipEmailTriggerMaxRequests', 'ipTokenActionWindowSeconds', 'ipTokenActionMaxRequests', 'accountVerifyResendCooldownSeconds', 'accountPasswordResetCooldownSeconds', 'accountLoginMaxFailures', 'accountLoginLockSeconds']
+} as const;
+
 export const $SystemSettingsDto = {
     type: 'object',
     properties: {
@@ -1531,9 +1578,17 @@ export const $SystemSettingsDto = {
                     '$ref': '#/components/schemas/SmtpSettingsDto'
                 }
             ]
+        },
+        rateLimit: {
+            description: 'Rate-limit settings',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RateLimitSettingsDto'
+                }
+            ]
         }
     },
-    required: ['app', 'smtp']
+    required: ['app', 'smtp', 'rateLimit']
 } as const;
 
 export const $UpdateAppSettingsDto = {
@@ -1603,6 +1658,42 @@ export const $UpdateSmtpSettingsDto = {
     required: ['service', 'host', 'port', 'from']
 } as const;
 
+export const $UpdateRateLimitSettingsDto = {
+    type: 'object',
+    properties: {
+        ipLoginWindowSeconds: {
+            type: 'number'
+        },
+        ipLoginMaxRequests: {
+            type: 'number'
+        },
+        ipEmailTriggerWindowSeconds: {
+            type: 'number'
+        },
+        ipEmailTriggerMaxRequests: {
+            type: 'number'
+        },
+        ipTokenActionWindowSeconds: {
+            type: 'number'
+        },
+        ipTokenActionMaxRequests: {
+            type: 'number'
+        },
+        accountVerifyResendCooldownSeconds: {
+            type: 'number'
+        },
+        accountPasswordResetCooldownSeconds: {
+            type: 'number'
+        },
+        accountLoginMaxFailures: {
+            type: 'number'
+        },
+        accountLoginLockSeconds: {
+            type: 'number'
+        }
+    }
+} as const;
+
 export const $UpdateSystemSettingsDto = {
     type: 'object',
     properties: {
@@ -1619,6 +1710,14 @@ export const $UpdateSystemSettingsDto = {
             allOf: [
                 {
                     '$ref': '#/components/schemas/UpdateSmtpSettingsDto'
+                }
+            ]
+        },
+        rateLimit: {
+            description: 'Rate-limit settings update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateRateLimitSettingsDto'
                 }
             ]
         }
