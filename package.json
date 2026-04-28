@@ -195,7 +195,7 @@
     "eslint-plugin-react-hooks": "5.2.0",
     "happy-dom": "^18.0.1",
     "husky": "^9.1.7",
-    "ink": "^6.8.0",
+    "ink": "^7.0.0",
     "jest": "30.3.0",
     "jest-environment-jsdom": "30.3.0",
     "jest-environment-node": "^30.3.0",
