@@ -1,3 +1,6 @@
+// Behavioural tests for sliding-window IP rate limiter and memory cap
+// FEATURE: Rate limiting subsystem for unauthenticated API endpoints
+
 import { Test } from '@nestjs/testing';
 import { RateLimitService } from './rate-limit.service';
 import { SettingsStoreService } from '../settings/settings-store.service';
