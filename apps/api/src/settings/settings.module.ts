@@ -11,6 +11,6 @@ import { SmtpSettingsService } from './smtp-settings.service';
   imports: [EncryptionModule, TypeOrmModule.forFeature([Setting, User])],
   providers: [SettingsStoreService, SmtpSettingsService, SettingsService],
   controllers: [SettingsController],
-  exports: [SettingsService],
+  exports: [SettingsService, SettingsStoreService],
 })
 export class SettingsModule {}

@@ -23,6 +23,7 @@ import { LicenseService } from '../license/license.service';
 import { BillingModule } from '../billing/billing.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsModule } from '../metrics/metrics.module';
@@ -39,6 +40,7 @@ import { VersionModule } from '../version/version.module';
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
     SettingsModule,
+    RateLimitModule,
     TypeOrmModule.forRoot(dataSourceConfig),
     ResourcesModule,
     ServeStaticModule.forRootAsync({

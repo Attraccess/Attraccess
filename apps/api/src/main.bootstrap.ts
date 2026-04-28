@@ -97,6 +97,7 @@ export async function bootstrap() {
 
   app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
 
+  app.set('trust proxy', 'loopback');
   app.use(cookieParser());
 
   const appSettingsService = app.get(SettingsService);
