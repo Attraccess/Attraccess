@@ -1,0 +1,4 @@
+{
+  "title": "Rate limiting",
+  "subtitle": "Throttle abusive requests on unauthenticated endpoints."
+}

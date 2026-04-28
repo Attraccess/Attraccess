@@ -1,0 +1,17 @@
+{
+  "save": "Speichern",
+  "success": { "title": "Gespeichert", "description": "Rate-Limit-Einstellungen aktualisiert." },
+  "error": { "title": "Speichern fehlgeschlagen", "description": "Rate-Limit-Einstellungen konnten nicht aktualisiert werden." },
+  "fields": {
+    "ipLoginWindowSeconds": "Login: Zeitfenster pro IP (Sekunden)",
+    "ipLoginMaxRequests": "Login: max. Anfragen pro IP im Zeitfenster",
+    "ipEmailTriggerWindowSeconds": "E-Mail-Endpunkte: Zeitfenster pro IP (Sekunden)",
+    "ipEmailTriggerMaxRequests": "E-Mail-Endpunkte: max. Anfragen pro IP im Zeitfenster",
+    "ipTokenActionWindowSeconds": "Token-Endpunkte: Zeitfenster pro IP (Sekunden)",
+    "ipTokenActionMaxRequests": "Token-Endpunkte: max. Anfragen pro IP im Zeitfenster",
+    "accountVerifyResendCooldownSeconds": "Verifizierung erneut senden: Cooldown pro Konto (Sekunden)",
+    "accountPasswordResetCooldownSeconds": "Passwort-Reset: Cooldown pro Konto (Sekunden)",
+    "accountLoginMaxFailures": "Account-Sperre: max. fehlgeschlagene Logins",
+    "accountLoginLockSeconds": "Account-Sperre: Dauer (Sekunden)"
+  }
+}

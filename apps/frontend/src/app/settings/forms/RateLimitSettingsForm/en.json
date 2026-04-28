@@ -1,0 +1,17 @@
+{
+  "save": "Save",
+  "success": { "title": "Saved", "description": "Rate-limit settings updated." },
+  "error": { "title": "Save failed", "description": "Could not update rate-limit settings." },
+  "fields": {
+    "ipLoginWindowSeconds": "Login: per-IP window (seconds)",
+    "ipLoginMaxRequests": "Login: per-IP max requests in window",
+    "ipEmailTriggerWindowSeconds": "Email-triggering routes: per-IP window (seconds)",
+    "ipEmailTriggerMaxRequests": "Email-triggering routes: per-IP max requests in window",
+    "ipTokenActionWindowSeconds": "Token routes: per-IP window (seconds)",
+    "ipTokenActionMaxRequests": "Token routes: per-IP max requests in window",
+    "accountVerifyResendCooldownSeconds": "Resend verification: per-account cooldown (seconds)",
+    "accountPasswordResetCooldownSeconds": "Password reset: per-account cooldown (seconds)",
+    "accountLoginMaxFailures": "Account lockout: max failed login attempts",
+    "accountLoginLockSeconds": "Account lockout: duration (seconds)"
+  }
+}
