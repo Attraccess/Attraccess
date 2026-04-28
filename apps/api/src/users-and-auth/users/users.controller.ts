@@ -69,6 +69,9 @@ import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { SSOService } from '../auth/sso/sso.service';
 import { getSsoManagedPermissionKeys } from '@attraccess/shared';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { RateLimit } from '../../rate-limit/rate-limit.decorator';
+import { RateLimitInterceptor } from '../../rate-limit/rate-limit.interceptor';
+import { RateLimitService } from '../../rate-limit/rate-limit.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -84,6 +87,9 @@ export class UsersController {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly tokenHashService: TokenHashService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly rateLimitService: RateLimitService,
   ) { }
 
   private mapEmailSendError(error: unknown): never {
@@ -610,6 +616,8 @@ export class UsersController {
   }
 
   @Post('resend-verification-email')
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'emailTrigger', mode: 'silentOk' })
   @ApiOperation({ summary: 'Resend the email verification link', operationId: 'resendVerificationEmail' })
   @ApiResponse({
     status: 200,
@@ -634,9 +642,19 @@ export class UsersController {
       return { message: 'OK' };
     }
 
+    const cooldown = await this.rateLimitService.accountCooldown(
+      'verifyResend',
+      user.lastVerificationEmailSentAt ?? null,
+    );
+    if (!cooldown.allowed) {
+      this.logger.debug(`Resend verification cooldown active for: ${body.email}`);
+      return { message: 'OK' };
+    }
+
     try {
       const verificationToken = await this.authService.generateEmailVerificationToken(user);
       await this.emailService.sendVerificationEmail(user, verificationToken);
+      await this.userRepository.update(user.id, { lastVerificationEmailSentAt: new Date() });
       this.logger.debug(`Verification email resent to: ${body.email}`);
     } catch (e) {
       this.logger.error(`Error resending verification email for: ${body.email}`, e.stack);

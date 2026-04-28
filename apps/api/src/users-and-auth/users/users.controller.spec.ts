@@ -13,6 +13,7 @@ import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { ForbiddenException } from '@nestjs/common';
+import { RateLimitService } from '../../rate-limit/rate-limit.service';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -79,6 +80,11 @@ describe('UsersController', () => {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
           },
         },
+        {
+          provide: RateLimitService,
+          useValue: { accountCooldown: jest.fn().mockResolvedValue({ allowed: true, retryAfterSeconds: 0 }) },
+        },
+        { provide: getRepositoryToken(User), useValue: { update: jest.fn() } },
       ],
     }).compile();
 

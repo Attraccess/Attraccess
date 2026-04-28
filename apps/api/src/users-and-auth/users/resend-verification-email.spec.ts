@@ -5,12 +5,15 @@ import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
 import { SSOService } from '../auth/sso/sso.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { RateLimitService } from '../../rate-limit/rate-limit.service';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Setting, User } from '@attraccess/database-entities';
 
 describe('UsersController – resendVerificationEmail', () => {
   let controller: UsersController;
+  let rateLimitService: { accountCooldown: jest.Mock };
+  let userRepository: { update: jest.Mock };
 
   const usersService = {
     findOne: jest.fn(),
@@ -74,10 +77,17 @@ describe('UsersController – resendVerificationEmail', () => {
         { provide: SSOService, useValue: ssoService },
         { provide: getRepositoryToken(Setting), useValue: settingRepository },
         { provide: TokenHashService, useValue: tokenHashService },
+        {
+          provide: RateLimitService,
+          useValue: { accountCooldown: jest.fn().mockResolvedValue({ allowed: true, retryAfterSeconds: 0 }) },
+        },
+        { provide: getRepositoryToken(User), useValue: { update: jest.fn() } },
       ],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
+    rateLimitService = module.get(RateLimitService);
+    userRepository = module.get(getRepositoryToken(User));
   });
 
   it('should return OK when no user exists with the given email', async () => {
@@ -224,5 +234,46 @@ describe('UsersController – resendVerificationEmail', () => {
     await controller.resendVerificationEmail({ email: 'UPPER@CASE.COM' });
 
     expect(usersService.findOne).toHaveBeenCalledWith({ email: 'UPPER@CASE.COM' });
+  });
+
+  it('should return OK without sending email when per-account cooldown is active', async () => {
+    const unverifiedUser: Partial<User> = {
+      id: 8,
+      email: 'cooldown@example.com',
+      isEmailVerified: false,
+      lastVerificationEmailSentAt: new Date(Date.now() - 10_000),
+    };
+    usersService.findOne.mockResolvedValue(unverifiedUser);
+    rateLimitService.accountCooldown.mockResolvedValue({ allowed: false, retryAfterSeconds: 30 });
+
+    const result = await controller.resendVerificationEmail({ email: 'cooldown@example.com' });
+
+    expect(result).toEqual({ message: 'OK' });
+    expect(rateLimitService.accountCooldown).toHaveBeenCalledWith(
+      'verifyResend',
+      unverifiedUser.lastVerificationEmailSentAt,
+    );
+    expect(authService.generateEmailVerificationToken).not.toHaveBeenCalled();
+    expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it('should update lastVerificationEmailSentAt after a successful send', async () => {
+    const unverifiedUser: Partial<User> = {
+      id: 9,
+      email: 'timestamp@example.com',
+      isEmailVerified: false,
+      lastVerificationEmailSentAt: null,
+    };
+    usersService.findOne.mockResolvedValue(unverifiedUser);
+    authService.generateEmailVerificationToken.mockResolvedValue('token-xyz');
+    emailService.sendVerificationEmail.mockResolvedValue(undefined);
+    userRepository.update.mockResolvedValue(undefined);
+
+    const result = await controller.resendVerificationEmail({ email: 'timestamp@example.com' });
+
+    expect(result).toEqual({ message: 'OK' });
+    expect(userRepository.update).toHaveBeenCalledWith(unverifiedUser.id, {
+      lastVerificationEmailSentAt: expect.any(Date),
+    });
   });
 });
