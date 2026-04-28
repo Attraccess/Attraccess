@@ -82,4 +82,43 @@ describe('RateLimitService', () => {
       expect(decision.allowed).toBe(true);
     });
   });
+
+  describe('accountCooldown', () => {
+    it('allows when there is no previous send', async () => {
+      const decision = await service.accountCooldown('verifyResend', null);
+      expect(decision.allowed).toBe(true);
+      expect(decision.retryAfterSeconds).toBe(0);
+    });
+
+    it('blocks when the previous send was inside the cooldown window', async () => {
+      const decision = await service.accountCooldown(
+        'verifyResend',
+        new Date(Date.now() - 5 * 1000),
+      );
+      expect(decision.allowed).toBe(false);
+      expect(decision.retryAfterSeconds).toBeGreaterThan(0);
+    });
+
+    it('allows again once the cooldown has passed', async () => {
+      const decision = await service.accountCooldown(
+        'verifyResend',
+        new Date(
+          Date.now() -
+            (RATE_LIMIT_DEFAULTS.accountVerifyResendCooldownSeconds + 1) * 1000,
+        ),
+      );
+      expect(decision.allowed).toBe(true);
+    });
+
+    it('uses the password-reset cooldown for the passwordReset key', async () => {
+      const decision = await service.accountCooldown(
+        'passwordReset',
+        new Date(Date.now() - 5 * 1000),
+      );
+      expect(decision.allowed).toBe(false);
+      expect(decision.retryAfterSeconds).toBeLessThanOrEqual(
+        RATE_LIMIT_DEFAULTS.accountPasswordResetCooldownSeconds,
+      );
+    });
+  });
 });

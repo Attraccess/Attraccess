@@ -55,6 +55,31 @@ export class RateLimitService {
     return { allowed: true, retryAfterSeconds: 0 };
   }
 
+  async accountCooldown(
+    kind: 'verifyResend' | 'passwordReset',
+    lastSentAt: Date | null,
+  ): Promise<RateLimitDecision> {
+    const cooldownSeconds = await this.readNumber(
+      kind === 'verifyResend'
+        ? RATE_LIMIT_KEYS.accountVerifyResendCooldownSeconds
+        : RATE_LIMIT_KEYS.accountPasswordResetCooldownSeconds,
+      kind === 'verifyResend'
+        ? RATE_LIMIT_DEFAULTS.accountVerifyResendCooldownSeconds
+        : RATE_LIMIT_DEFAULTS.accountPasswordResetCooldownSeconds,
+    );
+    if (!lastSentAt) {
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    const elapsedSeconds = (Date.now() - lastSentAt.getTime()) / 1000;
+    if (elapsedSeconds >= cooldownSeconds) {
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(cooldownSeconds - elapsedSeconds)),
+    };
+  }
+
   private enforceCap(bucket: IpBucket): void {
     if (bucket.size <= RATE_LIMIT_IP_BUCKET_CAP) return;
     const overflow = bucket.size - RATE_LIMIT_IP_BUCKET_CAP;
