@@ -7,6 +7,7 @@ import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { RateLimitService } from '../../rate-limit/rate-limit.service';
+import { RateLimitGuard } from '../../rate-limit/rate-limit.guard';
 
 describe('AuthController', () => {
   let authController: AuthController;
@@ -42,6 +43,10 @@ describe('AuthController', () => {
           useValue: {
             checkIp: jest.fn().mockResolvedValue({ allowed: true, retryAfterSeconds: 0 }),
           },
+        },
+        {
+          provide: RateLimitGuard,
+          useValue: { canActivate: jest.fn().mockResolvedValue(true) },
         },
       ],
     }).compile();

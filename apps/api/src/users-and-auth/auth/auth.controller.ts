@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginGuard } from '../strategies/login.guard';
@@ -7,7 +7,7 @@ import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { RateLimit } from '../../rate-limit/rate-limit.decorator';
-import { RateLimitInterceptor } from '../../rate-limit/rate-limit.interceptor';
+import { RateLimitGuard } from '../../rate-limit/rate-limit.guard';
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -18,9 +18,8 @@ export class AuthController {
   ) {}
 
   @Post('/session/local')
-  @UseInterceptors(RateLimitInterceptor)
   @RateLimit({ scope: 'login', mode: '429' })
-  @UseGuards(LoginGuard)
+  @UseGuards(RateLimitGuard, LoginGuard)
   @ApiOperation({ summary: 'Create a new session using local authentication', operationId: 'createSession' })
   @ApiResponse({
     status: 200,
