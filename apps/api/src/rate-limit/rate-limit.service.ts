@@ -121,14 +121,6 @@ export class RateLimitService {
     };
   }
 
-  applyLoginSuccess(user: {
-    failedLoginCount: number;
-    loginLockedUntil: Date | null;
-  }): { failedLoginCount: number; loginLockedUntil: Date | null } {
-    void user;
-    return { failedLoginCount: 0, loginLockedUntil: null };
-  }
-
   private enforceCap(bucket: IpBucket): void {
     if (bucket.size <= RATE_LIMIT_IP_BUCKET_CAP) return;
     const overflow = bucket.size - RATE_LIMIT_IP_BUCKET_CAP;

@@ -167,15 +167,5 @@ describe('RateLimitService', () => {
       expect(result.loginLockedUntil).toBeNull();
     });
 
-    it('clears counter and lock on success', () => {
-      const result = service.applyLoginSuccess(
-        baseUser({
-          failedLoginCount: 5,
-          loginLockedUntil: new Date(Date.now() + 1000),
-        }),
-      );
-      expect(result.failedLoginCount).toBe(0);
-      expect(result.loginLockedUntil).toBeNull();
-    });
   });
 });
