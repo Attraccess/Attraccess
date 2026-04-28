@@ -13,6 +13,9 @@ import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
 import { APP_KEYS, APP_PARENT, METRICS_KEYS, METRICS_PARENT } from './constants';
 import { SettingsStoreService } from './settings-store.service';
+import { RATE_LIMIT_DEFAULTS, RATE_LIMIT_KEYS, RATE_LIMIT_PARENT } from '../rate-limit/rate-limit.constants';
+import { RateLimitSettingsDto } from './dto/rate-limit-settings.dto';
+import { UpdateRateLimitSettingsDto } from './dto/update-rate-limit-settings.dto';
 import {
   FirstTimeSetupStatusDto,
   FirstTimeSetupStepsDto,
@@ -60,9 +63,45 @@ export class SettingsService {
     };
   }
 
+  async getRateLimitSettings(): Promise<RateLimitSettingsDto> {
+    const readNumber = async (key: string, fallback: number): Promise<number> => {
+      const raw = await this.settingsStore.getPlainSetting(RATE_LIMIT_PARENT, key);
+      if (raw === null) return fallback;
+      const parsed = Number.parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+    };
+    const entries = await Promise.all(
+      (Object.keys(RATE_LIMIT_DEFAULTS) as Array<keyof typeof RATE_LIMIT_DEFAULTS>).map(
+        async (camel) => {
+          const dbKey = RATE_LIMIT_KEYS[camel];
+          const value = await readNumber(dbKey, RATE_LIMIT_DEFAULTS[camel]);
+          return [camel, value] as const;
+        },
+      ),
+    );
+    return Object.fromEntries(entries) as unknown as RateLimitSettingsDto;
+  }
+
+  async updateRateLimitSettings(update: UpdateRateLimitSettingsDto): Promise<RateLimitSettingsDto> {
+    for (const camel of Object.keys(update) as Array<keyof UpdateRateLimitSettingsDto>) {
+      const value = update[camel];
+      if (value === undefined) continue;
+      await this.settingsStore.setPlainSetting(
+        RATE_LIMIT_PARENT,
+        RATE_LIMIT_KEYS[camel],
+        String(value),
+      );
+    }
+    return this.getRateLimitSettings();
+  }
+
   async getSystemSettings(): Promise<SystemSettingsDto> {
-    const [app, smtp] = await Promise.all([this.getAppSettings(), this.smtpSettingsService.getSettings()]);
-    return { app, smtp };
+    const [app, smtp, rateLimit] = await Promise.all([
+      this.getAppSettings(),
+      this.smtpSettingsService.getSettings(),
+      this.getRateLimitSettings(),
+    ]);
+    return { app, smtp, rateLimit };
   }
 
   async updateSystemSettings(update: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
@@ -71,6 +110,9 @@ export class SettingsService {
     }
     if (update.smtp) {
       await this.updateSmtpSettings(update.smtp);
+    }
+    if (update.rateLimit) {
+      await this.updateRateLimitSettings(update.rateLimit);
     }
     return this.getSystemSettings();
   }

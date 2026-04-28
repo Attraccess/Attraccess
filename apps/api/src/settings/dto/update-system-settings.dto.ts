@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { IsOptional, ValidateNested } from 'class-validator';
 import { UpdateAppSettingsDto } from './update-app-settings.dto';
 import { UpdateSmtpSettingsDto } from './update-smtp-settings.dto';
+import { UpdateRateLimitSettingsDto } from './update-rate-limit-settings.dto';
 
 export class UpdateSystemSettingsDto {
   @IsOptional()
@@ -16,4 +17,10 @@ export class UpdateSystemSettingsDto {
   @Type(() => UpdateSmtpSettingsDto)
   @ApiPropertyOptional({ description: 'SMTP settings update', type: UpdateSmtpSettingsDto })
   smtp?: UpdateSmtpSettingsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateRateLimitSettingsDto)
+  @ApiPropertyOptional({ description: 'Rate-limit settings update', type: UpdateRateLimitSettingsDto })
+  rateLimit?: UpdateRateLimitSettingsDto;
 }
