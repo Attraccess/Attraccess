@@ -22,7 +22,7 @@ export class EmailTemplateController {
   @ApiBody({ type: PreviewMjmlDto })
   @ApiResponse({ status: 200, description: 'MJML preview result', type: PreviewMjmlResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid MJML content' })
-  previewMjml(@Body() previewMjmlDto: PreviewMjmlDto): PreviewMjmlResponseDto {
+  async previewMjml(@Body() previewMjmlDto: PreviewMjmlDto): Promise<PreviewMjmlResponseDto> {
     return this.mjmlService.convertToHtml(previewMjmlDto.mjmlContent);
   }
 

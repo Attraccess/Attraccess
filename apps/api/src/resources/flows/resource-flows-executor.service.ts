@@ -39,7 +39,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { FlowConfigType } from './flow.config';
 import { Subject } from 'rxjs';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import axios from 'axios';
 import Handlebars from 'handlebars';
@@ -469,7 +469,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     this.logger.debug(`Processing nodes: ${nodes.map((n) => `ID:${n.id} Type:${n.type}`).join(', ')}`);
 
-    const flowRunId = `${nanoid(3)}-${nanoid(3)}-${nanoid(3)}`;
+    const flowRunId = `${randomBytes(3).toString('base64url').slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}`;
 
     await this.createFlowLog({
       flowRunId,

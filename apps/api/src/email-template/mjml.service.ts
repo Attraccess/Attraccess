@@ -1,3 +1,6 @@
+// Async MJML-to-HTML conversion service wrapping mjml v5 async API
+// FEATURE: Email template rendering with MJML
+
 import { Injectable, BadRequestException } from '@nestjs/common';
 import mjml2html from 'mjml';
 
@@ -9,9 +12,9 @@ export interface MjmlConversionResult {
 
 @Injectable()
 export class MjmlService {
-  convertToHtml(mjmlContent: string): MjmlConversionResult {
+  async convertToHtml(mjmlContent: string): Promise<MjmlConversionResult> {
     try {
-      const result = mjml2html(mjmlContent);
+      const result = await mjml2html(mjmlContent);
 
       if (result.errors?.length > 0) {
         return {
@@ -30,8 +33,8 @@ export class MjmlService {
     }
   }
 
-  validateAndConvert(mjmlContent: string): string {
-    const result = this.convertToHtml(mjmlContent);
+  async validateAndConvert(mjmlContent: string): Promise<string> {
+    const result = await this.convertToHtml(mjmlContent);
 
     if (result.hasErrors) {
       throw new BadRequestException(`MJML validation failed: ${result.error}`);

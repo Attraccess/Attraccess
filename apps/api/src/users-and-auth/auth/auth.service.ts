@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { EntityManager, Repository } from 'typeorm';
 import { User, AuthenticationDetail, AuthenticationType, SSOProviderType } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -218,7 +218,7 @@ export class AuthService {
   }
 
   async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
-    const token = nanoid();
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
     const storedToken = this.tokenHashService.hashToken(token);
 
     this.logger.debug(`Setting email verification token for user ID: ${user.id}`);
@@ -271,7 +271,7 @@ export class AuthService {
       return null;
     }
 
-    const token = nanoid();
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
     const storedToken = this.tokenHashService.hashToken(token);
     await this.usersService.updateOne(user.id, {
       passwordResetToken: storedToken,

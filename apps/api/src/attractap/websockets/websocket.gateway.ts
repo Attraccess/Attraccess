@@ -14,7 +14,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SumUpService } from '../../billing/sumup.service';
@@ -165,7 +165,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    const id = nanoid(5);
+    const id = randomBytes(4).toString('base64url').slice(0, 5);
     let messageCount = 0;
 
     const sendMessage = async (message: AttractapMessage) => {
@@ -256,7 +256,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }> = [];
 
   private async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
-    const id = nanoid(5);
+    const id = randomBytes(4).toString('base64url').slice(0, 5);
 
     const removeAwaiter = async () => {
       await this.clientResponseAwaitersMutex
