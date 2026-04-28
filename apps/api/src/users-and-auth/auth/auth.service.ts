@@ -10,6 +10,7 @@ import { UsersService } from '../users/users.service';
 import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RateLimitService } from '../../rate-limit/rate-limit.service';
 
 export interface LocalPasswordAuthenticationOptions {
   password: string;
@@ -58,9 +59,12 @@ export class AuthService {
     private emailService: EmailService,
     @InjectRepository(AuthenticationDetail)
     private authenticationDetailRepository: Repository<AuthenticationDetail>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     private usersService: UsersService,
     private readonly tokenHashService: TokenHashService,
     private readonly metricsService: MetricsService,
+    private readonly rateLimitService: RateLimitService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -206,7 +210,33 @@ export class AuthService {
       throw new UserEmailNotVerifiedException();
     }
 
+    if (options.type === AuthenticationType.LOCAL_PASSWORD) {
+      const lock = await this.rateLimitService.checkLoginLock(user);
+      if (!lock.allowed) {
+        this.logger.debug(`Login locked for user ID: ${user.id}`);
+        this.metricsService.authLoginTotal.inc({ method: 'local', status: 'fail' });
+        return null;
+      }
+    }
+
     const isValid = await this.validateAuthenticationDetails(user.id, options);
+
+    if (options.type === AuthenticationType.LOCAL_PASSWORD) {
+      if (!isValid) {
+        const next = await this.rateLimitService.applyLoginFailure(user);
+        await this.userRepository.update(user.id, {
+          failedLoginCount: next.failedLoginCount,
+          loginLockedUntil: next.loginLockedUntil,
+        });
+      } else {
+        this.rateLimitService.applyLoginSuccess(user);
+        await this.userRepository.update(user.id, {
+          failedLoginCount: 0,
+          loginLockedUntil: null,
+        });
+      }
+    }
+
     if (!isValid) {
       this.logger.debug(`Invalid authentication for user ID: ${user.id}`);
       this.metricsService.authLoginTotal.inc({ method: options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso', status: 'fail' });

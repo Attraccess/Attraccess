@@ -43,6 +43,7 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
 import { TwoFactorService } from './auth/two-factor.service';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import { RateLimitModule } from '../rate-limit/rate-limit.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { SettingsService } from '../settings/settings.service';
     EncryptionModule,
     LicenseModule,
     SettingsModule,
+    RateLimitModule,
   ],
   providers: [
     UsersService,

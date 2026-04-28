@@ -9,6 +9,7 @@ import { SSOService } from './sso/sso.service';
 import * as bcrypt from 'bcrypt';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { RateLimitService } from '../../rate-limit/rate-limit.service';
 
 const mockMetricsService = {
   authLoginTotal: { inc: jest.fn() },
@@ -24,6 +25,8 @@ describe('AuthService', () => {
   let authService: AuthService;
   let authenticationDetailRepository: Repository<AuthenticationDetail>;
   let usersService: UsersService;
+  let rateLimitService: { checkLoginLock: jest.Mock; applyLoginFailure: jest.Mock; applyLoginSuccess: jest.Mock };
+  let userRepository: { update: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -69,12 +72,28 @@ describe('AuthService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        {
+          provide: RateLimitService,
+          useValue: {
+            checkLoginLock: jest.fn().mockResolvedValue({ allowed: true, retryAfterSeconds: 0 }),
+            applyLoginFailure: jest.fn().mockResolvedValue({ failedLoginCount: 1, loginLockedUntil: null }),
+            applyLoginSuccess: jest.fn().mockReturnValue({ failedLoginCount: 0, loginLockedUntil: null }),
+          },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: {
+            update: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
     authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
     usersService = module.get<UsersService>(UsersService);
+    rateLimitService = module.get(RateLimitService) as unknown as typeof rateLimitService;
+    userRepository = module.get(getRepositoryToken(User)) as unknown as typeof userRepository;
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -230,6 +249,119 @@ describe('AuthService', () => {
       const result = await authService.userHasSSOAuthentication(1);
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('login lockout (LOCAL_PASSWORD)', () => {
+    const buildUser = (overrides: Partial<User> = {}) =>
+      ({
+        id: 1,
+        username: 'lockuser',
+        email: 'lock@example.com',
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+        systemPermissions: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        resourceIntroductions: [],
+        resourceUsages: [],
+        authenticationDetails: [],
+        resourceIntroducerPermissions: [],
+        lastVerificationEmailSentAt: null,
+        lastPasswordResetSentAt: null,
+        failedLoginCount: 0,
+        loginLockedUntil: null,
+        ...overrides,
+      }) as User;
+
+    it('returns null without bcrypt check when the user is currently locked', async () => {
+      const lockedUser = buildUser({ loginLockedUntil: new Date(Date.now() + 60_000) });
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(lockedUser);
+      rateLimitService.checkLoginLock.mockResolvedValue({ allowed: false, retryAfterSeconds: 60 });
+
+      const result = await authService.getUserByUsernameAndAuthenticationDetails(lockedUser.username, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: { password: 'right-password' },
+      });
+
+      expect(result).toBeNull();
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+      expect(rateLimitService.applyLoginFailure).not.toHaveBeenCalled();
+    });
+
+    it('persists the new lock state on a bad password that crosses the threshold', async () => {
+      const user = buildUser({ failedLoginCount: 9 });
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
+      rateLimitService.checkLoginLock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+      rateLimitService.applyLoginFailure.mockResolvedValue({
+        failedLoginCount: 0,
+        loginLockedUntil: new Date(Date.now() + 900_000),
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
+        userId: user.id,
+        type: AuthenticationType.LOCAL_PASSWORD,
+        password: 'hashed',
+      } as AuthenticationDetail);
+
+      const result = await authService.getUserByUsernameAndAuthenticationDetails(user.username, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: { password: 'wrong' },
+      });
+
+      expect(result).toBeNull();
+      expect(rateLimitService.applyLoginFailure).toHaveBeenCalledWith(user);
+      expect(userRepository.update).toHaveBeenCalledWith(user.id, {
+        failedLoginCount: 0,
+        loginLockedUntil: expect.any(Date),
+      });
+    });
+
+    it('clears the counter and lock on successful login', async () => {
+      const user = buildUser({ failedLoginCount: 3 });
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
+      rateLimitService.checkLoginLock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
+        userId: user.id,
+        type: AuthenticationType.LOCAL_PASSWORD,
+        password: 'hashed',
+      } as AuthenticationDetail);
+
+      const result = await authService.getUserByUsernameAndAuthenticationDetails(user.username, {
+        type: AuthenticationType.LOCAL_PASSWORD,
+        details: { password: 'right' },
+      });
+
+      expect(result).toEqual(user);
+      expect(userRepository.update).toHaveBeenCalledWith(user.id, {
+        failedLoginCount: 0,
+        loginLockedUntil: null,
+      });
+    });
+
+    it('does not enforce lockout for SSO logins', async () => {
+      const user = buildUser();
+      jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
+      jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
+        userId: user.id,
+        type: AuthenticationType.SSO,
+        providerType: SSOProviderType.OIDC,
+        providerId: 1,
+        ssoSubject: 'sub',
+      } as AuthenticationDetail);
+
+      const result = await authService.getUserByUsernameAndAuthenticationDetails(user.username, {
+        type: AuthenticationType.SSO,
+        details: { providerType: SSOProviderType.OIDC, providerId: 1, subject: 'sub' },
+      });
+
+      expect(result).toEqual(user);
+      expect(rateLimitService.checkLoginLock).not.toHaveBeenCalled();
+      expect(rateLimitService.applyLoginFailure).not.toHaveBeenCalled();
     });
   });
 });
