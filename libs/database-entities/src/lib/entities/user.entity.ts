@@ -188,6 +188,22 @@ export class User {
   @Exclude()
   nfcKeySeedToken!: string | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  lastVerificationEmailSentAt!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  lastPasswordResetSentAt!: Date | null;
+
+  @Column({ type: 'integer', default: 0 })
+  @Exclude()
+  failedLoginCount!: number;
+
+  @Column({ type: 'datetime', nullable: true })
+  @Exclude()
+  loginLockedUntil!: Date | null;
+
   @OneToMany(() => Session, (session) => session.user, {
     onDelete: 'CASCADE',
   })
