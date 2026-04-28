@@ -130,7 +130,7 @@ services:
       - .env.docker-compose
 
   prometheus:
-    image: prom/prometheus:v3.11.2
+    image: prom/prometheus:v3.11.3
     restart: unless-stopped
     expose:
       - '9090'
