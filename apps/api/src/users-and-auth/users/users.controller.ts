@@ -693,6 +693,8 @@ export class UsersController {
   }
 
   @Post('reset-password')
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'emailTrigger', mode: 'silentOk' })
   @ApiOperation({ summary: 'Request a password reset', operationId: 'requestPasswordReset' })
   @ApiResponse({
     status: 200,
@@ -719,12 +721,22 @@ export class UsersController {
       return { message: 'OK' };
     }
 
+    const cooldown = await this.rateLimitService.accountCooldown(
+      'passwordReset',
+      user.lastPasswordResetSentAt ?? null,
+    );
+    if (!cooldown.allowed) {
+      this.logger.debug(`Password reset cooldown active for: ${body.email}`);
+      return { message: 'OK' };
+    }
+
     const isSSOUser = await this.usersService.isSSOUser(user.id);
     if (isSSOUser) {
       throw new ForbiddenException('You cannot reset the password of an SSO user');
     }
 
     await this.emailService.sendPasswordResetEmail(user, token);
+    await this.userRepository.update(user.id, { lastPasswordResetSentAt: new Date() });
     this.logger.debug(`Password reset e-mail sent to: ${body.email}`);
 
     return { message: 'OK' };
