@@ -121,4 +121,61 @@ describe('RateLimitService', () => {
       );
     });
   });
+
+  describe('login lock', () => {
+    const baseUser = (overrides: Partial<{ failedLoginCount: number; loginLockedUntil: Date | null }> = {}) => ({
+      failedLoginCount: 0,
+      loginLockedUntil: null,
+      ...overrides,
+    });
+
+    it('reports unlocked when no lock is set', async () => {
+      const decision = await service.checkLoginLock(baseUser());
+      expect(decision.allowed).toBe(true);
+    });
+
+    it('reports unlocked once the lock expiry has passed', async () => {
+      const decision = await service.checkLoginLock(
+        baseUser({ loginLockedUntil: new Date(Date.now() - 1000) }),
+      );
+      expect(decision.allowed).toBe(true);
+    });
+
+    it('reports locked when loginLockedUntil is in the future', async () => {
+      const decision = await service.checkLoginLock(
+        baseUser({ loginLockedUntil: new Date(Date.now() + 60_000) }),
+      );
+      expect(decision.allowed).toBe(false);
+      expect(decision.retryAfterSeconds).toBeGreaterThan(0);
+    });
+
+    it('increments the counter and triggers a lock at the threshold', async () => {
+      const user = baseUser({
+        failedLoginCount: RATE_LIMIT_DEFAULTS.accountLoginMaxFailures - 1,
+      });
+      const result = await service.applyLoginFailure(user);
+      expect(result.failedLoginCount).toBe(0);
+      expect(result.loginLockedUntil).not.toBeNull();
+      expect(
+        (result.loginLockedUntil as Date).getTime() - Date.now(),
+      ).toBeGreaterThan(0);
+    });
+
+    it('increments without locking when below threshold', async () => {
+      const result = await service.applyLoginFailure(baseUser());
+      expect(result.failedLoginCount).toBe(1);
+      expect(result.loginLockedUntil).toBeNull();
+    });
+
+    it('clears counter and lock on success', () => {
+      const result = service.applyLoginSuccess(
+        baseUser({
+          failedLoginCount: 5,
+          loginLockedUntil: new Date(Date.now() + 1000),
+        }),
+      );
+      expect(result.failedLoginCount).toBe(0);
+      expect(result.loginLockedUntil).toBeNull();
+    });
+  });
 });

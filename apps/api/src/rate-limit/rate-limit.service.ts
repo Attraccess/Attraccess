@@ -80,6 +80,55 @@ export class RateLimitService {
     };
   }
 
+  async checkLoginLock(
+    user: { loginLockedUntil: Date | null },
+  ): Promise<RateLimitDecision> {
+    if (!user.loginLockedUntil) {
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    const remainingMs = user.loginLockedUntil.getTime() - Date.now();
+    if (remainingMs <= 0) {
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+    };
+  }
+
+  async applyLoginFailure(user: {
+    failedLoginCount: number;
+    loginLockedUntil: Date | null;
+  }): Promise<{ failedLoginCount: number; loginLockedUntil: Date | null }> {
+    const maxFailures = await this.readNumber(
+      RATE_LIMIT_KEYS.accountLoginMaxFailures,
+      RATE_LIMIT_DEFAULTS.accountLoginMaxFailures,
+    );
+    const lockSeconds = await this.readNumber(
+      RATE_LIMIT_KEYS.accountLoginLockSeconds,
+      RATE_LIMIT_DEFAULTS.accountLoginLockSeconds,
+    );
+    const next = (user.failedLoginCount ?? 0) + 1;
+    if (next >= maxFailures) {
+      return {
+        failedLoginCount: 0,
+        loginLockedUntil: new Date(Date.now() + lockSeconds * 1000),
+      };
+    }
+    return {
+      failedLoginCount: next,
+      loginLockedUntil: user.loginLockedUntil,
+    };
+  }
+
+  applyLoginSuccess(user: {
+    failedLoginCount: number;
+    loginLockedUntil: Date | null;
+  }): { failedLoginCount: number; loginLockedUntil: Date | null } {
+    void user;
+    return { failedLoginCount: 0, loginLockedUntil: null };
+  }
+
   private enforceCap(bucket: IpBucket): void {
     if (bucket.size <= RATE_LIMIT_IP_BUCKET_CAP) return;
     const overflow = bucket.size - RATE_LIMIT_IP_BUCKET_CAP;
