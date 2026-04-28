@@ -375,6 +375,8 @@ export class UsersController {
   }
 
   @Post()
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'emailTrigger', mode: '429' })
   @ApiOperation({ summary: 'Create a new user', operationId: 'createOneUser' })
   @ApiResponse({
     status: 201,
@@ -593,6 +595,8 @@ export class UsersController {
   }
 
   @Post('verify-email')
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'tokenAction', mode: '429' })
   @ApiOperation({ summary: 'Verify a user email address', operationId: 'verifyEmail' })
   @ApiResponse({
     status: 200,
@@ -665,6 +669,8 @@ export class UsersController {
   }
 
   @Post('accept-invitation')
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'tokenAction', mode: '429' })
   @ApiOperation({ summary: 'Accept a user invitation', operationId: 'acceptInvitation' })
   @ApiResponse({
     status: 200,
@@ -743,6 +749,8 @@ export class UsersController {
   }
 
   @Post('/:userId/change-password-by-token')
+  @UseInterceptors(RateLimitInterceptor)
+  @RateLimit({ scope: 'tokenAction', mode: '429' })
   @ApiOperation({ summary: 'Change a user password after password reset', operationId: 'changePasswordViaResetToken' })
   @ApiResponse({
     status: 200,
