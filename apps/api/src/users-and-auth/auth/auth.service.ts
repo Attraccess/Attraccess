@@ -229,11 +229,8 @@ export class AuthService {
           loginLockedUntil: next.loginLockedUntil,
         });
       } else {
-        this.rateLimitService.applyLoginSuccess(user);
-        await this.userRepository.update(user.id, {
-          failedLoginCount: 0,
-          loginLockedUntil: null,
-        });
+        const next = this.rateLimitService.applyLoginSuccess(user);
+        await this.userRepository.update(user.id, next);
       }
     }
 
