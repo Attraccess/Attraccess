@@ -324,7 +324,7 @@ importers:
         version: 5.1.7
       swagger-typescript-api:
         specifier: ^13.1.3
-        version: 13.7.1(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5)
+        version: 13.7.2(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5)
       tailwind-merge:
         specifier: ^3.2.0
         version: 3.5.0
@@ -9022,6 +9022,9 @@ packages:
   es-toolkit@1.46.0:
     resolution: {integrity: sha512-IToJ6ct9OLl5zz6WsC/1vZEwfSZ7Myil+ygl5Tf30Xjn9AEkzNB4kqp2G7VUJKF1DtTx/ra5M5KLlXvzOg51BA==}
 
+  es-toolkit@1.46.1:
+    resolution: {integrity: sha512-5eNtXOs3tbfxXOj04tjjseeWkRWaoCjdEI+96DgwzZoe6c9juL49pXlzAFTI72aWC9Y8p7168g6XIKjh7k6pyQ==}
+
   es5-ext@0.10.64:
     resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
     engines: {node: '>=0.10'}
@@ -12963,8 +12966,8 @@ packages:
   pkg-types@2.1.0:
     resolution: {integrity: sha512-wmJwA+8ihJixSoHKxZJRBQG1oY8Yr9pGLzRmSsNms0iNWyHHAlZCa7mmKiFR10YPZuz/2k169JiS/inOjBCZ2A==}
 
-  pkg-types@2.3.0:
-    resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
+  pkg-types@2.3.1:
+    resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
   playwright-core@1.56.1:
     resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
@@ -14740,8 +14743,8 @@ packages:
   swagger-schema-official@2.0.0-bab6bed:
     resolution: {integrity: sha512-rCC0NWGKr/IJhtRuPq/t37qvZHI/mH4I4sxflVM+qgVe5Z2uOCivzWaVbuioJaB61kvm5UvB7b49E+oBY0M8jA==}
 
-  swagger-typescript-api@13.7.1:
-    resolution: {integrity: sha512-CuRxMWjD6QqzDPQO9snTYLyN0FER3BK0PRDifCfgZlfqqOxwoet+9t3Q12zR8s2Vs8XEvKsaRKoMLedfMDUa/A==}
+  swagger-typescript-api@13.7.2:
+    resolution: {integrity: sha512-LQ6LJ6c7HM2/inzly0whDTwme3yAQa6VAHVLh+lBr6ZqDmKt6Zmdu8zFZM793qxX6Rm/WX5uu9GhjeC71KLUiA==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -19668,7 +19671,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.5
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -25464,7 +25467,7 @@ snapshots:
       ohash: 2.0.11
       pathe: 2.0.3
       perfect-debounce: 2.1.0
-      pkg-types: 2.3.0
+      pkg-types: 2.3.1
       rc9: 3.0.1
     optionalDependencies:
       magicast: 0.3.5
@@ -27007,6 +27010,8 @@ snapshots:
       is-symbol: 1.1.1
 
   es-toolkit@1.46.0: {}
+
+  es-toolkit@1.46.1: {}
 
   es5-ext@0.10.64:
     dependencies:
@@ -32516,7 +32521,7 @@ snapshots:
       exsolve: 1.0.8
       pathe: 2.0.3
 
-  pkg-types@2.3.0:
+  pkg-types@2.3.1:
     dependencies:
       confbox: 0.2.4
       exsolve: 1.0.8
@@ -34588,7 +34593,7 @@ snapshots:
 
   swagger-schema-official@2.0.0-bab6bed: {}
 
-  swagger-typescript-api@13.7.1(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5):
+  swagger-typescript-api@13.7.2(encoding@0.1.13)(magicast@0.3.5)(react@19.2.5):
     dependencies:
       '@apidevtools/swagger-parser': 12.1.0(openapi-types@12.1.3)
       '@biomejs/js-api': 4.0.0(@biomejs/wasm-nodejs@2.4.13)
@@ -34597,7 +34602,7 @@ snapshots:
       c12: 3.3.4(magicast@0.3.5)
       citty: 0.2.2
       consola: 3.4.2
-      es-toolkit: 1.46.0
+      es-toolkit: 1.46.1
       eta: 3.5.0
       nanoid: 5.1.9
       openapi-types: 12.1.3
