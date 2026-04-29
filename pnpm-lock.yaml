@@ -376,7 +376,7 @@ importers:
         version: 7.28.5(@babel/core@7.29.0)
       '@cyclonedx/cdxgen':
         specifier: ^12.1.5
-        version: 12.2.1
+        version: 12.3.0
       '@nx/esbuild':
         specifier: 22.7.0
         version: 22.7.0(@babel/traverse@7.29.0)(@swc-node/register@1.11.1(@emnapi/core@1.8.1)(@emnapi/runtime@1.9.2)(@swc/core@1.15.32(@swc/helpers@0.5.21))(@swc/types@0.1.26)(typescript@5.9.3))(@swc/core@1.15.32(@swc/helpers@0.5.21))(esbuild@0.28.0)(nx@22.7.0(@swc-node/register@1.11.1(@emnapi/core@1.8.1)(@emnapi/runtime@1.9.2)(@swc/core@1.15.32(@swc/helpers@0.5.21))(@swc/types@0.1.26)(typescript@5.9.3))(@swc/core@1.15.32(@swc/helpers@0.5.21)))(verdaccio@6.5.2(encoding@0.1.13)(typanion@3.14.0))
@@ -1719,8 +1719,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@cyclonedx/cdxgen@12.2.1':
-    resolution: {integrity: sha512-Omk8tVH29a4S50yDyX45IjmbvwkNk57CezIQi00+vUobNB8A1KWlHoAGKsvDGKW/3lofBBBcuCB7GXvL1zPT3A==}
+  '@cyclonedx/cdxgen@12.3.0':
+    resolution: {integrity: sha512-xGCp81p9aRG8k0vmq7kR/XbHxQq+SMY7/awtz4JoVoKkS7igNbk3O/bf92rlU0TKvWMYUEMGFiwkhj7PFEJQbQ==}
     engines: {node: ^20 || ^22 || ^24 || ^25, pnpm: '>=10'}
     hasBin: true
 
@@ -15475,8 +15475,8 @@ packages:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
 
-  uuid@13.0.0:
-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
+  uuid@13.0.1:
+    resolution: {integrity: sha512-9ezox2roIft6ExBVTVqibSd5dc5/47Sw/uY6b4SjQUT2TzQ0tltNquWA46y4xPQmdZYqvnio22SgWd41M86+jw==}
     hasBin: true
 
   uuid@14.0.0:
@@ -17607,7 +17607,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@cyclonedx/cdxgen@12.2.1':
+  '@cyclonedx/cdxgen@12.3.0':
     dependencies:
       '@babel/parser': 7.29.2
       '@babel/traverse': 7.29.0
@@ -17617,8 +17617,8 @@ snapshots:
       '@npmcli/map-workspaces': 5.0.3
       '@npmcli/name-from-folder': 4.0.0
       '@npmcli/package-json': 7.0.5
-      ajv: 8.18.0
-      ajv-formats: 3.0.1(ajv@8.18.0)
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
       bin-links: 6.0.0
       cheerio: 1.2.0
       common-ancestor-path: 1.0.1
@@ -17639,7 +17639,7 @@ snapshots:
       ssri: 13.0.1
       tar: 7.5.13
       treeverse: 3.0.0
-      uuid: 13.0.0
+      uuid: 14.0.0
       walk-up-path: 4.0.0
       xml-js: 1.6.11
       yaml: 2.8.3
@@ -18044,7 +18044,7 @@ snapshots:
 
   '@eslint/eslintrc@3.3.5':
     dependencies:
-      ajv: 6.15.0
+      ajv: 6.14.0
       debug: 4.4.3
       espree: 10.4.0
       globals: 14.0.0
@@ -19668,7 +19668,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.9
+      nanoid: 5.1.5
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -24662,6 +24662,10 @@ snapshots:
     optionalDependencies:
       ajv: 8.18.0
 
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
+      ajv: 8.20.0
+
   ajv-keywords@3.5.2(ajv@6.15.0):
     dependencies:
       ajv: 6.15.0
@@ -25127,7 +25131,7 @@ snapshots:
       balena-request: 14.2.0(balena-auth@6.1.0)(encoding@0.1.13)
       tslib: 2.8.1
       typed-error: 3.2.3
-      uuid: 13.0.0
+      uuid: 13.0.1
 
   balena-request@14.2.0(balena-auth@6.1.0)(encoding@0.1.13):
     dependencies:
@@ -35354,7 +35358,7 @@ snapshots:
 
   uuid@11.1.0: {}
 
-  uuid@13.0.0: {}
+  uuid@13.0.1: {}
 
   uuid@14.0.0: {}
 
