@@ -18,7 +18,7 @@ importers:
     dependencies:
       '@7nohe/openapi-react-query-codegen':
         specifier: ^1.6.2
-        version: 1.6.2(commander@14.0.3)(glob@12.0.0)(magicast@0.3.5)(ts-morph@27.0.2)(typescript@5.9.3)
+        version: 1.6.2(commander@14.0.3)(glob@12.0.0)(magicast@0.3.5)(ts-morph@28.0.0)(typescript@5.9.3)
       '@dagrejs/dagre':
         specifier: ^1.1.5
         version: 1.1.8
@@ -606,8 +606,8 @@ importers:
         specifier: ^9.5.2
         version: 9.5.7(typescript@5.9.3)(webpack@5.105.4)
       ts-morph:
-        specifier: ^27.0.0
-        version: 27.0.2
+        specifier: ^28.0.0
+        version: 28.0.0
       ts-node:
         specifier: 10.9.2
         version: 10.9.2(@swc/core@1.15.32(@swc/helpers@0.5.21))(@types/node@20.19.39)(typescript@5.9.3)
@@ -6026,8 +6026,8 @@ packages:
     resolution: {integrity: sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==}
     engines: {node: '>= 6'}
 
-  '@ts-morph/common@0.28.1':
-    resolution: {integrity: sha512-W74iWf7ILp1ZKNYXY5qbddNaml7e9Sedv5lvU1V8lftlitkc9Pq1A+jlH23ltDgWYeZFFEqGCD1Ies9hqu3O+g==}
+  '@ts-morph/common@0.29.0':
+    resolution: {integrity: sha512-35oUmphHbJvQ/+UTwFNme/t2p3FoKiGJ5auTjjpNTop2dyREspirjMy82PLSC1pnDJ8ah1GU98hwpVt64YXQsg==}
 
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
@@ -15036,8 +15036,8 @@ packages:
       typescript: '*'
       webpack: ^5.0.0
 
-  ts-morph@27.0.2:
-    resolution: {integrity: sha512-fhUhgeljcrdZ+9DZND1De1029PrE+cMkIP7ooqkLRTrRLTqcki2AstsyJm0vRNbTbVCNJ0idGlbBrfqc7/nA8w==}
+  ts-morph@28.0.0:
+    resolution: {integrity: sha512-Wp3tnZ2bzwxyTZMtgWVzXDfm7lB1Drz+y9DmmYH/L702PQhPyVrp3pkou3yIz4qjS14GY9kcpmLiOOMvl8oG1g==}
 
   ts-node@10.9.2:
     resolution: {integrity: sha512-f0FFpIdcHgn8zcPSbf1dRevwt047YMnaiJM3u2w2RewrB+fob/zePZcrOyQoLMMO7aBIddLcQIEK5dYjkLnGrQ==}
@@ -16251,12 +16251,12 @@ packages:
 
 snapshots:
 
-  '@7nohe/openapi-react-query-codegen@1.6.2(commander@14.0.3)(glob@12.0.0)(magicast@0.3.5)(ts-morph@27.0.2)(typescript@5.9.3)':
+  '@7nohe/openapi-react-query-codegen@1.6.2(commander@14.0.3)(glob@12.0.0)(magicast@0.3.5)(ts-morph@28.0.0)(typescript@5.9.3)':
     dependencies:
       '@hey-api/openapi-ts': 0.52.0(magicast@0.3.5)(typescript@5.9.3)
       commander: 14.0.3
       glob: 12.0.0
-      ts-morph: 27.0.2
+      ts-morph: 28.0.0
       typescript: 5.9.3
     transitivePeerDependencies:
       - magicast
@@ -19641,7 +19641,7 @@ snapshots:
       cli-high: 0.4.3
       diff: 5.2.2
       effect: 3.21.2
-      nanoid: 5.1.5
+      nanoid: 5.1.9
       recast: 0.23.11
       xycolors: 0.1.2
 
@@ -23336,7 +23336,7 @@ snapshots:
   '@tootallnate/once@1.1.2':
     optional: true
 
-  '@ts-morph/common@0.28.1':
+  '@ts-morph/common@0.29.0':
     dependencies:
       minimatch: 10.2.5
       path-browserify: 1.0.1
@@ -34872,9 +34872,9 @@ snapshots:
       typescript: 5.9.3
       webpack: 5.105.4(@swc/core@1.15.32(@swc/helpers@0.5.21))(esbuild@0.28.0)(webpack-cli@6.0.1(webpack@5.105.4))
 
-  ts-morph@27.0.2:
+  ts-morph@28.0.0:
     dependencies:
-      '@ts-morph/common': 0.28.1
+      '@ts-morph/common': 0.29.0
       code-block-writer: 13.0.3
 
   ts-node@10.9.2(@swc/core@1.15.32(@swc/helpers@0.5.21))(@types/node@20.19.39)(typescript@5.9.3):
