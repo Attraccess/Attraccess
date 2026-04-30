@@ -217,7 +217,7 @@
     "util": "^0.12.5",
     "verdaccio": "6.5.2",
     "vite": "7.3.2",
-    "vite-plugin-dts": "4.5.4",
+    "vite-plugin-dts": "5.0.0",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^1.6.1",
     "webpack-cli": "^6.0.1"
