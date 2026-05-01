@@ -25,7 +25,7 @@ export const prefetchUseSystemServiceGetCurrentVersion = (queryClient: QueryClie
 * @throws ApiError
 */
 export const prefetchUseSystemServiceGetUpdateStatus = (queryClient: QueryClient, { refresh }: {
-  refresh?: string;
+  refresh?: string | undefined;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }), queryFn: () => SystemService.getUpdateStatus({ refresh }) });
 /**
 * Get the local signup domain whitelist
@@ -44,10 +44,10 @@ export const prefetchUseUsersServiceGetLocalSignupDomainWhitelist = (queryClient
 * @throws ApiError
 */
 export const prefetchUseUsersServiceFindMany = (queryClient: QueryClient, { ids, limit, page, search }: {
-  ids?: number[];
-  limit?: number;
-  page?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, page, search }), queryFn: () => UsersService.findMany({ ids, limit, page, search }) });
 /**
 * Check if local signup is enabled
@@ -91,9 +91,9 @@ export const prefetchUseUsersServiceGetPermissions = (queryClient: QueryClient, 
 * @throws ApiError
 */
 export const prefetchUseUsersServiceGetAllWithPermission = (queryClient: QueryClient, { limit, page, permission }: {
-  limit?: number;
-  page?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  page?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) });
 /**
 * Refresh the current session
@@ -258,13 +258,13 @@ export const prefetchUseLicenseServiceGetLicenseInformation = (queryClient: Quer
 * @throws ApiError
 */
 export const prefetchUseResourcesServiceGetAllResources = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  page?: number;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }), queryFn: () => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }) });
 /**
 * Get all resources in use
@@ -318,10 +318,10 @@ export const prefetchUseResourcesServiceResourceGroupsGetOne = (queryClient: Que
 * @throws ApiError
 */
 export const prefetchUseResourcesServiceResourceUsageGetHistory = (queryClient: QueryClient, { limit, page, resourceId, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, page, resourceId, userId }), queryFn: () => ResourcesService.resourceUsageGetHistory({ limit, page, resourceId, userId }) });
 /**
 * Get active usage session for current user
@@ -474,11 +474,11 @@ export const prefetchUseResourceMaintenancesServiceCanManageMaintenance = (query
 * @throws ApiError
 */
 export const prefetchUseResourceMaintenancesServiceFindMaintenances = (queryClient: QueryClient, { includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
-  page?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, page, resourceId }), queryFn: () => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page, resourceId }) });
 /**
@@ -538,8 +538,8 @@ export const prefetchUseBillingServiceGetBillingBalance = (queryClient: QueryCli
 * @throws ApiError
 */
 export const prefetchUseBillingServiceGetBillingTransactions = (queryClient: QueryClient, { limit, page, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   userId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
 /**
@@ -617,8 +617,8 @@ export const prefetchUseResourceFlowsServiceGetResourceFlow = (queryClient: Quer
 * @throws ApiError
 */
 export const prefetchUseResourceFlowsServiceGetResourceFlowLogs = (queryClient: QueryClient, { limit, page, resourceId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) });
 /**
@@ -651,9 +651,9 @@ export const prefetchUseResourceFlowsServiceGetButtons = (queryClient: QueryClie
 * @throws ApiError
 */
 export const prefetchUseProjectsServiceFindManyProjects = (queryClient: QueryClient, { includeArchived, limit, page }: {
-  includeArchived?: boolean;
-  limit?: number;
-  page?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
 } = {}) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) });
 /**
 * Get one project
@@ -677,11 +677,11 @@ export const prefetchUseProjectsServiceFindOneProject = (queryClient: QueryClien
 * @throws ApiError
 */
 export const prefetchUseProjectsServiceGetProjectUsageHistory = (queryClient: QueryClient, { endDate, id, limit, page, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  page?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  page?: number | undefined;
+  startDate?: string | undefined;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) });
 /**
 * Get aggregated usage statistics for a project
@@ -693,9 +693,9 @@ export const prefetchUseProjectsServiceGetProjectUsageHistory = (queryClient: Qu
 * @throws ApiError
 */
 export const prefetchUseProjectsServiceGetProjectUsageStats = (queryClient: QueryClient, { endDate, id, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  startDate?: string;
+  startDate?: string | undefined;
 }) => queryClient.prefetchQuery({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
 /**
 * List project members
