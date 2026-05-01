@@ -208,7 +208,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     const sendBinaryData = (data: Buffer) => {
       try {
-        client.send(data);
+        client.send(data as unknown as BufferSource);
       } catch (e) {
         this.logger.error(`Failed to send binary data to client ${id}: ${(e as Error).message}`);
       }
