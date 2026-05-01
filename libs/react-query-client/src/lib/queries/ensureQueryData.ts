@@ -25,7 +25,7 @@ export const ensureUseSystemServiceGetCurrentVersionData = (queryClient: QueryCl
 * @throws ApiError
 */
 export const ensureUseSystemServiceGetUpdateStatusData = (queryClient: QueryClient, { refresh }: {
-  refresh?: string;
+  refresh?: string | undefined;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }), queryFn: () => SystemService.getUpdateStatus({ refresh }) });
 /**
 * Get the local signup domain whitelist
@@ -44,10 +44,10 @@ export const ensureUseUsersServiceGetLocalSignupDomainWhitelistData = (queryClie
 * @throws ApiError
 */
 export const ensureUseUsersServiceFindManyData = (queryClient: QueryClient, { ids, limit, page, search }: {
-  ids?: number[];
-  limit?: number;
-  page?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, page, search }), queryFn: () => UsersService.findMany({ ids, limit, page, search }) });
 /**
 * Check if local signup is enabled
@@ -91,9 +91,9 @@ export const ensureUseUsersServiceGetPermissionsData = (queryClient: QueryClient
 * @throws ApiError
 */
 export const ensureUseUsersServiceGetAllWithPermissionData = (queryClient: QueryClient, { limit, page, permission }: {
-  limit?: number;
-  page?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  page?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) });
 /**
 * Refresh the current session
@@ -258,13 +258,13 @@ export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: Qu
 * @throws ApiError
 */
 export const ensureUseResourcesServiceGetAllResourcesData = (queryClient: QueryClient, { groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  page?: number;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }), queryFn: () => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }) });
 /**
 * Get all resources in use
@@ -318,10 +318,10 @@ export const ensureUseResourcesServiceResourceGroupsGetOneData = (queryClient: Q
 * @throws ApiError
 */
 export const ensureUseResourcesServiceResourceUsageGetHistoryData = (queryClient: QueryClient, { limit, page, resourceId, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, page, resourceId, userId }), queryFn: () => ResourcesService.resourceUsageGetHistory({ limit, page, resourceId, userId }) });
 /**
 * Get active usage session for current user
@@ -474,11 +474,11 @@ export const ensureUseResourceMaintenancesServiceCanManageMaintenanceData = (que
 * @throws ApiError
 */
 export const ensureUseResourceMaintenancesServiceFindMaintenancesData = (queryClient: QueryClient, { includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
-  page?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, page, resourceId }), queryFn: () => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page, resourceId }) });
 /**
@@ -538,8 +538,8 @@ export const ensureUseBillingServiceGetBillingBalanceData = (queryClient: QueryC
 * @throws ApiError
 */
 export const ensureUseBillingServiceGetBillingTransactionsData = (queryClient: QueryClient, { limit, page, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   userId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) });
 /**
@@ -617,8 +617,8 @@ export const ensureUseResourceFlowsServiceGetResourceFlowData = (queryClient: Qu
 * @throws ApiError
 */
 export const ensureUseResourceFlowsServiceGetResourceFlowLogsData = (queryClient: QueryClient, { limit, page, resourceId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) });
 /**
@@ -651,9 +651,9 @@ export const ensureUseResourceFlowsServiceGetButtonsData = (queryClient: QueryCl
 * @throws ApiError
 */
 export const ensureUseProjectsServiceFindManyProjectsData = (queryClient: QueryClient, { includeArchived, limit, page }: {
-  includeArchived?: boolean;
-  limit?: number;
-  page?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
 } = {}) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) });
 /**
 * Get one project
@@ -677,11 +677,11 @@ export const ensureUseProjectsServiceFindOneProjectData = (queryClient: QueryCli
 * @throws ApiError
 */
 export const ensureUseProjectsServiceGetProjectUsageHistoryData = (queryClient: QueryClient, { endDate, id, limit, page, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  page?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  page?: number | undefined;
+  startDate?: string | undefined;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) });
 /**
 * Get aggregated usage statistics for a project
@@ -693,9 +693,9 @@ export const ensureUseProjectsServiceGetProjectUsageHistoryData = (queryClient: 
 * @throws ApiError
 */
 export const ensureUseProjectsServiceGetProjectUsageStatsData = (queryClient: QueryClient, { endDate, id, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  startDate?: string;
+  startDate?: string | undefined;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) });
 /**
 * List project members
