@@ -15,7 +15,7 @@ export type SystemServiceGetUpdateStatusDefaultResponse = Awaited<ReturnType<typ
 export type SystemServiceGetUpdateStatusQueryResult<TData = SystemServiceGetUpdateStatusDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useSystemServiceGetUpdateStatusKey = "SystemServiceGetUpdateStatus";
 export const UseSystemServiceGetUpdateStatusKeyFn = ({ refresh }: {
-  refresh?: string;
+  refresh?: string | undefined;
 } = {}, queryKey?: Array<unknown>) => [useSystemServiceGetUpdateStatusKey, ...(queryKey ?? [{ refresh }])];
 export type UsersServiceGetLocalSignupDomainWhitelistDefaultResponse = Awaited<ReturnType<typeof UsersService.getLocalSignupDomainWhitelist>>;
 export type UsersServiceGetLocalSignupDomainWhitelistQueryResult<TData = UsersServiceGetLocalSignupDomainWhitelistDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -25,10 +25,10 @@ export type UsersServiceFindManyDefaultResponse = Awaited<ReturnType<typeof User
 export type UsersServiceFindManyQueryResult<TData = UsersServiceFindManyDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceFindManyKey = "UsersServiceFindMany";
 export const UseUsersServiceFindManyKeyFn = ({ ids, limit, page, search }: {
-  ids?: number[];
-  limit?: number;
-  page?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: Array<unknown>) => [useUsersServiceFindManyKey, ...(queryKey ?? [{ ids, limit, page, search }])];
 export type UsersServiceIsLocalSignupEnabledDefaultResponse = Awaited<ReturnType<typeof UsersService.isLocalSignupEnabled>>;
 export type UsersServiceIsLocalSignupEnabledQueryResult<TData = UsersServiceIsLocalSignupEnabledDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -54,9 +54,9 @@ export type UsersServiceGetAllWithPermissionDefaultResponse = Awaited<ReturnType
 export type UsersServiceGetAllWithPermissionQueryResult<TData = UsersServiceGetAllWithPermissionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useUsersServiceGetAllWithPermissionKey = "UsersServiceGetAllWithPermission";
 export const UseUsersServiceGetAllWithPermissionKeyFn = ({ limit, page, permission }: {
-  limit?: number;
-  page?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  page?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}, queryKey?: Array<unknown>) => [useUsersServiceGetAllWithPermissionKey, ...(queryKey ?? [{ limit, page, permission }])];
 export type AuthenticationServiceRefreshSessionDefaultResponse = Awaited<ReturnType<typeof AuthenticationService.refreshSession>>;
 export type AuthenticationServiceRefreshSessionQueryResult<TData = AuthenticationServiceRefreshSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -151,13 +151,13 @@ export type ResourcesServiceGetAllResourcesDefaultResponse = Awaited<ReturnType<
 export type ResourcesServiceGetAllResourcesQueryResult<TData = ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourcesServiceGetAllResourcesKey = "ResourcesServiceGetAllResources";
 export const UseResourcesServiceGetAllResourcesKeyFn = ({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  page?: number;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: Array<unknown>) => [useResourcesServiceGetAllResourcesKey, ...(queryKey ?? [{ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }])];
 export type ResourcesServiceGetAllResourcesInUseDefaultResponse = Awaited<ReturnType<typeof ResourcesService.getAllResourcesInUse>>;
 export type ResourcesServiceGetAllResourcesInUseQueryResult<TData = ResourcesServiceGetAllResourcesInUseDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -189,10 +189,10 @@ export type ResourcesServiceResourceUsageGetHistoryDefaultResponse = Awaited<Ret
 export type ResourcesServiceResourceUsageGetHistoryQueryResult<TData = ResourcesServiceResourceUsageGetHistoryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourcesServiceResourceUsageGetHistoryKey = "ResourcesServiceResourceUsageGetHistory";
 export const UseResourcesServiceResourceUsageGetHistoryKeyFn = ({ limit, page, resourceId, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }, queryKey?: Array<unknown>) => [useResourcesServiceResourceUsageGetHistoryKey, ...(queryKey ?? [{ limit, page, resourceId, userId }])];
 export type ResourcesServiceResourceUsageGetActiveSessionDefaultResponse = Awaited<ReturnType<typeof ResourcesService.resourceUsageGetActiveSession>>;
 export type ResourcesServiceResourceUsageGetActiveSessionQueryResult<TData = ResourcesServiceResourceUsageGetActiveSessionDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -279,11 +279,11 @@ export type ResourceMaintenancesServiceFindMaintenancesDefaultResponse = Awaited
 export type ResourceMaintenancesServiceFindMaintenancesQueryResult<TData = ResourceMaintenancesServiceFindMaintenancesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceMaintenancesServiceFindMaintenancesKey = "ResourceMaintenancesServiceFindMaintenances";
 export const UseResourceMaintenancesServiceFindMaintenancesKeyFn = ({ includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
-  page?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceMaintenancesServiceFindMaintenancesKey, ...(queryKey ?? [{ includeActive, includePast, includeUpcoming, limit, page, resourceId }])];
 export type ResourceMaintenancesServiceGetMaintenanceDefaultResponse = Awaited<ReturnType<typeof ResourceMaintenancesService.getMaintenance>>;
@@ -316,8 +316,8 @@ export type BillingServiceGetBillingTransactionsDefaultResponse = Awaited<Return
 export type BillingServiceGetBillingTransactionsQueryResult<TData = BillingServiceGetBillingTransactionsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useBillingServiceGetBillingTransactionsKey = "BillingServiceGetBillingTransactions";
 export const UseBillingServiceGetBillingTransactionsKeyFn = ({ limit, page, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   userId: number;
 }, queryKey?: Array<unknown>) => [useBillingServiceGetBillingTransactionsKey, ...(queryKey ?? [{ limit, page, userId }])];
 export type BillingServiceGetBillingTransactionDefaultResponse = Awaited<ReturnType<typeof BillingService.getBillingTransaction>>;
@@ -364,8 +364,8 @@ export type ResourceFlowsServiceGetResourceFlowLogsDefaultResponse = Awaited<Ret
 export type ResourceFlowsServiceGetResourceFlowLogsQueryResult<TData = ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceFlowsServiceGetResourceFlowLogsKey = "ResourceFlowsServiceGetResourceFlowLogs";
 export const UseResourceFlowsServiceGetResourceFlowLogsKeyFn = ({ limit, page, resourceId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetResourceFlowLogsKey, ...(queryKey ?? [{ limit, page, resourceId }])];
 export type ResourceFlowsServiceResourceFlowsControllerStreamEventsDefaultResponse = Awaited<ReturnType<typeof ResourceFlowsService.resourceFlowsControllerStreamEvents>>;
@@ -384,9 +384,9 @@ export type ProjectsServiceFindManyProjectsDefaultResponse = Awaited<ReturnType<
 export type ProjectsServiceFindManyProjectsQueryResult<TData = ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectsServiceFindManyProjectsKey = "ProjectsServiceFindManyProjects";
 export const UseProjectsServiceFindManyProjectsKeyFn = ({ includeArchived, limit, page }: {
-  includeArchived?: boolean;
-  limit?: number;
-  page?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
 } = {}, queryKey?: Array<unknown>) => [useProjectsServiceFindManyProjectsKey, ...(queryKey ?? [{ includeArchived, limit, page }])];
 export type ProjectsServiceFindOneProjectDefaultResponse = Awaited<ReturnType<typeof ProjectsService.findOneProject>>;
 export type ProjectsServiceFindOneProjectQueryResult<TData = ProjectsServiceFindOneProjectDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -398,19 +398,19 @@ export type ProjectsServiceGetProjectUsageHistoryDefaultResponse = Awaited<Retur
 export type ProjectsServiceGetProjectUsageHistoryQueryResult<TData = ProjectsServiceGetProjectUsageHistoryDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectsServiceGetProjectUsageHistoryKey = "ProjectsServiceGetProjectUsageHistory";
 export const UseProjectsServiceGetProjectUsageHistoryKeyFn = ({ endDate, id, limit, page, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  page?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  page?: number | undefined;
+  startDate?: string | undefined;
 }, queryKey?: Array<unknown>) => [useProjectsServiceGetProjectUsageHistoryKey, ...(queryKey ?? [{ endDate, id, limit, page, startDate }])];
 export type ProjectsServiceGetProjectUsageStatsDefaultResponse = Awaited<ReturnType<typeof ProjectsService.getProjectUsageStats>>;
 export type ProjectsServiceGetProjectUsageStatsQueryResult<TData = ProjectsServiceGetProjectUsageStatsDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useProjectsServiceGetProjectUsageStatsKey = "ProjectsServiceGetProjectUsageStats";
 export const UseProjectsServiceGetProjectUsageStatsKeyFn = ({ endDate, id, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  startDate?: string;
+  startDate?: string | undefined;
 }, queryKey?: Array<unknown>) => [useProjectsServiceGetProjectUsageStatsKey, ...(queryKey ?? [{ endDate, id, startDate }])];
 export type ProjectsServiceListProjectMembersDefaultResponse = Awaited<ReturnType<typeof ProjectsService.listProjectMembers>>;
 export type ProjectsServiceListProjectMembersQueryResult<TData = ProjectsServiceListProjectMembersDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
