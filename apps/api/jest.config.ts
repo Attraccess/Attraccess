@@ -11,5 +11,6 @@ module.exports = {
   moduleNameMapper: {
     '^lodash-es$': 'lodash',
     '^@node-saml/passport-saml$': '<rootDir>/src/test/mocks/node-saml-passport-saml.ts',
+    '^mjml$': '<rootDir>/src/test/mocks/mjml.ts',
   },
 };

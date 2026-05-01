@@ -1,20 +1,23 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { SumUp } from '@sumup/sdk';
+// DTO for SumUp Reader API response with Swagger documentation
+// FEATURE: Billing SumUp integration DTO layer
 
-export class SumUpReaderDevice implements SumUp.Readers.ReaderDevice {
+import { ApiProperty } from '@nestjs/swagger';
+import type { Reader, ReaderDevice, ReaderStatus, Metadata } from '@sumup/sdk';
+
+export class SumUpReaderDevice implements ReaderDevice {
   @ApiProperty({ type: String, example: '1234567890' })
   identifier: string;
 
   @ApiProperty({
     type: String,
     example: 'solo',
-    enum: ['solo', 'virtual-solo'] as SumUp.Readers.ReaderDevice['model'][],
+    enum: ['solo', 'virtual-solo'] as ReaderDevice['model'][],
     enumName: 'SumUpReaderModel',
   })
   model: 'solo' | 'virtual-solo';
 }
 
-export class SumUpReaderDto implements SumUp.Readers.Reader {
+export class SumUpReaderDto implements Reader {
   @ApiProperty({ type: String, example: '1234567890' })
   id: string;
 
@@ -24,16 +27,16 @@ export class SumUpReaderDto implements SumUp.Readers.Reader {
   @ApiProperty({
     type: 'string',
     example: 'active',
-    enum: ['unknown', 'processing', 'paired', 'expired'] as SumUp.Readers.ReaderStatus[],
+    enum: ['unknown', 'processing', 'paired', 'expired'] as ReaderStatus[],
     enumName: 'SumUpReaderStatus',
   })
-  status: SumUp.Readers.ReaderStatus;
+  status: ReaderStatus;
 
   @ApiProperty({ type: SumUpReaderDevice })
   device: SumUpReaderDevice;
 
   @ApiProperty({ type: Object, example: {}, required: false, additionalProperties: true })
-  meta?: SumUp.Readers.Meta;
+  metadata?: Metadata;
 
   @ApiProperty({ type: String, example: '2021-01-01T00:00:00.000Z', format: 'date-time' })
   created_at: string;

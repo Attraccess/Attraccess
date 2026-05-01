@@ -49,6 +49,10 @@ def hex_to_int(hex_str):
     return hex_str
 
 def main():
+    if not shutil.which('platformio'):
+        print("Warning: platformio not found, skipping firmware build")
+        sys.exit(0)
+
     # Load configuration
     config = configparser.ConfigParser()
     config.read('platformio.ini')

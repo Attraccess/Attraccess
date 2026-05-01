@@ -2628,7 +2628,7 @@ export type SumUpReaderDto = {
     name: string;
     status: SumUpReaderStatus;
     device: SumUpReaderDevice;
-    meta?: {
+    metadata?: {
         [key: string]: unknown;
     };
     created_at: string;

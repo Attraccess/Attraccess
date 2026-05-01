@@ -1,3 +1,6 @@
+// SumUp payment integration service for billing and reader management
+// FEATURE: Billing SumUp integration
+
 import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,8 +35,10 @@ export class SumUpService {
 
   async setApiKey(token: string): Promise<void> {
     const sumUp = new SumUp({ apiKey: token });
+    let merchantCode: string;
     try {
-      await sumUp.merchant.get();
+      const me = await sumUp.get<{ merchant_code: string }>({ path: '/v0.1/me' });
+      merchantCode = me.merchant_code;
     } catch (error) {
       this.logger.error('Invalid API key', { error });
       throw new BadRequestException('Invalid API key');
@@ -41,11 +46,18 @@ export class SumUpService {
 
     const encryptedApiKey = this.encryptionService.encrypt(token);
 
-    const existingApiKeyInDb = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
-    if (existingApiKeyInDb) {
-      await this.settingRepository.update(existingApiKeyInDb.id, { value: encryptedApiKey });
+    const existingApiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
+    if (existingApiKey) {
+      await this.settingRepository.update(existingApiKey.id, { value: encryptedApiKey });
     } else {
       await this.settingRepository.insert({ parent: 'sumup', key: 'apiKey', value: encryptedApiKey });
+    }
+
+    const existingMerchantCode = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
+    if (existingMerchantCode) {
+      await this.settingRepository.update(existingMerchantCode.id, { value: merchantCode });
+    } else {
+      await this.settingRepository.insert({ parent: 'sumup', key: 'merchantCode', value: merchantCode });
     }
   }
 
@@ -75,26 +87,33 @@ export class SumUpService {
     return new SumUp({ apiKey });
   }
 
+  private async getMerchantCode(): Promise<string> {
+    const setting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
+    if (!setting?.value) {
+      throw new BadRequestException('SumUp merchant code not found');
+    }
+    return setting.value;
+  }
+
   async getMerchant(): Promise<SumUpMerchantDto> {
     const sumUp = await this.getSumUp();
-    return await sumUp.merchant.get();
+    const merchantCode = await this.getMerchantCode();
+    return await sumUp.merchants.get(merchantCode) as unknown as SumUpMerchantDto;
   }
 
   async getReaders(): Promise<SumUpReaderDto[]> {
     const sumUp = await this.getSumUp();
-    const merchant = await sumUp.merchant.get();
-    const response = await sumUp.readers.list(merchant.merchant_profile.merchant_code);
-    return response.items;
+    const merchantCode = await this.getMerchantCode();
+    const response = await sumUp.readers.list(merchantCode);
+    return response.items as unknown as SumUpReaderDto[];
   }
 
   async pairReader(pairingCode: string, name: string): Promise<SumUpReaderDto> {
     const sumUp = await this.getSumUp();
-
-    const merchant = await sumUp.merchant.get();
-    const merchantCode = merchant.merchant_profile.merchant_code;
+    const merchantCode = await this.getMerchantCode();
 
     try {
-      return await sumUp.readers.create(merchantCode, { pairing_code: pairingCode.toUpperCase(), name });
+      return await sumUp.readers.create(merchantCode, { pairing_code: pairingCode.toUpperCase(), name }) as unknown as SumUpReaderDto;
     } catch (error) {
       this.logger.error('Failed to pair reader', { error });
       throw new BadRequestException(error.error?.message ?? error.message ?? 'Failed to pair reader');
@@ -103,12 +122,10 @@ export class SumUpService {
 
   async removeReader(readerId: string): Promise<void> {
     const sumUp = await this.getSumUp();
-
-    const merchant = await sumUp.merchant.get();
-    const merchantCode = merchant.merchant_profile.merchant_code;
+    const merchantCode = await this.getMerchantCode();
 
     try {
-      await sumUp.readers.deleteReader(merchantCode, readerId);
+      await sumUp.readers.delete(merchantCode, readerId);
     } catch (error) {
       if (error.message.includes('SumUpError: Unexpected non-json response')) {
         return;
@@ -126,8 +143,7 @@ export class SumUpService {
     const { currency, minorUnit } = await this.billingService.getConfiguration();
 
     const sumUp = await this.getSumUp();
-    const merchant = await sumUp.merchant.get();
-    const merchantCode = merchant.merchant_profile.merchant_code;
+    const merchantCode = await this.getMerchantCode();
 
     let returnUrl: string | undefined;
     const publicInternetUrl = await this.settingsService.getPublicInternetUrl();
@@ -193,8 +209,7 @@ export class SumUpService {
     }
 
     const sumup = await this.getSumUp();
-    const merchant = await sumup.merchant.get();
-    const merchantCode = merchant.merchant_profile.merchant_code;
+    const merchantCode = await this.getMerchantCode();
     const sumUpTransactionData = await sumup.transactions.get(merchantCode, {
       client_transaction_id: sumupTransactionId,
     });

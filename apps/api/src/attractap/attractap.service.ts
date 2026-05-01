@@ -1,9 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { subtle, pbkdf2Sync } from 'crypto';
+import { subtle, pbkdf2Sync, randomBytes } from 'crypto';
 import { NFCCard, Attractap, Resource, User } from '@attraccess/database-entities';
 import { DeleteResult, FindManyOptions, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { nanoid } from 'nanoid';
 import { securelyHashToken } from './websockets/websocket.utils';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -137,12 +136,12 @@ export class AttractapService {
   }
 
   public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
-    const token = nanoid(16);
+    const token = randomBytes(12).toString('base64url').slice(0, 16);
     const apiTokenHash = await securelyHashToken(token);
 
     const reader = await this.readerRepository.save({
       apiTokenHash,
-      name: nanoid(4),
+      name: randomBytes(3).toString('base64url').slice(0, 4),
       firmware,
     });
 
@@ -281,7 +280,7 @@ export class AttractapService {
 
   private async resolveNfcKeySeedToken(user: User): Promise<string> {
     if (!user.nfcKeySeedToken) {
-      const token = nanoid(32); // 32 characters = ~192 bits of entropy
+      const token = randomBytes(24).toString('base64url').slice(0, 32);
       user.nfcKeySeedToken = this.encryptionService.encrypt(token);
       await this.userRepository.save(user);
       return token;
