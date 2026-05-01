@@ -146,7 +146,7 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:11.6.14
+    image: grafana/grafana:13.0.1
     restart: unless-stopped
     expose:
       - '3001'
