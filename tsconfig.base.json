@@ -47,7 +47,13 @@
       "@attraccess/shared": [
         "libs/shared/src/index.ts"
       ]
-    }
+    },
+    "ignoreDeprecations": "6.0",
+    "strictPropertyInitialization": false,
+    "strictNullChecks": false,
+    "useUnknownInCatchVariables": false,
+    "noImplicitAny": false,
+    "strictFunctionTypes": false
   },
   "exclude": [
     "node_modules",
