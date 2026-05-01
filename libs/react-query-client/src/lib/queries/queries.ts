@@ -25,7 +25,7 @@ export const useSystemServiceGetCurrentVersion = <TData = Common.SystemServiceGe
 * @throws ApiError
 */
 export const useSystemServiceGetUpdateStatus = <TData = Common.SystemServiceGetUpdateStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ refresh }: {
-  refresh?: string;
+  refresh?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }, queryKey), queryFn: () => SystemService.getUpdateStatus({ refresh }) as TData, ...options });
 /**
 * Get the local signup domain whitelist
@@ -44,10 +44,10 @@ export const useUsersServiceGetLocalSignupDomainWhitelist = <TData = Common.User
 * @throws ApiError
 */
 export const useUsersServiceFindMany = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
-  ids?: number[];
-  limit?: number;
-  page?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, page, search }, queryKey), queryFn: () => UsersService.findMany({ ids, limit, page, search }) as TData, ...options });
 /**
 * Check if local signup is enabled
@@ -91,9 +91,9 @@ export const useUsersServiceGetPermissions = <TData = Common.UsersServiceGetPerm
 * @throws ApiError
 */
 export const useUsersServiceGetAllWithPermission = <TData = Common.UsersServiceGetAllWithPermissionDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, permission }: {
-  limit?: number;
-  page?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  page?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }, queryKey), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) as TData, ...options });
 /**
 * Refresh the current session
@@ -258,13 +258,13 @@ export const useLicenseServiceGetLicenseInformation = <TData = Common.LicenseSer
 * @throws ApiError
 */
 export const useResourcesServiceGetAllResources = <TData = Common.ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  page?: number;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }, queryKey), queryFn: () => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }) as TData, ...options });
 /**
 * Get all resources in use
@@ -318,10 +318,10 @@ export const useResourcesServiceResourceGroupsGetOne = <TData = Common.Resources
 * @throws ApiError
 */
 export const useResourcesServiceResourceUsageGetHistory = <TData = Common.ResourcesServiceResourceUsageGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, page, resourceId, userId }, queryKey), queryFn: () => ResourcesService.resourceUsageGetHistory({ limit, page, resourceId, userId }) as TData, ...options });
 /**
 * Get active usage session for current user
@@ -474,11 +474,11 @@ export const useResourceMaintenancesServiceCanManageMaintenance = <TData = Commo
 * @throws ApiError
 */
 export const useResourceMaintenancesServiceFindMaintenances = <TData = Common.ResourceMaintenancesServiceFindMaintenancesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
-  page?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, page, resourceId }, queryKey), queryFn: () => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page, resourceId }) as TData, ...options });
 /**
@@ -538,8 +538,8 @@ export const useBillingServiceGetBillingBalance = <TData = Common.BillingService
 * @throws ApiError
 */
 export const useBillingServiceGetBillingTransactions = <TData = Common.BillingServiceGetBillingTransactionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }, queryKey), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) as TData, ...options });
 /**
@@ -617,8 +617,8 @@ export const useResourceFlowsServiceGetResourceFlow = <TData = Common.ResourceFl
 * @throws ApiError
 */
 export const useResourceFlowsServiceGetResourceFlowLogs = <TData = Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }, queryKey), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) as TData, ...options });
 /**
@@ -651,9 +651,9 @@ export const useResourceFlowsServiceGetButtons = <TData = Common.ResourceFlowsSe
 * @throws ApiError
 */
 export const useProjectsServiceFindManyProjects = <TData = Common.ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeArchived, limit, page }: {
-  includeArchived?: boolean;
-  limit?: number;
-  page?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }, queryKey), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) as TData, ...options });
 /**
 * Get one project
@@ -677,11 +677,11 @@ export const useProjectsServiceFindOneProject = <TData = Common.ProjectsServiceF
 * @throws ApiError
 */
 export const useProjectsServiceGetProjectUsageHistory = <TData = Common.ProjectsServiceGetProjectUsageHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, limit, page, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  page?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  page?: number | undefined;
+  startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) as TData, ...options });
 /**
 * Get aggregated usage statistics for a project
@@ -693,9 +693,9 @@ export const useProjectsServiceGetProjectUsageHistory = <TData = Common.Projects
 * @throws ApiError
 */
 export const useProjectsServiceGetProjectUsageStats = <TData = Common.ProjectsServiceGetProjectUsageStatsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  startDate?: string;
+  startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) as TData, ...options });
 /**
 * List project members
@@ -1056,15 +1056,15 @@ export const useAuthenticationServiceLinkUserToExternalAccount = <TData = Common
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoOidcLogout = <TData = Common.AuthenticationServiceSsoOidcLogoutMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcLogout({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * SAML-initiated logout
@@ -1077,15 +1077,15 @@ export const useAuthenticationServiceSsoOidcLogout = <TData = Common.Authenticat
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoSamlLogout = <TData = Common.AuthenticationServiceSsoSamlLogoutMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlLogout({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * SSO-initiated user deletion
@@ -1098,15 +1098,15 @@ export const useAuthenticationServiceSsoSamlLogout = <TData = Common.Authenticat
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoOidcDeleteUser = <TData = Common.AuthenticationServiceSsoOidcDeleteUserMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcDeleteUser({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * SAML-initiated user deletion
@@ -1119,15 +1119,15 @@ export const useAuthenticationServiceSsoOidcDeleteUser = <TData = Common.Authent
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoSamlDeleteUser = <TData = Common.AuthenticationServiceSsoSamlDeleteUserMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningUserDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlDeleteUser({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * SSO-initiated permission update
@@ -1140,15 +1140,15 @@ export const useAuthenticationServiceSsoSamlDeleteUser = <TData = Common.Authent
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoOidcUpdatePermissions = <TData = Common.AuthenticationServiceSsoOidcUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningPermissionsDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningPermissionsDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoOidcUpdatePermissions({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * SAML-initiated permission update
@@ -1161,15 +1161,15 @@ export const useAuthenticationServiceSsoOidcUpdatePermissions = <TData = Common.
 * @throws ApiError
 */
 export const useAuthenticationServiceSsoSamlUpdatePermissions = <TData = Common.AuthenticationServiceSsoSamlUpdatePermissionsMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningPermissionsDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  authorization?: string;
+  authorization?: string | undefined;
   providerId: string;
   requestBody: SSOProvisioningPermissionsDto;
-  xApiKey?: string;
+  xApiKey?: string | undefined;
 }, TContext>({ mutationFn: ({ authorization, providerId, requestBody, xApiKey }) => AuthenticationService.ssoSamlUpdatePermissions({ authorization, providerId, requestBody, xApiKey }) as unknown as Promise<TData>, ...options });
 /**
 * Callback for SAML login
