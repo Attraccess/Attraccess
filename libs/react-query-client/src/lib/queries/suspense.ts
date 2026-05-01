@@ -25,7 +25,7 @@ export const useSystemServiceGetCurrentVersionSuspense = <TData = Common.SystemS
 * @throws ApiError
 */
 export const useSystemServiceGetUpdateStatusSuspense = <TData = Common.SystemServiceGetUpdateStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ refresh }: {
-  refresh?: string;
+  refresh?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseSystemServiceGetUpdateStatusKeyFn({ refresh }, queryKey), queryFn: () => SystemService.getUpdateStatus({ refresh }) as TData, ...options });
 /**
 * Get the local signup domain whitelist
@@ -44,10 +44,10 @@ export const useUsersServiceGetLocalSignupDomainWhitelistSuspense = <TData = Com
 * @throws ApiError
 */
 export const useUsersServiceFindManySuspense = <TData = Common.UsersServiceFindManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, page, search }: {
-  ids?: number[];
-  limit?: number;
-  page?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, page, search }, queryKey), queryFn: () => UsersService.findMany({ ids, limit, page, search }) as TData, ...options });
 /**
 * Check if local signup is enabled
@@ -91,9 +91,9 @@ export const useUsersServiceGetPermissionsSuspense = <TData = Common.UsersServic
 * @throws ApiError
 */
 export const useUsersServiceGetAllWithPermissionSuspense = <TData = Common.UsersServiceGetAllWithPermissionDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, permission }: {
-  limit?: number;
-  page?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  page?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, page, permission }, queryKey), queryFn: () => UsersService.getAllWithPermission({ limit, page, permission }) as TData, ...options });
 /**
 * Refresh the current session
@@ -258,13 +258,13 @@ export const useLicenseServiceGetLicenseInformationSuspense = <TData = Common.Li
 * @throws ApiError
 */
 export const useResourcesServiceGetAllResourcesSuspense = <TData = Common.ResourcesServiceGetAllResourcesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  page?: number;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  page?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }, queryKey), queryFn: () => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page, search }) as TData, ...options });
 /**
 * Get all resources in use
@@ -318,10 +318,10 @@ export const useResourcesServiceResourceGroupsGetOneSuspense = <TData = Common.R
 * @throws ApiError
 */
 export const useResourcesServiceResourceUsageGetHistorySuspense = <TData = Common.ResourcesServiceResourceUsageGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, page, resourceId, userId }, queryKey), queryFn: () => ResourcesService.resourceUsageGetHistory({ limit, page, resourceId, userId }) as TData, ...options });
 /**
 * Get active usage session for current user
@@ -474,11 +474,11 @@ export const useResourceMaintenancesServiceCanManageMaintenanceSuspense = <TData
 * @throws ApiError
 */
 export const useResourceMaintenancesServiceFindMaintenancesSuspense = <TData = Common.ResourceMaintenancesServiceFindMaintenancesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeActive, includePast, includeUpcoming, limit, page, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
-  page?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, page, resourceId }, queryKey), queryFn: () => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page, resourceId }) as TData, ...options });
 /**
@@ -538,8 +538,8 @@ export const useBillingServiceGetBillingBalanceSuspense = <TData = Common.Billin
 * @throws ApiError
 */
 export const useBillingServiceGetBillingTransactionsSuspense = <TData = Common.BillingServiceGetBillingTransactionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, userId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, page, userId }, queryKey), queryFn: () => BillingService.getBillingTransactions({ limit, page, userId }) as TData, ...options });
 /**
@@ -617,8 +617,8 @@ export const useResourceFlowsServiceGetResourceFlowSuspense = <TData = Common.Re
 * @throws ApiError
 */
 export const useResourceFlowsServiceGetResourceFlowLogsSuspense = <TData = Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, page, resourceId }: {
-  limit?: number;
-  page?: number;
+  limit?: number | undefined;
+  page?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, page, resourceId }, queryKey), queryFn: () => ResourceFlowsService.getResourceFlowLogs({ limit, page, resourceId }) as TData, ...options });
 /**
@@ -651,9 +651,9 @@ export const useResourceFlowsServiceGetButtonsSuspense = <TData = Common.Resourc
 * @throws ApiError
 */
 export const useProjectsServiceFindManyProjectsSuspense = <TData = Common.ProjectsServiceFindManyProjectsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeArchived, limit, page }: {
-  includeArchived?: boolean;
-  limit?: number;
-  page?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
+  page?: number | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit, page }, queryKey), queryFn: () => ProjectsService.findManyProjects({ includeArchived, limit, page }) as TData, ...options });
 /**
 * Get one project
@@ -677,11 +677,11 @@ export const useProjectsServiceFindOneProjectSuspense = <TData = Common.Projects
 * @throws ApiError
 */
 export const useProjectsServiceGetProjectUsageHistorySuspense = <TData = Common.ProjectsServiceGetProjectUsageHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, limit, page, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  page?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  page?: number | undefined;
+  startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, page, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page, startDate }) as TData, ...options });
 /**
 * Get aggregated usage statistics for a project
@@ -693,9 +693,9 @@ export const useProjectsServiceGetProjectUsageHistorySuspense = <TData = Common.
 * @throws ApiError
 */
 export const useProjectsServiceGetProjectUsageStatsSuspense = <TData = Common.ProjectsServiceGetProjectUsageStatsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  startDate?: string;
+  startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseProjectsServiceGetProjectUsageStatsKeyFn({ endDate, id, startDate }, queryKey), queryFn: () => ProjectsService.getProjectUsageStats({ endDate, id, startDate }) as TData, ...options });
 /**
 * List project members
