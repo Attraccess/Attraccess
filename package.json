@@ -218,7 +218,7 @@
     "verdaccio": "6.5.2",
     "vite": "8.0.10",
     "vite-plugin-dts": "4.5.4",
-    "vite-plugin-pwa": "^1.0.0",
+    "vite-plugin-pwa": "^1.2.0",
     "vitest": "^1.6.1",
     "webpack-cli": "^6.0.1"
   },
