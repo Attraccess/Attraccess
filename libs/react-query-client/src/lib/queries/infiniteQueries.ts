@@ -15,12 +15,12 @@ import * as Common from "./common";
 * @throws ApiError
 */
 export const useUsersServiceFindManyInfinite = <TData = InfiniteData<Common.UsersServiceFindManyDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ ids, limit, search }: {
-  ids?: number[];
-  limit?: number;
-  search?: string;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, search }, queryKey), queryFn: ({ pageParam }) => UsersService.findMany({ ids, limit, page: pageParam as number, search }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseUsersServiceFindManyKeyFn({ ids, limit, search }, queryKey), queryFn: ({ pageParam }) => UsersService.findMany({ ids, limit, page: pageParam as number, search }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -33,11 +33,11 @@ export const useUsersServiceFindManyInfinite = <TData = InfiniteData<Common.User
 * @throws ApiError
 */
 export const useUsersServiceGetAllWithPermissionInfinite = <TData = InfiniteData<Common.UsersServiceGetAllWithPermissionDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, permission }: {
-  limit?: number;
-  permission?: PermissionFilter;
+  limit?: number | undefined;
+  permission?: PermissionFilter | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, permission }, queryKey), queryFn: ({ pageParam }) => UsersService.getAllWithPermission({ limit, page: pageParam as number, permission }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseUsersServiceGetAllWithPermissionKeyFn({ limit, permission }, queryKey), queryFn: ({ pageParam }) => UsersService.getAllWithPermission({ limit, page: pageParam as number, permission }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -54,15 +54,15 @@ export const useUsersServiceGetAllWithPermissionInfinite = <TData = InfiniteData
 * @throws ApiError
 */
 export const useResourcesServiceGetAllResourcesInfinite = <TData = InfiniteData<Common.ResourcesServiceGetAllResourcesDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, search }: {
-  groupId?: number;
-  ids?: number[];
-  limit?: number;
-  onlyInUseByMe?: boolean;
-  onlyWithPermissions?: boolean;
-  search?: string;
+  groupId?: number | undefined;
+  ids?: number[] | undefined;
+  limit?: number | undefined;
+  onlyInUseByMe?: boolean | undefined;
+  onlyWithPermissions?: boolean | undefined;
+  search?: string | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, search }, queryKey), queryFn: ({ pageParam }) => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page: pageParam as number, search }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseResourcesServiceGetAllResourcesKeyFn({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, search }, queryKey), queryFn: ({ pageParam }) => ResourcesService.getAllResources({ groupId, ids, limit, onlyInUseByMe, onlyWithPermissions, page: pageParam as number, search }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -76,12 +76,12 @@ export const useResourcesServiceGetAllResourcesInfinite = <TData = InfiniteData<
 * @throws ApiError
 */
 export const useResourcesServiceResourceUsageGetHistoryInfinite = <TData = InfiniteData<Common.ResourcesServiceResourceUsageGetHistoryDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, resourceId, userId }: {
-  limit?: number;
+  limit?: number | undefined;
   resourceId: number;
-  userId?: number;
+  userId?: number | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, resourceId, userId }, queryKey), queryFn: ({ pageParam }) => ResourcesService.resourceUsageGetHistory({ limit, page: pageParam as number, resourceId, userId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseResourcesServiceResourceUsageGetHistoryKeyFn({ limit, resourceId, userId }, queryKey), queryFn: ({ pageParam }) => ResourcesService.resourceUsageGetHistory({ limit, page: pageParam as number, resourceId, userId }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -98,14 +98,14 @@ export const useResourcesServiceResourceUsageGetHistoryInfinite = <TData = Infin
 * @throws ApiError
 */
 export const useResourceMaintenancesServiceFindMaintenancesInfinite = <TData = InfiniteData<Common.ResourceMaintenancesServiceFindMaintenancesDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeActive, includePast, includeUpcoming, limit, resourceId }: {
-  includeActive?: boolean;
-  includePast?: boolean;
-  includeUpcoming?: boolean;
-  limit?: number;
+  includeActive?: boolean | undefined;
+  includePast?: boolean | undefined;
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page: pageParam as number, resourceId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseResourceMaintenancesServiceFindMaintenancesKeyFn({ includeActive, includePast, includeUpcoming, limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceMaintenancesService.findMaintenances({ includeActive, includePast, includeUpcoming, limit, page: pageParam as number, resourceId }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -118,11 +118,11 @@ export const useResourceMaintenancesServiceFindMaintenancesInfinite = <TData = I
 * @throws ApiError
 */
 export const useBillingServiceGetBillingTransactionsInfinite = <TData = InfiniteData<Common.BillingServiceGetBillingTransactionsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, userId }: {
-  limit?: number;
+  limit?: number | undefined;
   userId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, userId }, queryKey), queryFn: ({ pageParam }) => BillingService.getBillingTransactions({ limit, page: pageParam as number, userId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseBillingServiceGetBillingTransactionsKeyFn({ limit, userId }, queryKey), queryFn: ({ pageParam }) => BillingService.getBillingTransactions({ limit, page: pageParam as number, userId }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -136,11 +136,11 @@ export const useBillingServiceGetBillingTransactionsInfinite = <TData = Infinite
 * @throws ApiError
 */
 export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = InfiniteData<Common.ResourceFlowsServiceGetResourceFlowLogsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ limit, resourceId }: {
-  limit?: number;
+  limit?: number | undefined;
   resourceId: number;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceFlowsService.getResourceFlowLogs({ limit, page: pageParam as number, resourceId }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
-    nextPage: string;
+  queryKey: Common.UseResourceFlowsServiceGetResourceFlowLogsKeyFn({ limit, resourceId }, queryKey), queryFn: ({ pageParam }) => ResourceFlowsService.getResourceFlowLogs({ limit, page: pageParam as number, resourceId }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
+    nextPage: number;
   }).nextPage, ...options
 });
 /**
@@ -153,10 +153,10 @@ export const useResourceFlowsServiceGetResourceFlowLogsInfinite = <TData = Infin
 * @throws ApiError
 */
 export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<Common.ProjectsServiceFindManyProjectsDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeArchived, limit }: {
-  includeArchived?: boolean;
-  limit?: number;
+  includeArchived?: boolean | undefined;
+  limit?: number | undefined;
 } = {}, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ includeArchived, limit, page: pageParam as number }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+  queryKey: Common.UseProjectsServiceFindManyProjectsKeyFn({ includeArchived, limit }, queryKey), queryFn: ({ pageParam }) => ProjectsService.findManyProjects({ includeArchived, limit, page: pageParam as number }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });
@@ -172,12 +172,12 @@ export const useProjectsServiceFindManyProjectsInfinite = <TData = InfiniteData<
 * @throws ApiError
 */
 export const useProjectsServiceGetProjectUsageHistoryInfinite = <TData = InfiniteData<Common.ProjectsServiceGetProjectUsageHistoryDefaultResponse>, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ endDate, id, limit, startDate }: {
-  endDate?: string;
+  endDate?: string | undefined;
   id: number;
-  limit?: number;
-  startDate?: string;
+  limit?: number | undefined;
+  startDate?: string | undefined;
 }, queryKey?: TQueryKey, options?: Omit<UseInfiniteQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useInfiniteQuery({
-  queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, startDate }, queryKey), queryFn: ({ pageParam }) => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page: pageParam as number, startDate }) as TData, initialPageParam: "1", getNextPageParam: response => (response as {
+  queryKey: Common.UseProjectsServiceGetProjectUsageHistoryKeyFn({ endDate, id, limit, startDate }, queryKey), queryFn: ({ pageParam }) => ProjectsService.getProjectUsageHistory({ endDate, id, limit, page: pageParam as number, startDate }) as TData, initialPageParam: 1, getNextPageParam: response => (response as {
     nextPage: number;
   }).nextPage, ...options
 });
