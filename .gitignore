@@ -33,6 +33,7 @@ secrets/
 bom.json
 .autopilot.json
 .mcp_data/
+.worktrees/
 .claude/worktrees/
 .claude/worktrees
 .claude/settings.local.json
