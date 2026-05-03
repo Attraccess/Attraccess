@@ -25,6 +25,16 @@ export const METRICS_TOGGLE_KEYS = {
 
 export type MetricsSubsystem = keyof typeof METRICS_TOGGLE_KEYS;
 
+export const METRICS_TOGGLE_DEFAULTS: Record<MetricsSubsystem, boolean> = {
+  http: true,
+  ws: true,
+  cron: true,
+  db: false,
+  external: true,
+  sse: true,
+  flow: true,
+};
+
 export const SMTP_KEYS = {
   service: 'service',
   host: 'host',
