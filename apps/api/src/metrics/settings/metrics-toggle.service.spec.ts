@@ -1,15 +1,18 @@
-// Unit tests for MetricsToggleService.isEnabled() per subsystem
+// Unit tests for MetricsToggleService cached + async toggle reads per subsystem
 // FEATURE: Metrics — runtime toggle reads from settings store
 import { Test } from '@nestjs/testing';
 import { MetricsToggleService } from './metrics-toggle.service';
 import { SettingsStoreService } from '../../settings/settings-store.service';
+import { METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
+
+const SUBSYSTEMS = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
 
 describe('MetricsToggleService', () => {
   let svc: MetricsToggleService;
   let store: { get: jest.Mock };
 
   beforeEach(async () => {
-    store = { get: jest.fn() };
+    store = { get: jest.fn().mockResolvedValue(null) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         MetricsToggleService,
@@ -19,34 +22,118 @@ describe('MetricsToggleService', () => {
     svc = moduleRef.get(MetricsToggleService);
   });
 
-  it.each([
-    ['http', 'metrics_http_enabled', true],
-    ['ws', 'metrics_ws_enabled', true],
-    ['cron', 'metrics_cron_enabled', true],
-    ['db', 'metrics_db_enabled', false],
-    ['external', 'metrics_external_enabled', true],
-    ['sse', 'metrics_sse_enabled', true],
-    ['flow', 'metrics_flow_enabled', true],
-  ])('returns DB value for %s', async (subsystem, key, value) => {
-    store.get.mockResolvedValueOnce(String(value));
-    await expect(svc.isEnabled(subsystem as never)).resolves.toBe(value);
-    expect(store.get).toHaveBeenCalledWith(key);
+  afterEach(() => {
+    svc.onModuleDestroy();
+    jest.useRealTimers();
   });
 
-  it('falls back to true when setting is missing for non-db subsystems', async () => {
-    store.get.mockResolvedValueOnce(null);
-    await expect(svc.isEnabled('http')).resolves.toBe(true);
+  describe('isEnabledCached defaults before refresh', () => {
+    it.each([
+      ['http', true],
+      ['ws', true],
+      ['cron', true],
+      ['db', false],
+      ['external', true],
+      ['sse', true],
+      ['flow', true],
+    ])('returns default for %s when no refresh has happened', (subsystem, expected) => {
+      expect(svc.isEnabledCached(subsystem as MetricsSubsystem)).toBe(expected);
+    });
   });
 
-  it('falls back to false for db subsystem when missing', async () => {
-    store.get.mockResolvedValueOnce(null);
-    await expect(svc.isEnabled('db')).resolves.toBe(false);
+  describe('refresh', () => {
+    it('reads each subsystem key once from the store', async () => {
+      await svc.refresh();
+      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      for (const subsystem of SUBSYSTEMS) {
+        expect(store.get).toHaveBeenCalledWith(METRICS_TOGGLE_KEYS[subsystem]);
+      }
+    });
+
+    it('updates the cache with values from the store', async () => {
+      store.get.mockImplementation(async (key: string) => {
+        if (key === METRICS_TOGGLE_KEYS.http) return 'false';
+        if (key === METRICS_TOGGLE_KEYS.db) return 'true';
+        return null;
+      });
+      await svc.refresh();
+      expect(svc.isEnabledCached('http')).toBe(false);
+      expect(svc.isEnabledCached('db')).toBe(true);
+      expect(svc.isEnabledCached('ws')).toBe(true);
+    });
+
+    it('coalesces concurrent refreshes into a single store read per subsystem', async () => {
+      let resolveStore: (() => void) | null = null;
+      const pending = new Promise<void>((resolve) => {
+        resolveStore = resolve;
+      });
+      store.get.mockImplementation(async () => {
+        await pending;
+        return null;
+      });
+      const refreshes = Promise.all([svc.refresh(), svc.refresh(), svc.refresh()]);
+      resolveStore?.();
+      await refreshes;
+      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+    });
   });
 
-  it('caches values for 5 seconds', async () => {
-    store.get.mockResolvedValue('true');
-    await svc.isEnabled('http');
-    await svc.isEnabled('http');
-    expect(store.get).toHaveBeenCalledTimes(1);
+  describe('isEnabled async path', () => {
+    it('refreshes then returns the cached value', async () => {
+      store.get.mockImplementation(async (key: string) => (key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true'));
+      await expect(svc.isEnabled('http')).resolves.toBe(false);
+      expect(store.get).toHaveBeenCalledWith(METRICS_TOGGLE_KEYS.http);
+    });
+
+    it('coalesces N parallel callers into 1 store read per subsystem', async () => {
+      let resolveStore: (() => void) | null = null;
+      const pending = new Promise<void>((resolve) => {
+        resolveStore = resolve;
+      });
+      store.get.mockImplementation(async () => {
+        await pending;
+        return null;
+      });
+      const calls = Promise.all([
+        svc.isEnabled('http'),
+        svc.isEnabled('http'),
+        svc.isEnabled('ws'),
+        svc.isEnabled('db'),
+        svc.isEnabled('external'),
+      ]);
+      resolveStore?.();
+      await calls;
+      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+    });
+  });
+
+  describe('lifecycle', () => {
+    it('onModuleInit refreshes the cache once and registers an interval that is unref-ed', async () => {
+      jest.useFakeTimers();
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      await svc.onModuleInit();
+      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
+      const timer = setIntervalSpy.mock.results[0].value as { unref?: () => void };
+      expect(typeof timer.unref).toBe('function');
+    });
+
+    it('interval callback triggers refresh', async () => {
+      jest.useFakeTimers();
+      await svc.onModuleInit();
+      store.get.mockClear();
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+    });
+
+    it('onModuleDestroy clears the interval', async () => {
+      jest.useFakeTimers();
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+      await svc.onModuleInit();
+      svc.onModuleDestroy();
+      expect(clearIntervalSpy).toHaveBeenCalled();
+    });
   });
 });
