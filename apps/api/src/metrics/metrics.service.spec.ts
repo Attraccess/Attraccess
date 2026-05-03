@@ -40,16 +40,6 @@ describe('MetricsService', () => {
   });
 
   describe('metric naming (issue #9: attraccess_ prefix)', () => {
-    it('HTTP request duration uses attraccess_ prefix', async () => {
-      const metrics = await service.getMetrics();
-      expect(metrics).toContain('# HELP attraccess_http_request_duration_seconds');
-    });
-
-    it('HTTP requests total uses attraccess_ prefix', async () => {
-      const metrics = await service.getMetrics();
-      expect(metrics).toContain('# HELP attraccess_http_requests_total');
-    });
-
     it('all custom metrics use attraccess_ prefix', async () => {
       const metricsOutput = await service.getMetrics();
       const customMetricLines = metricsOutput
@@ -97,7 +87,7 @@ describe('MetricsService', () => {
     it('returns a string containing prometheus-formatted metrics', async () => {
       const metrics = await service.getMetrics();
       expect(typeof metrics).toBe('string');
-      expect(metrics).toContain('attraccess_http_requests_total');
+      expect(metrics).toContain('attraccess_users_total');
     });
   });
 

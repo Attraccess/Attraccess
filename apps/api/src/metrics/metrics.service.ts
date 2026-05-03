@@ -16,9 +16,6 @@ export class MetricsService implements OnModuleInit {
   private readonly logger = new Logger(MetricsService.name);
   public readonly registry: Registry;
 
-  public readonly httpRequestDuration: Histogram;
-  public readonly httpRequestsTotal: Counter;
-
   public readonly authLoginTotal: Counter;
   public readonly authActiveSessions: Gauge;
   public readonly authSsoLoginTotal: Counter;
@@ -70,21 +67,6 @@ export class MetricsService implements OnModuleInit {
   ) {
     this.registry = new Registry();
     collectDefaultMetrics({ register: this.registry });
-
-    this.httpRequestDuration = new Histogram({
-      name: 'attraccess_http_request_duration_seconds',
-      help: 'Duration of HTTP requests in seconds',
-      labelNames: ['method', 'route', 'status_code'],
-      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-      registers: [this.registry],
-    });
-
-    this.httpRequestsTotal = new Counter({
-      name: 'attraccess_http_requests_total',
-      help: 'Total number of HTTP requests',
-      labelNames: ['method', 'route', 'status_code'],
-      registers: [this.registry],
-    });
 
     this.authLoginTotal = new Counter({
       name: 'attraccess_auth_login_total',
