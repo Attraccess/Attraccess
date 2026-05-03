@@ -22,7 +22,7 @@
       "cache": true,
       "outputs": ["{projectRoot}/src/lib/**/**"],
       "options": {
-        "command": "pnpm openapi-rq --operationId --input=dist/apps/api-swagger/swagger.json --enums=typescript --output=libs/react-query-client/src/lib && sed -i.bak 's/pageParam as string/pageParam as number/g; s/initialPageParam: \"1\"/initialPageParam: 1/g; s/nextPage: string;/nextPage: number;/g' libs/react-query-client/src/lib/queries/infiniteQueries.ts && rm libs/react-query-client/src/lib/queries/infiniteQueries.ts.bak"
+        "command": "pnpm openapi-rq --operationId --input=dist/apps/api-swagger/swagger.json --enums=typescript --output=libs/react-query-client/src/lib"
       },
       "dependsOn": ["api:export-swagger"]
     },
