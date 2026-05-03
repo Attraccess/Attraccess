@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 module.exports = {
   displayName: 'react-query-client',
   preset: '../../jest.preset.js',
