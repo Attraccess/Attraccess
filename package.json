@@ -232,7 +232,8 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "typeorm@0.3.28": "patches/typeorm@0.3.28.patch"
+      "typeorm@0.3.28": "patches/typeorm@0.3.28.patch",
+      "@7nohe/openapi-react-query-codegen@1.6.2": "patches/@7nohe__openapi-react-query-codegen@1.6.2.patch"
     },
     "overrides": {
       "@internationalized/date": "3.12.1"

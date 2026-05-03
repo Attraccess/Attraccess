@@ -1,0 +1,34 @@
+diff --git a/dist/createUseQuery.mjs b/dist/createUseQuery.mjs
+index fc837875e2bd28f1e40eecf60afface1932f349c..88b39bc7dd80bc8ba6144e0eb076d584defb4f42 100644
+--- a/dist/createUseQuery.mjs
++++ b/dist/createUseQuery.mjs
+@@ -180,11 +180,7 @@ export function createQueryHook({ queryString, suffix, responseDataType, request
+                         ts.factory.createObjectLiteralExpression(method
+                             .getParameters()
+                             .flatMap((param) => extractPropertiesFromObjectParam(param).map((p) => p.name === pageParam
+-                            ? ts.factory.createPropertyAssignment(ts.factory.createIdentifier(p.name), ts.factory.createAsExpression(ts.factory.createIdentifier("pageParam"), ts.factory.createKeywordTypeNode(p.type?.getText() === "number"
+-                                ? ts.SyntaxKind
+-                                    .NumberKeyword
+-                                : ts.SyntaxKind
+-                                    .StringKeyword)))
++                            ? ts.factory.createPropertyAssignment(ts.factory.createIdentifier(p.name), ts.factory.createAsExpression(ts.factory.createIdentifier("pageParam"), ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)))
+                             : ts.factory.createShorthandPropertyAssignment(ts.factory.createIdentifier(p.name))))),
+                     ]
+                     : undefined), ts.factory.createTypeReferenceNode(TData)))),
+@@ -296,7 +292,7 @@ function createInfiniteQueryParams(pageParam, nextPageParam, initialPageParam =
+         return [];
+     }
+     return [
+-        ts.factory.createPropertyAssignment(ts.factory.createIdentifier("initialPageParam"), ts.factory.createStringLiteral(initialPageParam)),
++        ts.factory.createPropertyAssignment(ts.factory.createIdentifier("initialPageParam"), ts.factory.createNumericLiteral(initialPageParam)),
+         ts.factory.createPropertyAssignment(ts.factory.createIdentifier("getNextPageParam"), 
+         // (response) => (response as { nextPage: number }).nextPage,
+         ts.factory.createArrowFunction(undefined, undefined, [
+@@ -307,6 +303,6 @@ function createInfiniteQueryParams(pageParam, nextPageParam, initialPageParam =
+             ]);
+         }, ts.factory.createKeywordTypeNode(type === "number"
+             ? ts.SyntaxKind.NumberKeyword
+-            : ts.SyntaxKind.StringKeyword)))), ts.factory.createIdentifier(nextPageParam)))),
++            : ts.SyntaxKind.NumberKeyword)))), ts.factory.createIdentifier(nextPageParam)))),
+     ];
+ }
