@@ -38,9 +38,7 @@ import { ResourceUsageFormRequestPayload } from './websocket.types';
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { WS_METRICS } from '../../metrics/definitions/tokens';
-import { WsMetrics } from '../../metrics/definitions/ws.metrics';
-
-const WS_GATEWAY_LABEL = 'attractap';
+import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../../metrics/definitions/ws.metrics';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -328,7 +326,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.connectedAt.delete(socket as unknown as object);
     if (connectedAt !== undefined && this.metricsToggle.isEnabledCached('ws')) {
       const seconds = Number(process.hrtime.bigint() - connectedAt) / 1e9;
-      this.wsMetrics.connectionDuration.observe({ gateway: WS_GATEWAY_LABEL }, seconds);
+      this.wsMetrics.connectionDuration.observe({ gateway: ATTRACTAP_GATEWAY_LABEL }, seconds);
     }
 
     this.logger.debug(`Client ${socket.id} disconnected.`);

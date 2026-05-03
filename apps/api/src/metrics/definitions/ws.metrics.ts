@@ -2,6 +2,8 @@
 // FEATURE: Metrics — WS message duration, count, and connection lifetime
 import { Counter, Histogram, Registry } from 'prom-client';
 
+export const ATTRACTAP_GATEWAY_LABEL = 'attractap';
+
 export interface WsMetrics {
   messageDuration: Histogram<'gateway' | 'event' | 'status'>;
   messagesTotal: Counter<'gateway' | 'event' | 'status'>;
