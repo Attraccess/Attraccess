@@ -1,21 +1,26 @@
+// Unit tests for HttpMetricsInterceptor recording duration + count per HTTP request
+// FEATURE: Metrics — HTTP timing instrumentation
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
-import { HttpMetricsInterceptor } from './http-metrics.interceptor';
-import { MetricsService } from './metrics.service';
+import { HttpMetricsInterceptor } from './http.interceptor';
+import { HttpMetrics } from '../definitions/http.metrics';
+import { MetricsToggleService } from '../settings/metrics-toggle.service';
 
 describe('HttpMetricsInterceptor', () => {
   let interceptor: HttpMetricsInterceptor;
-  let metricsService: {
-    httpRequestDuration: { observe: jest.Mock };
-    httpRequestsTotal: { inc: jest.Mock };
-  };
+  let metrics: { duration: { observe: jest.Mock }; total: { inc: jest.Mock } };
+  let toggle: { isEnabled: jest.Mock };
 
   beforeEach(() => {
-    metricsService = {
-      httpRequestDuration: { observe: jest.fn() },
-      httpRequestsTotal: { inc: jest.fn() },
+    metrics = {
+      duration: { observe: jest.fn() },
+      total: { inc: jest.fn() },
     };
-    interceptor = new HttpMetricsInterceptor(metricsService as unknown as MetricsService);
+    toggle = { isEnabled: jest.fn().mockResolvedValue(true) };
+    interceptor = new HttpMetricsInterceptor(
+      metrics as unknown as HttpMetrics,
+      toggle as unknown as MetricsToggleService,
+    );
   });
 
   afterEach(() => {
@@ -45,11 +50,11 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, next).subscribe({
       complete: () => {
-        expect(metricsService.httpRequestDuration.observe).toHaveBeenCalledWith(
+        expect(metrics.duration.observe).toHaveBeenCalledWith(
           expect.objectContaining({ method: 'GET', route: '/api/test', status_code: '200' }),
           expect.any(Number),
         );
-        expect(metricsService.httpRequestsTotal.inc).toHaveBeenCalledWith(
+        expect(metrics.total.inc).toHaveBeenCalledWith(
           expect.objectContaining({ method: 'GET', route: '/api/test', status_code: '200' }),
         );
         done();
@@ -65,7 +70,7 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, errorNext).subscribe({
       error: () => {
-        expect(metricsService.httpRequestDuration.observe).toHaveBeenCalledWith(
+        expect(metrics.duration.observe).toHaveBeenCalledWith(
           expect.objectContaining({ status_code: '422' }),
           expect.any(Number),
         );
@@ -82,7 +87,7 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, errorNext).subscribe({
       error: () => {
-        expect(metricsService.httpRequestDuration.observe).toHaveBeenCalledWith(
+        expect(metrics.duration.observe).toHaveBeenCalledWith(
           expect.objectContaining({ status_code: '500' }),
           expect.any(Number),
         );
@@ -101,7 +106,7 @@ describe('HttpMetricsInterceptor', () => {
     interceptor.intercept(context, next).subscribe({
       next: (value) => {
         expect(value).toBe('ws-result');
-        expect(metricsService.httpRequestDuration.observe).not.toHaveBeenCalled();
+        expect(metrics.duration.observe).not.toHaveBeenCalled();
         done();
       },
     });
@@ -112,7 +117,7 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, next).subscribe({
       complete: () => {
-        const duration = metricsService.httpRequestDuration.observe.mock.calls[0][1];
+        const duration = metrics.duration.observe.mock.calls[0][1];
         expect(duration).toBeGreaterThanOrEqual(0);
         expect(duration).toBeLessThan(1);
         done();
@@ -134,9 +139,22 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, next).subscribe({
       complete: () => {
-        expect(metricsService.httpRequestsTotal.inc).toHaveBeenCalledWith(
+        expect(metrics.total.inc).toHaveBeenCalledWith(
           expect.objectContaining({ route: 'unmatched' }),
         );
+        done();
+      },
+    });
+  });
+
+  it('skips recording when http toggle is disabled', (done) => {
+    toggle.isEnabled.mockResolvedValueOnce(false);
+    const { context, next } = createHttpContext();
+
+    interceptor.intercept(context, next).subscribe({
+      complete: () => {
+        expect(metrics.duration.observe).not.toHaveBeenCalled();
+        expect(metrics.total.inc).not.toHaveBeenCalled();
         done();
       },
     });
