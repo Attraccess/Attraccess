@@ -2,7 +2,7 @@
 // FEATURE: Metrics — runtime control over per-subsystem timing instrumentation
 import { Injectable } from '@nestjs/common';
 import { SettingsStoreService } from '../../settings/settings-store.service';
-import { METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
+import { METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
 
 interface CachedToggle {
   value: boolean;
@@ -10,16 +10,6 @@ interface CachedToggle {
 }
 
 const CACHE_TTL_MS = 5000;
-
-const DEFAULTS: Record<MetricsSubsystem, boolean> = {
-  http: true,
-  ws: true,
-  cron: true,
-  db: false,
-  external: true,
-  sse: true,
-  flow: true,
-};
 
 @Injectable()
 export class MetricsToggleService {
@@ -33,7 +23,7 @@ export class MetricsToggleService {
       return cached.value;
     }
     const raw = await this.store.get(METRICS_TOGGLE_KEYS[subsystem]);
-    const value = raw === null || raw === undefined ? DEFAULTS[subsystem] : raw === 'true';
+    const value = raw === null || raw === undefined ? METRICS_TOGGLE_DEFAULTS[subsystem] : raw === 'true';
     this.cache.set(subsystem, { value, expiresAt: Date.now() + CACHE_TTL_MS });
     return value;
   }
