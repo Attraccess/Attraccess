@@ -57,7 +57,7 @@ export class ResourceHealthState {
   })
   identifier!: string;
 
-  @Column({ type: 'simple-enum', enum: ResourceHealthStatus, default: ResourceHealthStatus.HEALTHY })
+  @Column({ type: 'varchar', default: ResourceHealthStatus.HEALTHY })
   @ApiProperty({
     description: 'Current health status',
     enum: ResourceHealthStatus,
@@ -75,7 +75,7 @@ export class ResourceHealthState {
   })
   reason!: string | null;
 
-  @Column({ type: 'simple-enum', enum: ResourceHealthSource, default: ResourceHealthSource.MANUAL })
+  @Column({ type: 'varchar', default: ResourceHealthSource.MANUAL })
   @ApiProperty({
     description: 'Detection variant that produced the current state',
     enum: ResourceHealthSource,
