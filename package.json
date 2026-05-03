@@ -12,7 +12,7 @@
   },
   "private": true,
   "dependencies": {
-    "@7nohe/openapi-react-query-codegen": "^2.0.0",
+    "@7nohe/openapi-react-query-codegen": "^1.6.2",
     "@dagrejs/dagre": "^1.1.5",
     "@eslint/js": "^9.39.4",
     "@golevelup/ts-jest": "^0.7.0",
