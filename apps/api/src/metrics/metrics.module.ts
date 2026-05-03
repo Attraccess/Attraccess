@@ -24,6 +24,7 @@ import { createExternalMetrics } from './definitions/external.metrics';
 import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http.interceptor';
+import { WsMetricsInterceptor } from './instrumentation/ws.interceptor';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
@@ -50,6 +51,10 @@ const definitionProviders = [
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpMetricsInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: WsMetricsInterceptor,
     },
   ],
   exports: [

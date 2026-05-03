@@ -15,12 +15,22 @@ import { ProjectsService } from '../../projects/projects.service';
 import { ResourceFormsService } from '../../resources/forms/forms.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from './websocket.types';
 import { MetricsService } from '../../metrics/metrics.service';
+import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
+import { WS_METRICS } from '../../metrics/definitions/tokens';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
   attractapNfcTapsTotal: { inc: jest.fn() },
   attractapFirmwareUpdatesTotal: { inc: jest.fn() },
 };
+
+const mockWsMetrics = {
+  messageDuration: { observe: jest.fn() },
+  messagesTotal: { inc: jest.fn() },
+  connectionDuration: { observe: jest.fn() },
+};
+
+const mockMetricsToggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
 
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
   return {
@@ -73,6 +83,8 @@ describe('AttractapGateway', () => {
         { provide: ProjectsService, useValue: {} },
         { provide: ResourceFormsService, useValue: {} },
         { provide: MetricsService, useValue: mockMetricsService },
+        { provide: WS_METRICS, useValue: mockWsMetrics },
+        { provide: MetricsToggleService, useValue: mockMetricsToggle },
       ],
     }).compile();
 
