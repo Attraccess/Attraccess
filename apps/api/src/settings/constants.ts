@@ -13,6 +13,18 @@ export const METRICS_KEYS = {
   apiKey: 'api_key',
 } as const;
 
+export const METRICS_TOGGLE_KEYS = {
+  http: 'metrics_http_enabled',
+  ws: 'metrics_ws_enabled',
+  cron: 'metrics_cron_enabled',
+  db: 'metrics_db_enabled',
+  external: 'metrics_external_enabled',
+  sse: 'metrics_sse_enabled',
+  flow: 'metrics_flow_enabled',
+} as const;
+
+export type MetricsSubsystem = keyof typeof METRICS_TOGGLE_KEYS;
+
 export const SMTP_KEYS = {
   service: 'service',
   host: 'host',
