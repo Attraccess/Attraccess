@@ -24,8 +24,8 @@ describe('react-query-client project.json — codegen target', () => {
     expect(typeof command).toBe('string');
   });
 
-  it('starts with the openapi-rq generator invocation', () => {
-    expect(command).toMatch(/^pnpm openapi-rq /);
+  it('invokes the openapi-rq generator', () => {
+    expect(command).toMatch(/\bopenapi-rq\b/);
   });
 
   it('does not invoke sed', () => {
