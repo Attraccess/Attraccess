@@ -1,7 +1,7 @@
 // Global Nest interceptor recording HTTP request duration + count via Prometheus
 // FEATURE: Metrics — HTTP timing instrumentation
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject } from '@nestjs/common';
-import { Observable, tap, from, switchMap } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { Request, Response } from 'express';
 import { HTTP_METRICS } from '../definitions/tokens';
 import { HttpMetrics } from '../definitions/http.metrics';
@@ -18,31 +18,25 @@ export class HttpMetricsInterceptor implements NestInterceptor {
     if (context.getType() !== 'http') {
       return next.handle();
     }
+    if (!this.toggle.isEnabledCached('http')) {
+      return next.handle();
+    }
     const httpCtx = context.switchToHttp();
     const request = httpCtx.getRequest<Request>();
     const startTime = process.hrtime.bigint();
     const route = request.route?.path || 'unmatched';
     const method = request.method;
-
-    return from(this.toggle.isEnabled('http')).pipe(
-      switchMap((enabled) =>
-        next.handle().pipe(
-          tap({
-            next: () => {
-              if (enabled) {
-                const response = httpCtx.getResponse<Response>();
-                this.record(method, route, response.statusCode, startTime);
-              }
-            },
-            error: (error) => {
-              if (enabled) {
-                const statusCode = error?.status || error?.statusCode || 500;
-                this.record(method, route, statusCode, startTime);
-              }
-            },
-          }),
-        ),
-      ),
+    return next.handle().pipe(
+      tap({
+        next: () => {
+          const response = httpCtx.getResponse<Response>();
+          this.record(method, route, response.statusCode, startTime);
+        },
+        error: (error) => {
+          const statusCode = error?.status || error?.statusCode || 500;
+          this.record(method, route, statusCode, startTime);
+        },
+      }),
     );
   }
 

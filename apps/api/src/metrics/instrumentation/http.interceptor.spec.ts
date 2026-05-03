@@ -9,14 +9,14 @@ import { MetricsToggleService } from '../settings/metrics-toggle.service';
 describe('HttpMetricsInterceptor', () => {
   let interceptor: HttpMetricsInterceptor;
   let metrics: { duration: { observe: jest.Mock }; total: { inc: jest.Mock } };
-  let toggle: { isEnabled: jest.Mock };
+  let toggle: { isEnabledCached: jest.Mock };
 
   beforeEach(() => {
     metrics = {
       duration: { observe: jest.fn() },
       total: { inc: jest.fn() },
     };
-    toggle = { isEnabled: jest.fn().mockResolvedValue(true) };
+    toggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
     interceptor = new HttpMetricsInterceptor(
       metrics as unknown as HttpMetrics,
       toggle as unknown as MetricsToggleService,
@@ -147,16 +147,31 @@ describe('HttpMetricsInterceptor', () => {
     });
   });
 
-  it('skips recording when http toggle is disabled', (done) => {
-    toggle.isEnabled.mockResolvedValueOnce(false);
-    const { context, next } = createHttpContext();
+  it('returns the downstream observable unchanged when the http toggle is disabled', (done) => {
+    toggle.isEnabledCached.mockReturnValueOnce(false);
+    const { context } = createHttpContext();
+    const handle = jest.fn(() => of('payload'));
+    const next = { handle } as unknown as CallHandler;
 
-    interceptor.intercept(context, next).subscribe({
+    const result = interceptor.intercept(context, next);
+
+    result.subscribe({
+      next: (value) => {
+        expect(value).toBe('payload');
+      },
       complete: () => {
+        expect(handle).toHaveBeenCalledTimes(1);
         expect(metrics.duration.observe).not.toHaveBeenCalled();
         expect(metrics.total.inc).not.toHaveBeenCalled();
         done();
       },
     });
+  });
+
+  it('reads the toggle synchronously without awaiting', () => {
+    const { context, next } = createHttpContext();
+    interceptor.intercept(context, next);
+    expect(toggle.isEnabledCached).toHaveBeenCalledWith('http');
+    expect(toggle.isEnabledCached).toHaveBeenCalledTimes(1);
   });
 });
