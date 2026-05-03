@@ -145,10 +145,18 @@ describe('AttractapGateway', () => {
     it('removes the socket from websocketService', async () => {
       const socket = createMockSocket({ id: 'disc-1' });
       websocketService.sockets.set('disc-1', socket);
+      (gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt.set(
+        socket as unknown as object,
+        process.hrtime.bigint(),
+      );
 
       expect(websocketService.sockets.size).toBe(1);
       await gateway.handleDisconnect(socket);
       expect(websocketService.sockets.size).toBe(0);
+      expect(mockWsMetrics.connectionDuration.observe).toHaveBeenCalledWith(
+        { gateway: 'attractap' },
+        expect.any(Number),
+      );
     });
 
     it('closes OTA file descriptor on disconnect if present', async () => {

@@ -3,10 +3,8 @@
 import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
 import { WS_METRICS } from '../definitions/tokens';
-import { WsMetrics } from '../definitions/ws.metrics';
+import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../definitions/ws.metrics';
 import { MetricsToggleService } from '../settings/metrics-toggle.service';
-
-const GATEWAY_LABEL = 'attractap';
 
 @Injectable()
 export class WsMetricsInterceptor implements NestInterceptor {
@@ -38,7 +36,7 @@ export class WsMetricsInterceptor implements NestInterceptor {
 
   private record(event: string, status: 'success' | 'error', startTime: bigint): void {
     const seconds = Number(process.hrtime.bigint() - startTime) / 1e9;
-    const labels = { gateway: GATEWAY_LABEL, event, status };
+    const labels = { gateway: ATTRACTAP_GATEWAY_LABEL, event, status };
     this.metrics.messageDuration.observe(labels, seconds);
     this.metrics.messagesTotal.inc(labels);
   }
