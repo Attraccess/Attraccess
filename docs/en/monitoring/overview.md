@@ -28,10 +28,15 @@ Attraccess ──(/api/metrics)──> Prometheus ──(queries)──> Grafana
 
 ## Pre-Built Dashboards
 
-Attraccess ships with two Grafana dashboards, ready to use out of the box:
+Attraccess ships with seven Grafana dashboards, ready to use out of the box:
 
 - **Attraccess Overview** -- Application metrics including request rates, authentication, resource usage, billing, devices, and more
 - **Node Runtime** -- System-level metrics including CPU, memory, event loop lag, and active handles
+- **Performance Overview** (`attraccess-perf-overview`) -- Cross-subsystem latency and throughput at a glance
+- **HTTP** (`attraccess-http`) -- Top slow routes, status codes, requests/sec
+- **WebSocket** (`attraccess-websocket`) -- Per-event latency, message rate, connection duration
+- **Cron Jobs** (`attraccess-cron`) -- Per-job duration, success/failure rate, time-since-last-success alerting
+- **Database** (`attraccess-database`) -- Per-entity query latency, slow queries, error rate
 
 ## Security
 
