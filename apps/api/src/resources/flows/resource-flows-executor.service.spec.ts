@@ -19,6 +19,7 @@ import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-me
 import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
+import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -153,6 +154,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       eventEmitter,
       resourceHealthService,
       { time: (_n, fn) => fn() } as unknown as CronTimer,
+      {
+        timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
+        timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
+      } as unknown as FlowTimer,
     );
   });
 
@@ -899,6 +904,10 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       eventEmitter,
       resourceHealthService,
       { time: (_n, fn) => fn() } as unknown as CronTimer,
+      {
+        timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
+        timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
+      } as unknown as FlowTimer,
     );
   });
 
