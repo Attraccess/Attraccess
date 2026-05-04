@@ -16,15 +16,15 @@ export class SseInstrumentation {
   ) {}
 
   wrap<T>(stream: SseStream, source: Observable<T>): Observable<T> {
+    if (!this.toggle.isEnabledCached('sse')) return source;
     return new Observable<T>((subscriber) => {
-      const enabled = this.toggle.isEnabledCached('sse');
-      const start = enabled ? process.hrtime.bigint() : BigInt(0);
-      if (enabled) this.metrics.activeConnections.inc({ stream });
+      const start = process.hrtime.bigint();
+      this.metrics.activeConnections.inc({ stream });
 
       const sub = source.subscribe({
         next: (value) => {
           subscriber.next(value);
-          if (enabled) this.metrics.messagesSentTotal.inc({ stream });
+          this.metrics.messagesSentTotal.inc({ stream });
         },
         error: (err) => subscriber.error(err),
         complete: () => subscriber.complete(),
@@ -32,13 +32,11 @@ export class SseInstrumentation {
 
       return () => {
         sub.unsubscribe();
-        if (enabled) {
-          this.metrics.activeConnections.dec({ stream });
-          this.metrics.connectionDuration.observe(
-            { stream },
-            Number(process.hrtime.bigint() - start) / 1e9,
-          );
-        }
+        this.metrics.activeConnections.dec({ stream });
+        this.metrics.connectionDuration.observe(
+          { stream },
+          Number(process.hrtime.bigint() - start) / 1e9,
+        );
       };
     });
   }
