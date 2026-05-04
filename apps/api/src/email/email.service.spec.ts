@@ -13,6 +13,7 @@ import { createTransport } from 'nodemailer';
 import { SettingsService } from '../settings/settings.service';
 import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 import { MetricsService } from '../metrics/metrics.service';
+import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -104,11 +105,16 @@ describe('EmailService', () => {
       emailSentTotal: { inc: jest.fn() },
     };
 
+    const externalCallTimer = {
+      time: <T,>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
+    };
+
     const service = new EmailService(
       settingsService as unknown as SettingsService,
       emailTemplateService as unknown as EmailTemplateService,
       mjmlService as unknown as MjmlService,
       metricsService as unknown as MetricsService,
+      externalCallTimer as unknown as ExternalCallTimer,
     );
 
     return { service, sendMail, close, settingsService, emailTemplateService, mjmlService };

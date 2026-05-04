@@ -12,6 +12,7 @@ import { LiveNotificationsService } from './liveNotificationsService';
 import { SumupTransactionEventType } from './dto/sumup/sumup-transaction-callback.dto';
 import { SettingsService } from '../settings/settings.service';
 import { CronTimer } from '../metrics/instrumentation/cron.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
 
 const mockSumUpGet = jest.fn();
 const mockMerchantsGet = jest.fn();
@@ -117,6 +118,10 @@ describe('SumUpService', () => {
         { provide: LiveNotificationsService, useValue: mockLiveNotificationsService },
         { provide: BillingService, useValue: mockBillingService },
         { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
+        {
+          provide: ExternalCallTimer,
+          useValue: { time: <T,>(_t: string, _o: string, fn: () => Promise<T>) => fn() },
+        },
       ],
     }).compile();
 
