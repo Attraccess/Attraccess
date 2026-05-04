@@ -522,6 +522,66 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     });
   }
 
+  private async dispatchNode(
+    node: ResourceFlowNode,
+    input: object,
+    transactionManager?: EntityManager,
+  ): Promise<NodeProcessingResult> {
+    switch (node.type) {
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
+      case ResourceFlowNodeType.INPUT_BUTTON:
+      case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
+      case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
+        return { payload: input };
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
+        return this.processHeartbeatNode(node, input);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
+        return this.processHealthSetNode(node, input);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
+        return this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_WAIT:
+        return this.processWaitNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+        return this.processHttpSendRequestNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+        return this.processMqttSendMessageNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+        return this.processEndUsageSessionNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
+        return this.processActivityTrackActivityNode(node, input);
+
+      case ResourceFlowNodeType.PROCESSING_IF:
+        return this.processIfNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
+        return this.processSetPayloadNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+        return this.processMqttWaitForMessageNode(node, input, transactionManager);
+
+      case ResourceFlowNodeType.PROCESSING_ERROR:
+        return this.processErrorNode(node, input, transactionManager);
+
+      default: {
+        const exhaustiveCheck: never = node.type;
+        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
+      }
+    }
+  }
+
   private async processNode(
     flowRunId: string,
     node: ResourceFlowNode,
@@ -555,61 +615,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         transactionManager,
       );
 
-      responseOfNode = await this.flowTimer.timeNode(node.type, async () => {
-        switch (node.type) {
-          case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
-          case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
-          case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-          case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
-          case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
-          case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-          case ResourceFlowNodeType.INPUT_BUTTON:
-          case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-          case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-            return { payload: input };
-
-          case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-            return this.processHeartbeatNode(node, input);
-
-          case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-            return this.processHealthSetNode(node, input);
-
-          case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-            return this.processBillingSetAdditionalItemsNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.PROCESSING_WAIT:
-            return this.processWaitNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-            return this.processHttpSendRequestNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-            return this.processMqttSendMessageNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-            return this.processEndUsageSessionNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-            return this.processActivityTrackActivityNode(node, input);
-
-          case ResourceFlowNodeType.PROCESSING_IF:
-            return this.processIfNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-            return this.processSetPayloadNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-            return this.processMqttWaitForMessageNode(node, input, transactionManager);
-
-          case ResourceFlowNodeType.PROCESSING_ERROR:
-            return this.processErrorNode(node, input, transactionManager);
-
-          default: {
-            const exhaustiveCheck: never = node.type;
-            throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-          }
-        }
-      });
+      responseOfNode = await this.flowTimer.timeNode(node.type, () =>
+        this.dispatchNode(node, input, transactionManager),
+      );
 
       const processingTime = Date.now() - startTime;
       this.logger.debug(`Successfully processed flow node ID: ${node.id} (Type: ${node.type}) in ${processingTime}ms`);
