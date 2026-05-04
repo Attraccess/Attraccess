@@ -97,8 +97,8 @@ describe('SseInstrumentation.wrap', () => {
     expect(text).toContain('attraccess_sse_connection_duration_seconds_count{stream="resource_usage"} 3');
   });
 
-  it('propagates errors through to subscriber', () => {
-    const { instr } = setup();
+  it('propagates errors through to subscriber and records teardown', async () => {
+    const { registry, instr } = setup();
     const source = new Subject<{ data: object }>();
     const wrapped = instr.wrap('billing', source.asObservable());
 
@@ -109,6 +109,30 @@ describe('SseInstrumentation.wrap', () => {
     source.error(boom);
 
     expect(onError).toHaveBeenCalledWith(boom);
+
+    const text = await registry.metrics();
+    expect(text).toContain('attraccess_sse_active_connections{stream="billing"} 0');
+    expect(text).toContain('attraccess_sse_connection_duration_seconds_count{stream="billing"} 1');
+
+    sub.unsubscribe();
+  });
+
+  it('records teardown when upstream completes', async () => {
+    const { registry, instr } = setup();
+    const source = new Subject<{ data: object }>();
+    const wrapped = instr.wrap('resource_flows', source.asObservable());
+
+    const onComplete = jest.fn();
+    const sub = wrapped.subscribe({ next: () => undefined, complete: onComplete });
+
+    source.complete();
+
+    expect(onComplete).toHaveBeenCalled();
+
+    const text = await registry.metrics();
+    expect(text).toContain('attraccess_sse_active_connections{stream="resource_flows"} 0');
+    expect(text).toContain('attraccess_sse_connection_duration_seconds_count{stream="resource_flows"} 1');
+
     sub.unsubscribe();
   });
 });
