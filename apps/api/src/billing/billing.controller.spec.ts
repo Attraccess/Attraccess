@@ -14,6 +14,8 @@ import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dt
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callback.dto';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
+import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+import { Observable } from 'rxjs';
 
 const baseReq = (userOverrides: DeepPartial<User> = {}) =>
   ({
@@ -93,6 +95,10 @@ describe('BillingController', () => {
         {
           provide: ResourceFlowsService,
           useValue: { getNodes: jest.fn().mockResolvedValue([]) },
+        },
+        {
+          provide: SseInstrumentation,
+          useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
         },
       ],
     }).compile();
