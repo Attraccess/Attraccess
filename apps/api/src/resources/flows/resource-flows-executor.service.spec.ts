@@ -18,6 +18,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { ResourceHealthService } from '../health/resource-health.service';
+import { CronTimer } from '../../metrics/instrumentation/cron.helper';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -151,6 +152,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
+      { time: (_n, fn) => fn() } as unknown as CronTimer,
     );
   });
 
@@ -896,6 +898,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
+      { time: (_n, fn) => fn() } as unknown as CronTimer,
     );
   });
 
