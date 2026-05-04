@@ -114,6 +114,130 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_email_sent_total` | Counter | `status` | Emails sent by delivery status |
 | `attraccess_websocket_connections_active` | Gauge | -- | Active WebSocket connections |
 
+## WebSocket Timing
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_ws_message_duration_seconds` | Histogram | `gateway`, `event`, `status` | Duration of WebSocket message handlers |
+| `attraccess_ws_messages_total` | Counter | `gateway`, `event`, `status` | Total WebSocket messages handled |
+| `attraccess_ws_connection_duration_seconds` | Histogram | `gateway` | Duration of WebSocket connections |
+
+**Message duration buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s
+**Connection duration buckets:** 10s, 30s, 1min, 5min, 15min, 1h, 6h, 24h
+
+### Example PromQL Queries
+
+```promql
+# p95 message latency by event
+histogram_quantile(0.95, sum by (event, le) (rate(attraccess_ws_message_duration_seconds_bucket[5m])))
+
+# Message error rate by event
+sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
+```
+
+## Cron Jobs
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_cron_job_duration_seconds` | Histogram | `job_name` | Duration of scheduled job runs |
+| `attraccess_cron_job_runs_total` | Counter | `job_name`, `status` | Cron job runs by outcome. `status`: `success` or `failure` |
+| `attraccess_cron_job_last_run_timestamp_seconds` | Gauge | `job_name` | Unix timestamp of the most recent run |
+| `attraccess_cron_job_last_success_timestamp_seconds` | Gauge | `job_name` | Unix timestamp of the most recent successful run |
+
+**Duration buckets:** 100ms, 500ms, 1s, 5s, 10s, 30s, 1min, 5min, 15min, 30min
+
+**Job names:** `sumup_poll`, `session_cleanup`, `maintenance_evaluator`, `flow_daily_cleanup`, `flow_minute_tick`.
+
+### Example PromQL Queries
+
+```promql
+# Time since last successful run (alert if too old)
+time() - attraccess_cron_job_last_success_timestamp_seconds
+
+# Cron failure rate
+sum by (job_name) (rate(attraccess_cron_job_runs_total{status="failure"}[15m]))
+```
+
+## Database
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_db_query_duration_seconds` | Histogram | `entity`, `method` | Duration of database write operations |
+| `attraccess_db_query_errors_total` | Counter | `entity`, `method`, `error_type` | Database query errors |
+| `attraccess_db_slow_queries_total` | Counter | `entity`, `method` | Queries exceeding the slow-query threshold |
+| `attraccess_db_pool_size` | Gauge | -- | Configured connection pool size |
+
+**Duration buckets:** 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s
+
+The TypeORM `EntitySubscriber` covers `insert`, `update`, `remove`, and `softRemove`. Read paths (`find`, `findOne`, ...) are not measured -- this is a known TypeORM `EntitySubscriber` limitation.
+
+**Disabled by default** (high cardinality). Enable via Admin Settings -> Metrics -> Toggles -> Database.
+
+### Example PromQL Queries
+
+```promql
+# Top 10 slowest entities (p95)
+topk(10, histogram_quantile(0.95, sum by (entity, method, le) (rate(attraccess_db_query_duration_seconds_bucket[5m]))))
+
+# Slow query rate
+sum by (entity, method) (rate(attraccess_db_slow_queries_total[5m]))
+```
+
+## External Calls
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_external_call_duration_seconds` | Histogram | `target`, `operation`, `status` | Duration of outbound calls to external services |
+| `attraccess_external_call_errors_total` | Counter | `target`, `operation`, `error_type` | External call errors |
+
+**Duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s
+
+**Targets:** `sumup`, `smtp`, `mqtt`, `github`. Operations are bounded enums per target (e.g. `merchant`, `checkout`, `transactions` for SumUp; `send` for SMTP; `publish`, `subscribe` for MQTT).
+
+### Example PromQL Queries
+
+```promql
+# External call error rate by target
+sum by (target) (rate(attraccess_external_call_errors_total[5m]))
+
+# p95 external call latency
+histogram_quantile(0.95, sum by (target, operation, le) (rate(attraccess_external_call_duration_seconds_bucket[5m])))
+```
+
+## Server-Sent Events
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_sse_active_connections` | Gauge | `stream` | Active SSE subscribers per stream |
+| `attraccess_sse_connection_duration_seconds` | Histogram | `stream` | Duration of SSE connections |
+| `attraccess_sse_messages_sent_total` | Counter | `stream` | Total SSE messages sent |
+
+**Connection duration buckets:** 10s, 30s, 1min, 5min, 15min, 1h, 6h, 24h
+
+**Streams:** `resource_usage`, `billing`, `resource_flows`.
+
+## Resource Flows
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `attraccess_flow_execution_duration_seconds` | Histogram | `trigger_type`, `status` | Duration of flow executions |
+| `attraccess_flow_node_duration_seconds` | Histogram | `node_type`, `status` | Duration per flow node |
+| `attraccess_flow_executions_total` | Counter | `trigger_type`, `status` | Total flow executions |
+
+**Duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 1min
+
+`trigger_type` and `node_type` are values from the `ResourceFlowNodeType` enum (e.g. `input.button`, `output.http.sendRequest`).
+
+### Example PromQL Queries
+
+```promql
+# Flow execution failure rate by trigger
+sum by (trigger_type) (rate(attraccess_flow_executions_total{status="failure"}[5m]))
+
+# p95 flow execution duration
+histogram_quantile(0.95, sum by (trigger_type, le) (rate(attraccess_flow_execution_duration_seconds_bucket[5m])))
+```
+
 ## Node.js Runtime Metrics
 
 These are standard metrics collected automatically by the [prom-client](https://github.com/siimon/prom-client) library:
