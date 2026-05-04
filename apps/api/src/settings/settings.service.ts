@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
@@ -11,12 +11,23 @@ import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { SmtpSettingsInternal, SmtpSettingsService } from './smtp-settings.service';
-import { APP_KEYS, APP_PARENT, METRICS_KEYS, METRICS_PARENT } from './constants';
+import {
+  APP_KEYS,
+  APP_PARENT,
+  METRICS_KEYS,
+  METRICS_PARENT,
+  METRICS_TOGGLE_DEFAULTS,
+  METRICS_TOGGLE_KEYS,
+  MetricsSubsystem,
+} from './constants';
 import { SettingsStoreService } from './settings-store.service';
 import {
   FirstTimeSetupStatusDto,
   FirstTimeSetupStepsDto,
 } from './dto/first-time-setup-status.dto';
+import { MetricsTogglesDto } from './dto/metrics-toggles.dto';
+import { UpdateMetricsTogglesDto } from './dto/update-metrics-toggles.dto';
+import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
 
 @Injectable()
 export class SettingsService {
@@ -25,6 +36,9 @@ export class SettingsService {
     private readonly userRepository: Repository<User>,
     private readonly settingsStore: SettingsStoreService,
     private readonly smtpSettingsService: SmtpSettingsService,
+    @Optional()
+    @Inject(METRICS_TOGGLE_INVALIDATOR)
+    private readonly metricsToggleInvalidator: MetricsToggleInvalidator | null = null,
   ) {}
 
   async isFirstTimeSetupAvailable(): Promise<boolean> {
@@ -142,5 +156,38 @@ export class SettingsService {
     const apiKey = randomBytes(32).toString('base64url');
     await this.settingsStore.setSecretSetting(METRICS_PARENT, METRICS_KEYS.apiKey, apiKey);
     return { apiKey };
+  }
+
+  async getMetricsToggles(): Promise<MetricsTogglesDto> {
+    const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
+    const reads = await Promise.all(
+      subsystems.map(async (subsystem) => {
+        const raw = await this.settingsStore.getPlainSetting(APP_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
+        const value = raw === null || raw === undefined ? METRICS_TOGGLE_DEFAULTS[subsystem] : raw === 'true';
+        return [subsystem, value] as const;
+      }),
+    );
+    return reads.reduce<MetricsTogglesDto>((acc, [subsystem, value]) => {
+      acc[subsystem] = value;
+      return acc;
+    }, {} as MetricsTogglesDto);
+  }
+
+  async updateMetricsToggles(update: UpdateMetricsTogglesDto): Promise<MetricsTogglesDto> {
+    const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
+    const writes = subsystems
+      .filter((subsystem) => update[subsystem] !== undefined)
+      .map((subsystem) =>
+        this.settingsStore.setPlainSetting(
+          APP_PARENT,
+          METRICS_TOGGLE_KEYS[subsystem],
+          update[subsystem] === true ? 'true' : 'false',
+        ),
+      );
+    await Promise.all(writes);
+    if (this.metricsToggleInvalidator) {
+      await this.metricsToggleInvalidator.refresh();
+    }
+    return this.getMetricsToggles();
   }
 }

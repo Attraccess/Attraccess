@@ -52,6 +52,10 @@ export class MetricsToggleService implements OnModuleInit, OnModuleDestroy {
     return this.refreshPromise;
   }
 
+  invalidate(): void {
+    this.cache.clear();
+  }
+
   private async runRefresh(): Promise<void> {
     const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
     const reads = subsystems.map(async (subsystem) => {

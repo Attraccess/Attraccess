@@ -6,6 +6,7 @@ import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
 import { MetricsGuard } from './metrics.guard';
 import { SettingsModule } from '../settings/settings.module';
+import { METRICS_TOGGLE_INVALIDATOR } from '../settings/metrics-toggle-invalidator.token';
 import { MetricsToggleService } from './settings/metrics-toggle.service';
 import {
   HTTP_METRICS,
@@ -66,6 +67,10 @@ const definitionProviders = [
       provide: APP_INTERCEPTOR,
       useClass: WsMetricsInterceptor,
     },
+    {
+      provide: METRICS_TOGGLE_INVALIDATOR,
+      useExisting: MetricsToggleService,
+    },
   ],
   exports: [
     MetricsService,
@@ -81,6 +86,7 @@ const definitionProviders = [
     EXTERNAL_METRICS,
     SSE_METRICS,
     FLOW_METRICS,
+    METRICS_TOGGLE_INVALIDATOR,
   ],
 })
 export class MetricsModule {}

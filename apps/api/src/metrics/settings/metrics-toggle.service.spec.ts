@@ -107,6 +107,19 @@ describe('MetricsToggleService', () => {
     });
   });
 
+  describe('invalidate', () => {
+    it('clears cached values so subsequent isEnabledCached falls back to defaults', async () => {
+      store.get.mockImplementation(async (key: string) => (key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true'));
+      await svc.refresh();
+      expect(svc.isEnabledCached('http')).toBe(false);
+
+      svc.invalidate();
+
+      expect(svc.isEnabledCached('http')).toBe(true);
+      expect(svc.isEnabledCached('db')).toBe(false);
+    });
+  });
+
   describe('lifecycle', () => {
     it('onModuleInit refreshes the cache once and registers an interval that is unref-ed', async () => {
       jest.useFakeTimers();
