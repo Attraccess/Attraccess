@@ -18,6 +18,8 @@ import { ResourceFlowsService } from '../resources/flows/resource-flows.service'
 import { EmailService } from '../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../metrics/metrics.service';
+import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+import { Observable } from 'rxjs';
 
 const mockMetricsService = {
   billingTransactionsTotal: { inc: jest.fn() },
@@ -84,6 +86,10 @@ describe('BillingModule', () => {
           {
             provide: MetricsService,
             useValue: mockMetricsService,
+          },
+          {
+            provide: SseInstrumentation,
+            useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
           },
         ],
       }).compile();

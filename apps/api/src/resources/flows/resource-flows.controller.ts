@@ -11,6 +11,7 @@ import {
 import { ResourceFlowLogEvent, ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { Observable, Subject } from 'rxjs';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
+import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
 @ApiTags('Resource Flows')
 @Controller('resources/:resourceId/flow')
@@ -21,6 +22,7 @@ export class ResourceFlowsController {
   constructor(
     private readonly resourceFlowsService: ResourceFlowsService,
     private readonly resourceFlowsExecutorService: ResourceFlowsExecutorService,
+    private readonly sse: SseInstrumentation,
   ) {}
 
   @Get('node-schemas')
@@ -190,7 +192,7 @@ export class ResourceFlowsController {
     }, 100);
 
     // Create an observable from the subject
-    return subject.asObservable();
+    return this.sse.wrap('resource_flows', subject.asObservable());
   }
 
   @Post('/buttons/:buttonId/press')

@@ -16,6 +16,7 @@ import { Resource } from '@attraccess/database-entities';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
 import { ApiTags } from '@nestjs/swagger';
+import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
 interface MessageEvent {
   data: object;
@@ -32,7 +33,8 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>
+    private readonly resourceRepository: Repository<Resource>,
+    private readonly sse: SseInstrumentation,
   ) {}
 
   onModuleInit() {
@@ -88,7 +90,7 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     }, 1000);
 
     // Create an observable from the subject
-    return subject.asObservable();
+    return this.sse.wrap('resource_usage', subject.asObservable());
   }
 
   private async getResourceInUseStatus(resourceId: number): Promise<boolean> {
