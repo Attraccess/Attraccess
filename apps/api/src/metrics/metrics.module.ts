@@ -27,6 +27,7 @@ import { HttpMetricsInterceptor } from './instrumentation/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws.interceptor';
 import { CronTimer } from './instrumentation/cron.helper';
 import { DbMetricsSubscriber } from './instrumentation/db.subscriber';
+import { ExternalCallTimer } from './instrumentation/external.helper';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
@@ -51,6 +52,7 @@ const definitionProviders = [
     MetricsToggleService,
     CronTimer,
     DbMetricsSubscriber,
+    ExternalCallTimer,
     ...definitionProviders,
     {
       provide: APP_INTERCEPTOR,
@@ -65,6 +67,7 @@ const definitionProviders = [
     MetricsService,
     MetricsToggleService,
     CronTimer,
+    ExternalCallTimer,
     HTTP_METRICS,
     WS_METRICS,
     CRON_METRICS,
