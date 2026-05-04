@@ -16,5 +16,10 @@
   "status": {
     "healthy": "Gesund",
     "unhealthy": "Ungesund"
+  },
+  "actions": {
+    "markHealthy": "Als gesund markieren",
+    "markHealthySuccess": "Status-Eintrag gelöscht",
+    "markHealthyError": "Status-Eintrag konnte nicht gelöscht werden"
   }
 }

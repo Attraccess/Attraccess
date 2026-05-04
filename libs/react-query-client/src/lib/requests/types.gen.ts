@@ -4948,6 +4948,13 @@ export type GetResourceHealthData = {
 
 export type GetResourceHealthResponse = ResourceHealthSummaryDto;
 
+export type ClearResourceHealthEntryData = {
+    entryId: number;
+    resourceId: number;
+};
+
+export type ClearResourceHealthEntryResponse = void;
+
 export type FindManyProjectsData = {
     /**
      * Include archived projects (already finished)
@@ -7735,6 +7742,29 @@ export type $OpenApiTs = {
                 401: unknown;
                 /**
                  * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/health/entries/{entryId}': {
+        delete: {
+            req: ClearResourceHealthEntryData;
+            res: {
+                /**
+                 * Entry cleared
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Missing maintenance management permission
+                 */
+                403: unknown;
+                /**
+                 * Health entry or resource not found
                  */
                 404: unknown;
             };

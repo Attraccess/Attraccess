@@ -122,6 +122,33 @@ export class ResourceHealthService {
     return count > 0;
   }
 
+  async clearEntry(resourceId: number, entryId: number): Promise<void> {
+    const entry = await this.healthRepository.findOne({
+      where: { id: entryId, resourceId },
+    });
+    if (!entry) {
+      throw new NotFoundException(`Health entry ${entryId} not found for resource ${resourceId}`);
+    }
+
+    await this.healthRepository.remove(entry);
+
+    if (entry.status === ResourceHealthStatus.UNHEALTHY) {
+      this.logger.log(
+        `Resource ${resourceId} health entry cleared (identifier="${entry.identifier}"): ${entry.status} -> cleared`,
+      );
+      this.eventEmitter.emit(
+        ResourceHealthChangedEvent.EVENT_NAME,
+        new ResourceHealthChangedEvent(
+          resourceId,
+          entry.identifier,
+          ResourceHealthStatus.HEALTHY,
+          null,
+          entry.status,
+        ),
+      );
+    }
+  }
+
   private toDto(entry: ResourceHealthState) {
     return {
       id: entry.id,

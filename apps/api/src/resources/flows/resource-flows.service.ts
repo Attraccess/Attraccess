@@ -324,7 +324,7 @@ export class ResourceFlowsService {
 
       switch (type) {
         case ResourceFlowNodeType.INPUT_BUTTON:
-          schema.configSchema = z.toJSONSchema(ButtonNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ButtonNodeDataSchema, { io: 'input' });
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
@@ -332,7 +332,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED:
         case ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema, { io: 'input' });
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
@@ -340,31 +340,31 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED:
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED:
         case ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED:
-          schema.configSchema = z.toJSONSchema(EventNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(EventNodeDataSchema, { io: 'input' });
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Door;
           break;
 
         case ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED:
-          schema.configSchema = z.toJSONSchema(MqttMessageReceivedNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(MqttMessageReceivedNodeDataSchema, { io: 'input' });
           schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY:
-          schema.configSchema = z.toJSONSchema(InputResourceActivityNoActivityNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(InputResourceActivityNoActivityNodeDataSchema, { io: 'input' });
           schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS:
-          schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema);
+          schema.configSchema = z.toJSONSchema(BillingTransactionItemCreateSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           break;
 
         case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
-          schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
@@ -372,62 +372,62 @@ export class ResourceFlowsService {
           break;
 
         case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
-          schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
-          schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
-          schema.configSchema = z.toJSONSchema(ResourceActivityTrackActivityNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ResourceActivityTrackActivityNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
 
         case ResourceFlowNodeType.PROCESSING_WAIT:
-          schema.configSchema = z.toJSONSchema(WaitNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(WaitNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.PROCESSING_IF:
-          schema.configSchema = z.toJSONSchema(IfNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(IfNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output-true', 'output-false'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.PROCESSING_SET_PAYLOAD:
-          schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(SetPayloadNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
-          schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.PROCESSING_ERROR:
-          schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ErrorNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.supportedByResource = true;
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
-          schema.configSchema = z.toJSONSchema(ResourceHealthHeartbeatNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ResourceHealthHeartbeatNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;
@@ -435,7 +435,7 @@ export class ResourceFlowsService {
           break;
 
         case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET:
-          schema.configSchema = z.toJSONSchema(ResourceHealthSetNodeDataSchema);
+          schema.configSchema = z.toJSONSchema(ResourceHealthSetNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];
           schema.supportedByResource = true;

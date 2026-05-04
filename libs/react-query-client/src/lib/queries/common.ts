@@ -613,6 +613,7 @@ export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaite
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenanceSchedulesServiceDeleteMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.deleteMaintenanceSchedule>>;
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
+export type ResourceHealthServiceClearResourceHealthEntryMutationResult = Awaited<ReturnType<typeof ResourceHealthService.clearResourceHealthEntry>>;
 export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
 export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;
 export type ProjectsServiceCancelProjectInvitationMutationResult = Awaited<ReturnType<typeof ProjectsService.cancelProjectInvitation>>;

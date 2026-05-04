@@ -2247,6 +2247,22 @@ export const useBillingServiceRemoveSumUpReader = <TData = Common.BillingService
   readerId: string;
 }, TContext>({ mutationFn: ({ readerId }) => BillingService.removeSumUpReader({ readerId }) as unknown as Promise<TData>, ...options });
 /**
+* Clear a health entry (manually mark healthy)
+* Deletes a single health state entry. Use this to clear a stuck unhealthy state when the originating flow node was deleted or its identifier changed. Requires maintenance management permission.
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.entryId
+* @returns void Entry cleared
+* @throws ApiError
+*/
+export const useResourceHealthServiceClearResourceHealthEntry = <TData = Common.ResourceHealthServiceClearResourceHealthEntryMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  entryId: number;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  entryId: number;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ entryId, resourceId }) => ResourceHealthService.clearResourceHealthEntry({ entryId, resourceId }) as unknown as Promise<TData>, ...options });
+/**
 * Delete a project
 * @param data The data for the request.
 * @param data.id

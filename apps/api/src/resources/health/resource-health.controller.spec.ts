@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceHealthController } from './resource-health.controller';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/database-entities';
+import { CanManageMaintenanceGuard } from '../maintenances/canManageMaintenance.guard';
 
 describe('ResourceHealthController', () => {
   let controller: ResourceHealthController;
@@ -15,13 +16,23 @@ describe('ResourceHealthController', () => {
           provide: ResourceHealthService,
           useValue: {
             getSummary: jest.fn(),
+            clearEntry: jest.fn(),
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(CanManageMaintenanceGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get(ResourceHealthController);
     service = module.get(ResourceHealthService);
+  });
+
+  it('delegates clearResourceHealthEntry to the service', async () => {
+    service.clearEntry.mockResolvedValue(undefined);
+    await controller.clearResourceHealthEntry(7, 42);
+    expect(service.clearEntry).toHaveBeenCalledWith(7, 42);
   });
 
   it('returns the summary from the service', async () => {

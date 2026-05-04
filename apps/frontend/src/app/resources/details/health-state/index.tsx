@@ -1,10 +1,16 @@
-import { Alert } from '@heroui/react';
-import { AlertTriangleIcon } from 'lucide-react';
+import { Alert, Button } from '@heroui/react';
+import { AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,
+  useResourceHealthServiceClearResourceHealthEntry,
   useResourceHealthServiceGetResourceHealth,
+  useResourceHealthServiceGetResourceHealthKey,
+  useResourceMaintenancesServiceCanManageMaintenance,
 } from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
@@ -15,11 +21,33 @@ interface Props {
 export function ResourceHealthWarning({ resourceId }: Props) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter({ showDate: true, showTime: true });
+  const queryClient = useQueryClient();
+  const { success, error: showError } = useToastMessage();
 
   const { data: summary } = useResourceHealthServiceGetResourceHealth(
     { resourceId },
     undefined,
     { refetchInterval: 5000 },
+  );
+
+  const { data: maintenancePermissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const canManage = maintenancePermissions?.canManage === true;
+
+  const clearEntry = useResourceHealthServiceClearResourceHealthEntry({
+    onSuccess: () => {
+      success({ title: t('actions.markHealthySuccess') });
+      queryClient.invalidateQueries({ queryKey: [useResourceHealthServiceGetResourceHealthKey] });
+    },
+    onError: () => {
+      showError({ title: t('actions.markHealthyError') });
+    },
+  });
+
+  const handleClear = useCallback(
+    (entryId: number) => {
+      clearEntry.mutate({ resourceId, entryId });
+    },
+    [clearEntry, resourceId],
   );
 
   if (!summary || summary.isHealthy) {
@@ -57,6 +85,20 @@ export function ResourceHealthWarning({ resourceId }: Props) {
                 <span className="text-gray-500 mr-1">{t('alert.lastSeen')}:</span>
                 <span>{formatDateTime(entry.lastReportedAt, '')}</span>
               </div>
+              {canManage && (
+                <div className="mt-2">
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    startContent={<CheckCircleIcon size={16} />}
+                    onPress={() => handleClear(entry.id)}
+                    isLoading={clearEntry.isPending}
+                  >
+                    {t('actions.markHealthy')}
+                  </Button>
+                </div>
+              )}
             </div>
           </Alert>
         );

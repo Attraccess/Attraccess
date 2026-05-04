@@ -16,5 +16,10 @@
   "status": {
     "healthy": "Healthy",
     "unhealthy": "Unhealthy"
+  },
+  "actions": {
+    "markHealthy": "Mark as healthy",
+    "markHealthySuccess": "Health entry cleared",
+    "markHealthyError": "Failed to clear health entry"
   }
 }

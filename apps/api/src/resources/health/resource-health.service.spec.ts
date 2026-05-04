@@ -29,7 +29,12 @@ describe('ResourceHealthService', () => {
 
     healthRepo = {
       findOne: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
-        records.find((r) => r.resourceId === where.resourceId && r.identifier === where.identifier) ?? null,
+        records.find((r) => {
+          if (where.id !== undefined && r.id !== where.id) return false;
+          if (where.resourceId !== undefined && r.resourceId !== where.resourceId) return false;
+          if (where.identifier !== undefined && r.identifier !== where.identifier) return false;
+          return true;
+        }) ?? null,
       ),
       find: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
         records.filter((r) => r.resourceId === where.resourceId),
@@ -53,6 +58,11 @@ describe('ResourceHealthService', () => {
         const persisted = { id: records.length + 1, createdAt: new Date(), updatedAt: new Date(), ...entity };
         records.push(persisted as ResourceHealthState);
         return persisted as ResourceHealthState;
+      }),
+      remove: jest.fn(async (entity: ResourceHealthState) => {
+        const idx = records.findIndex((r) => r.id === entity.id);
+        if (idx >= 0) records.splice(idx, 1);
+        return entity;
       }),
     };
 
@@ -258,6 +268,68 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.MANUAL,
       });
       expect(await service.isResourceUnhealthy(1)).toBe(false);
+    });
+  });
+
+  describe('clearEntry', () => {
+    it('throws NotFoundException when entry does not exist', async () => {
+      await expect(service.clearEntry(1, 999)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('removes the entry and emits a healthy transition event when previously unhealthy', async () => {
+      const emitSpy = jest.spyOn(eventEmitter, 'emit');
+      await service.reportHealth({
+        resourceId: 1,
+        identifier: 'Shelly',
+        status: ResourceHealthStatus.UNHEALTHY,
+        reason: 'gone',
+        source: ResourceHealthSource.HEARTBEAT,
+      });
+      emitSpy.mockClear();
+
+      const entryId = records[0].id;
+      await service.clearEntry(1, entryId);
+
+      expect(records).toHaveLength(0);
+      expect(emitSpy).toHaveBeenCalledWith(
+        ResourceHealthChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          resourceId: 1,
+          identifier: 'Shelly',
+          status: ResourceHealthStatus.HEALTHY,
+          previousStatus: ResourceHealthStatus.UNHEALTHY,
+        }),
+      );
+    });
+
+    it('does not emit a transition event when entry was already healthy', async () => {
+      await service.reportHealth({
+        resourceId: 1,
+        identifier: 'Shelly',
+        status: ResourceHealthStatus.HEALTHY,
+        source: ResourceHealthSource.MANUAL,
+      });
+      const emitSpy = jest.spyOn(eventEmitter, 'emit');
+      emitSpy.mockClear();
+
+      const entryId = records[0].id;
+      await service.clearEntry(1, entryId);
+
+      expect(records).toHaveLength(0);
+      expect(emitSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not delete entries belonging to other resources', async () => {
+      await service.reportHealth({
+        resourceId: 1,
+        identifier: 'Shelly',
+        status: ResourceHealthStatus.UNHEALTHY,
+        reason: 'broken',
+        source: ResourceHealthSource.MANUAL,
+      });
+      const entryId = records[0].id;
+      await expect(service.clearEntry(2, entryId)).rejects.toBeInstanceOf(NotFoundException);
+      expect(records).toHaveLength(1);
     });
   });
 
