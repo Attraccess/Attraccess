@@ -14,6 +14,7 @@ import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/su
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { BillingService } from './billing.service';
+import { CronTimer } from '../metrics/instrumentation/cron.helper';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
@@ -31,6 +32,7 @@ export class SumUpService {
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
     private readonly liveNotificationsService: LiveNotificationsService,
     private readonly billingService: BillingService,
+    private readonly cronTimer: CronTimer,
   ) {}
 
   async setApiKey(token: string): Promise<void> {
@@ -251,37 +253,39 @@ export class SumUpService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async processPendingTransactions(): Promise<void> {
-    if (!this.hasPendingTransactions) {
-      return;
-    }
-
-    this.logger.debug('processPendingTransactions: starting');
-
-    const transactions = await this.billingTransactionRepository.findBy({
-      status: BillingTransactionStatus.Pending,
-    });
-
-    this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
-
-    const consideredTransactions = transactions.filter((transaction) =>
-      transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
-    );
-
-    this.hasPendingTransactions = consideredTransactions.length > 0;
-
-    for (const transaction of consideredTransactions) {
-      const transactionId = transaction.externalReference.split(':')[1];
-      if (!transactionId) {
-        this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
-        transaction.status = BillingTransactionStatus.Failed;
-        const updatedTransaction = await this.billingTransactionRepository.save(transaction);
-        this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-        continue;
+    await this.cronTimer.time('sumup_poll', async () => {
+      if (!this.hasPendingTransactions) {
+        return;
       }
 
-      await this.updateTransactionStatusBySumupServer(transactionId);
-    }
+      this.logger.debug('processPendingTransactions: starting');
 
-    this.logger.debug('processPendingTransactions: finished');
+      const transactions = await this.billingTransactionRepository.findBy({
+        status: BillingTransactionStatus.Pending,
+      });
+
+      this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
+
+      const consideredTransactions = transactions.filter((transaction) =>
+        transaction.externalReference?.startsWith(SUMUP_TOPUP_TRANSACTION_PREFIX),
+      );
+
+      this.hasPendingTransactions = consideredTransactions.length > 0;
+
+      for (const transaction of consideredTransactions) {
+        const transactionId = transaction.externalReference.split(':')[1];
+        if (!transactionId) {
+          this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
+          transaction.status = BillingTransactionStatus.Failed;
+          const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+          this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
+          continue;
+        }
+
+        await this.updateTransactionStatusBySumupServer(transactionId);
+      }
+
+      this.logger.debug('processPendingTransactions: finished');
+    });
   }
 }

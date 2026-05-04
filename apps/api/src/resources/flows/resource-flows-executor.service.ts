@@ -56,6 +56,7 @@ import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-me
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FlowExecutionError } from './errors/flow-execution.error';
 import { ResourceHealthService } from '../health/resource-health.service';
+import { CronTimer } from '../../metrics/instrumentation/cron.helper';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -133,6 +134,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly eventEmitter: EventEmitter2,
     private readonly resourceHealthService: ResourceHealthService,
+    private readonly cronTimer: CronTimer,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -305,23 +307,25 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @Cron('0 2 * * *') // Daily at 2 AM
   async cleanupOldFlowLogs() {
-    try {
-      const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
+    await this.cronTimer.time('flow_daily_cleanup', async () => {
+      try {
+        const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
 
-      this.logger.log(
-        `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
-      );
+        this.logger.log(
+          `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
+        );
 
-      const result = await this.flowLogRepository.delete({
-        createdAt: LessThan(cutoffDate),
-      });
+        const result = await this.flowLogRepository.delete({
+          createdAt: LessThan(cutoffDate),
+        });
 
-      const deletedCount = result.affected || 0;
-      this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
-    } catch (error) {
-      this.logger.error('Failed to cleanup old flow logs', error.stack);
-      throw error;
-    }
+        const deletedCount = result.affected || 0;
+        this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
+      } catch (error) {
+        this.logger.error('Failed to cleanup old flow logs', error.stack);
+        throw error;
+      }
+    });
   }
 
   @OnEvent(ResourceUsageEvent.EVENT_NAME)
@@ -1089,53 +1093,55 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @Cron(CronExpression.EVERY_MINUTE)
   public async checkResourceActivity() {
-    const now = new Date();
+    await this.cronTimer.time('flow_minute_tick', async () => {
+      const now = new Date();
 
-    const onResourceInactivityNodes = await this.flowNodeRepository
-      .createQueryBuilder('node')
-      .innerJoin(
-        ResourceUsage,
-        'usage',
-        'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
-        { usageAction: ResourceUsageAction.Usage },
-      )
-      .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
-      .distinct(true)
-      .getMany();
+      const onResourceInactivityNodes = await this.flowNodeRepository
+        .createQueryBuilder('node')
+        .innerJoin(
+          ResourceUsage,
+          'usage',
+          'usage.resourceId = node.resourceId AND usage.endTime IS NULL AND usage.isFinalized = TRUE AND usage.usageAction = :usageAction',
+          { usageAction: ResourceUsageAction.Usage },
+        )
+        .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
+        .distinct(true)
+        .getMany();
 
-    await Promise.all(
-      onResourceInactivityNodes.map(async (node) => {
-        const parsedData = InputResourceActivityNoActivityNodeDataSchema.safeParse(node.data);
-        if (!parsedData.success) {
-          this.logger.warn(
-            `Skipping resource inactivity node ${node.id} for resource flow of resource ${node.resourceId} because of invalid data: ${parsedData.error.message}`,
+      await Promise.all(
+        onResourceInactivityNodes.map(async (node) => {
+          const parsedData = InputResourceActivityNoActivityNodeDataSchema.safeParse(node.data);
+          if (!parsedData.success) {
+            this.logger.warn(
+              `Skipping resource inactivity node ${node.id} for resource flow of resource ${node.resourceId} because of invalid data: ${parsedData.error.message}`,
+            );
+            return;
+          }
+
+          const { minInactivityMinutes } = parsedData.data;
+
+          const lastActivity = this.resourceActivity.get(node.resourceId);
+          if (!lastActivity) {
+            this.resourceActivity.set(node.resourceId, now);
+            return;
+          }
+
+          const millisSinceLastActivity = now.getTime() - lastActivity.getTime();
+          const minutesSinceLastActivity = millisSinceLastActivity / 1000 / 60;
+
+          if (minutesSinceLastActivity < minInactivityMinutes) {
+            return;
+          }
+
+          this.logger.debug(
+            `Resource ${node.resourceId} has been inactive for ${minutesSinceLastActivity} minutes, triggering inactivity node`,
           );
-          return;
-        }
+          await this.startFlow(node, { payload: {} });
 
-        const { minInactivityMinutes } = parsedData.data;
-
-        const lastActivity = this.resourceActivity.get(node.resourceId);
-        if (!lastActivity) {
           this.resourceActivity.set(node.resourceId, now);
-          return;
-        }
-
-        const millisSinceLastActivity = now.getTime() - lastActivity.getTime();
-        const minutesSinceLastActivity = millisSinceLastActivity / 1000 / 60;
-
-        if (minutesSinceLastActivity < minInactivityMinutes) {
-          return;
-        }
-
-        this.logger.debug(
-          `Resource ${node.resourceId} has been inactive for ${minutesSinceLastActivity} minutes, triggering inactivity node`,
-        );
-        await this.startFlow(node, { payload: {} });
-
-        this.resourceActivity.set(node.resourceId, now);
-      }),
-    );
+        }),
+      );
+    });
   }
 
   private compileTemplate(template: string, data: object): string {
