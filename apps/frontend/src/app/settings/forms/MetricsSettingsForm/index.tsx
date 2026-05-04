@@ -9,6 +9,7 @@ import {
   ModalFooter,
   ModalHeader,
   Spinner,
+  Switch,
   Tooltip,
   useDisclosure,
 } from '@heroui/react';
@@ -16,14 +17,20 @@ import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Ico
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  MetricsTogglesDto,
   useSettingsServiceGetMetricsSettings,
   UseSettingsServiceGetMetricsSettingsKeyFn,
   useSettingsServiceGenerateMetricsApiKey,
   useSettingsServiceDeleteMetricsApiKey,
+  useSettingsServiceUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
+
+type ToggleKey = keyof MetricsTogglesDto;
+
+const TOGGLE_ORDER: ToggleKey[] = ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'];
 
 function CodeBlock({ children }: { children: string }) {
   return (
@@ -39,6 +46,7 @@ export function MetricsSettingsForm() {
   const queryClient = useQueryClient();
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [pendingToggle, setPendingToggle] = useState<ToggleKey | null>(null);
 
   const { data: metricsSettings, isLoading } = useSettingsServiceGetMetricsSettings();
 
@@ -68,6 +76,24 @@ export function MetricsSettingsForm() {
         description: t('keyRemoved.description'),
       });
       removeModal.onClose();
+    },
+  });
+
+  const { mutate: updateMetricsSettings, isPending: isUpdatingToggles } = useSettingsServiceUpdateMetricsSettings({
+    onSuccess() {
+      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+      toast.success({
+        title: t('toggles.savedTitle'),
+        description: t('toggles.savedDescription'),
+      });
+      setPendingToggle(null);
+    },
+    onError() {
+      toast.error({
+        title: t('toggles.errorTitle'),
+        description: t('toggles.errorDescription'),
+      });
+      setPendingToggle(null);
     },
   });
 
@@ -101,6 +127,14 @@ export function MetricsSettingsForm() {
     }
   }, [metricsSettings?.apiKeyConfigured, rerollModal, generateApiKey]);
 
+  const handleToggleChange = useCallback(
+    (subsystem: ToggleKey, value: boolean) => {
+      setPendingToggle(subsystem);
+      updateMetricsSettings({ requestBody: { toggles: { [subsystem]: value } } });
+    },
+    [updateMetricsSettings],
+  );
+
   const prometheusSnippet = useMemo(() => {
     const host = window.location.host;
     return `scrape_configs:
@@ -119,6 +153,55 @@ export function MetricsSettingsForm() {
       </div>
     );
   }
+
+  const togglesSection = metricsSettings?.toggles ? (
+    <div className="flex flex-col gap-3">
+      <Divider />
+      <h4 className="text-sm font-semibold">{t('toggles.title')}</h4>
+      <p className="text-sm text-default-500">{t('toggles.description')}</p>
+      <div className="flex flex-col gap-3">
+        {TOGGLE_ORDER.map((subsystem) => {
+          const isHighCost = subsystem === 'db';
+          const checked = metricsSettings.toggles[subsystem];
+          return (
+            <div
+              key={subsystem}
+              className={`flex items-start justify-between gap-4 rounded-medium border p-3 ${
+                isHighCost
+                  ? 'border-warning-300 bg-warning-50 dark:border-warning-600/40 dark:bg-warning-50/5'
+                  : 'border-default-200 dark:border-default-100'
+              }`}
+            >
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  {t(`toggles.${subsystem}.label`)}
+                  {isHighCost && (
+                    <span className="rounded-full bg-warning-200 dark:bg-warning-700/40 text-warning-800 dark:text-warning-200 px-2 py-0.5 text-[10px] uppercase tracking-wide font-semibold">
+                      {t('toggles.highCostBadge')}
+                    </span>
+                  )}
+                </div>
+                <p
+                  className={`text-xs ${
+                    isHighCost ? 'text-warning-700 dark:text-warning-300' : 'text-default-500'
+                  }`}
+                >
+                  {t(`toggles.${subsystem}.description`)}
+                </p>
+              </div>
+              <Switch
+                data-testid={`metrics-toggle-${subsystem}`}
+                isSelected={checked}
+                onValueChange={(value) => handleToggleChange(subsystem, value)}
+                isDisabled={isUpdatingToggles && pendingToggle !== null}
+                aria-label={t(`toggles.${subsystem}.label`)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
 
   const endpointSection = (
     <Input
@@ -188,6 +271,7 @@ export function MetricsSettingsForm() {
 
         {endpointSection}
         {setupGuideSection}
+        {togglesSection}
 
         <div className="flex gap-2">
           <Button
@@ -231,6 +315,7 @@ export function MetricsSettingsForm() {
       </div>
 
       {metricsSettings?.apiKeyConfigured && setupGuideSection}
+      {togglesSection}
 
       <Modal isOpen={rerollModal.isOpen} onClose={rerollModal.onClose}>
         <ModalContent>
