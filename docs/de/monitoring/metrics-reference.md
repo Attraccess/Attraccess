@@ -192,7 +192,7 @@ sum by (entity, method) (rate(attraccess_db_slow_queries_total[5m]))
 
 **Dauer-Buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s
 
-**Targets:** `sumup`, `smtp`, `mqtt`, `github`. Operations sind je Target begrenzte Enums (z.B. `merchant`, `checkout`, `transactions` für SumUp; `send` für SMTP; `publish`, `subscribe` für MQTT).
+**Targets:** `sumup`, `smtp`, `mqtt`, `github`. Operationen sind pro Target als begrenzte Enums definiert (z.B. `merchant`, `checkout`, `transactions` für SumUp; `send` für SMTP; `publish`, `subscribe` für MQTT).
 
 ### Beispiel-PromQL-Abfragen
 

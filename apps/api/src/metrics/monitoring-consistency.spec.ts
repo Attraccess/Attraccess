@@ -23,7 +23,7 @@ function collectMetricNames(): Set<string> {
   ];
   for (const file of candidates) {
     const src = readFileSync(file, 'utf-8');
-    const re = /name:\s*'(attraccess_[a-z0-9_]+)'/g;
+    const re = /name:\s*["'](attraccess_[a-z0-9_]+)["']/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(src)) !== null) {
       names.add(m[1]);
