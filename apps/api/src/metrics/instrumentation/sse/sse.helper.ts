@@ -1,0 +1,45 @@
+// SSE stream instrumentation tracking active connections, lifetime, and message count
+// FEATURE: Metrics — Server-Sent Events instrumentation
+import { Inject, Injectable } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { SSE_METRICS } from '../../definitions/tokens';
+import { SseMetrics } from '../../definitions/sse.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
+
+export type SseStream = 'resource_usage' | 'billing' | 'resource_flows';
+
+@Injectable()
+export class SseInstrumentation {
+  constructor(
+    @Inject(SSE_METRICS) private readonly metrics: SseMetrics,
+    private readonly toggle: MetricsToggleService,
+  ) {}
+
+  wrap<T>(stream: SseStream, source: Observable<T>): Observable<T> {
+    return new Observable<T>((subscriber) => {
+      const enabled = this.toggle.isEnabledCached('sse');
+      const start = enabled ? process.hrtime.bigint() : BigInt(0);
+      if (enabled) this.metrics.activeConnections.inc({ stream });
+
+      const sub = source.subscribe({
+        next: (value) => {
+          subscriber.next(value);
+          if (enabled) this.metrics.messagesSentTotal.inc({ stream });
+        },
+        error: (err) => subscriber.error(err),
+        complete: () => subscriber.complete(),
+      });
+
+      return () => {
+        sub.unsubscribe();
+        if (enabled) {
+          this.metrics.activeConnections.dec({ stream });
+          this.metrics.connectionDuration.observe(
+            { stream },
+            Number(process.hrtime.bigint() - start) / 1e9,
+          );
+        }
+      };
+    });
+  }
+}
