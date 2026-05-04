@@ -29,6 +29,7 @@ import { CronTimer } from './instrumentation/cron/cron.helper';
 import { DbMetricsSubscriber } from './instrumentation/db/db.subscriber';
 import { ExternalCallTimer } from './instrumentation/external/external.helper';
 import { SseInstrumentation } from './instrumentation/sse/sse.helper';
+import { FlowTimer } from './instrumentation/flow/flow.helper';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
@@ -55,6 +56,7 @@ const definitionProviders = [
     DbMetricsSubscriber,
     ExternalCallTimer,
     SseInstrumentation,
+    FlowTimer,
     ...definitionProviders,
     {
       provide: APP_INTERCEPTOR,
@@ -71,6 +73,7 @@ const definitionProviders = [
     CronTimer,
     ExternalCallTimer,
     SseInstrumentation,
+    FlowTimer,
     HTTP_METRICS,
     WS_METRICS,
     CRON_METRICS,
