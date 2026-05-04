@@ -1074,11 +1074,84 @@ export type FirstTimeSetupStatusDto = {
     stepsCompleted: FirstTimeSetupStepsDto;
 };
 
+export type MetricsTogglesDto = {
+    /**
+     * Whether HTTP request timing metrics are enabled
+     */
+    http: boolean;
+    /**
+     * Whether WebSocket message timing metrics are enabled
+     */
+    ws: boolean;
+    /**
+     * Whether cron job timing metrics are enabled
+     */
+    cron: boolean;
+    /**
+     * Whether database query timing metrics are enabled (high cardinality)
+     */
+    db: boolean;
+    /**
+     * Whether external call timing metrics are enabled
+     */
+    external: boolean;
+    /**
+     * Whether Server-Sent Events metrics are enabled
+     */
+    sse: boolean;
+    /**
+     * Whether resource flow execution metrics are enabled
+     */
+    flow: boolean;
+};
+
 export type MetricsSettingsDto = {
     /**
      * Whether a metrics API key is configured
      */
     apiKeyConfigured: boolean;
+    /**
+     * Per-subsystem metrics timing toggles
+     */
+    toggles: MetricsTogglesDto;
+};
+
+export type UpdateMetricsTogglesDto = {
+    /**
+     * Whether HTTP request timing metrics are enabled
+     */
+    http?: boolean;
+    /**
+     * Whether WebSocket message timing metrics are enabled
+     */
+    ws?: boolean;
+    /**
+     * Whether cron job timing metrics are enabled
+     */
+    cron?: boolean;
+    /**
+     * Whether database query timing metrics are enabled (high cardinality)
+     */
+    db?: boolean;
+    /**
+     * Whether external call timing metrics are enabled
+     */
+    external?: boolean;
+    /**
+     * Whether Server-Sent Events metrics are enabled
+     */
+    sse?: boolean;
+    /**
+     * Whether resource flow execution metrics are enabled
+     */
+    flow?: boolean;
+};
+
+export type UpdateMetricsSettingsDto = {
+    /**
+     * Per-subsystem metrics toggles update
+     */
+    toggles?: UpdateMetricsTogglesDto;
 };
 
 export type GenerateMetricsApiKeyResponseDto = {
@@ -4254,6 +4327,12 @@ export type ApplyFirstTimeSetupSettingsResponse = SystemSettingsDto;
 
 export type GetMetricsSettingsResponse = MetricsSettingsDto;
 
+export type UpdateMetricsSettingsData = {
+    requestBody: UpdateMetricsSettingsDto;
+};
+
+export type UpdateMetricsSettingsResponse = MetricsSettingsDto;
+
 export type GenerateMetricsApiKeyResponse = GenerateMetricsApiKeyResponseDto;
 
 export type DeleteMetricsApiKeyResponse = MetricsSettingsDto;
@@ -6329,6 +6408,19 @@ export type $OpenApiTs = {
             res: {
                 /**
                  * Current metrics settings.
+                 */
+                200: MetricsSettingsDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        patch: {
+            req: UpdateMetricsSettingsData;
+            res: {
+                /**
+                 * Metrics settings updated.
                  */
                 200: MetricsSettingsDto;
                 /**

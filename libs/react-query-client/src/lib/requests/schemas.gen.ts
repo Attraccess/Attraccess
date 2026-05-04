@@ -1660,15 +1660,106 @@ export const $FirstTimeSetupStatusDto = {
     required: ['available', 'stepsCompleted']
 } as const;
 
+export const $MetricsTogglesDto = {
+    type: 'object',
+    properties: {
+        http: {
+            type: 'boolean',
+            description: 'Whether HTTP request timing metrics are enabled'
+        },
+        ws: {
+            type: 'boolean',
+            description: 'Whether WebSocket message timing metrics are enabled'
+        },
+        cron: {
+            type: 'boolean',
+            description: 'Whether cron job timing metrics are enabled'
+        },
+        db: {
+            type: 'boolean',
+            description: 'Whether database query timing metrics are enabled (high cardinality)'
+        },
+        external: {
+            type: 'boolean',
+            description: 'Whether external call timing metrics are enabled'
+        },
+        sse: {
+            type: 'boolean',
+            description: 'Whether Server-Sent Events metrics are enabled'
+        },
+        flow: {
+            type: 'boolean',
+            description: 'Whether resource flow execution metrics are enabled'
+        }
+    },
+    required: ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow']
+} as const;
+
 export const $MetricsSettingsDto = {
     type: 'object',
     properties: {
         apiKeyConfigured: {
             type: 'boolean',
             description: 'Whether a metrics API key is configured'
+        },
+        toggles: {
+            description: 'Per-subsystem metrics timing toggles',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/MetricsTogglesDto'
+                }
+            ]
         }
     },
-    required: ['apiKeyConfigured']
+    required: ['apiKeyConfigured', 'toggles']
+} as const;
+
+export const $UpdateMetricsTogglesDto = {
+    type: 'object',
+    properties: {
+        http: {
+            type: 'boolean',
+            description: 'Whether HTTP request timing metrics are enabled'
+        },
+        ws: {
+            type: 'boolean',
+            description: 'Whether WebSocket message timing metrics are enabled'
+        },
+        cron: {
+            type: 'boolean',
+            description: 'Whether cron job timing metrics are enabled'
+        },
+        db: {
+            type: 'boolean',
+            description: 'Whether database query timing metrics are enabled (high cardinality)'
+        },
+        external: {
+            type: 'boolean',
+            description: 'Whether external call timing metrics are enabled'
+        },
+        sse: {
+            type: 'boolean',
+            description: 'Whether Server-Sent Events metrics are enabled'
+        },
+        flow: {
+            type: 'boolean',
+            description: 'Whether resource flow execution metrics are enabled'
+        }
+    }
+} as const;
+
+export const $UpdateMetricsSettingsDto = {
+    type: 'object',
+    properties: {
+        toggles: {
+            description: 'Per-subsystem metrics toggles update',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/UpdateMetricsTogglesDto'
+                }
+            ]
+        }
+    }
 } as const;
 
 export const $GenerateMetricsApiKeyResponseDto = {

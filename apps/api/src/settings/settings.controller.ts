@@ -6,6 +6,7 @@ import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 import { MetricsSettingsDto } from './dto/metrics-settings.dto';
+import { UpdateMetricsSettingsDto } from './dto/update-metrics-settings.dto';
 import { GenerateMetricsApiKeyResponseDto } from './dto/generate-metrics-api-key-response.dto';
 
 @ApiTags('Settings')
@@ -46,8 +47,26 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
   async getMetricsSettings(): Promise<MetricsSettingsDto> {
-    const { configured } = await this.settingsService.getMetricsApiKey();
-    return { apiKeyConfigured: configured };
+    const [{ configured }, toggles] = await Promise.all([
+      this.settingsService.getMetricsApiKey(),
+      this.settingsService.getMetricsToggles(),
+    ]);
+    return { apiKeyConfigured: configured, toggles };
+  }
+
+  @Patch('metrics')
+  @Auth('canManageSystemConfiguration')
+  @ApiOperation({ summary: 'Update metrics settings', operationId: 'updateMetricsSettings' })
+  @ApiResponse({ status: 200, description: 'Metrics settings updated.', type: MetricsSettingsDto })
+  async updateMetricsSettings(@Body() body: UpdateMetricsSettingsDto): Promise<MetricsSettingsDto> {
+    if (body.toggles) {
+      await this.settingsService.updateMetricsToggles(body.toggles);
+    }
+    const [{ configured }, toggles] = await Promise.all([
+      this.settingsService.getMetricsApiKey(),
+      this.settingsService.getMetricsToggles(),
+    ]);
+    return { apiKeyConfigured: configured, toggles };
   }
 
   @Post('metrics/generate-api-key')
@@ -65,7 +84,8 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
   async deleteMetricsApiKey(): Promise<MetricsSettingsDto> {
     await this.settingsService.setMetricsApiKey(null);
-    return { apiKeyConfigured: false };
+    const toggles = await this.settingsService.getMetricsToggles();
+    return { apiKeyConfigured: false, toggles };
   }
 
   @Post('first-time-setup')
