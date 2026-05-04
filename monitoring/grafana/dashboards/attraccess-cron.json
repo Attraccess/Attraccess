@@ -1,0 +1,222 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Cron job health: per-job p95 duration, success/failure rate, and time-since-last-success/run for stuck-job detection.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Per-Job p95 Duration",
+      "type": "barchart",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (job_name, le) (rate(attraccess_cron_job_duration_seconds_bucket{job=\"attraccess\"}[15m])))",
+          "legendFormat": "{{ job_name }}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Success/Failure Rate per Job",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (job_name, status) (rate(attraccess_cron_job_runs_total{job=\"attraccess\"}[15m]))",
+          "legendFormat": "{{ job_name }} {{ status }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Time Since Last Success",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3600 },
+              { "color": "red", "value": 7200 }
+            ]
+          },
+          "custom": {
+            "displayMode": "color-background"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "time() - attraccess_cron_job_last_success_timestamp_seconds{job=\"attraccess\"}",
+          "legendFormat": "{{ job_name }}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Time Since Last Run",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3600 },
+              { "color": "red", "value": 7200 }
+            ]
+          },
+          "custom": {
+            "displayMode": "color-background"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "time() - attraccess_cron_job_last_run_timestamp_seconds{job=\"attraccess\"}",
+          "legendFormat": "{{ job_name }}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Per-Job Duration p50/p95/p99",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (job_name, le) (rate(attraccess_cron_job_duration_seconds_bucket{job=\"attraccess\"}[15m])))",
+          "legendFormat": "p50 {{ job_name }}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (job_name, le) (rate(attraccess_cron_job_duration_seconds_bucket{job=\"attraccess\"}[15m])))",
+          "legendFormat": "p95 {{ job_name }}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (job_name, le) (rate(attraccess_cron_job_duration_seconds_bucket{job=\"attraccess\"}[15m])))",
+          "legendFormat": "p99 {{ job_name }}",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Failed Runs per Hour",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(attraccess_cron_job_runs_total{job=\"attraccess\", status=\"failure\"}[1h]))",
+          "legendFormat": "failures/hr",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Success Runs per Hour",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(attraccess_cron_job_runs_total{job=\"attraccess\", status=\"success\"}[1h]))",
+          "legendFormat": "success/hr",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["attraccess", "performance", "cron"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Attraccess Cron Jobs",
+  "uid": "attraccess-cron",
+  "version": 1
+}
