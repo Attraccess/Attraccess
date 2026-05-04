@@ -8,7 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent } from './mqtt-message.event';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
-import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {

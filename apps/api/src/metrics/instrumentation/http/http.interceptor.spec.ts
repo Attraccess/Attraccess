@@ -3,8 +3,8 @@
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { HttpMetricsInterceptor } from './http.interceptor';
-import { HttpMetrics } from '../definitions/http.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { HttpMetrics } from '../../definitions/http.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 describe('HttpMetricsInterceptor', () => {
   let interceptor: HttpMetricsInterceptor;

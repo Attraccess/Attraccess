@@ -1,9 +1,9 @@
 // External call timing wrapper recording duration histogram and error counters
 // FEATURE: Metrics — external call timing instrumentation (SumUp, SMTP, MQTT)
 import { Inject, Injectable } from '@nestjs/common';
-import { EXTERNAL_METRICS } from '../definitions/tokens';
-import { ExternalMetrics } from '../definitions/external.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { EXTERNAL_METRICS } from '../../definitions/tokens';
+import { ExternalMetrics } from '../../definitions/external.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 export type ExternalTarget = 'sumup' | 'smtp' | 'mqtt' | 'github';
 

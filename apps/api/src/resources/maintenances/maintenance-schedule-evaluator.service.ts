@@ -14,7 +14,7 @@ import {
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
-import { CronTimer } from '../../metrics/instrumentation/cron.helper';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.

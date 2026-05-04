@@ -1,8 +1,8 @@
 // Unit tests for CronTimer wrapper recording duration, status, and last-run timestamps
 // FEATURE: Metrics — cron job timing instrumentation
 import { Registry } from 'prom-client';
-import { createCronMetrics } from '../definitions/cron.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { createCronMetrics } from '../../definitions/cron.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 import { CronTimer } from './cron.helper';
 
 describe('CronTimer.time', () => {

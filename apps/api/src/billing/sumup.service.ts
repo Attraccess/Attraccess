@@ -14,8 +14,8 @@ import { SumupTransactionCallbackDto, SumupTransactionEventType } from './dto/su
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { LiveNotificationsService } from './liveNotificationsService';
 import { BillingService } from './billing.service';
-import { CronTimer } from '../metrics/instrumentation/cron.helper';
-import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
+import { CronTimer } from '../metrics/instrumentation/cron/cron.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 

@@ -1,8 +1,8 @@
 // Unit tests for ExternalCallTimer wrapper recording duration, status, and error type
 // FEATURE: Metrics — external call timing instrumentation (SumUp, SMTP, MQTT)
 import { Registry } from 'prom-client';
-import { createExternalMetrics } from '../definitions/external.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { createExternalMetrics } from '../../definitions/external.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 import { ExternalCallTimer } from './external.helper';
 
 describe('ExternalCallTimer.time', () => {

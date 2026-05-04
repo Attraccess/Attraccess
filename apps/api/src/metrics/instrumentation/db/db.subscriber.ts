@@ -11,9 +11,9 @@ import {
   UpdateEvent,
 } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DB_METRICS } from '../definitions/tokens';
-import { DbMetrics } from '../definitions/db.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { DB_METRICS } from '../../definitions/tokens';
+import { DbMetrics } from '../../definitions/db.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 type DbMethod = 'insert' | 'update' | 'remove' | 'softRemove';
 

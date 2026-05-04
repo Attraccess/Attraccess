@@ -1,9 +1,9 @@
 // Cron job timing wrapper recording duration histogram, run counter, and last-run gauges
 // FEATURE: Metrics — cron job timing instrumentation
 import { Inject, Injectable } from '@nestjs/common';
-import { CRON_METRICS } from '../definitions/tokens';
-import { CronMetrics } from '../definitions/cron.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { CRON_METRICS } from '../../definitions/tokens';
+import { CronMetrics } from '../../definitions/cron.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 export type CronJobName =
   | 'sumup_poll'

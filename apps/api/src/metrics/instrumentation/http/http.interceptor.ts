@@ -3,9 +3,9 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Inject } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
 import { Request, Response } from 'express';
-import { HTTP_METRICS } from '../definitions/tokens';
-import { HttpMetrics } from '../definitions/http.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { HTTP_METRICS } from '../../definitions/tokens';
+import { HttpMetrics } from '../../definitions/http.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 @Injectable()
 export class HttpMetricsInterceptor implements NestInterceptor {

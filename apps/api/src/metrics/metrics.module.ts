@@ -23,11 +23,11 @@ import { createDbMetrics } from './definitions/db.metrics';
 import { createExternalMetrics } from './definitions/external.metrics';
 import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
-import { HttpMetricsInterceptor } from './instrumentation/http.interceptor';
-import { WsMetricsInterceptor } from './instrumentation/ws.interceptor';
-import { CronTimer } from './instrumentation/cron.helper';
-import { DbMetricsSubscriber } from './instrumentation/db.subscriber';
-import { ExternalCallTimer } from './instrumentation/external.helper';
+import { HttpMetricsInterceptor } from './instrumentation/http/http.interceptor';
+import { WsMetricsInterceptor } from './instrumentation/ws/ws.interceptor';
+import { CronTimer } from './instrumentation/cron/cron.helper';
+import { DbMetricsSubscriber } from './instrumentation/db/db.subscriber';
+import { ExternalCallTimer } from './instrumentation/external/external.helper';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
