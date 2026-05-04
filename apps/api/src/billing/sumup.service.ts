@@ -136,15 +136,16 @@ export class SumUpService {
     const sumUp = await this.getSumUp();
     const merchantCode = await this.getMerchantCode();
 
-    try {
-      await this.externalCallTimer.time('sumup', 'readers_delete', () => sumUp.readers.delete(merchantCode, readerId));
-    } catch (error) {
-      if (error.message.includes('SumUpError: Unexpected non-json response')) {
-        return;
+    await this.externalCallTimer.time('sumup', 'readers_delete', async () => {
+      try {
+        return await sumUp.readers.delete(merchantCode, readerId);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('SumUpError: Unexpected non-json response')) {
+          return;
+        }
+        throw error;
       }
-
-      throw error;
-    }
+    });
   }
 
   async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
