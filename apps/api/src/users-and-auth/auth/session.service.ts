@@ -6,7 +6,7 @@ import { Session, User } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
-import { CronTimer } from '../../metrics/instrumentation/cron.helper';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 export interface SessionMetadata {
   userAgent?: string;

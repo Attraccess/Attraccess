@@ -2,9 +2,9 @@
 // FEATURE: Metrics — WebSocket message timing instrumentation
 import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
-import { WS_METRICS } from '../definitions/tokens';
-import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../definitions/ws.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { WS_METRICS } from '../../definitions/tokens';
+import { ATTRACTAP_GATEWAY_LABEL, WsMetrics } from '../../definitions/ws.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 @Injectable()
 export class WsMetricsInterceptor implements NestInterceptor {

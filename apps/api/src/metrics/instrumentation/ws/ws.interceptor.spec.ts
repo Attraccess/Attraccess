@@ -4,8 +4,8 @@ import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { Registry } from 'prom-client';
 import { WsMetricsInterceptor } from './ws.interceptor';
-import { createWsMetrics } from '../definitions/ws.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { createWsMetrics } from '../../definitions/ws.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 function buildWsContext(event: string | null = 'HEARTBEAT'): ExecutionContext {
   return {

@@ -5,7 +5,7 @@ import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-eval
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
-import { CronTimer } from '../../metrics/instrumentation/cron.helper';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenance,

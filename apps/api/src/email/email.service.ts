@@ -16,7 +16,7 @@ import { MjmlService } from '../email-template/mjml.service';
 import { EntityManager } from 'typeorm';
 import { SettingsService } from '../settings/settings.service';
 import { MetricsService } from '../metrics/metrics.service';
-import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 @Injectable()
 export class EmailService {

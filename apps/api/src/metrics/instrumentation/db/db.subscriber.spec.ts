@@ -2,8 +2,8 @@
 // FEATURE: Metrics — database query timing instrumentation
 import { Registry } from 'prom-client';
 import { DataSource } from 'typeorm';
-import { createDbMetrics } from '../definitions/db.metrics';
-import { MetricsToggleService } from '../settings/metrics-toggle.service';
+import { createDbMetrics } from '../../definitions/db.metrics';
+import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 import { DbMetricsSubscriber } from './db.subscriber';
 
 type EventLike = { metadata: { tableName: string } };

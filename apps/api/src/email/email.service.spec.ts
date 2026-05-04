@@ -13,7 +13,7 @@ import { createTransport } from 'nodemailer';
 import { SettingsService } from '../settings/settings.service';
 import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 import { MetricsService } from '../metrics/metrics.service';
-import { ExternalCallTimer } from '../metrics/instrumentation/external.helper';
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),

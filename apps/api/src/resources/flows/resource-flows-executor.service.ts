@@ -56,7 +56,7 @@ import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-me
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FlowExecutionError } from './errors/flow-execution.error';
 import { ResourceHealthService } from '../health/resource-health.service';
-import { CronTimer } from '../../metrics/instrumentation/cron.helper';
+import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
