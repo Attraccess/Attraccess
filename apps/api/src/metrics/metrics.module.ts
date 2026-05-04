@@ -25,6 +25,7 @@ import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws.interceptor';
+import { CronTimer } from './instrumentation/cron.helper';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
@@ -47,6 +48,7 @@ const definitionProviders = [
     MetricsService,
     MetricsGuard,
     MetricsToggleService,
+    CronTimer,
     ...definitionProviders,
     {
       provide: APP_INTERCEPTOR,
@@ -60,6 +62,7 @@ const definitionProviders = [
   exports: [
     MetricsService,
     MetricsToggleService,
+    CronTimer,
     HTTP_METRICS,
     WS_METRICS,
     CRON_METRICS,
