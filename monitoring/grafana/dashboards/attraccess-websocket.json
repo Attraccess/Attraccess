@@ -1,0 +1,161 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "WebSocket performance: per-event latency, message throughput, connection lifetime distribution, and active connection counts.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Per-Event Latency p95 by Gateway",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (event, gateway, le) (rate(attraccess_ws_message_duration_seconds_bucket{job=\"attraccess\"}[5m])))",
+          "legendFormat": "{{ gateway }}/{{ event }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Message Rate by Event",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (event) (rate(attraccess_ws_messages_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{ event }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Message Status Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(attraccess_ws_messages_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "{{ status }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Connection Duration Heatmap",
+      "type": "heatmap",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "yAxis": { "unit": "s" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (le) (rate(attraccess_ws_connection_duration_seconds_bucket{job=\"attraccess\"}[15m]))",
+          "legendFormat": "{{ le }}",
+          "refId": "A",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "title": "Active Connections (Attractap Devices)",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "attraccess_attractap_devices_connected{job=\"attraccess\"}",
+          "legendFormat": "active",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total Messages/sec",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(attraccess_ws_messages_total{job=\"attraccess\"}[5m]))",
+          "legendFormat": "msg/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Connection Duration p95",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "attraccess-prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(attraccess_ws_connection_duration_seconds_bucket{job=\"attraccess\"}[1h])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["attraccess", "performance", "websocket"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Attraccess WebSocket",
+  "uid": "attraccess-websocket",
+  "version": 1
+}
