@@ -15,7 +15,7 @@
     "@7nohe/openapi-react-query-codegen": "^1.6.2",
     "@dagrejs/dagre": "^1.1.5",
     "@eslint/js": "^9.39.4",
-    "@golevelup/ts-jest": "^0.7.0",
+    "@golevelup/ts-jest": "^3.0.0",
     "@heroui/react": "^2.8.7",
     "@heroui/use-theme": "^2.1.10",
     "@hookform/resolvers": "^5.0.1",
