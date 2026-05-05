@@ -59,5 +59,11 @@
     "node_modules",
     "tmp",
     "*.md"
-  ]
+  ],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "types": ["node", "jest"]
+    }
+  }
 }

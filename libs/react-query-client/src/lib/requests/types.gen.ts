@@ -2724,7 +2724,9 @@ export enum ResourceFlowNodeType {
     PROCESSING_IF = 'processing.if',
     PROCESSING_SET_PAYLOAD = 'processing.set-payload',
     PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
-    PROCESSING_ERROR = 'processing.error'
+    PROCESSING_ERROR = 'processing.error',
+    OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
+    OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set'
 }
 
 export type ResourceFlowNodeSchemaDto = {
@@ -2964,6 +2966,58 @@ export type ResourceFlowNode = {
      * The resource being this node belongs to
      */
     resource?: Resource;
+};
+
+export enum ResourceHealthStatus {
+    HEALTHY = 'healthy',
+    UNHEALTHY = 'unhealthy'
+}
+
+export enum ResourceHealthSource {
+    PAYLOAD = 'payload',
+    HEARTBEAT = 'heartbeat',
+    MANUAL = 'manual'
+}
+
+export type ResourceHealthStateDto = {
+    /**
+     * The health record id
+     */
+    id: number;
+    /**
+     * The resource ID this state belongs to
+     */
+    resourceId: number;
+    /**
+     * Identifier for the source reporting health (empty for the resource default).
+     */
+    identifier: string;
+    status: ResourceHealthStatus;
+    reason?: string | null;
+    source: ResourceHealthSource;
+    /**
+     * When the state was last reported
+     */
+    lastReportedAt: string;
+};
+
+export type ResourceHealthSummaryDto = {
+    /**
+     * The resource ID
+     */
+    resourceId: number;
+    /**
+     * Whether the resource is currently considered healthy
+     */
+    isHealthy: boolean;
+    /**
+     * Individual health state entries (one per identifier). Empty if no entries exist yet.
+     */
+    entries: Array<ResourceHealthStateDto>;
+    /**
+     * Subset of entries that are unhealthy (convenience for clients showing warnings).
+     */
+    unhealthyEntries: Array<ResourceHealthStateDto>;
 };
 
 export type ProjectAccessInfoDto = {
@@ -4887,6 +4941,19 @@ export type GetButtonsData = {
 };
 
 export type GetButtonsResponse = Array<ResourceFlowNode>;
+
+export type GetResourceHealthData = {
+    resourceId: number;
+};
+
+export type GetResourceHealthResponse = ResourceHealthSummaryDto;
+
+export type ClearResourceHealthEntryData = {
+    entryId: number;
+    resourceId: number;
+};
+
+export type ClearResourceHealthEntryResponse = void;
 
 export type FindManyProjectsData = {
     /**
@@ -7656,6 +7723,48 @@ export type $OpenApiTs = {
                 403: unknown;
                 /**
                  * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/health': {
+        get: {
+            req: GetResourceHealthData;
+            res: {
+                /**
+                 * Health summary
+                 */
+                200: ResourceHealthSummaryDto;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Resource not found
+                 */
+                404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/health/entries/{entryId}': {
+        delete: {
+            req: ClearResourceHealthEntryData;
+            res: {
+                /**
+                 * Entry cleared
+                 */
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+                /**
+                 * Missing maintenance management permission
+                 */
+                403: unknown;
+                /**
+                 * Health entry or resource not found
                  */
                 404: unknown;
             };

@@ -1,0 +1,25 @@
+{
+  "title": "Device health",
+  "alert": {
+    "title": "A connected device is reporting an unhealthy state",
+    "description": "This resource cannot currently be used because at least one monitored component is unhealthy.",
+    "reason": {
+      "label": "Reason",
+      "noReason": "No reason reported"
+    },
+    "identifier": {
+      "label": "Source",
+      "default": "Default"
+    },
+    "lastSeen": "Last reported"
+  },
+  "status": {
+    "healthy": "Healthy",
+    "unhealthy": "Unhealthy"
+  },
+  "actions": {
+    "markHealthy": "Mark as healthy",
+    "markHealthySuccess": "Health entry cleared",
+    "markHealthyError": "Failed to clear health entry"
+  }
+}

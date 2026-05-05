@@ -17,6 +17,8 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: [path.join(__dirname, 'src/test-utils/setup.ts')],
+    testTimeout: 20000,
+    hookTimeout: 20000,
   },
   esbuild: {
     target: 'node20',

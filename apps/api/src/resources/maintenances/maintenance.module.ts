@@ -43,6 +43,6 @@ import { MaintenanceScheduleController } from './maintenance-schedule.controller
     MaintenanceScheduleEvaluatorService,
     MaintenanceScheduleService,
   ],
-  exports: [ResourceMaintenanceService],
+  exports: [ResourceMaintenanceService, CanManageMaintenanceGuard],
 })
 export class ResourceMaintenanceModule { }
