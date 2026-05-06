@@ -1,6 +1,6 @@
 // Evaluator for introduction schedules: baseline + dueAt + isDue + isWarning + tick
 // FEATURE: User retraining requirement (ATT-106)
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -57,7 +57,7 @@ function addInterval(d: Date, duration: number, unit: RetrainingIntervalUnit): D
 
 @Injectable()
 export class IntroductionScheduleEvaluatorService {
-  private readonly logger = new Logger(IntroductionScheduleEvaluatorService.name);
+  private tickInFlight = false;
 
   constructor(
     @InjectRepository(ResourceIntroduction)
@@ -220,16 +220,22 @@ export class IntroductionScheduleEvaluatorService {
 
   @Cron(CronExpression.EVERY_HOUR)
   async tick(now = new Date()): Promise<void> {
-    const schedules = await this.schedRepo.find({
-      where: { enabled: true },
-      relations: ['timeSinceIntroductionConfig', 'inactivityConfig'],
-    });
-    for (const s of schedules) {
-      const intros = await this.findIntroductionsForSchedule(s);
-      for (const intro of intros) {
-        if (await this.isDue(s, intro, now)) await this.recordExpireOnce(s, intro);
-        else if (await this.isWarning(s, intro, now)) await this.recordWarnSentOnce(s, intro);
+    if (this.tickInFlight) return;
+    this.tickInFlight = true;
+    try {
+      const schedules = await this.schedRepo.find({
+        where: { enabled: true },
+        relations: ['timeSinceIntroductionConfig', 'inactivityConfig'],
+      });
+      for (const s of schedules) {
+        const intros = await this.findIntroductionsForSchedule(s);
+        for (const intro of intros) {
+          if (await this.isDue(s, intro, now)) await this.recordExpireOnce(s, intro);
+          else if (await this.isWarning(s, intro, now)) await this.recordWarnSentOnce(s, intro);
+        }
       }
+    } finally {
+      this.tickInFlight = false;
     }
   }
 
