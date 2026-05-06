@@ -435,6 +435,62 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(1, 1, expect.anything());
     });
 
+    it('cannot start session when blocking schedule is due (hasValidIntroduction=false)', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow(BadRequestException);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(1, 1, expect.anything());
+    });
+
+    it('can start session when warn-only schedule is due (hasValidIntroduction=true)', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        endTime: null,
+        startTime: new Date(),
+        isFinalized: false,
+        user: { id: 1 } as User,
+        resource: { id: 1 } as Resource,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(createdSession)
+        .mockResolvedValueOnce(finalizedSession)
+        .mockResolvedValueOnce(finalizedSession);
+
+      const mockQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.startSession(1, mockUser, dto);
+
+      expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, isFinalized: true });
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(1, 1, expect.anything());
+    });
+
     it('should throw error when active session exists and no takeover requested', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
 
