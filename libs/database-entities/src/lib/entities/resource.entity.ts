@@ -21,6 +21,7 @@ import { ResourceFlowLog } from './resourceFlowLog';
 import { Attractap } from './attractap.entity';
 import { ResourceMaintenance } from './resource.maintenance';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
+import { ResourceIntroductionSchedule } from './resource-introduction-schedule.entity';
 import { ResourceType } from './resource.type';
 import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
 import { Form } from './form';
@@ -175,6 +176,9 @@ export class Resource {
 
   @OneToMany(() => ResourceMaintenanceSchedule, (schedule) => schedule.resource)
   maintenanceSchedules!: ResourceMaintenanceSchedule[];
+
+  @OneToMany(() => ResourceIntroductionSchedule, (s) => s.resource)
+  introductionSchedules!: ResourceIntroductionSchedule[];
 
   @OneToMany(() => ResourceBillingConfiguration, (configuration) => configuration.resource)
   billingConfigurations!: ResourceBillingConfiguration[];

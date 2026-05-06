@@ -11,6 +11,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { Resource } from './resource.entity';
+import { ResourceIntroductionSchedule } from './resource-introduction-schedule.entity';
 
 @Entity()
 export class ResourceGroup {
@@ -56,4 +57,7 @@ export class ResourceGroup {
 
   @ManyToMany(() => Resource, (resource) => resource.groups, { onDelete: 'CASCADE' })
   resources!: Resource[];
+
+  @OneToMany(() => ResourceIntroductionSchedule, (s) => s.resourceGroup)
+  introductionSchedules!: ResourceIntroductionSchedule[];
 }

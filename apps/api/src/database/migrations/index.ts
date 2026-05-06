@@ -105,3 +105,4 @@ export * from './1772618000000-remove-cookie-same-site-setting';
 export * from './1774980294900-attractap-led-capability';
 export * from './1774980482357-add-saml-provider-type-and-invitation-index';
 export * from './1777217977658-resource-health-state';
+export * from './1778016390000-introduction-schedules';

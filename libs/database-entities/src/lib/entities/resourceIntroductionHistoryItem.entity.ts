@@ -2,10 +2,14 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Jo
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { User } from './user.entity';
+import { ResourceIntroductionSchedule } from './resource-introduction-schedule.entity';
 
 export enum IntroductionHistoryAction {
   REVOKE = 'revoke',
   GRANT = 'grant',
+  RENEW = 'renew',
+  EXPIRE = 'expire',
+  WARN_SENT = 'warn_sent',
 }
 
 @Entity()
@@ -36,12 +40,13 @@ export class ResourceIntroductionHistoryItem {
   })
   action!: IntroductionHistoryAction;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', nullable: true })
   @ApiProperty({
     description: 'The ID of the user who performed the action',
     example: 1,
+    required: false,
   })
-  performedByUserId!: number;
+  performedByUserId!: number | null;
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
@@ -62,11 +67,20 @@ export class ResourceIntroductionHistoryItem {
   @JoinColumn({ name: 'introductionId' })
   introduction!: ResourceIntroduction;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'performedByUserId' })
   @ApiProperty({
     description: 'The user who performed the action',
     type: () => User,
+    required: false,
   })
-  performedByUser!: User;
+  performedByUser!: User | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: 'Schedule that produced this system action (EXPIRE/WARN_SENT)', required: false })
+  scheduleId!: number | null;
+
+  @ManyToOne(() => ResourceIntroductionSchedule, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'scheduleId' })
+  schedule?: ResourceIntroductionSchedule | null;
 }

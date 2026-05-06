@@ -44,6 +44,12 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceIntroductionSchedule,
+  ResourceIntroductionScheduleTriggerType,
+  ResourceIntroductionScheduleTimeSinceIntroductionConfig,
+  ResourceIntroductionScheduleInactivityConfig,
+  ResourceIntroductionScheduleInactivityScope,
+  RetrainingIntervalUnit,
   ResourceType,
   ResourceUsage,
   ResourceUsageAction,
@@ -146,6 +152,13 @@ const seedDatabase = async (dataSource: DataSource) => {
   );
   const maintenanceScheduleTimeIntervalConfigRepo = dataSource.getRepository(
     ResourceMaintenanceScheduleTimeIntervalConfig,
+  );
+  const introductionScheduleRepo = dataSource.getRepository(ResourceIntroductionSchedule);
+  const introductionScheduleTimeSinceConfigRepo = dataSource.getRepository(
+    ResourceIntroductionScheduleTimeSinceIntroductionConfig,
+  );
+  const introductionScheduleInactivityConfigRepo = dataSource.getRepository(
+    ResourceIntroductionScheduleInactivityConfig,
   );
   const flowNodeRepo = dataSource.getRepository(ResourceFlowNode);
   const flowEdgeRepo = dataSource.getRepository(ResourceFlowEdge);
@@ -326,6 +339,35 @@ const seedDatabase = async (dataSource: DataSource) => {
     scheduleId: scheduleTimeInterval.id,
     duration: 500,
     unit: UsageDurationUnit.HOURS,
+  }));
+
+  const introductionScheduleTimeSince = await ensureEntity(introductionScheduleRepo, () => ({
+    resourceId: resource.id,
+    name: `Seed introduction schedule time-since ${seedTag}`,
+    triggerType: ResourceIntroductionScheduleTriggerType.TIME_SINCE_INTRODUCTION,
+    blockAccess: false,
+    warnDaysBefore: 7,
+    enabled: true,
+  }));
+  await ensureEntity(introductionScheduleTimeSinceConfigRepo, () => ({
+    scheduleId: introductionScheduleTimeSince.id,
+    duration: 12,
+    unit: RetrainingIntervalUnit.MONTHS,
+  }));
+
+  const introductionScheduleInactivity = await ensureEntity(introductionScheduleRepo, () => ({
+    resourceGroupId: resourceGroup.id,
+    name: `Seed introduction schedule inactivity ${seedTag}`,
+    triggerType: ResourceIntroductionScheduleTriggerType.INACTIVITY,
+    blockAccess: true,
+    warnDaysBefore: 14,
+    enabled: true,
+  }));
+  await ensureEntity(introductionScheduleInactivityConfigRepo, () => ({
+    scheduleId: introductionScheduleInactivity.id,
+    duration: 6,
+    unit: RetrainingIntervalUnit.MONTHS,
+    scope: ResourceIntroductionScheduleInactivityScope.GROUP,
   }));
 
   const flowNode = await ensureEntity(flowNodeRepo, () => ({

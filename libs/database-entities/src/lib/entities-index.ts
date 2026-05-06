@@ -59,6 +59,16 @@ import {
 import { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
 import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
+import {
+  ResourceIntroductionSchedule,
+  ResourceIntroductionScheduleTriggerType,
+} from './entities/resource-introduction-schedule.entity';
+import { ResourceIntroductionScheduleTimeSinceIntroductionConfig } from './entities/resource-introduction-schedule-time-since-introduction-config.entity';
+import {
+  ResourceIntroductionScheduleInactivityConfig,
+  ResourceIntroductionScheduleInactivityScope,
+} from './entities/resource-introduction-schedule-inactivity-config.entity';
+import { RetrainingIntervalUnit } from './types/retraining-interval-unit.enum';
 import { ResourceUsageAction } from './entities/resourceUsage.type';
 import { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 import { ResourceBillingConfiguration } from './entities/resource-billing-configuration.entity';
@@ -109,6 +119,12 @@ export {
   UsageDurationUnit,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceIntroductionSchedule,
+  ResourceIntroductionScheduleTriggerType,
+  ResourceIntroductionScheduleTimeSinceIntroductionConfig,
+  ResourceIntroductionScheduleInactivityConfig,
+  ResourceIntroductionScheduleInactivityScope,
+  RetrainingIntervalUnit,
   ResourceType,
   ResourceUsageAction,
   ButtonNodeDataSchema,
@@ -170,6 +186,9 @@ export const entities = {
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceIntroductionSchedule,
+  ResourceIntroductionScheduleTimeSinceIntroductionConfig,
+  ResourceIntroductionScheduleInactivityConfig,
   BillingTransaction,
   ResourceBillingConfiguration,
   Setting,
