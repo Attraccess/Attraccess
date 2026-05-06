@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotFoundException } from '@nestjs/common';
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
@@ -9,6 +10,7 @@ import {
 import { Repository, Not, In } from 'typeorm';
 import { ResourceGroupsIntroductionsService } from './resourceGroups.introductions.service';
 import { IntroductionScheduleEvaluatorService } from '../../introductions/schedules/introduction-schedule-evaluator.service';
+import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
 
 describe('ResourceGroupsIntroductionsService', () => {
   let service: ResourceGroupsIntroductionsService;
@@ -85,6 +87,37 @@ describe('ResourceGroupsIntroductionsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('renew', () => {
+    it('appends a RENEW history item', async () => {
+      introRepo.findOne.mockResolvedValue({ id: 5 } as ResourceIntroduction);
+      historyRepo.create.mockImplementation((x: Partial<ResourceIntroductionHistoryItem>) => x as ResourceIntroductionHistoryItem);
+      historyRepo.save.mockImplementation((x: Partial<ResourceIntroductionHistoryItem>) =>
+        Promise.resolve({ ...x, id: 100, createdAt: new Date() } as ResourceIntroductionHistoryItem),
+      );
+      const result = await service.renew(1, 2, { comment: 'OK' });
+      expect(result.action).toBe(IntroductionHistoryAction.RENEW);
+      expect(historyRepo.save).toHaveBeenCalled();
+    });
+
+    it('emits ResourceGroupIntroductionChangedEvent', async () => {
+      introRepo.findOne.mockResolvedValue({ id: 5 } as ResourceIntroduction);
+      historyRepo.create.mockImplementation((x: Partial<ResourceIntroductionHistoryItem>) => x as ResourceIntroductionHistoryItem);
+      historyRepo.save.mockImplementation((x: Partial<ResourceIntroductionHistoryItem>) =>
+        Promise.resolve({ ...x, id: 100, createdAt: new Date() } as ResourceIntroductionHistoryItem),
+      );
+      await service.renew(1, 2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+        expect.any(ResourceGroupIntroductionChangedEvent),
+      );
+    });
+
+    it('throws NotFound when no introduction exists', async () => {
+      introRepo.findOne.mockResolvedValue(null);
+      await expect(service.renew(1, 2)).rejects.toThrow(NotFoundException);
     });
   });
 });

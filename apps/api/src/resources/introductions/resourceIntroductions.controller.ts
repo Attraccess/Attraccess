@@ -4,6 +4,7 @@ import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { IsResourceIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
+import { RenewIntroductionRequestDto } from './dtos/renewIntroduction.request.dto';
 
 @ApiTags('Access Control')
 @Controller('resources/:resourceId/introductions')
@@ -54,6 +55,25 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.revoke(resourceId, userId, data);
+  }
+
+  @Post('/:userId/renew')
+  @IsResourceIntroducer()
+  @ApiOperation({
+    summary: 'Renew (refresh baseline) a user introduction',
+    operationId: 'resourceIntroductionsRenew',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Introduction renewed',
+    type: ResourceIntroductionHistoryItem,
+  })
+  async renew(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() data: RenewIntroductionRequestDto
+  ): Promise<ResourceIntroductionHistoryItem> {
+    return await this.resourceIntroductionsService.renew(resourceId, userId, data);
   }
 
   @Get('/:userId/history')

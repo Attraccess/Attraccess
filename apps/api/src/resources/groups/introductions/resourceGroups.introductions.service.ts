@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
@@ -124,6 +124,35 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(groupId, userId, IntroductionHistoryAction.REVOKE, data);
+  }
+
+  public async renew(
+    groupId: number,
+    userId: number,
+    dto?: { comment?: string },
+  ): Promise<ResourceIntroductionHistoryItem> {
+    const intro = await this.resourceIntroductionRepository.findOne({
+      where: {
+        resourceGroup: { id: groupId },
+        receiverUser: { id: userId },
+      },
+    });
+    if (!intro) {
+      throw new NotFoundException('Introduction not found');
+    }
+    const item = await this.resourceIntroductionHistoryItemRepository.save(
+      this.resourceIntroductionHistoryItemRepository.create({
+        introduction: { id: intro.id },
+        action: IntroductionHistoryAction.RENEW,
+        comment: dto?.comment ?? null,
+        performedByUser: { id: userId },
+      }),
+    );
+    this.eventEmitter.emit(
+      ResourceGroupIntroductionChangedEvent.EVENT_NAME,
+      new ResourceGroupIntroductionChangedEvent(intro.id),
+    );
+    return item;
   }
 
   public async getHistoryByGroupIdAndUserId(

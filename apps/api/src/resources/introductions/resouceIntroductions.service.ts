@@ -3,7 +3,7 @@ import {
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Not, Repository } from 'typeorm';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
@@ -219,6 +219,32 @@ export class ResourceIntroductionsService {
     const result = await this.updateIntroductionStatus(resourceId, userId, IntroductionHistoryAction.REVOKE, data);
     this.logger.debug(`Revoke operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
+  }
+
+  public async renew(
+    resourceId: number,
+    userId: number,
+    dto?: { comment?: string },
+  ): Promise<ResourceIntroductionHistoryItem> {
+    this.logger.debug(`Renewing introduction for resourceId: ${resourceId}, userId: ${userId}`);
+    const intro = await this.getIntroductionOfUser(resourceId, userId);
+    if (!intro) {
+      throw new NotFoundException('Introduction not found');
+    }
+    const item = await this.resourceIntroductionHistoryItemRepository.save(
+      this.resourceIntroductionHistoryItemRepository.create({
+        introduction: { id: intro.id },
+        action: IntroductionHistoryAction.RENEW,
+        comment: dto?.comment ?? null,
+        performedByUser: { id: userId },
+      }),
+    );
+    this.eventEmitter.emit(
+      ResourceIntroductionChangedEvent.EVENT_NAME,
+      new ResourceIntroductionChangedEvent(intro.id),
+    );
+    this.logger.debug(`Renew operation completed for resourceId: ${resourceId}, userId: ${userId}`);
+    return item;
   }
 
   public async getHistoryByResourceIdAndUserId(

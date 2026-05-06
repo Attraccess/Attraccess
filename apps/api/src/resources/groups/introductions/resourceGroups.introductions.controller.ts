@@ -4,6 +4,7 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { IsResourceGroupIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
+import { RenewIntroductionRequestDto } from '../../introductions/dtos/renewIntroduction.request.dto';
 
 @ApiTags('Access Control')
 @Controller('resource-groups/:groupId/introductions')
@@ -83,5 +84,26 @@ export class ResourceGroupsIntroductionsController {
     @Body() data: UpdateResourceGroupIntroductionDto
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data);
+  }
+
+  @Post('/:userId/renew')
+  @IsResourceGroupIntroducer()
+  @ApiOperation({
+    summary: 'Renew (refresh baseline) a user group introduction',
+    operationId: 'resourceGroupIntroductionsRenew',
+  })
+  @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
+  @ApiParam({ name: 'userId', description: 'The ID of the user', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'The introduction has been successfully renewed.',
+    type: ResourceIntroductionHistoryItem,
+  })
+  async renew(
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() data: RenewIntroductionRequestDto
+  ): Promise<ResourceIntroductionHistoryItem> {
+    return await this.resourceGroupsIntroductionsService.renew(groupId, userId, data);
   }
 }
