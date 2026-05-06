@@ -97,7 +97,11 @@ describe('IntroductionScheduleService (resource scope)', () => {
       { resourceId },
       {
         triggerType: ResourceIntroductionScheduleTriggerType.INACTIVITY,
-        inactivityConfig: { duration: 6, unit: RetrainingIntervalUnit.MONTHS, scope: 'RESOURCE' as any },
+        inactivityConfig: {
+          duration: 6,
+          unit: RetrainingIntervalUnit.MONTHS,
+          scope: ResourceIntroductionScheduleInactivityScope.RESOURCE,
+        },
       }
     );
     const list = await svc.findAll({ resourceId });
@@ -118,7 +122,11 @@ describe('IntroductionScheduleService (resource scope)', () => {
     );
     const upd = await svc.update({ resourceId }, s.id, {
       triggerType: ResourceIntroductionScheduleTriggerType.INACTIVITY,
-      inactivityConfig: { duration: 30, unit: RetrainingIntervalUnit.DAYS, scope: 'GROUP' as any },
+      inactivityConfig: {
+        duration: 30,
+        unit: RetrainingIntervalUnit.DAYS,
+        scope: ResourceIntroductionScheduleInactivityScope.GROUP,
+      },
     });
     expect(upd.timeSinceIntroductionConfig).toBeFalsy();
     expect(upd.inactivityConfig?.duration).toBe(30);
