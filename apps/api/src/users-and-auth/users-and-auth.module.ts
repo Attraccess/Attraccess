@@ -9,6 +9,7 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { TwoFactorController } from './auth/two-factor.controller';
 import { SessionService } from './auth/session.service';
+import { UserIntroductionsService } from './users/user-introductions.service';
 
 // Strategies
 import { LocalStrategy } from './strategies/local.strategy';
@@ -25,6 +26,7 @@ import {
   Session,
   ResourceUsage,
   Setting,
+  ResourceIntroduction,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
@@ -43,6 +45,7 @@ import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.e
 import { TwoFactorService } from './auth/two-factor.service';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import { ResourceIntroductionsModule } from '../resources/introductions/resourceIntroductions.module';
 
 @Module({
   imports: [
@@ -55,18 +58,21 @@ import { SettingsService } from '../settings/settings.service';
       Session,
       ResourceUsage,
       Setting,
+      ResourceIntroduction,
     ]),
     PassportModule,
     EmailModule,
     EncryptionModule,
     LicenseModule,
     SettingsModule,
+    ResourceIntroductionsModule,
   ],
   providers: [
     UsersService,
     AuthService,
     SessionService,
     TwoFactorService,
+    UserIntroductionsService,
     LocalStrategy,
     SessionStrategy,
     SSOService,

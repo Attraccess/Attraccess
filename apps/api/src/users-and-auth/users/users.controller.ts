@@ -68,6 +68,8 @@ import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { SSOService } from '../auth/sso/sso.service';
 import { getSsoManagedPermissionKeys } from '@attraccess/shared';
 import { TokenHashService } from '../../encryption/token-hash.service';
+import { UserIntroductionsService } from './user-introductions.service';
+import { ExpiringIntroductionDto } from '../../resources/introductions/dtos/expiringIntroduction.response.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -83,6 +85,7 @@ export class UsersController {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly tokenHashService: TokenHashService,
+    private readonly userIntroductionsService: UserIntroductionsService,
   ) { }
 
   private mapEmailSendError(error: unknown): never {
@@ -777,6 +780,21 @@ export class UsersController {
     } catch (error) {
       throw this.mapEmailSendError(error);
     }
+  }
+
+  @Auth()
+  @Get('me/expiring-introductions')
+  @ApiOperation({
+    summary: 'Get my expiring introductions',
+    operationId: 'usersGetMyExpiringIntroductions',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of introductions in WARNING or EXPIRED state for the current user.',
+    type: [ExpiringIntroductionDto],
+  })
+  async getMyExpiringIntroductions(@Req() request: AuthenticatedRequest): Promise<ExpiringIntroductionDto[]> {
+    return await this.userIntroductionsService.findMyExpiring(request.user.id);
   }
 
   @Auth()

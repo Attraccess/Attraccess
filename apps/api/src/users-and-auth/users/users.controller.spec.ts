@@ -13,6 +13,7 @@ import { CsvInviteConfigDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { ForbiddenException } from '@nestjs/common';
+import { UserIntroductionsService } from './user-introductions.service';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -77,6 +78,12 @@ describe('UsersController', () => {
           provide: TokenHashService,
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
+          },
+        },
+        {
+          provide: UserIntroductionsService,
+          useValue: {
+            findMyExpiring: jest.fn(),
           },
         },
       ],

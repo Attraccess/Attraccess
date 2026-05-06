@@ -5,11 +5,19 @@ import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attracce
 import { IsResourceIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 import { RenewIntroductionRequestDto } from './dtos/renewIntroduction.request.dto';
+import {
+  IntroductionStatus,
+  IntroductionStatusResponseDto,
+} from './dtos/introductionStatus.response.dto';
+import { IntroductionScheduleEvaluatorService } from './schedules/introduction-schedule-evaluator.service';
 
 @ApiTags('Access Control')
 @Controller('resources/:resourceId/introductions')
 export class ResourceIntroductionsController {
-  constructor(private readonly resourceIntroductionsService: ResourceIntroductionsService) {}
+  constructor(
+    private readonly resourceIntroductionsService: ResourceIntroductionsService,
+    private readonly scheduleEvaluator: IntroductionScheduleEvaluatorService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all introductions for a resource', operationId: 'resourceIntroductionsGetMany' })
@@ -74,6 +82,38 @@ export class ResourceIntroductionsController {
     @Body() data: RenewIntroductionRequestDto
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.renew(resourceId, userId, data);
+  }
+
+  @Get('/:userId/status')
+  @ApiOperation({
+    summary: 'Get introduction status for a user on a resource',
+    operationId: 'resourceIntroductionsGetStatus',
+  })
+  @ApiParam({ name: 'resourceId', description: 'The ID of the resource', type: Number })
+  @ApiParam({ name: 'userId', description: 'The ID of the user', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Introduction status',
+    type: IntroductionStatusResponseDto,
+  })
+  async getStatus(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<IntroductionStatusResponseDto> {
+    const evalResult = await this.scheduleEvaluator.evaluateUserOnResource(userId, resourceId);
+    const valid = await this.resourceIntroductionsService.hasValidIntroduction(resourceId, userId);
+    return {
+      hasValidIntroduction: valid,
+      status: evalResult.status as IntroductionStatus,
+      expiresAt: evalResult.expiresAt ? evalResult.expiresAt.toISOString() : null,
+      schedules: evalResult.schedules.map((s) => ({
+        scheduleId: s.scheduleId,
+        dueAt: s.dueAt ? s.dueAt.toISOString() : null,
+        isWarning: s.isWarning,
+        isDue: s.isDue,
+        blockAccess: s.blockAccess,
+      })),
+    };
   }
 
   @Get('/:userId/history')

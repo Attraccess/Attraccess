@@ -5,11 +5,19 @@ import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attracce
 import { IsResourceGroupIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 import { RenewIntroductionRequestDto } from '../../introductions/dtos/renewIntroduction.request.dto';
+import {
+  IntroductionStatus,
+  IntroductionStatusResponseDto,
+} from '../../introductions/dtos/introductionStatus.response.dto';
+import { IntroductionScheduleEvaluatorService } from '../../introductions/schedules/introduction-schedule-evaluator.service';
 
 @ApiTags('Access Control')
 @Controller('resource-groups/:groupId/introductions')
 export class ResourceGroupsIntroductionsController {
-  constructor(private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService) {}
+  constructor(
+    private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
+    private readonly scheduleEvaluator: IntroductionScheduleEvaluatorService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get many introductions by group ID', operationId: 'resourceGroupIntroductionsGetMany' })
@@ -22,6 +30,38 @@ export class ResourceGroupsIntroductionsController {
   @IsResourceGroupIntroducer()
   async getMany(@Param('groupId', ParseIntPipe) groupId: number): Promise<ResourceIntroduction[]> {
     return await this.resourceGroupsIntroductionsService.getManyByGroupId(groupId);
+  }
+
+  @Get('/:userId/status')
+  @ApiOperation({
+    summary: 'Get introduction status for a user on a resource group',
+    operationId: 'resourceGroupIntroductionsGetStatus',
+  })
+  @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
+  @ApiParam({ name: 'userId', description: 'The ID of the user', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Introduction status',
+    type: IntroductionStatusResponseDto,
+  })
+  async getStatus(
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<IntroductionStatusResponseDto> {
+    const evalResult = await this.scheduleEvaluator.evaluateUserOnGroup(userId, groupId);
+    const valid = await this.resourceGroupsIntroductionsService.hasValidIntroduction({ groupId, userId });
+    return {
+      hasValidIntroduction: valid,
+      status: evalResult.status as IntroductionStatus,
+      expiresAt: evalResult.expiresAt ? evalResult.expiresAt.toISOString() : null,
+      schedules: evalResult.schedules.map((s) => ({
+        scheduleId: s.scheduleId,
+        dueAt: s.dueAt ? s.dueAt.toISOString() : null,
+        isWarning: s.isWarning,
+        isDue: s.isDue,
+        blockAccess: s.blockAccess,
+      })),
+    };
   }
 
   @Get('/:userId/history')

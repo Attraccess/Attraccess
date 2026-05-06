@@ -194,6 +194,25 @@ export class IntroductionScheduleEvaluatorService {
       where: { resourceId, receiverUserId: userId },
     });
     if (!intro) return { status: 'ACTIVE', expiresAt: null, schedules: [] };
+    return this.evaluateIntroduction(intro, now);
+  }
+
+  async evaluateUserOnGroup(
+    userId: number,
+    resourceGroupId: number,
+    now = new Date()
+  ): Promise<EvaluateUserOnResourceResult> {
+    const intro = await this.introRepo.findOne({
+      where: { resourceGroupId, receiverUserId: userId },
+    });
+    if (!intro) return { status: 'ACTIVE', expiresAt: null, schedules: [] };
+    return this.evaluateIntroduction(intro, now);
+  }
+
+  async evaluateIntroduction(
+    intro: ResourceIntroduction,
+    now = new Date()
+  ): Promise<EvaluateUserOnResourceResult> {
     const schedules = await this.getSchedulesForIntroduction(intro);
     const rows = await Promise.all(
       schedules.map(async (s) => {
