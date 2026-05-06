@@ -1,42 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceIntroductionsController } from './resourceIntroductions.controller';
-import {
-  Resource,
-  ResourceGroup,
-  ResourceIntroducer,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-  ResourceIntroductionSchedule,
-  ResourceIntroductionScheduleInactivityConfig,
-  ResourceIntroductionScheduleTimeSinceIntroductionConfig,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
-import { IntroductionScheduleEvaluatorService } from './schedules/introduction-schedule-evaluator.service';
-import { EmailModule } from '../../email/email.module';
+import { IntroductionScheduleModule } from './schedules/introduction-schedule.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Resource,
-      ResourceGroup,
-      ResourceIntroduction,
-      ResourceIntroducer,
-      ResourceIntroductionHistoryItem,
-      ResourceIntroductionSchedule,
-      ResourceIntroductionScheduleInactivityConfig,
-      ResourceIntroductionScheduleTimeSinceIntroductionConfig,
-      ResourceUsage,
-      User,
-    ]),
+    TypeOrmModule.forFeature([ResourceIntroduction, ResourceIntroductionHistoryItem]),
     ResourceIntroducersModule,
-    EmailModule,
+    IntroductionScheduleModule,
   ],
   controllers: [ResourceIntroductionsController],
-  providers: [ResourceIntroductionsService, IntroductionScheduleEvaluatorService],
-  exports: [ResourceIntroductionsService, IntroductionScheduleEvaluatorService],
+  providers: [ResourceIntroductionsService],
+  exports: [ResourceIntroductionsService, IntroductionScheduleModule],
 })
 export class ResourceIntroductionsModule {}
