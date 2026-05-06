@@ -33,7 +33,7 @@ export class ResourceIntroductionHistoryItem {
     enum: IntroductionHistoryAction,
   })
   @ApiProperty({
-    description: 'The action performed (revoke or grant)',
+    description: 'The action performed (revoke, grant, renew, expire, warn_sent)',
     enum: IntroductionHistoryAction,
     example: IntroductionHistoryAction.REVOKE,
     enumName: 'IntroductionHistoryAction',

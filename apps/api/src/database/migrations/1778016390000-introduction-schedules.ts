@@ -97,8 +97,8 @@ export class IntroductionSchedules1778016390000 implements MigrationInterface {
     await q.query(`DROP INDEX IF EXISTS "IDX_ris_resource"`);
     await q.query(`DROP INDEX IF EXISTS "IDX_ris_group"`);
     await q.query(`DROP INDEX IF EXISTS "IDX_ris_enabled"`);
-    await q.query(`DROP TABLE "resource_introduction_schedule_inactivity_config"`);
-    await q.query(`DROP TABLE "resource_introduction_schedule_time_since_introduction_config"`);
-    await q.query(`DROP TABLE "resource_introduction_schedule"`);
+    await q.query(`DROP TABLE IF EXISTS "resource_introduction_schedule_inactivity_config"`);
+    await q.query(`DROP TABLE IF EXISTS "resource_introduction_schedule_time_since_introduction_config"`);
+    await q.query(`DROP TABLE IF EXISTS "resource_introduction_schedule"`);
   }
 }
