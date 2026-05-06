@@ -68,6 +68,11 @@ import { Project } from './entities/project';
 import { ProjectMember, ProjectMemberRole } from './entities/project-member.entity';
 import { ProjectInvitation, ProjectInvitationStatus } from './entities/project-invitation.entity';
 import { Form, FormField, FormSubmission, FormFieldType, ResourceFormAction } from './entities/form';
+import {
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
+  type ResourceFlowVariableValueType,
+} from './entities/resourceFlowVariable';
 
 // Export all entities individually
 export {
@@ -142,6 +147,9 @@ export {
   ResourceHealthState,
   ResourceHealthStatus,
   ResourceHealthSource,
+  ResourceFlowVariable,
+  ResourceFlowVariableScope,
+  type ResourceFlowVariableValueType,
 };
 
 // Export the entities object
@@ -181,4 +189,5 @@ export const entities = {
   FormField,
   FormSubmission,
   ResourceHealthState,
+  ResourceFlowVariable,
 };
