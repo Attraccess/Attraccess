@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceGroupIntroductionSchedulesService, ResourceHealthService, ResourceIntroductionSchedulesService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -61,6 +61,12 @@ export const useUsersServiceIsLocalSignupEnabledSuspense = <TData = Common.Users
 * @throws ApiError
 */
 export const useUsersServiceGetCurrentSuspense = <TData = Common.UsersServiceGetCurrentDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetCurrentKeyFn(queryKey), queryFn: () => UsersService.getCurrent() as TData, ...options });
+/**
+* Get my expiring introductions
+* @returns ExpiringIntroductionDto List of introductions in WARNING or EXPIRED state for the current user.
+* @throws ApiError
+*/
+export const useUsersServiceUsersGetMyExpiringIntroductionsSuspense = <TData = Common.UsersServiceUsersGetMyExpiringIntroductionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseUsersServiceUsersGetMyExpiringIntroductionsKeyFn(queryKey), queryFn: () => UsersService.usersGetMyExpiringIntroductions() as TData, ...options });
 /**
 * Get a user by ID
 * @param data The data for the request.
@@ -245,6 +251,164 @@ export const useSettingsServiceGetMetricsSettingsSuspense = <TData = Common.Sett
 */
 export const useLicenseServiceGetLicenseInformationSuspense = <TData = Common.LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(queryKey), queryFn: () => LicenseService.getLicenseInformation() as TData, ...options });
 /**
+* Get all introductions for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroduction All introductions for a resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetManySuspense = <TData = Common.AccessControlServiceResourceIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) as TData, ...options });
+/**
+* Get introduction status for a user on a resource
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetStatusSuspense = <TData = Common.AccessControlServiceResourceIntroductionsGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetStatusKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetStatus({ resourceId, userId }) as TData, ...options });
+/**
+* Get history of introductions by resource ID and user ID
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetHistorySuspense = <TData = Common.AccessControlServiceResourceIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) as TData, ...options });
+/**
+* Check if a user is an introducer for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.includeGroups
+* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersIsIntroducerSuspense = <TData = Common.AccessControlServiceResourceIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeGroups, resourceId, userId }: {
+  includeGroups: boolean;
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) as TData, ...options });
+/**
+* Get all introducers for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroducer All introducers for a resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) as TData, ...options });
+/**
+* Get many introductions by group ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroduction The introductions have been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetManySuspense = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) as TData, ...options });
+/**
+* Get introduction status for a user on a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetStatusSuspense = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetStatusKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetStatus({ groupId, userId }) as TData, ...options });
+/**
+* Get history of introductions by group ID and user ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetHistorySuspense = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) as TData, ...options });
+/**
+* Get all introducers for a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroducer The introducers have been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceGroupIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) as TData, ...options });
+/**
+* Check if a user is an introducer for a resource group
+* @param data The data for the request.
+* @param data.userId The ID of the user
+* @param data.groupId The ID of the resource group
+* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersIsIntroducerSuspense = <TData = Common.AccessControlServiceResourceGroupIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) as TData, ...options });
+/**
+* List introduction schedules for resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceFindIntroductionSchedulesSuspense = <TData = Common.ResourceIntroductionSchedulesServiceFindIntroductionSchedulesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceIntroductionSchedulesServiceFindIntroductionSchedulesKeyFn({ resourceId }, queryKey), queryFn: () => ResourceIntroductionSchedulesService.findIntroductionSchedules({ resourceId }) as TData, ...options });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceGetIntroductionScheduleSuspense = <TData = Common.ResourceIntroductionSchedulesServiceGetIntroductionScheduleDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, scheduleId }: {
+  resourceId: number;
+  scheduleId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceIntroductionSchedulesServiceGetIntroductionScheduleKeyFn({ resourceId, scheduleId }, queryKey), queryFn: () => ResourceIntroductionSchedulesService.getIntroductionSchedule({ resourceId, scheduleId }) as TData, ...options });
+/**
+* List introduction schedules for resource group
+* @param data The data for the request.
+* @param data.groupId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesSuspense = <TData = Common.ResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesKeyFn({ groupId }, queryKey), queryFn: () => ResourceGroupIntroductionSchedulesService.findGroupIntroductionSchedules({ groupId }) as TData, ...options });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleSuspense = <TData = Common.ResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, scheduleId }: {
+  groupId: number;
+  scheduleId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleKeyFn({ groupId, scheduleId }, queryKey), queryFn: () => ResourceGroupIntroductionSchedulesService.getGroupIntroductionSchedule({ groupId, scheduleId }) as TData, ...options });
+/**
 * Get all resources
 * @param data The data for the request.
 * @param data.page Page number (1-based)
@@ -359,96 +523,6 @@ export const useMqttServiceMqttServersGetAllSuspense = <TData = Common.MqttServi
 export const useMqttServiceMqttServersGetOneByIdSuspense = <TData = Common.MqttServiceMqttServersGetOneByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }, queryKey), queryFn: () => MqttService.mqttServersGetOneById({ id }) as TData, ...options });
-/**
-* Get many introductions by group ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroduction The introductions have been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsGetManySuspense = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
-  groupId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) as TData, ...options });
-/**
-* Get history of introductions by group ID and user ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsGetHistorySuspense = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
-  groupId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) as TData, ...options });
-/**
-* Get all introducers for a resource group
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroducer The introducers have been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceGroupIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
-  groupId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) as TData, ...options });
-/**
-* Check if a user is an introducer for a resource group
-* @param data The data for the request.
-* @param data.userId The ID of the user
-* @param data.groupId The ID of the resource group
-* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersIsIntroducerSuspense = <TData = Common.AccessControlServiceResourceGroupIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
-  groupId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) as TData, ...options });
-/**
-* Check if a user is an introducer for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @param data.includeGroups
-* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersIsIntroducerSuspense = <TData = Common.AccessControlServiceResourceIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeGroups, resourceId, userId }: {
-  includeGroups: boolean;
-  resourceId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) as TData, ...options });
-/**
-* Get all introducers for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroducer All introducers for a resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersGetManySuspense = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
-  resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) as TData, ...options });
-/**
-* Get all introductions for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroduction All introductions for a resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsGetManySuspense = <TData = Common.AccessControlServiceResourceIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
-  resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) as TData, ...options });
-/**
-* Get history of introductions by resource ID and user ID
-* @param data The data for the request.
-* @param data.resourceId The ID of the resource
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsGetHistorySuspense = <TData = Common.AccessControlServiceResourceIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
-  resourceId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useSuspenseQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) as TData, ...options });
 /**
 * Check if user can manage maintenance
 * Check if the authenticated user has permission to manage maintenance for the specified resource

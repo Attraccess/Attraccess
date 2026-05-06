@@ -387,6 +387,43 @@ export const $ChangeEmailDto = {
     required: ['email']
 } as const;
 
+export const $IntroductionStatus = {
+    type: 'string',
+    enum: ['ACTIVE', 'WARNING', 'EXPIRED']
+} as const;
+
+export const $ExpiringIntroductionDto = {
+    type: 'object',
+    properties: {
+        kind: {
+            type: 'string',
+            enum: ['resource', 'resourceGroup']
+        },
+        resourceId: {
+            type: 'number'
+        },
+        resourceGroupId: {
+            type: 'number'
+        },
+        name: {
+            type: 'string'
+        },
+        status: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/IntroductionStatus'
+                }
+            ]
+        },
+        dueAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true
+        }
+    },
+    required: ['kind', 'name', 'status', 'dueAt']
+} as const;
+
 export const $UserNotFoundException = {
     type: 'object',
     properties: {}
@@ -1358,7 +1395,7 @@ export const $PreviewMjmlResponseDto = {
 
 export const $EmailTemplateType = {
     type: 'string',
-    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation'],
+    enum: ['verify-email', 'user-invitation', 'reset-password', 'username-changed', 'password-changed', 'resource-usage-billing-transaction-summary', 'project-invitation', 'delete-account-confirmation', 'introduction-expiry-warning', 'introduction-expired'],
     description: 'Template type/key used by the system'
 } as const;
 
@@ -1716,6 +1753,509 @@ export const $LicenseDataDto = {
         }
     },
     required: ['valid', 'modules', 'usageLimits', 'isNonProfit']
+} as const;
+
+export const $IntroductionHistoryAction = {
+    type: 'string',
+    enum: ['revoke', 'grant', 'renew', 'expire', 'warn_sent'],
+    description: 'The action performed (revoke, grant, renew, expire, warn_sent)'
+} as const;
+
+export const $ResourceIntroductionHistoryItem = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the introduction history entry',
+            example: 1
+        },
+        introductionId: {
+            type: 'number',
+            description: 'The ID of the related introduction',
+            example: 1
+        },
+        action: {
+            description: 'The action performed (revoke, grant, renew, expire, warn_sent)',
+            example: 'revoke',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/IntroductionHistoryAction'
+                }
+            ]
+        },
+        performedByUserId: {
+            type: 'number',
+            description: 'The ID of the user who performed the action',
+            example: 1
+        },
+        comment: {
+            type: 'string',
+            description: 'Optional comment explaining the reason for the action',
+            example: 'User no longer requires access to this resource'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the action was performed',
+            example: '2021-01-01T00:00:00.000Z'
+        },
+        performedByUser: {
+            description: 'The user who performed the action',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        scheduleId: {
+            type: 'number',
+            description: 'Schedule that produced this system action (EXPIRE/WARN_SENT)'
+        }
+    },
+    required: ['id', 'introductionId', 'action', 'createdAt']
+} as const;
+
+export const $ResourceIntroduction = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the introduction',
+            example: 1
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource (if this is a resource-specific introduction)',
+            example: 1
+        },
+        receiverUserId: {
+            type: 'number',
+            description: 'The ID of the user who received the introduction',
+            example: 1
+        },
+        tutorUserId: {
+            type: 'number',
+            description: 'The ID of the user who tutored the receiver',
+            example: 2
+        },
+        resourceGroupId: {
+            type: 'number',
+            description: 'The ID of the resource group (if this is a group-level introduction)',
+            example: 1
+        },
+        completedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the introduction was completed',
+            example: '2021-01-01T00:00:00.000Z'
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the introduction record was created',
+            example: '2021-01-01T00:00:00.000Z'
+        },
+        receiverUser: {
+            description: 'The user who received the introduction',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        tutorUser: {
+            description: 'The user who tutored the receiver',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        },
+        history: {
+            description: 'History of revoke/unrevoke actions for this introduction',
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/ResourceIntroductionHistoryItem'
+            }
+        }
+    },
+    required: ['id', 'receiverUserId', 'tutorUserId', 'completedAt', 'createdAt', 'receiverUser', 'tutorUser', 'history']
+} as const;
+
+export const $UpdateResourceIntroductionDto = {
+    type: 'object',
+    properties: {
+        comment: {
+            type: 'string',
+            description: 'The comment for the action',
+            example: 'This is a comment'
+        }
+    }
+} as const;
+
+export const $RenewIntroductionRequestDto = {
+    type: 'object',
+    properties: {
+        comment: {
+            type: 'string'
+        }
+    }
+} as const;
+
+export const $IntroductionScheduleStatusDto = {
+    type: 'object',
+    properties: {
+        scheduleId: {
+            type: 'number'
+        },
+        dueAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true
+        },
+        isWarning: {
+            type: 'boolean'
+        },
+        isDue: {
+            type: 'boolean'
+        },
+        blockAccess: {
+            type: 'boolean'
+        }
+    },
+    required: ['scheduleId', 'dueAt', 'isWarning', 'isDue', 'blockAccess']
+} as const;
+
+export const $IntroductionStatusResponseDto = {
+    type: 'object',
+    properties: {
+        hasValidIntroduction: {
+            type: 'boolean'
+        },
+        status: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/IntroductionStatus'
+                }
+            ]
+        },
+        expiresAt: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true
+        },
+        schedules: {
+            type: 'array',
+            items: {
+                '$ref': '#/components/schemas/IntroductionScheduleStatusDto'
+            }
+        }
+    },
+    required: ['hasValidIntroduction', 'status', 'expiresAt', 'schedules']
+} as const;
+
+export const $IsResourceIntroducerResponseDto = {
+    type: 'object',
+    properties: {
+        isIntroducer: {
+            type: 'boolean',
+            description: 'Whether the user is an introducer for the resource'
+        }
+    },
+    required: ['isIntroducer']
+} as const;
+
+export const $ResourceIntroducer = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'The unique identifier of the introduction permission',
+            example: 1
+        },
+        resourceId: {
+            type: 'number',
+            description: 'The ID of the resource (if permission is for a specific resource)',
+            example: 1
+        },
+        userId: {
+            type: 'number',
+            description: 'The ID of the user who can give introductions',
+            example: 1
+        },
+        resourceGroupId: {
+            type: 'number',
+            description: 'The ID of the resource group (if permission is for a group)',
+            example: 1
+        },
+        grantedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'When the permission was granted'
+        },
+        user: {
+            description: 'The user who can give introductions',
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/User'
+                }
+            ]
+        }
+    },
+    required: ['id', 'userId', 'grantedAt', 'user']
+} as const;
+
+export const $ResourceIntroductionScheduleTriggerType = {
+    type: 'string',
+    enum: ['TIME_SINCE_INTRODUCTION', 'INACTIVITY']
+} as const;
+
+export const $RetrainingIntervalUnit = {
+    type: 'string',
+    enum: ['DAYS', 'WEEKS', 'MONTHS', 'YEARS']
+} as const;
+
+export const $ResourceIntroductionScheduleTimeSinceIntroductionConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            example: 1
+        },
+        duration: {
+            type: 'number',
+            example: 1,
+            description: 'Duration value'
+        },
+        unit: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingIntervalUnit'
+                }
+            ]
+        }
+    },
+    required: ['id', 'scheduleId', 'duration', 'unit']
+} as const;
+
+export const $ResourceIntroductionScheduleInactivityScope = {
+    type: 'string',
+    enum: ['GROUP', 'RESOURCE']
+} as const;
+
+export const $ResourceIntroductionScheduleInactivityConfig = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            example: 1
+        },
+        scheduleId: {
+            type: 'number',
+            example: 1
+        },
+        duration: {
+            type: 'number',
+            example: 6
+        },
+        unit: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingIntervalUnit'
+                }
+            ]
+        },
+        scope: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroductionScheduleInactivityScope'
+                }
+            ]
+        }
+    },
+    required: ['id', 'scheduleId', 'duration', 'unit', 'scope']
+} as const;
+
+export const $ResourceIntroductionSchedule = {
+    type: 'object',
+    properties: {
+        id: {
+            type: 'number',
+            description: 'Schedule ID',
+            example: 1
+        },
+        createdAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Created'
+        },
+        updatedAt: {
+            format: 'date-time',
+            type: 'string',
+            description: 'Updated'
+        },
+        resourceId: {
+            type: 'number',
+            description: 'Resource ID (set when scope=resource)'
+        },
+        resourceGroupId: {
+            type: 'number',
+            description: 'Resource group ID (set when scope=group)'
+        },
+        name: {
+            type: 'string',
+            description: 'Optional human-readable label'
+        },
+        triggerType: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroductionScheduleTriggerType'
+                }
+            ]
+        },
+        blockAccess: {
+            type: 'boolean',
+            description: 'Whether triggering this schedule blocks usage',
+            default: false
+        },
+        warnDaysBefore: {
+            type: 'number',
+            description: 'Days before due date to email a warning. 0 disables.',
+            default: 0
+        },
+        enabled: {
+            type: 'boolean',
+            description: 'Schedule enabled',
+            default: true
+        },
+        timeSinceIntroductionConfig: {
+            '$ref': '#/components/schemas/ResourceIntroductionScheduleTimeSinceIntroductionConfig'
+        },
+        inactivityConfig: {
+            '$ref': '#/components/schemas/ResourceIntroductionScheduleInactivityConfig'
+        }
+    },
+    required: ['id', 'createdAt', 'updatedAt', 'triggerType', 'blockAccess', 'warnDaysBefore', 'enabled']
+} as const;
+
+export const $TimeSinceIntroductionConfigDto = {
+    type: 'object',
+    properties: {
+        duration: {
+            type: 'number',
+            example: 1
+        },
+        unit: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingIntervalUnit'
+                }
+            ]
+        }
+    },
+    required: ['duration', 'unit']
+} as const;
+
+export const $InactivityConfigDto = {
+    type: 'object',
+    properties: {
+        duration: {
+            type: 'number',
+            example: 6
+        },
+        unit: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/RetrainingIntervalUnit'
+                }
+            ]
+        },
+        scope: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroductionScheduleInactivityScope'
+                }
+            ]
+        }
+    },
+    required: ['duration', 'unit', 'scope']
+} as const;
+
+export const $CreateIntroductionScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string'
+        },
+        triggerType: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroductionScheduleTriggerType'
+                }
+            ]
+        },
+        blockAccess: {
+            type: 'boolean',
+            default: false
+        },
+        warnDaysBefore: {
+            type: 'number',
+            default: 0,
+            minimum: 0,
+            maximum: 365
+        },
+        enabled: {
+            type: 'boolean',
+            default: true
+        },
+        timeSinceIntroductionConfig: {
+            '$ref': '#/components/schemas/TimeSinceIntroductionConfigDto'
+        },
+        inactivityConfig: {
+            '$ref': '#/components/schemas/InactivityConfigDto'
+        }
+    },
+    required: ['triggerType', 'blockAccess', 'warnDaysBefore', 'enabled']
+} as const;
+
+export const $UpdateIntroductionScheduleDto = {
+    type: 'object',
+    properties: {
+        name: {
+            type: 'string'
+        },
+        triggerType: {
+            allOf: [
+                {
+                    '$ref': '#/components/schemas/ResourceIntroductionScheduleTriggerType'
+                }
+            ]
+        },
+        blockAccess: {
+            type: 'boolean',
+            default: false
+        },
+        warnDaysBefore: {
+            type: 'number',
+            default: 0,
+            minimum: 0,
+            maximum: 365
+        },
+        enabled: {
+            type: 'boolean',
+            default: true
+        },
+        timeSinceIntroductionConfig: {
+            '$ref': '#/components/schemas/TimeSinceIntroductionConfigDto'
+        },
+        inactivityConfig: {
+            '$ref': '#/components/schemas/InactivityConfigDto'
+        }
+    }
 } as const;
 
 export const $ResourceType = {
@@ -2734,129 +3274,6 @@ export const $UpdateResourceGroupDto = {
     required: ['name']
 } as const;
 
-export const $IntroductionHistoryAction = {
-    type: 'string',
-    enum: ['revoke', 'grant'],
-    description: 'The action performed (revoke or grant)'
-} as const;
-
-export const $ResourceIntroductionHistoryItem = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the introduction history entry',
-            example: 1
-        },
-        introductionId: {
-            type: 'number',
-            description: 'The ID of the related introduction',
-            example: 1
-        },
-        action: {
-            description: 'The action performed (revoke or grant)',
-            example: 'revoke',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/IntroductionHistoryAction'
-                }
-            ]
-        },
-        performedByUserId: {
-            type: 'number',
-            description: 'The ID of the user who performed the action',
-            example: 1
-        },
-        comment: {
-            type: 'string',
-            description: 'Optional comment explaining the reason for the action',
-            example: 'User no longer requires access to this resource'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the action was performed',
-            example: '2021-01-01T00:00:00.000Z'
-        },
-        performedByUser: {
-            description: 'The user who performed the action',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        }
-    },
-    required: ['id', 'introductionId', 'action', 'performedByUserId', 'createdAt', 'performedByUser']
-} as const;
-
-export const $ResourceIntroduction = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the introduction',
-            example: 1
-        },
-        resourceId: {
-            type: 'number',
-            description: 'The ID of the resource (if this is a resource-specific introduction)',
-            example: 1
-        },
-        receiverUserId: {
-            type: 'number',
-            description: 'The ID of the user who received the introduction',
-            example: 1
-        },
-        tutorUserId: {
-            type: 'number',
-            description: 'The ID of the user who tutored the receiver',
-            example: 2
-        },
-        resourceGroupId: {
-            type: 'number',
-            description: 'The ID of the resource group (if this is a group-level introduction)',
-            example: 1
-        },
-        completedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the introduction was completed',
-            example: '2021-01-01T00:00:00.000Z'
-        },
-        createdAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the introduction record was created',
-            example: '2021-01-01T00:00:00.000Z'
-        },
-        receiverUser: {
-            description: 'The user who received the introduction',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        tutorUser: {
-            description: 'The user who tutored the receiver',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        },
-        history: {
-            description: 'History of revoke/unrevoke actions for this introduction',
-            type: 'array',
-            items: {
-                '$ref': '#/components/schemas/ResourceIntroductionHistoryItem'
-            }
-        }
-    },
-    required: ['id', 'receiverUserId', 'tutorUserId', 'completedAt', 'createdAt', 'receiverUser', 'tutorUser', 'history']
-} as const;
-
 export const $UpdateResourceGroupIntroductionDto = {
     type: 'object',
     properties: {
@@ -2866,46 +3283,6 @@ export const $UpdateResourceGroupIntroductionDto = {
             example: 'This is a comment'
         }
     }
-} as const;
-
-export const $ResourceIntroducer = {
-    type: 'object',
-    properties: {
-        id: {
-            type: 'number',
-            description: 'The unique identifier of the introduction permission',
-            example: 1
-        },
-        resourceId: {
-            type: 'number',
-            description: 'The ID of the resource (if permission is for a specific resource)',
-            example: 1
-        },
-        userId: {
-            type: 'number',
-            description: 'The ID of the user who can give introductions',
-            example: 1
-        },
-        resourceGroupId: {
-            type: 'number',
-            description: 'The ID of the resource group (if permission is for a group)',
-            example: 1
-        },
-        grantedAt: {
-            format: 'date-time',
-            type: 'string',
-            description: 'When the permission was granted'
-        },
-        user: {
-            description: 'The user who can give introductions',
-            allOf: [
-                {
-                    '$ref': '#/components/schemas/User'
-                }
-            ]
-        }
-    },
-    required: ['id', 'userId', 'grantedAt', 'user']
 } as const;
 
 export const $IsResourceGroupIntroducerResponseDto = {
@@ -3075,28 +3452,6 @@ export const $CanControlResponseDto = {
         }
     },
     required: ['canControl']
-} as const;
-
-export const $IsResourceIntroducerResponseDto = {
-    type: 'object',
-    properties: {
-        isIntroducer: {
-            type: 'boolean',
-            description: 'Whether the user is an introducer for the resource'
-        }
-    },
-    required: ['isIntroducer']
-} as const;
-
-export const $UpdateResourceIntroductionDto = {
-    type: 'object',
-    properties: {
-        comment: {
-            type: 'string',
-            description: 'The comment for the action',
-            example: 'This is a comment'
-        }
-    }
 } as const;
 
 export const $CanManageMaintenanceResponseDto = {

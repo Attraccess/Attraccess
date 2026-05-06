@@ -1,8 +1,8 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
-import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateMaintenanceScheduleDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceGroupIntroductionSchedulesService, ResourceHealthService, ResourceIntroductionSchedulesService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AcceptInvitationDto, AppKeyRequestDto, BulkUpdateUserPermissionsDto, ChangeBillingFactorDto, ChangeEmailDto, ChangePasswordDto, ChangeUsernameDto, CreateFormDto, CreateIntroductionScheduleDto, CreateMaintenanceDto, CreateMaintenanceScheduleDto, CreateMqttServerDto, CreateProjectDto, CreateProjectInvitationDto, CreateResourceDto, CreateResourceGroupDto, CreateSSOProviderDto, CreateUserDto, CsvInviteUploadDto, DeleteAccountConfirmDto, EmailTemplateType, EndUsageSessionDto, EnrollNfcCardDto, FinishMaintenanceDto, InviteUserDto, LinkUserToExternalAccountRequestDto, ModifyBalanceDto, NfcCardSetActiveStateDto, PairSumUpReaderDto, PermissionFilter, PreviewMjmlDto, RefundTransactionDto, RenewIntroductionRequestDto, ResetNfcCardDto, ResetPasswordDto, ResourceFlowSaveDto, SetBillingConfigurationDto, SetSumUpApiKeyDto, SetUserPasswordDto, SSOProvisioningPermissionsDto, SSOProvisioningUserDto, StartUsageSessionDto, SumupTopUpDto, SumupTransactionCallbackDto, TwoFactorCodeDto, TwoFactorPolicyDto, UpdateEmailTemplateDto, UpdateFormDto, UpdateIntroductionScheduleDto, UpdateMaintenanceScheduleDto, UpdateMqttServerDto, UpdateProjectDto, UpdateReaderDto, UpdateResourceBillingConfigurationDto, UpdateResourceDto, UpdateResourceGroupDto, UpdateResourceGroupIntroductionDto, UpdateResourceIntroductionDto, UpdateSSOProviderDto, UpdateSystemSettingsDto, UpdateUsageSessionProjectDto, UpdateUserPermissionsDto, UploadPluginDto, VerifyEmailDto } from "../requests/types.gen";
 import * as Common from "./common";
 /**
 * Return API information
@@ -61,6 +61,12 @@ export const useUsersServiceIsLocalSignupEnabled = <TData = Common.UsersServiceI
 * @throws ApiError
 */
 export const useUsersServiceGetCurrent = <TData = Common.UsersServiceGetCurrentDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceGetCurrentKeyFn(queryKey), queryFn: () => UsersService.getCurrent() as TData, ...options });
+/**
+* Get my expiring introductions
+* @returns ExpiringIntroductionDto List of introductions in WARNING or EXPIRED state for the current user.
+* @throws ApiError
+*/
+export const useUsersServiceUsersGetMyExpiringIntroductions = <TData = Common.UsersServiceUsersGetMyExpiringIntroductionsDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseUsersServiceUsersGetMyExpiringIntroductionsKeyFn(queryKey), queryFn: () => UsersService.usersGetMyExpiringIntroductions() as TData, ...options });
 /**
 * Get a user by ID
 * @param data The data for the request.
@@ -245,6 +251,164 @@ export const useSettingsServiceGetMetricsSettings = <TData = Common.SettingsServ
 */
 export const useLicenseServiceGetLicenseInformation = <TData = Common.LicenseServiceGetLicenseInformationDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>(queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(queryKey), queryFn: () => LicenseService.getLicenseInformation() as TData, ...options });
 /**
+* Get all introductions for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroduction All introductions for a resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetMany = <TData = Common.AccessControlServiceResourceIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) as TData, ...options });
+/**
+* Get introduction status for a user on a resource
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetStatus = <TData = Common.AccessControlServiceResourceIntroductionsGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetStatusKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetStatus({ resourceId, userId }) as TData, ...options });
+/**
+* Get history of introductions by resource ID and user ID
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGetHistory = <TData = Common.AccessControlServiceResourceIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) as TData, ...options });
+/**
+* Check if a user is an introducer for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.includeGroups
+* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersIsIntroducer = <TData = Common.AccessControlServiceResourceIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeGroups, resourceId, userId }: {
+  includeGroups: boolean;
+  resourceId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) as TData, ...options });
+/**
+* Get all introducers for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroducer All introducers for a resource
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersGetMany = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) as TData, ...options });
+/**
+* Get many introductions by group ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroduction The introductions have been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetMany = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) as TData, ...options });
+/**
+* Get introduction status for a user on a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetStatus = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetStatusDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetStatusKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetStatus({ groupId, userId }) as TData, ...options });
+/**
+* Get history of introductions by group ID and user ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGetHistory = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) as TData, ...options });
+/**
+* Get all introducers for a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroducer The introducers have been successfully retrieved.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersGetMany = <TData = Common.AccessControlServiceResourceGroupIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) as TData, ...options });
+/**
+* Check if a user is an introducer for a resource group
+* @param data The data for the request.
+* @param data.userId The ID of the user
+* @param data.groupId The ID of the resource group
+* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersIsIntroducer = <TData = Common.AccessControlServiceResourceGroupIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
+  groupId: number;
+  userId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) as TData, ...options });
+/**
+* List introduction schedules for resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceFindIntroductionSchedules = <TData = Common.ResourceIntroductionSchedulesServiceFindIntroductionSchedulesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
+  resourceId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceIntroductionSchedulesServiceFindIntroductionSchedulesKeyFn({ resourceId }, queryKey), queryFn: () => ResourceIntroductionSchedulesService.findIntroductionSchedules({ resourceId }) as TData, ...options });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceGetIntroductionSchedule = <TData = Common.ResourceIntroductionSchedulesServiceGetIntroductionScheduleDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, scheduleId }: {
+  resourceId: number;
+  scheduleId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceIntroductionSchedulesServiceGetIntroductionScheduleKeyFn({ resourceId, scheduleId }, queryKey), queryFn: () => ResourceIntroductionSchedulesService.getIntroductionSchedule({ resourceId, scheduleId }) as TData, ...options });
+/**
+* List introduction schedules for resource group
+* @param data The data for the request.
+* @param data.groupId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedules = <TData = Common.ResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
+  groupId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesKeyFn({ groupId }, queryKey), queryFn: () => ResourceGroupIntroductionSchedulesService.findGroupIntroductionSchedules({ groupId }) as TData, ...options });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceGetGroupIntroductionSchedule = <TData = Common.ResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, scheduleId }: {
+  groupId: number;
+  scheduleId: number;
+}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleKeyFn({ groupId, scheduleId }, queryKey), queryFn: () => ResourceGroupIntroductionSchedulesService.getGroupIntroductionSchedule({ groupId, scheduleId }) as TData, ...options });
+/**
 * Get all resources
 * @param data The data for the request.
 * @param data.page Page number (1-based)
@@ -359,96 +523,6 @@ export const useMqttServiceMqttServersGetAll = <TData = Common.MqttServiceMqttSe
 export const useMqttServiceMqttServersGetOneById = <TData = Common.MqttServiceMqttServersGetOneByIdDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ id }: {
   id: number;
 }, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }, queryKey), queryFn: () => MqttService.mqttServersGetOneById({ id }) as TData, ...options });
-/**
-* Get many introductions by group ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroduction The introductions have been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsGetMany = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
-  groupId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) as TData, ...options });
-/**
-* Get history of introductions by group ID and user ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsGetHistory = <TData = Common.AccessControlServiceResourceGroupIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
-  groupId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) as TData, ...options });
-/**
-* Get all introducers for a resource group
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroducer The introducers have been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersGetMany = <TData = Common.AccessControlServiceResourceGroupIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId }: {
-  groupId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) as TData, ...options });
-/**
-* Check if a user is an introducer for a resource group
-* @param data The data for the request.
-* @param data.userId The ID of the user
-* @param data.groupId The ID of the resource group
-* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersIsIntroducer = <TData = Common.AccessControlServiceResourceGroupIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ groupId, userId }: {
-  groupId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }, queryKey), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) as TData, ...options });
-/**
-* Check if a user is an introducer for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @param data.includeGroups
-* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersIsIntroducer = <TData = Common.AccessControlServiceResourceIntroducersIsIntroducerDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ includeGroups, resourceId, userId }: {
-  includeGroups: boolean;
-  resourceId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) as TData, ...options });
-/**
-* Get all introducers for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroducer All introducers for a resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersGetMany = <TData = Common.AccessControlServiceResourceIntroducersGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
-  resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) as TData, ...options });
-/**
-* Get all introductions for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroduction All introductions for a resource
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsGetMany = <TData = Common.AccessControlServiceResourceIntroductionsGetManyDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId }: {
-  resourceId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) as TData, ...options });
-/**
-* Get history of introductions by resource ID and user ID
-* @param data The data for the request.
-* @param data.resourceId The ID of the resource
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsGetHistory = <TData = Common.AccessControlServiceResourceIntroductionsGetHistoryDefaultResponse, TError = unknown, TQueryKey extends Array<unknown> = unknown[]>({ resourceId, userId }: {
-  resourceId: number;
-  userId: number;
-}, queryKey?: TQueryKey, options?: Omit<UseQueryOptions<TData, TError>, "queryKey" | "queryFn">) => useQuery<TData, TError>({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }, queryKey), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) as TData, ...options });
 /**
 * Check if user can manage maintenance
 * Check if the authenticated user has permission to manage maintenance for the specified resource
@@ -1273,6 +1347,171 @@ export const useSettingsServiceApplyFirstTimeSetupSettings = <TData = Common.Set
 */
 export const useSettingsServiceGenerateMetricsApiKey = <TData = Common.SettingsServiceGenerateMetricsApiKeyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SettingsService.generateMetricsApiKey() as unknown as Promise<TData>, ...options });
 /**
+* Grant a user usage permission for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem Introduction granted
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsGrant = <TData = Common.AccessControlServiceResourceIntroductionsGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateResourceIntroductionDto;
+  resourceId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateResourceIntroductionDto;
+  resourceId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId, userId }) => AccessControlService.resourceIntroductionsGrant({ requestBody, resourceId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Renew (refresh baseline) a user introduction
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem Introduction renewed
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsRenew = <TData = Common.AccessControlServiceResourceIntroductionsRenewMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: RenewIntroductionRequestDto;
+  resourceId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: RenewIntroductionRequestDto;
+  resourceId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId, userId }) => AccessControlService.resourceIntroductionsRenew({ requestBody, resourceId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Grant a user introduction permission for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @returns ResourceIntroducer Introduction permissions granted
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersGrant = <TData = Common.AccessControlServiceResourceIntroducersGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ resourceId, userId }) => AccessControlService.resourceIntroducersGrant({ resourceId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Grant introduction permission for a resource group to a user
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsGrant = <TData = Common.AccessControlServiceResourceGroupIntroductionsGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  requestBody: UpdateResourceGroupIntroductionDto;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  requestBody: UpdateResourceGroupIntroductionDto;
+  userId: number;
+}, TContext>({ mutationFn: ({ groupId, requestBody, userId }) => AccessControlService.resourceGroupIntroductionsGrant({ groupId, requestBody, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Revoke introduction permission for a resource group from a user
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsRevoke = <TData = Common.AccessControlServiceResourceGroupIntroductionsRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  requestBody: UpdateResourceGroupIntroductionDto;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  requestBody: UpdateResourceGroupIntroductionDto;
+  userId: number;
+}, TContext>({ mutationFn: ({ groupId, requestBody, userId }) => AccessControlService.resourceGroupIntroductionsRevoke({ groupId, requestBody, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Renew (refresh baseline) a user group introduction
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem The introduction has been successfully renewed.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroductionsRenew = <TData = Common.AccessControlServiceResourceGroupIntroductionsRenewMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  requestBody: RenewIntroductionRequestDto;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  requestBody: RenewIntroductionRequestDto;
+  userId: number;
+}, TContext>({ mutationFn: ({ groupId, requestBody, userId }) => AccessControlService.resourceGroupIntroductionsRenew({ groupId, requestBody, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Grant a user introduction permission for a resource group
+* @param data The data for the request.
+* @param data.userId The ID of the user
+* @param data.groupId The ID of the resource group
+* @returns unknown The introducer has been successfully granted.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersGrant = <TData = Common.AccessControlServiceResourceGroupIntroducersGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ groupId, userId }) => AccessControlService.resourceGroupIntroducersGrant({ groupId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Revoke a user introduction permission for a resource group
+* @param data The data for the request.
+* @param data.userId The ID of the user
+* @param data.groupId The ID of the resource group
+* @returns unknown The introducer has been successfully revoked.
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceGroupIntroducersRevoke = <TData = Common.AccessControlServiceResourceGroupIntroducersRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ groupId, userId }) => AccessControlService.resourceGroupIntroducersRevoke({ groupId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Create schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.requestBody
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceCreateIntroductionSchedule = <TData = Common.ResourceIntroductionSchedulesServiceCreateIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: CreateIntroductionScheduleDto;
+  resourceId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: CreateIntroductionScheduleDto;
+  resourceId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId }) => ResourceIntroductionSchedulesService.createIntroductionSchedule({ requestBody, resourceId }) as unknown as Promise<TData>, ...options });
+/**
+* Create schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.requestBody
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceCreateGroupIntroductionSchedule = <TData = Common.ResourceGroupIntroductionSchedulesServiceCreateGroupIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  requestBody: CreateIntroductionScheduleDto;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  requestBody: CreateIntroductionScheduleDto;
+}, TContext>({ mutationFn: ({ groupId, requestBody }) => ResourceGroupIntroductionSchedulesService.createGroupIntroductionSchedule({ groupId, requestBody }) as unknown as Promise<TData>, ...options });
+/**
 * Create a new resource
 * @param data The data for the request.
 * @param data.formData
@@ -1374,105 +1613,6 @@ export const useMqttServiceMqttServersCreateOne = <TData = Common.MqttServiceMqt
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   requestBody: CreateMqttServerDto;
 }, TContext>({ mutationFn: ({ requestBody }) => MqttService.mqttServersCreateOne({ requestBody }) as unknown as Promise<TData>, ...options });
-/**
-* Grant introduction permission for a resource group to a user
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @param data.userId The ID of the user
-* @param data.requestBody
-* @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsGrant = <TData = Common.AccessControlServiceResourceGroupIntroductionsGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  groupId: number;
-  requestBody: UpdateResourceGroupIntroductionDto;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  groupId: number;
-  requestBody: UpdateResourceGroupIntroductionDto;
-  userId: number;
-}, TContext>({ mutationFn: ({ groupId, requestBody, userId }) => AccessControlService.resourceGroupIntroductionsGrant({ groupId, requestBody, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Revoke introduction permission for a resource group from a user
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @param data.userId The ID of the user
-* @param data.requestBody
-* @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroductionsRevoke = <TData = Common.AccessControlServiceResourceGroupIntroductionsRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  groupId: number;
-  requestBody: UpdateResourceGroupIntroductionDto;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  groupId: number;
-  requestBody: UpdateResourceGroupIntroductionDto;
-  userId: number;
-}, TContext>({ mutationFn: ({ groupId, requestBody, userId }) => AccessControlService.resourceGroupIntroductionsRevoke({ groupId, requestBody, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Grant a user introduction permission for a resource group
-* @param data The data for the request.
-* @param data.userId The ID of the user
-* @param data.groupId The ID of the resource group
-* @returns unknown The introducer has been successfully granted.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersGrant = <TData = Common.AccessControlServiceResourceGroupIntroducersGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  groupId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  groupId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ groupId, userId }) => AccessControlService.resourceGroupIntroducersGrant({ groupId, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Revoke a user introduction permission for a resource group
-* @param data The data for the request.
-* @param data.userId The ID of the user
-* @param data.groupId The ID of the resource group
-* @returns unknown The introducer has been successfully revoked.
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceGroupIntroducersRevoke = <TData = Common.AccessControlServiceResourceGroupIntroducersRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  groupId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  groupId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ groupId, userId }) => AccessControlService.resourceGroupIntroducersRevoke({ groupId, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Grant a user introduction permission for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @returns ResourceIntroducer Introduction permissions granted
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersGrant = <TData = Common.AccessControlServiceResourceIntroducersGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  resourceId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  resourceId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ resourceId, userId }) => AccessControlService.resourceIntroducersGrant({ resourceId, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Grant a user usage permission for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @param data.requestBody
-* @returns ResourceIntroductionHistoryItem Introduction granted
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsGrant = <TData = Common.AccessControlServiceResourceIntroductionsGrantMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody: UpdateResourceIntroductionDto;
-  resourceId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody: UpdateResourceIntroductionDto;
-  resourceId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ requestBody, resourceId, userId }) => AccessControlService.resourceIntroductionsGrant({ requestBody, resourceId, userId }) as unknown as Promise<TData>, ...options });
 /**
 * Create a maintenance for a resource
 * Create a new maintenance schedule for a specific resource
@@ -2070,6 +2210,42 @@ export const useSettingsServiceUpdateSystemSettings = <TData = Common.SettingsSe
   requestBody: UpdateSystemSettingsDto;
 }, TContext>({ mutationFn: ({ requestBody }) => SettingsService.updateSystemSettings({ requestBody }) as unknown as Promise<TData>, ...options });
 /**
+* Update schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.scheduleId
+* @param data.requestBody
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceUpdateIntroductionSchedule = <TData = Common.ResourceIntroductionSchedulesServiceUpdateIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateIntroductionScheduleDto;
+  resourceId: number;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateIntroductionScheduleDto;
+  resourceId: number;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId, scheduleId }) => ResourceIntroductionSchedulesService.updateIntroductionSchedule({ requestBody, resourceId, scheduleId }) as unknown as Promise<TData>, ...options });
+/**
+* Update schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.scheduleId
+* @param data.requestBody
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceUpdateGroupIntroductionSchedule = <TData = Common.ResourceGroupIntroductionSchedulesServiceUpdateGroupIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  requestBody: UpdateIntroductionScheduleDto;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  requestBody: UpdateIntroductionScheduleDto;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ groupId, requestBody, scheduleId }) => ResourceGroupIntroductionSchedulesService.updateGroupIntroductionSchedule({ groupId, requestBody, scheduleId }) as unknown as Promise<TData>, ...options });
+/**
 * Update reader name and connected resources
 * @param data The data for the request.
 * @param data.readerId The ID of the reader to update
@@ -2136,6 +2312,69 @@ export const useAuthenticationServiceDeleteOneSsoProvider = <TData = Common.Auth
 */
 export const useSettingsServiceDeleteMetricsApiKey = <TData = Common.SettingsServiceDeleteMetricsApiKeyMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, void, TContext>, "mutationFn">) => useMutation<TData, TError, void, TContext>({ mutationFn: () => SettingsService.deleteMetricsApiKey() as unknown as Promise<TData>, ...options });
 /**
+* Revoke a user usage permission for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.requestBody
+* @returns ResourceIntroductionHistoryItem Introduction revoked
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroductionsRevoke = <TData = Common.AccessControlServiceResourceIntroductionsRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  requestBody: UpdateResourceIntroductionDto;
+  resourceId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  requestBody: UpdateResourceIntroductionDto;
+  resourceId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ requestBody, resourceId, userId }) => AccessControlService.resourceIntroductionsRevoke({ requestBody, resourceId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Revoke a user introduction permission for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @returns unknown Introduction permissions revoked
+* @throws ApiError
+*/
+export const useAccessControlServiceResourceIntroducersRevoke = <TData = Common.AccessControlServiceResourceIntroducersRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+  userId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+  userId: number;
+}, TContext>({ mutationFn: ({ resourceId, userId }) => AccessControlService.resourceIntroducersRevoke({ resourceId, userId }) as unknown as Promise<TData>, ...options });
+/**
+* Delete schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.scheduleId
+* @returns void
+* @throws ApiError
+*/
+export const useResourceIntroductionSchedulesServiceDeleteIntroductionSchedule = <TData = Common.ResourceIntroductionSchedulesServiceDeleteIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  resourceId: number;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  resourceId: number;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ resourceId, scheduleId }) => ResourceIntroductionSchedulesService.deleteIntroductionSchedule({ resourceId, scheduleId }) as unknown as Promise<TData>, ...options });
+/**
+* Delete schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.scheduleId
+* @returns void
+* @throws ApiError
+*/
+export const useResourceGroupIntroductionSchedulesServiceDeleteGroupIntroductionSchedule = <TData = Common.ResourceGroupIntroductionSchedulesServiceDeleteGroupIntroductionScheduleMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
+  groupId: number;
+  scheduleId: number;
+}, TContext>, "mutationFn">) => useMutation<TData, TError, {
+  groupId: number;
+  scheduleId: number;
+}, TContext>({ mutationFn: ({ groupId, scheduleId }) => ResourceGroupIntroductionSchedulesService.deleteGroupIntroductionSchedule({ groupId, scheduleId }) as unknown as Promise<TData>, ...options });
+/**
 * Delete a resource
 * @param data The data for the request.
 * @param data.id
@@ -2186,39 +2425,6 @@ export const useMqttServiceMqttServersDeleteOne = <TData = Common.MqttServiceMqt
 }, TContext>, "mutationFn">) => useMutation<TData, TError, {
   id: number;
 }, TContext>({ mutationFn: ({ id }) => MqttService.mqttServersDeleteOne({ id }) as unknown as Promise<TData>, ...options });
-/**
-* Revoke a user introduction permission for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @returns unknown Introduction permissions revoked
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroducersRevoke = <TData = Common.AccessControlServiceResourceIntroducersRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  resourceId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  resourceId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ resourceId, userId }) => AccessControlService.resourceIntroducersRevoke({ resourceId, userId }) as unknown as Promise<TData>, ...options });
-/**
-* Revoke a user usage permission for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @param data.requestBody
-* @returns ResourceIntroductionHistoryItem Introduction revoked
-* @throws ApiError
-*/
-export const useAccessControlServiceResourceIntroductionsRevoke = <TData = Common.AccessControlServiceResourceIntroductionsRevokeMutationResult, TError = unknown, TContext = unknown>(options?: Omit<UseMutationOptions<TData, TError, {
-  requestBody: UpdateResourceIntroductionDto;
-  resourceId: number;
-  userId: number;
-}, TContext>, "mutationFn">) => useMutation<TData, TError, {
-  requestBody: UpdateResourceIntroductionDto;
-  resourceId: number;
-  userId: number;
-}, TContext>({ mutationFn: ({ requestBody, resourceId, userId }) => AccessControlService.resourceIntroductionsRevoke({ requestBody, resourceId, userId }) as unknown as Promise<TData>, ...options });
 /**
 * Delete a maintenance schedule
 * Delete a maintenance schedule

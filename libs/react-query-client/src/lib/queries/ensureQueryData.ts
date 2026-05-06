@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { type QueryClient } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceGroupIntroductionSchedulesService, ResourceHealthService, ResourceIntroductionSchedulesService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 import * as Common from "./common";
 /**
@@ -61,6 +61,12 @@ export const ensureUseUsersServiceIsLocalSignupEnabledData = (queryClient: Query
 * @throws ApiError
 */
 export const ensureUseUsersServiceGetCurrentData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceGetCurrentKeyFn(), queryFn: () => UsersService.getCurrent() });
+/**
+* Get my expiring introductions
+* @returns ExpiringIntroductionDto List of introductions in WARNING or EXPIRED state for the current user.
+* @throws ApiError
+*/
+export const ensureUseUsersServiceUsersGetMyExpiringIntroductionsData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseUsersServiceUsersGetMyExpiringIntroductionsKeyFn(), queryFn: () => UsersService.usersGetMyExpiringIntroductions() });
 /**
 * Get a user by ID
 * @param data The data for the request.
@@ -245,6 +251,164 @@ export const ensureUseSettingsServiceGetMetricsSettingsData = (queryClient: Quer
 */
 export const ensureUseLicenseServiceGetLicenseInformationData = (queryClient: QueryClient) => queryClient.ensureQueryData({ queryKey: Common.UseLicenseServiceGetLicenseInformationKeyFn(), queryFn: () => LicenseService.getLicenseInformation() });
 /**
+* Get all introductions for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroduction All introductions for a resource
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceIntroductionsGetManyData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) });
+/**
+* Get introduction status for a user on a resource
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceIntroductionsGetStatusData = (queryClient: QueryClient, { resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetStatusKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroductionsGetStatus({ resourceId, userId }) });
+/**
+* Get history of introductions by resource ID and user ID
+* @param data The data for the request.
+* @param data.resourceId The ID of the resource
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceIntroductionsGetHistoryData = (queryClient: QueryClient, { resourceId, userId }: {
+  resourceId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) });
+/**
+* Check if a user is an introducer for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.userId
+* @param data.includeGroups
+* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceIntroducersIsIntroducerData = (queryClient: QueryClient, { includeGroups, resourceId, userId }: {
+  includeGroups: boolean;
+  resourceId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) });
+/**
+* Get all introducers for a resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroducer All introducers for a resource
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceIntroducersGetManyData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) });
+/**
+* Get many introductions by group ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroduction The introductions have been successfully retrieved.
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceGroupIntroductionsGetManyData = (queryClient: QueryClient, { groupId }: {
+  groupId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) });
+/**
+* Get introduction status for a user on a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns IntroductionStatusResponseDto Introduction status
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceGroupIntroductionsGetStatusData = (queryClient: QueryClient, { groupId, userId }: {
+  groupId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetStatusKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetStatus({ groupId, userId }) });
+/**
+* Get history of introductions by group ID and user ID
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @param data.userId The ID of the user
+* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceGroupIntroductionsGetHistoryData = (queryClient: QueryClient, { groupId, userId }: {
+  groupId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) });
+/**
+* Get all introducers for a resource group
+* @param data The data for the request.
+* @param data.groupId The ID of the resource group
+* @returns ResourceIntroducer The introducers have been successfully retrieved.
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceGroupIntroducersGetManyData = (queryClient: QueryClient, { groupId }: {
+  groupId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) });
+/**
+* Check if a user is an introducer for a resource group
+* @param data The data for the request.
+* @param data.userId The ID of the user
+* @param data.groupId The ID of the resource group
+* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
+* @throws ApiError
+*/
+export const ensureUseAccessControlServiceResourceGroupIntroducersIsIntroducerData = (queryClient: QueryClient, { groupId, userId }: {
+  groupId: number;
+  userId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) });
+/**
+* List introduction schedules for resource
+* @param data The data for the request.
+* @param data.resourceId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const ensureUseResourceIntroductionSchedulesServiceFindIntroductionSchedulesData = (queryClient: QueryClient, { resourceId }: {
+  resourceId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceIntroductionSchedulesServiceFindIntroductionSchedulesKeyFn({ resourceId }), queryFn: () => ResourceIntroductionSchedulesService.findIntroductionSchedules({ resourceId }) });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.resourceId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const ensureUseResourceIntroductionSchedulesServiceGetIntroductionScheduleData = (queryClient: QueryClient, { resourceId, scheduleId }: {
+  resourceId: number;
+  scheduleId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceIntroductionSchedulesServiceGetIntroductionScheduleKeyFn({ resourceId, scheduleId }), queryFn: () => ResourceIntroductionSchedulesService.getIntroductionSchedule({ resourceId, scheduleId }) });
+/**
+* List introduction schedules for resource group
+* @param data The data for the request.
+* @param data.groupId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const ensureUseResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesData = (queryClient: QueryClient, { groupId }: {
+  groupId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceFindGroupIntroductionSchedulesKeyFn({ groupId }), queryFn: () => ResourceGroupIntroductionSchedulesService.findGroupIntroductionSchedules({ groupId }) });
+/**
+* Get one schedule
+* @param data The data for the request.
+* @param data.groupId
+* @param data.scheduleId
+* @returns ResourceIntroductionSchedule
+* @throws ApiError
+*/
+export const ensureUseResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleData = (queryClient: QueryClient, { groupId, scheduleId }: {
+  groupId: number;
+  scheduleId: number;
+}) => queryClient.ensureQueryData({ queryKey: Common.UseResourceGroupIntroductionSchedulesServiceGetGroupIntroductionScheduleKeyFn({ groupId, scheduleId }), queryFn: () => ResourceGroupIntroductionSchedulesService.getGroupIntroductionSchedule({ groupId, scheduleId }) });
+/**
 * Get all resources
 * @param data The data for the request.
 * @param data.page Page number (1-based)
@@ -359,96 +523,6 @@ export const ensureUseMqttServiceMqttServersGetAllData = (queryClient: QueryClie
 export const ensureUseMqttServiceMqttServersGetOneByIdData = (queryClient: QueryClient, { id }: {
   id: number;
 }) => queryClient.ensureQueryData({ queryKey: Common.UseMqttServiceMqttServersGetOneByIdKeyFn({ id }), queryFn: () => MqttService.mqttServersGetOneById({ id }) });
-/**
-* Get many introductions by group ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroduction The introductions have been successfully retrieved.
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceGroupIntroductionsGetManyData = (queryClient: QueryClient, { groupId }: {
-  groupId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetMany({ groupId }) });
-/**
-* Get history of introductions by group ID and user ID
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceGroupIntroductionsGetHistoryData = (queryClient: QueryClient, { groupId, userId }: {
-  groupId: number;
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroductionsGetHistory({ groupId, userId }) });
-/**
-* Get all introducers for a resource group
-* @param data The data for the request.
-* @param data.groupId The ID of the resource group
-* @returns ResourceIntroducer The introducers have been successfully retrieved.
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceGroupIntroducersGetManyData = (queryClient: QueryClient, { groupId }: {
-  groupId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId }), queryFn: () => AccessControlService.resourceGroupIntroducersGetMany({ groupId }) });
-/**
-* Check if a user is an introducer for a resource group
-* @param data The data for the request.
-* @param data.userId The ID of the user
-* @param data.groupId The ID of the resource group
-* @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceGroupIntroducersIsIntroducerData = (queryClient: QueryClient, { groupId, userId }: {
-  groupId: number;
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceGroupIntroducersIsIntroducerKeyFn({ groupId, userId }), queryFn: () => AccessControlService.resourceGroupIntroducersIsIntroducer({ groupId, userId }) });
-/**
-* Check if a user is an introducer for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @param data.userId
-* @param data.includeGroups
-* @returns IsResourceIntroducerResponseDto User is an introducer for the resource
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceIntroducersIsIntroducerData = (queryClient: QueryClient, { includeGroups, resourceId, userId }: {
-  includeGroups: boolean;
-  resourceId: number;
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroducersIsIntroducerKeyFn({ includeGroups, resourceId, userId }), queryFn: () => AccessControlService.resourceIntroducersIsIntroducer({ includeGroups, resourceId, userId }) });
-/**
-* Get all introducers for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroducer All introducers for a resource
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceIntroducersGetManyData = (queryClient: QueryClient, { resourceId }: {
-  resourceId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroducersGetMany({ resourceId }) });
-/**
-* Get all introductions for a resource
-* @param data The data for the request.
-* @param data.resourceId
-* @returns ResourceIntroduction All introductions for a resource
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceIntroductionsGetManyData = (queryClient: QueryClient, { resourceId }: {
-  resourceId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId }), queryFn: () => AccessControlService.resourceIntroductionsGetMany({ resourceId }) });
-/**
-* Get history of introductions by resource ID and user ID
-* @param data The data for the request.
-* @param data.resourceId The ID of the resource
-* @param data.userId The ID of the user
-* @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-* @throws ApiError
-*/
-export const ensureUseAccessControlServiceResourceIntroductionsGetHistoryData = (queryClient: QueryClient, { resourceId, userId }: {
-  resourceId: number;
-  userId: number;
-}) => queryClient.ensureQueryData({ queryKey: Common.UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId, userId }), queryFn: () => AccessControlService.resourceIntroductionsGetHistory({ resourceId, userId }) });
 /**
 * Check if user can manage maintenance
 * Check if the authenticated user has permission to manage maintenance for the specified resource

@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetCurrentVersionResponse, GetUpdateStatusData, GetUpdateStatusResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, SsoOidcLogoutData, SsoOidcLogoutResponse, SsoSamlLogoutData, SsoSamlLogoutResponse, SsoOidcDeleteUserData, SsoOidcDeleteUserResponse, SsoSamlDeleteUserData, SsoSamlDeleteUserResponse, SsoOidcUpdatePermissionsData, SsoOidcUpdatePermissionsResponse, SsoSamlUpdatePermissionsData, SsoSamlUpdatePermissionsResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetSystemSettingsResponse, UpdateSystemSettingsData, UpdateSystemSettingsResponse, GetFirstTimeSetupStatusResponse, ApplyFirstTimeSetupSettingsData, ApplyFirstTimeSetupSettingsResponse, GetMetricsSettingsResponse, GenerateMetricsApiKeyResponse, DeleteMetricsApiKeyResponse, GetLicenseInformationResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, FinishMaintenanceData, FinishMaintenanceResponse, FindMaintenanceSchedulesData, FindMaintenanceSchedulesResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleResponse, GetMaintenanceScheduleData, GetMaintenanceScheduleResponse, UpdateMaintenanceScheduleData, UpdateMaintenanceScheduleResponse, DeleteMaintenanceScheduleData, DeleteMaintenanceScheduleResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetResourceHealthData, GetResourceHealthResponse, ClearResourceHealthEntryData, ClearResourceHealthEntryResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, ArchiveProjectData, ArchiveProjectResponse, UnarchiveProjectData, UnarchiveProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
+import type { InfoResponse, RebootHostResponse, ShutdownHostResponse, GetCurrentVersionResponse, GetUpdateStatusData, GetUpdateStatusResponse, GetLocalSignupDomainWhitelistResponse, SetLocalSignupDomainWhitelistData, SetLocalSignupDomainWhitelistResponse, CreateOneUserData, CreateOneUserResponse, FindManyData, FindManyResponse, InviteUserData, InviteUserResponse, InviteUsersFromCsvData, InviteUsersFromCsvResponse, IsLocalSignupEnabledResponse, VerifyEmailData, VerifyEmailResponse, AcceptInvitationData, AcceptInvitationResponse, RequestPasswordResetData, RequestPasswordResetResponse, ChangePasswordViaResetTokenData, ChangePasswordViaResetTokenResponse, GetCurrentResponse, RequestDeleteAccountResponse, ConfirmDeleteAccountData, ConfirmDeleteAccountResponse, ChangeMyUsernameData, ChangeMyUsernameResponse, ChangeMyEmailData, ChangeMyEmailResponse, UsersGetMyExpiringIntroductionsResponse, GetOneUserByIdData, GetOneUserByIdResponse, DeleteUserData, DeleteUserResponse, UpdatePermissionsData, UpdatePermissionsResponse, GetPermissionsData, GetPermissionsResponse, BulkUpdatePermissionsData, BulkUpdatePermissionsResponse, GetAllWithPermissionData, GetAllWithPermissionResponse, SetUserPasswordData, SetUserPasswordResponse, ChangeUserUsernameData, ChangeUserUsernameResponse, ChangeUserEmailData, ChangeUserEmailResponse, ChangeUserBillingFactorData, ChangeUserBillingFactorResponse, CreateSessionData, CreateSessionResponse2, RefreshSessionData, RefreshSessionResponse, EndSessionResponse, GetAllSsoProvidersResponse, CreateOneSsoProviderData, CreateOneSsoProviderResponse, LinkUserToExternalAccountData, LinkUserToExternalAccountResponse, GetOneSsoProviderByIdData, GetOneSsoProviderByIdResponse, UpdateOneSsoProviderData, UpdateOneSsoProviderResponse, DeleteOneSsoProviderData, DeleteOneSsoProviderResponse, DiscoverAuthentikOidcData, DiscoverAuthentikOidcResponse, DiscoverKeycloakOidcData, DiscoverKeycloakOidcResponse, SsoOidcLogoutData, SsoOidcLogoutResponse, SsoSamlLogoutData, SsoSamlLogoutResponse, SsoOidcDeleteUserData, SsoOidcDeleteUserResponse, SsoSamlDeleteUserData, SsoSamlDeleteUserResponse, SsoOidcUpdatePermissionsData, SsoOidcUpdatePermissionsResponse, SsoSamlUpdatePermissionsData, SsoSamlUpdatePermissionsResponse, LoginWithOidcData, LoginWithOidcResponse, OidcLoginCallbackData, OidcLoginCallbackResponse, LoginWithSamlData, LoginWithSamlResponse, SamlLoginCallbackData, SamlLoginCallbackResponse, GetTwoFactorStatusResponse, SetupTwoFactorResponse, VerifyTwoFactorData, VerifyTwoFactorResponse, DisableTwoFactorData, DisableTwoFactorResponse, GetTwoFactorPolicyResponse, SetTwoFactorPolicyData, SetTwoFactorPolicyResponse, EmailTemplateControllerPreviewMjmlData, EmailTemplateControllerPreviewMjmlResponse, EmailTemplateControllerFindAllResponse, EmailTemplateControllerFindOneData, EmailTemplateControllerFindOneResponse, EmailTemplateControllerUpdateData, EmailTemplateControllerUpdateResponse, GetSystemSettingsResponse, UpdateSystemSettingsData, UpdateSystemSettingsResponse, GetFirstTimeSetupStatusResponse, ApplyFirstTimeSetupSettingsData, ApplyFirstTimeSetupSettingsResponse, GetMetricsSettingsResponse, GenerateMetricsApiKeyResponse, DeleteMetricsApiKeyResponse, GetLicenseInformationResponse, ResourceIntroductionsGetManyData, ResourceIntroductionsGetManyResponse, ResourceIntroductionsGrantData, ResourceIntroductionsGrantResponse, ResourceIntroductionsRevokeData, ResourceIntroductionsRevokeResponse, ResourceIntroductionsRenewData, ResourceIntroductionsRenewResponse, ResourceIntroductionsGetStatusData, ResourceIntroductionsGetStatusResponse, ResourceIntroductionsGetHistoryData, ResourceIntroductionsGetHistoryResponse, ResourceIntroducersIsIntroducerData, ResourceIntroducersIsIntroducerResponse, ResourceIntroducersGetManyData, ResourceIntroducersGetManyResponse, ResourceIntroducersGrantData, ResourceIntroducersGrantResponse, ResourceIntroducersRevokeData, ResourceIntroducersRevokeResponse, ResourceGroupIntroductionsGetManyData, ResourceGroupIntroductionsGetManyResponse, ResourceGroupIntroductionsGetStatusData, ResourceGroupIntroductionsGetStatusResponse, ResourceGroupIntroductionsGetHistoryData, ResourceGroupIntroductionsGetHistoryResponse, ResourceGroupIntroductionsGrantData, ResourceGroupIntroductionsGrantResponse, ResourceGroupIntroductionsRevokeData, ResourceGroupIntroductionsRevokeResponse, ResourceGroupIntroductionsRenewData, ResourceGroupIntroductionsRenewResponse, ResourceGroupIntroducersGetManyData, ResourceGroupIntroducersGetManyResponse, ResourceGroupIntroducersIsIntroducerData, ResourceGroupIntroducersIsIntroducerResponse, ResourceGroupIntroducersGrantData, ResourceGroupIntroducersGrantResponse, ResourceGroupIntroducersRevokeData, ResourceGroupIntroducersRevokeResponse, FindIntroductionSchedulesData, FindIntroductionSchedulesResponse, CreateIntroductionScheduleData, CreateIntroductionScheduleResponse, GetIntroductionScheduleData, GetIntroductionScheduleResponse, UpdateIntroductionScheduleData, UpdateIntroductionScheduleResponse, DeleteIntroductionScheduleData, DeleteIntroductionScheduleResponse, FindGroupIntroductionSchedulesData, FindGroupIntroductionSchedulesResponse, CreateGroupIntroductionScheduleData, CreateGroupIntroductionScheduleResponse, GetGroupIntroductionScheduleData, GetGroupIntroductionScheduleResponse, UpdateGroupIntroductionScheduleData, UpdateGroupIntroductionScheduleResponse, DeleteGroupIntroductionScheduleData, DeleteGroupIntroductionScheduleResponse, CreateOneResourceData, CreateOneResourceResponse, GetAllResourcesData, GetAllResourcesResponse, GetAllResourcesInUseResponse, GetOneResourceByIdData, GetOneResourceByIdResponse, UpdateOneResourceData, UpdateOneResourceResponse, DeleteOneResourceData, DeleteOneResourceResponse, SseControllerStreamEventsData, SseControllerStreamEventsResponse, ResourceGroupsCreateOneData, ResourceGroupsCreateOneResponse, ResourceGroupsGetManyResponse, ResourceGroupsGetOneData, ResourceGroupsGetOneResponse, ResourceGroupsUpdateOneData, ResourceGroupsUpdateOneResponse, ResourceGroupsAddResourceData, ResourceGroupsAddResourceResponse, ResourceGroupsRemoveResourceData, ResourceGroupsRemoveResourceResponse, ResourceGroupsDeleteOneData, ResourceGroupsDeleteOneResponse, ResourceUsageStartSessionData, ResourceUsageStartSessionResponse, ResourceUsageEndSessionData, ResourceUsageEndSessionResponse, ResourceUsageUpdateSessionProjectData, ResourceUsageUpdateSessionProjectResponse, LockDoorData, LockDoorResponse, UnlockDoorData, UnlockDoorResponse, UnlatchDoorData, UnlatchDoorResponse, ResourceUsageGetHistoryData, ResourceUsageGetHistoryResponse, ResourceUsageGetActiveSessionData, ResourceUsageGetActiveSessionResponse, ResourceUsageCanControlData, ResourceUsageCanControlResponse, MqttServersGetAllResponse, MqttServersCreateOneData, MqttServersCreateOneResponse, MqttServersGetOneByIdData, MqttServersGetOneByIdResponse, MqttServersUpdateOneData, MqttServersUpdateOneResponse, MqttServersDeleteOneData, MqttServersDeleteOneResponse, CanManageMaintenanceData, CanManageMaintenanceResponse, CreateMaintenanceData, CreateMaintenanceResponse, FindMaintenancesData, FindMaintenancesResponse, GetMaintenanceData, GetMaintenanceResponse, FinishMaintenanceData, FinishMaintenanceResponse, FindMaintenanceSchedulesData, FindMaintenanceSchedulesResponse, CreateMaintenanceScheduleData, CreateMaintenanceScheduleResponse, GetMaintenanceScheduleData, GetMaintenanceScheduleResponse, UpdateMaintenanceScheduleData, UpdateMaintenanceScheduleResponse, DeleteMaintenanceScheduleData, DeleteMaintenanceScheduleResponse, GetBillingBalanceData, GetBillingBalanceResponse, GetBillingTransactionsData, GetBillingTransactionsResponse, CreateManualTransactionData, CreateManualTransactionResponse, GetBillingTransactionData, GetBillingTransactionResponse, GetResourceBillingConfigurationData, GetResourceBillingConfigurationResponse, UpdateResourceBillingConfigurationData, UpdateResourceBillingConfigurationResponse, SetSumUpApiKeyData, SetSumUpApiKeyResponse, SetBillingConfigurationData, SetBillingConfigurationResponse, GetBillingConfigurationResponse, GetSumUpConfigurationResponse, GetSumUpReadersResponse, PairSumUpReaderData, PairSumUpReaderResponse, RemoveSumUpReaderData, TopUpWithSumUpReaderData, TopUpWithSumUpReaderResponse, SumUpTopUpCallbackData, SumUpTopUpCallbackResponse, RefundTransactionData, RefundTransactionResponse, GetNodeSchemasData, GetNodeSchemasResponse, GetResourceFlowData, GetResourceFlowResponse, SaveResourceFlowData, SaveResourceFlowResponse, GetResourceFlowLogsData, GetResourceFlowLogsResponse, ResourceFlowsControllerStreamEventsData, ResourceFlowsControllerStreamEventsResponse, PressButtonData, PressButtonResponse, GetButtonsData, GetButtonsResponse, GetResourceHealthData, GetResourceHealthResponse, ClearResourceHealthEntryData, ClearResourceHealthEntryResponse, FindManyProjectsData, FindManyProjectsResponse, CreateProjectData, CreateProjectResponse, FindOneProjectData, FindOneProjectResponse, DeleteOneProjectData, DeleteOneProjectResponse, UpdateProjectData, UpdateProjectResponse, ArchiveProjectData, ArchiveProjectResponse, UnarchiveProjectData, UnarchiveProjectResponse, GetProjectUsageHistoryData, GetProjectUsageHistoryResponse, GetProjectUsageStatsData, GetProjectUsageStatsResponse, ListProjectMembersData, ListProjectMembersResponse, RemoveProjectMemberData, RemoveProjectMemberResponse, ListProjectInvitationsData, ListProjectInvitationsResponse, CreateProjectInvitationData, CreateProjectInvitationResponse, ResendProjectInvitationData, ResendProjectInvitationResponse, CancelProjectInvitationData, CancelProjectInvitationResponse, ListMyProjectInvitationsResponse, AcceptProjectInvitationData, AcceptProjectInvitationResponse, DeclineProjectInvitationData, DeclineProjectInvitationResponse, ResourceFormsListData, ResourceFormsListResponse, ResourceFormsCreateData, ResourceFormsCreateResponse, ResourceFormsGetRequirementsData, ResourceFormsGetRequirementsResponse, ResourceFormsGetOneData, ResourceFormsGetOneResponse, ResourceFormsUpdateData, ResourceFormsUpdateResponse, ResourceFormsDeleteData, ResourceFormsDeleteResponse, GetPluginsResponse, UploadPluginData, GetFrontendPluginFileData, GetFrontendPluginFileResponse, DeletePluginData, DeletePluginResponse, EnrollNfcCardData, EnrollNfcCardResponse, ResetNfcCardData, ResetNfcCardResponse, UpdateReaderData, UpdateReaderResponse, GetReaderByIdData, GetReaderByIdResponse, DeleteReaderData, DeleteReaderResponse, GetReadersResponse, GetAppKeyByUidData, GetAppKeyByUidResponse, GetAllCardsResponse, ToggleCardActiveData, ToggleCardActiveResponse, GetFirmwaresResponse, DownloadFirmwareBinaryData, DownloadFirmwareBinaryResponse, GetFirmwareBinaryData, GetFirmwareBinaryResponse, GetResourceUsageHoursInDateRangeData, GetResourceUsageHoursInDateRangeResponse, GetBillingTransactionsInDateRangeData, GetBillingTransactionsInDateRangeResponse } from './types.gen';
 
 export class SystemService {
     /**
@@ -390,6 +390,21 @@ Unauthorized`
             url: '/api/users/me/email',
             body: data.requestBody,
             mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get my expiring introductions
+     * @returns ExpiringIntroductionDto List of introductions in WARNING or EXPIRED state for the current user.
+     * @throws ApiError
+     */
+    public static usersGetMyExpiringIntroductions(): CancelablePromise<UsersGetMyExpiringIntroductionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/users/me/expiring-introductions',
             errors: {
                 401: 'Unauthorized'
             }
@@ -1426,6 +1441,684 @@ Unauthorized`
     
 }
 
+export class AccessControlService {
+    /**
+     * Get all introductions for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceIntroduction All introductions for a resource
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGetMany(data: ResourceIntroductionsGetManyData): CancelablePromise<ResourceIntroductionsGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introductions',
+            path: {
+                resourceId: data.resourceId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user usage permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem Introduction granted
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGrant(data: ResourceIntroductionsGrantData): CancelablePromise<ResourceIntroductionsGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introductions/{userId}/grant',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user usage permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem Introduction revoked
+     * @throws ApiError
+     */
+    public static resourceIntroductionsRevoke(data: ResourceIntroductionsRevokeData): CancelablePromise<ResourceIntroductionsRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/introductions/{userId}/revoke',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Renew (refresh baseline) a user introduction
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem Introduction renewed
+     * @throws ApiError
+     */
+    public static resourceIntroductionsRenew(data: ResourceIntroductionsRenewData): CancelablePromise<ResourceIntroductionsRenewResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introductions/{userId}/renew',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Get introduction status for a user on a resource
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.userId The ID of the user
+     * @returns IntroductionStatusResponseDto Introduction status
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGetStatus(data: ResourceIntroductionsGetStatusData): CancelablePromise<ResourceIntroductionsGetStatusResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introductions/{userId}/status',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            }
+        });
+    }
+    
+    /**
+     * Get history of introductions by resource ID and user ID
+     * @param data The data for the request.
+     * @param data.resourceId The ID of the resource
+     * @param data.userId The ID of the user
+     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceIntroductionsGetHistory(data: ResourceIntroductionsGetHistoryData): CancelablePromise<ResourceIntroductionsGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introductions/{userId}/history',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource'
+            }
+        });
+    }
+    
+    /**
+     * Check if a user is an introducer for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @param data.includeGroups
+     * @returns IsResourceIntroducerResponseDto User is an introducer for the resource
+     * @throws ApiError
+     */
+    public static resourceIntroducersIsIntroducer(data: ResourceIntroducersIsIntroducerData): CancelablePromise<ResourceIntroducersIsIntroducerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introducers/{userId}/is-introducer',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            query: {
+                includeGroups: data.includeGroups
+            }
+        });
+    }
+    
+    /**
+     * Get all introducers for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceIntroducer All introducers for a resource
+     * @throws ApiError
+     */
+    public static resourceIntroducersGetMany(data: ResourceIntroducersGetManyData): CancelablePromise<ResourceIntroducersGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introducers',
+            path: {
+                resourceId: data.resourceId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user introduction permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @returns ResourceIntroducer Introduction permissions granted
+     * @throws ApiError
+     */
+    public static resourceIntroducersGrant(data: ResourceIntroducersGrantData): CancelablePromise<ResourceIntroducersGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introducers/{userId}/grant',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user introduction permission for a resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.userId
+     * @returns unknown Introduction permissions revoked
+     * @throws ApiError
+     */
+    public static resourceIntroducersRevoke(data: ResourceIntroducersRevokeData): CancelablePromise<ResourceIntroducersRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/introducers/{userId}/revoke',
+            path: {
+                resourceId: data.resourceId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get many introductions by group ID
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @returns ResourceIntroduction The introductions have been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGetMany(data: ResourceGroupIntroductionsGetManyData): CancelablePromise<ResourceGroupIntroductionsGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introductions',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Get introduction status for a user on a resource group
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @returns IntroductionStatusResponseDto Introduction status
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGetStatus(data: ResourceGroupIntroductionsGetStatusData): CancelablePromise<ResourceGroupIntroductionsGetStatusResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/status',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            }
+        });
+    }
+    
+    /**
+     * Get history of introductions by group ID and user ID
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGetHistory(data: ResourceGroupIntroductionsGetHistoryData): CancelablePromise<ResourceGroupIntroductionsGetHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/history',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Grant introduction permission for a resource group to a user
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsGrant(data: ResourceGroupIntroductionsGrantData): CancelablePromise<ResourceGroupIntroductionsGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/grant',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Revoke introduction permission for a resource group from a user
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsRevoke(data: ResourceGroupIntroductionsRevokeData): CancelablePromise<ResourceGroupIntroductionsRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/revoke',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Renew (refresh baseline) a user group introduction
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @param data.userId The ID of the user
+     * @param data.requestBody
+     * @returns ResourceIntroductionHistoryItem The introduction has been successfully renewed.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroductionsRenew(data: ResourceGroupIntroductionsRenewData): CancelablePromise<ResourceGroupIntroductionsRenewResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introductions/{userId}/renew',
+            path: {
+                groupId: data.groupId,
+                userId: data.userId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'User is not authenticated',
+                403: 'User does not have permission to introduce users to this resource group'
+            }
+        });
+    }
+    
+    /**
+     * Get all introducers for a resource group
+     * @param data The data for the request.
+     * @param data.groupId The ID of the resource group
+     * @returns ResourceIntroducer The introducers have been successfully retrieved.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersGetMany(data: ResourceGroupIntroducersGetManyData): CancelablePromise<ResourceGroupIntroducersGetManyResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introducers',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                404: 'The resource group has not been found.'
+            }
+        });
+    }
+    
+    /**
+     * Check if a user is an introducer for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersIsIntroducer(data: ResourceGroupIntroducersIsIntroducerData): CancelablePromise<ResourceGroupIntroducersIsIntroducerResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/is-introducer',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            }
+        });
+    }
+    
+    /**
+     * Grant a user introduction permission for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns unknown The introducer has been successfully granted.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersGrant(data: ResourceGroupIntroducersGrantData): CancelablePromise<ResourceGroupIntroducersGrantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/grant',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Revoke a user introduction permission for a resource group
+     * @param data The data for the request.
+     * @param data.userId The ID of the user
+     * @param data.groupId The ID of the resource group
+     * @returns unknown The introducer has been successfully revoked.
+     * @throws ApiError
+     */
+    public static resourceGroupIntroducersRevoke(data: ResourceGroupIntroducersRevokeData): CancelablePromise<ResourceGroupIntroducersRevokeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introducers/{userId}/revoke',
+            path: {
+                userId: data.userId,
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+}
+
+export class ResourceIntroductionSchedulesService {
+    /**
+     * List introduction schedules for resource
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static findIntroductionSchedules(data: FindIntroductionSchedulesData): CancelablePromise<FindIntroductionSchedulesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introduction-schedules',
+            path: {
+                resourceId: data.resourceId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Create schedule
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.requestBody
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static createIntroductionSchedule(data: CreateIntroductionScheduleData): CancelablePromise<CreateIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resources/{resourceId}/introduction-schedules',
+            path: {
+                resourceId: data.resourceId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get one schedule
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.scheduleId
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static getIntroductionSchedule(data: GetIntroductionScheduleData): CancelablePromise<GetIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resources/{resourceId}/introduction-schedules/{scheduleId}',
+            path: {
+                resourceId: data.resourceId,
+                scheduleId: data.scheduleId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update schedule
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.scheduleId
+     * @param data.requestBody
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static updateIntroductionSchedule(data: UpdateIntroductionScheduleData): CancelablePromise<UpdateIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/resources/{resourceId}/introduction-schedules/{scheduleId}',
+            path: {
+                resourceId: data.resourceId,
+                scheduleId: data.scheduleId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete schedule
+     * @param data The data for the request.
+     * @param data.resourceId
+     * @param data.scheduleId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteIntroductionSchedule(data: DeleteIntroductionScheduleData): CancelablePromise<DeleteIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resources/{resourceId}/introduction-schedules/{scheduleId}',
+            path: {
+                resourceId: data.resourceId,
+                scheduleId: data.scheduleId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+}
+
+export class ResourceGroupIntroductionSchedulesService {
+    /**
+     * List introduction schedules for resource group
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static findGroupIntroductionSchedules(data: FindGroupIntroductionSchedulesData): CancelablePromise<FindGroupIntroductionSchedulesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introduction-schedules',
+            path: {
+                groupId: data.groupId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Create schedule
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.requestBody
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static createGroupIntroductionSchedule(data: CreateGroupIntroductionScheduleData): CancelablePromise<CreateGroupIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/resource-groups/{groupId}/introduction-schedules',
+            path: {
+                groupId: data.groupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Get one schedule
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.scheduleId
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static getGroupIntroductionSchedule(data: GetGroupIntroductionScheduleData): CancelablePromise<GetGroupIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/resource-groups/{groupId}/introduction-schedules/{scheduleId}',
+            path: {
+                groupId: data.groupId,
+                scheduleId: data.scheduleId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Update schedule
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.scheduleId
+     * @param data.requestBody
+     * @returns ResourceIntroductionSchedule
+     * @throws ApiError
+     */
+    public static updateGroupIntroductionSchedule(data: UpdateGroupIntroductionScheduleData): CancelablePromise<UpdateGroupIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/resource-groups/{groupId}/introduction-schedules/{scheduleId}',
+            path: {
+                groupId: data.groupId,
+                scheduleId: data.scheduleId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+    /**
+     * Delete schedule
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.scheduleId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteGroupIntroductionSchedule(data: DeleteGroupIntroductionScheduleData): CancelablePromise<DeleteGroupIntroductionScheduleResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/resource-groups/{groupId}/introduction-schedules/{scheduleId}',
+            path: {
+                groupId: data.groupId,
+                scheduleId: data.scheduleId
+            },
+            errors: {
+                401: 'Unauthorized'
+            }
+        });
+    }
+    
+}
+
 export class ResourcesService {
     /**
      * Create a new resource
@@ -2043,364 +2736,6 @@ export class MqttService {
             errors: {
                 401: 'Unauthorized',
                 404: 'MQTT server not found'
-            }
-        });
-    }
-    
-}
-
-export class AccessControlService {
-    /**
-     * Get many introductions by group ID
-     * @param data The data for the request.
-     * @param data.groupId The ID of the resource group
-     * @returns ResourceIntroduction The introductions have been successfully retrieved.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroductionsGetMany(data: ResourceGroupIntroductionsGetManyData): CancelablePromise<ResourceGroupIntroductionsGetManyResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resource-groups/{groupId}/introductions',
-            path: {
-                groupId: data.groupId
-            },
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource group'
-            }
-        });
-    }
-    
-    /**
-     * Get history of introductions by group ID and user ID
-     * @param data The data for the request.
-     * @param data.groupId The ID of the resource group
-     * @param data.userId The ID of the user
-     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroductionsGetHistory(data: ResourceGroupIntroductionsGetHistoryData): CancelablePromise<ResourceGroupIntroductionsGetHistoryResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resource-groups/{groupId}/introductions/{userId}/history',
-            path: {
-                groupId: data.groupId,
-                userId: data.userId
-            },
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource group'
-            }
-        });
-    }
-    
-    /**
-     * Grant introduction permission for a resource group to a user
-     * @param data The data for the request.
-     * @param data.groupId The ID of the resource group
-     * @param data.userId The ID of the user
-     * @param data.requestBody
-     * @returns ResourceIntroductionHistoryItem The introduction has been successfully granted.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroductionsGrant(data: ResourceGroupIntroductionsGrantData): CancelablePromise<ResourceGroupIntroductionsGrantResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resource-groups/{groupId}/introductions/{userId}/grant',
-            path: {
-                groupId: data.groupId,
-                userId: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource group'
-            }
-        });
-    }
-    
-    /**
-     * Revoke introduction permission for a resource group from a user
-     * @param data The data for the request.
-     * @param data.groupId The ID of the resource group
-     * @param data.userId The ID of the user
-     * @param data.requestBody
-     * @returns ResourceIntroductionHistoryItem The introduction has been successfully revoked.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroductionsRevoke(data: ResourceGroupIntroductionsRevokeData): CancelablePromise<ResourceGroupIntroductionsRevokeResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resource-groups/{groupId}/introductions/{userId}/revoke',
-            path: {
-                groupId: data.groupId,
-                userId: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource group'
-            }
-        });
-    }
-    
-    /**
-     * Get all introducers for a resource group
-     * @param data The data for the request.
-     * @param data.groupId The ID of the resource group
-     * @returns ResourceIntroducer The introducers have been successfully retrieved.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroducersGetMany(data: ResourceGroupIntroducersGetManyData): CancelablePromise<ResourceGroupIntroducersGetManyResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resource-groups/{groupId}/introducers',
-            path: {
-                groupId: data.groupId
-            },
-            errors: {
-                404: 'The resource group has not been found.'
-            }
-        });
-    }
-    
-    /**
-     * Check if a user is an introducer for a resource group
-     * @param data The data for the request.
-     * @param data.userId The ID of the user
-     * @param data.groupId The ID of the resource group
-     * @returns IsResourceGroupIntroducerResponseDto The user is an introducer for the resource group.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroducersIsIntroducer(data: ResourceGroupIntroducersIsIntroducerData): CancelablePromise<ResourceGroupIntroducersIsIntroducerResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resource-groups/{groupId}/introducers/{userId}/is-introducer',
-            path: {
-                userId: data.userId,
-                groupId: data.groupId
-            }
-        });
-    }
-    
-    /**
-     * Grant a user introduction permission for a resource group
-     * @param data The data for the request.
-     * @param data.userId The ID of the user
-     * @param data.groupId The ID of the resource group
-     * @returns unknown The introducer has been successfully granted.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroducersGrant(data: ResourceGroupIntroducersGrantData): CancelablePromise<ResourceGroupIntroducersGrantResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resource-groups/{groupId}/introducers/{userId}/grant',
-            path: {
-                userId: data.userId,
-                groupId: data.groupId
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Revoke a user introduction permission for a resource group
-     * @param data The data for the request.
-     * @param data.userId The ID of the user
-     * @param data.groupId The ID of the resource group
-     * @returns unknown The introducer has been successfully revoked.
-     * @throws ApiError
-     */
-    public static resourceGroupIntroducersRevoke(data: ResourceGroupIntroducersRevokeData): CancelablePromise<ResourceGroupIntroducersRevokeResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resource-groups/{groupId}/introducers/{userId}/revoke',
-            path: {
-                userId: data.userId,
-                groupId: data.groupId
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Check if a user is an introducer for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @param data.userId
-     * @param data.includeGroups
-     * @returns IsResourceIntroducerResponseDto User is an introducer for the resource
-     * @throws ApiError
-     */
-    public static resourceIntroducersIsIntroducer(data: ResourceIntroducersIsIntroducerData): CancelablePromise<ResourceIntroducersIsIntroducerResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resources/{resourceId}/introducers/{userId}/is-introducer',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            query: {
-                includeGroups: data.includeGroups
-            }
-        });
-    }
-    
-    /**
-     * Get all introducers for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @returns ResourceIntroducer All introducers for a resource
-     * @throws ApiError
-     */
-    public static resourceIntroducersGetMany(data: ResourceIntroducersGetManyData): CancelablePromise<ResourceIntroducersGetManyResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resources/{resourceId}/introducers',
-            path: {
-                resourceId: data.resourceId
-            }
-        });
-    }
-    
-    /**
-     * Grant a user introduction permission for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @param data.userId
-     * @returns ResourceIntroducer Introduction permissions granted
-     * @throws ApiError
-     */
-    public static resourceIntroducersGrant(data: ResourceIntroducersGrantData): CancelablePromise<ResourceIntroducersGrantResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resources/{resourceId}/introducers/{userId}/grant',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Revoke a user introduction permission for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @param data.userId
-     * @returns unknown Introduction permissions revoked
-     * @throws ApiError
-     */
-    public static resourceIntroducersRevoke(data: ResourceIntroducersRevokeData): CancelablePromise<ResourceIntroducersRevokeResponse> {
-        return __request(OpenAPI, {
-            method: 'DELETE',
-            url: '/api/resources/{resourceId}/introducers/{userId}/revoke',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            errors: {
-                401: 'Unauthorized'
-            }
-        });
-    }
-    
-    /**
-     * Get all introductions for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @returns ResourceIntroduction All introductions for a resource
-     * @throws ApiError
-     */
-    public static resourceIntroductionsGetMany(data: ResourceIntroductionsGetManyData): CancelablePromise<ResourceIntroductionsGetManyResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resources/{resourceId}/introductions',
-            path: {
-                resourceId: data.resourceId
-            }
-        });
-    }
-    
-    /**
-     * Grant a user usage permission for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @param data.userId
-     * @param data.requestBody
-     * @returns ResourceIntroductionHistoryItem Introduction granted
-     * @throws ApiError
-     */
-    public static resourceIntroductionsGrant(data: ResourceIntroductionsGrantData): CancelablePromise<ResourceIntroductionsGrantResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/resources/{resourceId}/introductions/{userId}/grant',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource'
-            }
-        });
-    }
-    
-    /**
-     * Revoke a user usage permission for a resource
-     * @param data The data for the request.
-     * @param data.resourceId
-     * @param data.userId
-     * @param data.requestBody
-     * @returns ResourceIntroductionHistoryItem Introduction revoked
-     * @throws ApiError
-     */
-    public static resourceIntroductionsRevoke(data: ResourceIntroductionsRevokeData): CancelablePromise<ResourceIntroductionsRevokeResponse> {
-        return __request(OpenAPI, {
-            method: 'DELETE',
-            url: '/api/resources/{resourceId}/introductions/{userId}/revoke',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource'
-            }
-        });
-    }
-    
-    /**
-     * Get history of introductions by resource ID and user ID
-     * @param data The data for the request.
-     * @param data.resourceId The ID of the resource
-     * @param data.userId The ID of the user
-     * @returns ResourceIntroductionHistoryItem The history has been successfully retrieved.
-     * @throws ApiError
-     */
-    public static resourceIntroductionsGetHistory(data: ResourceIntroductionsGetHistoryData): CancelablePromise<ResourceIntroductionsGetHistoryResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/api/resources/{resourceId}/introductions/{userId}/history',
-            path: {
-                resourceId: data.resourceId,
-                userId: data.userId
-            },
-            errors: {
-                401: 'User is not authenticated',
-                403: 'User does not have permission to introduce users to this resource'
             }
         });
     }
