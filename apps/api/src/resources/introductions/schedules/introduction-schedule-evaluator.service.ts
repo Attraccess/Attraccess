@@ -1,6 +1,6 @@
 // Evaluator for introduction schedules: baseline + dueAt + isDue + isWarning + tick
 // FEATURE: User retraining requirement (ATT-106)
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, FindOptionsWhere } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -61,6 +61,7 @@ function addInterval(d: Date, duration: number, unit: RetrainingIntervalUnit): D
 @Injectable()
 export class IntroductionScheduleEvaluatorService {
   private tickInFlight = false;
+  private readonly logger = new Logger(IntroductionScheduleEvaluatorService.name);
 
   constructor(
     @InjectRepository(ResourceIntroduction)
@@ -348,8 +349,13 @@ export class IntroductionScheduleEvaluatorService {
     if (!resolved) return;
     try {
       await this.emailService.sendIntroductionExpiredEmail(resolved.user, resolved.target);
-    } catch {
-      void 0;
+    } catch (error) {
+      this.logger.error('Failed to send introduction expired email', {
+        introductionId: intro.id,
+        scheduleId: s.id,
+        templateType: 'introduction-expired',
+        error,
+      });
     }
   }
 
@@ -362,8 +368,13 @@ export class IntroductionScheduleEvaluatorService {
     if (!resolved) return;
     try {
       await this.emailService.sendIntroductionExpiryWarningEmail(resolved.user, resolved.target, dueAt);
-    } catch {
-      void 0;
+    } catch (error) {
+      this.logger.error('Failed to send introduction expiry warning email', {
+        introductionId: intro.id,
+        scheduleId: s.id,
+        templateType: 'introduction-expiry-warning',
+        error,
+      });
     }
   }
 
