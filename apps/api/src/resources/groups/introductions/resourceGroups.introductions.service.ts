@@ -6,10 +6,11 @@ import {
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Not, Repository } from 'typeorm';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
+import { IntroductionScheduleEvaluatorService } from '../../introductions/schedules/introduction-schedule-evaluator.service';
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
@@ -20,6 +21,7 @@ export class ResourceGroupsIntroductionsService {
     private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
+    private readonly scheduleEvaluator: IntroductionScheduleEvaluatorService,
   ) {}
 
   private async getLastHistoryItemOfIntroduction(
@@ -39,6 +41,23 @@ export class ResourceGroupsIntroductionsService {
       order: {
         createdAt: 'DESC',
       },
+    });
+  }
+
+  private async getLastNonSystemHistoryItemOfUser(
+    groupId: number,
+    userId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceIntroductionHistoryItem | null> {
+    const repo = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceIntroductionHistoryItem)
+      : this.resourceIntroductionHistoryItemRepository;
+    return repo.findOne({
+      where: {
+        introduction: { resourceGroup: { id: groupId }, receiverUser: { id: userId } },
+        action: Not(In([IntroductionHistoryAction.EXPIRE, IntroductionHistoryAction.WARN_SENT])),
+      },
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -120,26 +139,26 @@ export class ResourceGroupsIntroductionsService {
     { groupId, userId }: { groupId: number; userId: number },
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
+    const lastHistoryItem = await this.getLastNonSystemHistoryItemOfUser(
+      groupId,
+      userId,
+      transactionalEntityManager,
+    );
+    const isActiveAction =
+      lastHistoryItem?.action === IntroductionHistoryAction.GRANT ||
+      lastHistoryItem?.action === IntroductionHistoryAction.RENEW;
+    if (!isActiveAction) return false;
+
     const resourceIntroductionRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(ResourceIntroduction)
       : this.resourceIntroductionRepository;
-
     const introduction = await resourceIntroductionRepository.findOne({
       where: {
-        resourceGroup: {
-          id: groupId,
-        },
-        receiverUser: {
-          id: userId,
-        },
+        resourceGroup: { id: groupId },
+        receiverUser: { id: userId },
       },
     });
-
-    if (!introduction) {
-      return false;
-    }
-
-    const lastHistoryItem = await this.getLastHistoryItemOfIntroduction(introduction.id, transactionalEntityManager);
-    return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
+    if (!introduction) return false;
+    return !(await this.scheduleEvaluator.isBlockedByExpiry(introduction));
   }
 }

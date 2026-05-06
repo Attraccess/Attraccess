@@ -5,11 +5,12 @@ import {
 } from '@attraccess/database-entities';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Not, Repository } from 'typeorm';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
 import { MetricsService } from '../../metrics/metrics.service';
+import { IntroductionScheduleEvaluatorService } from './schedules/introduction-schedule-evaluator.service';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -23,6 +24,7 @@ export class ResourceIntroductionsService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly scheduleEvaluator: IntroductionScheduleEvaluatorService,
   ) {}
 
   private async getIntroductionOfUser(
@@ -91,6 +93,23 @@ export class ResourceIntroductionsService {
     return historyItem;
   }
 
+  private async getLastNonSystemHistoryItemOfUser(
+    resourceId: number,
+    userId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceIntroductionHistoryItem | null> {
+    const repo = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(ResourceIntroductionHistoryItem)
+      : this.resourceIntroductionHistoryItemRepository;
+    return repo.findOne({
+      where: {
+        introduction: { resource: { id: resourceId }, receiverUser: { id: userId } },
+        action: Not(In([IntroductionHistoryAction.EXPIRE, IntroductionHistoryAction.WARN_SENT])),
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   private async createOne(resourceId: number, userId: number): Promise<ResourceIntroduction> {
     this.logger.debug(`Creating new introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const introduction = this.resourceIntroductionRepository.create({
@@ -144,9 +163,26 @@ export class ResourceIntroductionsService {
   ): Promise<boolean> {
     this.logger.debug(`Checking if user ${userId} has valid introduction for resource ${resourceId}`);
 
-    const lastHistoryItem = await this.getLastHistoryItemOfUser(resourceId, userId, transactionalEntityManager);
-    const hasValid = lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
-    this.logger.debug(`User has valid introduction: ${hasValid}`);
+    const lastHistoryItem = await this.getLastNonSystemHistoryItemOfUser(
+      resourceId,
+      userId,
+      transactionalEntityManager,
+    );
+    const isActiveAction =
+      lastHistoryItem?.action === IntroductionHistoryAction.GRANT ||
+      lastHistoryItem?.action === IntroductionHistoryAction.RENEW;
+    if (!isActiveAction) {
+      this.logger.debug(`User has valid introduction: false (last action: ${lastHistoryItem?.action ?? 'none'})`);
+      return false;
+    }
+    const introduction = await this.getIntroductionOfUser(resourceId, userId, transactionalEntityManager);
+    if (!introduction) {
+      this.logger.debug('User has valid introduction: false (no introduction record)');
+      return false;
+    }
+    const blocked = await this.scheduleEvaluator.isBlockedByExpiry(introduction);
+    const hasValid = !blocked;
+    this.logger.debug(`User has valid introduction: ${hasValid} (blockedByExpiry=${blocked})`);
     return hasValid;
   }
 
