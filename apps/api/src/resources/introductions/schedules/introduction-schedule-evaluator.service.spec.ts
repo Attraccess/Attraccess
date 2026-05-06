@@ -228,4 +228,81 @@ describe('IntroductionScheduleEvaluatorService', () => {
     const due = await svc.computeDueAt(full, intro);
     expect(due?.toISOString()).toBe('2026-10-01T00:00:00.000Z');
   });
+
+  describe('tick()', () => {
+    it('emits one EXPIRE per (schedule, cycle) and is idempotent on rerun', async () => {
+      const schedulePayload: DeepPartial<ResourceIntroductionSchedule> = {
+        resourceId,
+        triggerType: ResourceIntroductionScheduleTriggerType.TIME_SINCE_INTRODUCTION,
+        blockAccess: true,
+        warnDaysBefore: 0,
+        enabled: true,
+      };
+      const schedule = await ds.getRepository(ResourceIntroductionSchedule).save(schedulePayload);
+      await ds.getRepository(ResourceIntroductionScheduleTimeSinceIntroductionConfig).save({
+        scheduleId: schedule.id,
+        duration: 1,
+        unit: RetrainingIntervalUnit.YEARS,
+      });
+      await svc.tick(fixedNow);
+      await svc.tick(fixedNow);
+      const expires = await ds.getRepository(ResourceIntroductionHistoryItem).find({
+        where: { action: IntroductionHistoryAction.EXPIRE, introductionId },
+      });
+      expect(expires).toHaveLength(1);
+      expect(expires[0].scheduleId).toBe(schedule.id);
+      expect(expires[0].performedByUserId).toBeNull();
+    });
+
+    it('after RENEW, second cycle emits a new EXPIRE', async () => {
+      const schedulePayload: DeepPartial<ResourceIntroductionSchedule> = {
+        resourceId,
+        triggerType: ResourceIntroductionScheduleTriggerType.TIME_SINCE_INTRODUCTION,
+        blockAccess: true,
+        warnDaysBefore: 0,
+        enabled: true,
+      };
+      const schedule = await ds.getRepository(ResourceIntroductionSchedule).save(schedulePayload);
+      await ds.getRepository(ResourceIntroductionScheduleTimeSinceIntroductionConfig).save({
+        scheduleId: schedule.id,
+        duration: 1,
+        unit: RetrainingIntervalUnit.YEARS,
+      });
+      await svc.tick(fixedNow);
+      await ds.getRepository(ResourceIntroductionHistoryItem).save({
+        introductionId,
+        action: IntroductionHistoryAction.RENEW,
+        performedByUserId: userId,
+        createdAt: new Date('2026-05-05T00:00:00.000Z'),
+      });
+      await svc.tick(new Date('2027-05-05T00:00:00.000Z'));
+      const expires = await ds.getRepository(ResourceIntroductionHistoryItem).find({
+        where: { action: IntroductionHistoryAction.EXPIRE, introductionId },
+      });
+      expect(expires).toHaveLength(2);
+    });
+
+    it('warn sent once per cycle', async () => {
+      const schedulePayload: DeepPartial<ResourceIntroductionSchedule> = {
+        resourceId,
+        triggerType: ResourceIntroductionScheduleTriggerType.TIME_SINCE_INTRODUCTION,
+        blockAccess: false,
+        warnDaysBefore: 30,
+        enabled: true,
+      };
+      const schedule = await ds.getRepository(ResourceIntroductionSchedule).save(schedulePayload);
+      await ds.getRepository(ResourceIntroductionScheduleTimeSinceIntroductionConfig).save({
+        scheduleId: schedule.id,
+        duration: 1,
+        unit: RetrainingIntervalUnit.YEARS,
+      });
+      const warningTime = new Date('2026-04-15T00:00:00.000Z');
+      await svc.tick(warningTime);
+      await svc.tick(warningTime);
+      const sent = await ds.getRepository(ResourceIntroductionHistoryItem).find({
+        where: { action: IntroductionHistoryAction.WARN_SENT, introductionId },
+      });
+      expect(sent).toHaveLength(1);
+    });
+  });
 });

@@ -253,16 +253,7 @@ export class IntroductionScheduleEvaluatorService {
     s: ResourceIntroductionSchedule,
     intro: ResourceIntroduction
   ): Promise<void> {
-    const baseline = await this.computeBaseline(intro);
-    const exists = await this.histRepo.findOne({
-      where: {
-        introductionId: intro.id,
-        action: IntroductionHistoryAction.EXPIRE,
-        scheduleId: s.id,
-      },
-      order: { createdAt: 'DESC' },
-    });
-    if (exists && exists.createdAt > baseline) return;
+    if (await this.alreadyEmittedThisCycle(intro.id, s.id, IntroductionHistoryAction.EXPIRE)) return;
     await this.histRepo.save(
       this.histRepo.create({
         introductionId: intro.id,
@@ -281,16 +272,7 @@ export class IntroductionScheduleEvaluatorService {
     s: ResourceIntroductionSchedule,
     intro: ResourceIntroduction
   ): Promise<void> {
-    const baseline = await this.computeBaseline(intro);
-    const exists = await this.histRepo.findOne({
-      where: {
-        introductionId: intro.id,
-        action: IntroductionHistoryAction.WARN_SENT,
-        scheduleId: s.id,
-      },
-      order: { createdAt: 'DESC' },
-    });
-    if (exists && exists.createdAt > baseline) return;
+    if (await this.alreadyEmittedThisCycle(intro.id, s.id, IntroductionHistoryAction.WARN_SENT)) return;
     await this.histRepo.save(
       this.histRepo.create({
         introductionId: intro.id,
@@ -303,5 +285,23 @@ export class IntroductionScheduleEvaluatorService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(intro.id)
     );
+  }
+
+  private async alreadyEmittedThisCycle(
+    introductionId: number,
+    scheduleId: number,
+    action: IntroductionHistoryAction
+  ): Promise<boolean> {
+    const exists = await this.histRepo.findOne({
+      where: { introductionId, action, scheduleId },
+      order: { id: 'DESC' },
+    });
+    if (!exists) return false;
+    const laterRenew = await this.histRepo.findOne({
+      where: { introductionId, action: IntroductionHistoryAction.RENEW },
+      order: { id: 'DESC' },
+    });
+    if (laterRenew && laterRenew.id > exists.id) return false;
+    return true;
   }
 }
