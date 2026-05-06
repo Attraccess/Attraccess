@@ -15,8 +15,11 @@ import {
   RetrainingIntervalUnit,
   ResourceUsage,
   Resource,
+  ResourceGroup,
+  User,
 } from '@attraccess/database-entities';
 import { ResourceIntroductionChangedEvent } from '../events/resource-introduction-changed.event';
+import { EmailService } from '../../../email/email.service';
 
 export type IntroductionStatus = 'ACTIVE' | 'WARNING' | 'EXPIRED';
 
@@ -70,7 +73,12 @@ export class IntroductionScheduleEvaluatorService {
     private readonly usageRepo: Repository<ResourceUsage>,
     @InjectRepository(Resource)
     private readonly resourceRepo: Repository<Resource>,
-    @Inject(EventEmitter2) private readonly events: EventEmitter2
+    @InjectRepository(ResourceGroup)
+    private readonly resourceGroupRepo: Repository<ResourceGroup>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @Inject(EventEmitter2) private readonly events: EventEmitter2,
+    private readonly emailService: EmailService
   ) {}
 
   async computeBaseline(introduction: ResourceIntroduction): Promise<Date> {
@@ -249,8 +257,10 @@ export class IntroductionScheduleEvaluatorService {
       for (const s of schedules) {
         const intros = await this.findIntroductionsForSchedule(s);
         for (const intro of intros) {
-          if (await this.isDue(s, intro, now)) await this.recordExpireOnce(s, intro);
-          else if (await this.isWarning(s, intro, now)) await this.recordWarnSentOnce(s, intro);
+          const dueAt = await this.computeDueAt(s, intro);
+          if (!dueAt) continue;
+          if (now.getTime() >= dueAt.getTime()) await this.recordExpireOnce(s, intro);
+          else if (await this.isWarning(s, intro, now)) await this.recordWarnSentOnce(s, intro, dueAt);
         }
       }
     } finally {
@@ -285,11 +295,13 @@ export class IntroductionScheduleEvaluatorService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(intro.id)
     );
+    await this.dispatchExpiredEmail(s, intro);
   }
 
   private async recordWarnSentOnce(
     s: ResourceIntroductionSchedule,
-    intro: ResourceIntroduction
+    intro: ResourceIntroduction,
+    dueAt: Date
   ): Promise<void> {
     if (await this.alreadyEmittedThisCycle(intro.id, s.id, IntroductionHistoryAction.WARN_SENT)) return;
     await this.histRepo.save(
@@ -304,6 +316,55 @@ export class IntroductionScheduleEvaluatorService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(intro.id)
     );
+    await this.dispatchWarningEmail(s, intro, dueAt);
+  }
+
+  private async resolveTarget(
+    s: ResourceIntroductionSchedule,
+    intro: ResourceIntroduction
+  ): Promise<{ user: User; target: { name: string } } | null> {
+    const user = await this.userRepo.findOne({ where: { id: intro.receiverUserId } });
+    if (!user || !user.email) return null;
+    const resourceId = s.resourceId ?? intro.resourceId;
+    if (resourceId != null) {
+      const resource = await this.resourceRepo.findOne({ where: { id: resourceId } });
+      if (!resource) return null;
+      return { user, target: { name: resource.name } };
+    }
+    const groupId = s.resourceGroupId ?? intro.resourceGroupId;
+    if (groupId != null) {
+      const group = await this.resourceGroupRepo.findOne({ where: { id: groupId } });
+      if (!group) return null;
+      return { user, target: { name: group.name } };
+    }
+    return null;
+  }
+
+  private async dispatchExpiredEmail(
+    s: ResourceIntroductionSchedule,
+    intro: ResourceIntroduction
+  ): Promise<void> {
+    const resolved = await this.resolveTarget(s, intro);
+    if (!resolved) return;
+    try {
+      await this.emailService.sendIntroductionExpiredEmail(resolved.user, resolved.target);
+    } catch {
+      void 0;
+    }
+  }
+
+  private async dispatchWarningEmail(
+    s: ResourceIntroductionSchedule,
+    intro: ResourceIntroduction,
+    dueAt: Date
+  ): Promise<void> {
+    const resolved = await this.resolveTarget(s, intro);
+    if (!resolved) return;
+    try {
+      await this.emailService.sendIntroductionExpiryWarningEmail(resolved.user, resolved.target, dueAt);
+    } catch {
+      void 0;
+    }
   }
 
   private async alreadyEmittedThisCycle(

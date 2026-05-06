@@ -11,6 +11,8 @@ export enum EmailTemplateType {
   RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY = 'resource-usage-billing-transaction-summary',
   PROJECT_INVITATION = 'project-invitation',
   DELETE_ACCOUNT_CONFIRMATION = 'delete-account-confirmation',
+  INTRODUCTION_EXPIRY_WARNING = 'introduction-expiry-warning',
+  INTRODUCTION_EXPIRED = 'introduction-expired',
 }
 
 @Entity('email_templates')

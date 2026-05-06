@@ -23,6 +23,7 @@ import {
 } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IntroductionScheduleEvaluatorService } from './introduction-schedule-evaluator.service';
+import { EmailService } from '../../../email/email.service';
 
 const fixedNow = new Date('2026-05-05T00:00:00.000Z');
 
@@ -32,8 +33,16 @@ describe('IntroductionScheduleEvaluatorService', () => {
   let userId: number;
   let resourceId: number;
   let introductionId: number;
+  let emailService: {
+    sendIntroductionExpiryWarningEmail: jest.Mock;
+    sendIntroductionExpiredEmail: jest.Mock;
+  };
 
   beforeEach(async () => {
+    emailService = {
+      sendIntroductionExpiryWarningEmail: jest.fn().mockResolvedValue(undefined),
+      sendIntroductionExpiredEmail: jest.fn().mockResolvedValue(undefined),
+    };
     const mod = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot({
@@ -57,6 +66,7 @@ describe('IntroductionScheduleEvaluatorService', () => {
       providers: [
         IntroductionScheduleEvaluatorService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: EmailService, useValue: emailService },
       ],
     }).compile();
 
@@ -252,6 +262,11 @@ describe('IntroductionScheduleEvaluatorService', () => {
       expect(expires).toHaveLength(1);
       expect(expires[0].scheduleId).toBe(schedule.id);
       expect(expires[0].performedByUserId).toBeNull();
+      expect(emailService.sendIntroductionExpiredEmail).toHaveBeenCalledTimes(1);
+      const [emailedUser, emailedResource] = emailService.sendIntroductionExpiredEmail.mock.calls[0];
+      expect(emailedUser.id).toBe(userId);
+      expect(emailedResource).toEqual({ name: 'R1' });
+      expect(emailService.sendIntroductionExpiryWarningEmail).not.toHaveBeenCalled();
     });
 
     it('after RENEW, second cycle emits a new EXPIRE', async () => {
@@ -303,6 +318,14 @@ describe('IntroductionScheduleEvaluatorService', () => {
         where: { action: IntroductionHistoryAction.WARN_SENT, introductionId },
       });
       expect(sent).toHaveLength(1);
+      expect(emailService.sendIntroductionExpiryWarningEmail).toHaveBeenCalledTimes(1);
+      const [emailedUser, emailedResource, dueAt] =
+        emailService.sendIntroductionExpiryWarningEmail.mock.calls[0];
+      expect(emailedUser.id).toBe(userId);
+      expect(emailedResource).toEqual({ name: 'R1' });
+      expect(dueAt instanceof Date).toBe(true);
+      expect((dueAt as Date).toISOString()).toBe('2026-05-05T00:00:00.000Z');
+      expect(emailService.sendIntroductionExpiredEmail).not.toHaveBeenCalled();
     });
   });
 });

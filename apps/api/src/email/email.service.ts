@@ -205,6 +205,34 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
   }
 
+  async sendIntroductionExpiryWarningEmail(
+    user: User,
+    resource: { name: string },
+    dueAt: Date,
+    manager?: EntityManager,
+  ) {
+    const baseContext = await this.getBaseContext(user);
+    const context = {
+      ...baseContext,
+      resource: { name: resource.name },
+      dueAt: dueAt.toISOString(),
+    };
+    await this.sendEmail(user, EmailTemplateType.INTRODUCTION_EXPIRY_WARNING, context, manager);
+  }
+
+  async sendIntroductionExpiredEmail(
+    user: User,
+    resource: { name: string },
+    manager?: EntityManager,
+  ) {
+    const baseContext = await this.getBaseContext(user);
+    const context = {
+      ...baseContext,
+      resource: { name: resource.name },
+    };
+    await this.sendEmail(user, EmailTemplateType.INTRODUCTION_EXPIRED, context, manager);
+  }
+
   async sendResourceUsageBillingSummaryEmail(
     user: User,
     transaction: BillingTransaction,
