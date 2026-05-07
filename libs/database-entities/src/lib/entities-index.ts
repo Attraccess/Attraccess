@@ -40,6 +40,10 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
+  VariableScopeSchema,
 } from './entities/resourceFlowNode';
 import {
   ResourceHealthState,
@@ -150,6 +154,10 @@ export {
   ResourceFlowVariable,
   ResourceFlowVariableScope,
   type ResourceFlowVariableValueType,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  VariableChangedNodeDataSchema,
+  VariableScopeSchema,
 };
 
 // Export the entities object

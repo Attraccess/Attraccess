@@ -608,6 +608,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           responseOfNode = await this.processErrorNode(node, input, transactionManager);
           break;
 
+        case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
+        case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
+        case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
+          responseOfNode = { payload: input };
+          break;
+
         default: {
           const exhaustiveCheck: never = node.type;
           throw new Error(`Unknown node type: ${exhaustiveCheck}`);
