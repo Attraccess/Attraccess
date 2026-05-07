@@ -482,7 +482,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     return results.map((r) => r.payload);
   }
 
-  private async startFlow(
+  public async startFlow(
     node: ResourceFlowNode | ResourceFlowNode[],
     data: NodeProcessingResult,
     transactionManager?: EntityManager,
