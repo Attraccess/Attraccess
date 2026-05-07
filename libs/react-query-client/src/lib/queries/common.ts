@@ -1,7 +1,7 @@
 // generated with @7nohe/openapi-react-query-codegen@1.6.2 
 
 import { UseQueryResult } from "@tanstack/react-query";
-import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
+import { AccessControlService, AnalyticsService, AttractapService, AuthenticationService, BillingService, EmailTemplatesService, FlowVariablesService, LicenseService, MqttService, PluginsService, ProjectInvitationsService, ProjectsService, ResourceFlowsService, ResourceFormsService, ResourceHealthService, ResourceMaintenanceSchedulesService, ResourceMaintenancesService, ResourcesService, SettingsService, SystemService, TwoFactorAuthenticationService, UsersService } from "../requests/services.gen";
 import { EmailTemplateType, PermissionFilter } from "../requests/types.gen";
 export type SystemServiceInfoDefaultResponse = Awaited<ReturnType<typeof SystemService.info>>;
 export type SystemServiceInfoQueryResult<TData = SystemServiceInfoDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
@@ -380,6 +380,12 @@ export const useResourceFlowsServiceGetButtonsKey = "ResourceFlowsServiceGetButt
 export const UseResourceFlowsServiceGetButtonsKeyFn = ({ resourceId }: {
   resourceId: number;
 }, queryKey?: Array<unknown>) => [useResourceFlowsServiceGetButtonsKey, ...(queryKey ?? [{ resourceId }])];
+export type FlowVariablesServiceListFlowVariablesDefaultResponse = Awaited<ReturnType<typeof FlowVariablesService.listFlowVariables>>;
+export type FlowVariablesServiceListFlowVariablesQueryResult<TData = FlowVariablesServiceListFlowVariablesDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
+export const useFlowVariablesServiceListFlowVariablesKey = "FlowVariablesServiceListFlowVariables";
+export const UseFlowVariablesServiceListFlowVariablesKeyFn = ({ resourceId }: {
+  resourceId: number;
+}, queryKey?: Array<unknown>) => [useFlowVariablesServiceListFlowVariablesKey, ...(queryKey ?? [{ resourceId }])];
 export type ResourceHealthServiceGetResourceHealthDefaultResponse = Awaited<ReturnType<typeof ResourceHealthService.getResourceHealth>>;
 export type ResourceHealthServiceGetResourceHealthQueryResult<TData = ResourceHealthServiceGetResourceHealthDefaultResponse, TError = unknown> = UseQueryResult<TData, TError>;
 export const useResourceHealthServiceGetResourceHealthKey = "ResourceHealthServiceGetResourceHealth";
@@ -589,6 +595,7 @@ export type ResourcesServiceResourceUsageUpdateSessionProjectMutationResult = Aw
 export type MqttServiceMqttServersUpdateOneMutationResult = Awaited<ReturnType<typeof MqttService.mqttServersUpdateOne>>;
 export type ResourceMaintenanceSchedulesServiceUpdateMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.updateMaintenanceSchedule>>;
 export type ResourceFlowsServiceSaveResourceFlowMutationResult = Awaited<ReturnType<typeof ResourceFlowsService.saveResourceFlow>>;
+export type FlowVariablesServiceUpsertFlowVariableMutationResult = Awaited<ReturnType<typeof FlowVariablesService.upsertFlowVariable>>;
 export type ProjectsServiceUpdateProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.updateProject>>;
 export type ResourceFormsServiceResourceFormsUpdateMutationResult = Awaited<ReturnType<typeof ResourceFormsService.resourceFormsUpdate>>;
 export type UsersServiceChangeMyUsernameMutationResult = Awaited<ReturnType<typeof UsersService.changeMyUsername>>;
@@ -613,6 +620,7 @@ export type AccessControlServiceResourceIntroducersRevokeMutationResult = Awaite
 export type AccessControlServiceResourceIntroductionsRevokeMutationResult = Awaited<ReturnType<typeof AccessControlService.resourceIntroductionsRevoke>>;
 export type ResourceMaintenanceSchedulesServiceDeleteMaintenanceScheduleMutationResult = Awaited<ReturnType<typeof ResourceMaintenanceSchedulesService.deleteMaintenanceSchedule>>;
 export type BillingServiceRemoveSumUpReaderMutationResult = Awaited<ReturnType<typeof BillingService.removeSumUpReader>>;
+export type FlowVariablesServiceDeleteFlowVariableMutationResult = Awaited<ReturnType<typeof FlowVariablesService.deleteFlowVariable>>;
 export type ResourceHealthServiceClearResourceHealthEntryMutationResult = Awaited<ReturnType<typeof ResourceHealthService.clearResourceHealthEntry>>;
 export type ProjectsServiceDeleteOneProjectMutationResult = Awaited<ReturnType<typeof ProjectsService.deleteOneProject>>;
 export type ProjectsServiceRemoveProjectMemberMutationResult = Awaited<ReturnType<typeof ProjectsService.removeProjectMember>>;

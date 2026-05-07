@@ -2715,6 +2715,7 @@ export enum ResourceFlowNodeType {
     INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',
     INPUT_MQTT_MESSAGE_RECEIVED = 'input.mqtt.message.received',
     INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY = 'input.resource.activity.no-activity',
+    INPUT_VARIABLE_CHANGED = 'input.variable.changed',
     OUTPUT_HTTP_SEND_REQUEST = 'output.http.sendRequest',
     OUTPUT_MQTT_SEND_MESSAGE = 'output.mqtt.sendMessage',
     OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
@@ -2725,6 +2726,8 @@ export enum ResourceFlowNodeType {
     PROCESSING_SET_PAYLOAD = 'processing.set-payload',
     PROCESSING_MQTT_WAIT_FOR_MESSAGE = 'processing.mqtt.waitForMessage',
     PROCESSING_ERROR = 'processing.error',
+    PROCESSING_VARIABLES_SET = 'processing.variables.set',
+    PROCESSING_VARIABLES_GET = 'processing.variables.get',
     OUTPUT_RESOURCE_HEALTH_HEARTBEAT = 'output.resource.health.heartbeat',
     OUTPUT_RESOURCE_HEALTH_SET = 'output.resource.health.set'
 }
@@ -2966,6 +2969,38 @@ export type ResourceFlowNode = {
      * The resource being this node belongs to
      */
     resource?: Resource;
+};
+
+export enum ResourceFlowVariableScope {
+    RESOURCE = 'resource',
+    GLOBAL = 'global'
+}
+
+export type FlowVariableDto = {
+    id: number;
+    scope: ResourceFlowVariableScope;
+    resourceId: number | null;
+    key: string;
+    /**
+     * Parsed JSON value
+     */
+    value: {
+        [key: string]: unknown;
+    };
+    valueType: {
+        [key: string]: unknown;
+    };
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type FlowVariableUpsertDto = {
+    /**
+     * Any JSON value
+     */
+    value: {
+        [key: string]: unknown;
+    };
 };
 
 export enum ResourceHealthStatus {
@@ -4941,6 +4976,29 @@ export type GetButtonsData = {
 };
 
 export type GetButtonsResponse = Array<ResourceFlowNode>;
+
+export type ListFlowVariablesData = {
+    resourceId: number;
+};
+
+export type ListFlowVariablesResponse = Array<FlowVariableDto>;
+
+export type UpsertFlowVariableData = {
+    key: string;
+    requestBody: FlowVariableUpsertDto;
+    resourceId: number;
+    scope: ResourceFlowVariableScope;
+};
+
+export type UpsertFlowVariableResponse = void;
+
+export type DeleteFlowVariableData = {
+    key: string;
+    resourceId: number;
+    scope: ResourceFlowVariableScope;
+};
+
+export type DeleteFlowVariableResponse = void;
 
 export type GetResourceHealthData = {
     resourceId: number;
@@ -7725,6 +7783,40 @@ export type $OpenApiTs = {
                  * Resource not found
                  */
                 404: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow-variables': {
+        get: {
+            req: ListFlowVariablesData;
+            res: {
+                200: Array<FlowVariableDto>;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+    };
+    '/api/resources/{resourceId}/flow-variables/{scope}/{key}': {
+        put: {
+            req: UpsertFlowVariableData;
+            res: {
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
+            };
+        };
+        delete: {
+            req: DeleteFlowVariableData;
+            res: {
+                204: void;
+                /**
+                 * Unauthorized
+                 */
+                401: unknown;
             };
         };
     };
