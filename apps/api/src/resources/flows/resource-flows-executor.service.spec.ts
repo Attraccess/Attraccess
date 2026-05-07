@@ -18,6 +18,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { ResourceHealthService } from '../health/resource-health.service';
+import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -50,6 +51,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
   let resourceHealthService: ResourceHealthService;
+  let variablesService: ResourceFlowVariablesService;
 
   // Dynamic stores per test
   let nodesById: Record<string, ResourceFlowNode>;
@@ -131,6 +133,15 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       getSummary: jest.fn(async () => ({ resourceId: 1, isHealthy: true, entries: [], unhealthyEntries: [] })),
     } as unknown as ResourceHealthService;
 
+    variablesService = {
+      get: jest.fn(async () => undefined),
+      getMany: jest.fn(async () => ({})),
+      getAll: jest.fn(async () => ({ resource: {}, global: {} })),
+      set: jest.fn(async () => undefined),
+      delete: jest.fn(async () => undefined),
+      listForResource: jest.fn(async () => []),
+    } as unknown as ResourceFlowVariablesService;
+
     const billingItemRepoMock = {
       manager: {
         findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
@@ -151,6 +162,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
+      variablesService,
     );
   });
 
@@ -789,6 +801,90 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       );
     });
   });
+
+  describe('variable nodes', () => {
+    it('PROCESSING_SET_VARIABLES renders templates and stores JSON-parsed values', async () => {
+      const setNode = createNode({
+        id: 'set-1',
+        type: ResourceFlowNodeType.PROCESSING_SET_VARIABLES,
+        resourceId: 1,
+        data: {
+          variables: [
+            { key: 'count', value: '{{payload.n}}', scope: 'global' },
+            { key: 'note', value: 'hello {{payload.who}}', scope: 'resource' },
+          ],
+        },
+      });
+      const inputNode = createNode({
+        id: 'trigger-1',
+        type: ResourceFlowNodeType.INPUT_BUTTON,
+        resourceId: 1,
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { n: 5, who: 'world' } });
+
+      expect(variablesService.set).toHaveBeenCalledTimes(2);
+      expect(variablesService.set).toHaveBeenNthCalledWith(1, 'global', null, 'count', 5, 1);
+      expect(variablesService.set).toHaveBeenNthCalledWith(2, 'resource', 1, 'note', 'hello world', 1);
+    });
+
+    it('PROCESSING_GET_VARIABLES writes lodash-set into payload', async () => {
+      (variablesService.get as jest.Mock).mockImplementation(async (_scope, _rid, key) =>
+        key === 'sessionId' ? 99 : undefined,
+      );
+
+      const inputNode = createNode({ id: 't', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId: 1 });
+      const getNode = createNode({
+        id: 'get-1',
+        type: ResourceFlowNodeType.PROCESSING_GET_VARIABLES,
+        resourceId: 1,
+        data: {
+          variables: [{ key: 'sessionId', scope: 'resource', payloadPath: 'session.id' }],
+        },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[getNode.id] = getNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: getNode.id }];
+      edgesBySourceAndHandle[`${getNode.id}|`] = [];
+
+      const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
+
+      expect(result[0]).toMatchObject({ session: { id: 99 } });
+      expect(variablesService.get).toHaveBeenCalledWith('resource', 1, 'sessionId');
+    });
+
+    it('exposes variables to Handlebars context via {{variables.resource.*}} and {{variables.global.*}}', async () => {
+      (variablesService.getAll as jest.Mock).mockResolvedValue({
+        resource: { foo: 1 },
+        global: { bar: 'x' },
+      });
+
+      const inputNode = createNode({ id: 't', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId: 1 });
+      const setNode = createNode({
+        id: 'set-1',
+        type: ResourceFlowNodeType.PROCESSING_SET_VARIABLES,
+        resourceId: 1,
+        data: {
+          variables: [{ key: 'rendered', value: '{{variables.resource.foo}}-{{variables.global.bar}}', scope: 'resource' }],
+        },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[setNode.id] = setNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: setNode.id }];
+      edgesBySourceAndHandle[`${setNode.id}|`] = [];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
+
+      expect(variablesService.set).toHaveBeenCalledWith('resource', 1, 'rendered', '1-x', 1);
+    });
+  });
 });
 
 describe('ResourceFlowsExecutorService MQTT', () => {
@@ -802,6 +898,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
   let resourceHealthService: ResourceHealthService;
+  let variablesService: ResourceFlowVariablesService;
 
   let nodesById: Record<string, ResourceFlowNode>;
   let initialNodes: ResourceFlowNode[];
@@ -876,6 +973,15 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       getSummary: jest.fn(async () => ({ resourceId: 1, isHealthy: true, entries: [], unhealthyEntries: [] })),
     } as unknown as ResourceHealthService;
 
+    variablesService = {
+      get: jest.fn(async () => undefined),
+      getMany: jest.fn(async () => ({})),
+      getAll: jest.fn(async () => ({ resource: {}, global: {} })),
+      set: jest.fn(async () => undefined),
+      delete: jest.fn(async () => undefined),
+      listForResource: jest.fn(async () => []),
+    } as unknown as ResourceFlowVariablesService;
+
     const billingItemRepoMock = {
       manager: {
         findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
@@ -896,6 +1002,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
+      variablesService,
     );
   });
 

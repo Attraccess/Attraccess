@@ -37,7 +37,11 @@ import {
   ResourceHealthSource,
   ResourceHealthStatus,
   HealthStateOptionEnum,
+  SetVariablesNodeDataSchema,
+  GetVariablesNodeDataSchema,
+  ResourceFlowVariableScope,
 } from '@attraccess/database-entities';
+import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageEvent } from '../usage/events/resource-usage.events';
 import { ConfigService } from '@nestjs/config';
@@ -116,6 +120,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
 
+  private readonly templateVariables = new WeakMap<
+    object,
+    { resource: Record<string, unknown>; global: Record<string, unknown> }
+  >();
+
   constructor(
     @InjectRepository(ResourceFlowNode)
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
@@ -133,6 +142,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     private readonly eventEmitter: EventEmitter2,
     private readonly resourceHealthService: ResourceHealthService,
+    private readonly variablesService: ResourceFlowVariablesService,
   ) {
     const flowConfig = this.configService.get<FlowConfigType>('flow');
     this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
@@ -280,14 +290,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     }
 
     const context = await this.getResourceContext(resourceId, transactionManager, cache);
+    const variables = await this.variablesService.getAll(resourceId);
     const payloadRecord = payload as Record<string, unknown>;
     const existingResource = payloadRecord.resource;
 
+    let result: Record<string, unknown>;
     if (this.isPlainObject(existingResource)) {
       const existingMetadata = (existingResource as Record<string, unknown>).metadata;
       const metadata = existingMetadata ?? context.metadata ?? null;
 
-      return {
+      result = {
         ...payloadRecord,
         resource: {
           ...(existingResource as Record<string, unknown>),
@@ -295,12 +307,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           metadata,
         },
       };
+    } else {
+      result = {
+        ...payloadRecord,
+        resource: context,
+      };
     }
 
-    return {
-      ...payloadRecord,
-      resource: context,
-    };
+    this.templateVariables.set(result, variables);
+    return result;
   }
 
   @Cron('0 2 * * *') // Daily at 2 AM
@@ -609,9 +624,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
           break;
 
         case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-        case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
-        case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
           responseOfNode = { payload: input };
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_SET_VARIABLES:
+          responseOfNode = await this.processSetVariablesNode(node, input);
+          break;
+
+        case ResourceFlowNodeType.PROCESSING_GET_VARIABLES:
+          responseOfNode = await this.processGetVariablesNode(node, input);
           break;
 
         default: {
@@ -1145,8 +1166,44 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   private compileTemplate(template: string, data: object): string {
+    const variables = this.templateVariables.get(data);
+    const dataWithVariables = variables ? { ...data, variables } : data;
     const compiledTemplate = Handlebars.compile(template);
-    return compiledTemplate(data);
+    return compiledTemplate(dataWithVariables);
+  }
+
+  private async processSetVariablesNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const data = SetVariablesNodeDataSchema.parse(node.data);
+    for (const item of data.variables) {
+      const renderedKey = this.compileTemplate(item.key, input);
+      const renderedValue = this.compileTemplate(item.value, input);
+      let parsed: unknown = renderedValue;
+      try {
+        parsed = JSON.parse(renderedValue);
+      } catch {
+        // leave as raw string
+      }
+      const scope = item.scope as ResourceFlowVariableScope;
+      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? node.resourceId : null;
+      await this.variablesService.set(scope, ownerId, renderedKey, parsed, node.resourceId);
+    }
+    return { payload: input };
+  }
+
+  private async processGetVariablesNode(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+    const data = GetVariablesNodeDataSchema.parse(node.data);
+    const payload = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
+    for (const item of data.variables) {
+      const renderedKey = this.compileTemplate(item.key, input);
+      const scope = item.scope as ResourceFlowVariableScope;
+      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? node.resourceId : null;
+      const value = await this.variablesService.get(scope, ownerId, renderedKey);
+      if (value === undefined) {
+        this.logger.warn(`GET variable miss: ${item.scope}:${renderedKey}`);
+      }
+      lodashSet(payload, item.payloadPath, value);
+    }
+    return { payload };
   }
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
