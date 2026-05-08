@@ -4,9 +4,8 @@ import {
   UseBillingServiceGetResourceBillingConfigurationKeyFn,
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { NumberInput } from "../../../../../utils/heroui-compat";
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { Button, Form, ModalBody, ModalFooter, ModalHeader } from "@heroui/react";
+import { NumberInput, useDisclosure } from "../../../../../utils/heroui-compat";
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from "@heroui/react";
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -123,39 +122,46 @@ export function ResourceBillingInfoEditor(props: Props) {
     <>
       {props.children(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
-          <ModalBody>
-            <Form onSubmit={onSubmit}>
-              <NumberInput
-                label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
-                description={t('inputs.creditsPerUsage.description')}
-                value={creditsPerUsage}
-                minValue={0}
-                onValueChange={(value) => setCreditsPerUsage(value)}
-                isClearable
-                defaultValue={0}
-              />
-              <NumberInput
-                label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
-                description={t('inputs.creditsPerMinute.description')}
-                value={creditsPerMinute}
-                minValue={0}
-                onValueChange={(value) => setCreditsPerMinute(value)}
-                isClearable
-                defaultValue={0}
-              />
-              <input hidden type="submit" />
-            </Form>
-          </ModalBody>
-          <ModalFooter>
-            <Button onPress={onSubmit} color="primary" isLoading={isSaving}>
-              {t('actions.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('title')} noMargin />
+                </ModalHeader>
+                <ModalBody>
+                  <Form onSubmit={onSubmit}>
+                    <NumberInput
+                      label={t('inputs.creditsPerUsage.label', { currency: configuration.currency })}
+                      description={t('inputs.creditsPerUsage.description')}
+                      value={creditsPerUsage}
+                      minValue={0}
+                      onValueChange={(value) => setCreditsPerUsage(value)}
+                      isClearable
+                      defaultValue={0}
+                    />
+                    <NumberInput
+                      label={t('inputs.creditsPerMinute.label', { currency: configuration.currency })}
+                      description={t('inputs.creditsPerMinute.description')}
+                      value={creditsPerMinute}
+                      minValue={0}
+                      onValueChange={(value) => setCreditsPerMinute(value)}
+                      isClearable
+                      defaultValue={0}
+                    />
+                    <input hidden type="submit" />
+                  </Form>
+                </ModalBody>
+                <ModalFooter>
+                  <Button onPress={onSubmit} color="primary" isLoading={isSaving}>
+                    {t('actions.save')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
