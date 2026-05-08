@@ -1,4 +1,4 @@
-import { CircularProgress } from '@heroui/react';
+import { CircularProgress } from "../utils/heroui-compat";
 
 export const TableDataLoadingIndicator = () => {
   return (

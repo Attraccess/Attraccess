@@ -1,19 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardProps,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableColumn,
-  Button,
-  NumberInput,
-  cn,
-  Skeleton,
-} from '@heroui/react';
+import { Card, CardContent, CardHeader, CardProps, Table, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton } from "@heroui/react";
+import { NumberInput } from "../../../../utils/heroui-compat";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,

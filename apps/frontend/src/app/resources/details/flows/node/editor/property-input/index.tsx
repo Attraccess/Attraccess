@@ -1,6 +1,7 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
+import { NumberInput } from "../../../../../../../utils/heroui-compat";
 import { Modal, ModalContent } from '../../../../../../../utils/heroui-compat';
-import { Autocomplete, AutocompleteItem, Button, Card, CardContent, Input, NumberInput, ModalBody, ModalHeader, Switch, Textarea } from '@heroui/react';
+import { Autocomplete, AutocompleteItem, Button, Card, CardContent, Input, ModalBody, ModalHeader, Switch, Textarea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';

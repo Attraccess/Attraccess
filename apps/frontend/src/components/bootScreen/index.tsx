@@ -1,7 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Progress } from "../../utils/heroui-compat";
 import { UnauthorizedLayout } from '../../app/unauthorized/unauthorized-layout/layout';
 import { PageHeader } from '../pageHeader';
-import { Progress } from '@heroui/react';
 
 import de from './de.json';
 import en from './en.json';

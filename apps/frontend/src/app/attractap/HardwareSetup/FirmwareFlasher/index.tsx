@@ -1,6 +1,7 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
+import { CircularProgress, Progress } from "../../../../utils/heroui-compat";
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, Button, CircularProgress, Progress } from '@heroui/react';
+import { Accordion, AccordionItem, Alert, Button } from "@heroui/react";
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, CircularProgress, Input } from '@heroui/react';
+import { CircularProgress } from "../../../../../utils/heroui-compat";
+import { Alert, Button, Input } from "@heroui/react";
 import {
   createContext,
   useCallback,
