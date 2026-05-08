@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
+import { Alert, Button, Card, CardBody, CardFooter, CardHeader } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -125,20 +125,17 @@ export function ConfirmDeleteAccount() {
           <CardBody>
             <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="confirm-delete-error-alert" />
           </CardBody>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             {allowRetry && (
-              <>
-                <Button
-                  fullWidth
-                  color="primary"
-                  onPress={() => confirm(true)}
-                  isDisabled={confirmDelete.isPending}
-                  data-cy="confirm-delete-error-try-again-button"
-                >
-                  {t('error.tryAgain')}
-                </Button>
-                <Spacer y={2} />
-              </>
+              <Button
+                fullWidth
+                color="primary"
+                onPress={() => confirm(true)}
+                isDisabled={confirmDelete.isPending}
+                data-cy="confirm-delete-error-try-again-button"
+              >
+                {t('error.tryAgain')}
+              </Button>
             )}
             <Button
               fullWidth
