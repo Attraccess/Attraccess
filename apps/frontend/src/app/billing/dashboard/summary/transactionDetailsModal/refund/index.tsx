@@ -1,7 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NumberInput } from "../../../../../../utils/heroui-compat";
-import { Modal, ModalContent, useDisclosure } from '../../../../../../utils/heroui-compat';
-import { Button, Form, ModalBody, ModalFooter, ModalHeader } from "@heroui/react";
+import { NumberInput, useDisclosure } from '../../../../../../utils/heroui-compat';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from "@heroui/react";
 import { PageHeader } from '../../../../../../components/pageHeader';
 import en from './en.json';
 import de from './de.json';
@@ -94,31 +93,38 @@ export function RefundModal(props: Props) {
   return (
     <>
       {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="xs" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer size="xs">
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('title')} noMargin />
+                </ModalHeader>
 
-          <ModalBody>
-            <Form onSubmit={onSubmit}>
-              <NumberInput
-                label={t('inputs.amount')}
-                value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
-                onValueChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
-                minValue={0}
-                maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
-              />
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+                <ModalBody>
+                  <Form onSubmit={onSubmit}>
+                    <NumberInput
+                      label={t('inputs.amount')}
+                      value={dbCurrencyToUserCurrency(amount, configuration.minorUnit)}
+                      onValueChange={(value) => setAmount(userCurrencyToDbCurrency(value, configuration.minorUnit))}
+                      minValue={0}
+                      maxValue={dbCurrencyToUserCurrency(Math.abs(transaction.amount), configuration.minorUnit)}
+                    />
+                    <input type="submit" hidden />
+                  </Form>
+                </ModalBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isRefunding}>
-              {t('actions.refund')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalFooter>
+                  <Button color="primary" onPress={onSubmit} isLoading={isRefunding}>
+                    {t('actions.refund')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

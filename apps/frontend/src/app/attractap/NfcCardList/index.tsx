@@ -1,5 +1,4 @@
-import { TableHeader, Table, TableBody, TableColumn, TableCell, TableRow, Button, ModalHeader, ModalBody, ModalFooter, Alert, cn } from '@heroui/react';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
+import { TableHeader, Table, TableBody, TableColumn, TableCell, TableRow, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Alert, cn } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -49,30 +48,37 @@ const NfcCardDeleteModal = (props: DeleteModalProps) => {
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
-    <Modal isOpen={props.show} onClose={() => props.close()} scrollBehavior="inside" data-cy="nfc-card-delete-modal">
-      <ModalContent>
-        <ModalHeader>
-          <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
-        </ModalHeader>
-        <ModalBody>
-          <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
-          <AttractapSelect
-            label={t('nfcCardsTable.deleteModal.readerLabel')}
-            placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
-            selection={readerId}
-            onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-            data-cy="nfc-card-delete-modal-reader-select"
-          />
-        </ModalBody>
-        <ModalFooter>
-          <Button onPress={() => props.close()} data-cy="nfc-card-delete-modal-cancel-button">
-            {t('nfcCardsTable.deleteModal.cancel')}
-          </Button>
-          <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
-            {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
+    <Modal isOpen={props.show} onOpenChange={(open) => { if (!open) props.close(); }} data-cy="nfc-card-delete-modal">
+      <ModalBackdrop />
+      <ModalContainer>
+        <ModalDialog>
+          {({ close }) => (
+            <>
+              <ModalHeader>
+                <h1>{t('nfcCardsTable.deleteModal.title')}</h1>
+              </ModalHeader>
+              <ModalBody>
+                <p>{t('nfcCardsTable.deleteModal.description', { id: props.cardId })}</p>
+                <AttractapSelect
+                  label={t('nfcCardsTable.deleteModal.readerLabel')}
+                  placeholder={t('nfcCardsTable.deleteModal.readerPlaceholder')}
+                  selection={readerId}
+                  onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+                  data-cy="nfc-card-delete-modal-reader-select"
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button onPress={close} data-cy="nfc-card-delete-modal-cancel-button">
+                  {t('nfcCardsTable.deleteModal.cancel')}
+                </Button>
+                <Button isDisabled={!readerId} onPress={deleteCard} data-cy="nfc-card-delete-modal-delete-button">
+                  {t('nfcCardsTable.deleteModal.delete')} ID: {!readerId ? 'null' : readerId}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 };
@@ -197,31 +203,38 @@ const EnrollNfcCardButton = () => {
       >
         {t('enroll')}
       </Button>
-      <Modal isOpen={show} onClose={() => setShow(false)} scrollBehavior="inside" data-cy="enroll-nfc-card-modal">
-        <ModalContent>
-          <ModalHeader>
-            <h1>{t('enrollModal.title')}</h1>
-          </ModalHeader>
-          <ModalBody>
-            <p>{t('enrollModal.description')}</p>
-            <AttractapSelect
-              label={t('enrollModal.readerLabel')}
-              placeholder={t('enrollModal.readerPlaceholder')}
-              selection={readerId}
-              onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
-              data-cy="enroll-nfc-card-modal-reader-select"
-              requiredCapabilities={{ cardEnrollment: true }}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button onPress={() => setShow(false)} data-cy="enroll-nfc-card-modal-cancel-button">
-              {t('enrollModal.cancel')}
-            </Button>
-            <Button isDisabled={!readerId} onPress={enrollNfcCard} data-cy="enroll-nfc-card-modal-enroll-button">
-              {t('enrollModal.enroll')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={show} onOpenChange={(open) => { if (!open) setShow(false); }} data-cy="enroll-nfc-card-modal">
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <h1>{t('enrollModal.title')}</h1>
+                </ModalHeader>
+                <ModalBody>
+                  <p>{t('enrollModal.description')}</p>
+                  <AttractapSelect
+                    label={t('enrollModal.readerLabel')}
+                    placeholder={t('enrollModal.readerPlaceholder')}
+                    selection={readerId}
+                    onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
+                    data-cy="enroll-nfc-card-modal-reader-select"
+                    requiredCapabilities={{ cardEnrollment: true }}
+                  />
+                </ModalBody>
+                <ModalFooter>
+                  <Button onPress={close} data-cy="enroll-nfc-card-modal-cancel-button">
+                    {t('enrollModal.cancel')}
+                  </Button>
+                  <Button isDisabled={!readerId} onPress={enrollNfcCard} data-cy="enroll-nfc-card-modal-enroll-button">
+                    {t('enrollModal.enroll')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

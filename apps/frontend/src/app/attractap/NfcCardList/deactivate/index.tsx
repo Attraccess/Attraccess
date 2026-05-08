@@ -1,5 +1,5 @@
-import { Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../../utils/heroui-compat';
 import de from './de.json';
 import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -44,19 +44,26 @@ export function NfcCardDeactivateModal(props: Props) {
       {activator(() => {
         onOpen();
       })}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside" data-cy="nfc-card-deactivate-modal">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} noMargin />
-          </ModalHeader>
-          <ModalBody>{t('description')}</ModalBody>
-          <ModalFooter>
-            <Button onPress={onClose}>{t('cancel')}</Button>
-            <Button onPress={onDeactivate} isLoading={isPending}>
-              {t('deactivate')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} data-cy="nfc-card-deactivate-modal">
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('title')} noMargin />
+                </ModalHeader>
+                <ModalBody>{t('description')}</ModalBody>
+                <ModalFooter>
+                  <Button onPress={close}>{t('cancel')}</Button>
+                  <Button onPress={onDeactivate} isLoading={isPending}>
+                    {t('deactivate')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
