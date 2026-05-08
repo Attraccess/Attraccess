@@ -1,8 +1,7 @@
 import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
-import { Button, Form, ModalBody, ModalHeader, ModalFooter, Divider, Slider } from '@heroui/react';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, ModalHeading, ModalFooter, Divider, Slider } from '@heroui/react';
 import { Input } from '@heroui/react';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -88,68 +87,71 @@ export function AttractapEditor(props: Readonly<Props>) {
     <Form onSubmit={onSubmit} data-cy="attractap-editor-form">
       <Modal
         isOpen={props.isOpen}
-        placement="top-center"
         onOpenChange={props.onCancel}
-        scrollBehavior="inside"
         data-cy="attractap-editor-modal"
       >
-        <ModalContent>
-          {() => (
-            <>
-              <ModalHeader className="flex flex-col gap-1">{t('title')}</ModalHeader>
-              <ModalBody>
-                <Input
-                  label={t('readerName')}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('enterReaderName')}
-                  className="w-full"
-                  data-cy="attractap-editor-name-input"
-                />
-                {reader?.firmware.capabilities.hasLeds && (
-                  <Slider
-                    label={t('ledBrightness')}
-                    step={1}
-                    minValue={0}
-                    maxValue={255}
-                    value={ledBrightness}
-                    onChange={(val) => setLedBrightness(val as number)}
+        <ModalBackdrop />
+        <ModalContainer placement="top-center">
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader className="flex flex-col gap-1">
+                  <ModalHeading>{t('title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <Input
+                    label={t('readerName')}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('enterReaderName')}
                     className="w-full"
-                    data-cy="attractap-editor-led-brightness-slider"
+                    data-cy="attractap-editor-name-input"
                   />
-                )}
-                <Divider className="my-6" />
-                <ResourceSelector
-                  selection={connectedResourceIds}
-                  onSelectionChange={(selection) => setConnectedResourceIds(selection)}
-                  data-cy="attractap-editor-resource-selector"
-                  multiple={reader?.firmware.capabilities.resourceSelection ?? true}
-                />
-              </ModalBody>
-              <ModalFooter>
-                <Button
-                  type="button"
-                  color="secondary"
-                  onPress={() => {
-                    props.onCancel();
-                  }}
-                  disabled={updateReaderMutation.isPending}
-                  data-cy="attractap-editor-cancel-button"
-                >
-                  {t('cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  isLoading={updateReaderMutation.isPending}
-                  onPress={save}
-                  data-cy="attractap-editor-save-button"
-                >
-                  {t('save')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
+                  {reader?.firmware.capabilities.hasLeds && (
+                    <Slider
+                      label={t('ledBrightness')}
+                      step={1}
+                      minValue={0}
+                      maxValue={255}
+                      value={ledBrightness}
+                      onChange={(val) => setLedBrightness(val as number)}
+                      className="w-full"
+                      data-cy="attractap-editor-led-brightness-slider"
+                    />
+                  )}
+                  <Divider className="my-6" />
+                  <ResourceSelector
+                    selection={connectedResourceIds}
+                    onSelectionChange={(selection) => setConnectedResourceIds(selection)}
+                    data-cy="attractap-editor-resource-selector"
+                    multiple={reader?.firmware.capabilities.resourceSelection ?? true}
+                  />
+                </ModalBody>
+                <ModalFooter>
+                  <Button
+                    type="button"
+                    color="secondary"
+                    onPress={() => {
+                      props.onCancel();
+                    }}
+                    disabled={updateReaderMutation.isPending}
+                    data-cy="attractap-editor-cancel-button"
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    type="submit"
+                    isLoading={updateReaderMutation.isPending}
+                    onPress={save}
+                    data-cy="attractap-editor-save-button"
+                  >
+                    {t('save')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </Form>
   );

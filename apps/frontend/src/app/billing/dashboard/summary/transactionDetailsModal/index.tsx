@@ -1,5 +1,5 @@
-import { Button, Chip, Divider, ModalBody, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { Button, Chip, Divider, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -68,8 +68,11 @@ export function TransactionDetailsModal(props: Props) {
   return (
     <>
       {children && children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
-        <ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer size="2xl">
+          <ModalDialog>
+            {() => (<>
           <ModalHeader>
             <PageHeader
               title={t('title')}
@@ -209,7 +212,9 @@ export function TransactionDetailsModal(props: Props) {
               </div>
             )}
           </ModalBody>
-        </ModalContent>
+            </>)}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

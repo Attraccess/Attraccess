@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Alert, Button, ModalBody, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
@@ -147,26 +147,31 @@ export function AttractapHardwareSetup(props: Props) {
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        size={state === 'configure' ? '5xl' : undefined}
-        scrollBehavior="inside"
       >
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title.' + state)} subtitle={t('subtitle.' + state)} noMargin onBack={onBack} />
-          </ModalHeader>
+        <ModalBackdrop />
+        <ModalContainer size={state === 'configure' ? '5xl' : undefined}>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('title.' + state)} subtitle={t('subtitle.' + state)} noMargin onBack={onBack} />
+                </ModalHeader>
 
-          <ModalBody className="mb-4">
-            <Content
-              state={state}
-              setState={setState}
-              onClose={onOpenChange}
-              openDeviceSettings={(deviceId) => {
-                onClose();
-                openDeviceSettings(deviceId);
-              }}
-            />
-          </ModalBody>
-        </ModalContent>
+                <ModalBody className="mb-4">
+                  <Content
+                    state={state}
+                    setState={setState}
+                    onClose={onOpenChange}
+                    openDeviceSettings={(deviceId) => {
+                      onClose();
+                      openDeviceSettings(deviceId);
+                    }}
+                  />
+                </ModalBody>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

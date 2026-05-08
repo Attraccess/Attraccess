@@ -1,8 +1,8 @@
 import en from './en.json';
-import { Modal, ModalContent, useDisclosure } from '../../../../../../utils/heroui-compat';
+import { useDisclosure } from '../../../../../../utils/heroui-compat';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -72,35 +72,42 @@ export function SumUpReadersPairing(props: Props) {
     <>
       {children(onOpen)}
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin onBack={onClose} />
-          </ModalHeader>
-          <ModalBody>
-            <Form onSubmit={onSubmit} ref={formRef}>
-              <PasswordInput
-                label={t('inputs.pairingCode')}
-                value={pairingCode}
-                onValueChange={setPairingCode}
-                autoComplete="off"
-                isRequired
-                minLength={8}
-                maxLength={9}
-              />
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin onBack={close} />
+                </ModalHeader>
+                <ModalBody>
+                  <Form onSubmit={onSubmit} ref={formRef}>
+                    <PasswordInput
+                      label={t('inputs.pairingCode')}
+                      value={pairingCode}
+                      onValueChange={setPairingCode}
+                      autoComplete="off"
+                      isRequired
+                      minLength={8}
+                      maxLength={9}
+                    />
 
-              <Input label={t('inputs.name')} value={name} onValueChange={setName} autoComplete="off" isRequired />
+                    <Input label={t('inputs.name')} value={name} onValueChange={setName} autoComplete="off" isRequired />
 
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+                    <input type="submit" hidden />
+                  </Form>
+                </ModalBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isPairingReader}>
-              {t('actions.pair')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalFooter>
+                  <Button color="primary" onPress={onSubmit} isLoading={isPairingReader}>
+                    {t('actions.pair')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
