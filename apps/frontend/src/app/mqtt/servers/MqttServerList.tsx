@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Spinner, Alert, ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Alert } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -144,31 +144,40 @@ export function MqttServerList() {
         ))}
       </div>
 
-      <Modal isOpen={isOpen} onClose={onClose} data-cy="mqtt-server-list-delete-confirmation-modal">
-        <ModalContent>
-          <ModalHeader>{t('deleteServer')}</ModalHeader>
-          <ModalBody>
-            <p>{t('deleteConfirmation')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              color="default"
-              variant="flat"
-              onPress={onClose}
-              data-cy="mqtt-server-list-delete-confirmation-cancel-button"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              color="danger"
-              onPress={confirmDelete}
-              isLoading={deleteServer.isPending}
-              data-cy="mqtt-server-list-delete-confirmation-delete-button"
-            >
-              {t('deleteServer')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} data-cy="mqtt-server-list-delete-confirmation-modal">
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('deleteServer')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <p>{t('deleteConfirmation')}</p>
+                </ModalBody>
+                <ModalFooter>
+                  <Button
+                    color="default"
+                    variant="flat"
+                    onPress={close}
+                    data-cy="mqtt-server-list-delete-confirmation-cancel-button"
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    color="danger"
+                    onPress={confirmDelete}
+                    isLoading={deleteServer.isPending}
+                    data-cy="mqtt-server-list-delete-confirmation-delete-button"
+                  >
+                    {t('deleteServer')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

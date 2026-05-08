@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
@@ -7,7 +6,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, CardHeader, Input, Form, ModalHeader, ModalBody, ModalFooter, Link } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Input, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Link } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
@@ -137,14 +136,23 @@ export function EditEmailTemplatePage() {
             <CardContent className="flex flex-col gap-4">
               {editor}
 
-              <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded} size="full" hideCloseButton>
-                <ModalContent>
-                  <ModalHeader>{t('templateType.' + templateType)}</ModalHeader>
-                  <ModalBody>{editor}</ModalBody>
-                  <ModalFooter>
-                    <Button onPress={() => setEditorIsExpanded(false)}>{t('actions.close')}</Button>
-                  </ModalFooter>
-                </ModalContent>
+              <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded}>
+                <ModalBackdrop />
+                <ModalContainer size="full">
+                  <ModalDialog>
+                    {({ close }) => (
+                      <>
+                        <ModalHeader>
+                          <ModalHeading>{t('templateType.' + templateType)}</ModalHeading>
+                        </ModalHeader>
+                        <ModalBody>{editor}</ModalBody>
+                        <ModalFooter>
+                          <Button onPress={close}>{t('actions.close')}</Button>
+                        </ModalFooter>
+                      </>
+                    )}
+                  </ModalDialog>
+                </ModalContainer>
               </Modal>
             </CardContent>
           </Card>

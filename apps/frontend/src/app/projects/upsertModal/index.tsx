@@ -1,5 +1,5 @@
-import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader, Textarea } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Textarea } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
@@ -137,43 +137,50 @@ export function UpsertProjectModal(props: Props) {
     <>
       {children(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
-          </ModalHeader>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={projectId ? t('title.update') : t('title.create')} noMargin />
+                </ModalHeader>
 
-          <ModalBody>
-            <Form
-              ref={formRef}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmit();
-              }}
-            >
-              <Input label={t('inputs.name.label')} name="name" value={name} onValueChange={setName} />
-              <Textarea
-                label={t('inputs.description.label')}
-                name="description"
-                value={description}
-                onValueChange={setDescription}
-              />
-              <ImageUpload
-                id="project-logo-image-upload"
-                label={t('inputs.logo.label')}
-                onChange={setLogo}
-                autoScale={{ maxWidth: 600, maxHeight: 600 }}
-                currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
-              />
-              <input type="submit" hidden />
-            </Form>
-          </ModalBody>
+                <ModalBody>
+                  <Form
+                    ref={formRef}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      onSubmit();
+                    }}
+                  >
+                    <Input label={t('inputs.name.label')} name="name" value={name} onValueChange={setName} />
+                    <Textarea
+                      label={t('inputs.description.label')}
+                      name="description"
+                      value={description}
+                      onValueChange={setDescription}
+                    />
+                    <ImageUpload
+                      id="project-logo-image-upload"
+                      label={t('inputs.logo.label')}
+                      onChange={setLogo}
+                      autoScale={{ maxWidth: 600, maxHeight: 600 }}
+                      currentImageUrl={existingProject?.logo ? filenameToUrl(existingProject.logo) : undefined}
+                    />
+                    <input type="submit" hidden />
+                  </Form>
+                </ModalBody>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSubmit} isLoading={isSaving}>
-              {projectId ? t('actions.update.label') : t('actions.create.label')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalFooter>
+                  <Button color="primary" onPress={onSubmit} isLoading={isSaving}>
+                    {projectId ? t('actions.update.label') : t('actions.create.label')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

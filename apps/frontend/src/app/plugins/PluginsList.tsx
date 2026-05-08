@@ -1,7 +1,6 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
-import { Modal, ModalContent } from '../../utils/heroui-compat';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, Button, ModalHeader, ModalBody, ModalFooter, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Alert } from '@heroui/react';
+import { Card, CardContent, CardHeader, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Alert } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
@@ -132,32 +131,41 @@ export function PluginsList() {
           onOpenChange={setDeleteModalOpen}
           data-cy="plugins-list-delete-confirmation-modal"
         >
-          <ModalContent>
-            <ModalHeader>{t('deleteConfirmation.title')}</ModalHeader>
-            <ModalBody>
-              {t('deleteConfirmation.message', {
-                pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
-              })}
-            </ModalBody>
-            <ModalFooter>
-              <Button
-                variant="flat"
-                onPress={handleDeleteCancel}
-                isDisabled={isDeleting}
-                data-cy="plugins-list-delete-confirmation-cancel-button"
-              >
-                {t('deleteConfirmation.cancel')}
-              </Button>
-              <Button
-                color="danger"
-                onPress={handleDeleteConfirm}
-                isLoading={isDeleting}
-                data-cy="plugins-list-delete-confirmation-delete-button"
-              >
-                {t('deleteConfirmation.delete')}
-              </Button>
-            </ModalFooter>
-          </ModalContent>
+          <ModalBackdrop />
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>
+                    <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
+                  </ModalHeader>
+                  <ModalBody>
+                    {t('deleteConfirmation.message', {
+                      pluginName: plugins?.find((plugin) => plugin.id === pluginToDelete)?.name,
+                    })}
+                  </ModalBody>
+                  <ModalFooter>
+                    <Button
+                      variant="flat"
+                      onPress={close}
+                      isDisabled={isDeleting}
+                      data-cy="plugins-list-delete-confirmation-cancel-button"
+                    >
+                      {t('deleteConfirmation.cancel')}
+                    </Button>
+                    <Button
+                      color="danger"
+                      onPress={handleDeleteConfirm}
+                      isLoading={isDeleting}
+                      data-cy="plugins-list-delete-confirmation-delete-button"
+                    >
+                      {t('deleteConfirmation.delete')}
+                    </Button>
+                  </ModalFooter>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
         </Modal>
 
         <UploadPluginModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} />
