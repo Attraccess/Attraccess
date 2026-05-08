@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
@@ -169,63 +169,63 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
       {props.children(onOpen)}
       <Modal
         isOpen={isOpen}
-        placement="top-center"
         onOpenChange={onOpenChange}
-        scrollBehavior="inside"
         data-cy="resource-group-upsert-modal"
       >
-        <ModalContent>
-          {(onClose) => (
-            <Form onSubmit={handleSubmit}>
-              <ModalHeader>{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</ModalHeader>
+        <ModalBackdrop />
+        <ModalContainer placement="top-center">
+          <ModalDialog>
+            {({ close }) => (
+              <Form onSubmit={handleSubmit}>
+                <ModalHeader>
+                  <ModalHeading>{isEditMode ? t('modalTitleUpdate') : t('modalTitleCreate')}</ModalHeading>
+                </ModalHeader>
 
-              <ModalBody className="w-full space-y-4">
-                <Input
-                  ref={nameInputRef}
-                  isRequired
-                  label={t('nameLabel')}
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  // Use isInvalid prop for error state
-                  isInvalid={!!getFieldError('name')}
-                  errorMessage={getFieldError('name')}
-                  // Clear specific error when user types
-                  onKeyDown={() => setApiErrors((prev) => ({ ...prev, name: undefined }))}
-                  data-cy="resource-group-name-input"
-                />
-                <Input
-                  label={t('descriptionLabel')}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  isInvalid={!!getFieldError('description')}
-                  errorMessage={getFieldError('description')}
-                  onKeyDown={() => setApiErrors((prev) => ({ ...prev, description: undefined }))}
-                  data-cy="resource-group-description-input"
-                />
-              </ModalBody>
+                <ModalBody className="w-full space-y-4">
+                  <Input
+                    ref={nameInputRef}
+                    isRequired
+                    label={t('nameLabel')}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    isInvalid={!!getFieldError('name')}
+                    errorMessage={getFieldError('name')}
+                    onKeyDown={() => setApiErrors((prev) => ({ ...prev, name: undefined }))}
+                    data-cy="resource-group-name-input"
+                  />
+                  <Input
+                    label={t('descriptionLabel')}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    isInvalid={!!getFieldError('description')}
+                    errorMessage={getFieldError('description')}
+                    onKeyDown={() => setApiErrors((prev) => ({ ...prev, description: undefined }))}
+                    data-cy="resource-group-description-input"
+                  />
+                </ModalBody>
 
-              <ModalFooter>
-                <Button
-                  variant="flat"
-                  color="default"
-                  onPress={onClose}
-                  data-cy="resource-group-upsert-modal-cancel-button"
-                >
-                  {t('cancelButton')}
-                </Button>
-                {/* Use the general mutation.isPending state */}
-                <Button
-                  color="primary"
-                  type="submit"
-                  isLoading={mutation.isPending}
-                  data-cy="resource-group-upsert-modal-submit-button"
-                >
-                  {isEditMode ? t('updateButton') : t('createButton')}
-                </Button>
-              </ModalFooter>
-            </Form>
-          )}
-        </ModalContent>
+                <ModalFooter>
+                  <Button
+                    variant="flat"
+                    color="default"
+                    onPress={close}
+                    data-cy="resource-group-upsert-modal-cancel-button"
+                  >
+                    {t('cancelButton')}
+                  </Button>
+                  <Button
+                    color="primary"
+                    type="submit"
+                    isLoading={mutation.isPending}
+                    data-cy="resource-group-upsert-modal-submit-button"
+                  >
+                    {isEditMode ? t('updateButton') : t('createButton')}
+                  </Button>
+                </ModalFooter>
+              </Form>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

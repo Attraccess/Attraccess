@@ -1,7 +1,6 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { SelectItem } from "../../../../../utils/heroui-compat";
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { Button, ModalBody, ModalFooter, ModalHeader, Select, Selection } from "@heroui/react";
+import { SelectItem, useDisclosure } from "../../../../../utils/heroui-compat";
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Select, Selection } from "@heroui/react";
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -110,41 +109,46 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
     <>
       {children(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-        <ModalContent>
-          {() => (
-            <>
-              <ModalHeader>{t('title')}</ModalHeader>
-              <ModalBody className="gap-4">
-                <p className="text-small text-default-500">{t('description')}</p>
-                <UserSearch
-                  label={t('inputs.user')}
-                  onSelectionChange={setSelectedUser}
-                  afterSelection={
-                    selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
-                  }
-                />
-                <Select
-                  label={t('inputs.role')}
-                  selectedKeys={[role]}
-                  onSelectionChange={onSelectionChange}
-                  disallowEmptySelection
-                >
-                  {roleOptions.map((value) => (
-                    <SelectItem key={value} id={value}>{t(`roles.${value}`)}</SelectItem>
-                  ))}
-                </Select>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={() => onClose()} isDisabled={isPending}>
-                  {t('actions.cancel')}
-                </Button>
-                <Button color="primary" onPress={onInvite} isDisabled={!selectedUser} isLoading={isPending}>
-                  {t('actions.invite')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody className="gap-4">
+                  <p className="text-small text-default-500">{t('description')}</p>
+                  <UserSearch
+                    label={t('inputs.user')}
+                    onSelectionChange={setSelectedUser}
+                    afterSelection={
+                      selectedUser ? <span className="text-tiny text-default-500">{selectedUser.username}</span> : null
+                    }
+                  />
+                  <Select
+                    label={t('inputs.role')}
+                    selectedKeys={[role]}
+                    onSelectionChange={onSelectionChange}
+                    disallowEmptySelection
+                  >
+                    {roleOptions.map((value) => (
+                      <SelectItem key={value} id={value}>{t(`roles.${value}`)}</SelectItem>
+                    ))}
+                  </Select>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={close} isDisabled={isPending}>
+                    {t('actions.cancel')}
+                  </Button>
+                  <Button color="primary" onPress={onInvite} isDisabled={!selectedUser} isLoading={isPending}>
+                    {t('actions.invite')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
