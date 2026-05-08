@@ -1,6 +1,6 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { Modal, ModalContent, useDisclosure } from '../../../../../../utils/heroui-compat';
-import { Button, Form, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../../../../utils/heroui-compat';
+import { Button, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';
@@ -48,42 +48,49 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(onOpen)}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader
-              title={t('nodes.' + schema.type + '.title')}
-              subtitle={t('nodes.' + schema.type + '.description')}
-              noMargin
-            />
-          </ModalHeader>
-
-          <ModalBody className="flex flex-col gap-2">
-            <Form onSubmit={onSave} ref={formRef}>
-              {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
-                ([propertyName, property]) => (
-                  <PropertyInput
-                    key={propertyName}
-                    isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
-                    nodeType={schema.type}
-                    tNodeTranslations={t}
-                    name={propertyName}
-                    schema={property}
-                    value={data[propertyName]}
-                    onChange={(value) => onInputChange(propertyName, value)}
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader
+                    title={t('nodes.' + schema.type + '.title')}
+                    subtitle={t('nodes.' + schema.type + '.description')}
+                    noMargin
                   />
-                ),
-              )}
-              <input hidden type="submit" />
-            </Form>
-          </ModalBody>
+                </ModalHeader>
 
-          <ModalFooter>
-            <Button color="primary" onPress={onSave}>
-              {t('editor.buttons.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalBody className="flex flex-col gap-2">
+                  <Form onSubmit={onSave} ref={formRef}>
+                    {Object.entries(schema.configSchema.properties as Record<string, Property<unknown>>).map(
+                      ([propertyName, property]) => (
+                        <PropertyInput
+                          key={propertyName}
+                          isRequired={(schema.configSchema.required as string[])?.includes(propertyName)}
+                          nodeType={schema.type}
+                          tNodeTranslations={t}
+                          name={propertyName}
+                          schema={property}
+                          value={data[propertyName]}
+                          onChange={(value) => onInputChange(propertyName, value)}
+                        />
+                      ),
+                    )}
+                    <input hidden type="submit" />
+                  </Form>
+                </ModalBody>
+
+                <ModalFooter>
+                  <Button color="primary" onPress={onSave}>
+                    {t('editor.buttons.save')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

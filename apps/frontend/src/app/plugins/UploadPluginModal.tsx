@@ -1,7 +1,6 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
-import { Modal, ModalContent } from '../../utils/heroui-compat';
 import { useState, useRef } from 'react';
-import { Button, ModalHeader, ModalBody, ModalFooter, Input } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Input } from '@heroui/react';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';
@@ -75,54 +74,63 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onClose} data-cy="upload-plugin-modal">
-      <ModalContent>
-        <ModalHeader>{t('title')}</ModalHeader>
-        <ModalBody>
-          <div className="space-y-4">
-            <p>{t('description')}</p>
+    <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }} data-cy="upload-plugin-modal">
+      <ModalBackdrop />
+      <ModalContainer>
+        <ModalDialog>
+          {({ close }) => (
+            <>
+              <ModalHeader>
+                <ModalHeading>{t('title')}</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <div className="space-y-4">
+                  <p>{t('description')}</p>
 
-            <Input
-              type="file"
-              ref={fileInputRef}
-              accept=".zip"
-              onChange={handleFileChange}
-              isInvalid={isFileInvalid}
-              errorMessage={isFileInvalid ? t('errors.invalidFile') : ''}
-              description={t('fileInputDescription')}
-              data-cy="upload-plugin-modal-file-input"
-            />
+                  <Input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".zip"
+                    onChange={handleFileChange}
+                    isInvalid={isFileInvalid}
+                    errorMessage={isFileInvalid ? t('errors.invalidFile') : ''}
+                    description={t('fileInputDescription')}
+                    data-cy="upload-plugin-modal-file-input"
+                  />
 
-            {selectedFile && (
-              <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                <p className="text-sm">
-                  <span className="font-semibold">{t('selectedFile')}:</span> {selectedFile.name}
-                </p>
-              </div>
-            )}
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            variant="flat"
-            onPress={handleCancel}
-            isDisabled={isPending}
-            data-cy="upload-plugin-modal-cancel-button"
-          >
-            {t('cancel')}
-          </Button>
-          <Button
-            color="primary"
-            onPress={handleUpload}
-            isLoading={isPending}
-            isDisabled={!selectedFile || isFileInvalid}
-            startContent={<Upload size={18} />}
-            data-cy="upload-plugin-modal-upload-button"
-          >
-            {t('upload')}
-          </Button>
-        </ModalFooter>
-      </ModalContent>
+                  {selectedFile && (
+                    <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">
+                      <p className="text-sm">
+                        <span className="font-semibold">{t('selectedFile')}:</span> {selectedFile.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="flat"
+                  onPress={close}
+                  isDisabled={isPending}
+                  data-cy="upload-plugin-modal-cancel-button"
+                >
+                  {t('cancel')}
+                </Button>
+                <Button
+                  color="primary"
+                  onPress={handleUpload}
+                  isLoading={isPending}
+                  isDisabled={!selectedFile || isFileInvalid}
+                  startContent={<Upload size={18} />}
+                  data-cy="upload-plugin-modal-upload-button"
+                >
+                  {t('upload')}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 }
