@@ -123,6 +123,39 @@
             }
           }
         }
+      },
+      "variable": {
+        "changed": {
+          "title": "Variable changed",
+          "description": "Triggered when a watched flow variable changes value.",
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "watches": {
+              "label": "Watched variables",
+              "empty": "No variables watched.",
+              "add": "Add watch",
+              "items": {
+                "key": { "label": "Key" },
+                "scope": {
+                  "label": "Scope",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
+            },
+            "source": {
+              "label": "Trigger source",
+              "enum": {
+                "any": "Any change (including this resource)",
+                "exclude-self": "Only changes from other resources"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -249,6 +282,64 @@
         "config": {
           "message": {
             "label": "Error message template"
+          }
+        }
+      },
+      "variables": {
+        "set": {
+          "title": "Set variables",
+          "description": "Stores one or more flow variables. Keys and values support Handlebars templates.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": { "label": "Key" },
+                "value": { "label": "Value template" },
+                "scope": {
+                  "label": "Scope",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "title": "Get variables",
+          "description": "Reads flow variables and writes them onto the payload at the configured paths.",
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
+          "config": {
+            "variables": {
+              "label": "Variables",
+              "empty": "No variables configured.",
+              "add": "Add variable",
+              "items": {
+                "key": { "label": "Key" },
+                "scope": {
+                  "label": "Scope",
+                  "enum": {
+                    "resource": "Resource",
+                    "global": "Global"
+                  }
+                },
+                "payloadPath": { "label": "Payload path" }
+              }
+            }
           }
         }
       }

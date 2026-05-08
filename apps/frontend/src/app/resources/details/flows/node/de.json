@@ -123,6 +123,39 @@
             }
           }
         }
+      },
+      "variable": {
+        "changed": {
+          "title": "Variable geändert",
+          "description": "Wird ausgelöst, wenn sich der Wert einer überwachten Flow-Variable ändert.",
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "watches": {
+              "label": "Überwachte Variablen",
+              "empty": "Keine Variablen überwacht.",
+              "add": "Überwachung hinzufügen",
+              "items": {
+                "key": { "label": "Schlüssel" },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                }
+              }
+            },
+            "source": {
+              "label": "Auslöse-Quelle",
+              "enum": {
+                "any": "Jede Änderung (auch diese Ressource)",
+                "exclude-self": "Nur Änderungen aus anderen Ressourcen"
+              }
+            }
+          }
+        }
       }
     },
     "processing": {
@@ -249,6 +282,64 @@
         "config": {
           "message": {
             "label": "Fehlermeldungs-Vorlage"
+          }
+        }
+      },
+      "variables": {
+        "set": {
+          "title": "Variablen setzen",
+          "description": "Speichert eine oder mehrere Flow-Variablen. Schlüssel und Werte unterstützen Handlebars-Vorlagen.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "variables": {
+              "label": "Variablen",
+              "empty": "Keine Variablen konfiguriert.",
+              "add": "Variable hinzufügen",
+              "items": {
+                "key": { "label": "Schlüssel" },
+                "value": { "label": "Wert-Vorlage" },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "get": {
+          "title": "Variablen lesen",
+          "description": "Liest Flow-Variablen und schreibt sie an den konfigurierten Pfaden in das Payload.",
+          "inputs": {
+            "input": "Eingabe"
+          },
+          "outputs": {
+            "output": "Ausgabe"
+          },
+          "config": {
+            "variables": {
+              "label": "Variablen",
+              "empty": "Keine Variablen konfiguriert.",
+              "add": "Variable hinzufügen",
+              "items": {
+                "key": { "label": "Schlüssel" },
+                "scope": {
+                  "label": "Geltungsbereich",
+                  "enum": {
+                    "resource": "Ressource",
+                    "global": "Global"
+                  }
+                },
+                "payloadPath": { "label": "Nutzlast-Pfad" }
+              }
+            }
           }
         }
       }
