@@ -37,6 +37,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
     callbackURL: string,
     stateStore: OidcCookieStateStore,
   ) {
+    const configuredScopes =
+      config.scopes && config.scopes.length > 0 ? config.scopes : ['openid', 'email', 'profile'];
+    // passport-openidconnect always prepends `openid` to the scope param, so strip it from the
+    // configured list to avoid sending `scope=openid openid email profile`.
+    const scopeWithoutOpenid = configuredScopes.filter((s) => s.trim().toLowerCase() !== 'openid');
+
     super({
       issuer: config.issuer,
       authorizationURL: config.authorizationURL,
@@ -45,8 +51,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', true
       clientID: config.clientId,
       clientSecret: config.clientSecret,
       callbackURL,
-      scope: config.scopes && config.scopes.length > 0 ? config.scopes : ['openid', 'email', 'profile'],
+      scope: scopeWithoutOpenid,
       store: stateStore,
+      // Force userinfo endpoint fetch — the library otherwise skips it unless the verify
+      // callback has arity ≥ 9. Some IdPs only return `email` from userinfo, not the id_token.
+      skipUserProfile: false,
     });
 
     this.logger.log(`Initialized OIDC strategy with issuer: ${config.issuer} and callbackURL: ${callbackURL}`);
