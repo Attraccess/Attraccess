@@ -133,8 +133,7 @@
           },
           "preview": {
             "watches": "Überwacht",
-            "source": "Quelle",
-            "watchEntry": "{{key}} ({{scope}})"
+            "source": "Quelle"
           },
           "config": {
             "watches": {
@@ -301,8 +300,7 @@
             "output": "Ausgabe"
           },
           "preview": {
-            "assignments": "Setzt",
-            "assignment": "{{scope}}.{{key}} = {{value}}"
+            "assignments": "Setzt"
           },
           "config": {
             "variables": {
@@ -316,7 +314,7 @@
                 },
                 "value": {
                   "label": "Wert-Vorlage",
-                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit {{path.to.field}}, vorhandene Variablen mit {{variables.<key>}}. Reiner Text ohne {{}} wird unverändert übernommen.",
+                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
                   "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
                   "docsLabel": "Handlebars-Syntax-Referenz"
                 },
@@ -342,8 +340,7 @@
             "output": "Ausgabe"
           },
           "preview": {
-            "reads": "Liest",
-            "read": "{{scope}}.{{key}} → {{path}}"
+            "reads": "Liest"
           },
           "config": {
             "variables": {
