@@ -100,7 +100,7 @@ export function PluginsList() {
               emptyContent={<EmptyState />}
             >
               {(plugin) => (
-                <TableRow key={plugin.name}>
+                <TableRow key={plugin.name} id={plugin.name}>
                   <TableCell>{plugin.name}</TableCell>
                   <TableCell>
                     <Chip size="sm" variant="flat" color="primary">

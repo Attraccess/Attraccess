@@ -1,4 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { SelectItem } from "../../../utils/heroui-compat";
 import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
 import {
   ApiError,
@@ -6,7 +7,7 @@ import {
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import { Alert, Button, ModalBody, ModalFooter, ModalHeader, Select, SelectItem, Selection } from '@heroui/react';
+import { Alert, Button, ModalBody, ModalFooter, ModalHeader, Select, Selection } from "@heroui/react";
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -122,7 +123,7 @@ export function TwoFactorPolicyModal(props: Props) {
               isDisabled={isLoading}
             >
               {policyOptions.map((option) => (
-                <SelectItem key={option.value} textValue={option.label}>
+                <SelectItem key={option.value} id={option.value} textValue={option.label}>
                   <div className="flex flex-col gap-1">
                     <span>{option.label}</span>
                     <span className="text-xs text-default-500">{option.description}</span>

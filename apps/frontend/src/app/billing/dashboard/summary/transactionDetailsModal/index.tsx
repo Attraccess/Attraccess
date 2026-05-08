@@ -172,7 +172,7 @@ export function TransactionDetailsModal(props: Props) {
                     </TableHeader>
                     <TableBody emptyContent={t('items.empty')}>
                       {(transaction.items ?? []).map((item) => (
-                        <TableRow key={item.id}>
+                        <TableRow key={item.id} id={item.id}>
                           <TableCell>
                             <div className="font-medium">
                               {tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}

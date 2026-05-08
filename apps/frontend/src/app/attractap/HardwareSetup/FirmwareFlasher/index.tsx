@@ -136,7 +136,7 @@ export function FirmwareFlasher(props: Props) {
       )}
 
       <Accordion>
-        <AccordionItem key="terminal" title={t('terminal.title')}>
+        <AccordionItem key="terminal" id="terminal" title={t('terminal.title')}>
           <Terminal logLines={logLines} maxHeight="30vh" />
         </AccordionItem>
       </Accordion>

@@ -89,6 +89,7 @@ export function ModalContent({ children }: ModalContentProps) {
 }
 
 export { ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+export { ListBoxItem as SelectItem, ListBoxItem as AutocompleteItem } from '@heroui/react';
 
 export type ProgressProps = ComponentProps<typeof V3ProgressBar>;
 

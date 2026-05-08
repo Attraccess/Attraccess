@@ -138,7 +138,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
           <TableColumn>{t('selectedUsers.columns.user')}</TableColumn>
           {
             (additionalColumns ?? []).map((col) => (
-              <TableColumn className={col.headerClassName} key={col.key}>
+              <TableColumn className={col.headerClassName} key={col.key} id={col.key}>
                 {col.label}
               </TableColumn>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,7 +153,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
           emptyContent={<EmptyState />}
         >
           {(user) => (
-            <TableRow key={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>
+            <TableRow key={user.id} id={user.id} className={typeof rowClassName === 'function' ? rowClassName(user) : rowClassName}>
               <TableCell className="w-full">
                 <AttraccessUser user={user} />
               </TableCell>

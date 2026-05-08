@@ -274,7 +274,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 </TableHeader>
                 <TableBody>
                   {topResources.map((resource) => (
-                    <TableRow key={resource.resourceId}>
+                    <TableRow key={resource.resourceId} id={resource.resourceId}>
                       <TableCell>{resource.resourceName}</TableCell>
                       <TableCell>{formatNumber(resource.sessions)}</TableCell>
                       <TableCell>{formatNumber(resource.minutes)}</TableCell>

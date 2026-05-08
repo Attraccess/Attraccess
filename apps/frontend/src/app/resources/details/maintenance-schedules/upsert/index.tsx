@@ -1,4 +1,5 @@
-import { ModalBody, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select, SelectItem } from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select } from "@heroui/react";
+import { SelectItem } from "../../../../../utils/heroui-compat";
 import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -244,7 +245,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                 }}
               >
                 {TRIGGER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value}>{t(`triggerType.${opt.labelKey}`)}</SelectItem>
+                  <SelectItem key={opt.value} id={opt.value}>{t(`triggerType.${opt.labelKey}`)}</SelectItem>
                 ))}
               </Select>
 
@@ -267,7 +268,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (
-                      <SelectItem key={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                      <SelectItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
                     ))}
                   </Select>
                 </>
@@ -303,7 +304,7 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
                     }}
                   >
                     {Object.values(UsageDurationUnit).map((unit) => (
-                      <SelectItem key={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
+                      <SelectItem key={unit} id={unit}>{t(`inputs.unit.${unit}`)}</SelectItem>
                     ))}
                   </Select>
                   <p className="text-sm text-default-500">{t('inputs.timeIntervalEvaluationNote')}</p>

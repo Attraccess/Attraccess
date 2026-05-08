@@ -197,7 +197,7 @@ export const UserManagementPage: React.FC = () => {
                 const isSsoLinked = ssoDetails.length > 0;
 
                 return (
-                  <TableRow key={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
+                  <TableRow key={user.id} id={user.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
                     <TableCell className="hidden md:table-cell">
                       {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                     </TableCell>

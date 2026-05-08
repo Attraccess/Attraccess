@@ -178,7 +178,7 @@ export function ManageResourceGroups({
           >
             {(group) => (
               <TableRow
-                key={group.id}
+                key={group.id} id={group.id}
                 className={isAdded(group) ? 'border-l-8 border-l-success' : 'border-l-8 border-l-danger'}
               >
                 <TableCell className="w-full">{group.name}</TableCell>

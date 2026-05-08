@@ -143,7 +143,7 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
             </DropdownTrigger>
             <DropdownMenu disallowEmptySelection aria-label={t('alternativeEndSessionOptionsMenu.label')}>
               <DropdownItem
-                key="endWithNotes"
+                key="endWithNotes" id="endWithNotes"
                 description={t('alternativeEndSessionOptionsMenu.endWithNotes.description')}
                 onPress={handleOpenEndSessionModal}
               >

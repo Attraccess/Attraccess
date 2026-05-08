@@ -182,7 +182,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
           aria-label={t('table.ariaLabel')}
         >
           <TableHeader columns={selectedColumns}>
-            {(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}
+            {(column) => <TableColumn key={column.key} id={column.key}>{column.label}</TableColumn>}
           </TableHeader>
           <TableBody
             items={itemRows}
@@ -191,7 +191,7 @@ export function BaseCsvExportModal<TData extends Row>(props: Props<TData>) {
             emptyContent={<EmptyState />}
           >
             {(row) => (
-              <TableRow key={row.key}>
+              <TableRow key={row.key} id={row.key}>
                 {row.columns.map((column) => (
                   <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
                     {column.value}

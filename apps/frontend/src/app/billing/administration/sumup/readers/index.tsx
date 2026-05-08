@@ -74,7 +74,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
             emptyContent={<EmptyState />}
           >
             {(reader) => (
-              <TableRow key={reader.id}>
+              <TableRow key={reader.id} id={reader.id}>
                 <TableCell>{reader.name}</TableCell>
                 <TableCell>{reader.device.model}</TableCell>
                 <TableCell>{reader.status}</TableCell>

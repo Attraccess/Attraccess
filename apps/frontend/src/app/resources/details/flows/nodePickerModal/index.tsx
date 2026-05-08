@@ -92,7 +92,7 @@ export function NodePickerModal(props: Props) {
           <ModalBody className="flex flex-col gap-4">
             <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
               {nodeGroups.map((group, index) => (
-                <AccordionItem key={index} title={t('nodeType.' + group.category)}>
+                <AccordionItem key={index} id={index} title={t('nodeType.' + group.category)}>
                   <div className="flex flex-row flex-wrap gap-4">
                     {group.nodes.map((nodeSchema) => (
                       <div

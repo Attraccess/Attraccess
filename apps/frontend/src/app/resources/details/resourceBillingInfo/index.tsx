@@ -169,7 +169,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             </TableRow>
             {
               resourceBillingConfiguration.additionalItems.map((item) => (
-                <TableRow key={JSON.stringify(item)}>
+                <TableRow key={JSON.stringify(item)} id={JSON.stringify(item)}>
                   <TableCell>{item.name}</TableCell>
                   <TableCell className="text-warning">
                     {t('billingValue', {

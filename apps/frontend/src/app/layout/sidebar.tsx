@@ -193,7 +193,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
             <Accordion defaultSelectedKeys={['##default##']}>
               {otherGroups.map((group) => (
                 <AccordionItem
-                  key={group.translationKey}
+                  key={group.translationKey} id={group.translationKey}
                   title={t('groups.' + group.translationKey + '.label')}
                   startContent={<group.icon size={16} />}
                 >
@@ -218,7 +218,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
             <Accordion isCompact>
               {sidebarEndGroups.map((group) => (
                 <AccordionItem
-                  key={group.translationKey}
+                  key={group.translationKey} id={group.translationKey}
                   title={t('endItems.groups.' + group.translationKey + '.label')}
                   startContent={<group.icon size={16} />}
                   isCompact
@@ -269,11 +269,11 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu data-cy="sidebar-settings-dropdown-menu">
-                  <DropdownItem key="language-label" isDisabled startContent={<Languages className="h-4 w-4" />}>
+                  <DropdownItem key="language-label" id="language-label" isDisabled startContent={<Languages className="h-4 w-4" />}>
                     {t('language')}
                   </DropdownItem>
                   <DropdownItem
-                    key="language-en"
+                    key="language-en" id="language-en"
                     onPress={() => setLanguage('en')}
                     endContent={language === 'en' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-en"
@@ -281,7 +281,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                     {t('languages.en')}
                   </DropdownItem>
                   <DropdownItem
-                    key="language-de"
+                    key="language-de" id="language-de"
                     onPress={() => setLanguage('de')}
                     endContent={language === 'de' ? <Check className="h-4 w-4" /> : null}
                     data-cy="sidebar-language-de"
@@ -289,7 +289,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                     {t('languages.de')}
                   </DropdownItem>
                   <DropdownItem
-                    key="account"
+                    key="account" id="account"
                     onPress={() => navigate('/account')}
                     startContent={<User className="h-4 w-4" />}
                     data-cy="sidebar-account-button"
@@ -297,7 +297,7 @@ export function Sidebar({ isOpen, toggleSidebar }: SidebarProps) {
                     {t('account')}
                   </DropdownItem>
                   <DropdownItem
-                    key="logout"
+                    key="logout" id="logout"
                     onPress={() => logout()}
                     startContent={<LogOut />}
                     data-cy="sidebar-logout-button"
