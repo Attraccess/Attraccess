@@ -1,4 +1,4 @@
-import { Image, Skeleton, Card, CardBody } from '@heroui/react';
+import { Skeleton, Card, CardBody } from '@heroui/react';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -36,7 +36,7 @@ export function ProjectTeamPage() {
         subtitle={project?.name ?? <Skeleton className="h-4 w-full" />}
         icon={
           project?.logo ? (
-            <Image className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
+            <img className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
           ) : (
             <FoldersIcon />
           )

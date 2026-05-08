@@ -7,7 +7,7 @@ import {
   useProjectsServiceFindOneProjectKey,
   useProjectsServiceUnarchiveProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Image, Button, Link, Chip } from '@heroui/react';
+import { Skeleton, Button, Link, Chip } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
 import { PageHeader } from '../../../components/pageHeader';
 import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
@@ -140,7 +140,7 @@ export function ProjectDetailsPage() {
         subtitle={project?.description ?? <Skeleton className="w-full h-4" />}
         icon={
           project?.logo ? (
-            <Image className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
+            <img className="max-w-12 max-h-12" src={filenameToUrl(project.logo)} alt={project?.name} />
           ) : (
             <FoldersIcon />
           )
