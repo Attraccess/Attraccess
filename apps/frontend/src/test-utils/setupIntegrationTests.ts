@@ -18,13 +18,16 @@ vi.mock('../hooks/useAuth', () => ({
 }));
 
 // Mock theme hook
-vi.mock('@heroui/use-theme', () => ({
-  __esModule: true,
-  useTheme: () => ({
-    theme: 'light',
-    setTheme: vi.fn(),
-  }),
-}));
+vi.mock('@heroui/react', async () => {
+  const actual = await vi.importActual<typeof import('@heroui/react')>('@heroui/react');
+  return {
+    ...actual,
+    useTheme: () => ({
+      theme: 'light',
+      setTheme: vi.fn(),
+    }),
+  };
+});
 
 // Mock the API module to handle import.meta
 vi.mock('../api/index', () => ({

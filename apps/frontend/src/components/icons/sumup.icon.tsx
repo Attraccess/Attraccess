@@ -1,4 +1,4 @@
-import { useTheme } from '@heroui/use-theme';
+import { useTheme } from '@heroui/react';
 import { useMemo } from 'react';
 
 function SumUpIconDarkTheme(props: React.SVGProps<SVGSVGElement>) {

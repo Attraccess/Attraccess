@@ -28,7 +28,7 @@ import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { ExpandIcon } from 'lucide-react';
-import { useTheme } from '@heroui/use-theme';
+import { useTheme } from '@heroui/react';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();

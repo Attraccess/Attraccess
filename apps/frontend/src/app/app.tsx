@@ -1,13 +1,13 @@
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
-import { useTheme } from '@heroui/use-theme';
 import { PropsWithChildren, useEffect, useMemo } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { HeroUIProvider, Spinner } from '@heroui/react';
+import { Spinner, useTheme } from '@heroui/react';
+import { I18nProvider, RouterProvider } from 'react-aria-components';
 import { OpenAPI, SystemPermissions } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import PullToRefresh from 'react-simple-pull-to-refresh';
@@ -96,16 +96,18 @@ function AppLayout(props: PropsWithChildren) {
       }
       isPullable={pullToRefreshIsEnabled}
     >
-      <HeroUIProvider navigate={navigate} labelPlacement="inside" locale={language}>
-        <ToastProvider>
-          <ReactFlowProvider>
-            <Layout noLayout={!isAuthenticated}>
-              <ServerNotAvailable />
-              {props.children}
-            </Layout>
-          </ReactFlowProvider>
-        </ToastProvider>
-      </HeroUIProvider>
+      <RouterProvider navigate={navigate}>
+        <I18nProvider locale={language}>
+          <ToastProvider>
+            <ReactFlowProvider>
+              <Layout noLayout={!isAuthenticated}>
+                <ServerNotAvailable />
+                {props.children}
+              </Layout>
+            </ReactFlowProvider>
+          </ToastProvider>
+        </I18nProvider>
+      </RouterProvider>
     </PullToRefresh>
   );
 }
