@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { Button, Spacer } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { Logo } from '../../components/logo';
 
 interface HeaderProps {
@@ -20,7 +20,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         <Menu className="h-6 w-6" />
       </Button>
       <Logo />
-      <Spacer className="w-6" />
+      <div className="w-6" aria-hidden="true" />
     </header>
   );
 }

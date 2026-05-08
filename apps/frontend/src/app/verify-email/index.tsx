@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, Button, Card, CardBody, CardFooter, CardHeader, Spacer } from '@heroui/react';
+import { Alert, Button, Card, CardBody, CardFooter, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -107,7 +107,7 @@ export function VerifyEmail() {
               data-cy="verify-email-error-alert"
             />
           </CardBody>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             <Button
               fullWidth
               color="primary"
@@ -117,7 +117,6 @@ export function VerifyEmail() {
             >
               {t('error.tryAgain')}
             </Button>
-            <Spacer y={2} />
             <Button
               fullWidth
               variant="bordered"
