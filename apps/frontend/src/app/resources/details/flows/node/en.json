@@ -131,6 +131,11 @@
           "outputs": {
             "output": "Output"
           },
+          "preview": {
+            "watches": "Watching",
+            "source": "Source",
+            "watchEntry": "{{key}} ({{scope}})"
+          },
           "config": {
             "watches": {
               "label": "Watched variables",
@@ -295,16 +300,29 @@
           "outputs": {
             "output": "Output"
           },
+          "preview": {
+            "assignments": "Sets",
+            "assignment": "{{scope}}.{{key}} = {{value}}"
+          },
           "config": {
             "variables": {
               "label": "Variables",
               "empty": "No variables configured.",
               "add": "Add variable",
               "items": {
-                "key": { "label": "Key" },
-                "value": { "label": "Value template" },
+                "key": {
+                  "label": "Key",
+                  "helpText": "Identifier for this variable. Letters, digits, dot, dash and underscore."
+                },
+                "value": {
+                  "label": "Value template",
+                  "helpText": "Handlebars template. Reference payload as {{path.to.field}} and existing variables as {{variables.<key>}}. Plain text without {{}} is stored as-is.",
+                  "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
+                  "docsLabel": "Handlebars syntax reference"
+                },
                 "scope": {
                   "label": "Scope",
+                  "helpText": "Resource: only this resource sees the value. Global: shared across all resources.",
                   "enum": {
                     "resource": "Resource",
                     "global": "Global"
@@ -323,21 +341,32 @@
           "outputs": {
             "output": "Output"
           },
+          "preview": {
+            "reads": "Reads",
+            "read": "{{scope}}.{{key}} → {{path}}"
+          },
           "config": {
             "variables": {
               "label": "Variables",
               "empty": "No variables configured.",
               "add": "Add variable",
               "items": {
-                "key": { "label": "Key" },
+                "key": {
+                  "label": "Key",
+                  "helpText": "Variable to read."
+                },
                 "scope": {
                   "label": "Scope",
+                  "helpText": "Resource: only variables stored on this resource. Global: shared across all resources.",
                   "enum": {
                     "resource": "Resource",
                     "global": "Global"
                   }
                 },
-                "payloadPath": { "label": "Payload path" }
+                "payloadPath": {
+                  "label": "Payload path",
+                  "helpText": "Dot path on the payload where the value will be written, e.g. user.email."
+                }
               }
             }
           }

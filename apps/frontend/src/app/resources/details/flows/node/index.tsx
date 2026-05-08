@@ -9,10 +9,11 @@ import { DeleteConfirmationModal } from '../../../../../components/deleteConfirm
 import { ResourceFlowLog } from '@attraccess/react-query-client';
 import { useNodePreviewRows } from './preview';
 import { NodeEditor } from './editor';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface Props {
   tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
   schema: ResourceFlowNodeSchemaDto;
   node?: NodeProps;
   previewMode?: boolean;
@@ -30,7 +31,7 @@ enum ProcessingState {
 }
 
 export function AttraccessNode(props: Props) {
-  const { schema, previewMode, tNodeTranslations: t, data } = props;
+  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data } = props;
 
   const nodeId = useNodeId();
 
@@ -153,7 +154,7 @@ export function AttraccessNode(props: Props) {
   const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
 
   return (
-    <NodeEditor schema={schema} tNodeTranslations={t}>
+    <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>
       {(openEditor) => (
         <div>
           <DeleteConfirmationModal

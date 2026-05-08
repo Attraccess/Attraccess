@@ -165,10 +165,80 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
-      case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
-      case ResourceFlowNodeType.PROCESSING_VARIABLES_SET:
-      case ResourceFlowNodeType.PROCESSING_VARIABLES_GET:
-        return [];
+      case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED: {
+        const watches = (nodeData?.data.watches as Array<{ key: string; scope: string }>) ?? [];
+        const watchPreview = watches
+          .slice(0, 3)
+          .map((w) =>
+            t('nodes.input.variable.changed.preview.watchEntry', {
+              key: w?.key ?? '',
+              scope: w?.scope
+                ? t('nodes.input.variable.changed.config.watches.items.scope.enum.' + w.scope)
+                : '',
+            }),
+          )
+          .join(', ');
+        const sourceValue = nodeData?.data.source as string | undefined;
+        const rows: NodePreviewData = [
+          {
+            label: t('nodes.input.variable.changed.preview.watches'),
+            value: watchPreview || '-',
+          },
+        ];
+        if (sourceValue) {
+          rows.push({
+            label: t('nodes.input.variable.changed.preview.source'),
+            value: t('nodes.input.variable.changed.config.source.enum.' + sourceValue),
+          });
+        }
+        return rows;
+      }
+
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_SET: {
+        const variables =
+          (nodeData?.data.variables as Array<{ key: string; value: string; scope: string }>) ?? [];
+        const preview = variables
+          .slice(0, 3)
+          .map((v) =>
+            t('nodes.processing.variables.set.preview.assignment', {
+              key: v?.key ?? '',
+              value: v?.value ?? '',
+              scope: v?.scope
+                ? t('nodes.processing.variables.set.config.variables.items.scope.enum.' + v.scope)
+                : '',
+            }),
+          )
+          .join(', ');
+        return [
+          {
+            label: t('nodes.processing.variables.set.preview.assignments'),
+            value: preview || '-',
+          },
+        ];
+      }
+
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_GET: {
+        const variables =
+          (nodeData?.data.variables as Array<{ key: string; scope: string; payloadPath: string }>) ?? [];
+        const preview = variables
+          .slice(0, 3)
+          .map((v) =>
+            t('nodes.processing.variables.get.preview.read', {
+              key: v?.key ?? '',
+              path: v?.payloadPath ?? '',
+              scope: v?.scope
+                ? t('nodes.processing.variables.get.config.variables.items.scope.enum.' + v.scope)
+                : '',
+            }),
+          )
+          .join(', ');
+        return [
+          {
+            label: t('nodes.processing.variables.get.preview.reads'),
+            value: preview || '-',
+          },
+        ];
+      }
 
       default: {
         const exhaustiveCheck: never = schema.type;
