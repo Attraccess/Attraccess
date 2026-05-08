@@ -2,7 +2,7 @@
 // FEATURE: Metrics — runtime control over per-subsystem timing instrumentation
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { SettingsStoreService } from '../../settings/settings-store.service';
-import { METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
+import { METRICS_PARENT, METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
 
 const REFRESH_INTERVAL_MS = 5000;
 
@@ -59,7 +59,7 @@ export class MetricsToggleService implements OnModuleInit, OnModuleDestroy {
   private async runRefresh(): Promise<void> {
     const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
     const reads = subsystems.map(async (subsystem) => {
-      const raw = await this.store.get(METRICS_TOGGLE_KEYS[subsystem]);
+      const raw = await this.store.getPlainSetting(METRICS_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
       const value = raw === null || raw === undefined ? METRICS_TOGGLE_DEFAULTS[subsystem] : raw === 'true';
       this.cache.set(subsystem, value);
     });

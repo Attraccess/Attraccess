@@ -6,7 +6,7 @@ import { User } from '@attraccess/database-entities';
 import { SettingsService } from './settings.service';
 import { SettingsStoreService } from './settings-store.service';
 import { SmtpSettingsService } from './smtp-settings.service';
-import { METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, APP_PARENT } from './constants';
+import { METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, METRICS_PARENT } from './constants';
 import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService metrics toggles', () => {
@@ -42,7 +42,7 @@ describe('SettingsService metrics toggles', () => {
 
     it('returns stored true/false strings parsed correctly', async () => {
       store.getPlainSetting.mockImplementation(async (parent: string, key: string) => {
-        if (parent !== APP_PARENT) return null;
+        if (parent !== METRICS_PARENT) return null;
         if (key === METRICS_TOGGLE_KEYS.http) return 'false';
         if (key === METRICS_TOGGLE_KEYS.db) return 'true';
         return null;
@@ -61,13 +61,13 @@ describe('SettingsService metrics toggles', () => {
       await service.updateMetricsToggles({ db: true });
 
       expect(store.setPlainSetting).toHaveBeenCalledTimes(1);
-      expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, METRICS_TOGGLE_KEYS.db, 'true');
+      expect(store.setPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_TOGGLE_KEYS.db, 'true');
     });
 
     it('writes false explicitly when value is false', async () => {
       await service.updateMetricsToggles({ http: false });
 
-      expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, METRICS_TOGGLE_KEYS.http, 'false');
+      expect(store.setPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_TOGGLE_KEYS.http, 'false');
     });
 
     it('invokes the toggle invalidator after writes', async () => {

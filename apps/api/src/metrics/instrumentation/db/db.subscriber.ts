@@ -17,7 +17,17 @@ import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 type DbMethod = 'insert' | 'update' | 'remove' | 'softRemove';
 
-const SLOW_QUERY_THRESHOLD_SECONDS = 0.5;
+const DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS = 0.5;
+
+function resolveSlowQueryThresholdSeconds(): number {
+  const raw = process.env.METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS;
+  if (raw === undefined || raw === '') return DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS;
+  return parsed;
+}
+
+const SLOW_QUERY_THRESHOLD_SECONDS = resolveSlowQueryThresholdSeconds();
 
 @Injectable()
 @EventSubscriber()

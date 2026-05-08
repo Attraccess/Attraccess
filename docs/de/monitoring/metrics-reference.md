@@ -173,6 +173,8 @@ Der TypeORM-`EntitySubscriber` deckt `insert`, `update`, `remove` und `softRemov
 
 **Standardmäßig deaktiviert** (hohe Kardinalität). Aktivieren über Admin-Einstellungen -> Metriken -> Toggles -> Datenbank.
 
+**Slow-Query-Schwellwert:** Abfragen über `0.5s` erhöhen `attraccess_db_slow_queries_total`. Über die Umgebungsvariable `METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS` überschreibbar (z.B. `METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS=0.1`). Negative oder nicht-numerische Werte fallen auf den Default zurück.
+
 ### Beispiel-PromQL-Abfragen
 
 ```promql

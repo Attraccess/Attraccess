@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
+  Card,
+  CardBody,
+  Chip,
   Divider,
   Input,
   Modal,
@@ -164,39 +167,28 @@ export function MetricsSettingsForm() {
           const isHighCost = subsystem === 'db';
           const checked = metricsSettings.toggles[subsystem];
           return (
-            <div
-              key={subsystem}
-              className={`flex items-start justify-between gap-4 rounded-medium border p-3 ${
-                isHighCost
-                  ? 'border-warning-300 bg-warning-50 dark:border-warning-600/40 dark:bg-warning-50/5'
-                  : 'border-default-200 dark:border-default-100'
-              }`}
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  {t(`toggles.${subsystem}.label`)}
-                  {isHighCost && (
-                    <span className="rounded-full bg-warning-200 dark:bg-warning-700/40 text-warning-800 dark:text-warning-200 px-2 py-0.5 text-[10px] uppercase tracking-wide font-semibold">
-                      {t('toggles.highCostBadge')}
-                    </span>
-                  )}
+            <Card key={subsystem} shadow="none" radius="md" isBlurred={false}>
+              <CardBody className="flex flex-row items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {t(`toggles.${subsystem}.label`)}
+                    {isHighCost && (
+                      <Chip size="sm" color="warning" variant="flat">
+                        {t('toggles.highCostBadge')}
+                      </Chip>
+                    )}
+                  </div>
+                  <p className="text-xs text-default-500">{t(`toggles.${subsystem}.description`)}</p>
                 </div>
-                <p
-                  className={`text-xs ${
-                    isHighCost ? 'text-warning-700 dark:text-warning-300' : 'text-default-500'
-                  }`}
-                >
-                  {t(`toggles.${subsystem}.description`)}
-                </p>
-              </div>
-              <Switch
-                data-testid={`metrics-toggle-${subsystem}`}
-                isSelected={checked}
-                onValueChange={(value) => handleToggleChange(subsystem, value)}
-                isDisabled={isUpdatingToggles && pendingToggle !== null}
-                aria-label={t(`toggles.${subsystem}.label`)}
-              />
-            </div>
+                <Switch
+                  data-testid={`metrics-toggle-${subsystem}`}
+                  isSelected={checked}
+                  onValueChange={(value) => handleToggleChange(subsystem, value)}
+                  isDisabled={isUpdatingToggles && pendingToggle !== null}
+                  aria-label={t(`toggles.${subsystem}.label`)}
+                />
+              </CardBody>
+            </Card>
           );
         })}
       </div>

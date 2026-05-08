@@ -2,7 +2,7 @@
 // FEATURE: Metrics — runtime control over per-subsystem timing instrumentation
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-const PARENT = 'app';
+const PARENT = 'metrics';
 
 const SUBSYSTEM_DEFAULTS: ReadonlyArray<readonly [string, boolean]> = [
   ['metrics_http_enabled', true],

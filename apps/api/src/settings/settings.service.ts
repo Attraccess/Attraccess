@@ -162,7 +162,7 @@ export class SettingsService {
     const subsystems = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
     const reads = await Promise.all(
       subsystems.map(async (subsystem) => {
-        const raw = await this.settingsStore.getPlainSetting(APP_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
+        const raw = await this.settingsStore.getPlainSetting(METRICS_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
         const value = raw === null || raw === undefined ? METRICS_TOGGLE_DEFAULTS[subsystem] : raw === 'true';
         return [subsystem, value] as const;
       }),
@@ -179,7 +179,7 @@ export class SettingsService {
       .filter((subsystem) => update[subsystem] !== undefined)
       .map((subsystem) =>
         this.settingsStore.setPlainSetting(
-          APP_PARENT,
+          METRICS_PARENT,
           METRICS_TOGGLE_KEYS[subsystem],
           update[subsystem] === true ? 'true' : 'false',
         ),

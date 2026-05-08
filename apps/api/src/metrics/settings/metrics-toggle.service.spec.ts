@@ -3,16 +3,16 @@
 import { Test } from '@nestjs/testing';
 import { MetricsToggleService } from './metrics-toggle.service';
 import { SettingsStoreService } from '../../settings/settings-store.service';
-import { METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
+import { METRICS_PARENT, METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
 
 const SUBSYSTEMS = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
 
 describe('MetricsToggleService', () => {
   let svc: MetricsToggleService;
-  let store: { get: jest.Mock };
+  let store: { getPlainSetting: jest.Mock };
 
   beforeEach(async () => {
-    store = { get: jest.fn().mockResolvedValue(null) };
+    store = { getPlainSetting: jest.fn().mockResolvedValue(null) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         MetricsToggleService,
@@ -44,14 +44,14 @@ describe('MetricsToggleService', () => {
   describe('refresh', () => {
     it('reads each subsystem key once from the store', async () => {
       await svc.refresh();
-      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
       for (const subsystem of SUBSYSTEMS) {
-        expect(store.get).toHaveBeenCalledWith(METRICS_TOGGLE_KEYS[subsystem]);
+        expect(store.getPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
       }
     });
 
     it('updates the cache with values from the store', async () => {
-      store.get.mockImplementation(async (key: string) => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) => {
         if (key === METRICS_TOGGLE_KEYS.http) return 'false';
         if (key === METRICS_TOGGLE_KEYS.db) return 'true';
         return null;
@@ -67,22 +67,24 @@ describe('MetricsToggleService', () => {
       const pending = new Promise<void>((resolve) => {
         resolveStore = resolve;
       });
-      store.get.mockImplementation(async () => {
+      store.getPlainSetting.mockImplementation(async () => {
         await pending;
         return null;
       });
       const refreshes = Promise.all([svc.refresh(), svc.refresh(), svc.refresh()]);
       resolveStore?.();
       await refreshes;
-      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
     });
   });
 
   describe('isEnabled async path', () => {
     it('refreshes then returns the cached value', async () => {
-      store.get.mockImplementation(async (key: string) => (key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true'));
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true',
+      );
       await expect(svc.isEnabled('http')).resolves.toBe(false);
-      expect(store.get).toHaveBeenCalledWith(METRICS_TOGGLE_KEYS.http);
+      expect(store.getPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_TOGGLE_KEYS.http);
     });
 
     it('coalesces N parallel callers into 1 store read per subsystem', async () => {
@@ -90,7 +92,7 @@ describe('MetricsToggleService', () => {
       const pending = new Promise<void>((resolve) => {
         resolveStore = resolve;
       });
-      store.get.mockImplementation(async () => {
+      store.getPlainSetting.mockImplementation(async () => {
         await pending;
         return null;
       });
@@ -103,13 +105,15 @@ describe('MetricsToggleService', () => {
       ]);
       resolveStore?.();
       await calls;
-      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
     });
   });
 
   describe('invalidate', () => {
     it('clears cached values so subsequent isEnabledCached falls back to defaults', async () => {
-      store.get.mockImplementation(async (key: string) => (key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true'));
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_TOGGLE_KEYS.http ? 'false' : 'true',
+      );
       await svc.refresh();
       expect(svc.isEnabledCached('http')).toBe(false);
 
@@ -125,7 +129,7 @@ describe('MetricsToggleService', () => {
       jest.useFakeTimers();
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
       await svc.onModuleInit();
-      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
       expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
       const timer = setIntervalSpy.mock.results[0].value as { unref?: () => void };
       expect(typeof timer.unref).toBe('function');
@@ -134,11 +138,11 @@ describe('MetricsToggleService', () => {
     it('interval callback triggers refresh', async () => {
       jest.useFakeTimers();
       await svc.onModuleInit();
-      store.get.mockClear();
+      store.getPlainSetting.mockClear();
       jest.advanceTimersByTime(5000);
       await Promise.resolve();
       await Promise.resolve();
-      expect(store.get).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
     });
 
     it('onModuleDestroy clears the interval', async () => {
