@@ -5,7 +5,7 @@ import { AuthenticationType, User } from '@attraccess/database-entities';
 import { UsersService } from '../users-and-auth/users/users.service';
 import { AuthService } from '../users-and-auth/auth/auth.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 
 export class TestSetup {
   private static app: INestApplication;
@@ -16,7 +16,7 @@ export class TestSetup {
   public testInstanceIdentifier: string;
 
   public constructor() {
-    this.testInstanceIdentifier = nanoid(4);
+    this.testInstanceIdentifier = randomBytes(3).toString('base64url').slice(0, 4);
   }
 
   private users: User[] = [];

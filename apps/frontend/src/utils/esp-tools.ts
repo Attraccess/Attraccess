@@ -1,4 +1,4 @@
-import { Transport, ESPLoader, IEspLoaderTerminal } from 'esptool-js';
+import { Transport, ESPLoader, IEspLoaderTerminal, FlashModeValues, FlashFreqValues, FlashSizeValues } from 'esptool-js';
 import { Mutex } from 'async-mutex';
 
 export enum ESPToolsErrorType {
@@ -222,25 +222,17 @@ export class ESPTools {
     firmware: Blob;
     terminal?: IEspLoaderTerminal;
     onProgress?: (progressPct: number) => unknown;
-    flashMode?: 'qio' | 'qout' | 'dio' | 'dout';
-    flashFreq?: '80m' | '40m' | '26m' | '20m';
-    flashSize?: string;
+    flashMode?: FlashModeValues;
+    flashFreq?: FlashFreqValues;
+    flashSize?: FlashSizeValues;
   }): Promise<ESPToolsResult<void>> {
     const { firmware, terminal, onProgress, flashMode, flashFreq, flashSize } = options;
 
-    let firmwareDataString: string;
+    let firmwareData: Uint8Array;
     try {
-      firmwareDataString = await new Promise<string>((resolve, reject) => {
+      firmwareData = await new Promise<Uint8Array>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-          const arrayBuffer = reader.result as ArrayBuffer;
-          const uint8Array = new Uint8Array(arrayBuffer);
-          // Convert to binary string for compatibility with esploader
-          const binaryString = Array.from(uint8Array)
-            .map((byte) => String.fromCharCode(byte))
-            .join('');
-          resolve(binaryString);
-        };
+        reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
         reader.onerror = () => reject(reader.error);
         reader.readAsArrayBuffer(firmware);
       });
@@ -266,7 +258,6 @@ export class ESPTools {
           const esploader = new ESPLoader({
             transport,
             baudrate: 115200,
-            romBaudrate: 115200,
             enableTracing: false,
             terminal,
           });
@@ -284,18 +275,17 @@ export class ESPTools {
           let totalWritten = 0;
 
           await esploader.writeFlash({
-            fileArray: [{ data: firmwareDataString, address: 0 }],
-            flashSize: flashSize || 'keep',
-            flashMode: flashMode || 'dio',
-            flashFreq: flashFreq || '80m',
+            fileArray: [{ data: firmwareData, address: 0 }],
+            flashSize: flashSize ?? 'keep',
+            flashMode: flashMode ?? 'dio',
+            flashFreq: flashFreq ?? '80m',
             eraseAll: false,
             compress: true,
             reportProgress: (_fileIndex: number, written: number, total: number) => {
-              const uncompressedWritten = (written / total) * firmwareDataString.length;
+              const uncompressedWritten = (written / total) * firmwareData.length;
               const currentProgress = totalWritten + uncompressedWritten;
               const percentage = Math.floor((currentProgress / totalSize) * 100);
 
-              // Ensure we don't skip 99% - cap at 99% until we're truly done
               const cappedPercentage = Math.min(percentage, 99);
 
               console.debug(`Writing firmware: ${cappedPercentage}%`);
@@ -402,27 +392,14 @@ export class ESPTools {
       blocking: false,
       fn: async (transport) => {
         let isConsoleClosed = false;
-        let readLoopPromise: Promise<void> | null = null;
-
-        const startReadLoop = async () => {
-          const readLoop = transport.rawRead();
-          while (!isConsoleClosed) {
-            const { value, done } = await readLoop.next();
-
-            if (done || !value) {
-              break;
-            }
-            onWrite(value);
-          }
-        };
-
-        readLoopPromise = startReadLoop();
+        const readLoopPromise = transport.rawRead(
+          (data) => onWrite(data),
+          () => isConsoleClosed,
+        );
 
         return async () => {
           isConsoleClosed = true;
-          if (readLoopPromise) {
-            await readLoopPromise;
-          }
+          await readLoopPromise;
         };
       },
     });
@@ -454,64 +431,57 @@ export class ESPTools {
           continueReading = false;
         }, timeout);
 
-        const readLoop = transport.rawRead();
-        while (continueReading) {
-          const { value, done } = await readLoop.next();
-          if (done || !value) {
-            break;
-          }
+        let resolveResult: ((v: string | null) => void) | null = null;
+        const resultPromise = new Promise<string | null>((resolve) => {
+          resolveResult = resolve;
+        });
 
-          // Convert Uint8Array to string and add to buffer
-          const chunk = new TextDecoder().decode(value);
-          buffer += chunk;
+        transport.rawRead(
+          (value) => {
+            if (!continueReading) return;
+            const chunk = new TextDecoder().decode(value);
+            buffer += chunk;
 
-          // Process complete lines
-          const bufferEndsWithNewLine = buffer.endsWith('\n');
-          const lines = buffer.split('\n');
-          if (!bufferEndsWithNewLine) {
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          } else {
-            buffer = '';
-          }
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine) continue;
-
-            // Strip any non-printable / BOM-like bytes that sometimes precede
-            // real text on serial lines.
-            const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
-
-            console.debug('Cleaned line:', cleaned);
-
-            // Check if line matches expected RESP format: RESP <topic> <payload>
-            // Firmware emits: RESP <topic> <payload>
-            const respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
-            let responseTopic: string | undefined;
-            let payload: string | undefined;
-            if (respMatch) {
-              responseTopic = respMatch[1];
-              console.debug('Response topic:', responseTopic);
-              payload = respMatch[2];
+            const bufferEndsWithNewLine = buffer.endsWith('\n');
+            const lines = buffer.split('\n');
+            if (!bufferEndsWithNewLine) {
+              buffer = lines.pop() || '';
             } else {
-              console.debug('No response match');
-              continue;
+              buffer = '';
             }
 
-            // Check if the response topic matches our command topic
-            if (responseTopic !== command.topic) {
-              console.debug('Response topic does not match command topic:', responseTopic, '!==', command.topic);
-              continue;
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine) continue;
+
+              const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
+              console.debug('Cleaned line:', cleaned);
+
+              const respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
+              if (!respMatch) {
+                console.debug('No response match');
+                continue;
+              }
+
+              const responseTopic = respMatch[1];
+              const payload = respMatch[2];
+              console.debug('Response topic:', responseTopic);
+
+              if (responseTopic !== command.topic) {
+                console.debug('Response topic does not match command topic:', responseTopic, '!==', command.topic);
+                continue;
+              }
+
+              clearTimeout(timeoutId);
+              continueReading = false;
+              resolveResult?.(payload ?? null);
+              return;
             }
+          },
+          () => !continueReading,
+        );
 
-            clearTimeout(timeoutId);
-            continueReading = false;
-            return payload ?? null;
-          }
-        }
-
-        clearTimeout(timeoutId);
-        return null;
+        return await resultPromise;
       },
     });
   }

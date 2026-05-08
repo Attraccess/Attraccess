@@ -387,6 +387,44 @@
               "output": "Ausgabe"
             }
           }
+        },
+        "health": {
+          "heartbeat": {
+            "title": "Lebenszeichen",
+            "description": "Markiert die Ressource als gesund, wenn dieser Knoten ausgelöst wird. Erfolgt innerhalb des Timeouts kein neues Lebenszeichen, wird die Ressource automatisch als ungesund markiert.",
+            "inputs": { "input": "Eingabe" },
+            "outputs": { "output": "Ausgabe" },
+            "preview": {
+              "identifier": "Bezeichner",
+              "timeoutSeconds": "Timeout (s)"
+            },
+            "config": {
+              "identifier": { "label": "Bezeichner (optional)" },
+              "timeoutSeconds": { "label": "Timeout (Sekunden)" },
+              "unhealthyReason": { "label": "Begründung bei Timeout (optional)" }
+            }
+          },
+          "set": {
+            "title": "Gesundheitszustand setzen",
+            "description": "Setzt den Gesundheitszustand der Ressource. Statische Werte können per Payload-Feldern überschrieben werden (health.identifier, health.status, health.reason).",
+            "inputs": { "input": "Eingabe" },
+            "outputs": { "output": "Ausgabe" },
+            "preview": {
+              "identifier": "Bezeichner",
+              "status": "Status"
+            },
+            "config": {
+              "identifier": { "label": "Bezeichner (optional)" },
+              "status": {
+                "label": "Status",
+                "enum": {
+                  "healthy": "Gesund",
+                  "unhealthy": "Ungesund"
+                }
+              },
+              "reason": { "label": "Begründung (optional, Templates erlaubt)" }
+            }
+          }
         }
       }
     }

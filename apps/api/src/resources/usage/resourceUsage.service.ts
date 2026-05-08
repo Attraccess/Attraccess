@@ -15,6 +15,8 @@ import { EndUsageSessionDto } from './dtos/endUsageSession.dto';
 import { UpdateUsageSessionProjectDto } from './dtos/updateUsageSessionProject.dto';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
+import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.exception';
+import { ResourceHealthService } from '../health/resource-health.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceUsageEvent, ResourceUsageTakenOverEvent } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
@@ -73,6 +75,7 @@ export class ResourceUsageService {
     private readonly projectsService: ProjectsService,
     private readonly resourceFormsService: ResourceFormsService,
     private readonly metricsService: MetricsService,
+    private readonly resourceHealthService: ResourceHealthService,
   ) {}
 
   public async canControllResource(
@@ -157,6 +160,26 @@ export class ResourceUsageService {
         }
 
         this.logger.debug(`User ${user.id} has maintenance permissions, allowing usage during maintenance window`);
+      }
+
+      // Health gate: block non-maintenance users when any health entry is unhealthy.
+      // Users that can manage maintenance are intentionally allowed through so they can investigate/repair.
+      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId);
+      if (isUnhealthy) {
+        const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
+          user,
+          resourceId,
+          transactionalEntityManager,
+        );
+        if (!canManageMaintenance) {
+          this.logger.warn(
+            `User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`,
+          );
+          throw new ResourceUnhealthyException(resourceId);
+        }
+        this.logger.debug(
+          `User ${user.id} has maintenance permissions, allowing usage despite unhealthy state on resource ${resourceId}`,
+        );
       }
     }
 

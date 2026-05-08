@@ -122,8 +122,8 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
       id,
       source,
       target,
-      sourceHandle: sourceHandle ?? null,
-      targetHandle: targetHandle ?? null,
+      sourceHandle: (sourceHandle as string | null | undefined) ?? null,
+      targetHandle: (targetHandle as string | null | undefined) ?? null,
     };
   });
 

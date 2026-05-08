@@ -18,6 +18,7 @@ jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
 }));
 
+
 describe('EmailService', () => {
   const makeUser = (overrides: Partial<User> = {}): User =>
     ({
@@ -96,11 +97,7 @@ describe('EmailService', () => {
       }),
     };
     const mjmlService = {
-      validateAndConvert: jest.fn().mockImplementation((template: string) => {
-        // In tests, treat MJML string as already-valid Handlebars HTML fragment for simplicity
-        // The service will compile it with Handlebars and we can assert on the output
-        return template;
-      }),
+      validateAndConvert: jest.fn().mockImplementation((template: string) => Promise.resolve(template)),
     };
 
     const metricsService = {

@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
 import decompress from 'decompress';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 
 
@@ -66,7 +66,7 @@ export class PluginService {
         ) as LoadedPluginManifest | null;
         if (manifest) {
           manifest.pluginDirectory = pluginFolder;
-          manifest.id = nanoid();
+          manifest.id = randomBytes(16).toString('base64url').slice(0, 21);
         }
         return manifest;
       })
@@ -103,7 +103,7 @@ export class PluginService {
 
     // unzip file
     PluginService.logger.debug(`Unzipping file ${zipFile.originalname}`);
-    const tempFolder = join(PluginService.PLUGIN_PATH, 'temp', nanoid());
+    const tempFolder = join(PluginService.PLUGIN_PATH, 'temp', randomBytes(16).toString('base64url').slice(0, 21));
     await decompress(zipFile.buffer, tempFolder);
 
     // read manifest

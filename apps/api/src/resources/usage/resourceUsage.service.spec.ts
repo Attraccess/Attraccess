@@ -113,6 +113,13 @@ describe('ResourceUsageService', () => {
     canManageMaintenance: jest.fn(),
   };
 
+  const mockResourceHealthService = {
+    isResourceUnhealthy: jest.fn().mockResolvedValue(false),
+    reportHealth: jest.fn(),
+    getSummary: jest.fn(),
+    listForResource: jest.fn(),
+  };
+
   const mockBillingService = {
     getResourceBillingConfiguration: jest.fn(),
     getBalance: jest.fn(),
@@ -219,6 +226,10 @@ describe('ResourceUsageService', () => {
         {
           provide: MetricsService,
           useValue: mockMetricsService,
+        },
+        {
+          provide: require('../health/resource-health.service').ResourceHealthService,
+          useValue: mockResourceHealthService,
         },
       ],
     }).compile();
@@ -660,6 +671,61 @@ describe('ResourceUsageService', () => {
       );
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
       expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(mockUser, 1, expect.anything());
+    });
+
+    it('should throw ResourceUnhealthyException when resource is unhealthy and user cannot manage maintenance', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      mockResourceHealthService.isResourceUnhealthy.mockResolvedValueOnce(true);
+      resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
+
+      const { ResourceUnhealthyException } = require('../../exceptions/resource.unhealthy.exception');
+
+      await expect(service.startSession(1, mockUser, dto)).rejects.toBeInstanceOf(ResourceUnhealthyException);
+      expect(mockResourceHealthService.isResourceUnhealthy).toHaveBeenCalledWith(1);
+      expect(resourceMaintenanceService.canManageMaintenance).toHaveBeenCalled();
+    });
+
+    it('should allow maintenance users to start a session even when resource is unhealthy', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      resourceRepository.findOne.mockResolvedValue(mockResource);
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      mockResourceHealthService.isResourceUnhealthy.mockResolvedValueOnce(true);
+      resourceMaintenanceService.canManageMaintenance.mockResolvedValue(true);
+
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      const createdSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+      } as ResourceUsage;
+      const finalizedSession = { ...createdSession, isFinalized: true };
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(createdSession)
+        .mockResolvedValueOnce(finalizedSession)
+        .mockResolvedValueOnce(finalizedSession);
+
+      const mockQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+
+      const result = await service.startSession(1, mockUser, dto);
+      expect(result).toEqual(finalizedSession);
     });
 
     it('should allow usage when resource is under maintenance but user can manage maintenance', async () => {

@@ -24,6 +24,7 @@ import { ResourceIntroducersModule } from './introducers/resourceIntroducers.mod
 import { ResourceFlowsModule } from './flows/resource-flows.module';
 import { ResourceMaintenanceModule } from './maintenances/maintenance.module';
 import { ResourceFormsModule } from './forms/forms.module';
+import { ResourceHealthModule } from './health/resource-health.module';
 import { LicenseModule } from '../license/license.module';
 
 @Module({
@@ -51,6 +52,7 @@ import { LicenseModule } from '../license/license.module';
     ResourceFlowsModule,
     ResourceMaintenanceModule,
     ResourceFormsModule,
+    ResourceHealthModule,
     LicenseModule,
   ],
   controllers: [ResourcesController],

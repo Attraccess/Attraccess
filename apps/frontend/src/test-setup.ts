@@ -39,7 +39,7 @@ class MockResizeObserver implements ResizeObserver {
 global.ResizeObserver = MockResizeObserver;
 
 // Mock IntersectionObserver
-class MockIntersectionObserver implements IntersectionObserver {
+class MockIntersectionObserver {
   readonly root: Element | Document | null = null;
   readonly rootMargin: string = '0px';
   readonly thresholds: ReadonlyArray<number> = [0];
@@ -58,7 +58,7 @@ class MockIntersectionObserver implements IntersectionObserver {
   disconnect = vi.fn();
   takeRecords = vi.fn().mockReturnValue([]);
 }
-global.IntersectionObserver = MockIntersectionObserver;
+global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Suppress console errors during tests
 console.error = vi.fn();

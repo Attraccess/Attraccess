@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 
 /**
  * Migration to convert IoT configurations (MQTT and Webhook) to Flow system.
@@ -392,11 +392,11 @@ export class IotToFlow1752005121356 implements MigrationInterface {
   }
 
   private generateNodeId(): string {
-    return nanoid(21); // Same format as used in the flow system
+    return randomBytes(16).toString('base64url').slice(0, 21); // Same format as used in the flow system
   }
 
   private generateEdgeId(): string {
-    return nanoid(21);
+    return randomBytes(16).toString('base64url').slice(0, 21);
   }
 
   /**

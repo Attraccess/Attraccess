@@ -28,7 +28,7 @@ import { EmailService } from '../../email/email.service';
 import { DataSource, IsNull, QueryFailedError } from 'typeorm';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { addDays } from 'date-fns';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -151,7 +151,7 @@ export class UsersService {
       }
     }
 
-    const suffix = nanoid(8).toLowerCase();
+    const suffix = randomBytes(6).toString('base64url').slice(0, 8).toLowerCase();
     return `sso-user-${suffix}`;
   }
 
@@ -445,7 +445,7 @@ export class UsersService {
       throw new BadRequestException('Email already exists');
     }
 
-    const token = nanoid();
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
     const expiresAt = addDays(new Date(), 3);
 
     try {
@@ -700,7 +700,7 @@ export class UsersService {
       throw new UserNotFoundException(userId);
     }
 
-    const token = nanoid();
+    const token = randomBytes(16).toString('base64url').slice(0, 21);
     const expiresAt = addDays(new Date(), 1);
     const storedToken = this.tokenHashService.hashToken(token);
 
@@ -761,7 +761,7 @@ export class UsersService {
       throw new UserHasActiveUsageSessionsException();
     }
 
-    const suffix = nanoid(8);
+    const suffix = randomBytes(6).toString('base64url').slice(0, 8);
     const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
     const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
 

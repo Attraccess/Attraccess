@@ -13,12 +13,19 @@ const normalizeOptionalInput = (value: unknown) => {
 };
 
 const coerceOptionalNumber = (message: string) =>
-  z
-    .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
-    .refine((value) => value === undefined || !Number.isNaN(value), { message });
+  z.optional(
+    z
+      .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
+      .refine((value) => value === undefined || !Number.isNaN(value), { message })
+  );
 
 const coerceOptionalPositiveNumber = (message: string) =>
-  coerceOptionalNumber(message).refine((value) => value === undefined || value > 0, { message });
+  z.optional(
+    z
+      .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
+      .refine((value) => value === undefined || !Number.isNaN(value), { message })
+      .refine((value) => value === undefined || (value as number) > 0, { message })
+  );
 
 const optionalTrimmedString = z
   .preprocess((value) => {

@@ -32,7 +32,7 @@ export class EmailTemplateService {
     await this.findOne(type);
 
     if (updateEmailTemplateDto.body) {
-      this.mjmlService.validateAndConvert(updateEmailTemplateDto.body);
+      await this.mjmlService.validateAndConvert(updateEmailTemplateDto.body);
     }
 
     await this.emailTemplateRepository.update(

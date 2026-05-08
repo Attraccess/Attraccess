@@ -31,11 +31,11 @@ export class EmailService {
     this.logger.debug('EmailService initialized');
   }
 
-  private convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {
+  private async convertTemplate(template: EmailTemplate, context: Record<string, unknown>) {
     const subjectTemplate = Handlebars.compile(template.subject);
     const subject = subjectTemplate(context);
 
-    const bodyMjml = this.mjmlService.validateAndConvert(template.body);
+    const bodyMjml = await this.mjmlService.validateAndConvert(template.body);
     const bodyTemplate = Handlebars.compile(bodyMjml);
     const body = bodyTemplate(context);
 
@@ -54,7 +54,7 @@ export class EmailService {
     try {
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
-      const { subject, body } = this.convertTemplate(dbTemplate, context);
+      const { subject, body } = await this.convertTemplate(dbTemplate, context);
       const { transporter, from } = await this.createTransporter();
 
       this.logger.debug(

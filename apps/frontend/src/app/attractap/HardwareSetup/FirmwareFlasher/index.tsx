@@ -55,9 +55,9 @@ export function FirmwareFlasher(props: Props) {
     // Flash firmware with parameters from firmware metadata
     const flashResult = await espTools.flashFirmware({
       firmware: firmwareBinary as unknown as Blob,
-      flashMode: props.firmware.flashMode as 'qio' | 'qout' | 'dio' | 'dout' | undefined,
-      flashFreq: props.firmware.flashFreq as '80m' | '40m' | '26m' | '20m' | undefined,
-      flashSize: props.firmware.flashSize,
+      flashMode: props.firmware.flashMode as import('esptool-js').FlashModeValues | undefined,
+      flashFreq: props.firmware.flashFreq as import('esptool-js').FlashFreqValues | undefined,
+      flashSize: props.firmware.flashSize as import('esptool-js').FlashSizeValues | undefined,
       onProgress: (progressPct) => {
         setFlashProgress(progressPct);
         if (progressPct === 100) {

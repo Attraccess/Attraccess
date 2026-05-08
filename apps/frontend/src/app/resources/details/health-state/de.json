@@ -1,0 +1,25 @@
+{
+  "title": "Geräte-Status",
+  "alert": {
+    "title": "Ein verbundenes Gerät ist nicht funktionsfähig",
+    "description": "Diese Ressource kann derzeit nicht verwendet werden, weil mindestens eine überwachte Komponente einen ungesunden Zustand meldet.",
+    "reason": {
+      "label": "Ursache",
+      "noReason": "Keine Begründung gemeldet"
+    },
+    "identifier": {
+      "label": "Quelle",
+      "default": "Standard"
+    },
+    "lastSeen": "Zuletzt gemeldet"
+  },
+  "status": {
+    "healthy": "Gesund",
+    "unhealthy": "Ungesund"
+  },
+  "actions": {
+    "markHealthy": "Als gesund markieren",
+    "markHealthySuccess": "Status-Eintrag gelöscht",
+    "markHealthyError": "Status-Eintrag konnte nicht gelöscht werden"
+  }
+}

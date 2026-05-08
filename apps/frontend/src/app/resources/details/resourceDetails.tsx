@@ -32,6 +32,7 @@ import { filenameToUrl } from '../../../api';
 import { MaintenanceManagement } from './maintenance-management';
 import { MaintenanceSchedules } from './maintenance-schedules';
 import { ResourceBillingInfo } from './resourceBillingInfo';
+import { ResourceHealthWarning } from './health-state';
 
 function ResourceDetailsComponent() {
   const { id } = useParams<{ id: string }>();
@@ -198,6 +199,7 @@ function ResourceDetailsComponent() {
       />
 
       <div className="w-full space-y-6 mb-6">
+        <ResourceHealthWarning resourceId={resourceId} />
         <div className="flex flex-row flex-wrap w-full gap-6 items-stretch">
           <ResourceUsageSession
             resourceId={resourceId}

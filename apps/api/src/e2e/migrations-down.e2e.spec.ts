@@ -36,6 +36,9 @@ import {
   ResourceIntroductionHistoryItem,
   ResourceIntroducer,
   ResourceMaintenance,
+  ResourceHealthSource,
+  ResourceHealthState,
+  ResourceHealthStatus,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleTimeIntervalConfig,
@@ -278,6 +281,16 @@ const seedDatabase = async (dataSource: DataSource) => {
     startTime: new Date(),
     endTime: null,
     reason: 'Seed maintenance',
+  }));
+
+  const resourceHealthRepo = dataSource.getRepository(ResourceHealthState);
+  await ensureEntity(resourceHealthRepo, () => ({
+    resourceId: resource.id,
+    identifier: 'Seed source',
+    status: ResourceHealthStatus.UNHEALTHY,
+    reason: 'Seed unhealthy state',
+    source: ResourceHealthSource.MANUAL,
+    lastReportedAt: new Date(),
   }));
 
   const scheduleUsageHours = await ensureEntity(maintenanceScheduleRepo, () => ({

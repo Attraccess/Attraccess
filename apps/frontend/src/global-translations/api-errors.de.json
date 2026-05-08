@@ -11,6 +11,10 @@
     "title": "Ressource bereits in Verwendung",
     "description": "Die Ressource ist derzeit von einem anderen Benutzer in Verwendung und kann solange nicht von ihnen gestartet werden."
   },
+  "ResourceUnhealthyException": {
+    "title": "Ressource nicht betriebsbereit",
+    "description": "Die Ressource meldet derzeit einen fehlerhaften Zustand und kann nicht verwendet werden, bis sie sich erholt."
+  },
   "INSUFFICIENT_BALANCE": {
     "title": "Nicht genügend Guthaben",
     "description": "Das Guthaben ist für diese Aktion nicht ausreichend."

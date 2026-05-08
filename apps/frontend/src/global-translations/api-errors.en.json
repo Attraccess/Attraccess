@@ -11,6 +11,10 @@
     "title": "Resource already in use",
     "description": "The resource is currently in use by another user and cannot be started by you until it is released."
   },
+  "ResourceUnhealthyException": {
+    "title": "Resource unhealthy",
+    "description": "The resource is currently reporting an unhealthy state and cannot be used until it recovers."
+  },
   "INSUFFICIENT_BALANCE": {
     "title": "Insufficient balance",
     "description": "The balance is not sufficient for this action."

@@ -14,6 +14,7 @@ import { ConfigModule } from '@nestjs/config';
 import flowConfig from './flow.config';
 import { MqttModule } from '../../mqtt/mqtt.module';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
+import { ResourceHealthModule } from '../health/resource-health.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ResourceUsageModule } from '../usage/resourceUsage.module';
     ConfigModule.forFeature(flowConfig),
     MqttModule,
     forwardRef(() => ResourceUsageModule),
+    ResourceHealthModule,
   ],
   controllers: [ResourceFlowsController],
   providers: [ResourceFlowsService, ResourceFlowsExecutorService],
