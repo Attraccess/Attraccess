@@ -23,6 +23,7 @@ describe('ResourceFlowVariablesController', () => {
           resource: null,
         } as never,
       ]),
+      parseValue: jest.fn((row: { value: string }) => JSON.parse(row.value)),
       set: jest.fn(),
       delete: jest.fn(),
     } as unknown as jest.Mocked<ResourceFlowVariablesService>;

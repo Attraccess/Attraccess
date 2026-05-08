@@ -122,10 +122,14 @@ export class ResourceFlowVariablesService {
     });
   }
 
+  parseValue(row: ResourceFlowVariable): unknown {
+    return this.deserialize(row);
+  }
+
   private deserialize(row: ResourceFlowVariable): unknown {
     try {
       return JSON.parse(row.value);
-    } catch (err) {
+    } catch {
       this.logger.warn(`Variable ${row.scope}:${row.resourceId}:${row.key} stored as raw string`);
       return row.value;
     }

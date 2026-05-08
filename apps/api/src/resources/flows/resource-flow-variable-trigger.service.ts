@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
@@ -25,9 +25,11 @@ export class ResourceFlowVariableTriggerService {
 
   @OnEvent(FlowVariableChangedEvent.EVENT_NAME)
   async handle(event: FlowVariableChangedEvent): Promise<void> {
-    const candidates = await this.nodeRepository.find({
-      where: { type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED },
-    });
+    const where: FindOptionsWhere<ResourceFlowNode> = { type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED };
+    if (event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== null) {
+      where.resourceId = event.resourceId;
+    }
+    const candidates = await this.nodeRepository.find({ where });
 
     for (const node of candidates) {
       const parsed = VariableChangedNodeDataSchema.safeParse(node.data);
@@ -39,6 +41,10 @@ export class ResourceFlowVariableTriggerService {
 
       const matchesWatch = watches.some((w) => w.scope === event.scope && w.key === event.key);
       if (!matchesWatch) continue;
+
+      if (event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== node.resourceId) {
+        continue;
+      }
 
       if (source === 'exclude-self' && event.sourceResourceId === node.resourceId) {
         continue;

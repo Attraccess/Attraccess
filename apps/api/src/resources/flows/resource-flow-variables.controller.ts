@@ -20,7 +20,7 @@ export class ResourceFlowVariablesController {
       scope: row.scope,
       resourceId: row.resourceId,
       key: row.key,
-      value: this.safeParse(row.value),
+      value: this.service.parseValue(row),
       valueType: row.valueType,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -52,13 +52,5 @@ export class ResourceFlowVariablesController {
     @Param('key') key: string,
   ): Promise<void> {
     await this.service.delete(scope, resourceId, key);
-  }
-
-  private safeParse(value: string): unknown {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
-    }
   }
 }

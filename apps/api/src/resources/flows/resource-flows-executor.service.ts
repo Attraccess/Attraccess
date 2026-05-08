@@ -1203,6 +1203,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       }
       lodashSet(payload, item.payloadPath, value);
     }
+    const variables = this.templateVariables.get(input);
+    if (variables) {
+      this.templateVariables.set(payload, variables);
+    }
     return { payload };
   }
 
