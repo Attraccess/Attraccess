@@ -1,5 +1,5 @@
-import { Button, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -78,25 +78,32 @@ export function AuthentikDiscoveryDialog(props: Props) {
   return (
     <>
       {activator(onOpen)}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader noMargin title={t('title')} />
-          </ModalHeader>
-          <ModalBody>
-            <Input label={t('host')} value={host} onChange={(e) => setHost(e.target.value)} />
-            <Input
-              label={t('applicationName')}
-              value={applicationName}
-              onChange={(e) => setApplicationName(e.target.value)}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button color="primary" onPress={discover} isLoading={isDiscovering}>
-              {t('discover')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <PageHeader noMargin title={t('title')} />
+                </ModalHeader>
+                <ModalBody>
+                  <Input label={t('host')} value={host} onChange={(e) => setHost(e.target.value)} />
+                  <Input
+                    label={t('applicationName')}
+                    value={applicationName}
+                    onChange={(e) => setApplicationName(e.target.value)}
+                  />
+                </ModalBody>
+                <ModalFooter>
+                  <Button color="primary" onPress={discover} isLoading={isDiscovering}>
+                    {t('discover')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

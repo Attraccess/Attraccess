@@ -1,6 +1,5 @@
 import { memo } from 'react';
-import { Modal, ModalContent } from '../../../../../utils/heroui-compat';
-import { ModalHeader, ModalBody, ModalFooter, Button, Spinner, Textarea } from '@heroui/react';
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Spinner, Textarea } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
@@ -37,9 +36,14 @@ export const UsageNotesModal = memo(
     if (!isOpen) return null;
 
     return (
-      <Modal isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">{t('sessionNotes')}</ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (<>
+          <ModalHeader className="flex flex-col gap-1">
+            <ModalHeading>{t('sessionNotes')}</ModalHeading>
+          </ModalHeader>
           <ModalBody>
             {session ? (
               <div className="space-y-4">
@@ -104,7 +108,9 @@ export const UsageNotesModal = memo(
               {t('close')}
             </Button>
           </ModalFooter>
-        </ModalContent>
+            </>)}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     );
   });
