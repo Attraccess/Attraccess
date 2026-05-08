@@ -1,19 +1,8 @@
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NumberInput } from "../../../../utils/heroui-compat";
 import en from './en.json';
 import de from './de.json';
-import {
-  Alert,
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardProps,
-  Spinner,
-  cn,
-  Form,
-  NumberInput,
-} from '@heroui/react';
+import { Alert, Button, Card, CardContent, CardFooter, CardHeader, CardProps, Spinner, cn, Form } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {

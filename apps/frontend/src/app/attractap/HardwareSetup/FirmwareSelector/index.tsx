@@ -1,5 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Card, CardContent, CardHeader, Chip, CircularProgress } from '@heroui/react';
+import { CircularProgress } from "../../../../utils/heroui-compat";
+import { Card, CardContent, CardHeader, Chip } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {

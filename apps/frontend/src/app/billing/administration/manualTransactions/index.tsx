@@ -1,4 +1,5 @@
-import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberInput } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, CardProps } from "@heroui/react";
+import { NumberInput } from "../../../../utils/heroui-compat";
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

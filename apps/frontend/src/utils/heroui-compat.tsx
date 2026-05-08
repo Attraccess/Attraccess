@@ -3,6 +3,18 @@ import {
   ModalBackdrop,
   ModalContainer,
   ModalDialog,
+  ProgressBar as V3ProgressBar,
+  ProgressBarFill,
+  ProgressBarTrack,
+  ProgressCircle as V3ProgressCircle,
+  ProgressCircleFillCircle,
+  ProgressCircleTrack,
+  ProgressCircleTrackCircle,
+  NumberField as V3NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
   useOverlayState,
   type UseOverlayStateProps,
 } from '@heroui/react';
@@ -77,3 +89,47 @@ export function ModalContent({ children }: ModalContentProps) {
 }
 
 export { ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+
+export type ProgressProps = ComponentProps<typeof V3ProgressBar>;
+
+export function Progress(props: ProgressProps) {
+  return (
+    <V3ProgressBar {...props}>
+      <ProgressBarTrack>
+        <ProgressBarFill />
+      </ProgressBarTrack>
+    </V3ProgressBar>
+  );
+}
+
+export type CircularProgressProps = ComponentProps<typeof V3ProgressCircle>;
+
+export function CircularProgress(props: CircularProgressProps) {
+  return (
+    <V3ProgressCircle {...props}>
+      <ProgressCircleTrack>
+        <ProgressCircleTrackCircle />
+        <ProgressCircleFillCircle />
+      </ProgressCircleTrack>
+    </V3ProgressCircle>
+  );
+}
+
+type V3NumberFieldProps = ComponentProps<typeof V3NumberField>;
+
+export interface NumberInputProps extends V3NumberFieldProps {
+  hideStepper?: boolean;
+}
+
+export function NumberInput({ hideStepper, children, ...rest }: NumberInputProps) {
+  return (
+    <V3NumberField {...rest}>
+      <NumberFieldGroup>
+        {!hideStepper && <NumberFieldDecrementButton>-</NumberFieldDecrementButton>}
+        <NumberFieldInput />
+        {!hideStepper && <NumberFieldIncrementButton>+</NumberFieldIncrementButton>}
+      </NumberFieldGroup>
+      {children}
+    </V3NumberField>
+  );
+}

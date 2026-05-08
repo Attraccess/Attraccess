@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CircularProgress } from '@heroui/react';
+import { Card, CardContent, CardHeader } from "@heroui/react";
+import { CircularProgress } from "../../../../../utils/heroui-compat";
 import { PageHeader } from '../../../../../components/pageHeader';
 import { CheckCircle2Icon, XCircleIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';

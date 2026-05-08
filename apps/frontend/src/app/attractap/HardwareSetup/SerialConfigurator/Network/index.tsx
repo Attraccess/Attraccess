@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Autocomplete, AutocompleteItem, Button, CircularProgress, cn, Progress } from '@heroui/react';
+import { CircularProgress, Progress } from "../../../../../utils/heroui-compat";
+import { Alert, Autocomplete, AutocompleteItem, Button, cn } from "@heroui/react";
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';

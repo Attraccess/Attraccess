@@ -4,8 +4,9 @@ import {
   UseBillingServiceGetResourceBillingConfigurationKeyFn,
   useBillingServiceUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
+import { NumberInput } from "../../../../../utils/heroui-compat";
 import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { Button, Form, ModalBody, ModalFooter, ModalHeader, NumberInput } from '@heroui/react';
+import { Button, Form, ModalBody, ModalFooter, ModalHeader } from "@heroui/react";
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';

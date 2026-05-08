@@ -1,4 +1,5 @@
-import { Alert, Button, CircularProgress } from '@heroui/react';
+import { Alert, Button } from "@heroui/react";
+import { CircularProgress } from "../../../../utils/heroui-compat";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ESPTools, ESPToolsResult } from '../../../../utils/esp-tools';
