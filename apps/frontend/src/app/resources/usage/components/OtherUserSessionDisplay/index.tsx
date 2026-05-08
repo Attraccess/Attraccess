@@ -217,7 +217,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownTrigger>
                 <DropdownMenu disallowEmptySelection aria-label={t('takeover.optionsMenu.label')}>
                   <DropdownItem
-                    key="takeoverWithNotes"
+                    key="takeoverWithNotes" id="takeoverWithNotes"
                     description={t('takeover.optionsMenu.takeoverWithNotes.description')}
                     onPress={handleOpenTakeoverModal}
                   >
@@ -248,7 +248,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 </DropdownTrigger>
                 <DropdownMenu disallowEmptySelection aria-label={t('stopOtherUserSession.optionsMenu.label')}>
                   <DropdownItem
-                    key="stopOtherUserSessionWithNotes"
+                    key="stopOtherUserSessionWithNotes" id="stopOtherUserSessionWithNotes"
                     description={t('stopOtherUserSession.optionsMenu.stopOtherUserSessionWithNotes.description')}
                     onPress={handleOpenStopOtherUserSessionModal}
                   >

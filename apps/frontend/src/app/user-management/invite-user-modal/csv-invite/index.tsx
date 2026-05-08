@@ -305,7 +305,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
         </TableHeader>
         <TableBody items={previewUsers} emptyContent={<EmptyState />}>
           {(user) => (
-            <TableRow key={user.index}>
+            <TableRow key={user.index} id={user.index}>
               <TableCell>#{user.index}</TableCell>
               <TableCell className="w-full">{user.username}</TableCell>
               <TableCell>{user.email}</TableCell>

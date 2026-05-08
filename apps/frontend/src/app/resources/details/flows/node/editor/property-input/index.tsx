@@ -1,7 +1,8 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
+import { AutocompleteItem } from "../../../../../../../utils/heroui-compat";
 import { NumberInput } from "../../../../../../../utils/heroui-compat";
 import { Modal, ModalContent } from '../../../../../../../utils/heroui-compat';
-import { Autocomplete, AutocompleteItem, Button, Card, CardContent, Input, ModalBody, ModalHeader, Switch, Textarea } from "@heroui/react";
+import { Autocomplete, Button, Card, CardContent, Input, ModalBody, ModalHeader, Switch, Textarea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -152,7 +153,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             description={description}
           >
             {schema.enum.map((enumValue) => (
-              <AutocompleteItem key={enumValue}>
+              <AutocompleteItem key={enumValue} id={enumValue}>
                 {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
               </AutocompleteItem>
             ))}
@@ -210,7 +211,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             description={description}
           >
             {enumValues.map((enumValue) => (
-              <AutocompleteItem key={String(enumValue)}>
+              <AutocompleteItem key={String(enumValue)} id={String(enumValue)}>
                 {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
               </AutocompleteItem>
             ))}

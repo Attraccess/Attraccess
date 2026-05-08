@@ -165,7 +165,7 @@ export const HistoryTable = ({
       >
         {filteredHistory.map((session: ResourceUsage) => (
           <TableRow
-            key={session.id}
+            key={session.id} id={session.id}
             className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
             onClick={() => onSessionClick(session)}
           >

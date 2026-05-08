@@ -141,7 +141,7 @@ export function MaintenanceSchedules(props: Props & Omit<CardProps, 'children'>)
             emptyContent={<EmptyState message={t('empty')} />}
           >
             {(schedule) => (
-              <TableRow key={schedule.id}>
+              <TableRow key={schedule.id} id={schedule.id}>
                 <TableCell>{schedule.name ?? '—'}</TableCell>
                 <TableCell>{t(`triggerType.${schedule.triggerType}`)}</TableCell>
                 <TableCell>{configSummary(schedule, t)}</TableCell>

@@ -653,7 +653,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
             emptyContent={<EmptyState />}
           >
             {(provider) => (
-              <TableRow key={provider.id}>
+              <TableRow key={provider.id} id={provider.id}>
                 <TableCell>
                   <span className="font-mono text-sm">{provider.id}</span>
                 </TableCell>
@@ -755,7 +755,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                   </DropdownTrigger>
                                   <DropdownMenu aria-label="OIDC auto discovery options">
                                     <DropdownItem
-                                      key="authentik"
+                                      key="authentik" id="authentik"
                                       onPress={onOpenAuthentikDiscovery}
                                       data-cy="sso-provider-form-authentik-discovery-button"
                                     >
@@ -763,7 +763,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                     </DropdownItem>
 
                                     <DropdownItem
-                                      key="keycloak"
+                                      key="keycloak" id="keycloak"
                                       onPress={onOpenKeycloakDiscovery}
                                       data-cy="sso-provider-form-keycloak-discovery-button"
                                     >

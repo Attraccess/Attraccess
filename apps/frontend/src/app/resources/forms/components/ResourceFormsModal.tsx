@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { SelectItem } from "../../../../utils/heroui-compat";
 import { Modal, ModalContent } from '../../../../utils/heroui-compat';
-import { Button, Input, ModalBody, ModalFooter, ModalHeader, Select, SelectItem, Selection, Switch, Textarea } from '@heroui/react';
+import { Button, Input, ModalBody, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -356,7 +357,7 @@ function renderSelectInput(
       aria-label={fieldName}
     >
       {options.map((option) => (
-        <SelectItem key={option}>{option}</SelectItem>
+        <SelectItem key={option} id={option}>{option}</SelectItem>
       ))}
     </Select>
   );

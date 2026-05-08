@@ -125,7 +125,7 @@ export function FirstTimeSetupPage() {
         className="w-full"
       >
         <AccordionItem
-          key="step-1"
+          key="step-1" id="step-1"
           aria-label={t('steps.app')}
           title={
             <span className="flex items-center gap-2">
@@ -139,7 +139,7 @@ export function FirstTimeSetupPage() {
           <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
         </AccordionItem>
         <AccordionItem
-          key="step-2"
+          key="step-2" id="step-2"
           aria-label={t('steps.smtp')}
           title={
             <span className="flex items-center gap-2">
@@ -153,7 +153,7 @@ export function FirstTimeSetupPage() {
           <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
         </AccordionItem>
         <AccordionItem
-          key="step-3"
+          key="step-3" id="step-3"
           aria-label={t('steps.license')}
           title={
             <span className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export function FirstTimeSetupPage() {
           <LicenseStep onSuccess={goToStep4} />
         </AccordionItem>
         <AccordionItem
-          key="step-4"
+          key="step-4" id="step-4"
           aria-label={t('steps.admin')}
           title={
             <span className="flex items-center gap-2">
@@ -181,7 +181,7 @@ export function FirstTimeSetupPage() {
           <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
         </AccordionItem>
         <AccordionItem
-          key="step-5"
+          key="step-5" id="step-5"
           aria-label={t('steps.verify')}
           title={
             <span className="flex items-center gap-2">

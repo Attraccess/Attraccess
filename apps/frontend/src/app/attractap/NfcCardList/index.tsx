@@ -294,7 +294,7 @@ export function NfcCardList() {
       <Table aria-label={t('nfcCards')} data-cy="nfc-card-list-table">
         <TableHeader>
           {headers.map((header) => (
-            <TableColumn key={header}>{t('nfcCardsTable.headers.' + header)}</TableColumn>
+            <TableColumn key={header} id={header}>{t('nfcCardsTable.headers.' + header)}</TableColumn>
           ))}
         </TableHeader>
         <TableBody
@@ -305,7 +305,7 @@ export function NfcCardList() {
         >
           {(card) => (
             <TableRow
-              key={card.id}
+              key={card.id} id={card.id}
               className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
             >
               {headers.map((header) => (

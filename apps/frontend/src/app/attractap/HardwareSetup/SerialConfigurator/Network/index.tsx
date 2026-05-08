@@ -1,6 +1,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AutocompleteItem } from "../../../../../utils/heroui-compat";
 import { CircularProgress, Progress } from "../../../../../utils/heroui-compat";
-import { Alert, Autocomplete, AutocompleteItem, Button, cn } from "@heroui/react";
+import { Alert, Autocomplete, Button, cn } from "@heroui/react";
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -97,7 +98,7 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         isLoading={isFetchingConfiguration}
         inputValue={selectedWifiSSID ?? ''}
       >
-        {(item) => <AutocompleteItem key={item.key}>{item.label}</AutocompleteItem>}
+        {(item) => <AutocompleteItem key={item.key} id={item.key}>{item.label}</AutocompleteItem>}
       </Autocomplete>
       <PasswordInput
         label={t('password.label')}

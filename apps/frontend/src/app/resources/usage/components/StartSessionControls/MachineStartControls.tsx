@@ -41,7 +41,7 @@ export function MachineStartControls({
           </DropdownTrigger>
           <DropdownMenu disallowEmptySelection aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
             <DropdownItem
-              key="startWithNotes"
+              key="startWithNotes" id="startWithNotes"
               description={t('machine.alternativeStartSessionOptionsMenu.startWithNotes.description')}
               onPress={onStartWithNotes}
             >

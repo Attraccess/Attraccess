@@ -54,7 +54,7 @@ export function EmailTemplatesPage() {
           emptyContent={<EmptyState />}
         >
           {(item) => (
-            <TableRow key={item.key}>
+            <TableRow key={item.key} id={item.key}>
               <TableCell>{item.type}</TableCell>
               <TableCell>{item.subject}</TableCell>
               <TableCell>{item.actions}</TableCell>

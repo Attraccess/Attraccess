@@ -288,7 +288,7 @@ export function FormEditorPage() {
 
                 return (
                   <AccordionItem
-                    key={key}
+                    key={key} id={key}
                     aria-label={`${t('fields.label')} #${index + 1}`}
                     title={
                       <div className="flex flex-col text-start">

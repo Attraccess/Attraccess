@@ -141,7 +141,7 @@ export function AttractapList() {
                     </DropdownTrigger>
                     <DropdownMenu aria-label="Attractap actions">
                       <DropdownItem
-                        key="serial-console"
+                        key="serial-console" id="serial-console"
                         startContent={<LogsIcon className="w-4 h-4" />}
                         onPress={onOpenSerialConsole}
                         data-cy="attractap-list-open-console-button"
@@ -150,7 +150,7 @@ export function AttractapList() {
                       </DropdownItem>
 
                       <DropdownItem
-                        key="hardware-setup"
+                        key="hardware-setup" id="hardware-setup"
                         startContent={<CpuIcon className="w-4 h-4" />}
                         onPress={onOpenHardwareSetup}
                         data-cy="attractap-list-open-flasher-button"
@@ -206,7 +206,7 @@ export function AttractapList() {
                   emptyContent={<EmptyState />}
                 >
                   {(reader) => (
-                    <TableRow key={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
+                    <TableRow key={reader.id} id={reader.id} className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}>
                       <TableCell>{reader.name}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {reader.firmware.name} ({reader.firmware.variant})

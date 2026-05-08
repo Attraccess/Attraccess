@@ -213,7 +213,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
           </TableHeader>
           <TableBody items={transactions?.data ?? []} isLoading={isLoadingTransactions}>
             {(transaction) => (
-              <TableRow key={transaction.id} className="wrap-none cursor-pointer">
+              <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">
                 <TableCell>{transaction.id}</TableCell>
                 <TableCell className="whitespace-nowrap">
                   <DateTimeDisplay date={transaction.createdAt} />

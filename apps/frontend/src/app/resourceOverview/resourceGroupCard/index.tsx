@@ -172,7 +172,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             emptyContent={<EmptyState />}
           >
             {(resource) => (
-              <TableRow key={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
+              <TableRow key={resource.id} id={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
                 <TableCell>
                   <div className="w-12 h-12 shrink-0">
                     <Image

@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { SelectItem } from "../../../../../utils/heroui-compat";
 import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { Button, ModalBody, ModalFooter, ModalHeader, Select, SelectItem, Selection } from '@heroui/react';
+import { Button, ModalBody, ModalFooter, ModalHeader, Select, Selection } from "@heroui/react";
 import { useQueryClient } from '@tanstack/react-query';
 import {
   UseProjectsServiceListProjectInvitationsKeyFn,
@@ -129,7 +130,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
                   disallowEmptySelection
                 >
                   {roleOptions.map((value) => (
-                    <SelectItem key={value}>{t(`roles.${value}`)}</SelectItem>
+                    <SelectItem key={value} id={value}>{t(`roles.${value}`)}</SelectItem>
                   ))}
                 </Select>
               </ModalBody>

@@ -69,7 +69,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
               emptyContent={<EmptyState />}
             >
               {(item) => (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} id={item.id}>
                   <TableCell>
                     <DateTimeDisplay date={item.createdAt} />
                   </TableCell>

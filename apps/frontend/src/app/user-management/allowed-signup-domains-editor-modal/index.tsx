@@ -141,7 +141,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
                 emptyContent={<EmptyState />}
               >
                 {(domain) => (
-                  <TableRow key={domain.value}>
+                  <TableRow key={domain.value} id={domain.value}>
                     <TableCell className="w-full">{domain.value}</TableCell>
                     <TableCell className="flex-row flex">
                       <Button
