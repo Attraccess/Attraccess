@@ -174,16 +174,17 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             {(resource) => (
               <TableRow key={resource.id} className="cursor-pointer hover:bg-primary-50 transition-bg duration-300">
                 <TableCell>
-                  <Image
-                    height={48}
-                    width={48}
-                    isBlurred
-                    src={filenameToUrl(resource.imageFilename)}
-                    alt={resource.name}
-                    classNames={{
-                      img: 'object-contain',
-                    }}
-                  />
+                  <div className="w-12 h-12 shrink-0">
+                    <Image
+                      isBlurred
+                      src={filenameToUrl(resource.imageFilename)}
+                      alt={resource.name}
+                      classNames={{
+                        wrapper: '!max-w-none w-12 h-12',
+                        img: 'object-contain w-12 h-12',
+                      }}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell>{resource.name}</TableCell>
                 <TableCell className="text-right">
