@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
-import { Button, Divider, Input, ModalBody, ModalFooter, ModalHeader, Spinner, Tooltip } from '@heroui/react';
+import { useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, Divider, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -358,38 +358,56 @@ export function MetricsSettingsForm() {
       {togglesSection}
       {thresholdSection}
 
-      <Modal isOpen={rerollModal.isOpen} onClose={rerollModal.onClose}>
-        <ModalContent>
-          <ModalHeader>{t('confirmReroll.title')}</ModalHeader>
-          <ModalBody>
-            <p>{t('confirmReroll.description')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={rerollModal.onClose}>
-              {t('confirmReroll.cancel')}
-            </Button>
-            <Button color="warning" onPress={() => generateApiKey()} isLoading={isGenerating}>
-              {t('confirmReroll.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={rerollModal.isOpen} onOpenChange={(open) => { if (!open) rerollModal.onClose(); }}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <p>{t('confirmReroll.description')}</p>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={close}>
+                    {t('confirmReroll.cancel')}
+                  </Button>
+                  <Button color="warning" onPress={() => generateApiKey()} isLoading={isGenerating}>
+                    {t('confirmReroll.confirm')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
 
-      <Modal isOpen={removeModal.isOpen} onClose={removeModal.onClose}>
-        <ModalContent>
-          <ModalHeader>{t('confirmRemove.title')}</ModalHeader>
-          <ModalBody>
-            <p>{t('confirmRemove.description')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={removeModal.onClose}>
-              {t('confirmRemove.cancel')}
-            </Button>
-            <Button color="danger" onPress={() => deleteApiKey()} isLoading={isDeleting}>
-              {t('confirmRemove.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+      <Modal isOpen={removeModal.isOpen} onOpenChange={(open) => { if (!open) removeModal.onClose(); }}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <p>{t('confirmRemove.description')}</p>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={close}>
+                    {t('confirmRemove.cancel')}
+                  </Button>
+                  <Button color="danger" onPress={() => deleteApiKey()} isLoading={isDeleting}>
+                    {t('confirmRemove.confirm')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </div>
   );

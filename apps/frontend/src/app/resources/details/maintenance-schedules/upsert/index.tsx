@@ -1,6 +1,5 @@
-import { ModalBody, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select } from "@heroui/react";
-import { SelectItem } from "../../../../../utils/heroui-compat";
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select } from "@heroui/react";
+import { SelectItem, useDisclosure } from "../../../../../utils/heroui-compat";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -218,7 +217,10 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
     <>
       {activator(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (<>
           <ModalHeader>
             <PageHeader
               icon={<CalendarClockIcon />}
@@ -334,7 +336,9 @@ export function MaintenanceScheduleUpsertModal(props: Props) {
               {t('actions.save')}
             </Button>
           </ModalFooter>
-        </ModalContent>
+            </>)}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

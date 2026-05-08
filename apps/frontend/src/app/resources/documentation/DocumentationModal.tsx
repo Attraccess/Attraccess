@@ -1,6 +1,6 @@
 import { memo, useCallback, useState, useEffect } from 'react';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Button, ModalBody, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -139,74 +139,75 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        size={modalSize}
-        scrollBehavior="inside"
         data-cy="documentation-modal"
       >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex justify-between items-center">
-                <div>{t('title')}</div>
-                <div className="flex gap-1">
-                  {canManageResources && (
+        <ModalBackdrop />
+        <ModalContainer size={modalSize}>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader className="flex justify-between items-center">
+                  <div>{t('title')}</div>
+                  <div className="flex gap-1">
+                    {canManageResources && (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="flat"
+                        onPress={handleEditDocumentation}
+                        aria-label={t('actions.edit')}
+                        data-cy="documentation-modal-edit-button"
+                      >
+                        <Edit size={16} />
+                      </Button>
+                    )}
                     <Button
                       isIconOnly
                       size="sm"
                       variant="flat"
-                      onPress={handleEditDocumentation}
-                      aria-label={t('actions.edit')}
-                      data-cy="documentation-modal-edit-button"
+                      onPress={toggleFullscreen}
+                      aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
+                      data-cy="documentation-modal-fullscreen-button"
                     >
-                      <Edit size={16} />
+                      {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                     </Button>
-                  )}
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={toggleFullscreen}
-                    aria-label={isFullscreen ? t('actions.exitFullscreen') : t('actions.fullscreen')}
-                    data-cy="documentation-modal-fullscreen-button"
-                  >
-                    {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                  </Button>
 
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={handleOpenInNewTab}
-                    aria-label={t('actions.openInNewTab')}
-                    data-cy="documentation-modal-open-in-new-tab-button"
-                  >
-                    <ExternalLink size={16} />
-                  </Button>
-
-                  {resource?.documentationType === 'url' && (
                     <Button
                       isIconOnly
                       size="sm"
                       variant="flat"
-                      onPress={() => refetch()}
-                      isLoading={isFetching}
-                      aria-label={t('actions.refresh')}
-                      data-cy="documentation-modal-refresh-button"
+                      onPress={handleOpenInNewTab}
+                      aria-label={t('actions.openInNewTab')}
+                      data-cy="documentation-modal-open-in-new-tab-button"
                     >
-                      <RefreshCw size={16} />
+                      <ExternalLink size={16} />
                     </Button>
-                  )}
-                </div>
-              </ModalHeader>
-              <ModalBody>{renderDocumentationContent()}</ModalBody>
-              <ModalFooter>
-                <Button color="primary" variant="light" onPress={onClose} data-cy="documentation-modal-close-button">
-                  {t('actions.close')}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
+
+                    {resource?.documentationType === 'url' && (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="flat"
+                        onPress={() => refetch()}
+                        isLoading={isFetching}
+                        aria-label={t('actions.refresh')}
+                        data-cy="documentation-modal-refresh-button"
+                      >
+                        <RefreshCw size={16} />
+                      </Button>
+                    )}
+                  </div>
+                </ModalHeader>
+                <ModalBody>{renderDocumentationContent()}</ModalBody>
+                <ModalFooter>
+                  <Button color="primary" variant="light" onPress={close} data-cy="documentation-modal-close-button">
+                    {t('actions.close')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
