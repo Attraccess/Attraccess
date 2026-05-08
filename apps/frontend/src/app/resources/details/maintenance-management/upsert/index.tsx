@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { Textarea, ModalBody, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Textarea, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -111,60 +111,67 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     <>
       {activator(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
-          </ModalHeader>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader icon={<CalendarIcon />} title={t('title')} noMargin />
+                </ModalHeader>
 
-          <ModalBody>
-            <Form onSubmit={onSubmit} ref={formRef}>
-              <DatePicker
-                label={t('inputs.startTime.label')}
-                value={startTime}
-                isRequired
-                hideTimeZone
-                onChange={setStartTime}
-              />
+                <ModalBody>
+                  <Form onSubmit={onSubmit} ref={formRef}>
+                    <DatePicker
+                      label={t('inputs.startTime.label')}
+                      value={startTime}
+                      isRequired
+                      hideTimeZone
+                      onChange={setStartTime}
+                    />
 
-              <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
-                {t('inputs.hasEndDate.label')}
-              </Switch>
-              {hasEndDate && (
-                <DatePicker
-                  label={t('inputs.endTime.label')}
-                  value={endTime}
-                  isRequired
-                  hideTimeZone
-                  onChange={setEndTime}
-                />
-              )}
+                    <Switch isSelected={hasEndDate} onValueChange={onHasEndDateChange}>
+                      {t('inputs.hasEndDate.label')}
+                    </Switch>
+                    {hasEndDate && (
+                      <DatePicker
+                        label={t('inputs.endTime.label')}
+                        value={endTime}
+                        isRequired
+                        hideTimeZone
+                        onChange={setEndTime}
+                      />
+                    )}
 
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
-                {reason ? (
-                  <p className="text-sm text-default-500 mb-2">
-                    {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
-                  </p>
-                ) : null}
-                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
-              </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1 block">{t('inputs.reason.label')}</label>
+                      {reason ? (
+                        <p className="text-sm text-default-500 mb-2">
+                          {t('inputs.reason.displayedToUsers')}: <MaintenanceReasonDisplay reason={reason} />
+                        </p>
+                      ) : null}
+                      <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+                    </div>
 
-              {error ? (
-                <Alert color="danger" title={t('alert.error.title')} variant="flat">
-                  {(error as Error).message}
-                </Alert>
-              ) : null}
+                    {error ? (
+                      <Alert color="danger" title={t('alert.error.title')} variant="flat">
+                        {(error as Error).message}
+                      </Alert>
+                    ) : null}
 
-              <button type="submit" hidden />
-            </Form>
-          </ModalBody>
+                    <button type="submit" hidden />
+                  </Form>
+                </ModalBody>
 
-          <ModalFooter>
-            <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating}>
-              {t('actions.save')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalFooter>
+                  <Button onPress={onSubmit} color="primary" type="submit" isLoading={isCreating}>
+                    {t('actions.save')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

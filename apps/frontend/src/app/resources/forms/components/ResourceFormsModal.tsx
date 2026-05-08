@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SelectItem } from "../../../../utils/heroui-compat";
-import { Modal, ModalContent } from '../../../../utils/heroui-compat';
-import { Button, Input, ModalBody, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
+import { Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Select, Selection, Switch, Textarea } from "@heroui/react";
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {
@@ -118,9 +117,11 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} size="lg" scrollBehavior="inside">
-      <ModalContent>
-        <>
+    <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <ModalBackdrop />
+      <ModalContainer size="lg">
+        <ModalDialog>
+          {({ close }) => (<>
           <ModalHeader className="flex flex-col gap-1">
             <span>{modalTitle}</span>
             <span className="text-sm text-default-500">{t('modal.description')}</span>
@@ -167,8 +168,9 @@ export function ResourceFormsModal({ isOpen, action, forms, onSubmit, onCancel }
               {t('modal.submit')}
             </Button>
           </ModalFooter>
-        </>
-      </ModalContent>
+          </>)}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 }
