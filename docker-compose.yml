@@ -85,7 +85,7 @@ services:
       interval: 30s
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.10.0
+    image: ghcr.io/koenkk/zigbee2mqtt:2.10.1
     restart: unless-stopped
     expose:
       - '8080'
