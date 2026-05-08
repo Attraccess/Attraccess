@@ -4,6 +4,14 @@
 # https://coolify.io/docs/knowledge-base/docker/compose for details.
 #
 # Stack: rabbitmq (AMQP+MQTT), zigbee2mqtt, attraccess, prometheus, grafana.
+#
+# NOTE: prometheus + grafana mount ./monitoring/* relative to this file.
+# Coolify's Git-based deploy clones the repo so these resolve at runtime.
+# If deploying outside Coolify, copy ./monitoring next to this compose.
+#
+# NOTE: zigbee2mqtt has no `devices:` mapping by default (host-specific).
+# To pass a Zigbee adapter, use a Coolify compose override or extend with
+# a docker-compose.override.yml exposing e.g. /dev/ttyACM0.
 
 services:
   attraccess:
@@ -11,8 +19,8 @@ services:
     restart: unless-stopped
     environment:
       - SERVICE_FQDN_ATTRACCESS_3000
-      - ATTRACCESS_URL=$SERVICE_FQDN_ATTRACCESS
-      - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_FQDN_ATTRACCESS}
+      - ATTRACCESS_URL=$SERVICE_FQDN_ATTRACCESS_3000
+      - ATTRACCESS_PUBLIC_INTERNET_URL=${ATTRACCESS_PUBLIC_INTERNET_URL:-$SERVICE_FQDN_ATTRACCESS_3000}
       - AUTH_SESSION_SECRET=$SERVICE_BASE64_64_AUTHSESSION
       - LICENSE_KEY=${LICENSE_KEY}
       - TZ=${TZ:-UTC}
@@ -72,6 +80,12 @@ services:
     volumes:
       - zigbee2mqtt-data:/app/data
       - /run/udev:/run/udev:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://127.0.0.1:8080 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -91,14 +105,14 @@ services:
       - '--web.enable-lifecycle'
     depends_on:
       attraccess:
-        condition: service_started
+        condition: service_healthy
 
   grafana:
     image: grafana/grafana:13.0.1
     restart: unless-stopped
     environment:
       - SERVICE_FQDN_GRAFANA_3000
-      - GF_SERVER_ROOT_URL=$SERVICE_FQDN_GRAFANA
+      - GF_SERVER_ROOT_URL=$SERVICE_FQDN_GRAFANA_3000
       - GF_SECURITY_ADMIN_USER=$SERVICE_USER_GRAFANA
       - GF_SECURITY_ADMIN_PASSWORD=$SERVICE_PASSWORD_GRAFANA
     volumes:
