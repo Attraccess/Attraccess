@@ -26,12 +26,31 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: attraccess-local:latest
     expose:
       - '3000'
     volumes:
       - attraccess-storage:/app/storage
     env_file:
       - .env.docker-compose
+
+  monitoring-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: attraccess-local:latest
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >
+        set -e &&
+        cp -f /app/share/monitoring/prometheus/alerts.yml /prometheus-config/alerts.yml &&
+        cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
+        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
+    volumes:
+      - prometheus-config:/prometheus-config
+      - grafana-provisioning:/grafana-provisioning
+      - grafana-dashboards:/grafana-dashboards
 
   mailpit:
     image: axllent/mailpit:v1.29.7
@@ -136,10 +155,12 @@ services:
       - '9090'
     volumes:
       - prometheus-config:/etc/prometheus:ro
-      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     depends_on:
-      - config-ui
+      config-ui:
+        condition: service_started
+      monitoring-init:
+        condition: service_completed_successfully
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
@@ -155,9 +176,12 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-attraccess}
       - GF_SERVER_HTTP_PORT=3001
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana-dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
+    depends_on:
+      monitoring-init:
+        condition: service_completed_successfully
 
   duplicati:
     image: duplicati/duplicati:2.3.0.1-stable
@@ -189,4 +213,6 @@ volumes:
   prometheus-config:
   prometheus-data:
   grafana-data:
+  grafana-provisioning:
+  grafana-dashboards:
   duplicati:

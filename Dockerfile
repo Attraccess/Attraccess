@@ -61,6 +61,10 @@ COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
+# Bundle sidecar configs (Prometheus rules, Grafana provisioning, dashboards)
+# so they can be copied into shared volumes by a monitoring-init container.
+COPY --from=builder /app/monitoring /app/share/monitoring
+
 # Set environment variable to tell API about frontend location
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
 

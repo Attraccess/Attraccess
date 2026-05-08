@@ -5,9 +5,10 @@
 #
 # Stack: rabbitmq (AMQP+MQTT), zigbee2mqtt, attraccess, prometheus, grafana.
 #
-# NOTE: prometheus + grafana mount ./monitoring/* relative to this file.
-# Coolify's Git-based deploy clones the repo so these resolve at runtime.
-# If deploying outside Coolify, copy ./monitoring next to this compose.
+# Sidecar configs (Prometheus rules, Grafana provisioning, dashboards) ship
+# bundled inside the attraccess image at /app/share/monitoring/. The
+# monitoring-init service copies them into named volumes on stack startup,
+# so this compose file deploys standalone — no repo checkout required.
 #
 # NOTE: zigbee2mqtt has no `devices:` mapping by default (host-specific).
 # To pass a Zigbee adapter, use a Coolify compose override or extend with
@@ -25,13 +26,6 @@ services:
       - LICENSE_KEY=${LICENSE_KEY}
       - TZ=${TZ:-UTC}
       - LOG_LEVELS=${LOG_LEVELS:-error,warn,log}
-      - SMTP_SERVICE=${SMTP_SERVICE:-SMTP}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
-      - SMTP_SECURE=${SMTP_SECURE:-true}
     volumes:
       - attraccess-storage:/app/storage
     healthcheck:
@@ -90,6 +84,21 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  monitoring-init:
+    image: ${ATTRACCESS_IMAGE:-ghcr.io/attraccess/attraccess:latest}
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >
+        set -e &&
+        cp -rT /app/share/monitoring/prometheus /prometheus-config &&
+        cp -rT /app/share/monitoring/grafana/provisioning /grafana-provisioning &&
+        cp -rT /app/share/monitoring/grafana/dashboards /grafana-dashboards
+    volumes:
+      - prometheus-config:/prometheus-config
+      - grafana-provisioning:/grafana-provisioning
+      - grafana-dashboards:/grafana-dashboards
+
   prometheus:
     image: prom/prometheus:v3.11.3
     restart: unless-stopped
@@ -97,13 +106,14 @@ services:
       - SERVICE_FQDN_PROMETHEUS_9090
     volumes:
       - prometheus-data:/prometheus
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-config:/etc/prometheus:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
       - '--web.enable-lifecycle'
     depends_on:
+      monitoring-init:
+        condition: service_completed_successfully
       attraccess:
         condition: service_healthy
 
@@ -117,14 +127,20 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=$SERVICE_PASSWORD_GRAFANA
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana-dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - prometheus
+      monitoring-init:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
 
 volumes:
   attraccess-storage:
   rabbitmq-data:
   zigbee2mqtt-data:
   prometheus-data:
+  prometheus-config:
   grafana-data:
+  grafana-provisioning:
+  grafana-dashboards:
