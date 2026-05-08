@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
-import { Alert, Button, ModalBody, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -219,23 +218,23 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
 
       <Modal
         isOpen={isModalOpen}
-        onClose={() => (!isEndingAll ? setIsModalOpen(false) : undefined)}
-        isDismissable={!isEndingAll}
-        size="lg"
+        onOpenChange={(open) => { if (!open && !isEndingAll) setIsModalOpen(false); }}
       >
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>
-                {allCompleted ? (
-                  <div className="flex items-center gap-2">
-                    <Check className="h-5 w-5 text-green-500" /> {t('modal.completedTitle')}
-                  </div>
-                ) : (
-                  t('modal.title')
-                )}
-              </ModalHeader>
-              <ModalBody>
+        <ModalBackdrop isDismissable={!isEndingAll} />
+        <ModalContainer size="lg">
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  {allCompleted ? (
+                    <div className="flex items-center gap-2">
+                      <Check className="h-5 w-5 text-green-500" /> {t('modal.completedTitle')}
+                    </div>
+                  ) : (
+                    t('modal.title')
+                  )}
+                </ModalHeader>
+                <ModalBody>
                 {allCompleted ? (
                   <div className="flex flex-col items-center justify-center py-6 gap-3">
                     <CheckCircle2 className="h-16 w-16 text-green-500" />
@@ -282,25 +281,26 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                     </ul>
                   </div>
                 )}
-              </ModalBody>
-              {!allCompleted && (
-                <ModalFooter>
-                  <Button variant="light" onPress={onClose} isDisabled={isEndingAll}>
-                    {t('modal.cancel')}
-                  </Button>
-                  <Button
-                    color="danger"
-                    isLoading={isEndingAll}
-                    isDisabled={isLoadingResources || activeResources.length === 0}
-                    onPress={confirmEndAll}
-                  >
-                    {t('modal.confirm')}
-                  </Button>
-                </ModalFooter>
-              )}
-            </>
-          )}
-        </ModalContent>
+                </ModalBody>
+                {!allCompleted && (
+                  <ModalFooter>
+                    <Button variant="light" onPress={close} isDisabled={isEndingAll}>
+                      {t('modal.cancel')}
+                    </Button>
+                    <Button
+                      color="danger"
+                      isLoading={isEndingAll}
+                      isDisabled={isLoadingResources || activeResources.length === 0}
+                      onPress={confirmEndAll}
+                    >
+                      {t('modal.confirm')}
+                    </Button>
+                  </ModalFooter>
+                )}
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </div>
   );

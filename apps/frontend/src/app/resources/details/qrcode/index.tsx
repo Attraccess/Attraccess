@@ -1,5 +1,5 @@
-import { Button, ButtonProps, Link, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, ButtonProps, Link, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
+import { useDisclosure } from '../../../../utils/heroui-compat';
 import { PageHeader } from '../../../../components/pageHeader';
 import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -54,42 +54,49 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
         {t('button.label')}
       </Button>
 
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader>
-            <PageHeader title={t('modal.title')} subtitle={t('modal.subtitle')} icon={<QrCodeIcon />} noMargin />
-          </ModalHeader>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <PageHeader title={t('modal.title')} subtitle={t('modal.subtitle')} icon={<QrCodeIcon />} noMargin />
+                </ModalHeader>
 
-          <ModalBody>
-            <Select
-              selectedKey={action}
-              onSelectionChange={(key) => setAction(key as QrCodeAction)}
-              items={Object.values(QrCodeAction).map((val) => ({
-                key: val,
-                label: t(`modal.action.${val}`),
-              }))}
-              label={t('modal.action.label')}
-            />
-            <QRCode
-              value={qrCodeUrl}
-              size={300}
-              logoHeight={100}
-              logoWidth={50}
-              logoPadding={10}
-              logoPaddingStyle="square"
-              logoImage="/logo.png"
-              qrStyle="fluid"
-              id={id}
-            />
-            <Link target="_blank" href={qrCodeUrl}>
-              {qrCodeUrl}
-            </Link>
-          </ModalBody>
+                <ModalBody>
+                  <Select
+                    selectedKey={action}
+                    onSelectionChange={(key) => setAction(key as QrCodeAction)}
+                    items={Object.values(QrCodeAction).map((val) => ({
+                      key: val,
+                      label: t(`modal.action.${val}`),
+                    }))}
+                    label={t('modal.action.label')}
+                  />
+                  <QRCode
+                    value={qrCodeUrl}
+                    size={300}
+                    logoHeight={100}
+                    logoWidth={50}
+                    logoPadding={10}
+                    logoPaddingStyle="square"
+                    logoImage="/logo.png"
+                    qrStyle="fluid"
+                    id={id}
+                  />
+                  <Link target="_blank" href={qrCodeUrl}>
+                    {qrCodeUrl}
+                  </Link>
+                </ModalBody>
 
-          <ModalFooter>
-            <Button onPress={download}>{t('modal.download')}</Button>
-          </ModalFooter>
-        </ModalContent>
+                <ModalFooter>
+                  <Button onPress={download}>{t('modal.download')}</Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
