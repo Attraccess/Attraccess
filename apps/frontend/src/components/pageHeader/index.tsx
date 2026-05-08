@@ -1,8 +1,7 @@
 import React, { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { Button } from '@heroui/react';
-import { cn, Image } from '@heroui/react';
+import { Button, cn } from '@heroui/react';
 
 interface PageHeaderProps {
   title: string | ReactNode;
@@ -49,13 +48,10 @@ export function PageHeader({
             <div className="mr-2">
               {icon}
               {thumbnailSrc && (
-                <Image
-                  classNames={{
-                    img: 'object-contain',
-                  }}
+                <img
+                  className="object-contain rounded-lg"
                   height={48}
                   width={48}
-                  isBlurred
                   src={thumbnailSrc}
                   alt={thumbnailAlt}
                 />

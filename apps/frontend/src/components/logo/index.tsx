@@ -1,4 +1,4 @@
-import { cn, Image, Link, LinkProps } from '@heroui/react';
+import { cn, Link, LinkProps } from '@heroui/react';
 
 export function Logo(props: Omit<LinkProps, 'children'>) {
   return (
@@ -7,7 +7,7 @@ export function Logo(props: Omit<LinkProps, 'children'>) {
       href={props.href ?? '/'}
       className={cn(props.className, 'font-bold text-inherit flex items-center gap-2')}
     >
-      <Image src="/logo.png" alt="Attraccess" height={32} />
+      <img src="/logo.png" alt="Attraccess" height={32} />
       <span className="text-xl">Attraccess</span>
     </Link>
   );

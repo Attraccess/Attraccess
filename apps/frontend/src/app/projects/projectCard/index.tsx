@@ -1,5 +1,5 @@
 import { Project } from '@attraccess/react-query-client';
-import { Card, CardBody, CardFooter, Chip, Image, Link } from '@heroui/react';
+import { Card, CardBody, CardFooter, Chip, Link } from '@heroui/react';
 import { filenameToUrl } from '../../../api';
 
 interface Props {
@@ -13,13 +13,10 @@ export function ProjectCard(props: Props) {
   return (
     <Card isPressable shadow="sm" as={Link} href={`/projects/${project.id}`}>
       <CardBody className="overflow-visible p-0">
-        <Image
+        <img
           alt={project.name}
-          className="w-full object-cover h-[240px] hover:object-contain transition-all duration-300"
-          radius="lg"
-          shadow="sm"
+          className="w-full object-cover h-[240px] hover:object-contain transition-all duration-300 rounded-lg shadow-sm"
           src={filenameToUrl(project.logo) || '/project-no-thumbnail.svg'}
-          width="100%"
         />
       </CardBody>
       <CardFooter className="flex-col items-start justify-start gap-2">
