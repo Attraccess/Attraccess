@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
-import { ModalBody, ModalFooter, ModalHeader, Button, Textarea, Form, Alert } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
+import { Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Button, Textarea, Form, Alert } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
 import {
@@ -60,40 +60,49 @@ export function MarkDoneModal(props: Props) {
     <>
       {children(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
-        <ModalContent>
-          <ModalHeader>{t('actions.markDone.modal.title')}</ModalHeader>
-          <ModalBody>
-            <Form
-              ref={formRef}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSubmit();
-              }}
-            >
-              <Textarea
-                label={t('actions.markDone.modal.notesLabel')}
-                placeholder={t('actions.markDone.modal.notesPlaceholder')}
-                description={t('actions.markDone.modal.notesOptional')}
-                value={notes}
-                onValueChange={setNotes}
-              />
-              {error ? (
-                <Alert color="danger" variant="flat">
-                  {(error as Error).message}
-                </Alert>
-              ) : null}
-              <button type="submit" hidden />
-            </Form>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={onClose}>
-              {t('actions.markDone.modal.cancel')}
-            </Button>
-            <Button color="primary" onPress={onSubmit} isLoading={isPending}>
-              {t('actions.markDone.modal.confirm')}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {({ close }) => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('actions.markDone.modal.title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody>
+                  <Form
+                    ref={formRef}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      onSubmit();
+                    }}
+                  >
+                    <Textarea
+                      label={t('actions.markDone.modal.notesLabel')}
+                      placeholder={t('actions.markDone.modal.notesPlaceholder')}
+                      description={t('actions.markDone.modal.notesOptional')}
+                      value={notes}
+                      onValueChange={setNotes}
+                    />
+                    {error ? (
+                      <Alert color="danger" variant="flat">
+                        {(error as Error).message}
+                      </Alert>
+                    ) : null}
+                    <button type="submit" hidden />
+                  </Form>
+                </ModalBody>
+                <ModalFooter>
+                  <Button variant="light" onPress={close}>
+                    {t('actions.markDone.modal.cancel')}
+                  </Button>
+                  <Button color="primary" onPress={onSubmit} isLoading={isPending}>
+                    {t('actions.markDone.modal.confirm')}
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

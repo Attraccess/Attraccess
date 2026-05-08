@@ -1,8 +1,7 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
 import { AutocompleteItem } from "../../../../../../../utils/heroui-compat";
 import { NumberInput } from "../../../../../../../utils/heroui-compat";
-import { Modal, ModalContent } from '../../../../../../../utils/heroui-compat';
-import { Autocomplete, Button, Card, CardContent, Input, ModalBody, ModalHeader, Switch, Textarea } from "@heroui/react";
+import { Autocomplete, Button, Card, CardContent, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Switch, Textarea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -116,26 +115,29 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           </Button>
         </div>
 
-        <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} scrollBehavior="inside">
-          <ModalContent>
-            {(onClose) => (
-              <>
-                <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
-                <ModalBody>
-                  <CreateMqttServerForm
-                    onSuccess={(server) => {
-                      onChange(server.id as TValue);
-                      setIsCreateServerOpen(false);
-                    }}
-                    onCancel={() => {
-                      setIsCreateServerOpen(false);
-                      onClose();
-                    }}
-                  />
-                </ModalBody>
-              </>
-            )}
-          </ModalContent>
+        <Modal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen}>
+          <ModalBackdrop />
+          <ModalContainer>
+            <ModalDialog>
+              {({ close }) => (
+                <>
+                  <ModalHeader>{t('nodes.genericConfig.createMqttServer')}</ModalHeader>
+                  <ModalBody>
+                    <CreateMqttServerForm
+                      onSuccess={(server) => {
+                        onChange(server.id as TValue);
+                        setIsCreateServerOpen(false);
+                      }}
+                      onCancel={() => {
+                        setIsCreateServerOpen(false);
+                        close();
+                      }}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalDialog>
+          </ModalContainer>
         </Modal>
       </>
     );

@@ -1,5 +1,5 @@
-import { Accordion, AccordionItem, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { Accordion, AccordionItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
 import { useCallback, useMemo } from 'react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
@@ -86,34 +86,43 @@ export function NodePickerModal(props: Props) {
   return (
     <>
       {props.children(onOpen)}
-      <Modal scrollBehavior="inside" isOpen={isOpen} onOpenChange={onOpenChange} size="4xl">
-        <ModalContent>
-          <ModalHeader>{t('title')}</ModalHeader>
-          <ModalBody className="flex flex-col gap-4">
-            <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
-              {nodeGroups.map((group, index) => (
-                <AccordionItem key={index} id={index} title={t('nodeType.' + group.category)}>
-                  <div className="flex flex-row flex-wrap gap-4">
-                    {group.nodes.map((nodeSchema) => (
-                      <div
-                        key={nodeSchema.type}
-                        onClick={() => onSelect(nodeSchema.type)}
-                        className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                      >
-                        <AttraccessNode
-                          tNodeTranslations={props.tNodeTranslations}
-                          schema={nodeSchema}
-                          previewMode={true}
-                        />
-                      </div>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+        <ModalBackdrop />
+        <ModalContainer size="4xl">
+          <ModalDialog>
+            {() => (
+              <>
+                <ModalHeader>
+                  <ModalHeading>{t('title')}</ModalHeading>
+                </ModalHeader>
+                <ModalBody className="flex flex-col gap-4">
+                  <Accordion defaultExpandedKeys={nodeGroups.map((_, index) => index.toString())}>
+                    {nodeGroups.map((group, index) => (
+                      <AccordionItem key={index} id={index} title={t('nodeType.' + group.category)}>
+                        <div className="flex flex-row flex-wrap gap-4">
+                          {group.nodes.map((nodeSchema) => (
+                            <div
+                              key={nodeSchema.type}
+                              onClick={() => onSelect(nodeSchema.type)}
+                              className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                            >
+                              <AttraccessNode
+                                tNodeTranslations={props.tNodeTranslations}
+                                schema={nodeSchema}
+                                previewMode={true}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionItem>
                     ))}
-                  </div>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </ModalBody>
-          <ModalFooter></ModalFooter>
-        </ModalContent>
+                  </Accordion>
+                </ModalBody>
+                <ModalFooter></ModalFooter>
+              </>
+            )}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
