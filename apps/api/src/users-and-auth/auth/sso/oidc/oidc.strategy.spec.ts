@@ -284,6 +284,58 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     expect(user.systemPermissions.canManageUsers).toBe(false);
   });
 
+  describe('strategy options passed to passport-openidconnect', () => {
+    function readOptions(strategy: SSOOIDCStrategy): { scope: unknown; skipUserProfile: unknown } {
+      const internal = strategy as unknown as { _scope: unknown; _skipUserProfile: unknown };
+      return { scope: internal._scope, skipUserProfile: internal._skipUserProfile };
+    }
+
+    it('filters configured `openid` from scopes so it is not passed twice', () => {
+      const strategy = createStrategy(
+        { scopes: ['openid', 'email', 'profile'] },
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
+    });
+
+    it('filters `openid` case-insensitively and trimmed from configured scopes', () => {
+      const strategy = createStrategy(
+        { scopes: [' OpenID ', 'Email', 'profile'] },
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['Email', 'profile']);
+    });
+
+    it('uses default scopes (without openid) when scopes is unset', () => {
+      const strategy = createStrategy(
+        {},
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
+    });
+
+    it('uses default scopes (without openid) when scopes is an empty array', () => {
+      const strategy = createStrategy(
+        { scopes: [] },
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
+    });
+
+    it('passes `skipUserProfile: false` explicitly so the userinfo endpoint is always fetched', () => {
+      const strategy = createStrategy(
+        {},
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).skipUserProfile).toBe(false);
+    });
+  });
+
   describe('authenticate (per-request callback URL)', () => {
     it('passes callback URL from request to base strategy when set (no restart needed for URL changes)', () => {
       const baseAuthenticateSpy = jest.spyOn(Strategy.prototype, 'authenticate').mockImplementation(() => {
