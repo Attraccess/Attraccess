@@ -165,6 +165,11 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
           },
         ];
 
+      case ResourceFlowNodeType.INPUT_VARIABLE_CHANGED:
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_SET:
+      case ResourceFlowNodeType.PROCESSING_VARIABLES_GET:
+        return [];
+
       default: {
         const exhaustiveCheck: never = schema.type;
         throw new Error(`Unknown node type: ${exhaustiveCheck}`);
