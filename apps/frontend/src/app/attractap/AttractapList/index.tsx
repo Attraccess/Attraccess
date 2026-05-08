@@ -14,7 +14,7 @@ import {
   TableRow,
   Card,
   CardHeader,
-  CardBody,
+  CardContent,
   Chip,
 } from '@heroui/react';
 import { ArrowRightIcon, CpuIcon, LogsIcon, MoreVertical, PencilIcon, Trash2Icon } from 'lucide-react';
@@ -187,7 +187,7 @@ export function AttractapList() {
                 subtitle={t(`table.${tableIndex === 0 ? 'active' : 'stale'}.description`)}
               />
             </CardHeader>
-            <CardBody>
+            <CardContent>
               <Table
                 aria-label={`${tableIndex === 0 ? 'active' : 'stale'} attractaps`}
                 data-cy={`attractap-list-table-${tableIndex === 0 ? 'active' : 'stale'}`}
@@ -244,7 +244,7 @@ export function AttractapList() {
                   )}
                 </TableBody>
               </Table>
-            </CardBody>
+            </CardContent>
           </Card>
         ))}
       </div>

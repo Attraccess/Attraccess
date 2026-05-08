@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardFooter,
   CardHeader,
   Input,
@@ -155,9 +155,9 @@ function DocumentationEditorComponent() {
         <CardHeader>
           <h2 className="text-xl">{t('error.title')}</h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </CardBody>
+        </CardContent>
         <CardFooter className="flex justify-center gap-4">
           <Button onPress={() => refetchResource()} color="primary" data-cy="documentation-editor-error-retry-button">
             {t('actions.retry')}
@@ -182,9 +182,9 @@ function DocumentationEditorComponent() {
         <CardHeader>
           <h2 className="text-xl">{t('notFound.title')}</h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <p>{t('notFound.message')}</p>
-        </CardBody>
+        </CardContent>
         <CardFooter className="justify-center">
           <Button
             onPress={() => navigate('/resources')}
@@ -236,7 +236,7 @@ function DocumentationEditorComponent() {
             </Radio>
           </RadioGroup>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           {documentationType === DocumentationType.MARKDOWN && (
             <Tabs
               selectedKey={selectedTab}
@@ -280,7 +280,7 @@ function DocumentationEditorComponent() {
               data-cy="documentation-editor-url-input"
             />
           )}
-        </CardBody>
+        </CardContent>
         <CardFooter>
           <div className="flex justify-end space-x-2">
             <Button

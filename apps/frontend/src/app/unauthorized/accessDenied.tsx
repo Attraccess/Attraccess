@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Button, Card, CardBody, CardFooter, CardHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader } from '@heroui/react';
 import { ShieldX, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -35,10 +35,10 @@ export const AccessDenied = memo(function AccessDeniedComponent() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
         </CardHeader>
 
-        <CardBody>
+        <CardContent>
           {/* Description */}
           <p className="text-center text-gray-600 dark:text-gray-300 leading-relaxed">{t('description')}</p>
-        </CardBody>
+        </CardContent>
 
         <CardFooter className="flex flex-col gap-2">
           {/* Action Buttons */}

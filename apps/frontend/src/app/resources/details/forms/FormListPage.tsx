@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardFooter, CardHeader, Chip, Spinner } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, Chip, Spinner } from '@heroui/react';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -78,9 +78,9 @@ export function FormListPage() {
                   )}
                 </div>
               </CardHeader>
-              <CardBody>
+              <CardContent>
                 <p className="text-sm text-default-500">{t('list.fieldCount', { count: form.fields.length })}</p>
-              </CardBody>
+              </CardContent>
               <CardFooter className="flex justify-between text-xs text-default-400">
                 <span>{t('list.updated')}</span>
                 <DateTimeDisplay date={form.updatedAt} />

@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { InviteProjectMemberModal } from '../inviteMemberModal';
 import { UserPlus2Icon } from 'lucide-react';
@@ -24,7 +24,7 @@ export function TeamInviteCard(props: Readonly<TeamInviteCardProps>) {
         <p className="text-large font-semibold">{t('sections.invite.title')}</p>
         <p className="text-small text-default-500">{t('sections.invite.description')}</p>
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <InviteProjectMemberModal projectId={projectId}>
           {(onOpen) => (
             <Button onPress={onOpen} startContent={<UserPlus2Icon className="size-4" />} color="primary">
@@ -32,7 +32,7 @@ export function TeamInviteCard(props: Readonly<TeamInviteCardProps>) {
             </Button>
           )}
         </InviteProjectMemberModal>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, CardHeader, CardBody, CardFooter, Switch } from '@heroui/react';
+import { Button, Card, CardHeader, CardContent, CardFooter, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import {
@@ -119,7 +119,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
         <PageHeader title={t('title')} noMargin />
       </CardHeader>
 
-      <CardBody className="flex flex-col gap-2">
+      <CardContent className="flex flex-col gap-2">
         {isSsoManaged ? (
           <div
             className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -141,7 +141,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({ user, ss
             {t(`permissions.${permission}`)}
           </Switch>
         ))}
-      </CardBody>
+      </CardContent>
 
       <CardFooter className="flex justify-end">
         <Button

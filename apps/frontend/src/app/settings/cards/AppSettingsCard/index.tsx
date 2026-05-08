@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
+import { Card, CardContent, CardHeader, Chip } from '@heroui/react';
 import { CheckIcon, Settings2Icon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -42,9 +42,9 @@ export function AppSettingsCard({ variant, onNext }: AppSettingsCardProps) {
           actions={licenseChip}
         />
       </CardHeader>
-      <CardBody className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         <AppSettingsForm variant={variant} endpoint="settings" onNext={onNext} />
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

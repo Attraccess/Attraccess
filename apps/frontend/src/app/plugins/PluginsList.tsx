@@ -1,7 +1,7 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { Modal, ModalContent } from '../../utils/heroui-compat';
 import { useState } from 'react';
-import { Card, CardBody, CardHeader, Button, ModalHeader, ModalBody, ModalFooter, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Alert } from '@heroui/react';
+import { Card, CardContent, CardHeader, Button, ModalHeader, ModalBody, ModalFooter, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Alert } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
@@ -85,7 +85,7 @@ export function PluginsList() {
             {t('uploadButton')}
           </Button>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <Table aria-label="Plugins table" data-cy="plugins-list-table">
             <TableHeader>
               <TableColumn>{t('columns.name')}</TableColumn>
@@ -125,7 +125,7 @@ export function PluginsList() {
               )}
             </TableBody>
           </Table>
-        </CardBody>
+        </CardContent>
 
         <Modal
           isOpen={deleteModalOpen}

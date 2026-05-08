@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, Button, Card, CardBody, CardFooter, CardHeader } from '@heroui/react';
+import { Alert, Button, Card, CardContent, CardFooter, CardHeader } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -102,9 +102,9 @@ export function ConfirmDeleteAccount() {
           <CardHeader className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </CardBody>
+          </CardContent>
           <CardFooter>
             <Button fullWidth color="primary" onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
               {t('success.backToLogin')}
@@ -122,9 +122,9 @@ export function ConfirmDeleteAccount() {
           <CardHeader className="text-center">
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <Alert color="danger" title={t('error.errorTitle')} description={error} data-cy="confirm-delete-error-alert" />
-          </CardBody>
+          </CardContent>
           <CardFooter className="flex flex-col gap-2">
             {allowRetry && (
               <Button

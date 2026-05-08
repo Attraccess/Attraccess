@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Button, Card, CardBody, CardFooter, CardHeader, Form } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, Form } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import en from './en.json';
@@ -56,9 +56,9 @@ export function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full" data-cy="reset-password-success-card">
           <CardHeader className="text-center">{t('success.title')}</CardHeader>
-          <CardBody>
+          <CardContent>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </CardBody>
+          </CardContent>
           <CardFooter>
             <Button
               fullWidth
@@ -84,7 +84,7 @@ export function ResetPassword() {
         data-cy="reset-password-form"
       >
         <CardHeader>{t('title')}</CardHeader>
-        <CardBody>
+        <CardContent>
           <PasswordInput
             label={t('inputs.password')}
             value={password}
@@ -109,7 +109,7 @@ export function ResetPassword() {
             data-cy="reset-password-confirm-password-input"
             autoComplete="new-password"
           />
-        </CardBody>
+        </CardContent>
         <CardFooter>
           <Button fullWidth color="primary" type="submit" data-cy="reset-password-submit-button">
             {t('submit')}

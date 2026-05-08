@@ -1,6 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, ModalBody, ModalFooter, ModalHeader, Divider, Card, CardBody, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, ModalBody, ModalFooter, ModalHeader, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -1058,7 +1058,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       <Info size={16} />
                       <span className="font-semibold">{t('setupInstructions')}</span>
                     </CardHeader>
-                    <CardBody className="flex flex-col gap-3">
+                    <CardContent className="flex flex-col gap-3">
                       <p className="text-xs text-default-500">{t('setupInstructionsHint')}</p>
                       <div className="flex flex-col gap-3">
                         {!isSamlProvider && (
@@ -1125,7 +1125,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                           </Link>
                         )}
                       </div>
-                    </CardBody>
+                    </CardContent>
                   </Card>
                 </div>
               </ModalBody>

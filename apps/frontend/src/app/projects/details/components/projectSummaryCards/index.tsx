@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Skeleton } from '@heroui/react';
+import { Card, CardContent, CardHeader, Skeleton } from '@heroui/react';
 import { useTranslations, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { ActivityIcon, CircleDollarSignIcon, Clock3Icon } from 'lucide-react';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
@@ -57,7 +57,7 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
               <p className="text-xs text-default-500">{card.description}</p>
             </div>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             {isLoading ? (
               <Skeleton className="h-6 w-24" />
             ) : card.value ? (
@@ -65,7 +65,7 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
             ) : (
               <p className="text-default-400 text-sm">{t('summary.empty')}</p>
             )}
-          </CardBody>
+          </CardContent>
         </Card>
       ))}
     </div>

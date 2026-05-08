@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
-import { Card, CardHeader, CardBody, CardProps, ModalHeader, ModalBody, Textarea, ModalFooter, Button, Form } from '@heroui/react';
+import { Card, CardHeader, CardContent, CardProps, ModalHeader, ModalBody, Textarea, ModalFooter, Button, Form } from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -111,7 +111,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
       <CardHeader>
         <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<ShieldCheckIcon />} noMargin={true} />
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <UserSelectionList
           selectedUsers={userWithIntroductionStatus}
           onAddToSelection={(user) => onGrantIntroduction({ user })}
@@ -153,7 +153,7 @@ export function IntroductionsManagement(props: Readonly<IntroductionsManagementP
             </ModalFooter>
           </ModalContent>
         </Modal>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

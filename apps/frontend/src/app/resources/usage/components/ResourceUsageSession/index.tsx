@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, CardBody, CardHeader, Spinner } from '@heroui/react';
+import { Card, CardContent, CardHeader, Spinner } from '@heroui/react';
 import { Clock } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -117,7 +117,7 @@ export function ResourceUsageSession({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('title.' + resource.type)}: </h3>
         </div>
       </CardHeader>
-      <CardBody>{renderContent()}</CardBody>
+      <CardContent>{renderContent()}</CardContent>
     </Card>
   );
 }

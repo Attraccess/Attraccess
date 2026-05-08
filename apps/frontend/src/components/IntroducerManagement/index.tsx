@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, CardHeader, CardBody, CardProps } from '@heroui/react';
+import { Card, CardHeader, CardContent, CardProps } from '@heroui/react';
 import { Trash2Icon, AwardIcon } from 'lucide-react';
 import { User, ResourceIntroducer } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -32,7 +32,7 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
       <CardHeader>
         <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<AwardIcon />} noMargin={true} />
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <UserSelectionList
           selectedUsers={introducerUsers ?? []}
           onAddToSelection={onGrantIntroducer}
@@ -55,7 +55,7 @@ export function IntroducerManagement(props: Readonly<IntroducerManagementProps &
             },
           ]}
         />
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

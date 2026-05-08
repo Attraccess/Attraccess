@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
-import { Card, CardHeader, CardBody } from '@heroui/react';
+import { Card, CardHeader, CardContent } from '@heroui/react';
 import {
   ResourceUsage,
   useResourcesServiceResourceUsageUpdateSessionProject,
@@ -142,7 +142,7 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
         />
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <HistoryTable
           resourceId={resourceId}
           showAllUsers={showAllUsers}
@@ -153,7 +153,7 @@ export function ResourceUsageHistory({ resourceId, ...rest }: ResourceUsageHisto
           updatingSessionIds={updatingSessionIds}
           onProjectChange={handleProjectChange}
         />
-      </CardBody>
+      </CardContent>
 
       <UsageNotesModal
         isOpen={isModalOpen}

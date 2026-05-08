@@ -11,7 +11,7 @@ import {
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   CardProps,
   Checkbox,
@@ -155,7 +155,7 @@ export function ManageResourceGroups({
           }
         />
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <Table
           aria-label={t('table.ariaLabel')}
           shadow="none"
@@ -200,7 +200,7 @@ export function ManageResourceGroups({
             )}
           </TableBody>
         </Table>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

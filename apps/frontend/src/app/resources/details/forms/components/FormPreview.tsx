@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
+import { Card, CardContent, CardHeader, Input, Select, SelectItem, Switch, Textarea } from '@heroui/react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 
@@ -29,7 +29,7 @@ export function FormPreview({ fields, t }: FormPreviewProps) {
             </p>
             {field.description && <p className="text-sm text-default-500">{field.description}</p>}
           </CardHeader>
-          <CardBody className="pt-2">{renderPreviewField(field, t)}</CardBody>
+          <CardContent className="pt-2">{renderPreviewField(field, t)}</CardContent>
         </Card>
       ))}
     </div>

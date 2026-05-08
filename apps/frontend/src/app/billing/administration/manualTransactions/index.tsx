@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardFooter, CardHeader, CardProps, NumberInput } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberInput } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { HandCoinsIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -85,9 +85,9 @@ export function ManualTransactionsCard(props: Props & Omit<CardProps, 'children'
         <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
       </CardHeader>
 
-      <CardBody className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         <NumberInput label={t('inputs.amount')} value={amount} onValueChange={(value) => setAmount(value)} />
-      </CardBody>
+      </CardContent>
 
       <CardFooter>
         <Button color="primary" onPress={handleCreateTransaction} isLoading={isCreatingManualTransaction}>

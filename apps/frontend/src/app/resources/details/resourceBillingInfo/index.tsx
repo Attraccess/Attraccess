@@ -1,6 +1,6 @@
 import {
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   CardProps,
   Table,
@@ -150,7 +150,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
         />
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <Table hideHeader removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn> </TableColumn>
@@ -229,7 +229,7 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             </TableRow>
           </TableBody>
         </Table>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

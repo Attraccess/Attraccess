@@ -5,7 +5,7 @@ import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
 import { User } from '@attraccess/react-query-client';
-import { Button, Card, CardBody, CardHeader, Link } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Link } from '@heroui/react';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
 import { BanknoteIcon } from 'lucide-react';
@@ -34,9 +34,9 @@ export function BillingAdministrationPage() {
           <CardHeader>
             <PageHeader title={t('inputs.user')} noMargin />
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <UserSearch onSelectionChange={setUser} label={t('inputs.user')} />
-          </CardBody>
+          </CardContent>
         </Card>
 
         {user && (

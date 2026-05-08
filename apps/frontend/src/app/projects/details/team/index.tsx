@@ -1,4 +1,4 @@
-import { Skeleton, Card, CardBody } from '@heroui/react';
+import { Skeleton, Card, CardContent } from '@heroui/react';
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -47,9 +47,9 @@ export function ProjectTeamPage() {
       <div className="mt-6 space-y-6">
         {!isOwner && (
           <Card>
-            <CardBody>
+            <CardContent>
               <p className="text-small text-default-500">{t('messages.ownerOnly')}</p>
-            </CardBody>
+            </CardContent>
           </Card>
         )}
         <TeamInviteCard projectId={projectId} isOwner={isOwner} />

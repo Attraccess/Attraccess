@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardBody, CardFooter, CardHeader, CardProps, NumberInput } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberInput } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { HandCoinsIcon, PercentIcon } from 'lucide-react';
@@ -77,7 +77,7 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
         <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
       </CardHeader>
 
-      <CardBody className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         <NumberInput
           label={t('inputs.amount')}
           value={value}
@@ -85,7 +85,7 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
           minValue={0}
           endContent={<PercentIcon />}
         />
-      </CardBody>
+      </CardContent>
 
       <CardFooter>
         <Button color="primary" onPress={handleUpdate} isLoading={isChangingBillingFactor}>

@@ -7,7 +7,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardBody, CardHeader, Input, Form, ModalHeader, ModalBody, ModalFooter, Link } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Input, Form, ModalHeader, ModalBody, ModalFooter, Link } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
@@ -134,7 +134,7 @@ export function EditEmailTemplatePage() {
               <span>{t('sections.template')}</span>
               <Button isIconOnly startContent={<ExpandIcon />} onPress={() => setEditorIsExpanded(true)} />
             </CardHeader>
-            <CardBody className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-4">
               {editor}
 
               <Modal isOpen={editorIsExpanded} onOpenChange={setEditorIsExpanded} size="full" hideCloseButton>
@@ -146,18 +146,18 @@ export function EditEmailTemplatePage() {
                   </ModalFooter>
                 </ModalContent>
               </Modal>
-            </CardBody>
+            </CardContent>
           </Card>
 
           <Card className="flex-1">
             <CardHeader>{t('sections.preview')}</CardHeader>
-            <CardBody>
+            <CardContent>
               <iframe
                 srcDoc={previewHtml}
                 title={t('preview.iframeTitle')}
                 className="w-full h-full min-h-[435px] border-0"
               />
-            </CardBody>
+            </CardContent>
           </Card>
         </div>
 

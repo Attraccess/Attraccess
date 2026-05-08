@@ -15,7 +15,7 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { PageHeader } from '../../components/pageHeader';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton, Switch } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Skeleton, Switch } from '@heroui/react';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal';
 import { EmptyState } from '../../components/emptyState';
@@ -226,7 +226,7 @@ export function ProjectsListPage() {
             <p className="text-large font-semibold">{t('invitations.title')}</p>
             <p className="text-small text-default-500">{t('invitations.description')}</p>
           </CardHeader>
-          <CardBody className="space-y-3">{invitationContent}</CardBody>
+          <CardContent className="space-y-3">{invitationContent}</CardContent>
         </Card>
       )}
 

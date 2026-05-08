@@ -19,7 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Button, Card, CardBody, CardHeader, Chip, Divider, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Divider, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
@@ -164,27 +164,27 @@ export function UserManagementDetailsPage() {
               <CardHeader>
                 <PageHeader title={t('profile.usernameTitle')} noMargin />
               </CardHeader>
-              <CardBody className="flex flex-col gap-8">
+              <CardContent className="flex flex-col gap-8">
                 <ChangeUsernameForm userId={user.id} />
-              </CardBody>
+              </CardContent>
             </Card>
 
             <Card className="w-full">
               <CardHeader>
                 <PageHeader title={t('profile.emailTitle')} noMargin />
               </CardHeader>
-              <CardBody className="flex flex-col gap-8">
+              <CardContent className="flex flex-col gap-8">
                 <ChangeEmailForm userId={user.id} />
-              </CardBody>
+              </CardContent>
             </Card>
 
             <Card className="w-full">
               <CardHeader>
                 <PageHeader title={t('profile.passwordTitle')} noMargin />
               </CardHeader>
-              <CardBody className="flex flex-col gap-8">
+              <CardContent className="flex flex-col gap-8">
                 <SetPasswordForm userId={user.id} />
-              </CardBody>
+              </CardContent>
             </Card>
 
             <Card className="w-full">
@@ -197,7 +197,7 @@ export function UserManagementDetailsPage() {
                   {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
                 </Chip>
               </CardHeader>
-              <CardBody>
+              <CardContent>
                 {ssoDetails.length === 0 ? (
                   <div className="flex items-center gap-2">
                     <Chip color="default" variant="flat">
@@ -233,14 +233,14 @@ export function UserManagementDetailsPage() {
                     })}
                   </div>
                 )}
-              </CardBody>
+              </CardContent>
             </Card>
 
             <Card className="w-full">
               <CardHeader>
                 <PageHeader title={t('delete.title')} noMargin />
               </CardHeader>
-              <CardBody className="flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-4">
                 <p className="text-sm text-default-500">{t('delete.description')}</p>
                 <Button
                   color="danger"
@@ -252,7 +252,7 @@ export function UserManagementDetailsPage() {
                   {t('delete.actions.open')}
                 </Button>
                 {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
-              </CardBody>
+              </CardContent>
             </Card>
           </>
         )}

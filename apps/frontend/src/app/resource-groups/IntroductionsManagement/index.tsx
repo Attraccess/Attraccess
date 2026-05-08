@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDisclosure } from '../../../utils/heroui-compat';
-import { Card, CardBody, CardProps } from '@heroui/react';
+import { Card, CardContent, CardProps } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,
@@ -116,7 +116,7 @@ export function ResourceGroupIntroductionsManagement(
   if (error) {
     return (
       <Card {...rest}>
-        <CardBody>
+        <CardContent>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <AlertCircle size={20} color="red" />
             <div>
@@ -124,7 +124,7 @@ export function ResourceGroupIntroductionsManagement(
               <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('loadErrorDescription')}</p>
             </div>
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
     );
   }

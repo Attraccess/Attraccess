@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, CircularProgress } from '@heroui/react';
+import { Card, CardContent, CardHeader, CircularProgress } from '@heroui/react';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { CheckCircle2Icon, XCircleIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -87,7 +87,7 @@ export function TransactionProcessingCard(props: Props) {
       <CardHeader>
         <PageHeader title={t('title')} subtitle={t('description')} noMargin />
       </CardHeader>
-      <CardBody className="flex items-center justify-center">
+      <CardContent className="flex items-center justify-center">
         {status === BillingTransactionStatus.PENDING && (
           <CircularProgress
             size="lg"
@@ -110,7 +110,7 @@ export function TransactionProcessingCard(props: Props) {
           <CheckCircle2Icon size={128} className="text-success animate-pulse" />
         )}
         {status === BillingTransactionStatus.FAILED && <XCircleIcon size={128} className="text-danger animate-pulse" />}
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

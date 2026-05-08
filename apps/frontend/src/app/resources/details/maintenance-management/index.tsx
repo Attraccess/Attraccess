@@ -1,7 +1,7 @@
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   CardProps,
   cn,
@@ -104,7 +104,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
         />
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.start')}</TableColumn>
@@ -167,7 +167,7 @@ export function MaintenanceManagement(props: Props & Omit<CardProps, 'children'>
             )}
           </TableBody>
         </Table>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }
