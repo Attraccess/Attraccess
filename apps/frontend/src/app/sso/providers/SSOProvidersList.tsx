@@ -1,6 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, ModalBody, ModalFooter, ModalHeader, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -705,14 +705,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        size="2xl"
-        scrollBehavior="inside"
         data-cy="sso-provider-form-modal"
       >
-        <ModalContent>
-          {(onClose) => (
+        <ModalBackdrop />
+        <ModalContainer size="2xl" scrollBehavior="inside">
+          <ModalDialog>
+            {({ close }) => (
             <>
-              <ModalHeader>{editingProvider ? t('editProvider') : t('createNewProvider')}</ModalHeader>
+              <ModalHeader><ModalHeading>{editingProvider ? t('editProvider') : t('createNewProvider')}</ModalHeading></ModalHeader>
               <ModalBody>
                 <div className="space-y-4">
                   <Input
@@ -1130,7 +1130,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                 </div>
               </ModalBody>
               <ModalFooter>
-                <Button variant="flat" onPress={onClose} data-cy="sso-provider-form-cancel-button">
+                <Button variant="flat" onPress={close} data-cy="sso-provider-form-cancel-button">
                   {t('cancel')}
                 </Button>
                 <Button
@@ -1145,7 +1145,8 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
               </ModalFooter>
             </>
           )}
-        </ModalContent>
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

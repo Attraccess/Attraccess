@@ -1,9 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
+import { useDisclosure } from '../../utils/heroui-compat';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Alert, Input } from '@heroui/react';
+import { Alert, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
 import { Button } from '@heroui/react';
-import { ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
@@ -230,11 +229,12 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       <Modal
         isOpen={isOpen}
         onOpenChange={onOpenChange}
-        scrollBehavior="inside"
         data-cy="registration-form-success-modal"
       >
-        <ModalContent>
-          {(onClose) => (
+        <ModalBackdrop />
+        <ModalContainer scrollBehavior="inside">
+          <ModalDialog>
+            {({ close }) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
@@ -251,7 +251,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
               <ModalFooter>
                 <Button
                   variant="light"
-                  onPress={onClose}
+                  onPress={close}
                   data-cy="registration-form-success-modal-close-button"
                 >
                   {t('success.closeButton')}
@@ -260,7 +260,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
                   color="primary"
                   onPress={() => {
                     markTwoFactorSetupIntent();
-                    onClose();
+                    close();
                     onHasAccount();
                   }}
                   data-cy="registration-form-success-modal-two-factor-button"
@@ -270,7 +270,8 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
               </ModalFooter>
             </>
           )}
-        </ModalContent>
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
