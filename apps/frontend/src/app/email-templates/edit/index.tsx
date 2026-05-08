@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, ModalContent } from '../../../utils/heroui-compat';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
@@ -6,20 +7,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Input,
-  Form,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Link,
-} from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Input, Form, ModalHeader, ModalBody, ModalFooter, Link } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';

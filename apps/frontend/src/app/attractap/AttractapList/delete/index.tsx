@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useDisclosure } from '@heroui/react';
+
+import { useDisclosure } from '../../../../utils/heroui-compat';
 import de from './de.json';
 import en from './en.json';
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';

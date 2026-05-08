@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { Modal, ModalContent } from '../../../utils/heroui-compat';
+import { Alert, Button, ModalBody, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {

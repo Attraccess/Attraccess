@@ -1,6 +1,7 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
+import { Modal, ModalContent } from '../../utils/heroui-compat';
 import { useState, useRef } from 'react';
-import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input } from '@heroui/react';
+import { Button, ModalHeader, ModalBody, ModalFooter, Input } from '@heroui/react';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';

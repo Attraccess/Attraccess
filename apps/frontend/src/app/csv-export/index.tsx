@@ -1,17 +1,6 @@
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardFooter,
-  CardHeader,
-  DateValue,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  RangeCalendar,
-  RangeValue,
-} from '@heroui/react';
+import { Modal, ModalContent } from '../../utils/heroui-compat';
+import { Button, Card, CardBody, CardFooter, CardHeader, DateValue, ModalHeader, RangeCalendar, RangeValue } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useCallback, useMemo, useRef, useState } from 'react';

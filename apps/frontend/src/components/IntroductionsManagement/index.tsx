@@ -1,19 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardBody,
-  CardProps,
-  useDisclosure,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  Textarea,
-  ModalFooter,
-  Button,
-  Form,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
+import { Card, CardHeader, CardBody, CardProps, ModalHeader, ModalBody, Textarea, ModalFooter, Button, Form } from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon } from 'lucide-react';
 import { ResourceIntroduction, User } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

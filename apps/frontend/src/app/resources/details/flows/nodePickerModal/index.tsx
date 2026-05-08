@@ -1,13 +1,5 @@
-import {
-  Accordion,
-  AccordionItem,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Accordion, AccordionItem, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
 import { useCallback, useMemo } from 'react';
 import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';

@@ -1,17 +1,8 @@
 import en from './en.json';
+import { Modal, ModalContent, useDisclosure } from '../../../../../../utils/heroui-compat';
 import de from './de.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Form,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';

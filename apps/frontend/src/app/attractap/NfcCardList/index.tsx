@@ -1,19 +1,5 @@
-import {
-  TableHeader,
-  Table,
-  TableBody,
-  TableColumn,
-  TableCell,
-  TableRow,
-  Button,
-  Modal,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalContent,
-  Alert,
-  cn,
-} from '@heroui/react';
+import { TableHeader, Table, TableBody, TableColumn, TableCell, TableRow, Button, ModalHeader, ModalBody, ModalFooter, Alert, cn } from '@heroui/react';
+import { Modal, ModalContent } from '../../../utils/heroui-compat';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {

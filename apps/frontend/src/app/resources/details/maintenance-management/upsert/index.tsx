@@ -1,18 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Modal,
-  Textarea,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  useDisclosure,
-  Button,
-  ModalFooter,
-  Alert,
-  Form,
-  DatePicker,
-  Switch,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { Textarea, ModalBody, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';

@@ -1,10 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDisclosure } from '../../../utils/heroui-compat';
 import { useAuth } from '../../../hooks/useAuth';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ArrowLeft, BookOpen, ListChecks, PenSquareIcon, ShapesIcon, Trash, WorkflowIcon } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { Spinner, Link } from '@heroui/react';
-import { useDisclosure } from '@heroui/react';
+
 import { ResourceUsageSession } from '../usage/resourceUsageSession';
 import { ResourceUsageHistory } from '../usage/resourceUsageHistory';
 import { PageHeader } from '../../../components/pageHeader';

@@ -1,12 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from '@heroui/react';
+import { Modal, ModalContent } from '../../utils/heroui-compat';
+import { Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';

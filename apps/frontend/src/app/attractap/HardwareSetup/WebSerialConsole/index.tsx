@@ -1,4 +1,5 @@
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalHeader, useDisclosure } from '@heroui/react';
+import { Alert, Button, ModalBody, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { PageHeader } from '../../../../components/pageHeader';

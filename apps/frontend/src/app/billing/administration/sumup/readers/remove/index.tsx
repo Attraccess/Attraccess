@@ -1,11 +1,12 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDisclosure } from '../../../../../../utils/heroui-compat';
 import de from './de.json';
 import en from './en.json';
 import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceRemoveSumUpReader,
 } from '@attraccess/react-query-client';
-import { useDisclosure } from '@heroui/react';
+
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';

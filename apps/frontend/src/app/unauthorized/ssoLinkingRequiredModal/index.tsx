@@ -1,4 +1,5 @@
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
+import { Alert, Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent } from '../../../utils/heroui-compat';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';

@@ -1,5 +1,6 @@
-import { Modal, ModalContent, useDisclosure } from '@heroui/react';
+
 import { Scanner, IDetectedBarcode, boundingBox } from '@yudiel/react-qr-scanner';
+import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

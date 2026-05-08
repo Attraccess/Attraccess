@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Card, CardBody, CardProps, useDisclosure } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
+import { Card, CardBody, CardProps } from '@heroui/react';
 import { AlertCircle } from 'lucide-react';
 import {
   UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,

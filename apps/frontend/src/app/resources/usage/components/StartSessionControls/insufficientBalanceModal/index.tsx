@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent } from '@heroui/react';
+
+import { Modal, ModalContent } from '../../../../../../utils/heroui-compat';
 import en from './en.json';
 import de from './de.json';
 import { BillingDashboardTopupCard } from '../../../../../billing/dashboard/topup';
