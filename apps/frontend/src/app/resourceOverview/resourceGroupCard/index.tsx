@@ -6,7 +6,7 @@ import {
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardFooter,
   CardHeader,
   CardProps,
@@ -150,7 +150,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
         )}
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <Table
           shadow="none"
           removeWrapper
@@ -197,7 +197,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
             )}
           </TableBody>
         </Table>
-      </CardBody>
+      </CardContent>
 
       <CardFooter className="flex w-full justify-center">
         {isFetchedResources && (

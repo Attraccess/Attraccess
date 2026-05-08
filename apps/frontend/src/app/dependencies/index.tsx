@@ -3,7 +3,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardBody, CardFooter, Link, Skeleton } from '@heroui/react';
+import { Card, CardContent, CardFooter, Link, Skeleton } from '@heroui/react';
 import { PageHeader } from '../../components/pageHeader';
 
 interface Dependency {
@@ -26,7 +26,7 @@ function getDomainFromUrl(url: string): string {
 function CardSkeleton() {
   return (
     <Card className="w-full">
-      <CardBody className="p-4">
+      <CardContent className="p-4">
         <div className="space-y-3">
           <div>
             <Skeleton className="h-6 w-3/4 rounded-lg mb-2" />
@@ -45,7 +45,7 @@ function CardSkeleton() {
             </div>
           </div>
         </div>
-      </CardBody>
+      </CardContent>
       <CardFooter className="flex justify-end">
         <Skeleton className="h-4 w-24 rounded-lg" />
       </CardFooter>
@@ -80,7 +80,7 @@ export function Dependencies() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
           {dependencies?.map((dependency) => (
             <Card key={dependency.name} className="w-full">
-              <CardBody className="p-4">
+              <CardContent className="p-4">
                 <div className="space-y-3">
                   <div>
                     <h3 className="text-lg font-semibold text-foreground">{dependency.name}</h3>
@@ -99,7 +99,7 @@ export function Dependencies() {
                     </div>
                   </div>
                 </div>
-              </CardBody>
+              </CardContent>
               <CardFooter className="flex justify-end">
                 <Link
                   href={dependency.url}

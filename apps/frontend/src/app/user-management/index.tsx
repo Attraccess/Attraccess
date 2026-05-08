@@ -4,7 +4,7 @@ import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardFooter,
   Chip,
   Input,
@@ -144,7 +144,7 @@ export const UserManagementPage: React.FC = () => {
       />
 
       <Card>
-        <CardBody>
+        <CardContent>
           <Input
             label={t('table.inputs.search')}
             value={search}
@@ -272,7 +272,7 @@ export const UserManagementPage: React.FC = () => {
               }}
             </TableBody>
           </Table>
-        </CardBody>
+        </CardContent>
 
         <CardFooter className="flex w-full justify-end">
           {isFetchedSearchResult && (

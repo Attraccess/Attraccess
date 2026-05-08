@@ -1,6 +1,6 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
 import { Modal, ModalContent } from '../../../../../../../utils/heroui-compat';
-import { Autocomplete, AutocompleteItem, Button, Card, CardBody, Input, NumberInput, ModalBody, ModalHeader, Switch, Textarea } from '@heroui/react';
+import { Autocomplete, AutocompleteItem, Button, Card, CardContent, Input, NumberInput, ModalBody, ModalHeader, Switch, Textarea } from '@heroui/react';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -237,9 +237,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         if (Object.entries((value ?? {}) as Record<string, unknown>)?.length === 0) {
           content = (
             <Card>
-              <CardBody>
+              <CardContent>
                 <p className="text-sm text-gray-500">{t('nodes.' + nodeType + '.config.' + name + '.empty')}</p>
-              </CardBody>
+              </CardContent>
             </Card>
           );
         } else {
@@ -312,9 +312,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       if (arrayValue.length === 0) {
         content = (
           <Card>
-            <CardBody>
+            <CardContent>
               <p className="text-sm text-gray-500">{emptyText}</p>
-            </CardBody>
+            </CardContent>
           </Card>
         );
       } else {
@@ -322,7 +322,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           <div className="flex flex-col gap-2 w-full">
             {arrayValue.map((row, index) => (
               <Card key={index} className="p-2 w-full">
-                <CardBody className="p-0">
+                <CardContent className="p-0">
                   <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
                     <div className="flex flex-col gap-2 p-2 w-full">
                       {items && items.type === 'object' && items.properties ? (
@@ -380,7 +380,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                       </Button>
                     </div>
                   </div>
-                </CardBody>
+                </CardContent>
               </Card>
             ))}
           </div>

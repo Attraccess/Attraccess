@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { TwoFactorCard } from '../account/two-factor';
 import { useTwoFactorGate } from '../../hooks/useTwoFactorGate';
@@ -26,7 +26,7 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
             {gate.needsTwoFactorSetup ? t('requiredDescription') : t('optionalDescription')}
           </p>
         </CardHeader>
-        <CardBody className="flex flex-col gap-6">
+        <CardContent className="flex flex-col gap-6">
           <TwoFactorCard />
           {gate.canSkip && (
             <div className="flex justify-end">
@@ -35,7 +35,7 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
               </Button>
             </div>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );

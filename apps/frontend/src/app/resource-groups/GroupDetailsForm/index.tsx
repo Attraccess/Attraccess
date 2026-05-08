@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardBody, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
+import { Card, CardHeader, CardContent, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,
@@ -98,12 +98,12 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
   if (isLoading) {
     return (
       <Card {...rest}>
-        <CardBody>
+        <CardContent>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
             <Spinner size="sm" />
             <span style={{ marginLeft: '8px', opacity: 0.7 }}>{t('states.loading')}</span>
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
     );
   }
@@ -111,7 +111,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
   if (error || !group) {
     return (
       <Card {...rest}>
-        <CardBody>
+        <CardContent>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Edit3 size={20} color="red" />
             <div>
@@ -119,7 +119,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
               <p style={{ fontSize: '14px', opacity: 0.7 }}>{t('errors.load.description')}</p>
             </div>
           </div>
-        </CardBody>
+        </CardContent>
       </Card>
     );
   }
@@ -129,7 +129,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
       <CardHeader>
         <PageHeader title={t('form.title')} subtitle={t('form.subtitle')} icon={<Edit3 size={20} />} noMargin={true} />
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <Input
             label={t('form.fields.name.label')}
@@ -175,7 +175,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
             isDeleting={isDeleting}
           />
         </form>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

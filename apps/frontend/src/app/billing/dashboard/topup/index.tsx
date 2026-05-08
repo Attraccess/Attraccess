@@ -5,7 +5,7 @@ import {
   Alert,
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardFooter,
   CardHeader,
   CardProps,
@@ -133,9 +133,9 @@ export function BillingDashboardTopupCard(props: Props) {
         <CardHeader>
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
         </CardHeader>
-        <CardBody className="flex justify-center py-8">
+        <CardContent className="flex justify-center py-8">
           <Spinner label={t('loading')} />
-        </CardBody>
+        </CardContent>
       </Card>
     );
   }
@@ -146,7 +146,7 @@ export function BillingDashboardTopupCard(props: Props) {
         <CardHeader>
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <Alert
             color={isSumUpConfigurationError ? 'danger' : 'warning'}
             variant="flat"
@@ -154,7 +154,7 @@ export function BillingDashboardTopupCard(props: Props) {
           >
             <p className="text-sm">{t('unavailable.description')}</p>
           </Alert>
-        </CardBody>
+        </CardContent>
       </Card>
     );
   }
@@ -177,7 +177,7 @@ export function BillingDashboardTopupCard(props: Props) {
         <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -208,7 +208,7 @@ export function BillingDashboardTopupCard(props: Props) {
             <p className="max-w-[600px] text-sm whitespace-pre-wrap text-wrap">{t('topUpInstructions.description')}</p>
           </Alert>
         </div>
-      </CardBody>
+      </CardContent>
 
       <CardFooter>
         <Button

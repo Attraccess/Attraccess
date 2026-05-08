@@ -1,6 +1,6 @@
 import {
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Skeleton,
   Table,
@@ -160,7 +160,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
         </CardHeader>
-        <CardBody className="h-[320px]">
+        <CardContent className="h-[320px]">
           {isLoading ? (
             <Skeleton className="w-full h-full" />
           ) : chartData.length === 0 ? (
@@ -201,7 +201,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               </LineChart>
             </ResponsiveContainer>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       <Card className="min-h-[360px]">
@@ -211,7 +211,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
             <p className="text-xs text-default-500">{t('charts.title')}</p>
           </div>
         </CardHeader>
-        <CardBody className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-4">
           {isLoading ? (
             <>
               <Skeleton className="h-6 w-full" />
@@ -291,7 +291,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
               </Table>
             </>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );

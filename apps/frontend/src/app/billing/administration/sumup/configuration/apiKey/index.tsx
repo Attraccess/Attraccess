@@ -7,7 +7,7 @@ import {
   useBillingServiceGetSumUpReadersKey,
   useBillingServiceSetSumUpApiKey,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardBody, CardHeader, Form, Chip, Spinner, Link, CardFooter, CardProps } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Form, Chip, Spinner, Link, CardFooter, CardProps } from '@heroui/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { PasswordInput } from '../../../../../../components/PasswordInput';
 import { useCallback, useRef, useState } from 'react';
@@ -106,7 +106,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
         />
       </CardHeader>
 
-      <CardBody className="flex flex-col gap-2">
+      <CardContent className="flex flex-col gap-2">
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -131,7 +131,7 @@ export function ApiKeyCard(props: Omit<CardProps, 'children'>) {
 
           <input type="submit" hidden />
         </Form>
-      </CardBody>
+      </CardContent>
       <CardFooter>
         <Button color="primary" onPress={onSubmitApiKey} isLoading={isPendingSetSumUpApiKey}>
           {t('actions.save')}

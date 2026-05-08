@@ -1,7 +1,7 @@
 import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   CardProps,
   Chip,
@@ -171,7 +171,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
       <CardHeader>
         <PageHeader title={t('title')} noMargin icon={<CreditCardIcon />} />
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <div className="mb-4">
           {isLoadingBalance ? (
             <Spinner />
@@ -245,7 +245,7 @@ export function SummaryCard(props: Omit<CardProps, 'children'> & Props) {
             onClose={() => setIsOpenDetails(false)}
           />
         )}
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

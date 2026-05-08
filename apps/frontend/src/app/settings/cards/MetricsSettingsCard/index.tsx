@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
+import { Card, CardContent, CardHeader, Chip } from '@heroui/react';
 import { ActivityIcon, CheckIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -33,9 +33,9 @@ export function MetricsSettingsCard() {
           actions={statusChip}
         />
       </CardHeader>
-      <CardBody className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         <MetricsSettingsForm />
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Modal, ModalContent } from '../../utils/heroui-compat';
-import { Button, Card, CardBody, CardFooter, CardHeader, DateValue, ModalHeader, RangeCalendar, RangeValue } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, DateValue, ModalHeader, RangeCalendar, RangeValue } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -58,7 +58,7 @@ export function CsvExport() {
     <>
       <Card>
         <CardHeader>{t('title')}</CardHeader>
-        <CardBody>
+        <CardContent>
           <span className="font-bold">{t('rangeCalendar.selection.label')}</span>
           <div className="flex gap-4 flex-row flex-wrap">
             <RangeCalendar
@@ -77,7 +77,7 @@ export function CsvExport() {
               {t('rangeCalendar.selection.end', { date: dateRangeEndFormatted })}
             </p>
           </div>
-        </CardBody>
+        </CardContent>
         <CardFooter>
           {exportTypes.map((exportType) => (
             <Button

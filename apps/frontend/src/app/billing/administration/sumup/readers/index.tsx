@@ -4,7 +4,7 @@ import de from './de.json';
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   CardProps,
   Table,
@@ -58,7 +58,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
         />
       </CardHeader>
 
-      <CardBody>
+      <CardContent>
         <Table removeWrapper aria-label={t('table.ariaLabel')}>
           <TableHeader>
             <TableColumn>{t('table.columns.name')}</TableColumn>
@@ -97,7 +97,7 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
             )}
           </TableBody>
         </Table>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }

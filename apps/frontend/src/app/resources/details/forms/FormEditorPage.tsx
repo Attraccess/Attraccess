@@ -17,7 +17,7 @@ import {
   AccordionItem,
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Divider,
   Input,
@@ -235,7 +235,7 @@ export function FormEditorPage() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <Card>
-          <CardBody className="space-y-6">
+          <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label={t('editor.nameLabel')}
@@ -329,16 +329,16 @@ export function FormEditorPage() {
                 {t('editor.save')}
               </Button>
             </div>
-          </CardBody>
+          </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <p className="font-semibold text-default-700">{t('editor.previewTitle')}</p>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <FormPreview fields={form.fields} t={t} />
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
 

@@ -1,6 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
 import { ComputerIcon, PowerIcon, RefreshCcwIcon } from 'lucide-react';
-import { Card, CardHeader, CardBody, Button } from '@heroui/react';
+import { Card, CardHeader, CardContent, Button } from '@heroui/react';
 import { BalenaIcon } from './balena-icon';
 import { useSystemServiceRebootHost, useSystemServiceShutdownHost } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
@@ -63,7 +63,7 @@ export function BalenaPage() {
           <CardHeader>
             <PageHeader title="Host Machine" icon={<ComputerIcon />} />
           </CardHeader>
-          <CardBody className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-4">
             <Button
               startContent={<RefreshCcwIcon />}
               color="primary"
@@ -80,7 +80,7 @@ export function BalenaPage() {
             >
               {shutdownIsConfirmed ? 'Confirm Shutdown' : 'Shutdown'}
             </Button>
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
     </>

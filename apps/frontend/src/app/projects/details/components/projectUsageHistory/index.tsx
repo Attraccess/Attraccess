@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Table,
   TableHeader,
@@ -73,7 +73,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
             canManageResources={false}
           />
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <Table
             aria-label={t('history.title')}
             shadow="none"
@@ -129,7 +129,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
               )}
             </TableBody>
           </Table>
-        </CardBody>
+        </CardContent>
       </Card>
 
       <UsageNotesModal isOpen={isModalOpen} onClose={closeModal} session={selectedSession} />

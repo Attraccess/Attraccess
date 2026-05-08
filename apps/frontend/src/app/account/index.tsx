@@ -1,6 +1,6 @@
 import { PageHeader } from '../../components/pageHeader';
 import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
-import { Button, Card, CardBody, CardHeader, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -51,32 +51,32 @@ export default function AccountPage() {
           <CardHeader>
             <PageHeader title={t('sections.profile')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-6">
+          <CardContent className="flex flex-col gap-6">
             <EmailForm />
             <UsernameForm />
-          </CardBody>
+          </CardContent>
         </Card>
 
         <Card className="max-w-md">
           <CardHeader>
             <PageHeader title={t('sections.security')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-6">
+          <CardContent className="flex flex-col gap-6">
             {me && <SetPasswordForm userId={me.id} />}
             {me && <TwoFactorCard />}
-          </CardBody>
+          </CardContent>
         </Card>
 
         <Card className="max-w-md">
           <CardHeader>
             <PageHeader title={t('sections.dangerZone')} noMargin />
           </CardHeader>
-          <CardBody className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-4">
             <p className="text-sm text-default-500">{t('deleteAccount.description')}</p>
             <Button color="danger" variant="flat" onPress={onOpen} data-cy="delete-account-open-modal">
               {t('deleteAccount.actions.request')}
             </Button>
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
 

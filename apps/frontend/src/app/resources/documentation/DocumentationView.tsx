@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, CardBody, CardFooter, CardHeader, Spinner } from '@heroui/react';
+import { Button, Card, CardContent, CardFooter, CardHeader, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../../components/pageHeader';
@@ -52,9 +52,9 @@ function DocumentationViewComponent() {
         <CardHeader>
           <h2 className="text-xl">{t('error.title')}</h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-        </CardBody>
+        </CardContent>
         <CardFooter className="flex justify-center gap-4">
           <Button
             onPress={() => refetchResource()}
@@ -84,9 +84,9 @@ function DocumentationViewComponent() {
         <CardHeader>
           <h2 className="text-xl">{t('notFound.title')}</h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <p>{t('notFound.message')}</p>
-        </CardBody>
+        </CardContent>
         <CardFooter className="justify-center">
           <Button
             onPress={() => navigate('/resources')}
@@ -138,7 +138,7 @@ function DocumentationViewComponent() {
         <CardHeader>
           <h2 className="text-xl font-semibold">{resource.name}</h2>
         </CardHeader>
-        <CardBody className="relative">
+        <CardContent className="relative">
           {isFetching && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
               <Spinner size="lg" data-cy="documentation-view-fetching-spinner" />
@@ -161,7 +161,7 @@ function DocumentationViewComponent() {
               sandbox="allow-scripts allow-same-origin allow-forms"
             />
           )}
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );

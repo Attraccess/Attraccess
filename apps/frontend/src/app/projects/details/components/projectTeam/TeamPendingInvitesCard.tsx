@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
   ProjectInvitation,
@@ -123,9 +123,9 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
           {pendingInvitations.length}
         </Chip>
       </CardHeader>
-      <CardBody>
+      <CardContent>
         <div className="space-y-3">{content}</div>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }
