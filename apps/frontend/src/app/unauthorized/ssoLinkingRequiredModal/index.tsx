@@ -1,5 +1,4 @@
-import { Alert, Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
-import { Modal, ModalContent } from '../../../utils/heroui-compat';
+import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../components/PasswordInput';
@@ -98,8 +97,11 @@ export function SSOLinkingRequiredModal(props: Props) {
   }, [linkToken, linkMutation, password]);
 
   return (
-    <Modal isOpen={show} isDismissable={false}>
-      <ModalContent>
+    <Modal isOpen={show}>
+      <ModalBackdrop isDismissable={false} />
+      <ModalContainer>
+        <ModalDialog>
+          {() => (<>
         <ModalHeader>
           <PageHeader title={t('title')} subtitle={t('subtitle')} noMargin />
         </ModalHeader>
@@ -120,7 +122,9 @@ export function SSOLinkingRequiredModal(props: Props) {
             {t('actions.link')}
           </Button>
         </ModalFooter>
-      </ModalContent>
+          </>)}
+        </ModalDialog>
+      </ModalContainer>
     </Modal>
   );
 }

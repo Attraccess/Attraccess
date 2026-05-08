@@ -1,5 +1,5 @@
-import { Button, Form, Input, ModalBody, ModalHeader, Tab, Tabs } from '@heroui/react';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Tab, Tabs } from '@heroui/react';
+import { useDisclosure } from '../../../utils/heroui-compat';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -110,8 +110,11 @@ export function InviteUserModal(props: Props) {
   return (
     <>
       {children(onOpen)}
-      <Modal isOpen={isOpen} onClose={onClose} size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
-        <ModalContent>
+      <Modal isOpen={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <ModalBackdrop />
+        <ModalContainer size={tab === 'single' ? 'sm' : '3xl'} scrollBehavior="inside">
+          <ModalDialog>
+            {() => (<>
           <ModalHeader>
             <PageHeader title={t('title')} noMargin />
           </ModalHeader>
@@ -173,7 +176,9 @@ export function InviteUserModal(props: Props) {
               </Tab>
             </Tabs>
           </ModalBody>
-        </ModalContent>
+            </>)}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );

@@ -1,11 +1,11 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { useDisclosure } from '../../../utils/heroui-compat';
 import {
   ApiError,
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { Alert, Button, Input, ModalBody, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Alert, Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';
@@ -104,7 +104,10 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     <>
       {props.children(onOpen)}
       <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-        <ModalContent>
+        <ModalBackdrop />
+        <ModalContainer>
+          <ModalDialog>
+            {() => (<>
           <ModalHeader>
             <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon />} noMargin={true} />
           </ModalHeader>
@@ -165,7 +168,9 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
               {t('actions.save.label')}
             </Button>
           </ModalFooter>
-        </ModalContent>
+            </>)}
+          </ModalDialog>
+        </ModalContainer>
       </Modal>
     </>
   );
