@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
-import { METRICS_TOGGLE_DEFAULTS } from './constants';
+import { METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS, METRICS_TOGGLE_DEFAULTS } from './constants';
 
 describe('SettingsController (metrics endpoints)', () => {
   let controller: SettingsController;
@@ -13,6 +13,8 @@ describe('SettingsController (metrics endpoints)', () => {
       | 'setMetricsApiKey'
       | 'getMetricsToggles'
       | 'updateMetricsToggles'
+      | 'getMetricsSlowQueryThresholdSeconds'
+      | 'setMetricsSlowQueryThresholdSeconds'
     >
   >;
 
@@ -23,6 +25,8 @@ describe('SettingsController (metrics endpoints)', () => {
       setMetricsApiKey: jest.fn(),
       getMetricsToggles: jest.fn().mockResolvedValue({ ...METRICS_TOGGLE_DEFAULTS }),
       updateMetricsToggles: jest.fn().mockResolvedValue({ ...METRICS_TOGGLE_DEFAULTS }),
+      getMetricsSlowQueryThresholdSeconds: jest.fn().mockResolvedValue(METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS),
+      setMetricsSlowQueryThresholdSeconds: jest.fn().mockResolvedValue(undefined),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -98,7 +102,26 @@ describe('SettingsController (metrics endpoints)', () => {
 
       const result = await controller.updateMetricsSettings({ toggles: { http: true } });
 
-      expect(result).toEqual({ apiKeyConfigured: true, toggles: METRICS_TOGGLE_DEFAULTS });
+      expect(result).toEqual({
+        apiKeyConfigured: true,
+        toggles: METRICS_TOGGLE_DEFAULTS,
+        slowQueryThresholdSeconds: METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
+      });
+    });
+
+    it('persists the slow query threshold update', async () => {
+      settingsService.getMetricsSlowQueryThresholdSeconds.mockResolvedValue(2.5);
+
+      const result = await controller.updateMetricsSettings({ slowQueryThresholdSeconds: 2.5 });
+
+      expect(settingsService.setMetricsSlowQueryThresholdSeconds).toHaveBeenCalledWith(2.5);
+      expect(result.slowQueryThresholdSeconds).toBe(2.5);
+    });
+
+    it('skips slow query threshold writes when omitted', async () => {
+      await controller.updateMetricsSettings({});
+
+      expect(settingsService.setMetricsSlowQueryThresholdSeconds).not.toHaveBeenCalled();
     });
   });
 

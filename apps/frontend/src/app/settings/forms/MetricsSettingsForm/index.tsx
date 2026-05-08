@@ -1,8 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
-  Card,
-  CardBody,
   Chip,
   Divider,
   Input,
@@ -11,6 +9,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  NumberInput,
   Spinner,
   Switch,
   Tooltip,
@@ -43,6 +42,15 @@ function CodeBlock({ children }: { children: string }) {
   );
 }
 
+function SectionHeading({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {description ? <p className="text-sm text-default-500">{description}</p> : null}
+    </div>
+  );
+}
+
 export function MetricsSettingsForm() {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
@@ -50,8 +58,15 @@ export function MetricsSettingsForm() {
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [pendingToggle, setPendingToggle] = useState<ToggleKey | null>(null);
+  const [thresholdInput, setThresholdInput] = useState<number | undefined>(undefined);
 
   const { data: metricsSettings, isLoading } = useSettingsServiceGetMetricsSettings();
+
+  useEffect(() => {
+    if (metricsSettings?.slowQueryThresholdSeconds !== undefined) {
+      setThresholdInput(metricsSettings.slowQueryThresholdSeconds);
+    }
+  }, [metricsSettings?.slowQueryThresholdSeconds]);
 
   const rerollModal = useDisclosure();
   const removeModal = useDisclosure();
@@ -100,6 +115,22 @@ export function MetricsSettingsForm() {
     },
   });
 
+  const { mutate: updateThreshold, isPending: isSavingThreshold } = useSettingsServiceUpdateMetricsSettings({
+    onSuccess() {
+      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+      toast.success({
+        title: t('slowQueryThreshold.savedTitle'),
+        description: t('slowQueryThreshold.savedDescription'),
+      });
+    },
+    onError() {
+      toast.error({
+        title: t('slowQueryThreshold.errorTitle'),
+        description: t('slowQueryThreshold.errorDescription'),
+      });
+    },
+  });
+
   const handleCopyText = useCallback(async (text: string, successTitle: string, successDescription: string) => {
     if (!navigator?.clipboard?.writeText) {
       toast.error({ title: t('copyFailed.title'), description: t('copyFailed.description') });
@@ -138,6 +169,11 @@ export function MetricsSettingsForm() {
     [updateMetricsSettings],
   );
 
+  const handleSaveThreshold = useCallback(() => {
+    if (thresholdInput === undefined || Number.isNaN(thresholdInput) || thresholdInput < 0) return;
+    updateThreshold({ requestBody: { slowQueryThresholdSeconds: thresholdInput } });
+  }, [thresholdInput, updateThreshold]);
+
   const prometheusSnippet = useMemo(() => {
     const host = window.location.host;
     return `scrape_configs:
@@ -160,38 +196,63 @@ export function MetricsSettingsForm() {
   const togglesSection = metricsSettings?.toggles ? (
     <div className="flex flex-col gap-3">
       <Divider />
-      <h4 className="text-sm font-semibold">{t('toggles.title')}</h4>
-      <p className="text-sm text-default-500">{t('toggles.description')}</p>
-      <div className="flex flex-col gap-3">
-        {TOGGLE_ORDER.map((subsystem) => {
-          const isHighCost = subsystem === 'db';
-          const checked = metricsSettings.toggles[subsystem];
-          return (
-            <Card key={subsystem} shadow="none" radius="md" isBlurred={false}>
-              <CardBody className="flex flex-row items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {t(`toggles.${subsystem}.label`)}
-                    {isHighCost && (
-                      <Chip size="sm" color="warning" variant="flat">
-                        {t('toggles.highCostBadge')}
-                      </Chip>
-                    )}
-                  </div>
-                  <p className="text-xs text-default-500">{t(`toggles.${subsystem}.description`)}</p>
-                </div>
-                <Switch
-                  data-testid={`metrics-toggle-${subsystem}`}
-                  isSelected={checked}
-                  onValueChange={(value) => handleToggleChange(subsystem, value)}
-                  isDisabled={isUpdatingToggles && pendingToggle !== null}
-                  aria-label={t(`toggles.${subsystem}.label`)}
-                />
-              </CardBody>
-            </Card>
-          );
-        })}
+      <SectionHeading title={t('toggles.title')} description={t('toggles.description')} />
+      <div className="flex flex-col gap-2">
+        {TOGGLE_ORDER.map((subsystem) => (
+          <Switch
+            key={subsystem}
+            data-testid={`metrics-toggle-${subsystem}`}
+            isSelected={metricsSettings.toggles[subsystem]}
+            onValueChange={(value) => handleToggleChange(subsystem, value)}
+            isDisabled={isUpdatingToggles && pendingToggle !== null}
+            classNames={{ base: 'inline-flex flex-row-reverse items-start justify-between max-w-full w-full' }}
+          >
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {t(`toggles.${subsystem}.label`)}
+                {subsystem === 'db' && (
+                  <Chip size="sm" color="warning" variant="flat">
+                    {t('toggles.highCostBadge')}
+                  </Chip>
+                )}
+              </div>
+              <p className="text-xs text-default-500">{t(`toggles.${subsystem}.description`)}</p>
+            </div>
+          </Switch>
+        ))}
       </div>
+    </div>
+  ) : null;
+
+  const thresholdSection = metricsSettings ? (
+    <div className="flex flex-col gap-3">
+      <Divider />
+      <SectionHeading title={t('slowQueryThreshold.title')} description={t('slowQueryThreshold.description')} />
+      <NumberInput
+        label={t('slowQueryThreshold.label')}
+        value={thresholdInput}
+        onValueChange={setThresholdInput}
+        minValue={0}
+        step={0.1}
+        variant="bordered"
+        endContent={
+          <Button
+            size="sm"
+            color="primary"
+            variant="flat"
+            onPress={handleSaveThreshold}
+            isLoading={isSavingThreshold}
+            isDisabled={
+              thresholdInput === undefined ||
+              Number.isNaN(thresholdInput) ||
+              thresholdInput < 0 ||
+              thresholdInput === metricsSettings.slowQueryThresholdSeconds
+            }
+          >
+            {t('slowQueryThreshold.saveButton')}
+          </Button>
+        }
+      />
     </div>
   ) : null;
 
@@ -264,6 +325,7 @@ export function MetricsSettingsForm() {
         {endpointSection}
         {setupGuideSection}
         {togglesSection}
+        {thresholdSection}
 
         <div className="flex gap-2">
           <Button
@@ -308,6 +370,7 @@ export function MetricsSettingsForm() {
 
       {metricsSettings?.apiKeyConfigured && setupGuideSection}
       {togglesSection}
+      {thresholdSection}
 
       <Modal isOpen={rerollModal.isOpen} onClose={rerollModal.onClose}>
         <ModalContent>

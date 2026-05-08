@@ -173,7 +173,7 @@ The TypeORM `EntitySubscriber` covers `insert`, `update`, `remove`, and `softRem
 
 **Disabled by default** (high cardinality). Enable via Admin Settings -> Metrics -> Toggles -> Database.
 
-**Slow-query threshold:** queries longer than `0.5s` increment `attraccess_db_slow_queries_total`. Override via the `METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS` env var (e.g. `METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS=0.1`). Negative or non-numeric values fall back to the default.
+**Slow-query threshold:** queries longer than `0.5s` increment `attraccess_db_slow_queries_total`. Configurable via Admin Settings -> Metrics -> Slow query threshold. Negative or non-numeric values fall back to the default.
 
 ### Example PromQL Queries
 

@@ -47,6 +47,16 @@
     "grafanaTitle": "Grafana-Einrichtung",
     "grafanaDescription": "Füge in Grafana eine Prometheus-Datenquelle hinzu, die auf deinen Prometheus-Server zeigt (z. B. http://prometheus:9090). Die Metriken sind automatisch verfügbar, sobald Prometheus den obigen Endpunkt abfragt."
   },
+  "slowQueryThreshold": {
+    "title": "Schwellwert für langsame Queries",
+    "description": "DB-Queries über dieser Dauer werden als langsam gezählt.",
+    "label": "Schwellwert (Sekunden)",
+    "savedTitle": "Schwellwert gespeichert",
+    "savedDescription": "Schwellwert für langsame Queries aktualisiert. Änderungen werden innerhalb weniger Sekunden wirksam.",
+    "errorTitle": "Speichern fehlgeschlagen",
+    "errorDescription": "Schwellwert konnte nicht aktualisiert werden. Bitte versuche es erneut.",
+    "saveButton": "Speichern"
+  },
   "toggles": {
     "title": "Timing-Metriken pro Subsystem",
     "description": "Aktiviere oder deaktiviere die Timing-Instrumentierung einzelner Subsysteme. Deaktivierte Subsysteme stellen das Schreiben ihrer Histogramm- und Counter-Serien ein.",

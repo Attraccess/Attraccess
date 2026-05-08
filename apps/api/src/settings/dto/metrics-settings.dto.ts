@@ -7,4 +7,9 @@ export class MetricsSettingsDto {
 
   @ApiProperty({ description: 'Per-subsystem metrics timing toggles', type: MetricsTogglesDto })
   toggles!: MetricsTogglesDto;
+
+  @ApiProperty({
+    description: 'Threshold above which a DB query is counted as slow (in seconds).',
+  })
+  slowQueryThresholdSeconds!: number;
 }

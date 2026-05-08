@@ -3,7 +3,13 @@
 import { Test } from '@nestjs/testing';
 import { MetricsToggleService } from './metrics-toggle.service';
 import { SettingsStoreService } from '../../settings/settings-store.service';
-import { METRICS_PARENT, METRICS_TOGGLE_KEYS, MetricsSubsystem } from '../../settings/constants';
+import {
+  METRICS_KEYS,
+  METRICS_PARENT,
+  METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
+  METRICS_TOGGLE_KEYS,
+  MetricsSubsystem,
+} from '../../settings/constants';
 
 const SUBSYSTEMS = Object.keys(METRICS_TOGGLE_KEYS) as MetricsSubsystem[];
 
@@ -42,12 +48,13 @@ describe('MetricsToggleService', () => {
   });
 
   describe('refresh', () => {
-    it('reads each subsystem key once from the store', async () => {
+    it('reads each subsystem key plus the threshold once from the store', async () => {
       await svc.refresh();
-      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length + 1);
       for (const subsystem of SUBSYSTEMS) {
         expect(store.getPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_TOGGLE_KEYS[subsystem]);
       }
+      expect(store.getPlainSetting).toHaveBeenCalledWith(METRICS_PARENT, METRICS_KEYS.slowQueryThresholdSeconds);
     });
 
     it('updates the cache with values from the store', async () => {
@@ -74,7 +81,46 @@ describe('MetricsToggleService', () => {
       const refreshes = Promise.all([svc.refresh(), svc.refresh(), svc.refresh()]);
       resolveStore?.();
       await refreshes;
-      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length + 1);
+    });
+  });
+
+  describe('getSlowQueryThresholdSecondsCached', () => {
+    it('returns the default before any refresh', () => {
+      expect(svc.getSlowQueryThresholdSecondsCached()).toBe(METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS);
+    });
+
+    it('returns the stored numeric value after refresh', async () => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_KEYS.slowQueryThresholdSeconds ? '1.25' : null,
+      );
+
+      await svc.refresh();
+
+      expect(svc.getSlowQueryThresholdSecondsCached()).toBe(1.25);
+    });
+
+    it('falls back to the default when the stored value is invalid', async () => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_KEYS.slowQueryThresholdSeconds ? 'oops' : null,
+      );
+
+      await svc.refresh();
+
+      expect(svc.getSlowQueryThresholdSecondsCached()).toBe(METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS);
+    });
+
+    it('resets to default on invalidate', async () => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_KEYS.slowQueryThresholdSeconds ? '3' : null,
+      );
+
+      await svc.refresh();
+      expect(svc.getSlowQueryThresholdSecondsCached()).toBe(3);
+
+      svc.invalidate();
+
+      expect(svc.getSlowQueryThresholdSecondsCached()).toBe(METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS);
     });
   });
 
@@ -105,7 +151,7 @@ describe('MetricsToggleService', () => {
       ]);
       resolveStore?.();
       await calls;
-      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length + 1);
     });
   });
 
@@ -129,7 +175,7 @@ describe('MetricsToggleService', () => {
       jest.useFakeTimers();
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
       await svc.onModuleInit();
-      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length + 1);
       expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
       const timer = setIntervalSpy.mock.results[0].value as { unref?: () => void };
       expect(typeof timer.unref).toBe('function');
@@ -142,7 +188,7 @@ describe('MetricsToggleService', () => {
       jest.advanceTimersByTime(5000);
       await Promise.resolve();
       await Promise.resolve();
-      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length);
+      expect(store.getPlainSetting).toHaveBeenCalledTimes(SUBSYSTEMS.length + 1);
     });
 
     it('onModuleDestroy clears the interval', async () => {

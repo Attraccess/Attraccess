@@ -17,18 +17,6 @@ import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
 type DbMethod = 'insert' | 'update' | 'remove' | 'softRemove';
 
-const DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS = 0.5;
-
-function resolveSlowQueryThresholdSeconds(): number {
-  const raw = process.env.METRICS_DB_SLOW_QUERY_THRESHOLD_SECONDS;
-  if (raw === undefined || raw === '') return DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_SLOW_QUERY_THRESHOLD_SECONDS;
-  return parsed;
-}
-
-const SLOW_QUERY_THRESHOLD_SECONDS = resolveSlowQueryThresholdSeconds();
-
 @Injectable()
 @EventSubscriber()
 export class DbMetricsSubscriber implements EntitySubscriberInterface, OnModuleInit {
@@ -94,7 +82,7 @@ export class DbMetricsSubscriber implements EntitySubscriberInterface, OnModuleI
     const seconds = Number(process.hrtime.bigint() - startTime) / 1e9;
     const entity = event.metadata?.tableName ?? 'unknown';
     this.metrics.queryDuration.observe({ entity, method }, seconds);
-    if (seconds > SLOW_QUERY_THRESHOLD_SECONDS) {
+    if (seconds > this.toggle.getSlowQueryThresholdSecondsCached()) {
       this.metrics.slowQueriesTotal.inc({ entity, method });
     }
   }

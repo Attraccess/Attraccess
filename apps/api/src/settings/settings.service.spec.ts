@@ -6,7 +6,13 @@ import { User } from '@attraccess/database-entities';
 import { SettingsService } from './settings.service';
 import { SettingsStoreService } from './settings-store.service';
 import { SmtpSettingsService } from './smtp-settings.service';
-import { METRICS_TOGGLE_DEFAULTS, METRICS_TOGGLE_KEYS, METRICS_PARENT } from './constants';
+import {
+  METRICS_KEYS,
+  METRICS_PARENT,
+  METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
+  METRICS_TOGGLE_DEFAULTS,
+  METRICS_TOGGLE_KEYS,
+} from './constants';
 import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService metrics toggles', () => {
@@ -86,6 +92,45 @@ describe('SettingsService metrics toggles', () => {
       const result = await service.updateMetricsToggles({ db: true });
 
       expect(result.db).toBe(true);
+    });
+  });
+
+  describe('slow query threshold', () => {
+    it('returns the default when no value is stored', async () => {
+      store.getPlainSetting.mockResolvedValue(null);
+
+      await expect(service.getMetricsSlowQueryThresholdSeconds()).resolves.toBe(
+        METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
+      );
+    });
+
+    it('parses the stored numeric string', async () => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_KEYS.slowQueryThresholdSeconds ? '1.5' : null,
+      );
+
+      await expect(service.getMetricsSlowQueryThresholdSeconds()).resolves.toBe(1.5);
+    });
+
+    it('falls back to default for invalid stored values', async () => {
+      store.getPlainSetting.mockImplementation(async (_parent: string, key: string) =>
+        key === METRICS_KEYS.slowQueryThresholdSeconds ? 'not-a-number' : null,
+      );
+
+      await expect(service.getMetricsSlowQueryThresholdSeconds()).resolves.toBe(
+        METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
+      );
+    });
+
+    it('writes the threshold and refreshes the toggle invalidator', async () => {
+      await service.setMetricsSlowQueryThresholdSeconds(2);
+
+      expect(store.setPlainSetting).toHaveBeenCalledWith(
+        METRICS_PARENT,
+        METRICS_KEYS.slowQueryThresholdSeconds,
+        '2',
+      );
+      expect(invalidator.refresh).toHaveBeenCalledTimes(1);
     });
   });
 });

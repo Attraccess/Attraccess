@@ -47,11 +47,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
   async getMetricsSettings(): Promise<MetricsSettingsDto> {
-    const [{ configured }, toggles] = await Promise.all([
-      this.settingsService.getMetricsApiKey(),
-      this.settingsService.getMetricsToggles(),
-    ]);
-    return { apiKeyConfigured: configured, toggles };
+    return this.buildMetricsSettings();
   }
 
   @Patch('metrics')
@@ -62,11 +58,10 @@ export class SettingsController {
     if (body.toggles) {
       await this.settingsService.updateMetricsToggles(body.toggles);
     }
-    const [{ configured }, toggles] = await Promise.all([
-      this.settingsService.getMetricsApiKey(),
-      this.settingsService.getMetricsToggles(),
-    ]);
-    return { apiKeyConfigured: configured, toggles };
+    if (body.slowQueryThresholdSeconds !== undefined) {
+      await this.settingsService.setMetricsSlowQueryThresholdSeconds(body.slowQueryThresholdSeconds);
+    }
+    return this.buildMetricsSettings();
   }
 
   @Post('metrics/generate-api-key')
@@ -84,8 +79,16 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
   async deleteMetricsApiKey(): Promise<MetricsSettingsDto> {
     await this.settingsService.setMetricsApiKey(null);
-    const toggles = await this.settingsService.getMetricsToggles();
-    return { apiKeyConfigured: false, toggles };
+    return this.buildMetricsSettings();
+  }
+
+  private async buildMetricsSettings(): Promise<MetricsSettingsDto> {
+    const [{ configured }, toggles, slowQueryThresholdSeconds] = await Promise.all([
+      this.settingsService.getMetricsApiKey(),
+      this.settingsService.getMetricsToggles(),
+      this.settingsService.getMetricsSlowQueryThresholdSeconds(),
+    ]);
+    return { apiKeyConfigured: configured, toggles, slowQueryThresholdSeconds };
   }
 
   @Post('first-time-setup')

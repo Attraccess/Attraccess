@@ -9,10 +9,13 @@ import { DbMetricsSubscriber } from './db.subscriber';
 type EventLike = { metadata: { tableName: string } };
 
 describe('DbMetricsSubscriber', () => {
-  function setup(enabled = true) {
+  function setup(enabled = true, slowQueryThresholdSeconds = 0.5) {
     const registry = new Registry();
     const metrics = createDbMetrics(registry);
-    const toggle = { isEnabledCached: jest.fn().mockReturnValue(enabled) } as unknown as MetricsToggleService;
+    const toggle = {
+      isEnabledCached: jest.fn().mockReturnValue(enabled),
+      getSlowQueryThresholdSecondsCached: jest.fn().mockReturnValue(slowQueryThresholdSeconds),
+    } as unknown as MetricsToggleService;
     const dataSource = { subscribers: [] as unknown[] } as unknown as DataSource;
     const subscriber = new DbMetricsSubscriber(metrics, toggle, dataSource);
     return { registry, metrics, toggle, dataSource, subscriber };
@@ -162,6 +165,21 @@ describe('DbMetricsSubscriber', () => {
     subscriber.afterInsert(event as never);
 
     expect(toggle.isEnabledCached).toHaveBeenCalledWith('db');
+  });
+
+  it('uses the cached slow query threshold from MetricsToggleService', () => {
+    const { metrics, subscriber, toggle } = setup(true, 0.05);
+    const event = makeEvent('user');
+    const original = process.hrtime.bigint.bind(process.hrtime);
+    const sequence: bigint[] = [BigInt(0), BigInt(100_000_000)];
+    const slowSpy = jest.spyOn(metrics.slowQueriesTotal, 'inc');
+    jest.spyOn(process.hrtime, 'bigint').mockImplementation(() => sequence.shift() ?? original());
+
+    subscriber.beforeInsert(event as never);
+    subscriber.afterInsert(event as never);
+
+    expect(toggle.getSlowQueryThresholdSecondsCached).toHaveBeenCalled();
+    expect(slowSpy).toHaveBeenCalledWith({ entity: 'user', method: 'insert' });
   });
 
   it('does not emit when afterInsert fires without prior beforeInsert', async () => {

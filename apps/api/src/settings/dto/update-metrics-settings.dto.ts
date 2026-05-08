@@ -2,7 +2,7 @@
 // FEATURE: Metrics — admin-controlled timing instrumentation toggles
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, ValidateNested } from 'class-validator';
+import { IsNumber, IsOptional, Min, ValidateNested } from 'class-validator';
 import { UpdateMetricsTogglesDto } from './update-metrics-toggles.dto';
 
 export class UpdateMetricsSettingsDto {
@@ -11,4 +11,14 @@ export class UpdateMetricsSettingsDto {
   @Type(() => UpdateMetricsTogglesDto)
   @ApiPropertyOptional({ description: 'Per-subsystem metrics toggles update', type: UpdateMetricsTogglesDto })
   toggles?: UpdateMetricsTogglesDto;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  @ApiPropertyOptional({
+    description: 'Threshold above which a DB query is counted as slow (in seconds).',
+    minimum: 0,
+  })
+  slowQueryThresholdSeconds?: number;
 }

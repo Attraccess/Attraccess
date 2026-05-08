@@ -16,6 +16,7 @@ import {
   APP_PARENT,
   METRICS_KEYS,
   METRICS_PARENT,
+  METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS,
   METRICS_TOGGLE_DEFAULTS,
   METRICS_TOGGLE_KEYS,
   MetricsSubsystem,
@@ -171,6 +172,25 @@ export class SettingsService {
       acc[subsystem] = value;
       return acc;
     }, {} as MetricsTogglesDto);
+  }
+
+  async getMetricsSlowQueryThresholdSeconds(): Promise<number> {
+    const raw = await this.settingsStore.getPlainSetting(METRICS_PARENT, METRICS_KEYS.slowQueryThresholdSeconds);
+    if (raw === null || raw === undefined || raw === '') {
+      return METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS;
+    }
+    return parsed;
+  }
+
+  async setMetricsSlowQueryThresholdSeconds(value: number): Promise<void> {
+    await this.settingsStore.setPlainSetting(METRICS_PARENT, METRICS_KEYS.slowQueryThresholdSeconds, String(value));
+    if (this.metricsToggleInvalidator) {
+      await this.metricsToggleInvalidator.refresh();
+    }
   }
 
   async updateMetricsToggles(update: UpdateMetricsTogglesDto): Promise<MetricsTogglesDto> {

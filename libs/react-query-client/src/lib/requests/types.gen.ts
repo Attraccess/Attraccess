@@ -1114,6 +1114,10 @@ export type MetricsSettingsDto = {
      * Per-subsystem metrics timing toggles
      */
     toggles: MetricsTogglesDto;
+    /**
+     * Threshold above which a DB query is counted as slow (in seconds).
+     */
+    slowQueryThresholdSeconds: number;
 };
 
 export type UpdateMetricsTogglesDto = {
@@ -1152,6 +1156,10 @@ export type UpdateMetricsSettingsDto = {
      * Per-subsystem metrics toggles update
      */
     toggles?: UpdateMetricsTogglesDto;
+    /**
+     * Threshold above which a DB query is counted as slow (in seconds).
+     */
+    slowQueryThresholdSeconds?: number;
 };
 
 export type GenerateMetricsApiKeyResponseDto = {

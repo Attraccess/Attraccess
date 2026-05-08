@@ -47,6 +47,16 @@
     "grafanaTitle": "Grafana Setup",
     "grafanaDescription": "In Grafana, add a Prometheus data source pointing to your Prometheus server (e.g. http://prometheus:9090). The metrics will be available automatically once Prometheus is scraping the endpoint above."
   },
+  "slowQueryThreshold": {
+    "title": "Slow query threshold",
+    "description": "Database queries above this duration are counted as slow.",
+    "label": "Threshold (seconds)",
+    "savedTitle": "Threshold saved",
+    "savedDescription": "Slow query threshold updated. Changes apply within a few seconds.",
+    "errorTitle": "Save failed",
+    "errorDescription": "Could not update the slow query threshold. Please try again.",
+    "saveButton": "Save"
+  },
   "toggles": {
     "title": "Per-subsystem timing metrics",
     "description": "Enable or disable timing instrumentation for individual subsystems. Disabling a subsystem stops emitting its histogram and counter series.",

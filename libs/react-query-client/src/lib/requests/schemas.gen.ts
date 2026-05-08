@@ -1709,9 +1709,13 @@ export const $MetricsSettingsDto = {
                     '$ref': '#/components/schemas/MetricsTogglesDto'
                 }
             ]
+        },
+        slowQueryThresholdSeconds: {
+            type: 'number',
+            description: 'Threshold above which a DB query is counted as slow (in seconds).'
         }
     },
-    required: ['apiKeyConfigured', 'toggles']
+    required: ['apiKeyConfigured', 'toggles', 'slowQueryThresholdSeconds']
 } as const;
 
 export const $UpdateMetricsTogglesDto = {
@@ -1758,6 +1762,11 @@ export const $UpdateMetricsSettingsDto = {
                     '$ref': '#/components/schemas/UpdateMetricsTogglesDto'
                 }
             ]
+        },
+        slowQueryThresholdSeconds: {
+            type: 'number',
+            description: 'Threshold above which a DB query is counted as slow (in seconds).',
+            minimum: 0
         }
     }
 } as const;

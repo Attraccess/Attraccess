@@ -11,7 +11,10 @@ export const METRICS_PARENT = 'metrics';
 
 export const METRICS_KEYS = {
   apiKey: 'api_key',
+  slowQueryThresholdSeconds: 'slow_query_threshold_seconds',
 } as const;
+
+export const METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS = 0.5;
 
 export const METRICS_TOGGLE_KEYS = {
   http: 'metrics_http_enabled',
