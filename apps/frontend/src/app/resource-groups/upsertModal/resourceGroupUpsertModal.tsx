@@ -1,15 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import {
-  Button,
-  Form,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';

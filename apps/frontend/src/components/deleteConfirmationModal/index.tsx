@@ -1,4 +1,5 @@
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalProps } from '@heroui/react';
+import { ModalHeader, ModalBody, ModalFooter, ModalProps } from '@heroui/react';
+import { Modal, ModalContent } from '../../utils/heroui-compat';
 import { Button } from '@heroui/react';
 import { useTranslations, I18nTransComponent } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';

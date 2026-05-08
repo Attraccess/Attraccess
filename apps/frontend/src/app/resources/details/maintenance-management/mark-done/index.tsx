@@ -1,16 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-  Button,
-  Textarea,
-  Form,
-  Alert,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
+import { ModalBody, ModalFooter, ModalHeader, Button, Textarea, Form, Alert } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
 import {

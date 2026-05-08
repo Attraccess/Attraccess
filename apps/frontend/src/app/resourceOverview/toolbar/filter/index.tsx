@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DrawerBody, Drawer, DrawerContent, DrawerHeader, useDisclosure, Switch } from '@heroui/react';
+import { useDisclosure } from '../../../../utils/heroui-compat';
+import { DrawerBody, Drawer, DrawerContent, DrawerHeader, Switch } from '@heroui/react';
 
 import de from './de.json';
 import en from './en.json';

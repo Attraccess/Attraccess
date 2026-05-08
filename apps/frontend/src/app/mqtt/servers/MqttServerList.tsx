@@ -1,15 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Spinner,
-  Alert,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Spinner, Alert, ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';

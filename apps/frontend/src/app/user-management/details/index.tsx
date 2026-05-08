@@ -8,6 +8,7 @@ import {
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
 import { PageHeader } from '../../../components/pageHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm';
@@ -18,20 +19,7 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Divider,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Chip, Divider, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';

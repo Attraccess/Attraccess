@@ -1,18 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Selection,
-  Switch,
-  Textarea,
-} from '@heroui/react';
+import { Modal, ModalContent } from '../../../../utils/heroui-compat';
+import { Button, Input, ModalBody, ModalFooter, ModalHeader, Select, SelectItem, Selection, Switch, Textarea } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormResponseDto, FormSubmissionRequestDto } from '@attraccess/react-query-client';
 import {

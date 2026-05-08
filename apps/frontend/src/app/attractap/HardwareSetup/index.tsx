@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Modal, ModalBody, ModalContent, ModalHeader, useDisclosure } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Alert, Button, ModalBody, ModalHeader } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';

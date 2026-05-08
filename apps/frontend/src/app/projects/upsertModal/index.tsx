@@ -1,15 +1,5 @@
-import {
-  Button,
-  Form,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Textarea,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, Form, Input, ModalBody, ModalFooter, ModalHeader, Textarea } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
 import { PageHeader } from '../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';

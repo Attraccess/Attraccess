@@ -1,32 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import {
-  Button,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Tooltip,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-  Divider,
-  Card,
-  CardBody,
-  CardHeader,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Textarea,
-  Switch,
-  Link,
-} from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, ModalBody, ModalFooter, ModalHeader, Divider, Card, CardBody, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

@@ -1,26 +1,11 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
 import {
   ApiError,
   useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import {
-  Alert,
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  useDisclosure,
-} from '@heroui/react';
+import { Alert, Button, Input, ModalBody, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
 import { PageHeader } from '../../../components/pageHeader';
 import { TableDataLoadingIndicator } from '../../../components/tableComponents';

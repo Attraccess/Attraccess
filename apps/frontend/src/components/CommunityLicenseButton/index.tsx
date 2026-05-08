@@ -1,13 +1,5 @@
-import {
-  Alert,
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Alert, Button, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
 import { HeartHandshakeIcon } from 'lucide-react';
 import { I18nTransComponent, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';

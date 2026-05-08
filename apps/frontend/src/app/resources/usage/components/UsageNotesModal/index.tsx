@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Spinner, Textarea } from '@heroui/react';
+import { Modal, ModalContent } from '../../../../../utils/heroui-compat';
+import { ModalHeader, ModalBody, ModalFooter, Button, Spinner, Textarea } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';

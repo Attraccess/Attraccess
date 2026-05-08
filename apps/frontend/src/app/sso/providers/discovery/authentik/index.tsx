@@ -1,4 +1,5 @@
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
+import { Button, Input, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

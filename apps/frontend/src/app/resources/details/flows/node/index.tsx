@@ -1,6 +1,7 @@
 import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
 import { NodeProps } from '@xyflow/react';
-import { Button, Card, CardBody, CardHeader, cn, Tooltip, useDisclosure } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, cn, Tooltip } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useFlowContext } from '../flowContext';

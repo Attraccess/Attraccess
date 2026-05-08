@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { Modal, ModalContent, useDisclosure } from '../../utils/heroui-compat';
 import { ArrowRight, Mail } from 'lucide-react';
 import { Alert, Input } from '@heroui/react';
 import { Button } from '@heroui/react';
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from '@heroui/react';
+import { ModalHeader, ModalBody, ModalFooter } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';

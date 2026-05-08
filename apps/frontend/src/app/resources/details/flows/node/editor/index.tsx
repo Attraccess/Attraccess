@@ -1,5 +1,6 @@
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { Button, Form, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, useDisclosure } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../../utils/heroui-compat';
+import { Button, Form, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { PageHeader } from '../../../../../../components/pageHeader';
 import { useFlowContext } from '../../flowContext';

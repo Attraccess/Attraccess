@@ -1,18 +1,5 @@
-import {
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Button,
-  Input,
-  Switch,
-  Form,
-  Alert,
-  Select,
-  SelectItem,
-  useDisclosure,
-} from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, Button, Input, Switch, Form, Alert, Select, SelectItem } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {

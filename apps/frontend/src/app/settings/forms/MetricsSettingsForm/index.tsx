@@ -1,20 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Chip,
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  NumberInput,
-  Spinner,
-  Switch,
-  Tooltip,
-  useDisclosure,
-} from '@heroui/react';
+import { useCallback, useMemo, useState } from 'react';
+import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
+import { Button, Divider, Input, ModalBody, ModalFooter, ModalHeader, Spinner, Tooltip } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';

@@ -1,14 +1,5 @@
-import {
-  Button,
-  ButtonProps,
-  Link,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, ButtonProps, Link, ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../utils/heroui-compat';
 import { PageHeader } from '../../../../components/pageHeader';
 import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';

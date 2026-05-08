@@ -1,23 +1,12 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Modal, ModalContent, useDisclosure } from '../../../utils/heroui-compat';
 import {
   ApiError,
   TwoFactorPolicy,
   useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
-import {
-  Alert,
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Selection,
-  useDisclosure,
-} from '@heroui/react';
+import { Alert, Button, ModalBody, ModalFooter, ModalHeader, Select, SelectItem, Selection } from '@heroui/react';
 import { Settings2Icon } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../components/pageHeader';

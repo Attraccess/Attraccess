@@ -1,5 +1,6 @@
-import { useDisclosure } from '@heroui/react';
+
 import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
+import { useDisclosure } from '../../../../utils/heroui-compat';
 import {
   useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule,
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
@@ -18,7 +19,6 @@ export function ScheduleDeleteModal(props: Props) {
   const { resourceId, schedule, children } = props;
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure();
   const queryClient = useQueryClient();
-
 
   const { mutate: deleteSchedule, isPending: isDeleting } =
     useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule({

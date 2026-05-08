@@ -1,19 +1,5 @@
-import {
-  Button,
-  Chip,
-  Divider,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  useDisclosure,
-} from '@heroui/react';
+import { Button, Chip, Divider, ModalBody, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from '@heroui/react';
+import { Modal, ModalContent, useDisclosure } from '../../../../../utils/heroui-compat';
 import de from './de.json';
 import en from './en.json';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';

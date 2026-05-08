@@ -1,14 +1,5 @@
-import {
-  Accordion,
-  AccordionItem,
-  Divider,
-  Drawer,
-  DrawerBody,
-  DrawerContent,
-  DrawerHeader,
-  Textarea,
-  useDisclosure,
-} from '@heroui/react';
+import { Accordion, AccordionItem, Divider, Drawer, DrawerBody, DrawerContent, DrawerHeader, Textarea } from '@heroui/react';
+import { useDisclosure } from '../../../../../utils/heroui-compat';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
