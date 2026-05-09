@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Input, InputProps } from '@heroui/react';
+import { TextFieldProps, TextField, Label, Input, FieldError, Description } from '@heroui/react';
 
 export const USERNAME_RULES = {
   minLength: 3,
@@ -38,28 +38,36 @@ export function useUsernameValidation(username: string, messages: UsernameValida
 
 type UsernameInputProps = {
   value: string;
-  onValueChange: (value: string) => void;
-  label: string;
-  description: string;
+  onValueChange?: (value: string) => void;
+  label?: React.ReactNode;
+  description?: React.ReactNode;
   validationMessages: UsernameValidationMessages;
-} & Omit<InputProps, 'value' | 'onValueChange' | 'type'>;
+} & Omit<TextFieldProps, 'value' | 'onChange' | 'children'>;
 
 export function UsernameInput(props: UsernameInputProps) {
-  const { value, onValueChange, label, description, validationMessages, ...rest } = props;
+  const { value, onValueChange, onChange, label, description, validationMessages, ...rest } = props;
   const { error } = useUsernameValidation(value, validationMessages);
 
+  const handleChange = (v: string) => {
+    onChange?.(v);
+    onValueChange?.(v);
+  };
+
   return (
-    <Input
-      type="text"
-      label={label}
+    <TextField
       value={value}
-      onValueChange={onValueChange}
-      minLength={USERNAME_RULES.minLength}
-      maxLength={USERNAME_RULES.maxLength}
+      onChange={handleChange}
       isInvalid={!!error}
-      errorMessage={error || undefined}
-      description={description}
       {...rest}
-    />
+    >
+      {label && <Label>{label}</Label>}
+      <Input
+        type="text"
+        minLength={USERNAME_RULES.minLength}
+        maxLength={USERNAME_RULES.maxLength}
+      />
+      {error && <FieldError>{error}</FieldError>}
+      {description && <Description>{description}</Description>}
+    </TextField>
   );
 }

@@ -1,6 +1,6 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Input } from '@heroui/react';
+import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, TextField, FieldError, Input, Description } from '@heroui/react';
 import { Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';
@@ -87,16 +87,17 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
                 <div className="space-y-4">
                   <p>{t('description')}</p>
 
-                  <Input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".zip"
-                    onChange={handleFileChange}
-                    isInvalid={isFileInvalid}
-                    errorMessage={isFileInvalid ? t('errors.invalidFile') : ''}
-                    description={t('fileInputDescription')}
-                    data-cy="upload-plugin-modal-file-input"
-                  />
+                  <TextField isInvalid={isFileInvalid}>
+                    <Input
+                      type="file"
+                      ref={fileInputRef}
+                      accept=".zip"
+                      onChange={handleFileChange}
+                      data-cy="upload-plugin-modal-file-input"
+                    />
+                    <Description>{t('fileInputDescription')}</Description>
+                    {isFileInvalid && <FieldError>{t('errors.invalidFile')}</FieldError>}
+                  </TextField>
 
                   {selectedFile && (
                     <div className="py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-md">

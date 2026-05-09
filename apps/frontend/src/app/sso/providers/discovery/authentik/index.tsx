@@ -1,4 +1,4 @@
-import { Button, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Button, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
 import { PageHeader } from '../../../../../components/pageHeader';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -87,12 +87,14 @@ export function AuthentikDiscoveryDialog(props: Props) {
                   <PageHeader noMargin title={t('title')} />
                 </ModalHeader>
                 <ModalBody>
-                  <Input label={t('host')} value={host} onChange={(e) => setHost(e.target.value)} />
-                  <Input
-                    label={t('applicationName')}
-                    value={applicationName}
-                    onChange={(e) => setApplicationName(e.target.value)}
-                  />
+                  <TextField value={host} onChange={setHost}>
+                    <Label>{t('host')}</Label>
+                    <Input />
+                  </TextField>
+                  <TextField value={applicationName} onChange={setApplicationName}>
+                    <Label>{t('applicationName')}</Label>
+                    <Input />
+                  </TextField>
                 </ModalBody>
                 <ModalFooter>
                   <Button variant="primary" onPress={discover} isPending={isDiscovering}>

@@ -7,6 +7,7 @@ import {
   CardContent,
   CardFooter,
   Chip,
+  TextField,
   Input,
   Pagination,
   Table,
@@ -143,14 +144,9 @@ export const UserManagementPage: React.FC = () => {
 
       <Card>
         <CardContent>
-          <Input
-            label={t('table.inputs.search')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mb-4"
-            isClearable
-            onClear={() => setSearch('')}
-          />
+          <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')} className="mb-4">
+            <Input placeholder={t('table.inputs.search')} />
+          </TextField>
 
           <Table removeWrapper aria-label={t('table.ariaLabel')} onRowAction={(key) => navigate(`/users/${key}`)}>
             <TableHeader>

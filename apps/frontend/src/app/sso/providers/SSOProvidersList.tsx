@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
-import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link, useOverlayState } from '@heroui/react';
+import { Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, TextField, Label, Input, InputGroup, Description, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Divider, Card, CardContent, CardHeader, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea, Switch, Link, useOverlayState } from '@heroui/react';
 import { Pencil, Trash, Key, FileCode, Eye, EyeOff, MoreVertical, Copy, Info } from 'lucide-react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -366,45 +366,19 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-
-    if (name.includes('.')) {
-      const [section, field] = name.split('.');
-      if (section === 'oidcConfiguration') {
-        setFormValues((prev) => ({
-          ...prev,
-          oidcConfiguration: {
-            ...ensureOidcConfiguration(prev.oidcConfiguration),
-            [field]: value,
-          },
-        }));
-      }
-      if (section === 'samlConfiguration') {
-        setFormValues((prev) => ({
-          ...prev,
-          samlConfiguration: {
-            ...ensureSamlConfiguration(prev.samlConfiguration),
-            [field]: value,
-          },
-        }));
-      }
-    } else {
-      setFormValues((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
+  const setOidc = (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
+    }));
   };
 
-  const handlePermissionMappingChange =
-    (setter: React.Dispatch<React.SetStateAction<Record<PermissionKey, string>>>, key: PermissionKey) =>
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        setter((prev) => ({
-          ...prev,
-          [key]: event.target.value,
-        }));
-      };
+  const setSaml = (field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      samlConfiguration: { ...ensureSamlConfiguration(prev.samlConfiguration), [field]: value },
+    }));
+  };
 
   const handleCopyValue = useCallback(
     async (value: string, successTitle: string) => {
@@ -711,15 +685,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
               <ModalHeader><ModalHeading>{editingProvider ? t('editProvider') : t('createNewProvider')}</ModalHeading></ModalHeader>
               <ModalBody>
                 <div className="space-y-4">
-                  <Input
-                    label={t('name')}
-                    name="name"
-                    value={formValues.name}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Company OIDC"
+                  <TextField
                     isRequired
-                    data-cy="sso-provider-form-name-input"
-                  />
+                    value={formValues.name}
+                    onChange={(v) => setFormValues((prev) => ({ ...prev, name: v }))}
+                  >
+                    <Label>{t('name')}</Label>
+                    <Input placeholder="e.g. Company OIDC" data-cy="sso-provider-form-name-input" />
+                  </TextField>
 
                   <Select
                     items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
@@ -773,66 +746,35 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         </AuthentikDiscoveryDialog>
                       </div>
 
-                      <Input
-                        label={t('issuer')}
-                        name="oidcConfiguration.issuer"
-                        value={formValues.oidcConfiguration?.issuer ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="https://sso.example.com/auth/realms/example"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-issuer-input"
-                      />
+                      <TextField isRequired value={formValues.oidcConfiguration?.issuer ?? ''} onChange={(v) => setOidc('issuer', v)}>
+                        <Label>{t('issuer')}</Label>
+                        <Input placeholder="https://sso.example.com/auth/realms/example" data-cy="sso-provider-form-oidc-issuer-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('authorizationURL')}
-                        name="oidcConfiguration.authorizationURL"
-                        value={formValues.oidcConfiguration?.authorizationURL ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/auth"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-authorization-url-input"
-                      />
+                      <TextField isRequired value={formValues.oidcConfiguration?.authorizationURL ?? ''} onChange={(v) => setOidc('authorizationURL', v)}>
+                        <Label>{t('authorizationURL')}</Label>
+                        <Input placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/auth" data-cy="sso-provider-form-oidc-authorization-url-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('tokenURL')}
-                        name="oidcConfiguration.tokenURL"
-                        value={formValues.oidcConfiguration?.tokenURL ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/token"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-token-url-input"
-                      />
+                      <TextField isRequired value={formValues.oidcConfiguration?.tokenURL ?? ''} onChange={(v) => setOidc('tokenURL', v)}>
+                        <Label>{t('tokenURL')}</Label>
+                        <Input placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/token" data-cy="sso-provider-form-oidc-token-url-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('userInfoURL')}
-                        name="oidcConfiguration.userInfoURL"
-                        value={formValues.oidcConfiguration?.userInfoURL ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/userinfo"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-user-info-url-input"
-                      />
+                      <TextField isRequired value={formValues.oidcConfiguration?.userInfoURL ?? ''} onChange={(v) => setOidc('userInfoURL', v)}>
+                        <Label>{t('userInfoURL')}</Label>
+                        <Input placeholder="https://sso.example.com/auth/realms/example/protocol/openid-connect/userinfo" data-cy="sso-provider-form-oidc-user-info-url-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('clientId')}
-                        name="oidcConfiguration.clientId"
-                        value={formValues.oidcConfiguration?.clientId ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="your-client-id"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-client-id-input"
-                      />
+                      <TextField isRequired value={formValues.oidcConfiguration?.clientId ?? ''} onChange={(v) => setOidc('clientId', v)}>
+                        <Label>{t('clientId')}</Label>
+                        <Input placeholder="your-client-id" data-cy="sso-provider-form-oidc-client-id-input" />
+                      </TextField>
 
-                      <Input
-                        type={showClientSecret ? 'text' : 'password'}
-                        label={t('clientSecret')}
-                        name="oidcConfiguration.clientSecret"
-                        value={formValues.oidcConfiguration?.clientSecret ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="••••••••••••••••"
-                        isRequired
-                        data-cy="sso-provider-form-oidc-client-secret-input"
-                        endContent={
+                      <TextField isRequired value={formValues.oidcConfiguration?.clientSecret ?? ''} onChange={(v) => setOidc('clientSecret', v)}>
+                        <Label>{t('clientSecret')}</Label>
+                        <InputGroup>
+                          <Input type={showClientSecret ? 'text' : 'password'} placeholder="••••••••••••••••" data-cy="sso-provider-form-oidc-client-secret-input" />
                           <Tooltip content={showClientSecret ? t('hideClientSecret') : t('showClientSecret')}>
                             <Button variant="ghost"
                               isIconOnly
@@ -843,31 +785,22 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               {showClientSecret ? <EyeOff size={16} /> : <Eye size={16} />}
                             </Button>
                           </Tooltip>
-                        }
-                      />
+                        </InputGroup>
+                      </TextField>
 
                       <Divider className="my-2" />
-                      <Input
-                        label={t('scopes')}
-                        value={scopesInput}
-                        onChange={(e) => setScopesInput(e.target.value)}
-                        placeholder="openid, email, profile"
-                        data-cy="sso-provider-form-oidc-scopes-input"
-                      />
-                      <Input
-                        label={t('usernameClaimPaths')}
-                        value={usernameClaimPathsInput}
-                        onChange={(e) => setUsernameClaimPathsInput(e.target.value)}
-                        placeholder="preferred_username, email, sub"
-                        data-cy="sso-provider-form-oidc-username-claims-input"
-                      />
-                      <Input
-                        label={t('emailClaimPaths')}
-                        value={emailClaimPathsInput}
-                        onChange={(e) => setEmailClaimPathsInput(e.target.value)}
-                        placeholder="email, emails[0].value, upn"
-                        data-cy="sso-provider-form-oidc-email-claims-input"
-                      />
+                      <TextField value={scopesInput} onChange={setScopesInput}>
+                        <Label>{t('scopes')}</Label>
+                        <Input placeholder="openid, email, profile" data-cy="sso-provider-form-oidc-scopes-input" />
+                      </TextField>
+                      <TextField value={usernameClaimPathsInput} onChange={setUsernameClaimPathsInput}>
+                        <Label>{t('usernameClaimPaths')}</Label>
+                        <Input placeholder="preferred_username, email, sub" data-cy="sso-provider-form-oidc-username-claims-input" />
+                      </TextField>
+                      <TextField value={emailClaimPathsInput} onChange={setEmailClaimPathsInput}>
+                        <Label>{t('emailClaimPaths')}</Label>
+                        <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
+                      </TextField>
 
                       <Divider className="my-2" />
                       <div className="flex items-center gap-2 mb-2">
@@ -876,14 +809,14 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       </div>
                       <p className="text-xs text-default-500">{t('permissionMappingsHint')}</p>
                       {permissionKeys.map((permissionKey) => (
-                        <Input
+                        <TextField
                           key={`oidc-permission-${permissionKey}`}
-                          label={t(`permissionMappingLabels.${permissionKey}`)}
                           value={oidcPermissionMappingsInput[permissionKey]}
-                          onChange={handlePermissionMappingChange(setOidcPermissionMappingsInput, permissionKey)}
-                          placeholder={t('permissionMappingsPlaceholder')}
-                          data-cy={`sso-provider-form-oidc-permission-mapping-${permissionKey}`}
-                        />
+                          onChange={(v) => setOidcPermissionMappingsInput((prev) => ({ ...prev, [permissionKey]: v }))}
+                        >
+                          <Label>{t(`permissionMappingLabels.${permissionKey}`)}</Label>
+                          <Input placeholder={t('permissionMappingsPlaceholder')} data-cy={`sso-provider-form-oidc-permission-mapping-${permissionKey}`} />
+                        </TextField>
                       ))}
                     </>
                   )}
@@ -895,31 +828,21 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         <span className="font-semibold">{t('samlConfiguration')}</span>
                       </div>
 
-                      <Input
-                        label={t('entryPoint')}
-                        name="samlConfiguration.entryPoint"
-                        value={formValues.samlConfiguration?.entryPoint ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="https://idp.example.com/realms/master/protocol/saml"
-                        isRequired
-                        data-cy="sso-provider-form-saml-entry-point-input"
-                      />
+                      <TextField isRequired value={formValues.samlConfiguration?.entryPoint ?? ''} onChange={(v) => setSaml('entryPoint', v)}>
+                        <Label>{t('entryPoint')}</Label>
+                        <Input placeholder="https://idp.example.com/realms/master/protocol/saml" data-cy="sso-provider-form-saml-entry-point-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('issuer')}
-                        name="samlConfiguration.issuer"
-                        value={formValues.samlConfiguration?.issuer ?? ''}
-                        onChange={handleInputChange}
-                        placeholder={window.location.origin ?? ''}
-                        isRequired
-                        data-cy="sso-provider-form-saml-issuer-input"
-                      />
+                      <TextField isRequired value={formValues.samlConfiguration?.issuer ?? ''} onChange={(v) => setSaml('issuer', v)}>
+                        <Label>{t('issuer')}</Label>
+                        <Input placeholder={window.location.origin ?? ''} data-cy="sso-provider-form-saml-issuer-input" />
+                      </TextField>
 
                       <Textarea
                         label={t('certificate')}
                         name="samlConfiguration.certificate"
                         value={formValues.samlConfiguration?.certificate ?? ''}
-                        onChange={handleInputChange}
+                        onChange={(e) => setSaml('certificate', e.target.value)}
                         placeholder="MIICmzCCAYMCBg..."
                         minRows={4}
                         isRequired
@@ -927,37 +850,22 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       />
                       <p className="text-xs text-default-500">{t('certificateHint')}</p>
 
-                      <Input
-                        label={t('audience')}
-                        name="samlConfiguration.audience"
-                        value={formValues.samlConfiguration?.audience ?? ''}
-                        onChange={handleInputChange}
-                        placeholder={window.location.origin ?? ''}
-                        data-cy="sso-provider-form-saml-audience-input"
-                      />
+                      <TextField value={formValues.samlConfiguration?.audience ?? ''} onChange={(v) => setSaml('audience', v)}>
+                        <Label>{t('audience')}</Label>
+                        <Input placeholder={window.location.origin ?? ''} data-cy="sso-provider-form-saml-audience-input" />
+                      </TextField>
 
-                      <Input
-                        label={t('emailAttributeKeys')}
-                        description={t('emailAttributeKeysHint')}
-                        value={emailAttributeKeysInput}
-                        onChange={(e) => setEmailAttributeKeysInput(e.target.value)}
-                        placeholder="email, mail, urn:oid:1.2.840.113549.1.9.1"
-                        data-cy="sso-provider-form-saml-email-attribute-keys-input"
-                      />
+                      <TextField value={emailAttributeKeysInput} onChange={setEmailAttributeKeysInput}>
+                        <Label>{t('emailAttributeKeys')}</Label>
+                        <Input placeholder="email, mail, urn:oid:1.2.840.113549.1.9.1" data-cy="sso-provider-form-saml-email-attribute-keys-input" />
+                        <Description>{t('emailAttributeKeysHint')}</Description>
+                      </TextField>
 
-                      <Input
-                        type={showSamlProvisioningSecret ? 'text' : 'password'}
-                        label={t('samlProvisioningSecret')}
-                        name="samlConfiguration.provisioningSecret"
-                        value={formValues.samlConfiguration?.provisioningSecret ?? ''}
-                        onChange={handleInputChange}
-                        placeholder="••••••••••••••••"
-                        description={t('samlProvisioningSecretHint')}
-                        data-cy="sso-provider-form-saml-provisioning-secret-input"
-                        endContent={
-                          <Tooltip
-                            content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}
-                          >
+                      <TextField value={formValues.samlConfiguration?.provisioningSecret ?? ''} onChange={(v) => setSaml('provisioningSecret', v)}>
+                        <Label>{t('samlProvisioningSecret')}</Label>
+                        <InputGroup>
+                          <Input type={showSamlProvisioningSecret ? 'text' : 'password'} placeholder="••••••••••••••••" data-cy="sso-provider-form-saml-provisioning-secret-input" />
+                          <Tooltip content={showSamlProvisioningSecret ? t('hideSamlProvisioningSecret') : t('showSamlProvisioningSecret')}>
                             <Button variant="ghost"
                               isIconOnly
                               size="sm"
@@ -967,8 +875,9 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               {showSamlProvisioningSecret ? <EyeOff size={16} /> : <Eye size={16} />}
                             </Button>
                           </Tooltip>
-                        }
-                      />
+                        </InputGroup>
+                        <Description>{t('samlProvisioningSecretHint')}</Description>
+                      </TextField>
 
                       <Divider className="my-2" />
                       <div className="flex items-center gap-2 mb-2">
@@ -977,21 +886,21 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       </div>
                       <p className="text-xs text-default-500">{t('permissionMappingsHint')}</p>
                       {permissionKeys.map((permissionKey) => (
-                        <Input
+                        <TextField
                           key={`saml-permission-${permissionKey}`}
-                          label={t(`permissionMappingLabels.${permissionKey}`)}
                           value={samlPermissionMappingsInput[permissionKey]}
-                          onChange={handlePermissionMappingChange(setSamlPermissionMappingsInput, permissionKey)}
-                          placeholder={t('permissionMappingsPlaceholder')}
-                          data-cy={`sso-provider-form-saml-permission-mapping-${permissionKey}`}
-                        />
+                          onChange={(v) => setSamlPermissionMappingsInput((prev) => ({ ...prev, [permissionKey]: v }))}
+                        >
+                          <Label>{t(`permissionMappingLabels.${permissionKey}`)}</Label>
+                          <Input placeholder={t('permissionMappingsPlaceholder')} data-cy={`sso-provider-form-saml-permission-mapping-${permissionKey}`} />
+                        </TextField>
                       ))}
 
                       <Textarea
                         label={t('spSigningCertificate')}
                         name="samlConfiguration.spSigningCertificate"
                         value={formValues.samlConfiguration?.spSigningCertificate ?? ''}
-                        onChange={handleInputChange}
+                        onChange={(e) => setSaml('spSigningCertificate', e.target.value)}
                         placeholder="MIICmzCCAYMCBg..."
                         minRows={4}
                         data-cy="sso-provider-form-saml-sp-certificate-input"
@@ -1002,7 +911,7 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                         label={t('spSigningPrivateKey')}
                         name="samlConfiguration.spSigningPrivateKey"
                         value={formValues.samlConfiguration?.spSigningPrivateKey ?? ''}
-                        onChange={handleInputChange}
+                        onChange={(e) => setSaml('spSigningPrivateKey', e.target.value)}
                         placeholder="-----BEGIN PRIVATE KEY-----"
                         minRows={4}
                         data-cy="sso-provider-form-saml-sp-private-key-input"
@@ -1056,14 +965,11 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                       <p className="text-xs text-default-500">{t('setupInstructionsHint')}</p>
                       <div className="flex flex-col gap-3">
                         {!isSamlProvider && (
-                          <Input
-                            label={t('authentikRedirectRegex')}
-                            value={authentikRedirectRegexPattern}
-                            isReadOnly
-                            isDisabled={!hasSetupUrls}
-                            description={hasSetupUrls ? t('authentikRedirectRegexDescription') : t('setupUrlPending')}
-                            endContent={
-                              hasSetupUrls ? (
+                          <TextField isReadOnly isDisabled={!hasSetupUrls} value={authentikRedirectRegexPattern}>
+                            <Label>{t('authentikRedirectRegex')}</Label>
+                            {hasSetupUrls ? (
+                              <InputGroup>
+                                <Input data-cy="sso-provider-form-authentik-regex" />
                                 <Button variant="ghost"
                                   size="sm"
                                   onPress={() => handleCopyLoginUrl(authentikRedirectRegexPattern)}
@@ -1072,25 +978,18 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                                 >
                                   {t('copy')}
                                 </Button>
-                              ) : undefined
-                            }
-                            data-cy="sso-provider-form-authentik-regex"
-                          />
+                              </InputGroup>
+                            ) : (
+                              <Input data-cy="sso-provider-form-authentik-regex" />
+                            )}
+                            <Description>{hasSetupUrls ? t('authentikRedirectRegexDescription') : t('setupUrlPending')}</Description>
+                          </TextField>
                         )}
-                        <Input
-                          label={isSamlProvider ? t('samlAcsUrl') : t('oidcRedirectUri')}
-                          value={isSamlProvider ? samlCallbackUrl : oidcCallbackUrl}
-                          isReadOnly
-                          isDisabled={!hasSetupUrls}
-                          description={
-                            hasSetupUrls
-                              ? isSamlProvider
-                                ? t('samlAcsUrlDescription')
-                                : t('oidcRedirectUriDescription')
-                              : t('setupUrlPending')
-                          }
-                          endContent={
-                            hasSetupUrls ? (
+                        <TextField isReadOnly isDisabled={!hasSetupUrls} value={isSamlProvider ? samlCallbackUrl : oidcCallbackUrl}>
+                          <Label>{isSamlProvider ? t('samlAcsUrl') : t('oidcRedirectUri')}</Label>
+                          {hasSetupUrls ? (
+                            <InputGroup>
+                              <Input data-cy="sso-provider-form-callback-url" />
                               <Button variant="ghost"
                                 size="sm"
                                 onPress={isSamlProvider ? handleCopySamlCallbackUrl : handleCopyOidcCallbackUrl}
@@ -1099,10 +998,18 @@ export const SSOProvidersList = forwardRef<SSOProvidersListRef, React.ComponentP
                               >
                                 {t('copy')}
                               </Button>
-                            ) : undefined
-                          }
-                          data-cy="sso-provider-form-callback-url"
-                        />
+                            </InputGroup>
+                          ) : (
+                            <Input data-cy="sso-provider-form-callback-url" />
+                          )}
+                          <Description>
+                            {hasSetupUrls
+                              ? isSamlProvider
+                                ? t('samlAcsUrlDescription')
+                                : t('oidcRedirectUriDescription')
+                              : t('setupUrlPending')}
+                          </Description>
+                        </TextField>
                       </div>
 
                       <div className="flex flex-wrap gap-3 text-xs">

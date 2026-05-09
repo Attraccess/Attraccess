@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Divider, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
+import { Button, Divider, TextField, Label, Input, InputGroup, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Tooltip, useOverlayState } from '@heroui/react';
 import { AlertTriangleIcon, ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -236,13 +236,10 @@ export function MetricsSettingsForm() {
   ) : null;
 
   const endpointSection = (
-    <Input
-      label={t('endpointLabel')}
-      value={metricsEndpointUrl}
-      isReadOnly
-      variant="bordered"
-      classNames={{ input: 'font-mono text-sm' }}
-      endContent={
+    <TextField value={metricsEndpointUrl} isReadOnly>
+      <Label>{t('endpointLabel')}</Label>
+      <InputGroup>
+        <Input className="font-mono text-sm" />
         <Tooltip content={t('copyButton')}>
           <Button variant="ghost"
             isIconOnly
@@ -253,8 +250,8 @@ export function MetricsSettingsForm() {
             <ClipboardCopyIcon size={16} />
           </Button>
         </Tooltip>
-      }
-    />
+      </InputGroup>
+    </TextField>
   );
 
   const setupGuideSection = (
@@ -279,13 +276,10 @@ export function MetricsSettingsForm() {
           {t('warning')}
         </div>
 
-        <Input
-          label={t('apiKeyLabel')}
-          value={generatedKey}
-          isReadOnly
-          variant="bordered"
-          classNames={{ input: 'font-mono text-sm' }}
-          endContent={
+        <TextField value={generatedKey} isReadOnly>
+          <Label>{t('apiKeyLabel')}</Label>
+          <InputGroup>
+            <Input className="font-mono text-sm" />
             <Tooltip content={t('copyButton')}>
               <Button variant="ghost"
                 isIconOnly
@@ -296,8 +290,8 @@ export function MetricsSettingsForm() {
                 <ClipboardCopyIcon size={16} />
               </Button>
             </Tooltip>
-          }
-        />
+          </InputGroup>
+        </TextField>
 
         {endpointSection}
         {setupGuideSection}

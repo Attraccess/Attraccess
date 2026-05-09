@@ -9,7 +9,7 @@ import {
   useSettingsServiceUpdateSystemSettings,
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
-import { Button, Form, Input, Spinner, Switch } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, Description, Spinner, Switch } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../../../components/PasswordInput';
 import { Select } from '../../../../components/select';
@@ -161,24 +161,26 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         items={smtpServiceOptions}
         isRequired
       />
-      <Input
-        label={t('inputs.host.label')}
-        description={t('inputs.host.description')}
+      <TextField
+        isRequired
+        isDisabled={smtpService !== SmtpServiceType.SMTP}
         value={smtpHost}
-        onValueChange={setSmtpHost}
+        onChange={setSmtpHost}
+      >
+        <Label>{t('inputs.host.label')}</Label>
+        <Input />
+        <Description>{t('inputs.host.description')}</Description>
+      </TextField>
+      <TextField
         isRequired
         isDisabled={smtpService !== SmtpServiceType.SMTP}
-      />
-      <Input
-        label={t('inputs.port.label')}
-        description={t('inputs.port.description')}
-        type="number"
         value={smtpPort}
-        onValueChange={setSmtpPort}
-        isRequired
-        isDisabled={smtpService !== SmtpServiceType.SMTP}
-        min={1}
-      />
+        onChange={setSmtpPort}
+      >
+        <Label>{t('inputs.port.label')}</Label>
+        <Input type="number" min={1} />
+        <Description>{t('inputs.port.description')}</Description>
+      </TextField>
       <Switch
         isSelected={smtpSecure}
         onValueChange={setSmtpSecure}
@@ -186,12 +188,11 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
       >
         {t('inputs.secure.label')}
       </Switch>
-      <Input
-        label={t('inputs.user.label')}
-        description={t('inputs.user.description')}
-        value={smtpUser}
-        onValueChange={setSmtpUser}
-      />
+      <TextField value={smtpUser} onChange={setSmtpUser}>
+        <Label>{t('inputs.user.label')}</Label>
+        <Input />
+        <Description>{t('inputs.user.description')}</Description>
+      </TextField>
       <PasswordInput
         label={t('inputs.pass.label')}
         description={t('inputs.pass.description')}
@@ -199,13 +200,11 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
         onValueChange={setSmtpPass}
         autoComplete="off"
       />
-      <Input
-        label={t('inputs.from.label')}
-        description={t('inputs.from.description')}
-        value={smtpFrom}
-        onValueChange={setSmtpFrom}
-        isRequired
-      />
+      <TextField isRequired value={smtpFrom} onChange={setSmtpFrom}>
+        <Label>{t('inputs.from.label')}</Label>
+        <Input />
+        <Description>{t('inputs.from.description')}</Description>
+      </TextField>
       <Button variant="primary"
         onPress={handleSubmit}
         isPending={isSaving}
