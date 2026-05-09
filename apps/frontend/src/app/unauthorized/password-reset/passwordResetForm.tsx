@@ -6,7 +6,7 @@ import en from './en.json';
 import de from './de.json';
 import { useUsersServiceRequestPasswordReset } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { Input } from '@heroui/react';
+import { TextField, Label, Input } from '@heroui/react';
 
 interface PasswordResetFormProps {
   onGoBack: () => void;
@@ -57,12 +57,10 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
         </p>
       </div>
 
-      <Input
-        label={t('emailLabel')}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        data-cy="password-reset-form-email-input"
-      />
+      <TextField value={email} onChange={setEmail}>
+        <Label>{t('emailLabel')}</Label>
+        <Input data-cy="password-reset-form-email-input" />
+      </TextField>
 
       <Button variant="primary"
         onPress={() => requestPasswordReset({ requestBody: { email } })}

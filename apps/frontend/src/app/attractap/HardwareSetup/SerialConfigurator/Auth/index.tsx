@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Input, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Alert, Button, TextField, Label, Input, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import {
   createContext,
   useCallback,
@@ -249,14 +249,10 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
   if (!isAuthenticated) {
     return (
       <form className="flex flex-col gap-3" onSubmit={handleUnlock}>
-        <Input
-          label={t('fields.pin')}
-          value={pinInput}
-          onChange={(e) => setPinInput(e.target.value)}
-          maxLength={4}
-          inputMode="numeric"
-          required
-        />
+        <TextField value={pinInput} onChange={setPinInput}>
+          <Label>{t('fields.pin')}</Label>
+          <Input maxLength={4} inputMode="numeric" required />
+        </TextField>
         {error && <Alert color="danger">{error}</Alert>}
         <Button variant="primary" type="submit" isPending={isSubmitting}>
           {t('enterPin.submit')}

@@ -1,5 +1,5 @@
 import { ApiError, useUsersServiceChangeMyEmail, useUsersServiceGetCurrentKey } from '@attraccess/react-query-client';
-import { Button, Input } from '@heroui/react';
+import { Button, TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -49,7 +49,10 @@ export function EmailForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Input type="email" label={t('email.label')} value={email} onValueChange={setEmail} />
+      <TextField value={email} onChange={setEmail}>
+        <Label>{t('email.label')}</Label>
+        <Input type="email" />
+      </TextField>
       <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
         {t('actions.save')}
       </Button>

@@ -1,5 +1,4 @@
-import { Button } from '@heroui/react';
-import { Input } from '@heroui/react';
+import { Button, TextField, InputGroup, Input } from '@heroui/react';
 import { SearchIcon, PlusIcon, ScanQrCodeIcon, ListFilterIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -37,46 +36,35 @@ export function Toolbar({
     <div>
       <div className="mb-6 flex flex-row w-full items-center justify-between gap-4 rounded-full p-2 shadow-medium bg-content1">
         <div className="relative flex-grow">
-          <Input
-            radius="full"
+          <TextField
             value={filterProps.search}
-            onChange={(e) => filterProps.onSearchChanged(e.target.value)}
-            placeholder={t('searchPlaceholder')}
+            onChange={filterProps.onSearchChanged}
             className={cn((searchIsLoading || highlightSearch) && 'animate-pulse')}
-            color={highlightSearch ? 'danger' : undefined}
-            startContent={
-              <>
-                <ResourceFilter
-                  onlyInUseByMe={filterProps.onlyInUseByMe}
-                  onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
-                  onlyWithPermissions={filterProps.onlyWithPermissions}
-                  onOnlyWithPermissionsChanged={filterProps.onOnlyWithPermissionsChanged}
-                  hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
-                  onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
-                >
-                  {({ onOpen }) => (
-                    <>
-                      {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
-                      <Button
-                        size="sm"
-                        variant="light"
-                        startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
-                        isIconOnly
-                        color={highlightFilter ? 'danger' : undefined}
-                        onPress={onOpen}
-                      />
-                    </>
-                  )}
-                </ResourceFilter>
-                <SearchIcon size={18} />
-              </>
-            }
-            classNames={{
-              inputWrapper: 'bg-transparent border-none shadow-none focus-within:ring-0 pl-2',
-              input: 'text-sm',
-            }}
-            data-cy="resource-search-input"
-          />
+            aria-label={t('searchPlaceholder')}
+          >
+            <InputGroup>
+              <ResourceFilter
+                onlyInUseByMe={filterProps.onlyInUseByMe}
+                onOnlyInUseByMeChanged={filterProps.onOnlyInUseByMeChanged}
+                onlyWithPermissions={filterProps.onlyWithPermissions}
+                onOnlyWithPermissionsChanged={filterProps.onOnlyWithPermissionsChanged}
+                hideEmptyResourceGroups={filterProps.hideEmptyResourceGroups}
+                onHideEmptyResourceGroupsChanged={filterProps.onHideEmptyResourceGroupsChanged}
+              >
+                {({ onOpen }) => (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    startContent={<ListFilterIcon size={18} className={cn(highlightFilter && 'animate-pulse')} />}
+                    isIconOnly
+                    onPress={onOpen}
+                  />
+                )}
+              </ResourceFilter>
+              <SearchIcon size={18} />
+              <Input placeholder={t('searchPlaceholder')} data-cy="resource-search-input" />
+            </InputGroup>
+          </TextField>
         </div>
 
         <ResourceScanner>

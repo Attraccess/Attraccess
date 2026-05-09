@@ -6,7 +6,10 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
+  TextField,
+  Label,
   Input,
+  FieldError,
   Radio,
   RadioGroup,
   Spinner,
@@ -266,16 +269,17 @@ function DocumentationEditorComponent() {
           )}
 
           {documentationType === DocumentationType.URL && (
-            <Input
-              label={t('urlContent.label')}
-              placeholder={t('urlContent.placeholder')}
+            <TextField
               value={urlContent}
-              onChange={(e) => setUrlContent(e.target.value)}
+              onChange={setUrlContent}
               isInvalid={!!validationErrors.url}
-              errorMessage={validationErrors.url}
               isDisabled={updateResource.isPending}
               data-cy="documentation-editor-url-input"
-            />
+            >
+              <Label>{t('urlContent.label')}</Label>
+              <Input placeholder={t('urlContent.placeholder')} />
+              {validationErrors.url && <FieldError>{validationErrors.url}</FieldError>}
+            </TextField>
           )}
         </CardContent>
         <CardFooter>

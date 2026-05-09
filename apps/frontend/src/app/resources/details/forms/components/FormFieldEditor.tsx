@@ -1,4 +1,4 @@
-import { Button, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
+import { Button, TextField, Label, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -36,14 +36,10 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
   return (
     <div className="space-y-4 py-2">
       <div className="grid gap-4 md:grid-cols-2">
-        <Input
-          label={t('fields.label')}
-          placeholder={t('fields.placeholder.label')}
-          value={field.name}
-          onChange={(event) => onChange({ ...field, name: event.target.value })}
-          isRequired
-          ref={labelInputRef as React.Ref<HTMLInputElement> | undefined}
-        />
+        <TextField isRequired value={field.name} onChange={(v) => onChange({ ...field, name: v })}>
+          <Label>{t('fields.label')}</Label>
+          <Input placeholder={t('fields.placeholder.label')} ref={labelInputRef as React.Ref<HTMLInputElement> | undefined} />
+        </TextField>
 
         <Select
           label={t('fields.type')}

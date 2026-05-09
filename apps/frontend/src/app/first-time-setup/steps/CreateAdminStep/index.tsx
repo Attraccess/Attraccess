@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button, Form, Input } from '@heroui/react';
+import { Button, Form, TextField, Label, Input } from '@heroui/react';
 import { UserPlusIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -141,13 +141,10 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
           onValueChange={setUsername}
           isRequired
         />
-        <Input
-          label={t('email')}
-          type="email"
-          value={email}
-          onValueChange={setEmail}
-          isRequired
-        />
+        <TextField value={email} onChange={setEmail} isRequired>
+          <Label>{t('email')}</Label>
+          <Input type="email" />
+        </TextField>
         <PasswordInput
           label={t('password')}
           value={password ?? ''}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardContent, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
+import { Card, CardHeader, CardContent, TextField, Label, Input, Textarea, Button, Spinner, CardProps } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
   useResourcesServiceResourceGroupsGetOne,
@@ -131,13 +131,10 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<Ca
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <Input
-            label={t('form.fields.name.label')}
-            placeholder={t('form.fields.name.placeholder')}
-            value={name}
-            onValueChange={setName}
-            isRequired
-          />
+          <TextField value={name} onChange={setName} isRequired>
+            <Label>{t('form.fields.name.label')}</Label>
+            <Input placeholder={t('form.fields.name.placeholder')} />
+          </TextField>
 
           <Textarea
             label={t('form.fields.description.label')}

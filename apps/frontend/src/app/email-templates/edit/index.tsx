@@ -6,7 +6,7 @@ import {
   useEmailTemplatesServiceEmailTemplateControllerPreviewMjml,
   EmailTemplateType,
 } from '@attraccess/react-query-client';
-import { Button, Card, CardContent, CardHeader, Input, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Link } from '@heroui/react';
+import { Button, Card, CardContent, CardHeader, TextField, Label, Input, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Link } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../../components/pageHeader';
 import Editor from '@monaco-editor/react';
@@ -90,7 +90,10 @@ export function EditEmailTemplatePage() {
   const editor = useMemo(() => {
     return (
       <>
-        <Input label={t('form.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} />
+        <TextField value={subject} onChange={setSubject}>
+          <Label>{t('form.subject')}</Label>
+          <Input />
+        </TextField>
         <Editor
           theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
           defaultLanguage="mjml"

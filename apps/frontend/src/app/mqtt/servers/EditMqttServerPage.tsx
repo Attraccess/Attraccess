@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, CardHeader, Input, Checkbox, ListBoxItem, Spinner, Switch, Select } from "@heroui/react";
+import { Button, Card, CardHeader, TextField, Label, Input, Checkbox, ListBoxItem, Spinner, Switch, Select } from "@heroui/react";
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -79,15 +79,6 @@ export function EditMqttServerPage() {
     },
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    const newValue = type === 'checkbox' ? checked : type === 'number' ? parseInt(value, 10) : value;
-
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: newValue,
-    }));
-  };
 
   const qosOptions = [0, 1, 2] as const;
 
@@ -138,100 +129,42 @@ export function EditMqttServerPage() {
         <div style={{ padding: '1rem' }}>
           <form onSubmit={handleSubmit} className="space-y-6" data-cy="edit-mqtt-server-form">
             <div className="space-y-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium mb-1">
-                  {t('nameLabel')}
-                </label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder={t('namePlaceholder')}
-                  value={formValues.name}
-                  onChange={handleInputChange}
-                  required
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-name-input"
-                />
-              </div>
+              <TextField value={formValues.name} onChange={(v) => setFormValues((p) => ({ ...p, name: v }))}>
+                <Label>{t('nameLabel')}</Label>
+                <Input id="name" name="name" placeholder={t('namePlaceholder')} required data-cy="edit-mqtt-server-form-name-input" />
+              </TextField>
 
-              <div>
-                <label htmlFor="host" className="block text-sm font-medium mb-1">
-                  {t('hostLabel')}
-                </label>
-                <Input
-                  id="host"
-                  name="host"
-                  placeholder={t('hostPlaceholder')}
-                  value={formValues.host}
-                  onChange={handleInputChange}
-                  required
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-host-input"
-                />
-              </div>
+              <TextField value={formValues.host} onChange={(v) => setFormValues((p) => ({ ...p, host: v }))}>
+                <Label>{t('hostLabel')}</Label>
+                <Input id="host" name="host" placeholder={t('hostPlaceholder')} required data-cy="edit-mqtt-server-form-host-input" />
+              </TextField>
 
-              <div>
-                <label htmlFor="port" className="block text-sm font-medium mb-1">
-                  {t('portLabel')}
-                </label>
-                <Input
-                  id="port"
-                  name="port"
-                  type="number"
-                  placeholder={t('portPlaceholder')}
-                  value={String(formValues.port || 1883)}
-                  onChange={handleInputChange}
-                  required
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-port-input"
-                />
-              </div>
+              <TextField value={String(formValues.port || 1883)} onChange={(v) => setFormValues((p) => ({ ...p, port: parseInt(v, 10) }))}>
+                <Label>{t('portLabel')}</Label>
+                <Input id="port" name="port" type="number" placeholder={t('portPlaceholder')} required data-cy="edit-mqtt-server-form-port-input" />
+              </TextField>
 
-              <div>
-                <label htmlFor="clientId" className="block text-sm font-medium mb-1">
-                  {t('clientIdLabel')}
-                </label>
-                <Input
-                  id="clientId"
-                  name="clientId"
-                  placeholder={t('clientIdPlaceholder')}
-                  value={formValues.clientId}
-                  onChange={handleInputChange}
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-client-id-input"
-                />
-              </div>
+              <TextField value={formValues.clientId} onChange={(v) => setFormValues((p) => ({ ...p, clientId: v }))}>
+                <Label>{t('clientIdLabel')}</Label>
+                <Input id="clientId" name="clientId" placeholder={t('clientIdPlaceholder')} data-cy="edit-mqtt-server-form-client-id-input" />
+              </TextField>
 
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium mb-1">
-                  {t('usernameLabel')}
-                </label>
-                <Input
-                  id="username"
-                  name="username"
-                  placeholder={t('usernamePlaceholder')}
-                  value={formValues.username}
-                  onChange={handleInputChange}
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-username-input"
-                />
-              </div>
+              <TextField value={formValues.username} onChange={(v) => setFormValues((p) => ({ ...p, username: v }))}>
+                <Label>{t('usernameLabel')}</Label>
+                <Input id="username" name="username" placeholder={t('usernamePlaceholder')} data-cy="edit-mqtt-server-form-username-input" />
+              </TextField>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium mb-1">
-                  {t('passwordLabel')}
-                </label>
-                <PasswordInput
-                  id="password"
-                  name="password"
-                  placeholder={t('passwordPlaceholder')}
-                  value={formValues.password}
-                  onChange={handleInputChange}
-                  fullWidth
-                  data-cy="edit-mqtt-server-form-password-input"
-                  autoComplete="off"
-                />
-              </div>
+              <PasswordInput
+                label={t('passwordLabel')}
+                id="password"
+                name="password"
+                placeholder={t('passwordPlaceholder')}
+                value={formValues.password}
+                onChange={(v: string) => setFormValues((p) => ({ ...p, password: v }))}
+                fullWidth
+                data-cy="edit-mqtt-server-form-password-input"
+                autoComplete="off"
+              />
 
               <div className="flex items-center space-x-2">
                 <Checkbox

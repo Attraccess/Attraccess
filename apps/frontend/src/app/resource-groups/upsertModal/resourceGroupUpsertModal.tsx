@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Button, Form, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
+import { Button, Form, TextField, Label, Input, FieldError, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
@@ -181,26 +181,27 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
                 </ModalHeader>
 
                 <ModalBody className="w-full space-y-4">
-                  <Input
-                    ref={nameInputRef}
+                  <TextField
                     isRequired
-                    label={t('nameLabel')}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     isInvalid={!!getFieldError('name')}
-                    errorMessage={getFieldError('name')}
-                    onKeyDown={() => setApiErrors((prev) => ({ ...prev, name: undefined }))}
+                    value={formData.name}
+                    onChange={(v) => { setFormData({ ...formData, name: v }); setApiErrors((prev) => ({ ...prev, name: undefined })); }}
                     data-cy="resource-group-name-input"
-                  />
-                  <Input
-                    label={t('descriptionLabel')}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  >
+                    <Label>{t('nameLabel')}</Label>
+                    <Input ref={nameInputRef} />
+                    {getFieldError('name') && <FieldError>{getFieldError('name')}</FieldError>}
+                  </TextField>
+                  <TextField
                     isInvalid={!!getFieldError('description')}
-                    errorMessage={getFieldError('description')}
-                    onKeyDown={() => setApiErrors((prev) => ({ ...prev, description: undefined }))}
+                    value={formData.description}
+                    onChange={(v) => { setFormData({ ...formData, description: v }); setApiErrors((prev) => ({ ...prev, description: undefined })); }}
                     data-cy="resource-group-description-input"
-                  />
+                  >
+                    <Label>{t('descriptionLabel')}</Label>
+                    <Input />
+                    {getFieldError('description') && <FieldError>{getFieldError('description')}</FieldError>}
+                  </TextField>
                 </ModalBody>
 
                 <ModalFooter>

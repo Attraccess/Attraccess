@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, Input, Skeleton } from '@heroui/react';
+import { Accordion, AccordionItem, TextField, Label, Input, Description, Skeleton } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -133,17 +133,10 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
-      <Input
-        id="username"
-        name="username"
-        type="text"
-        label={t('username')}
-
-        required
-        isDisabled={isPending}
-        data-cy="login-form-username-input"
-        autoComplete="username"
-      />
+      <TextField isDisabled={isPending}>
+        <Label>{t('username')}</Label>
+        <Input id="username" name="username" type="text" required autoComplete="username" data-cy="login-form-username-input" />
+      </TextField>
       <PasswordInput
         id="password"
         name="password"
@@ -153,19 +146,11 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      <Input
-        id="twoFactorCode"
-        name="twoFactorCode"
-        type="text"
-        label={t('twoFactorCode')}
-        description={t('twoFactorHelper')}
-        variant="underlined"
-        isDisabled={isPending}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        data-cy="login-form-two-factor-input"
-      />
+      <TextField isDisabled={isPending}>
+        <Label>{t('twoFactorCode')}</Label>
+        <Input id="twoFactorCode" name="twoFactorCode" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} data-cy="login-form-two-factor-input" />
+        <Description>{t('twoFactorHelper')}</Description>
+      </TextField>
       <div className="flex items-center justify-between">
         <Button variant="secondary"
           onPress={onForgotPassword}
