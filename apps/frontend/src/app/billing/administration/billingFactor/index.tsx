@@ -1,9 +1,8 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NumberInput } from "../../../../utils/heroui-compat";
-import { Button, Card, CardContent, CardFooter, CardHeader, CardProps } from "@heroui/react";
+import { Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { HandCoinsIcon, PercentIcon } from 'lucide-react';
+import { HandCoinsIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
@@ -79,13 +78,18 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        <NumberInput
-          label={t('inputs.amount')}
+        <NumberField
+          aria-label={t('inputs.amount')}
           value={value}
-          onValueChange={setValue}
+          onChange={setValue}
           minValue={0}
-          endContent={<PercentIcon />}
-        />
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
       </CardContent>
 
       <CardFooter>

@@ -1,6 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { SelectItem } from "../../../utils/heroui-compat";
-import { Button, Card, CardHeader, Input, Checkbox, Spinner, Switch, Select } from "@heroui/react";
+import { Button, Card, CardHeader, Input, Checkbox, ListBoxItem, Spinner, Switch, Select } from "@heroui/react";
 import { ArrowLeft } from 'lucide-react';
 import { PasswordInput } from '../../../components/PasswordInput';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -261,7 +260,7 @@ export function EditMqttServerPage() {
                   data-cy="edit-mqtt-server-form-default-publish-qos-input"
                 >
                   {qosOptions.map((option) => (
-                    <SelectItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
+                    <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
                   ))}
                 </Select>
               </div>
@@ -291,7 +290,7 @@ export function EditMqttServerPage() {
                   data-cy="edit-mqtt-server-form-default-subscribe-qos-input"
                 >
                   {qosOptions.map((option) => (
-                    <SelectItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</SelectItem>
+                    <ListBoxItem key={String(option)} id={String(option)}>{t(`qosOption.${option}`)}</ListBoxItem>
                   ))}
                 </Select>
               </div>

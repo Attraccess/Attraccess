@@ -1,5 +1,4 @@
-import { Button, Input, Select, Switch, Textarea } from "@heroui/react";
-import { SelectItem } from "../../../../../utils/heroui-compat";
+import { Button, Input, ListBoxItem, Select, Switch, Textarea } from "@heroui/react";
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -55,7 +54,7 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
           }}
         >
           {FIELD_TYPE_OPTIONS.map((option) => (
-            <SelectItem key={option.value} id={option.value}>{t(option.labelKey)}</SelectItem>
+            <ListBoxItem key={option.value} id={option.value}>{t(option.labelKey)}</ListBoxItem>
           ))}
         </Select>
       </div>

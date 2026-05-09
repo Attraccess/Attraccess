@@ -1,9 +1,14 @@
-import { CircularProgress } from "../utils/heroui-compat";
+import { ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 
 export const TableDataLoadingIndicator = () => {
   return (
     <div className="flex justify-center items-center p-4">
-      <CircularProgress isIndeterminate aria-label="Loading table data" />
+      <ProgressCircle isIndeterminate aria-label="Loading table data">
+        <ProgressCircleTrack>
+          <ProgressCircleTrackCircle />
+          <ProgressCircleFillCircle />
+        </ProgressCircleTrack>
+      </ProgressCircle>
     </div>
   );
 };

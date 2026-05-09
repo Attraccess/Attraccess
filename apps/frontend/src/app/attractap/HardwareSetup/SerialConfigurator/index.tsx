@@ -1,5 +1,4 @@
-import { Alert, Button } from "@heroui/react";
-import { CircularProgress } from "../../../../utils/heroui-compat";
+import { Alert, Button, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ESPTools, ESPToolsResult } from '../../../../utils/esp-tools';
@@ -99,7 +98,12 @@ export function AttractapSerialConfigurator(props: Props) {
   if (state === 'connecting') {
     return (
       <div className="flex flex-col items-center justify-center gap-4">
-        <CircularProgress isIndeterminate label={t('connecting.progress.label')} />
+        <ProgressCircle isIndeterminate aria-label={t('connecting.progress.label')}>
+        <ProgressCircleTrack>
+          <ProgressCircleTrackCircle />
+          <ProgressCircleFillCircle />
+        </ProgressCircleTrack>
+      </ProgressCircle>
       </div>
     );
   }

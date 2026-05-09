@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardProps, Table, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton } from "@heroui/react";
-import { NumberInput } from "../../../../utils/heroui-compat";
+import { Card, CardContent, CardHeader, CardProps, Table, TableHeader, TableBody, TableRow, TableCell, TableColumn, Button, cn, Skeleton, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -187,14 +186,19 @@ export function ResourceBillingInfo(props: Props & Omit<CardProps, 'children'>) 
             }
             <TableRow className="border-t border-b-4 border-divider">
               <TableCell>
-                <NumberInput
-                  size="sm"
+                <NumberField
+                  aria-label={t('example.label', { minutes: exampleMinutes })}
                   value={exampleMinutes}
-                  onValueChange={(value) => setExampleMinutes(value)}
-                  label={t('example.label', { minutes: exampleMinutes })}
+                  onChange={(value) => setExampleMinutes(value)}
                   minValue={0}
                   defaultValue={10}
-                />
+                >
+                  <NumberFieldGroup>
+                    <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                    <NumberFieldInput />
+                    <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                  </NumberFieldGroup>
+                </NumberField>
               </TableCell>
               <TableCell>
                 {t('billingValue', {

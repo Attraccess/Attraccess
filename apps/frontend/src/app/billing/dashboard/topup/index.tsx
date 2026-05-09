@@ -1,8 +1,7 @@
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NumberInput } from "../../../../utils/heroui-compat";
 import en from './en.json';
 import de from './de.json';
-import { Alert, Button, Card, CardContent, CardFooter, CardHeader, CardProps, Spinner, cn, Form } from "@heroui/react";
+import { Alert, Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Spinner, cn, Form } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {
@@ -182,13 +181,18 @@ export function BillingDashboardTopupCard(props: Props) {
             />
           )}
 
-          <NumberInput
-            label={t('inputs.amount.label')}
-            description={t('inputs.amount.description')}
+          <NumberField
+            aria-label={t('inputs.amount.label')}
             value={amount}
-            onValueChange={(value) => setAmount(value)}
+            onChange={(value) => setAmount(value)}
             minValue={1}
-          />
+          >
+            <NumberFieldGroup>
+              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+              <NumberFieldInput />
+              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+            </NumberFieldGroup>
+          </NumberField>
           <input type="submit" hidden />
         </Form>
 

@@ -1,7 +1,5 @@
 import { ResourceFlowNodeDto, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
-import { AutocompleteItem } from "../../../../../../../utils/heroui-compat";
-import { NumberInput } from "../../../../../../../utils/heroui-compat";
-import { Autocomplete, Button, Card, CardContent, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Switch, Textarea } from "@heroui/react";
+import { Autocomplete, Button, Card, CardContent, Input, ListBoxItem, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Switch, Textarea } from "@heroui/react";
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
@@ -155,9 +153,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             description={description}
           >
             {schema.enum.map((enumValue) => (
-              <AutocompleteItem key={enumValue} id={enumValue}>
+              <ListBoxItem key={enumValue} id={enumValue}>
                 {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </AutocompleteItem>
+              </ListBoxItem>
             ))}
           </Autocomplete>
         );
@@ -213,25 +211,30 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             description={description}
           >
             {enumValues.map((enumValue) => (
-              <AutocompleteItem key={String(enumValue)} id={String(enumValue)}>
+              <ListBoxItem key={String(enumValue)} id={String(enumValue)}>
                 {t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue)}
-              </AutocompleteItem>
+              </ListBoxItem>
             ))}
           </Autocomplete>
         );
       }
 
       return (
-        <NumberInput
+        <NumberField
           isRequired={isRequired}
-          label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+          aria-label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : t('nodes.' + nodeType + '.config.' + name + '.label')}
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
-          onValueChange={(newValue) => setValue(newValue as TValue)}
+          onChange={(newValue) => setValue(newValue as TValue)}
           minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
           maxValue={schema.maximum}
-          description={description}
-        />
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
       );
     }
 

@@ -1,7 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { AutocompleteItem } from "../../../../../utils/heroui-compat";
-import { CircularProgress, Progress } from "../../../../../utils/heroui-compat";
-import { Alert, Autocomplete, Button, cn } from "@heroui/react";
+import { Alert, Autocomplete, Button, cn, ListBoxItem, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -63,7 +61,14 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
             <Button size="sm" onPress={handleRefresh} isLoading={isFetchingConfiguration}>
               {t('actions.refreshWifi')}
             </Button>
-            {isFetchingConfiguration && <CircularProgress size="sm" isIndeterminate />}
+            {isFetchingConfiguration && (
+              <ProgressCircle isIndeterminate>
+                <ProgressCircleTrack>
+                  <ProgressCircleTrackCircle />
+                  <ProgressCircleFillCircle />
+                </ProgressCircleTrack>
+              </ProgressCircle>
+            )}
           </div>
         }
       />
@@ -73,7 +78,13 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
           {t('wifi.connected.description', { ssid: status.wifi_ssid, ip: status.wifi_ip })}
         </Alert>
       )}
-      {isWifiConnecting && <Progress isIndeterminate label={t('wifi.connecting.label', { ssid: selectedWifiSSID })} />}
+      {isWifiConnecting && (
+        <ProgressBar isIndeterminate aria-label={t('wifi.connecting.label', { ssid: selectedWifiSSID })}>
+          <ProgressBarTrack>
+            <ProgressBarFill />
+          </ProgressBarTrack>
+        </ProgressBar>
+      )}
       {status && !status.wifi_connected && !isWifiConnecting && (
         <Alert color="danger" title={t('wifi.disconnected.title')}>
           {t('wifi.disconnected.description', { ssid: status.wifi_ssid ?? '' })}
@@ -98,7 +109,7 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         isLoading={isFetchingConfiguration}
         inputValue={selectedWifiSSID ?? ''}
       >
-        {(item) => <AutocompleteItem key={item.key} id={item.key}>{item.label}</AutocompleteItem>}
+        {(item) => <ListBoxItem key={item.key} id={item.key}>{item.label}</ListBoxItem>}
       </Autocomplete>
       <PasswordInput
         label={t('password.label')}

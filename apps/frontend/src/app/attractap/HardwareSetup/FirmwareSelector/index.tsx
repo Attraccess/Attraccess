@@ -1,6 +1,5 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { CircularProgress } from "../../../../utils/heroui-compat";
-import { Card, CardContent, CardHeader, Chip } from "@heroui/react";
+import { Card, CardContent, CardHeader, Chip, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
 import { PageHeader } from '../../../../components/pageHeader';
 
 interface Props {
@@ -12,7 +11,14 @@ export function FirmwareSelector(props: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {isLoading && <CircularProgress isIndeterminate />}
+      {isLoading && (
+        <ProgressCircle isIndeterminate>
+          <ProgressCircleTrack>
+            <ProgressCircleTrackCircle />
+            <ProgressCircleFillCircle />
+          </ProgressCircleTrack>
+        </ProgressCircle>
+      )}
       {firmwares?.map((firmware) => (
         <Card onPress={() => props.onSelect(firmware)} isPressable key={`${firmware.name}-${firmware.variant}`}>
           <CardHeader>
