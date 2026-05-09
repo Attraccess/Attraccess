@@ -1,6 +1,6 @@
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Tooltip, Alert } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Card, CardContent, CardHeader, Chip, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Tooltip } from '@heroui/react';
 import { Trash2, Upload } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UploadPluginModal } from './UploadPluginModal';
@@ -69,8 +69,10 @@ export function PluginsList() {
 
   return (
     <>
-      <Alert color="danger" className="mb-4" data-cy="plugins-list-work-in-progress-alert">
-        {t('workInProgressAlert')}
+      <Alert status="danger" className="mb-4" data-cy="plugins-list-work-in-progress-alert">
+        <AlertContent>
+          <AlertDescription>{t('workInProgressAlert')}</AlertDescription>
+        </AlertContent>
       </Alert>
       <Card className="w-full" data-cy="plugins-list-card">
         <CardHeader className="flex justify-between items-center">

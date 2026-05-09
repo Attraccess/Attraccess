@@ -1,4 +1,4 @@
-import { Alert, Button } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
 import { AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,
@@ -63,13 +63,13 @@ export function ResourceHealthWarning({ resourceId }: Props) {
             : t('alert.identifier.default');
 
         return (
-          <Alert
+          <Alert status="danger"
             key={entry.id}
-            color="danger"
-            title={t('alert.title')}
-            icon={<AlertTriangleIcon />}
-            description={t('alert.description')}
           >
+            <AlertContent>
+              <AlertTitle>{t('alert.title')}</AlertTitle>
+              <AlertDescription>{t('alert.description')}</AlertDescription>
+            </AlertContent>
             <div className="flex flex-col gap-1 mt-2 text-sm">
               <div>
                 <span className="text-gray-500 mr-1">{t('alert.identifier.label')}:</span>

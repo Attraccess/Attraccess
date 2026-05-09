@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, TextField, Label, Input, Description, Skeleton } from '@heroui/react';
+import { Accordion, AccordionItem, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Skeleton, TextField } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { Alert } from '@heroui/react';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -172,7 +172,12 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       </Button>
 
       {errorTitle && (
-        <Alert color="danger" title={errorTitle} description={errorDescription} data-cy="login-form-error-alert" />
+        <Alert status="danger" data-cy="login-form-error-alert" >
+          <AlertContent>
+            <AlertTitle>{errorTitle}</AlertTitle>
+            <AlertDescription>{errorDescription}</AlertDescription>
+          </AlertContent>
+        </Alert>
       )}
     </form>
   );

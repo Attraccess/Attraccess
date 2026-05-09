@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -184,7 +184,10 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
   if (isLoading || isFetching) {
     return (
       <div className="mb-4">
-        <Alert color="secondary" title={t('loadingTitle')}>
+        <Alert status="default">
+          <AlertContent>
+            <AlertTitle>{t('loadingTitle')}</AlertTitle>
+          </AlertContent>
           <div className="flex items-center gap-2">
             <Spinner size="sm" />
             <span>{t('loadingDescription')}</span>
@@ -202,7 +205,10 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
 
   return (
     <div className="mb-4">
-      <Alert color="warning" title={t('title', { count: activeCount })}>
+      <Alert status="warning">
+        <AlertContent>
+          <AlertTitle>{t('title', { count: activeCount })}</AlertTitle>
+        </AlertContent>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
           <div className="flex flex-1">{t('description', { count: activeCount })}</div>
           <div className="flex flex-shrink gap-2">
@@ -247,12 +253,12 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                   <div className="space-y-2">
                     <div className="text-sm text-default-500">{t('modal.description')}</div>
                     {successfulResources.length > 0 && (
-                      <Alert
-                        color="success"
-                        variant="flat"
-                        title={t('modal.successListTitle', { count: successfulResources.length })}
+                      <Alert status="success"
                         className="text-sm"
                       >
+                        <AlertContent>
+                          <AlertTitle>{t('modal.successListTitle', { count: successfulResources.length })}</AlertTitle>
+                        </AlertContent>
                         <div className="text-xs text-success-600">
                           {successfulResources.map((r) => r.name).join(', ')}
                         </div>
@@ -271,7 +277,10 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
                               <span>{r.name}</span>
                             </div>
                             {status === 'error' && errorInfo && (
-                              <Alert color="danger" variant="flat" title={errorInfo.title} className="text-sm">
+                              <Alert status="danger" className="text-sm">
+                                <AlertContent>
+                                  <AlertTitle>{errorInfo.title}</AlertTitle>
+                                </AlertContent>
                                 <div className="text-xs text-danger-500">{errorInfo.description}</div>
                               </Alert>
                             )}

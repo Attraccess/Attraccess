@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Autocomplete, Button, cn, ListBoxItem, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Alert, AlertContent, AlertTitle, Autocomplete, Button, ListBoxItem, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, cn } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { PasswordInput } from '../../../../../components/PasswordInput';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -74,7 +74,10 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
       />
 
       {status?.wifi_connected && (
-        <Alert color="success" title={t('wifi.connected.title')}>
+        <Alert status="success">
+          <AlertContent>
+            <AlertTitle>{t('wifi.connected.title')}</AlertTitle>
+          </AlertContent>
           {t('wifi.connected.description', { ssid: status.wifi_ssid, ip: status.wifi_ip })}
         </Alert>
       )}
@@ -86,17 +89,27 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         </ProgressBar>
       )}
       {status && !status.wifi_connected && !isWifiConnecting && (
-        <Alert color="danger" title={t('wifi.disconnected.title')}>
+        <Alert status="danger">
+          <AlertContent>
+            <AlertTitle>{t('wifi.disconnected.title')}</AlertTitle>
+          </AlertContent>
           {t('wifi.disconnected.description', { ssid: status.wifi_ssid ?? '' })}
         </Alert>
       )}
 
       {status?.ethernet_connected ? (
-        <Alert color="success" title={t('ethernet.connected.title')}>
+        <Alert status="success">
+          <AlertContent>
+            <AlertTitle>{t('ethernet.connected.title')}</AlertTitle>
+          </AlertContent>
           {t('ethernet.connected.description', { ip: status.ethernet_ip })}
         </Alert>
       ) : (
-        <Alert color="warning" title={t('ethernet.disconnected.title')} />
+        <Alert status="warning" >
+          <AlertContent>
+            <AlertTitle>{t('ethernet.disconnected.title')}</AlertTitle>
+          </AlertContent>
+        </Alert>
       )}
 
       <Autocomplete

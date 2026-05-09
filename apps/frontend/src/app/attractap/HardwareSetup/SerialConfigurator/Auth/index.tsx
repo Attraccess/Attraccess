@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, TextField, Label, Input, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Alert, AlertContent, AlertDescription, Button, Input, Label, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle, TextField } from '@heroui/react';
 import {
   createContext,
   useCallback,
@@ -253,7 +253,11 @@ export function AttractapSerialCommGate({ children }: PropsWithChildren) {
           <Label>{t('fields.pin')}</Label>
           <Input maxLength={4} inputMode="numeric" required />
         </TextField>
-        {error && <Alert color="danger">{error}</Alert>}
+        {error && <Alert status="danger">
+          <AlertContent>
+            <AlertDescription>{error}</AlertDescription>
+          </AlertContent>
+        </Alert>}
         <Button variant="primary" type="submit" isPending={isSubmitting}>
           {t('enterPin.submit')}
         </Button>

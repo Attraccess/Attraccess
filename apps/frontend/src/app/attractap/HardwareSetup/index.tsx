@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 import { FirmwareSelector } from './FirmwareSelector';
 import { FirmwareFlasher } from './FirmwareFlasher';
@@ -54,7 +54,11 @@ function Content(props: ContentProps) {
   if (!isConnected) {
     return (
       <div className="flex flex-col gap-4">
-        <Alert color="primary">{t('connect.description')}</Alert>
+        <Alert status="default">
+          <AlertContent>
+            <AlertDescription>{t('connect.description')}</AlertDescription>
+          </AlertContent>
+        </Alert>
 
         <Button variant="primary" onPress={() => espTools.current.connectToDevice()} fullWidth>
           {t('connect.button.label')}
@@ -66,7 +70,11 @@ function Content(props: ContentProps) {
   if (state === 'init') {
     return (
       <>
-        <Alert color="primary">{t('init.description')}</Alert>
+        <Alert status="default">
+          <AlertContent>
+            <AlertDescription>{t('init.description')}</AlertDescription>
+          </AlertContent>
+        </Alert>
 
         <Button onPress={() => setState('select')}>{t('init.actions.selectFirmware')}</Button>
 

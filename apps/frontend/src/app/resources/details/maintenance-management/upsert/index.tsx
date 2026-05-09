@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Textarea, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, Button, ModalFooter, Alert, Form, DatePicker, Switch, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, DatePicker, Form, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Switch, Textarea, useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
 import { PageHeader } from '../../../../../components/pageHeader';
@@ -153,7 +153,10 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
                     </div>
 
                     {error ? (
-                      <Alert color="danger" title={t('alert.error.title')} variant="flat">
+                      <Alert status="danger">
+                        <AlertContent>
+                          <AlertTitle>{t('alert.error.title')}</AlertTitle>
+                        </AlertContent>
                         {(error as Error).message}
                       </Alert>
                     ) : null}

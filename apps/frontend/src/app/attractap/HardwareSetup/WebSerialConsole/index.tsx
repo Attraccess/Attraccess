@@ -1,4 +1,4 @@
-import { Alert, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalHeader, useOverlayState } from '@heroui/react';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { PageHeader } from '../../../../components/pageHeader';
@@ -76,7 +76,10 @@ export function WebSerialConsole({ children }: Props) {
                   )}
 
                   {error && (
-                    <Alert color="danger" title={error.type}>
+                    <Alert status="danger">
+                      <AlertContent>
+                        <AlertTitle>{error.type}</AlertTitle>
+                      </AlertContent>
                       {error.details as string}
                     </Alert>
                   )}

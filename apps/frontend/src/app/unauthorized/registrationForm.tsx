@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ArrowRight, Mail } from 'lucide-react';
-import { Alert, Button, TextField, Label, Input, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Input, Label, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, TextField, useOverlayState } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput';
@@ -235,7 +235,12 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
                 <p className="text-center text-gray-500 dark:text-gray-400">
                   {t('success.message').replace('{email}', registeredEmail)}
                 </p>
-                <Alert color="primary" variant="flat" title={t('twoFactor.title')} description={t('twoFactor.description')} />
+                <Alert status="default" >
+                  <AlertContent>
+                    <AlertTitle>{t('twoFactor.title')}</AlertTitle>
+                    <AlertDescription>{t('twoFactor.description')}</AlertDescription>
+                  </AlertContent>
+                </Alert>
               </ModalBody>
               <ModalFooter>
                 <Button variant="ghost"

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
-import { Alert, Button, Card, CardContent, CardFooter, CardHeader } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Card, CardContent, CardFooter, CardHeader } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -100,12 +100,14 @@ export function VerifyEmail() {
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </CardHeader>
           <CardContent>
-            <Alert
-              color="danger"
-              title={t('error.errorTitle')}
-              description={error}
+            <Alert status="danger"
               data-cy="verify-email-error-alert"
-            />
+            >
+              <AlertContent>
+                <AlertTitle>{t('error.errorTitle')}</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </AlertContent>
+            </Alert>
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Button variant="primary"

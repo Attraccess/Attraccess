@@ -1,7 +1,7 @@
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { Alert, Button, Card, CardContent, CardFooter, CardHeader, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Spinner, cn, Form } from "@heroui/react";
+import { Alert, AlertContent, AlertTitle, Button, Card, CardContent, CardFooter, CardHeader, CardProps, Form, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Spinner, cn } from '@heroui/react';
 import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import {
@@ -135,11 +135,11 @@ export function BillingDashboardTopupCard(props: Props) {
           <PageHeader title={title ?? t('title')} subtitle={subtitle ?? t('subtitle')} icon={<SumUpIcon />} noMargin />
         </CardHeader>
         <CardContent>
-          <Alert
-            color={isSumUpConfigurationError ? 'danger' : 'warning'}
-            variant="flat"
-            title={t('unavailable.title')}
+          <Alert status={isSumUpConfigurationError ? 'danger' : 'warning'}
           >
+            <AlertContent>
+              <AlertTitle>{t('unavailable.title')}</AlertTitle>
+            </AlertContent>
             <p className="text-sm">{t('unavailable.description')}</p>
           </Alert>
         </CardContent>
@@ -197,7 +197,10 @@ export function BillingDashboardTopupCard(props: Props) {
         </Form>
 
         <div>
-          <Alert color="warning" variant="flat" title={t('topUpInstructions.title')}>
+          <Alert status="warning">
+            <AlertContent>
+              <AlertTitle>{t('topUpInstructions.title')}</AlertTitle>
+            </AlertContent>
             <p className="max-w-[600px] text-sm whitespace-pre-wrap text-wrap">{t('topUpInstructions.description')}</p>
           </Alert>
         </div>

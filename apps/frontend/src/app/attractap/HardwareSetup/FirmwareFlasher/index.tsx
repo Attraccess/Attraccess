@@ -1,6 +1,6 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, Alert, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import { Accordion, AccordionItem, Alert, AlertContent, AlertTitle, Button, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -120,7 +120,10 @@ export function FirmwareFlasher(props: Props) {
   return (
     <div className="space-y-4">
       {flashError && (
-        <Alert title={t('errors.' + flashError.type)} color="danger" className="flex-row flex-wrap flex-gap-2">
+        <Alert status="danger" className="flex-row flex-wrap flex-gap-2">
+          <AlertContent>
+            <AlertTitle>{t('errors.' + flashError.type)}</AlertTitle>
+          </AlertContent>
           <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
           <Button variant="primary" size="sm" onPress={flashFirmware}>

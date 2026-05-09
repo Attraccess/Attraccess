@@ -1,4 +1,4 @@
-import { TableHeader, Table, TableBody, TableColumn, TableCell, TableRow, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Alert, cn } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, cn } from '@heroui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -287,8 +287,10 @@ export function NfcCardList() {
         }
       />
 
-      <Alert color="warning" className="mb-4">
-        {t('workInProgress')}
+      <Alert status="warning" className="mb-4">
+        <AlertContent>
+          <AlertDescription>{t('workInProgress')}</AlertDescription>
+        </AlertContent>
       </Alert>
 
       <NfcCardDeleteModal

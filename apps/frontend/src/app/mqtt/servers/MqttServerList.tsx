@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, Alert, useOverlayState } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Button, Modal, ModalBackdrop, ModalBody, ModalContainer, ModalDialog, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayState } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -108,16 +108,20 @@ export function MqttServerList() {
 
   if (error) {
     return (
-      <Alert color="danger" data-cy="mqtt-server-list-error-alert">
-        {t('errorLoading')}
+      <Alert status="danger" data-cy="mqtt-server-list-error-alert">
+        <AlertContent>
+          <AlertDescription>{t('errorLoading')}</AlertDescription>
+        </AlertContent>
       </Alert>
     );
   }
 
   if (servers.length === 0) {
     return (
-      <Alert color="warning" data-cy="mqtt-server-list-no-servers-alert">
-        {t('noServersConfigured')}
+      <Alert status="warning" data-cy="mqtt-server-list-no-servers-alert">
+        <AlertContent>
+          <AlertDescription>{t('noServersConfigured')}</AlertDescription>
+        </AlertContent>
       </Alert>
     );
   }
